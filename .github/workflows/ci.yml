@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: pytest (ubuntu, py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install -e . pytest
+      - name: Test
+        run: python -m pytest -q
+
+  test-macos:
+    # public repo only: macOS minutes bill 10x on private repos (the dev mirror)
+    if: github.repository == 'skill-labV2/Makoto'
+    name: pytest (macos, py3.13)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: python -m pip install -e . pytest
+      - name: Test
+        run: python -m pytest -q

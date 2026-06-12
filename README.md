@@ -1,5 +1,7 @@
 # Makoto
 
+[![CI](https://github.com/skill-labV2/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/skill-labV2/Makoto/actions/workflows/ci.yml)
+
 **An integrity hook for Claude Code that watches the agent's _own_ tool calls and blocks the ones
 that fake a check.** When Claude says it did something — ran the tests, cited a paper, committed the
 fix, verified the certificate — makoto holds that word against its record. If the deed isn't there,
