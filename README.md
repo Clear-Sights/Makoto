@@ -69,8 +69,8 @@ a word is real the way water is wet, a constitutive property, not an after-the-f
 
 ```bash
 # In Claude Code:
-/plugin install /Users/<you>/path/to/makoto
-# (or your git URL)
+/plugin install https://github.com/skill-labV2/makoto
+# (or a local clone path)
 ```
 
 Claude Code reads `hooks/hooks.json` and registers `PreToolUse`, `PostToolUse`, and `Stop` hooks
@@ -103,7 +103,7 @@ double-dispatch. Migrate cleanly:
 
 ```bash
 python -m makoto uninstall                   # removes old settings.json entries
-/plugin install /Users/<you>/path/to/makoto  # installs the plugin
+/plugin install https://github.com/skill-labV2/makoto  # installs the plugin
 ```
 
 ## Non-plugin install (power users)
