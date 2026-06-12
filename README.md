@@ -69,7 +69,7 @@ a word is real the way water is wet, a constitutive property, not an after-the-f
 
 ```bash
 # In Claude Code:
-/plugin install https://github.com/skill-labV2/makoto
+/plugin install https://github.com/skill-labV2/Makoto
 # (or a local clone path)
 ```
 
@@ -103,7 +103,7 @@ double-dispatch. Migrate cleanly:
 
 ```bash
 python -m makoto uninstall                   # removes old settings.json entries
-/plugin install https://github.com/skill-labV2/makoto  # installs the plugin
+/plugin install https://github.com/skill-labV2/Makoto  # installs the plugin
 ```
 
 ## Non-plugin install (power users)
