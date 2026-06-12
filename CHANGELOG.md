@@ -5,7 +5,10 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-06-12
+
 ### Changed
+- **License is now Apache-2.0** (was MIT): canonical `LICENSE` added; `plugin.json` updated.
 - **Check tiers collapsed from four to two (Pre + Stop).** The taxonomy is by trigger event, so the
   one-member close-check tier (fired on Stop) and the empty post-check tier (would fire on
   PostToolUse, never populated) were folded away. `closecheck.liveness` is now the `gate.liveness`
@@ -24,7 +27,7 @@ All notable changes to makoto. Versions follow the live check inventory
   `disabled-pattern` row too — parity with the already-audited gate switch. New
   `audit.append_exemption` / `audit.read_exemptions` (shared `_read_jsonl` with `read_rows`);
   9 behavioral pins in `tests/test_exemption_audit.py`. No new gate: check inventory unchanged
-  (18 pre / 1 close / 7 stop / 0 post); a suppressed fire still never blocks — it is just no
+  (18 pre-checks, 8 Stop gates); a suppressed fire still never blocks — it is just no
   longer silent.
 
 ## [1.3.1] — 2026-06-10
