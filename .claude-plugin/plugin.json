@@ -1,6 +1,6 @@
 {
   "name": "makoto",
-  "description": "Integrity guardrail for Claude Code agents — declarative pattern catalog + SQLite-backed event store + a two-tier predicate catalog (18 pre-checks, 8 Stop gates)",
+  "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned. Two-tier catalog (18 pre-checks, 8 Stop gates), each shipped at measured zero false positives.",
   "version": "1.4.0",
   "author": {"name": "skill-labV2"},
   "homepage": "https://github.com/skill-labV2/makoto",
