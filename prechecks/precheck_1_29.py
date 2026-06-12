@@ -1,0 +1,48 @@
+"""pattern 1.29 predicate — certificate verification disabled via verify_mode = CERT_NONE
+(active-code only).
+
+Fires when a PreToolUse Write/Edit/MultiEdit INTRODUCES, as REAL Python code, an assignment that
+turns off an SSLContext's certificate verification:
+  * ``<ctx>.verify_mode = ssl.CERT_NONE``
+  * ``<ctx>.verify_mode = CERT_NONE``        (CERT_NONE imported into scope)
+
+Materiality: ``SSLContext.verify_mode = CERT_NONE`` makes the context accept ANY peer certificate —
+the cert-identity integrity check becomes a no-op while the handshake still "succeeds". This is the
+assignment 1.26 deliberately punts: a BARE ``ssl.CERT_NONE`` is also the right-hand side of a
+legitimate COMPARISON (``if mode == ssl.CERT_NONE:``), so 1.26 does not match CERT_NONE at all. The
+ASSIGNMENT context disambiguates — you do not ``==``-compare by assigning, and assigning CERT_NONE
+to a ``verify_mode`` attribute is unambiguously disabling verification, never reading it.
+
+Active-code only (lib.factories.parse_introduced): a comment / string / docstring mentioning the shape
+never fires. A genuinely-legitimate case (a localhost test server with no CA) is annotated
+``makoto-allow: <reason>`` and stays silent.
+
+ACKNOWLEDGED FN (v1): (a) ``ctx.verify_mode = ssl.CERT_OPTIONAL`` is a WEAKER setting, not a full
+disable, and is left out of this pattern's honest scope (CERT_NONE is the unambiguous off).
+(b) routing CERT_NONE through an intermediate variable (``mode = ssl.CERT_NONE; ctx.verify_mode =
+mode``) is not a literal CERT_NONE at the assignment site -> not matched. (c) a bare local
+``verify_mode = ssl.CERT_NONE`` (Name target, not yet wired to a context attribute) is not matched.
+
+Knight-Leveson: stdlib ast/re only.
+"""
+from __future__ import annotations
+import ast
+from typing import Optional
+
+from makoto.lib.factories import ast_introduced_predicate, is_cert_none
+
+from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+
+
+def _cert_none_node_match(node: ast.AST) -> Optional[str]:
+    # `<ctx>.verify_mode = CERT_NONE` — an ATTRIBUTE-target assignment (the material disable;
+    # a bare Name target is a not-yet-applied local, an acknowledged FN).
+    if not isinstance(node, ast.Assign) or not is_cert_none(node.value):
+        return None
+    for tgt in node.targets:
+        if isinstance(tgt, ast.Attribute) and tgt.attr == "verify_mode":
+            return "verify_mode = CERT_NONE"
+    return None
+
+
+predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_cert_none_node_match)
