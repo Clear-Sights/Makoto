@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "makoto"
 version = "1.4.0"
-description = "Integrity layer for Claude Code agents — declarative pattern catalog + reader"
+description = "Integrity hook for Claude Code — holds the agent's claims against its own logged deeds and blocks faked checks; every check ships at measured zero false positives"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "skill-labV2"}]
@@ -14,7 +14,7 @@ keywords = ["claude-code", "guardrails", "integrity", "hooks"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
 ]
