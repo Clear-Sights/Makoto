@@ -1,0 +1,1020 @@
+"""end-to-end dispatcher tests for makoto/_dispatch.py (SQLite(WAL) backend)."""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+
+def _setup_state(tmp_path):
+    """create a makoto.db with the 3 tables + minimal config; return state_dir."""
+    from makoto.db import init_db
+    state_dir = tmp_path / "makoto_state"
+    citations = tmp_path / "CITATIONS.md"
+    citations.write_text("Smith 2020\n")
+    init_db(state_dir, citations)
+    return state_dir
+
+
+def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
+    """invoke `python -m makoto._dispatch` with payload on stdin; return (exit, stdout)."""
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    if extra_env:
+        env.update(extra_env)
+    proc = subprocess.run(
+        [sys.executable, "-m", "makoto._dispatch"],
+        input=json.dumps(payload).encode("utf-8"),
+        capture_output=True,
+        env=env,
+        cwd=str(Path(__file__).parent.parent),
+    )
+    return proc.returncode, proc.stdout.decode("utf-8")
+
+
+def _dispatch_facts(state_dir) -> list:
+    """read the HYBRID can't-evaluate facts (dispatch_errors.jsonl rows)."""
+    f = Path(state_dir) / "dispatch_errors.jsonl"
+    if not f.exists():
+        return []
+    return [json.loads(ln) for ln in f.read_text().splitlines() if ln.strip()]
+
+
+def test_dispatch_clean_event_exits_0_empty_stdout(tmp_path):
+    """benign PreToolUse event -> no decision JSON, exit 0, and (HYBRID FP-clean) NO dispatch.* fact:
+    a well-formed object envelope must never trip a can't-evaluate row."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "s1",
+        "cwd": "/tmp",
+        "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello"},
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert out == ""
+    assert _dispatch_facts(state_dir) == [], "happy path must write zero dispatch can't-evaluate facts"
+
+
+def test_dispatch_loose_comparator_emits_block_json(tmp_path):
+    """PreToolUse writing a verifier with .startswith( -> block JSON on stdout."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "s1",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "constitution/integrity/checks/myverifier.py",
+            "content": 'def check(x):\n    return x.startswith("ok")\n',
+        },
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0  # hook always exits 0; decision is in stdout
+    assert out, "expected block JSON on stdout"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "1.1" in decision["reason"] or "loose" in decision["reason"].lower() or "startswith" in decision["reason"]
+
+
+def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
+    """HYBRID: unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON)
+    -> loud-ALLOW (exit 0, empty stdout) AND an on-the-record fact. Never a silent fail-open."""
+    state_dir = _setup_state(tmp_path)
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    proc = subprocess.run(
+        [sys.executable, "-m", "makoto._dispatch"],
+        input=b"not json{{{",
+        capture_output=True,
+        env=env,
+        cwd=str(Path(__file__).parent.parent),
+    )
+    assert proc.returncode == 0
+    assert proc.stdout == b""
+    facts = _dispatch_facts(state_dir)
+    assert any(f.get("pattern_id") == "dispatch.unparseable_payload" for f in facts), facts
+
+
+def test_dispatch_non_object_payload_blocks_exit_2_with_fact(tmp_path):
+    """HYBRID: valid JSON that is NOT an object is tamper-shaped — a truncated pipe yields INVALID
+    json, and Claude Code's envelope is always an object, so a parseable non-object is anomalous ->
+    fail CLOSED (exit 2 + stderr reason + fact). Tested for a list, a string, and `null`."""
+    state_dir = _setup_state(tmp_path)
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    for raw in (b'["not","an","object"]', b'"a bare string"', b'null'):
+        proc = subprocess.run(
+            [sys.executable, "-m", "makoto._dispatch"],
+            input=raw, capture_output=True, env=env,
+            cwd=str(Path(__file__).parent.parent),
+        )
+        assert proc.returncode == 2, (raw, proc.returncode, proc.stderr)
+        assert b"object" in proc.stderr.lower(), (raw, proc.stderr)
+    facts = _dispatch_facts(state_dir)
+    assert any(f.get("pattern_id") == "dispatch.non_object_payload" for f in facts), facts
+
+
+def test_dispatch_db_init_failure_loud_allows_with_fact(tmp_path, monkeypatch):
+    """HYBRID infra: lazy DB init failure -> loud-ALLOW (exit 0) + fact (never crash, never silent)."""
+    import io
+    from makoto import _dispatch
+    state_dir = tmp_path / "makoto_state"
+    state_dir.mkdir(parents=True)
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
+    monkeypatch.setattr(_dispatch, "_ensure_db_initialized", lambda *a, **k: False)
+    payload = {"hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/tmp", "tool_input": {}}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    assert _dispatch.main() == 0
+    facts = _dispatch_facts(state_dir)
+    assert any(f.get("pattern_id") == "dispatch.db_init_failed" for f in facts), facts
+
+
+def test_dispatch_db_lock_loud_allows_with_fact(tmp_path, monkeypatch):
+    """HYBRID infra: write-lock not acquired -> loud-ALLOW (exit 0) + fact."""
+    import io
+    from makoto import _dispatch
+    state_dir = _setup_state(tmp_path)
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
+    monkeypatch.setattr(_dispatch, "_connect_with_retry", lambda *a, **k: None)
+    payload = {"hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/tmp", "tool_input": {}}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    assert _dispatch.main() == 0
+    facts = _dispatch_facts(state_dir)
+    assert any(f.get("pattern_id") == "dispatch.db_locked" for f in facts), facts
+
+
+def test_dispatch_body_exception_loud_allows_with_fact(tmp_path, monkeypatch):
+    """HYBRID infra: an unexpected body fault -> loud-ALLOW (exit 0, never crash to non-zero) + fact
+    (Exception, not BaseException, so Ctrl-C still propagates)."""
+    import io
+    from makoto import _dispatch
+    state_dir = _setup_state(tmp_path)
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
+    def boom(*a, **k):
+        raise RuntimeError("ingest blew up")
+    monkeypatch.setattr(_dispatch, "_ingest_event", boom)
+    payload = {"hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/tmp", "tool_input": {}}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    assert _dispatch.main() == 0
+    facts = _dispatch_facts(state_dir)
+    assert any(f.get("pattern_id") == "dispatch.exception" for f in facts), facts
+
+
+def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
+    """if makoto.db is absent, _dispatch.main() creates it on first call."""
+    state_dir = tmp_path / "makoto_state"
+    # DO NOT call init_db here — the dispatcher must create it lazily.
+    state_dir.mkdir(parents=True)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "lazy_init_test",
+        "cwd": "/tmp",
+        "tool_input": {"file_path": "/tmp/x.txt", "content": "hello"},
+    }
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    proc = subprocess.run(
+        [sys.executable, "-m", "makoto._dispatch"],
+        input=json.dumps(payload).encode("utf-8"),
+        capture_output=True,
+        env=env,
+        cwd=str(Path(__file__).parent.parent),
+    )
+    assert proc.returncode == 0
+    db_file = state_dir / "makoto.db"
+    assert db_file.is_file(), "lazy init should have created makoto.db"
+
+
+def test_connect_with_retry_fails_open_on_lock(monkeypatch):
+    """A write lock held past the busy_timeout budget must fail OPEN: _connect_with_retry
+    returns None so the caller skips evaluation and the agent's tool call proceeds.
+
+    SQLite(WAL) makes lock contention rare (concurrent readers + busy_timeout absorb
+    most of it), but the fail-open path is safety-critical — a hung lock must never
+    crash or block the hook. Tested at the unit level so it is fast and deterministic
+    rather than racing two processes for a lock.
+    """
+    import sqlite3
+    from makoto import _dispatch
+    calls = {"n": 0}
+
+    def _locked(*a, **kw):
+        calls["n"] += 1
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(sqlite3, "connect", _locked)
+    assert _dispatch._connect_with_retry(Path("/tmp/whatever.db")) is None
+    assert calls["n"] == _dispatch._LOCK_RETRY_ATTEMPTS  # retried the full budget, then gave up
+
+
+def test_connect_with_retry_reraises_non_lock_errors(monkeypatch):
+    """A non-lock OperationalError is a real bug, not contention — it must propagate,
+    never be silently swallowed as fail-open (that would mask corruption)."""
+    import sqlite3
+    from makoto import _dispatch
+
+    def _boom(*a, **kw):
+        raise sqlite3.OperationalError("no such table: events")
+
+    monkeypatch.setattr(sqlite3, "connect", _boom)
+    with pytest.raises(sqlite3.OperationalError):
+        _dispatch._connect_with_retry(Path("/tmp/whatever.db"))
+
+
+def test_dispatch_skips_audit_row_when_no_findings(tmp_path):
+    """only-fires audit policy: empty-findings hook fires do not append a row.
+
+    Pre-1.0.2: every hook fire wrote a row, even when nothing matched. Real-world
+    logs were 99%+ noise (~710/712 rows empty). The audit log's purpose is forensic
+    review of what Makoto *detected* — silent hook fires carry no signal.
+    """
+    state_dir = _setup_state(tmp_path)
+    audit_path = state_dir / "audit.jsonl"
+    pre_size = audit_path.stat().st_size if audit_path.exists() else 0
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "noise",
+        "cwd": "/tmp",
+        "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello world"},
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert out == ""
+    post_size = audit_path.stat().st_size if audit_path.exists() else 0
+    assert post_size == pre_size, (
+        f"empty-findings hook must not write an audit row; size grew {pre_size}->{post_size}"
+    )
+
+
+def test_dispatch_still_writes_audit_row_when_finding_fires(tmp_path):
+    """only-fires policy must NOT silence real fires — pattern 1.1 still records its row."""
+    state_dir = _setup_state(tmp_path)
+    audit_path = state_dir / "audit.jsonl"
+    pre_size = audit_path.stat().st_size if audit_path.exists() else 0
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "real_fire",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "/tmp/constitution/integrity/checks/test_block.py",
+            "content": 'def check(s): return s.startswith("ok")\n',
+        },
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert "block" in out, f"pattern 1.1 should still emit block JSON; got {out!r}"
+    assert audit_path.exists()
+    post_size = audit_path.stat().st_size
+    assert post_size > pre_size, "fire-row must be recorded"
+
+
+def test_dispatch_env_disable_silences_specific_pattern(tmp_path):
+    """MAKOTO_DISABLE_PATTERNS=1.1 makes pattern 1.1 a no-op for this dispatcher call.
+
+    The same payload that fires 1.1 under normal config must produce no block JSON
+    and no audit row when the env var lists 1.1. Other patterns continue normally.
+    """
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "session_id": "disable_test",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "/tmp/constitution/integrity/checks/test_block.py",
+            "content": 'def check(s): return s.startswith("ok")\n',
+        },
+    }
+    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_PATTERNS": "1.1"})
+    assert rc == 0
+    assert out == "", f"disabled pattern must not emit block JSON; got {out!r}"
+    audit_path = state_dir / "audit.jsonl"
+    if audit_path.exists():
+        rows = [json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
+        assert not any("1.1" in r.get("pattern_fires", []) for r in rows), \
+            "disabled pattern must not record a fire row"
+
+
+def test_dispatch_audit_row_records_tool_name(tmp_path):
+    """1.0.2: AuditRow.tool_name is populated from payload so fires are mineable by tool."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "session_id": "tool_name_test",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "/tmp/constitution/integrity/checks/test_block.py",
+            "content": 'def check(s): return s.startswith("ok")\n',
+        },
+    }
+    rc, _ = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert len(rows) == 1
+    assert rows[0].get("tool_name") == "Write", (
+        f"expected tool_name='Write' on fire row; got {rows[0].get('tool_name')!r}"
+    )
+    assert rows[0]["pattern_fires"] == ["1.1"]
+
+
+def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
+    """PostToolUse Write -> a `touched` ledger row (the update recorder, wired live)."""
+    import sqlite3
+    from makoto import ledger
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Write",
+        "session_id": "ledger_write",
+        "cwd": "/tmp",
+        "tool_input": {"file_path": "src/auth.py", "content": "x"},
+        "tool_response": {"filePath": "src/auth.py"},
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert out == "", "PostToolUse must never emit a decision"
+    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    try:
+        row = ledger.read_key(conn, "src/auth.py")
+    finally:
+        conn.close()
+    assert row is not None and row["kind"] == "touched", f"expected touched row; got {row!r}"
+
+
+def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
+    """PostToolUse Bash -> a `value` ledger row keyed by the path token in the command."""
+    import sqlite3
+    from makoto import ledger
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "session_id": "ledger_bash",
+        "cwd": "/tmp",
+        "tool_input": {"command": "wc -l tests/auth_test.py"},   # non-runner -> a generic value row
+        "tool_response": {"stdout": "120 tests/auth_test.py", "stderr": "", "exitCode": 0},
+    }
+    rc, _ = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    try:
+        row = ledger.read_key(conn, "tests/auth_test.py")
+    finally:
+        conn.close()
+    assert row is not None and row["kind"] == "value", f"expected value row; got {row!r}"
+    assert "120 tests/auth_test.py" in (row["value"] or "")
+
+
+def test_dispatch_completion_gate_blocks_by_default(tmp_path):
+    """2026-06-01 flip: an unbacked PRODUCTION claim (a produce verb governs an absent path)
+    BLOCKS live by default — no env var needed. This is the validated completion gate."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "gate_default",
+        "cwd": str(tmp_path),  # the cited file definitely does not exist under here
+        "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
+    }
+    rc, out = _run_dispatch(state_dir, payload)   # no env -> completion gate blocks live
+    assert rc == 0
+    assert out, "completion gate must block by default after the flip"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "src/nonexistent_zzz.py" in decision["reason"]
+
+
+def test_dispatch_green_claim_gate_blocks_after_recorded_red_run(tmp_path):
+    """end-to-end connectivity: a failing pytest recorded at PostToolUse, then a WHOLE-SUITE green
+    claim at Stop -> gate.green_claim BLOCKS live (corpus-FP=0, measured POWERED)."""
+    state_dir = _setup_state(tmp_path)
+    post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "gc",
+            "cwd": str(tmp_path),
+            "tool_input": {"command": "python -m pytest tests/ -q"},
+            "tool_response": {"stdout": "=== 2 failed, 9 passed in 3.0s ===", "stderr": "",
+                              "exitCode": 1}}
+    rc, _ = _run_dispatch(state_dir, post)              # records the red run -> kind='testrun'
+    assert rc == 0
+    stop = {"hook_event_name": "Stop", "session_id": "gc", "cwd": str(tmp_path),
+            "last_assistant_message": "Done — all tests pass now."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out, "green_claim gate must block on a green claim over a recorded red run"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "test" in decision["reason"].lower()
+
+
+def test_dispatch_green_claim_silent_after_green_run(tmp_path):
+    """control: the SAME green claim but the recorded run PASSED -> no contradiction -> no block."""
+    state_dir = _setup_state(tmp_path)
+    post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "gc2",
+            "cwd": str(tmp_path),
+            "tool_input": {"command": "python -m pytest tests/ -q"},
+            "tool_response": {"stdout": "=== 11 passed in 3.0s ===", "stderr": "", "exitCode": 0}}
+    _run_dispatch(state_dir, post)
+    stop = {"hook_event_name": "Stop", "session_id": "gc2", "cwd": str(tmp_path),
+            "last_assistant_message": "Done — all tests pass now."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out == "", "run was green -> green_claim gate must stay silent"
+
+
+def test_dispatch_completion_gate_shadow_when_disabled(tmp_path):
+    """MAKOTO_DISABLE_GATES=1 returns the completion gate to shadow: still audited, no block
+    (the escape valve if a real-session false-block ever surfaces)."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "gate_shadow",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
+    }
+    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    assert rc == 0
+    assert out == "", "disabled completion gate must not block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.completion" in r.get("pattern_fires", []) for r in rows), \
+        "the shadow gate fire must still be audited so its FP rate can be mined"
+
+
+def test_dispatch_completion_gate_silent_on_mere_path_mention(tmp_path):
+    """FP guard, end to end: a path merely REFERENCED at Stop (no production verb governing it)
+    must NOT block even with the gate live — the production-claim-binding fix."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "gate_ref",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Done reviewing. See src/nonexistent_zzz.py for the details.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)   # gate live, but no production claim
+    assert rc == 0
+    assert out == "", "a referenced (not produced) path must not false-block"
+
+
+def test_dispatch_advance_gate_blocks_by_default(tmp_path):
+    """2026-06-01 flip: the advance gate BLOCKS live by default — no env var needed. Record an
+    open commitment (Stop 1), then claim UNIVERSAL completion while it is undischarged (Stop 2):
+    the advance gate fires AND blocks. Validated FP-clean (0 fires across 1335 corpus sessions
+    after the proposal-menu / code-fence sourcing guards); the reason-bound retraction path
+    (next test) clears legitimately-dropped promises so honest re-prioritization never blocks."""
+    state_dir = _setup_state(tmp_path)
+    promise = {
+        "hook_event_name": "Stop", "session_id": "adv", "cwd": str(tmp_path),
+        "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py.",
+    }
+    advance = {
+        "hook_event_name": "Stop", "session_id": "adv", "cwd": str(tmp_path),
+        "last_assistant_message": "Everything is done — all complete.",
+    }
+    _run_dispatch(state_dir, promise)
+    rc, out = _run_dispatch(state_dir, advance)   # universal-completion claim + undischarged commitment
+    assert rc == 0
+    assert out, "advance gate must block by default after the flip"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "src/promised_zzz.py" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
+        "the advance fire must still be audited"
+
+
+def test_dispatch_advance_gate_shadow_when_disabled(tmp_path):
+    """MAKOTO_DISABLE_GATES=1 returns the advance gate to shadow: still audited, no block —
+    the single escape valve, shared with the completion gate."""
+    state_dir = _setup_state(tmp_path)
+    promise = {
+        "hook_event_name": "Stop", "session_id": "adv_off", "cwd": str(tmp_path),
+        "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py.",
+    }
+    advance = {
+        "hook_event_name": "Stop", "session_id": "adv_off", "cwd": str(tmp_path),
+        "last_assistant_message": "Everything is done — all complete.",
+    }
+    _run_dispatch(state_dir, promise, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    rc, out = _run_dispatch(state_dir, advance, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    assert rc == 0
+    assert out == "", "disabled advance gate must not block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
+        "the shadow advance fire must still be audited so its FP rate can be mined"
+
+
+def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
+    """Behavioral blocking pin for gate.dropped THROUGH the real dispatch — the falsifiability gap
+    its 3 sibling gates each closed but it landed without. A forward promise carrying identifying
+    info (a named symbol), left undischarged at turn-end (file absent, no Write recorded), BLOCKS
+    live by default. Breaking the _blocking_gate_ids() filter reddens THIS (not just the structural
+    set-equality test), proving gate.dropped actually stops the agent, not merely emits a finding."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "drop_default",
+        "cwd": str(tmp_path),  # src/gates_zzz.py does not exist here -> undischarged
+        "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)   # no env -> dropped gate blocks live
+    assert rc == 0
+    assert out, "dropped gate must block by default on an undischarged forward promise"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "validate_seal_zzz" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.dropped" in r.get("pattern_fires", []) for r in rows), \
+        "the dropped fire must still be audited"
+
+
+def test_dispatch_dropped_gate_silent_when_discharged(tmp_path):
+    """Control proving the gate DISCRIMINATES end-to-end (not fire-on-everything): the SAME forward
+    promise, but the named symbol IS present in the cited file on disk -> discharged -> no block."""
+    state_dir = _setup_state(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "gates_zzz.py").write_text("def validate_seal_zzz():\n    return True\n")
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "drop_met",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert out == "", "a discharged promise (symbol present on disk) must not block"
+
+
+def test_dispatch_dropped_gate_shadow_when_disabled(tmp_path):
+    """MAKOTO_DISABLE_GATES=1 returns the dropped gate to shadow: still audited, no block — the
+    same single escape valve the other three blocking gates share."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "drop_off",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
+    }
+    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    assert rc == 0
+    assert out == "", "disabled dropped gate must not block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.dropped" in r.get("pattern_fires", []) for r in rows), \
+        "the shadow dropped fire must still be audited so its FP rate can be mined"
+
+
+def test_dispatch_liveness_gate_blocks_on_illusory_code(tmp_path):
+    """Behavioral blocking pin for the liveness gate THROUGH the real dispatch. A .py file
+    touched this turn (recorded via a PostToolUse Write -> ledger touched-key) and present on disk
+    with a dead pure statement (a value computed and never reaching I/O) BLOCKS at Stop by default.
+    Breaking the _blocking_gate_ids() filter reddens THIS, proving the gate actually stops the
+    agent end-to-end, not merely emits a finding."""
+    state_dir = _setup_state(tmp_path)
+    (tmp_path / "dead.py").write_text("def fn():\n d = 1 + 1\n return 0\n")   # on disk for fs_read
+    write_ev = {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Write",
+        "session_id": "live_block",
+        "cwd": str(tmp_path),
+        "tool_input": {"file_path": "dead.py", "content": "def fn():\n d = 1 + 1\n return 0\n"},
+        "tool_response": {"filePath": "dead.py"},
+    }
+    rc, out = _run_dispatch(state_dir, write_ev)            # records the touched ledger key
+    assert rc == 0 and out == ""
+    stop = {
+        "hook_event_name": "Stop",
+        "session_id": "live_block",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Done — added the helper.",
+    }
+    rc, out = _run_dispatch(state_dir, stop)                # no env -> liveness gate blocks live
+    assert rc == 0
+    assert out, "liveness gate must block by default on a touched file with illusory code"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "illusory" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.liveness" in r.get("pattern_fires", []) for r in rows), \
+        "the liveness fire must still be audited"
+
+
+def test_dispatch_liveness_gate_silent_when_code_is_material(tmp_path):
+    """Control proving the gate DISCRIMINATES end-to-end: the SAME touched file, but its
+    computed value reaches the return (material, not illusory) -> no block."""
+    state_dir = _setup_state(tmp_path)
+    (tmp_path / "live.py").write_text("def fn():\n d = 1 + 1\n return d\n")
+    write_ev = {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Write",
+        "session_id": "live_ok",
+        "cwd": str(tmp_path),
+        "tool_input": {"file_path": "live.py", "content": "def fn():\n d = 1 + 1\n return d\n"},
+        "tool_response": {"filePath": "live.py"},
+    }
+    rc, out = _run_dispatch(state_dir, write_ev)
+    assert rc == 0 and out == ""
+    stop = {
+        "hook_event_name": "Stop",
+        "session_id": "live_ok",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Done — added the helper.",
+    }
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out == "", "a material statement (its value reaches the return) must not block"
+
+
+def test_dispatch_liveness_gate_shadow_when_disabled(tmp_path):
+    """MAKOTO_DISABLE_GATES=1 returns the liveness gate to shadow: still audited, no block —
+    the same single escape valve the Stop gates share."""
+    state_dir = _setup_state(tmp_path)
+    (tmp_path / "dead.py").write_text("def fn():\n d = 1 + 1\n return 0\n")
+    write_ev = {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Write",
+        "session_id": "live_off",
+        "cwd": str(tmp_path),
+        "tool_input": {"file_path": "dead.py", "content": "def fn():\n d = 1 + 1\n return 0\n"},
+        "tool_response": {"filePath": "dead.py"},
+    }
+    _run_dispatch(state_dir, write_ev, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    stop = {
+        "hook_event_name": "Stop",
+        "session_id": "live_off",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Done — added the helper.",
+    }
+    rc, out = _run_dispatch(state_dir, stop, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    assert rc == 0
+    assert out == "", "disabled liveness gate must not block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.liveness" in r.get("pattern_fires", []) for r in rows), \
+        "the shadow liveness fire must still be audited so its FP rate can be mined"
+
+
+def test_dispatch_reason_bound_retraction_clears_so_advance_does_not_fire(tmp_path):
+    """The reconcile wiring end-to-end: promise (Stop 1), then RETRACT it with a surfaced
+    reason (Stop 2), then claim universal completion (Stop 3). The commitment is cleared
+    (status='retracted'), so the advance gate does NOT fire even in the audit log — the
+    legitimately-dropped promise is not held against the AI. Contrast with the test above,
+    where the SAME promise + universal-completion (no retraction) DOES fire advance."""
+    state_dir = _setup_state(tmp_path)
+    sid = "adv_retract"
+    promise = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
+               "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py."}
+    retract = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
+               "last_assistant_message": "Skipping src/promised_zzz.py for this sprint per your note."}
+    advance = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
+               "last_assistant_message": "Everything is done — all complete."}
+    _run_dispatch(state_dir, promise)
+    _run_dispatch(state_dir, retract)
+    rc, out = _run_dispatch(state_dir, advance)
+    assert rc == 0 and out == ""
+    # only-fires audit policy: a missing audit.jsonl means ZERO patterns fired across all three
+    # Stop dispatches — which already proves advance did not fire. A regression that fired advance
+    # would recreate the file with a gate.advance row, flipping the any(...) below to True.
+    audit_path = state_dir / "audit.jsonl"
+    rows = ([json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
+            if audit_path.exists() else [])
+    assert not any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
+        "a reason-bound retraction must clear the commitment so advance never fires on it"
+
+
+def test_dispatch_fabricated_action_gate_blocks(tmp_path):
+    """Behavioral blocking pin for gate.fabricated_action THROUGH the real dispatch. A Stop message
+    claims a completed tool action with a distinctive (backticked) object whose command NO recorded
+    tool event this session ran -> the gate walks ctx.history (the events-table slice, empty of any
+    matching command here) -> BLOCKS live by default. Breaking _blocking_gate_ids() or the history wiring
+    reddens THIS, proving the fabricated-action claim actually stops the agent end-to-end."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "fab_action",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)   # no prior command recorded -> fabricated -> blocks
+    assert rc == 0
+    assert out, "fabricated_action gate must block a tool-action claim with no recorded command"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "pytest tests/zzz_unrun.py -q" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.fabricated_action" in r.get("pattern_fires", []) for r in rows), \
+        "the fabricated_action fire must be audited"
+
+
+def test_dispatch_fabricated_action_silent_when_command_ran(tmp_path):
+    """Control proving the gate DISCRIMINATES end-to-end on PRESENCE of tool work: the SAME action
+    claim, but a tool call really happened this turn (a PreToolUse event — every tool call emits one,
+    matcher '*') -> turn_tool_calls > 0 -> discharged -> no block. The discharge is presence-of-work,
+    NOT command-text matching, so it is immune to paraphrase and to invisible tools."""
+    state_dir = _setup_state(tmp_path)
+    pre = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "fab_ok",
+           "cwd": str(tmp_path),
+           "tool_input": {"command": "python -m pytest tests/zzz_unrun.py -q --tb=short"}}
+    _run_dispatch(state_dir, pre)                  # a tool call really happened this turn
+    stop = {"hook_event_name": "Stop", "session_id": "fab_ok", "cwd": str(tmp_path),
+            "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out == "", "a tool call this turn discharges the action claim -> must not block"
+
+
+def test_dispatch_named_test_gate_blocks_after_recorded_named_red(tmp_path):
+    """Behavioral blocking pin for gate.named_test THROUGH the real dispatch. A failing PER-TEST run
+    (FAILED ...::test_foo) recorded at PostToolUse, then a claim that test_foo passes at Stop -> the
+    gate reads the per-name verdict from ctx.history -> BLOCKS live. Breaking _blocking_gate_ids() or the
+    history wiring reddens THIS, proving the named-test claim stops the agent end-to-end."""
+    state_dir = _setup_state(tmp_path)
+    post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "nt",
+            "cwd": str(tmp_path),
+            "tool_input": {"command": "python -m pytest tests/ -q"},
+            "tool_response": {"stdout": "FAILED tests/x.py::test_foo - AssertionError\n1 failed in 0.1s",
+                              "stderr": "", "exitCode": 1}}
+    rc, _ = _run_dispatch(state_dir, post)              # records the per-test red into history
+    assert rc == 0
+    stop = {"hook_event_name": "Stop", "session_id": "nt", "cwd": str(tmp_path),
+            "last_assistant_message": "Good news — test_foo passes now."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out, "named_test gate must block a named-test pass-claim over that test's recorded red"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "test_foo" in decision["reason"]
+
+
+def test_dispatch_stale_pass_gate_blocks_on_live_lastfailed(tmp_path):
+    """Behavioral blocking pin for gate.stale_pass THROUGH the real dispatch. pytest's own
+    lastfailed under the Stop payload's cwd names a failing node whose test STILL EXISTS, and the
+    final message makes a clean whole-suite pass-claim -> the gate reads the on-disk record via
+    ctx.cwd -> BLOCKS live. Breaking _blocking_gate_ids() or the cwd wiring reddens THIS."""
+    state_dir = _setup_state(tmp_path)
+    cache = tmp_path / ".pytest_cache" / "v" / "cache"
+    cache.mkdir(parents=True)
+    (cache / "lastfailed").write_text(json.dumps({"tests/t.py::test_red": True}))
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "t.py").write_text("def test_red():\n    assert False\n")
+    stop = {"hook_event_name": "Stop", "session_id": "sp", "cwd": str(tmp_path),
+            "last_assistant_message": "Done — all tests pass."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out, "stale_pass gate must block a whole-suite pass-claim over a live lastfailed record"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "tests/t.py::test_red" in decision["reason"]
+
+
+def test_no_shadow_gate_every_gate_blocks():
+    """Warning-tier-elimination invariant, STRUCTURAL after the gates/ package cutover: discovered
+    <=> live <=> blocking. The blocking set DERIVES from load_stopchecks() (the discovered gates), so a
+    gate cannot be wired without blocking (no audit-only shadow tier) and cannot block without being
+    discovered. The former check.quantity shadow gate was CUT 2026-06-02 — it could not block
+    FP-safely. A future shadow gate (discoverable but routed around _blocking_gate_ids(), or wired into
+    run_stop_checks without being discovered) turns this red."""
+    from makoto.stopchecks import load_stopchecks
+    from makoto._dispatch import _blocking_gate_ids
+    discovered = {g.id for g in load_stopchecks()}
+    assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
+                          "gate.fabricated_action", "gate.named_test", "gate.stale_pass",
+                          "gate.liveness"}    # liveness folded in from the collapsed close-check tier
+    # discovered <=> blocking: the set is not hand-maintained, it IS the discovered stopcheck ids.
+    assert set(_blocking_gate_ids()) == discovered
+    # The check.quantity / claim_check capability no longer EXISTS: no discovered gate is named it,
+    # and the package exposes no such callable (re-adding it as a gate turns this red).
+    assert "claim_check" not in {g.fn.__name__ for g in load_stopchecks()}
+    assert "dropped_gate" in {g.fn.__name__ for g in load_stopchecks()}       # live -> discovered + blocking
+
+
+def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
+    """Gap-CLASS closer (generalizes the gate.dropped miss). The set-equality pin above is STRUCTURAL:
+    dropping a gate from _blocking_gate_ids() reddens it, but so would a legitimate addition — it pins
+    the set's value, not the gate's blocking BEHAVIOR. The behavioral pin is a dispatch test that
+    drives a triggering Stop message all the way through `_run_dispatch` and asserts decision==block;
+    only THAT reddens when the blocking-filter LOGIC regresses (verified: breaking the
+    _blocking_gate_ids() filter reddens these 4 behavioral tests, not the structural ones).
+    gate.dropped shipped without one — so
+    require every blocking gate to carry a `test_dispatch_<gate>_gate_blocks*` test, by the same naming
+    convention its 3 siblings already follow. A future blocking gate added without one reddens HERE,
+    at landing, instead of leaving its real blocking behavior unfalsifiable."""
+    from pathlib import Path as _P
+    from makoto._dispatch import _blocking_gate_ids
+    src = _P(__file__).read_text()
+    missing = [gid for gid in _blocking_gate_ids()
+               if f"def test_dispatch_{gid.split('.')[-1]}_gate_blocks" not in src]
+    assert not missing, (f"blocking gate(s) without a BEHAVIORAL dispatch-block test (a structural "
+                         f"set-membership pin is not enough — see this test's docstring): {missing}")
+
+
+# ---------------------------------------------------------------------------
+# Line-level pinning tests (mutation-audit gap closure for _dispatch.py).
+# Each test below reddens a specific surviving single-token mutant; the
+# (lineno, kind) it closes is named in the docstring.
+# ---------------------------------------------------------------------------
+
+
+def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
+    """Pins line 62 (`_ensure_db_initialized` success -> `return True`), RETURN and CONST.
+
+    On the lazy-init path (db absent), a successful init MUST return truthy so main()
+    does NOT fail open at line 250. A firing PreToolUse event (pattern 1.1, loose
+    comparator in a verifier file) created via lazy init must still emit block JSON.
+    If `return True` is mutated to `return None`/`return False`, main() fails open and
+    stdout is empty -> this assertion reddens.
+    """
+    state_dir = tmp_path / "makoto_state"
+    state_dir.mkdir(parents=True)  # dir exists, but NO makoto.db -> dispatcher inits lazily
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "session_id": "lazy_init_fire",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "constitution/integrity/checks/v.py",
+            "content": 'def check(s):\n    return s.startswith("ok")\n',
+        },
+    }
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    proc = subprocess.run(
+        [sys.executable, "-m", "makoto._dispatch"],
+        input=json.dumps(payload).encode("utf-8"),
+        capture_output=True,
+        env=env,
+        cwd=str(Path(__file__).parent.parent),
+    )
+    assert proc.returncode == 0
+    out = proc.stdout.decode("utf-8")
+    assert (state_dir / "makoto.db").is_file(), "lazy init should have created makoto.db"
+    assert out, "lazy-init success must propagate so the firing event still blocks (not fail-open)"
+    assert json.loads(out)["decision"] == "block"
+
+
+def test_dispatch_lazy_init_failure_fails_open_not_crash(tmp_path):
+    """Pins line 65 (`_ensure_db_initialized` except handler -> `return False`), RETURN and CONST.
+
+    When lazy init RAISES (here: state_dir already exists as a regular file, so db creation
+    fails), the handler must return falsy so main() fails open at line 250 (exit 0, no crash).
+    If `return False` is mutated to `return True`, main() skips the fail-open guard and
+    _connect_with_retry hits a non-existent db -> unhandled sqlite3.OperationalError -> the
+    process exits non-zero. This asserts the fail-open contract (rc == 0).
+    """
+    state_dir = tmp_path / "makoto_state"
+    state_dir.write_text("i am a regular file, not a directory\n")  # makes init_db raise
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "init_fail",
+        "cwd": "/tmp",
+        "tool_input": {"file_path": "/tmp/x.txt", "content": "hello"},
+    }
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    proc = subprocess.run(
+        [sys.executable, "-m", "makoto._dispatch"],
+        input=json.dumps(payload).encode("utf-8"),
+        capture_output=True,
+        env=env,
+        cwd=str(Path(__file__).parent.parent),
+    )
+    assert proc.returncode == 0, (
+        "lazy-init failure must fail OPEN (exit 0), never crash the hook; "
+        f"got rc={proc.returncode}, stderr={proc.stderr.decode('utf-8')!r}"
+    )
+    assert proc.stdout == b"", "a failed-open dispatch must emit no decision"
+
+
+def test_connect_with_retry_sleeps_backoff_between_attempts(monkeypatch):
+    """Pins line 89 (`if attempt < _LOCK_RETRY_ATTEMPTS - 1:` guarding the backoff sleep), NOT and CMP.
+
+    Under sustained lock contention, the dispatcher backs off between every attempt EXCEPT the
+    last -> exactly (_LOCK_RETRY_ATTEMPTS - 1) sleeps. Negating the test (NOT) sleeps only on the
+    last attempt (1 sleep); swapping the comparator `<`->`>` (CMP) never sleeps (0 sleeps). Either
+    mutation changes the observed sleep count, so pinning it to ATTEMPTS-1 reddens both.
+    """
+    import sqlite3
+    from makoto import _dispatch
+    sleeps = {"n": 0}
+
+    def _locked(*a, **kw):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(sqlite3, "connect", _locked)
+    monkeypatch.setattr(_dispatch.time, "sleep", lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1))
+    assert _dispatch._connect_with_retry(Path("/tmp/whatever.db")) is None
+    assert sleeps["n"] == _dispatch._LOCK_RETRY_ATTEMPTS - 1, (
+        "backoff must sleep between every attempt except the last "
+        f"(expected {_dispatch._LOCK_RETRY_ATTEMPTS - 1}, got {sleeps['n']})"
+    )
+
+
+def test_keyword_hit_empty_keywords_returns_false():
+    """Pins line 122 (`if not pattern.keywords: return False`), RETURN and CONST.
+
+    A pattern with no keywords matches nothing — the guard must return False. Mutating
+    `return False` to `return None`/`return True` makes an empty-keyword pattern (synthetic,
+    a defensive branch) claim a hit on any payload. Direct unit on the helper.
+    """
+    from makoto._dispatch import _keyword_hit
+    from makoto.schema import PreCheck
+    pattern = PreCheck(id="x", description="d", fire_level="error",
+                      predicate_module="m", keywords=[], retry_hint="")
+    assert _keyword_hit(pattern, "any payload at all") is False
+
+
+def test_keyword_hit_all_keywords_present_returns_true():
+    """Pins line 123 (`return any(kw in raw_payload for kw in pattern.keywords)`), CMP (`in`->`not in`).
+
+    With EVERY keyword present in the payload, the prefilter must report a hit. The `in`->`not in`
+    swap turns `any(kw in payload)` into `any(kw not in payload)`, which is False precisely when
+    all keywords are present -> the hit is lost. Asserting True on an all-present payload reddens
+    the swap (a partial-present payload would not, since `not in` is True for the missing kw).
+    """
+    from makoto._dispatch import _keyword_hit
+    from makoto.schema import PreCheck
+    pattern = PreCheck(id="y", description="d", fire_level="error",
+                      predicate_module="m", keywords=["foo", "bar"], retry_hint="")
+    assert _keyword_hit(pattern, "xx foo yy bar zz") is True
+
+
+def test_dispatch_select_recent_returns_history_so_history_predicate_fires(tmp_path):
+    """Pins line 110 (`_select_recent` -> `return conn.execute(...).fetchall()`), RETURN.
+
+    A history-walking predicate (1.22: fabricated commit SHA) needs the real prior-event slice.
+    A Stop claiming a commit SHA with no prior `git commit` tool_use fires 1.22 and blocks.
+    If `_select_recent` returns None instead of the list, `for entry in history` raises TypeError
+    inside the predicate, which dispatch swallows -> 1.22 never fires -> no block JSON. Asserting
+    the block fires pins the real return value.
+    """
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "fab_sha",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Committed the fix in abc1234. Done.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert out, "1.22 (fabricated SHA) must fire on a real history slice -> block JSON"
+    assert json.loads(out)["decision"] == "block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("1.22" in r.get("pattern_fires", []) for r in rows), \
+        "the 1.22 fire must be recorded (history slice was actually returned)"
+
+
+def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):
+    """Pins line 206 (`retry_hint`: `errors[0].retry_hint or ""`), BOOL (`or`->`and`).
+
+    PreCheck 1.1 produces a truthy retry_hint. In the live decision JSON on stdout (which Claude
+    Code consumes), `retry_hint or ""` surfaces that hint. The `or`->`and` swap yields
+    `truthy_hint and ""` == "" -> the hint is silently dropped. Asserting the emitted retry_hint
+    is non-empty pins the operator.
+    """
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "session_id": "hint_test",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "/tmp/constitution/integrity/checks/v.py",
+            "content": 'def check(s): return s.startswith("ok")\n',
+        },
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    assert out, "pattern 1.1 must emit a block decision"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert decision["retry_hint"], (
+        "a finding with a retry_hint must surface it in the decision JSON "
+        "(retry_hint or '' must keep the hint, not collapse to '')"
+    )
+
+
+def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
+    """Pins line 234 (`exit_code=(2 if any(f.level == "error" ...) else 0)`), CMP (`==`->`!=`).
+
+    PreCheck 1.1 is an error-level finding, so the recorded audit row's exit_code must be 2.
+    Swapping `==` to `!=` computes exit_code from non-error findings -> records 0 instead.
+    Asserting the recorded exit_code == 2 pins the comparator.
+    """
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "session_id": "exit_code_test",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "/tmp/constitution/integrity/checks/v.py",
+            "content": 'def check(s): return s.startswith("ok")\n',
+        },
+    }
+    rc, _ = _run_dispatch(state_dir, payload)
+    assert rc == 0
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert rows, "the error-level fire must record an audit row"
+    fire_rows = [r for r in rows if "1.1" in r.get("pattern_fires", [])]
+    assert fire_rows, "expected a 1.1 fire row"
+    assert fire_rows[0].get("exit_code") == 2, (
+        "an error-level finding must record exit_code=2 in the audit row; "
+        f"got {fire_rows[0].get('exit_code')!r}"
+    )

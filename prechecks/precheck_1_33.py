@@ -1,0 +1,48 @@
+"""pattern 1.33 predicate — certificate verification disabled via a cert_reqs=CERT_NONE kwarg.
+
+Fires when a PreToolUse Write/Edit/MultiEdit INTRODUCES, as REAL Python code, a call that passes
+``cert_reqs=CERT_NONE`` — turning off peer-certificate verification at the call site:
+  * ``ssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)``
+  * ``context.wrap_socket(sock, cert_reqs=CERT_NONE)``
+  * ``urllib3.PoolManager(cert_reqs=ssl.CERT_NONE)``
+
+Materiality: ``cert_reqs=CERT_NONE`` instructs the TLS layer to require NO certificate from the peer —
+the handshake "succeeds" against any (or no) certificate, so the cert-identity integrity check is a
+no-op. This is the KWARG form, structurally DISTINCT from 1.29: 1.29 matches the assignment
+``<ctx>.verify_mode = CERT_NONE`` (an ``ast.Assign`` to a ``verify_mode`` attribute); this matches a
+``cert_reqs=`` keyword on an ``ast.Call``. Different node type -> the same introduced text never
+double-fires, and each form is caught in its own right.
+
+Reuses ``lib.factories.is_cert_none`` (the shared ``ssl.CERT_NONE`` / bare ``CERT_NONE`` recognizer, also
+used by 1.29) and ``lib.factories.ast_introduced_predicate`` for the active-code AST gate. A comment /
+docstring mention never fires; a genuinely-legitimate case (a localhost test client with no CA) is
+annotated ``makoto-allow: <reason>`` and stays silent.
+
+ACKNOWLEDGED FN (v1): (a) the urllib3 STRING form ``cert_reqs="CERT_NONE"`` is a string Constant, not
+the ``ssl.CERT_NONE`` symbol, and is left out of this v1's honest scope (matching arbitrary
+``"CERT_NONE"`` strings widens the FP surface; the symbol form is the unambiguous one). (b) routing
+``CERT_NONE`` through a variable (``r = ssl.CERT_NONE; ...(cert_reqs=r)``) is not a literal at the call
+site -> not matched. (c) ``cert_reqs=ssl.CERT_OPTIONAL`` is a weaker-but-not-off setting, out of scope
+(CERT_NONE is the unambiguous disable, mirroring 1.29's scope boundary).
+
+Knight-Leveson: stdlib ast/re only.
+"""
+from __future__ import annotations
+import ast
+from typing import Optional
+
+from makoto.lib.factories import ast_introduced_predicate, is_cert_none
+
+from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+
+
+def _cert_reqs_node_match(node: ast.AST) -> Optional[str]:
+    if not isinstance(node, ast.Call):
+        return None
+    for kw in node.keywords:
+        if kw.arg == "cert_reqs" and is_cert_none(kw.value):
+            return "cert_reqs=CERT_NONE"
+    return None
+
+
+predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_cert_reqs_node_match)
