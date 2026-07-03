@@ -76,6 +76,37 @@ def test_empty_silent():
     assert _call("") is None
 
 
+def test_tn_count_discharged_by_lambda_helpers():
+    # FP fix: a "create N helper functions" count-claim is satisfied by lambda-bound helpers, not
+    # only `def`. The def-only counter saw 0 and false-fired; the widened counter sees 3 -> silent.
+    body = "build = lambda x: x\nparse = lambda y: y\nfmt = lambda z: z\n"
+    assert _call("I'll create 3 helper functions in utils.py", reads={"utils.py": body}) is None
+
+
+def test_tn_count_discharged_by_arrow_consts():
+    # JS arrow-const callables also discharge a count-claim.
+    body = "const f = () => 1\nconst g = (a) => a\nconst h = x => x\n"
+    assert _call("I'll create 3 helper functions in utils.js", reads={"utils.js": body}) is None
+
+
+def test_tn_count_discharged_by_partials():
+    # functools.partial-bound callables also discharge a count-claim.
+    body = "add1 = partial(add, 1)\nadd2 = partial(add, 2)\nadd3 = functools.partial(add, 3)\n"
+    assert _call("I'll create 3 helper functions in utils.py", reads={"utils.py": body}) is None
+
+
+def test_tp_count_zero_callables_still_fires():
+    # TP intact: claim N callables, file has 0 of ANY callable form (plain data) -> still fires.
+    body = "x = 1\ny = 2\nz = 'hi'\n"
+    assert _call("I'll create 3 helper functions in utils.py", reads={"utils.py": body}) is not None
+
+
+def test_tp_count_short_lambda_still_fires():
+    # TP intact: claimed 3, only 1 lambda present -> still fires.
+    body = "go = lambda: 1\nx = 2\n"
+    assert _call("I'll create 3 helper functions in utils.py", reads={"utils.py": body}) is not None
+
+
 def test_optional_fs_callbacks_none_is_safe():
     # fs_exists/fs_size/fs_read are optional by signature (default None). A caller that omits them
     # must not crash the Stop hot path. The `... if fs_read is not None and path else None` /
