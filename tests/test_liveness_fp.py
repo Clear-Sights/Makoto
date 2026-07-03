@@ -142,3 +142,137 @@ def test_fp_zero_on_makoto_source():
                            capture_output=True, text=True).stdout.split()
     rep = measure([f for f in files if not f.startswith("tests/")])
     assert rep["fires"] == 0, f"pre-registered falsifier FIRED — triage each candidate FP: {rep['detail']}"
+
+
+# --- H8: the two corpus FP classes (precheck.liveness shelved at corpus_fp=3) -------------------
+# Class 1 — TUPLE-UNPACK LOOP READ: a name read via the RHS of a tuple-unpack assignment whose
+#   unpacked targets ARE live is itself live (its value reaches the live targets). live_locals
+#   missed it because a tuple-unpack assign has no single _assigned_name, so its RHS reads were
+#   never propagated. Corpus: cells_frame.py 'sample_patterns', cells_plan.py (same shape).
+# Class 2 — ANNASSIGN-NONE THEN RE-RAISED: `last_exc: Exception | None = None` later re-assigned
+#   and read inside a `raise` is live; `raise` was never a liveness seed, so the None-init was
+#   flagged dead. Corpus: paid_client.py 'last_exc'.
+# Each repro is the minimal faithful shape of the real corpus fire; both must go from RED -> GREEN.
+
+# Faithful minimal of cells_frame.py frame_assess_dont: sample_patterns read via a tuple-unpack
+# whose targets (tool/pattern) are used; the list-init must NOT be flagged dead.
+TUPLE_UNPACK_LOOP_READ = (
+    "def fn(n):\n sample_patterns = [(1, 2), (3, 4)]\n out = []\n"
+    " for i in range(n):\n  tool, pattern = sample_patterns[i % 2]\n  out.append(tool + pattern)\n"
+    " return out")
+
+# Faithful minimal of paid_client.py complete: last_exc None-init, reassigned in except, re-raised.
+ANNASSIGN_NONE_THEN_RERAISE = (
+    "def fn(n):\n last_exc: Exception | None = None\n for i in range(n):\n  try:\n"
+    "   return do(i)\n  except Exception as e:\n   last_exc = e\n raise RuntimeError(last_exc)")
+
+# FN guard: a genuinely-dead tuple-unpack feeder must STILL fire. `x = 1 + 1` is pure-dead, then
+# unpacked into UNUSED targets — making tuple RHS unconditionally live would hide x (a NEW FN);
+# the fix seeds RHS reads only when an unpacked target is live, so x stays flagged here.
+DEAD_FEEDS_UNUSED_UNPACK = (
+    "def fn():\n x = 1 + 1\n a, b = x, 0\n return 0")
+
+
+def test_tuple_unpack_loop_read_is_live():
+    # RED before fix: sample_patterns wrongly flagged dead. GREEN after: silent.
+    assert illusory_statements(_f(TUPLE_UNPACK_LOOP_READ)) == [], \
+        "FP: sample_patterns is read by a live tuple-unpack and must not be flagged dead"
+    assert "sample_patterns" in live_locals(_f(TUPLE_UNPACK_LOOP_READ))
+
+
+def test_annassign_none_then_reraise_is_live():
+    # RED before fix: last_exc None-init wrongly flagged dead. GREEN after: silent.
+    assert illusory_statements(_f(ANNASSIGN_NONE_THEN_RERAISE)) == [], \
+        "FP: last_exc is re-raised and must not be flagged dead"
+    assert "last_exc" in live_locals(_f(ANNASSIGN_NONE_THEN_RERAISE))
+
+
+def test_dead_feeder_of_unused_unpack_still_fires():
+    # FN guard: x is genuinely dead (feeds only unused unpack targets) -> must STILL fire. The
+    # load-bearing assertion is that the live_locals propagation fix did NOT over-suppress x:
+    # because the unpack targets (a, b) are dead, x's RHS reads are never seeded live, so x stays
+    # flagged. (Line 3 `a, b = x, 0` is ALSO a genuine dead pure unpack — a correct TP newly caught
+    # by the unpack-FN branch — so it fires too; both are real dead pure statements.)
+    lines = {s.lineno for s in illusory_statements(_f(DEAD_FEEDS_UNUSED_UNPACK))}
+    assert 2 in lines, f"FN regression: a genuinely-dead pure feeder must still fire, got {lines}"
+    assert lines == {2, 3}, f"the dead unpack on line 3 is also a TP; got {lines}"
+
+
+# --- H9: ast.Match subject/guard is a CONSUMING position (FP fix) -------------------------------
+# A local read ONLY by a `match` subject (or a case guard) genuinely steers which arm runs, exactly
+# like an `if`/`while` test — but live_locals never seeded ast.Match, so it was flagged dead. The
+# same code with `if status == 2:` was correctly silent, the match form was an FP.
+MATCH_SUBJECT_LIVE = (
+    "def f():\n status = 1 + 1\n match status:\n  case 2:\n   return True\n return False")
+IF_SUBJECT_LIVE = (
+    "def f():\n status = 1 + 1\n if status == 2:\n  return True\n return False")
+# Descent guard: a dead pure assign INSIDE a case body is still dead -> must fire.
+DEAD_IN_CASE_BODY = (
+    "def f(x):\n match x:\n  case 2:\n   d = 1 + 1\n   return True\n return False")
+
+
+def test_match_subject_read_is_live():
+    # RED before fix: status flagged dead (subject not seeded). GREEN after: silent, matching `if`.
+    assert illusory_statements(_f(MATCH_SUBJECT_LIVE)) == [], \
+        "FP: a local consumed by a match subject must not be flagged dead"
+    assert illusory_statements(_f(IF_SUBJECT_LIVE)) == [], "control: the `if` form is silent"
+    assert "status" in live_locals(_f(MATCH_SUBJECT_LIVE))
+
+
+def test_dead_pure_inside_match_case_still_fires():
+    # _scan must descend into case bodies: a dead pure assign in an arm is a TRUE positive.
+    lines = {s.lineno for s in illusory_statements(_f(DEAD_IN_CASE_BODY))}
+    assert lines == {4}, f"a dead pure assign inside a match case must fire, got {lines}"
+
+
+# --- H10: dead TUPLE/LIST/CHAINED-target unpack where EVERY name is dead (FN fix) ---------------
+# A dead pure unpack whose every bound name is dead was never flagged (no single _assigned_name).
+DEAD_TUPLE_UNPACK   = "def f():\n a, b = 1, 2\n return 0"
+DEAD_ONE_TUPLE      = "def f():\n (x,) = (1 + 2,)\n return 0"
+DEAD_CHAINED        = "def f():\n a = b = 5\n return 0"
+DEAD_LIST_UNPACK    = "def f():\n [a, b] = [1, 2]\n return 0"
+# GREEN guards: any one live/captured/impure/escaping target keeps the whole binding live.
+LIVE_TUPLE_ONE_USED = "def f():\n a, b = 1, 2\n return a"            # a live
+IMPURE_UNPACK       = "def f():\n a, b = g()\n return a"             # impure RHS (and a live)
+STAR_USED           = "def f(xs):\n a, *b = xs\n return b"           # b live
+SWAP_USED           = "def f(p, q):\n a, b = p, q\n a, b = b, a\n return a + b"
+NESTED_C_LIVE       = "def f():\n (a, (b, c)) = (1, (2, 3))\n return c"
+CHAINED_A_LIVE      = "def f():\n a = b = 5\n return a"
+CLOSURE_CAP_UNPACK  = "def o():\n a, b = 1, 2\n def i():\n  return a\n return i"
+LAMBDA_CAP_UNPACK   = "def o():\n a, b = 1, 2\n return lambda: a"
+ATTR_TARGET_UNPACK  = "def f(o):\n o.x, o.y = 1, 2\n return 0"       # store escapes (is_effect)
+SUB_TARGET_UNPACK   = "def f(o):\n o[0], o[1] = 1, 2\n return 0"     # store escapes (is_effect)
+GLOBAL_READ_RHS     = "def f():\n a, b = G, 1\n return 0"            # global read -> impure RHS
+
+
+def test_dead_tuple_unpack_fires():
+    assert {s.lineno for s in illusory_statements(_f(DEAD_TUPLE_UNPACK))} == {2}, \
+        "FN: a, b = 1, 2 with both names dead must fire"
+
+
+def test_dead_one_tuple_unpack_fires():
+    assert {s.lineno for s in illusory_statements(_f(DEAD_ONE_TUPLE))} == {2}, \
+        "FN: (x,) = (1+2,) with x dead must fire (1-tuple bypass)"
+
+
+def test_dead_chained_target_fires():
+    assert {s.lineno for s in illusory_statements(_f(DEAD_CHAINED))} == {2}, \
+        "FN: a = b = 5 with both names dead must fire"
+
+
+def test_dead_list_unpack_fires():
+    assert {s.lineno for s in illusory_statements(_f(DEAD_LIST_UNPACK))} == {2}, \
+        "FN: [a, b] = [1, 2] with both names dead must fire"
+
+
+def test_unpack_green_guards_all_silent():
+    guards = {
+        "live_tuple_one_used": LIVE_TUPLE_ONE_USED, "impure_unpack": IMPURE_UNPACK,
+        "star_used": STAR_USED, "swap_used": SWAP_USED, "nested_c_live": NESTED_C_LIVE,
+        "chained_a_live": CHAINED_A_LIVE, "closure_cap": CLOSURE_CAP_UNPACK,
+        "lambda_cap": LAMBDA_CAP_UNPACK, "attr_target": ATTR_TARGET_UNPACK,
+        "sub_target": SUB_TARGET_UNPACK, "global_read_rhs": GLOBAL_READ_RHS,
+    }
+    bad = {k: [s.lineno for s in illusory_statements(_f(v))] for k, v in guards.items()}
+    assert all(v == [] for v in bad.values()), \
+        f"unpack widening over-fired (FP): {[k for k, v in bad.items() if v]}"
