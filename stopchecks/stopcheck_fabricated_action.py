@@ -22,6 +22,13 @@ _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed
 _ACTION_RX = re.compile(rf"\bI\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
 _NEG = re.compile(r"\b(?:not|never|without)\b|n't", re.I)
 _FUTURE = re.compile(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
+# PRIOR-TURN frame: the claim is a truthful RECAP of work done in an earlier turn/session, not an
+# assertion that the action happened THIS (tool-less) turn. turn_tool_calls only counts THIS turn's
+# calls (post-final-Stop), so a recap of last turn's real run reads as fabricated; this frame, scoped
+# to the claim's own clause, fails open. GATE-LOCAL (turn_tool_calls in _common.py is untouched).
+_PRIOR_TURN = re.compile(
+    r"\b(?:earlier|previously|already|before|last\s+turn|previous\s+turn|prior\s+turn|"
+    r"this\s+session|in\s+the\s+last\s+turn|in\s+the\s+previous\s+turn|a\s+moment\s+ago)\b", re.I)
 
 
 def _distinctive(obj: str) -> bool:
@@ -45,6 +52,15 @@ def _action_signal(text: str):
         pre = text[max(0, m.start() - 24):m.start()]
         if _NEG.search(pre) or _FUTURE.search(pre):
             continue                                  # negated / future -> not a completed action
+        # PRIOR-TURN recap: the claim is scoped to an earlier turn/session ("Earlier this session I
+        # ran X", "I ran X previously"). Scan the claim's own sentence (the frame can lead or trail
+        # the verb). turn_tool_calls only sees THIS turn, so such a truthful recap reads as fabricated
+        # -> fail open. The sentence is delimited cheaply on the surrounding terminators.
+        s0 = max((text.rfind(p, 0, m.start()) for p in (". ", "! ", "? ", "\n")), default=-1) + 1
+        e1 = min((p for p in (text.find(". ", m.end()), text.find("\n", m.end())) if p != -1),
+                 default=len(text))
+        if _PRIOR_TURN.search(text[s0:e1 + 1]):
+            continue                                  # recap of an earlier turn -> not this-turn claim
         obj = m.group("obj")
         if not _distinctive(obj):
             continue

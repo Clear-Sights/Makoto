@@ -31,7 +31,20 @@ _DROP_RX_SYMBOL = re.compile(
     rf"(?:\b[^.;\n]*?\b(?:to|in|into|inside|within)\s+(?P<loc>{_DROP_PATH}))?", re.I)
 _DROP_RX_ARTIFACT = re.compile(
     rf"{_DROP_PRE}\s+(?:a\s+|an\s+|the\s+|new\s+)*(?:file\s+|module\s+|script\s+|config\s+)?(?P<loc>{_DROP_PATH})", re.I)
-_DROP_DEF_COUNTER = re.compile(r"^\s*(?:async\s+def|def|class)\s+\w+", re.M)
+# Counts a defined callable in ANY surface form, so a "create N functions/helpers" count-claim
+# discharges against lambda/arrow/partial-bound helpers too (the measured FP: 3 lambda-assigned
+# helpers left the def-only counter at 0 and false-fired). Forms: py `def`/`class`; JS
+# `function name`; assignment-bound callables — JS `const/let/var name = function|(...)=>|x=>|partial`
+# and py `name = lambda|partial|functools.partial`. A line with NO callable binding (plain data
+# assignment `x = 1`) is not counted, so the real TP (claim N, file has 0 callables of any form)
+# still fires.
+_DROP_DEF_COUNTER = re.compile(
+    r"^\s*(?:async\s+def|def|class)\s+\w+"
+    r"|^\s*(?:export\s+)?function\*?\s+\w+"
+    r"|^\s*(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?"
+      r"(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>|partial\b)"
+    r"|^\s*\w+\s*=\s*(?:lambda\b|partial\b|functools\.partial\b)",
+    re.M)
 _DROP_TEST_COUNTER = re.compile(r"^\s*(?:async\s+def|def)\s+test\w*", re.M)
 def _drop_def_or_class(sym):
     return re.compile(rf"^\s*(?:async\s+def|def|class|const|function\*?)\s+{re.escape(sym)}\b", re.M)

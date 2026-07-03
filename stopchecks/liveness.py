@@ -95,6 +95,21 @@ def _assigned_name(stmt):
     return None
 
 
+def _unpack_target_names(stmt) -> set:
+    """Names bound by a TUPLE/LIST/STARRED unpack assignment target (`a, b = ...`, `a, *rest = ...`).
+    Empty for a single-Name / attr / subscript target — those are handled by `_assigned_name`. Used by
+    the liveness fixpoint to propagate: if ANY unpacked name is live, the RHS reads are live too."""
+    if not isinstance(stmt, ast.Assign):
+        return set()
+    out = set()
+    for t in stmt.targets:
+        if isinstance(t, (ast.Tuple, ast.List)):
+            for n in ast.walk(t):
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                    out.add(n.id)
+    return out
+
+
 def _escaping_names(func) -> set:
     out = set()
     for n in ast.walk(func):
@@ -131,6 +146,14 @@ def live_locals(func) -> set:
     for n in body:
         if isinstance(n, (ast.Return, ast.Yield, ast.YieldFrom)) and getattr(n, "value", None) is not None:
             seeds.append(n.value)
+        # A `raise X from Y` is an OUTPUT: the raised value (and cause) escapes the function, so every
+        # name it reads is live. Without this seed an exception accumulator (`last_exc = None` … then
+        # `raise RuntimeError(last_exc)`) had its None-init flagged dead — a false positive.
+        if isinstance(n, ast.Raise):
+            if n.exc is not None:
+                seeds.append(n.exc)
+            if n.cause is not None:
+                seeds.append(n.cause)
     for stmt in ast.walk(func):
         if isinstance(stmt, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Expr)):
             if is_effect(stmt, locals_, escaping):
@@ -156,6 +179,15 @@ def live_locals(func) -> set:
             seeds.append(stmt.test)
             if stmt.msg is not None:
                 seeds.append(stmt.msg)
+        elif isinstance(stmt, ast.Match):
+            # `match subject: case ... if guard:` CONSUMES the subject (it steers which case runs)
+            # and each guard, exactly like an `if`/`while` test. Without seeding these, a local read
+            # ONLY by a match was flagged dead — a false positive (`if status == 2:` was correctly
+            # silent, `match status:` was not). Over-seeding is FN-safe (more live => fewer flags).
+            seeds.append(stmt.subject)
+            for case in stmt.cases:
+                if case.guard is not None:
+                    seeds.append(case.guard)
         elif isinstance(stmt, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
             for g in stmt.generators:
                 seeds.append(g.iter)
@@ -168,6 +200,12 @@ def live_locals(func) -> set:
     changed = True
     assigns = [(s, _assigned_name(s)) for s in ast.walk(func)
                if _assigned_name(s) is not None]
+    # Tuple/list-unpack assigns (`tool, pattern = sample_patterns[i]`) have no single _assigned_name,
+    # so the plain fixpoint never propagated their RHS reads. If ANY unpacked target is live, the RHS
+    # value reaches a live binding, so its reads are live too. Gated on a live target (not seeded
+    # unconditionally) so a genuinely-dead feeder of UNUSED unpack targets still fires — no FN.
+    unpacks = [(s, _unpack_target_names(s)) for s in ast.walk(func)
+               if _unpack_target_names(s)]
     while changed:
         changed = False
         for stmt, name in assigns:
@@ -178,6 +216,12 @@ def live_locals(func) -> set:
                     if new:
                         live |= new
                         changed = True
+        for stmt, names in unpacks:
+            if names & live and stmt.value is not None:
+                new = _names_read(stmt.value) - live
+                if new:
+                    live |= new
+                    changed = True
     return live
 
 
@@ -293,6 +337,18 @@ def _scan(stmt, func, locals_, escaping, typed, live, captured, out):
         if (rhs is not None and is_pure(rhs, locals_, typed) and not is_effect(stmt, locals_, escaping)
                 and name is not None and name not in live and name not in captured):
             out.append(stmt)
+        elif name is None and isinstance(stmt, ast.Assign):
+            # No single-Name target -> a TUPLE/LIST/CHAINED-target assign (`a, b = 1, 2`; `a = b = 5`;
+            # `[a, b] = [1, 2]`; `(x,) = (1+2,)`). Without this branch every-name-dead unpacks were a
+            # silent FN. Flag dead iff: the RHS is pure, the stmt is not an effect (an attr/subscript
+            # store target IS an effect via is_effect, so those are excluded), there is at least one
+            # bound Store Name, and EVERY bound name is dead AND uncaptured — any one live/captured
+            # target keeps the whole binding live. (is_pure/is_effect/live/captured reused verbatim.)
+            names = {n.id for t in stmt.targets for n in ast.walk(t)
+                     if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+            if (names and is_pure(rhs, locals_, typed) and not is_effect(stmt, locals_, escaping)
+                    and all(nm not in live and nm not in captured for nm in names)):
+                out.append(stmt)
     elif isinstance(stmt, ast.Expr):
         # A bare LITERAL statement is not illusory WORK: a string Constant is a docstring / block
         # comment (material as __doc__), `...` is an intentional stub placeholder, a bare number is a
@@ -308,6 +364,11 @@ def _scan(stmt, func, locals_, escaping, typed, live, captured, out):
         for s in (*stmt.body, *[b for h in stmt.handlers for b in h.body],
                   *stmt.orelse, *stmt.finalbody):
             _scan(s, func, locals_, escaping, typed, live, captured, out)
+    elif isinstance(stmt, ast.Match):
+        # Descend into each case body — a dead pure statement inside a `match` arm is still dead.
+        for case in stmt.cases:
+            for s in case.body:
+                _scan(s, func, locals_, escaping, typed, live, captured, out)
     # ast.FunctionDef / AsyncFunctionDef / Lambda / ClassDef: separate scopes, NOT scanned here.
 
 

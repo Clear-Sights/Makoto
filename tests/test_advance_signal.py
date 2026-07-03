@@ -10,7 +10,7 @@ The INERT cases are not invented: each is an actual false-fire driver adjudicate
 ~/.claude session corpus (distributive determiner, adjectival done-word, code-quoted done-word,
 enumerated/scoped claim, forward frame, negation, scoped done, bare phase-transition).
 """
-from makoto.stopchecks.stopcheck_advance import _advance_signal
+from makoto.stopchecks.stopcheck_advance import _advance_signal, advance_gate
 
 
 # --- RECALL: genuine universal-completion claims MUST fire ---------------------------------
@@ -83,6 +83,40 @@ def test_detector_is_neither_fire_all_nor_fire_none():
 def test_empty_and_none_are_inert():
     assert _advance_signal("") is False
     assert _advance_signal(None) is False
+
+
+
+# --- advance_gate discharge: relocation tolerance (direct gate-function calls) -------------
+_UNIV = "Everything is wired up now."
+
+
+def test_relocated_commitment_does_not_false_fire():
+    """FP fix: a universal-completion claim while the open commitment was satisfied at a RENAMED
+    path (src/parser.py -> src/parser_v2.py) must NOT fire — the path moved, the work was done."""
+    f = advance_gate(_UNIV, [{"location": "src/parser.py"}],
+                     touched_keys={"src/parser_v2.py"}, fs_exists=lambda p: False)
+    assert f is None
+
+
+def test_genuinely_dropped_commitment_still_fires():
+    """TP intact: a universal claim with a commitment never touched and not on disk -> fires."""
+    f = advance_gate(_UNIV, [{"location": "src/missing.py"}],
+                     touched_keys=set(), fs_exists=lambda p: False)
+    assert f is not None and f.pattern_id == "gate.advance"
+
+
+def test_unrelated_touch_is_not_a_rename_and_still_fires():
+    """TP intact: an unrelated touched file is not a rename of the commitment -> still fires."""
+    f = advance_gate(_UNIV, [{"location": "src/missing.py"}],
+                     touched_keys={"src/other.py"}, fs_exists=lambda p: False)
+    assert f is not None and f.pattern_id == "gate.advance"
+
+
+def test_rename_tolerance_preserves_fakeexcuse_firewall():
+    """auth.py vs auth_helper.py is NOT a rename (`_helper` is not a version token) -> still fires."""
+    f = advance_gate(_UNIV, [{"location": "src/auth.py"}],
+                     touched_keys={"src/auth_helper.py"}, fs_exists=lambda p: False)
+    assert f is not None and f.pattern_id == "gate.advance"
 
 
 def test_code_span_guard_only_skips_word_INSIDE_a_span():
