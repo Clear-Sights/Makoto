@@ -33,7 +33,9 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output"
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module (the "number
     "_common.py": 6,                                       # of functions" the design decomposes to)
     "stopcheck_completion.py": 2,
-    "stopcheck_advance.py": 2,
+    "stopcheck_advance.py": 4,                             # _advance_signal + advance_gate + the
+                                                            # relocation-discharge pair (_adv_stem_core/
+                                                            # _adv_relocated_discharge, FP fix)
     "stopcheck_green_claim.py": 1,
     "stopcheck_dropped.py": 6,
     "stopcheck_fabricated_action.py": 3,
