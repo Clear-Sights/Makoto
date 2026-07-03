@@ -47,6 +47,27 @@ def test_silent_when_no_claim():
     assert fabricated_action_gate("I verified the logic.", history=[]) is None
 
 
+# --- PRIOR-TURN recap (seed FP) — a truthful recap of an earlier turn on a summary turn ---
+def test_silent_on_prior_turn_recap_summary_turn():
+    """Seed FP: a tool-less summary turn that recaps work done EARLIER. turn_tool_calls counts only
+    this turn, so the truthful recap read as fabricated. The prior-turn frame fails open."""
+    assert fabricated_action_gate(
+        "Earlier this session I ran scripts/validate.sh and it passed; this turn I'm just summarizing.",
+        history=[]) is None
+
+
+def test_silent_on_trailing_prior_turn_frame():
+    """The frame can trail the verb too ('I ran X previously')."""
+    assert fabricated_action_gate("I ran scripts/validate.sh previously.", history=[]) is None
+
+
+def test_TP_intact_present_turn_claim_zero_tool_calls_fires():
+    """The real TP MUST still fire: a present-turn 'I ran X' with zero tool calls this turn and NO
+    prior-turn frame."""
+    f = fabricated_action_gate("I ran scripts/deploy.sh and it succeeded.", history=[])
+    assert f is not None and f.pattern_id == "gate.fabricated_action"
+
+
 # --- TP: a concrete tool-action claim yields its object ---
 def test_tp_ran_backticked_command():
     assert _action_signal("I ran `pytest tests/ -q`.") == "pytest tests/ -q"
