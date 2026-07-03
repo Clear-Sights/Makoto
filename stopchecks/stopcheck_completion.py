@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from typing import Optional
 from makoto.checks import detect_locations, normalize_path
 from makoto.schema import Finding
@@ -7,6 +8,25 @@ from makoto.lexicons import (
 )
 from makoto.stopchecks._common import _BIND_BEFORE, _discharged
 from makoto.stopchecks._types import StopCheck
+
+
+# A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
+# intervening noun phrase + clause separates the produce verb from the path: the verb governs a
+# DIFFERENT direct object ("updated the logic so … config.yaml", "wrote the handler to read from
+# settings.json"), and the path is an inert reference (a read source, a constraint), not the
+# authored object. A genuine production claim ("I wrote config.yaml", "created `handler.py`",
+# "added X to `src/auth.py`") has either an essentially-empty gap (whitespace / article / quote /
+# adjective) or a production-DESTINATION preposition before the path.
+#
+# Deliberately NOT in this set: a bare `to` / `from` / `that`. Those are the canonical
+# production-target prepositions — "added the handler TO src/auth.py", "wrote the migration TO
+# 0007.sql" are real production claims, not references. Their referencing uses are caught by the
+# fuller frame instead: `read(s) from` (the read FP), `so` / `matches` / `requires` (the
+# subordinate-clause FP). Including bare `to`/`from` over-narrowed and silenced live TPs
+# (FP remediation 2026-06-25; tests/test_gates.py + tests/test_substrate_teeth.py pin the TPs).
+_PRODUCE_OBJ_SEP_RX = re.compile(
+    r"\b(?:so|against|match(?:es|ing)?|reads?\s+from|requires?|"
+    r"according\s+to|based\s+on|conform(?:s|ing)?\s+to)\b", re.I)
 
 
 def _production_claim_location(text):
@@ -31,6 +51,10 @@ def _production_claim_location(text):
             between = before[vm.end():]
             if _CLAUSE_BREAK_RX.search(between):
                 continue                              # verb governs a different clause's noun
+            if _PRODUCE_OBJ_SEP_RX.search(between):
+                continue                              # subordinator/read-frame separates verb and
+                                                      # path -> path is a referenced source, not the
+                                                      # verb's direct object (the measured FP)
             near = pre[-40:]
             if _FORWARD_FRAME_RX.search(near):
                 continue                              # "will add X" -> a plan, not a claim
