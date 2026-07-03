@@ -65,6 +65,15 @@ def test_normalize_path_empty_returns_empty_string():
     assert normalize_path("") == ""
 
 
+def test_normalize_path_forces_forward_slash():
+    """Windows-portability fix: os.path.normpath emits '\\' separators on Windows,
+    which would make the same logical path mismatch its POSIX-authored form. Both
+    spellings of the same path must normalize identically regardless of platform.
+    Reddens if the trailing '.replace(\"\\\\\\\\\", \"/\")' is dropped."""
+    assert normalize_path("dir\\sub\\file.py") == normalize_path("dir/sub/file.py")
+    assert "\\" not in normalize_path("dir\\sub\\file.py")
+
+
 def test_subject_binds_requires_equality():
     assert subject_binds("auth.py", "auth.py") is True
     assert subject_binds("auth.py", "auth_helper.py") is False

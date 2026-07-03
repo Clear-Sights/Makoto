@@ -9,10 +9,14 @@ import re
 
 
 def normalize_path(p: str) -> str:
-    """Case-folded, normalized, trailing-separator-stripped path for equality."""
+    """Case-folded, normalized, trailing-separator-stripped path for equality.
+
+    Separators are forced to forward-slash so a claim/commitment/touched identity is
+    platform-stable: os.path.normpath emits '\\' on Windows, which would make the same
+    logical path mismatch its POSIX-authored form (Windows-portability fix)."""
     if not p:
         return ""
-    return os.path.normcase(os.path.normpath(p.strip())).rstrip("/\\")
+    return os.path.normcase(os.path.normpath(p.strip())).rstrip("/\\").replace("\\", "/")
 
 
 def location_match(location: str, touched_keys) -> bool:
