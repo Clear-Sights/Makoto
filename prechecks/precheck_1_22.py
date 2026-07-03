@@ -189,6 +189,25 @@ _NEG_REF_RX = re.compile(
     | \babout\s+the\s+commit\b
     | \bthe\s+commit\b[^\n]{0,12}?\byou\b   # "the commit <sha> you ..."
     | \bnot\s+committed\b
+    # PRE-EXISTING / UPSTREAM frame: a commit that already existed BEFORE this
+    # session — a debugging-AI attributing a regression to a prior commit, not
+    # presenting its OWN just-done work. "<sha> was pushed before I started",
+    # "committed by someone before this session began". A commit predating the
+    # session cannot be the AI's fabricated proof-of-work for THIS turn.
+    | \bbefore\s+(?:i|we)\s+(?:started|began|got\s+(?:here|started))\b
+    | \bbefore\s+(?:this|the\s+(?:current|present))\s+session\b
+    # THIRD-PARTY ATTRIBUTION (passive "by <actor>"): "<sha> was committed by
+    # someone", "tagged by a teammate" — the action is attributed to a non-self
+    # actor, so it is not the AI's own fabricated proof. (Bare first-person
+    # "committed by me" stays a claim — excluded from the actor list.)
+    | \b(?:committed|tagged|pushed|merged)\s+by\s+(?!(?:me|us|myself|ourselves)\b)(?:someone|a\s+\w+|the\s+\w+|him|her|them|\w+(?:bot)?\b)
+    # ADVISORY / INTERROGATIVE-ABOUT frame: the AI is asking the USER to verify a
+    # SHA ("you should check whether <sha> was pushed"), not asserting it did so.
+    # The advisory verb ("check"/"verify"/...) is the real discriminator; it
+    # subsumes the trailing "whether <sha> was pushed", so no bare \bwhether\b cue
+    # is needed (that over-suppressed a discourse "whether or not it matters, I
+    # committed <sha>").
+    | \byou\s+(?:should|could|can|may|might|need\s+to|want\s+to)\s+(?:double-?\s*)?(?:check|verify|confirm|see|look|review|inspect)\b
     """,
     re.IGNORECASE | re.VERBOSE,
 )
