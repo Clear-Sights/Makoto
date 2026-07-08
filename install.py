@@ -33,12 +33,14 @@ def _validate_predicate_modules() -> None:
 
     Fails loud (exit 1) on import error, missing predicate, or empty keywords.
     Skips rows with empty predicate_module (transitional state).
+
+    SPEC-C item 2 (Pre-tier cutover): sources the live catalog via load_prechecks()'s DEFAULT
+    (loader-backed) path, not an explicit read of data/patterns.toml -- that file is no longer
+    the runtime source of truth, so gating this validation on its presence would make the gate
+    silently vacuous the moment the file is removed (item 2 step 3).
     """
     import importlib
-    patterns_path = Path(__file__).parent / "data" / "patterns.toml"
-    if not patterns_path.exists():
-        return
-    for p in load_prechecks(patterns_path):
+    for p in load_prechecks():
         if not p.predicate_module:
             continue
         try:
@@ -165,6 +167,26 @@ def _uninstall_claude_conventions(claude_md_path: Path) -> None:
     claude_md_path.write_text((stripped + "\n") if stripped else "", encoding="utf-8")
 
 
+def _record_configchange_manifest(settings_path: Path, *, state_dir: Path) -> None:
+    """D5 (docs/DEFERRED.md, owner-authorized blocking flip, 2026-07-08): record that the
+    installer wired Makoto's hooks into `settings_path`, so `_dispatch_configchange.py`'s
+    blocking tier can treat a LATER full-strip of this exact path as a genuine strip (not the
+    ambiguous "never wired" case `configchange_verdict` cannot distinguish on its own) -- ground
+    truth from the one place that actually knows what it wired, complementary to (not a
+    replacement for) the transition-snapshot half of the same detector. Fail-open: a write
+    failure here must never break install."""
+    manifest_path = state_dir / "configchange_manifest.json"
+    try:
+        paths = set(json.loads(manifest_path.read_text(encoding="utf-8"))) if manifest_path.exists() else set()
+    except Exception:
+        paths = set()
+    paths.add(str(settings_path.resolve()))
+    try:
+        manifest_path.write_text(json.dumps(sorted(paths), indent=2) + "\n", encoding="utf-8")
+    except Exception:
+        pass  # observability must never break install
+
+
 def cmd_install() -> int:
     """state-dir setup + ~/.claude/settings.json hook wiring. Idempotent."""
     _validate_predicate_modules()
@@ -178,6 +200,7 @@ def cmd_install() -> int:
     if not settings.exists():
         settings.write_text("{}\n", encoding="utf-8")
     _wire_claude_hooks(settings)
+    _record_configchange_manifest(settings, state_dir=state_dir)
     claude_md = Path.home() / ".claude" / "CLAUDE.md"
     _install_claude_conventions(claude_md)
     print(json.dumps({
@@ -215,8 +238,8 @@ def _hooks_wired(data: dict) -> bool:
 def cmd_status() -> int:
     """report patterns_count, hooks_wired, state_dir."""
     state_dir = Path.home() / ".claude" / "makoto_state"
-    patterns_path = Path(__file__).parent / "data" / "patterns.toml"
-    patterns_count = len(load_prechecks(patterns_path)) if patterns_path.exists() else 0
+    # SPEC-C item 2 (Pre-tier cutover): the live catalog count, not a literal patterns.toml read.
+    patterns_count = len(load_prechecks())
     settings = Path.home() / ".claude" / "settings.json"
     hooks_wired = False
     if settings.exists():

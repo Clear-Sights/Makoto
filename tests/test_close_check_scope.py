@@ -5,7 +5,7 @@ contamination vector) is skipped. This realizes the user's "a block counts only 
 closed" criterion at the unit-closure layer WITHOUT weakening the analyzer: detection logic is
 unchanged, only the firing scope narrows to closed work. Suppression is limited to known scratch
 roots — never a blanket skip — so the gate keeps its teeth on all real code."""
-from makoto.stopchecks import stopcheck_liveness as CL
+from makoto.checks import deadPureStatement as CL
 
 DEAD = "def fn():\n d = 1 + 1\n return 0\n"   # exactly one genuinely-illusory statement
 

@@ -5,7 +5,7 @@ discharge on ANY tool activity this turn (presence-of-work, NOT command-text mat
 immune to command paraphrase and to invisible Workflow/Agent/Task tools). Signal half pinned too."""
 import json
 
-from makoto.stopchecks.stopcheck_fabricated_action import _action_signal, fabricated_action_gate
+from makoto.checks.fabricatedToolAction import _action_signal, fabricated_action_gate
 
 
 def _tool_call(name="Bash", cmd="x"):

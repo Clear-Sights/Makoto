@@ -13,10 +13,9 @@ A FIRING soundness sentinel means a real analyzer bug. NEVER weaken a sentinel t
 """
 from __future__ import annotations
 import ast
-import subprocess
 
-from makoto.stopchecks.fp_harness import measure
-from makoto.stopchecks.liveness import (
+from makoto.checks._fpHarness import measure
+from makoto.checks.deadPureStatement import (
     illusory_statements, analyze_file, live_locals, _assigned_name)
 
 
@@ -138,9 +137,8 @@ def test_sole_killer_purity_guard():
 #   corpus     : `git ls-files "*.py"` minus tests/  (82 files at measurement)
 #   measurement: fires == 0  (no candidate FPs to triage; pre-registered falsifier did NOT fire)
 def test_fp_zero_on_makoto_source():
-    files = subprocess.run(["git", "ls-files", "*.py"],
-                           capture_output=True, text=True).stdout.split()
-    rep = measure([f for f in files if not f.startswith("tests/")])
+    from makoto.tests._repo_scope import tracked_py_files
+    rep = measure(tracked_py_files())        # scope pinned to makoto/, cwd-independent
     assert rep["fires"] == 0, f"pre-registered falsifier FIRED — triage each candidate FP: {rep['detail']}"
 
 

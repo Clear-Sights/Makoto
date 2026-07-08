@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from makoto.schema import PreCheck
+from makoto.schema import PreCheck, load_prechecks
 
 
 def _evt(file_path: str, content: str) -> dict:
@@ -26,7 +26,10 @@ def _evt(file_path: str, content: str) -> dict:
 
 def _run(pid: str, content: str, file_path: str, level: str, conn=None):
     import importlib
-    mod = importlib.import_module("makoto.prechecks.precheck_" + pid.replace(".", "_"))
+    # SPEC-5: resolve via the real catalog's predicate_module (flat makoto.checks, descriptive
+    # names -- no longer derivable from the pattern id).
+    _mod_path = next(p.predicate_module for p in load_prechecks() if p.id == pid)
+    mod = importlib.import_module(_mod_path)
     pat = PreCheck(id=pid, fire_level=level, description="x", retry_hint="y")
     return mod.predicate(current_event=_evt(file_path, content), history=[], pattern=pat, conn=conn)
 
@@ -35,7 +38,7 @@ def _run(pid: str, content: str, file_path: str, level: str, conn=None):
 # 1.2/1.3/1.8 CUT 2026-06-02 (irreducibly FP-prone — see warning-tier-elimination cert). 1.4 scoped
 # to the integrity-keyed shape (`audit_skip`); a bare `cache_skip` no longer fires (not an integrity check).
 _CASES = [
-    ("1.4", "config.toml", "audit_skip = true\n", "error"),
+    ("content.integrity_suppression_flag", "config.toml", "audit_skip = true\n", "error"),
 ]
 
 
@@ -60,9 +63,9 @@ def test_violation_fires_but_makoto_allow_exempts(pid, fp, content, level):
 
 def test_1_6_violation_fires_but_makoto_allow_exempts(citation_conn):
     content = "As shown by Faketon 2019 the result holds.\n"
-    assert _run("1.6", content, "paper.md", "error", conn=citation_conn) is not None, "1.6 phantom citation must fire"
+    assert _run("content.phantom_citation", content, "paper.md", "error", conn=citation_conn) is not None, "1.6 phantom citation must fire"
     exempted = content.rstrip() + "  <!-- makoto-allow: real source, cited from memory -->\n"
-    assert _run("1.6", exempted, "paper.md", "error", conn=citation_conn) is None, "1.6: makoto-allow must exempt"
+    assert _run("content.phantom_citation", exempted, "paper.md", "error", conn=citation_conn) is None, "1.6: makoto-allow must exempt"
 
 
 def test_makoto_allow_requires_structured_reason():

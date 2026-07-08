@@ -76,7 +76,9 @@ def test_predicate_finding_carries_source_event_id(tmp_path):
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0 and "block" in out, f"pattern 1.1 should fire; got rc={rc} out={out!r}"
+    # SPEC-5 Task 8: a PreToolUse block renders wire.py's real Pre shape (deny), not a literal
+    # "block" substring.
+    assert rc == 0 and '"deny"' in out, f"pattern 1.1 should fire; got rc={rc} out={out!r}"
     findings = _recorded_findings(state_dir)
     assert findings, "expected a recorded predicate finding"
     eid = _only_event_id(state_dir)

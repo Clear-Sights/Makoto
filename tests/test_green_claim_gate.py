@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 
 from makoto.lib.claims import whole_suite_pass_claim
-from makoto.stopchecks.stopcheck_green_claim import green_claim_gate
+from makoto.checks.falseGreenClaim import green_claim_gate
 from makoto._dispatch import run_stop_checks
 from makoto import ledger as L
 

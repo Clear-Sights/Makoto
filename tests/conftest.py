@@ -11,7 +11,6 @@ Provides:
 """
 from __future__ import annotations
 import pytest
-from pathlib import Path
 
 from makoto.schema import PreCheck, load_prechecks
 
@@ -44,14 +43,16 @@ def stop_evt():
 
 @pytest.fixture
 def loaded_pattern():
-    """load a PreCheck from the live patterns.toml by id; raises if id is unknown.
+    """load a PreCheck from the live checks/ catalog by id; raises if id is unknown.
 
     Use this instead of hand-constructing PreCheck dataclasses in tests, so test
     fixtures stay in sync with the live catalog (description / retry_hint /
     fire_level / keywords drift between test and prod is caught automatically).
+
+    SPEC-C item 2 (Pre-tier cutover): load_prechecks()'s default path is loader-backed now, not
+    a literal data/patterns.toml read -- this fixture follows that, not the file.
     """
-    patterns_path = Path(__file__).parent.parent / "data" / "patterns.toml"
-    catalog = {p.id: p for p in load_prechecks(patterns_path)}
+    catalog = {p.id: p for p in load_prechecks()}
 
     def _by_id(pid: str) -> PreCheck:
         if pid not in catalog:

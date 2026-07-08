@@ -125,3 +125,52 @@ def test_testrun_stores_verdict_tail_not_head():
     assert row is not None and row["kind"] == "testrun"
     assert "2 failed" in (row["value"] or "")                    # tail kept the verdict
     assert len(row["value"]) <= 500
+
+
+def test_record_update_no_root_never_chain_appends(tmp_path, monkeypatch):
+    """root=None (the default, and every bare unit test above) must NOT chain-append anywhere --
+    not even to a MAKOTO_STATE_DIR left set by a prior test in the same process. Guards the exact
+    leak this design was built to avoid."""
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
+    c = _conn()
+    record_update(
+        c, {"hook_event_name": "PostToolUse", "tool_name": "Write",
+            "tool_input": {"file_path": "src/x.py"}},
+        event_id=1, session_id="s",
+    )
+    from makoto import ledger as _ledger
+    assert _ledger.read(root=tmp_path) == []
+
+
+def test_record_update_with_root_chain_appends_touched_row(tmp_path):
+    """root=<explicit> (the real _dispatch.py call site's shape) chain-appends a 'touched' row
+    at that exact root, verifiable via verify_chain(root=...)."""
+    from makoto import ledger as _ledger
+    c = _conn()
+    record_update(
+        c, {"hook_event_name": "PostToolUse", "tool_name": "Write",
+            "tool_input": {"file_path": "src/x.py"}},
+        event_id=1, session_id="s", root=tmp_path,
+    )
+    assert _ledger.verify_chain(root=tmp_path) is None
+    rows = _ledger.read(root=tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "touched"
+    assert rows[0]["key"] == "src/x.py"
+
+
+def test_record_update_chain_fault_never_blocks_sqlite_write(tmp_path, monkeypatch):
+    """A chain-append fault must never lose the sqlite (latest-wins) write it accompanies."""
+    import makoto.ledger as _ledger_mod
+    def _boom(*a, **k):
+        raise RuntimeError("chain unavailable")
+    monkeypatch.setattr(_ledger_mod, "append", _boom)
+    c = _conn()
+    record_update(
+        c, {"hook_event_name": "PostToolUse", "tool_name": "Write",
+            "tool_input": {"file_path": "src/x.py"}},
+        event_id=1, session_id="s", root=tmp_path,
+    )
+    row = read_key(c, "src/x.py")
+    assert row is not None
+    assert row["kind"] == "touched"

@@ -1,23 +1,23 @@
 [
   {
-    "id": "1.1",
-    "module": "makoto.prechecks.precheck_1_1",
+    "id": "content.verifier_predicate_weakened",
+    "module": "makoto.checks.verifierPredicateWeakened",
     "target_path": "constitution/integrity/checks/myverifier.py",
     "body_match": "def fn(x):\n    return x.startswith(\"ok\")\n",
     "body_clean": "def fn(x):\n    return x == \"ok\"\n",
     "wrong_path": "/tmp/unrelated.py"
   },
   {
-    "id": "1.4",
-    "module": "makoto.prechecks.precheck_1_4",
+    "id": "content.integrity_suppression_flag",
+    "module": "makoto.checks.integritySuppressionFlag",
     "target_path": "/tmp/config.toml",
     "body_match": "audit_skip = true\n",
     "body_clean": "cache_skip = true\n",
     "wrong_path": "/tmp/config.py"
   },
   {
-    "id": "1.5",
-    "module": "makoto.prechecks.precheck_1_5",
+    "id": "content.deferred_checkbox_theater",
+    "module": "makoto.checks.deferredCheckboxTheater",
     "target_path": "docs/pristine-baseline.md",
     "body_match": "- [x] DEFERRED rewrite of subsystem X\n",
     "body_clean": "- [ ] DEFERRED rewrite of subsystem X\n",

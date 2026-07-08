@@ -58,18 +58,12 @@ class Finding:
                                # marks a finding built outside the hot path (a direct unit call).
 
 
-def load_prechecks(path: Path | None = None) -> list[PreCheck]:
-    """parse patterns.toml -> list[PreCheck]. Empty file -> empty list.
-
-    Unknown TOML keys (forensic-catalog fields dropped in 1.0.3, future expansion)
-    are silently ignored — only the keys in _PATTERN_FIELDS are passed to the
-    constructor. Keeps the loader forward-compatible with TOML metadata that
-    isn't (yet) hot-path data.
-
-    When path is None, resolves to makoto/data/patterns.toml.
-    """
-    if path is None:
-        path = Path(__file__).parent / "data" / "patterns.toml"
+def _load_prechecks_from_toml(path: Path) -> list[PreCheck]:
+    """The ORIGINAL toml-parsing path, unchanged -- still the mechanism for any EXPLICIT `path`
+    override (install.py's own patterns_path re-count, and every test that hands load_prechecks
+    a synthetic fixture toml to exercise the loader/validation in isolation). Only the DEFAULT
+    (path=None) case below was migrated to the checks/ catalog; explicit-path callers keep
+    reading real TOML exactly as before -- no change in their observable behavior."""
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     rows = data.get("pattern", [])
     patterns = [PreCheck(**{k: v for k, v in r.items() if k in _PATTERN_FIELDS})
@@ -81,3 +75,40 @@ def load_prechecks(path: Path | None = None) -> list[PreCheck]:
             f"makoto has no non-blocking tier: every pattern must be fire_level='error' or be CUT. "
             f"Offending rows: {ids}. See the warning-tier-elimination cert.")
     return patterns
+
+
+def load_prechecks(path: Path | None = None) -> list[PreCheck]:
+    """The live Pre-tier catalog -> list[PreCheck]. Empty file -> empty list.
+
+    SPEC-C item 2 (Pre-tier cutover, 2026-07-07): the DEFAULT case (`path=None`, what
+    `_dispatch.py`'s real hot path calls) sources from `checks._loader.discover()` -- each
+    Pre-tier module's own self-describing `CHECK` export. This is the "one registration"
+    unification: a check's keywords/retry_hint/description live in ONE place (the module
+    itself), not duplicated between a TOML row and the Python file. SPEC-C item 2 step 3
+    (2026-07-08): `data/patterns.toml` itself is DELETED -- it was already superseded for the
+    default path, and its own consumers (install.py's patterns_path re-count, tests/conftest.py's
+    `loaded_pattern` fixture) were migrated to the same default, loader-backed path first.
+    `_load_prechecks_from_toml` (below) still exists and is still exercised -- by tests that hand
+    this function their OWN synthetic fixture toml via an explicit `path`, unrelated to the now-
+    deleted real file -- so an arbitrary toml file can still be parsed on request.
+
+    The `_ALLOWED_FIRE_LEVELS` invariant (makoto has no non-blocking Pre tier) is restated
+    for the new source as: every discovered Pre-tier CHECK's posture must be BLOCK (checked
+    case-insensitively, matching `_dispatch._blocking_gate_ids()`'s own comparison) -- a
+    posture other than BLOCK on a Pre-tier CHECK raises exactly like a bad fire_level did.
+    """
+    if path is not None:
+        return _load_prechecks_from_toml(path)
+    from makoto.checks._loader import discover
+    from makoto import posture as _posture
+    live = [c for c in discover() if c.applies_at == "Pre" and c.predicate_module]
+    bad = [c for c in live if str(c.posture).strip().lower() != _posture.BLOCK]
+    if bad:
+        ids = ", ".join(f"{c.id}={c.posture!r}" for c in bad)
+        raise ValueError(
+            f"makoto has no non-blocking tier: every Pre-tier check must be posture=BLOCK or be CUT. "
+            f"Offending rows: {ids}. See the warning-tier-elimination cert.")
+    return [PreCheck(id=c.id, fire_level="error", description=c.description,
+                      retry_hint=c.retry_hint, predicate_module=c.predicate_module,
+                      keywords=list(c.keywords))
+            for c in live]

@@ -16,7 +16,7 @@
 #             can safely widen to absorb a purpose-neighbor.
 
 [[purpose]]
-id = "1.1"
+id = "content.verifier_predicate_weakened"
 domain = "verifier-weakened"
 what = "startswith/endswith/re.match/re.search/in[...] used as a verifier comparator"
 when = "PreToolUse-Write/Edit"
@@ -25,7 +25,7 @@ purpose = "a strict-equality verification comparator silently loosened to a pref
 widen = "LOW — tied to the integrity-file WHERE; dropping it FPs on ordinary string code"
 
 [[purpose]]
-id = "1.2"
+id = "content.env_gated_audit"
 domain = "env-gated-audit"
 what = "if <env-read> (os.environ.get / os.getenv / os.environ[...]) whose key or gated body names an integrity concept (audit|verif|integrit|attest|checksum|signatur|tamper|provenance)"
 when = "PreToolUse-Write/Edit"
@@ -34,7 +34,7 @@ purpose = "an audit/verification check made opt-in behind an env var — silentl
 widen = "LOW — the (env-read AND integrity-token AND active-code) conjunction is the guard; dropping any one FPs (every env-gated feature flag, or every audit op, or every doc/comment mention). Name-agnostic body scan is the load-bearing half"
 
 [[purpose]]
-id = "1.4"
+id = "content.integrity_suppression_flag"
 domain = "suppression-flag"
 what = "*_skip / *_bypass / *_inapplicable = <truthy const> with no makoto-allow rationale"
 when = "PreToolUse-Write/Edit"
@@ -43,7 +43,7 @@ purpose = "a check disabled by an undocumented boolean suppression flag"
 widen = "MEASURED (audit_ratchet) — axis-resolved: WHERE=.toml has corpus-headroom (widening to any file stays 0/1335, the .toml narrowing is threat-model-conservative not corpus-forced); WHAT/vocab is the guard-load-bearing axis by design. NB corpus is underpowered for this rare shape (0 honest *_skip .toml) — frontier needs adversarial near-miss synthesis, not replay alone"
 
 [[purpose]]
-id = "1.5"
+id = "content.deferred_checkbox_theater"
 domain = "plan-theater"
 what = "a checked/closed checkbox whose item text admits DEFERRED"
 when = "PreToolUse-Write/Edit"
@@ -52,7 +52,7 @@ purpose = "marking an open task-item done while its own text says it was deferre
 widen = "MEDIUM — the DEFERRED+checked co-occurrence is specific; broadening to any checkbox FPs"
 
 [[purpose]]
-id = "1.6"
+id = "content.phantom_citation"
 domain = "citation-phantom"
 what = "an Author-Year citation ('Name 19xx/20xx', 'et al') absent from docs/CITATIONS.md"
 when = "PreToolUse-Write/Edit"
@@ -61,7 +61,7 @@ purpose = "a scholarly citation presented as real but absent from the canonical 
 widen = "MEDIUM — bounded by the CITATIONS.md cross-check; widening the year/name regex FPs on dates"
 
 [[purpose]]
-id = "1.9"
+id = "content.unsourced_webfetch"
 domain = "provenance-external"
 what = "a URL cited/claimed-fetched that never appeared in any prior tool_result this session"
 when = "Stop"
@@ -70,7 +70,7 @@ purpose = "citing a web source that was never actually retrieved"
 widen = "MEDIUM — bounded by the seen-in-history firewall; widening the URL regex FPs on example URLs"
 
 [[purpose]]
-id = "1.21"
+id = "content.verifier_exit_masking"
 domain = "verifier-weakened"
 what = "|| true / ; true / || : / set +e applied to a test/build/verify command"
 when = "PreToolUse-Bash"
@@ -79,7 +79,7 @@ purpose = "masking a verifier's non-zero exit so a failing check reports success
 widen = "LOW-MEDIUM — needs the runner-context guard; any '|| true' FPs on non-verifier shell"
 
 [[purpose]]
-id = "1.22"
+id = "content.fabricated_commit_sha"
 domain = "provenance-git"
 what = "a commit/tag SHA presented as proof of a commit not in git history"
 when = "Stop"
@@ -88,7 +88,7 @@ purpose = "claiming a commit/tag/push landed when no such git object exists"
 widen = "HIGH — the real-git cross-check is the firewall; the claim-verb set can widen freely"
 
 [[purpose]]
-id = "1.23"
+id = "content.self_mute_guard"
 domain = "self-defense"
 what = "edits un-wiring makoto (settings.json / MAKOTO_DISABLE / disableAllHooks / makoto_state)"
 when = "PreToolUse-Write/Edit"
@@ -97,7 +97,7 @@ purpose = "disabling or un-wiring makoto itself"
 widen = "MEDIUM — the makoto-config token set is specific; widening to any settings.json edit FPs"
 
 [[purpose]]
-id = "1.26"
+id = "content.cert_verify_disabled"
 domain = "crypto-verify-disabled"
 what = "verify=False / check_hostname=False / ssl._create_unverified_context"
 when = "PreToolUse-Write/Edit"
@@ -106,7 +106,7 @@ purpose = "TLS/certificate verification disabled (requests/ssl)"
 widen = "HIGH — AST-specific WHAT; WHERE-independent"
 
 [[purpose]]
-id = "1.27"
+id = "content.verifier_body_hollowed"
 domain = "verifier-weakened"
 what = "a verifier body hollowed to return-True / pass / assert-True / broad-except-swallow"
 when = "PreToolUse-Write/Edit"
@@ -115,7 +115,7 @@ purpose = "a verification function gutted so it always passes"
 widen = "LOW — tied to the integrity-file WHERE; any always-true function FPs elsewhere"
 
 [[purpose]]
-id = "1.28"
+id = "content.jwt_signature_disabled"
 domain = "crypto-verify-disabled"
 what = "jwt.decode(..., verify=False / verify_signature=False)"
 when = "PreToolUse-Write/Edit"
@@ -124,7 +124,7 @@ purpose = "JWT signature verification disabled"
 widen = "HIGH — AST-specific WHAT; WHERE-independent"
 
 [[purpose]]
-id = "1.29"
+id = "content.cert_none_mode"
 domain = "crypto-verify-disabled"
 what = "SSLContext.verify_mode = ssl.CERT_NONE"
 when = "PreToolUse-Write/Edit"
@@ -133,7 +133,7 @@ purpose = "peer-certificate verification disabled via SSLContext.verify_mode"
 widen = "HIGH — AST-specific WHAT; WHERE-independent"
 
 [[purpose]]
-id = "1.30"
+id = "content.timing_unsafe_compare"
 domain = "crypto-timing"
 what = "==/!= comparison of a secret/HMAC/digest/signature/otp/nonce operand"
 when = "PreToolUse-Write/Edit"
@@ -142,7 +142,7 @@ purpose = "a secret/MAC compared with a timing-unsafe operator instead of hmac.c
 widen = "MEDIUM — needs the secret-operand heuristic; widening the name set FPs on ordinary =="
 
 [[purpose]]
-id = "1.31"
+id = "content.jwt_none_alg"
 domain = "crypto-verify-disabled"
 what = "jwt.decode algorithms list whitelists the unsigned 'none' algorithm"
 when = "PreToolUse-Write/Edit"
@@ -151,7 +151,7 @@ purpose = "JWT decode configured to accept the unsigned 'none' algorithm"
 widen = "HIGH — AST-specific WHAT; WHERE-independent"
 
 [[purpose]]
-id = "1.32"
+id = "content.paramiko_host_key_weakened"
 domain = "crypto-verify-disabled"
 what = "paramiko set_missing_host_key_policy(AutoAddPolicy/WarningPolicy)"
 when = "PreToolUse-Write/Edit"
@@ -160,7 +160,7 @@ purpose = "SSH host-key verification weakened to auto-accept unknown hosts"
 widen = "HIGH — AST-specific WHAT; WHERE-independent"
 
 [[purpose]]
-id = "1.33"
+id = "content.cert_reqs_none"
 domain = "crypto-verify-disabled"
 what = "cert_reqs=ssl.CERT_NONE kwarg"
 when = "PreToolUse-Write/Edit"
@@ -240,9 +240,18 @@ where = "the touched .py files this turn — per-function AST liveness over the 
 purpose = "code written into a completed unit that does nothing — a pure value computed and discarded; a said-but-immaterial statement whose referent never reaches I/O (material-not-illusory, applied to a code unit's internals rather than the turn's claims)"
 widen = "LOW — conservative purity: any possible operator-dunder dispatch / unknown call / attr-subscript store / escaping name ⇒ live ⇒ never flagged; only provably-builtin-typed dead values fire (soundness over recall). Widening the purity allowlist risks FP on overloaded operators"
 
+[[purpose]]
+id = "gate.canon"
+domain = "agnostic-canon"
+what = "a tool call this turn that ended in a direct error state (interrupted or self-emitted error code) left unresolved at turn-end (canon.timeout); OR the same byte-identical failing call re-issued back-to-back with nothing changed — a stuck retry loop (canon.recur)"
+when = "Stop"
+where = "the turn's call stream (ctx.history PostToolUse rows: tool_name/tool_input identity, tool_response.interrupted/.error)"
+purpose = "a turn closed on a silent unresolved error, or a stuck retry loop with no intervening change — the agnostic type-2 and recur negative states, both detectable with no language token"
+widen = "LOW — fires only on the closed agnostic terminal set; a clean (non-interrupted, no error code) call stays silent; recur requires >=2 consecutive identical failing calls, judged at run-end so a later success silences it"
+
 # makoto-allow: this registry row must name the phrase 1.34 detects (legitimate provenance metadata, not a real trailer)
 [[purpose]]
-id = "1.34"
+id = "content.illusory_authorship_trailer"
 domain = "illusory-authorship"
 what = "Claude-authorship commit trailer (Claude-gated)"
 when = "PreToolUse-Bash/Write/Edit"

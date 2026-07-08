@@ -8,8 +8,8 @@ claim. Unknown/edited/conventional-empty cases fail open (never a false block).
 import os
 import sqlite3
 
-from makoto.stopchecks._common import _discharged
-from makoto.stopchecks.stopcheck_completion import completion_gate
+from makoto.checks._shared import _discharged
+from makoto.checks.claimedProduceAbsent import completion_gate
 from makoto._dispatch import run_stop_checks
 from makoto import ledger as L
 

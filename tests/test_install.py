@@ -115,6 +115,24 @@ def test_cmd_install_creates_state_dir_db_and_wires_settings(tmp_path, monkeypat
     assert found, "cmd_install must wire settings.json"
 
 
+def test_cmd_install_records_configchange_manifest(tmp_path, monkeypatch):
+    """D5 (docs/DEFERRED.md, owner-authorized 2026-07-08): cmd_install records the settings path
+    it wires into <state_dir>/configchange_manifest.json, so _dispatch_configchange.py's blocking
+    tier can later treat a full-strip of THIS exact path as a genuine strip, not the ambiguous
+    never-wired case."""
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    (fake_home / ".claude").mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    rc = cmd_install()
+    assert rc == 0
+    manifest_path = fake_home / ".claude" / "makoto_state" / "configchange_manifest.json"
+    assert manifest_path.exists()
+    paths = json.loads(manifest_path.read_text())
+    settings = fake_home / ".claude" / "settings.json"
+    assert str(settings.resolve()) in paths
+
+
 def test_cmd_install_idempotent(tmp_path, monkeypatch):
     """re-running cmd_install does not crash and produces identical settings.json."""
     fake_home = tmp_path / "home"
@@ -144,9 +162,16 @@ def test_cmd_uninstall_reverses_install(tmp_path, monkeypatch):
 
 
 def test_validate_predicate_modules_passes_on_current_catalog():
-    """current patterns.toml: validation gate passes."""
+    """the live checks/ catalog (SPEC-C item 2 Pre-tier cutover -- no longer literally
+    patterns.toml): validation gate passes, i.e. it does NOT sys.exit(1) against the real,
+    current predicate modules."""
     from makoto.install import _validate_predicate_modules
-    _validate_predicate_modules()
+    try:
+        _validate_predicate_modules()
+        raised = False
+    except SystemExit:
+        raised = True
+    assert not raised, "validation gate must pass (not sys.exit) against the current live catalog"
 
 
 def test_validate_predicate_modules_aborts_on_missing_callable(monkeypatch, capsys):

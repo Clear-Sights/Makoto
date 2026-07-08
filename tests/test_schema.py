@@ -89,11 +89,12 @@ some_future_field = "ignored"
 
 
 def test_load_prechecks_default_path_resolves_to_package_data():
-    """load_prechecks() with no arg loads makoto/data/patterns.toml automatically."""
+    """load_prechecks() with no arg resolves to the live checks/ catalog (SPEC-C item 2 Pre-tier
+    cutover -- the default path is loader-backed, not a direct patterns.toml parse anymore)."""
     patterns = load_prechecks()
     assert len(patterns) >= 8
     ids = {p.id for p in patterns}
-    assert "1.1" in ids and "1.23" in ids
+    assert "content.verifier_predicate_weakened" in ids and "content.self_mute_guard" in ids
 
 
 def test_all_active_patterns_have_keywords_and_predicate_module():
@@ -101,8 +102,11 @@ def test_all_active_patterns_have_keywords_and_predicate_module():
     patterns = load_prechecks()
     for p in patterns:
         assert p.predicate_module, f"pattern {p.id} missing predicate_module"
-        assert p.predicate_module == f"makoto.prechecks.precheck_{p.id.replace('.', '_')}", \
-            f"pattern {p.id} has wrong predicate_module: {p.predicate_module}"
+        # SPEC-5: prechecks migrated into flat makoto.checks with descriptive names (no longer
+        # derivable from the pattern id) -- assert the real invariant that survives the move: a
+        # live predicate_module actually rooted under the checks catalog.
+        assert p.predicate_module.startswith("makoto.checks."), \
+            f"pattern {p.id} has non-catalog predicate_module: {p.predicate_module}"
         assert p.keywords, f"pattern {p.id} missing keywords"
 
 

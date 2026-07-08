@@ -7,7 +7,7 @@ read-frame ("so … config.yaml", "to read from settings.json") is an inert REFE
 self-production claim — it must stay silent. A genuine production claim ("I wrote config.yaml")
 must still fire.
 """
-from makoto.stopchecks.stopcheck_completion import completion_gate
+from makoto.checks.claimedProduceAbsent import completion_gate
 
 
 def _fires(text):

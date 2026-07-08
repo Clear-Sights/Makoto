@@ -38,6 +38,9 @@ class AuditRow:
     retry_hint_emitted: bool
     findings: list[dict]
     tool_name: str = ""
+    oversight_clamp: dict | None = None    # D6: {"active", "configured_mode", "permission_mode"}
+    #   when posture.is_oversight_clamped fired for this event -- None otherwise (the common
+    #   case). Additive: existing readers use dict.get, so old rows without this key parse fine.
 
 
 def _append_jsonl(state_root: Path, filename: str, obj: dict) -> None:
@@ -54,8 +57,28 @@ def _append_jsonl(state_root: Path, filename: str, obj: dict) -> None:
 
 
 def append_row(state_root: Path, row: AuditRow) -> None:
-    """serialize row to JSON and append one line to <state_root>/audit.jsonl."""
-    _append_jsonl(state_root, "audit.jsonl", asdict(row))
+    """serialize row to JSON and append one line to <state_root>/audit.jsonl.
+
+    Task 2 slice 3b (owner decision: unify -- every dispatch audit row is chain-appended). The
+    SAME row is also appended to the chained, tamper-evident stream via
+    `ledger.append(..., root=state_root)` (an explicit root, per FABLE DECISION 2026-07-07 --
+    audit.py's whole contract is an explicit `state_root`, never an env var, so the chain write
+    must land in exactly the caller's root, not wherever MAKOTO_STATE_DIR happens to point).
+    `prev_hash`/`row_hash` come back ADDITIVE on the audit.jsonl line -- existing readers use
+    dict.get, so pre-upgrade rows without these keys keep parsing identically, and audit.jsonl's
+    own history is NEVER rewritten (append-only law); the chain simply starts accumulating from
+    the first post-upgrade row onward. A chain-append fault must never block the older, more
+    foundational fires log -- caught and swallowed; audit.jsonl still gets its row either way.
+    """
+    obj = asdict(row)
+    try:
+        from makoto import ledger as _ledger
+        chained = _ledger.append({"kind": "audit", **obj}, root=state_root)
+        obj["prev_hash"] = chained.get("prev_hash", "")
+        obj["row_hash"] = chained.get("row_hash", "")
+    except Exception:
+        pass
+    _append_jsonl(state_root, "audit.jsonl", obj)
 
 
 def _read_jsonl(state_root: Path, filename: str, since: str | None) -> Iterator[dict]:
@@ -113,8 +136,13 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
     (a keyword-matched pattern muted via MAKOTO_DISABLE_PATTERNS). The escape valve stays open —
     it can no longer be silent. This makes claim C3 ('on-the-record, auditable rationale, never a
     disguise') hold against the audit stream, not only the in-source annotation.
+
+    Task 2 slice 4 (Fable-flagged gap, closed): also chain-appended (kind="exemption", root=
+    state_root) so the receipt emitter's exemption_count cites a real `verify_chain`-backed row
+    instead of an unchained file the receipt's own "every line re-runnable" claim couldn't honor.
+    Same fault-tolerance as append_row's chain wire: a chain fault never blocks this write.
     """
-    _append_jsonl(state_root, "exemptions.jsonl", {
+    obj = {
         "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "kind": kind,
         "pattern_id": pattern_id,
@@ -124,7 +152,20 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
         "snippet": snippet,
         "session_id": session_id,
         "tool_name": tool_name,
-    })
+    }
+    try:
+        from makoto import ledger as _ledger
+        # obj's own "kind" field is the SUPPRESSION mechanism ('makoto-allow'/'disabled-pattern'),
+        # which collides with the chain row's STRUCTURAL kind ("exemption") -- renamed to
+        # exemption_kind in the chain payload only; the audit.jsonl line's own "kind" is untouched.
+        chain_payload = {k: v for k, v in obj.items() if k != "kind"}
+        chain_payload["exemption_kind"] = obj["kind"]
+        chained = _ledger.append({"kind": "exemption", **chain_payload}, root=state_root)
+        obj["prev_hash"] = chained.get("prev_hash", "")
+        obj["row_hash"] = chained.get("row_hash", "")
+    except Exception:
+        pass
+    _append_jsonl(state_root, "exemptions.jsonl", obj)
 
 
 def read_exemptions(state_root: Path, since: str | None = None) -> Iterator[dict]:

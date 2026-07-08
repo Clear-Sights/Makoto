@@ -1,10 +1,20 @@
-"""The gate package's SHAPE is itself a word makoto emits about its own design — so it must be
-MATERIAL, not illusory. This test pins the design (file set, function counts, exports, the StopCheck
-schema, the dark/_common split, the layering firewall, the house style) AND proves each shape
-predicate has TEETH: a `test_TEETH_*` feeds it a planted violation and asserts it goes red. The
-single source for "the design" is the EXPECTED_* declarations below — change the package <=> change
-these <=> the test moves with it (a re-checkable artifact, not a comment). StopCheck-registry cutover
-2026-06-05.
+"""The Stop-gate catalog's SHAPE is itself a word makoto emits about its own design — so it must be
+MATERIAL, not illusory. This test pins the design (the gate-related file subset, function counts,
+exports, the StopCheck schema, the shared/named-gate split, the layering firewall, the house style)
+AND proves each shape predicate has TEETH: a `test_TEETH_*` feeds it a planted violation and asserts
+it goes red. The single source for "the design" is the EXPECTED_* declarations below — change the
+package <=> change these <=> the test moves with it (a re-checkable artifact, not a comment).
+
+SPEC-5 Task 4 (2026-07-07): the gate catalog moved from its own `makoto/stopchecks/` package (one
+file per adapter/engine/harness, `stopcheck_*.py` prefix) into the shared flat `makoto/checks/`
+package (SPEC-5 Task 2's home for every check, prechecks included) with descriptive names and each
+adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py` survives only as a
+thin compat shim (`load_stopchecks()` still works, still memoized) — the actual gate MODULES now live
+in `checks/`, so this test's GATES_DIR and every design declaration below point there. Because
+`checks/` also holds every precheck, `forbiddenLocation`, and the completeness check itself, the
+file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness files must be present),
+not an exact-set equality over the whole directory the way the old single-purpose `stopchecks/`
+package allowed.
 """
 from __future__ import annotations
 import ast
@@ -14,44 +24,78 @@ from pathlib import Path
 
 from makoto.stopchecks import load_stopchecks, StopCheck, GateContext
 
-GATES_DIR = Path(__file__).resolve().parent.parent / "stopchecks"
+GATES_DIR = Path(__file__).resolve().parent.parent / "checks"
 
 # ---- the declared design (single source; the package must MATCH it) --------------------------
-EXPECTED_GATE_FILES = {
-    "__init__.py", "_types.py", "_common.py",
-    "stopcheck_completion.py", "stopcheck_advance.py", "stopcheck_green_claim.py", "stopcheck_dropped.py",
-    "stopcheck_fabricated_action.py", "stopcheck_named_test.py", "stopcheck_stale_pass.py",
-    # liveness gate (folded in from the collapsed close-check tier): adapter + its AST analyzer engine
-    # + the test-only FP/soundness harness. Its fn is the analyzer, not a per-gate claim-vs-ledger pred.
-    "stopcheck_liveness.py", "liveness.py", "fp_harness.py",
+# The 11 named Stop-gate modules — each is its adapter AND its own engine merged into one file
+# (SPEC-5 Task 4 folded what used to be a separate `stopcheck_X.py` + `X.py` engine pair together).
+GATE_MODULE_STEMS = {
+    "claimedProduceAbsent", "undischargedCommitment", "falseGreenClaim", "silentlyDroppedCommitment",
+    "fabricatedToolAction", "namedTestTeeth", "stalePytestCache",
+    "deadPureStatement",    # liveness gate: adapter + its own AST analyzer engine, one file
+    "selfWiredCheck",       # the ONE advisory-tier exception to "discovered<=>live<=>blocking"
+                            # (2026-07-05, FABLE DECISION, self-defense-asymmetry-followup mitigation)
+                            # — partial-strip detection of makoto's own settings.json hook wiring.
+    "hollowTest",           # hollow_test gate: adapter + its own AST analyzer engine, one file
+    "canonTimeoutRecur",    # canon gate: adapter + its own pure engine (canon.timeout/canon.recur)
+    "canonFingerprints",           # SPEC-5 Task 9: BLOCK-tier half of the 17 canon fingerprints
+    "canonFingerprintsAdvisory",   # SPEC-5 Task 9: ADVISE-tier half (shares _canonAtoms.py)
+    "contractOrder",        # SPEC-5 (Makoto absorbs Assay): the plan's Stop remainder guard.
+                             # staleEstablisher.py is its DETECTIVE/advisory sibling but is
+                             # DELIBERATELY NOT a discovered GATE (no GATE export) -- it is
+                             # invoked directly by run_stop_checks so its finding can never enter
+                             # _blocking_gate_ids(), rather than needing a cited FABLE-DECISION
+                             # _ADVISORY_ALLOWLIST entry (test_stop_gate_level_invariant.py) this
+                             # worker has no standing to mint.
 }
+GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
+# the shared substrate (StopCheck/GateContext + common predicates) + the two test-only FP/soundness
+# harnesses (never imported by a gate module itself — only by their own battery tests) that travel
+# with the gate catalog but are not gates. _canonAtoms.py is the same kind of shared substrate,
+# scoped to the two canonFingerprints* gates (SPEC-5 Task 9).
+EXPECTED_SHARED_FILES = {"_shared.py", "_fpHarness.py", "_hollowTestFpHarness.py", "_canonAtoms.py"}
+EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # 14 files, the gate subset of checks/
 EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
-                          "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness"}
+                          "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
+                          "gate.self_wired", "gate.hollow_test", "gate.canon",
+                          "gate.canon_fingerprints", "gate.canon_fingerprints_advisory",
+                          "gate.contract_order"}
 EXPECTED_GATE_FIELDS = {"id", "fn", "run"}                 # NO 'blocking' — discovered<=>live<=>blocking
 EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output",
-                           "cwd", "fs_exists", "fs_size", "fs_read", "history"}
-EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module (the "number
-    "_common.py": 6,                                       # of functions" the design decomposes to)
-    "stopcheck_completion.py": 2,
-    "stopcheck_advance.py": 4,                             # _advance_signal + advance_gate + the
-                                                            # relocation-discharge pair (_adv_stem_core/
-                                                            # _adv_relocated_discharge, FP fix)
-    "stopcheck_green_claim.py": 1,
-    "stopcheck_dropped.py": 6,
-    "stopcheck_fabricated_action.py": 3,
-    "stopcheck_named_test.py": 6,
-    "stopcheck_stale_pass.py": 1,
-    "stopcheck_liveness.py": 5,                            # _scratch_roots/_under/_is_scratch/_read/_run
+                           "cwd", "fs_exists", "fs_size", "fs_read", "history",
+                           "permission_mode", "agent_id", "agent_type", "plan",
+                           "session_id", "transcript_path", "state_root"}   # Task 2 slice 5
+EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
+    "_shared.py": 6,                                       # against the real merged file
+    "claimedProduceAbsent.py": 2,
+    "undischargedCommitment.py": 4,
+    "falseGreenClaim.py": 1,
+    "silentlyDroppedCommitment.py": 6,
+    "fabricatedToolAction.py": 3,
+    "namedTestTeeth.py": 6,
+    "stalePytestCache.py": 1,
+    "deadPureStatement.py": 19,                            # engine + adapter merged (_run lives here)
+    "selfWiredCheck.py": 3,
+    "hollowTest.py": 35,                                   # engine + adapter merged (_run lives here)
+    "canonTimeoutRecur.py": 15,                            # engine + adapter merged (canon_gate lives here)
+    "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
+    "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
+    "contractOrder.py": 5,
 }
-# a gate module may import ONLY L0/L1 primitives + the intra-package _common/_types — never a sibling
-# gate (gate_*) nor a sibling L2 detector (commitments / retraction / ledger).
+# a gate module may import ONLY L0/L1 primitives + the intra-package `_shared`/`_loader`/
+# `_canonAtoms` — never a sibling NAMED gate (checks.<other-gate-stem>) nor a sibling L2 detector
+# (commitments / retraction / ledger). `makoto.checks` (bare) is the package's own re-exported L0
+# primitives module.
 ALLOWED_IMPORT_ROOTS = {
-    "makoto.checks", "makoto.schema", "makoto.lib.io", "makoto.lib.claims", "makoto.lib.pytest_cache",
+    "makoto.checks", "makoto.checks._shared", "makoto.checks._loader", "makoto.checks._canonAtoms",
+    "makoto.checks._planNode",
+    "makoto.schema", "makoto.lib.io", "makoto.lib.claims", "makoto.lib.pytest_cache",
     "makoto.lexicons",
-    "makoto.stopchecks._common", "makoto.stopchecks._types",
-    "makoto.stopchecks.liveness",   # the liveness gate's own AST analyzer engine (intra-package, like _common)
+    "makoto.ackblock",   # Task 2 slice 5: canonFingerprints.py's ack-block discharge lookup --
+    #   named explicitly (never bare "makoto") so the firewall stays a curated allowlist, not a
+    #   hole into makoto's whole namespace.
 }
-FORBIDDEN_SIBLING_PREFIXES = ("makoto.stopchecks.stopcheck_",)
+GATE_MODULE_PATHS = {f"makoto.checks.{stem}" for stem in GATE_MODULE_STEMS}
 
 
 # ---- pure shape predicates (each is fed a planted violation by a test_TEETH_* below) ---------
@@ -69,9 +113,9 @@ def imported_makoto_modules(src: str) -> set:
 
 
 def sibling_gate_imports(src: str) -> set:
-    """The gate sibling modules src imports — the L2->L2 firewall violations (empty = clean)."""
-    return {m for m in imported_makoto_modules(src)
-            if any(m.startswith(p) for p in FORBIDDEN_SIBLING_PREFIXES)}
+    """The NAMED sibling gate modules src imports — the L2->L2 firewall violations (empty = clean).
+    Importing the shared `_shared`/`_loader` helpers is fine; importing another named gate is not."""
+    return imported_makoto_modules(src) & GATE_MODULE_PATHS
 
 
 def _def_count(src: str) -> int:
@@ -79,7 +123,18 @@ def _def_count(src: str) -> int:
 
 
 def _gate_source_files() -> list:
-    return sorted(GATES_DIR.glob("stopcheck_*.py")) + [GATES_DIR / "_common.py"]
+    return sorted(GATES_DIR / f"{stem}.py" for stem in GATE_MODULE_STEMS) + [GATES_DIR / "_shared.py"]
+
+
+def _leads_with_future_import(src: str) -> bool:
+    """True if the future-annotations import is the file's first statement, or its first
+    statement after a leading module docstring (SPEC-5 Task 4 merged each gate's own engine
+    docstring into the adapter file, so a leading docstring is now legitimate house style,
+    not a violation — the future-import must still come immediately after it)."""
+    body = ast.parse(src).body
+    idx = 1 if body and isinstance(body[0], ast.Expr) and isinstance(
+        getattr(body[0], "value", None), ast.Constant) and isinstance(body[0].value.value, str) else 0
+    return idx < len(body) and isinstance(body[idx], ast.ImportFrom) and body[idx].module == "__future__"
 
 
 # ---- the design, pinned ----------------------------------------------------------------------
@@ -95,11 +150,10 @@ def test_each_live_gate_exports_a_well_formed_GATE():
     for g in load_stopchecks():
         assert isinstance(g, StopCheck)
         assert callable(g.fn) and callable(g.run)
-        # the GATE export lives in the ADAPTER module (where `run` is defined). For the ledger-gates
-        # fn and run are co-located; gate.liveness's fn is the shared analyzer (stopchecks.liveness),
-        # while its adapter + GATE export live in stopcheck_liveness.
+        # the GATE export lives in the merged adapter+engine module (where `run` is defined).
         home = g.run.__module__
-        assert home.startswith("makoto.stopchecks.stopcheck_")
+        assert home.startswith("makoto.checks.")
+        assert home.rsplit(".", 1)[-1] in GATE_MODULE_STEMS
         mod = importlib.import_module(home)
         assert getattr(mod, "GATE") is g                    # the module's GATE export IS the gate
 
@@ -124,9 +178,14 @@ def test_gatecontext_has_history_field():
 
 
 def test_package_file_shape_matches_the_design():
-    assert {p.name for p in GATES_DIR.glob("*.py")} == EXPECTED_GATE_FILES
+    # checks/ is the SHARED flat home for every check (prechecks, forbiddenLocation, the
+    # completeness check, and this gate subset) — a subset check, not exact-set equality.
+    present = {p.name for p in GATES_DIR.glob("*.py")}
+    assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(list(GATES_DIR.glob("stopcheck_*.py"))) == 8      # 7 ledger-gates + liveness (folded from close-check tier)
+    assert len(GATE_MODULE_FILES & present) == 14                # 7 ledger-gates + liveness + self_wired +
+    # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + contractOrder (SPEC-5,
+    # Makoto absorbs Assay)
 
 
 def test_module_function_counts_match_the_design():
@@ -143,17 +202,18 @@ def test_no_gate_module_imports_a_sibling_or_cross_l2():
 
 
 def test_each_gate_module_follows_the_house_style():
-    for f in GATES_DIR.glob("stopcheck_*.py"):
+    for stem in GATE_MODULE_STEMS:
+        f = GATES_DIR / f"{stem}.py"
         src = f.read_text()
-        assert src.startswith("from __future__ import annotations"), f"{f.name}: missing future header"
+        assert _leads_with_future_import(src), f"{f.name}: missing future header"
         assert "\nGATE = StopCheck(" in src, f"{f.name}: GATE export missing/misplaced"
 
 
 # ---- teeth: every shape predicate must go RED on a planted violation --------------------------
 def test_TEETH_sibling_import_detector_discriminates():
-    planted = "from makoto.stopchecks.stopcheck_advance import advance_gate\nx = 1\n"
-    assert sibling_gate_imports(planted) == {"makoto.stopchecks.stopcheck_advance"}   # caught
-    clean = "from makoto.stopchecks._common import _discharged\n"
+    planted = "from makoto.checks.undischargedCommitment import advance_gate\nx = 1\n"
+    assert sibling_gate_imports(planted) == {"makoto.checks.undischargedCommitment"}   # caught
+    clean = "from makoto.checks._shared import _discharged\n"
     assert sibling_gate_imports(clean) == set()                            # no false positive
 
 
@@ -178,7 +238,7 @@ def test_TEETH_no_shadow_field_check_catches_a_planted_blocking_field():
 def test_TEETH_function_count_check_catches_a_drift():
     planted = "def a():\n    pass\ndef b():\n    pass\n"
     assert _def_count(planted) == 2
-    assert _def_count(planted) != EXPECTED_FUNCTION_COUNTS["stopcheck_dropped.py"]  # a 6->2 drift reddens
+    assert _def_count(planted) != EXPECTED_FUNCTION_COUNTS["silentlyDroppedCommitment.py"]  # a 6->2 drift reddens
 
 
 def test_TEETH_discovery_count_is_load_bearing():

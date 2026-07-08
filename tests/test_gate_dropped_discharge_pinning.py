@@ -28,7 +28,7 @@ audit_lines convention, line 143 "or document as equivalent/dead"):
     optimization; on the gate's BINARY output (fire iff any claim undischarged) double-counting an
     overlapping span cannot change fire-vs-silent, so no input distinguishes the mutant.
 """
-from makoto.stopchecks.stopcheck_dropped import dropped_gate
+from makoto.checks.silentlyDroppedCommitment import dropped_gate
 from makoto.checks import normalize_path
 
 

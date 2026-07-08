@@ -10,7 +10,7 @@ The INERT cases are not invented: each is an actual false-fire driver adjudicate
 ~/.claude session corpus (distributive determiner, adjectival done-word, code-quoted done-word,
 enumerated/scoped claim, forward frame, negation, scoped done, bare phase-transition).
 """
-from makoto.stopchecks.stopcheck_advance import _advance_signal, advance_gate
+from makoto.checks.undischargedCommitment import _advance_signal, advance_gate
 
 
 # --- RECALL: genuine universal-completion claims MUST fire ---------------------------------

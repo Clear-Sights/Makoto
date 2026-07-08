@@ -1,9 +1,14 @@
 """The two firing categories load under their loaders: Pre-Checks (prechecks/, load_prechecks) and
 Stop-Checks (stopchecks/, load_stopchecks). The former Close-Checks and Post-Checks PACKAGES were
 collapsed away — the taxonomy is by TRIGGER EVENT, and liveness already fired on Stop, so it is now
-the gate.liveness StopCheck; the empty post tier (PostToolUse, never populated) was deleted."""
-import importlib
-import pytest
+the gate.liveness StopCheck; the empty post tier (PostToolUse, never populated) was deleted.
+
+SPEC-C item 7 (dead weight sweep): the dead-package regression guard this file used to carry
+(`test_collapsed_packages_are_gone`) is now `test_checks_taxonomy.py::
+test_collapsed_packages_are_still_gone` -- ONE guard, not two copies of the same assertion drifting
+independently. That file tests a genuinely different subject (the newer, not-yet-live
+`checks._loader.load_checks` discovery mechanism) and is NOT a duplicate of this one otherwise --
+both files stay, each testing its own real, still-live subsystem."""
 from makoto.schema import load_prechecks            # schema.py exposes the Pre-Check loader
 from makoto.stopchecks import load_stopchecks
 
@@ -13,17 +18,9 @@ def test_two_categories_load():
     assert load_stopchecks(), "stopchecks discovered"
 
 
-def test_collapsed_packages_are_gone():
-    # The collapse is MATERIAL, not just a rename: the old packages must not import. A reintroduced
-    # closechecks/ or postchecks/ tier (the empty-room regression this change removed) reddens here.
-    for dead in ("makoto.closechecks", "makoto.postchecks"):
-        with pytest.raises(ModuleNotFoundError):
-            importlib.import_module(dead)
-
-
 def test_liveness_run_adapter_emits_findings(tmp_path):
     # The Stop adapter reads each touched .py file and emits a real Finding per illusory statement.
-    from makoto.stopchecks.stopcheck_liveness import _run
+    from makoto.checks.deadPureStatement import _run
     from makoto.schema import Finding
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
@@ -43,7 +40,7 @@ def test_liveness_run_adapter_emits_findings(tmp_path):
 
 
 def test_liveness_run_adapter_skips_nonpy_and_missing(tmp_path):
-    from makoto.stopchecks.stopcheck_liveness import _run
+    from makoto.checks.deadPureStatement import _run
 
     class Ctx:
         touched = frozenset({str(tmp_path / "notes.txt"), str(tmp_path / "gone.py")})
@@ -55,7 +52,7 @@ def test_liveness_run_adapter_skips_nonpy_and_missing(tmp_path):
 
 
 def test_liveness_gate_fires_on_touched_file(tmp_path):
-    from makoto.stopchecks.stopcheck_liveness import GATE
+    from makoto.checks.deadPureStatement import GATE
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
 

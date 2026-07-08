@@ -22,15 +22,15 @@ per-pattern adversarial teeth. The teeth test proves a neutered predicate would 
 from __future__ import annotations
 
 from makoto.schema import PreCheck
-from makoto.prechecks.precheck_1_2 import predicate as p_1_2
-from makoto.prechecks.precheck_1_26 import predicate as p_1_26
-from makoto.prechecks.precheck_1_27 import predicate as p_1_27
-from makoto.prechecks.precheck_1_28 import predicate as p_1_28
-from makoto.prechecks.precheck_1_29 import predicate as p_1_29
-from makoto.prechecks.precheck_1_30 import predicate as p_1_30
-from makoto.prechecks.precheck_1_31 import predicate as p_1_31
-from makoto.prechecks.precheck_1_32 import predicate as p_1_32
-from makoto.prechecks.precheck_1_33 import predicate as p_1_33
+from makoto.checks.envGatedAudit import predicate as p_1_2
+from makoto.checks.certVerifyDisabled import predicate as p_1_26
+from makoto.checks.verifierBodyHollowed import predicate as p_1_27
+from makoto.checks.jwtSignatureDisabled import predicate as p_1_28
+from makoto.checks.certNoneMode import predicate as p_1_29
+from makoto.checks.timingUnsafeCompare import predicate as p_1_30
+from makoto.checks.jwtNoneAlg import predicate as p_1_31
+from makoto.checks.paramikoHostKeyWeakened import predicate as p_1_32
+from makoto.checks.certReqsNone import predicate as p_1_33
 
 
 def _pat(pid: str) -> PreCheck:
@@ -40,23 +40,23 @@ def _pat(pid: str) -> PreCheck:
 # (predicate, pattern, NEW file path, canonical real-violation content) — TP shapes are the exact
 # proven-firing strings from each pattern's own sentinel, re-pathed to a brand-new file.
 _VIOLATIONS = [
-    (p_1_2,  "1.2",  "new_app.py",
+    (p_1_2,  "content.env_gated_audit",  "new_app.py",
      "if os.environ.get('ENABLE_AUDIT_TRAIL'):\n    write_audit_trail()\n"),
-    (p_1_26, "1.26", "new_client.py",
+    (p_1_26, "content.cert_verify_disabled", "new_client.py",
      "import requests\nr = requests.get(url, verify=False)\n"),
-    (p_1_27, "1.27", "constitution/integrity/checks/new_seal.py",
+    (p_1_27, "content.verifier_body_hollowed", "constitution/integrity/checks/new_seal.py",
      "def verify_seal(state):\n    return True\n"),
-    (p_1_28, "1.28", "new_auth.py",
+    (p_1_28, "content.jwt_signature_disabled", "new_auth.py",
      "import jwt\ndata = jwt.decode(token, key, verify=False)\n"),
-    (p_1_29, "1.29", "new_net.py",
+    (p_1_29, "content.cert_none_mode", "new_net.py",
      "import ssl\nctx.verify_mode = ssl.CERT_NONE\n"),
-    (p_1_30, "1.30", "new_mac.py",
+    (p_1_30, "content.timing_unsafe_compare", "new_mac.py",
      "if hmac.new(key, body).hexdigest() == sig:\n    ok()\n"),
-    (p_1_31, "1.31", "new_svc.py",
+    (p_1_31, "content.jwt_none_alg", "new_svc.py",
      'import jwt\njwt.decode(token, key, algorithms=["none"])\n'),
-    (p_1_32, "1.32", "new_ssh.py",
+    (p_1_32, "content.paramiko_host_key_weakened", "new_ssh.py",
      "import paramiko\nclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())\n"),
-    (p_1_33, "1.33", "new_tls.py",
+    (p_1_33, "content.cert_reqs_none", "new_tls.py",
      "import ssl\nssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)\n"),
 ]
 
@@ -99,14 +99,14 @@ def test_legit_new_repro_file_is_silent_across_all_patterns():
 def test_legit_secure_near_misses_silent():
     """Per-pattern legit near-miss: the SECURE counterpart of each violation stays silent."""
     near = [
-        (p_1_26, "1.26", "new_client.py", "import requests\nr = requests.get(url, verify=True)\n"),
-        (p_1_28, "1.28", "new_auth.py",   "import jwt\ndata = jwt.decode(token, key, algorithms=['HS256'])\n"),
-        (p_1_29, "1.29", "new_net.py",    "import ssl\nctx.verify_mode = ssl.CERT_REQUIRED\n"),
-        (p_1_31, "1.31", "new_svc.py",    'jwt.decode(token, key, algorithms=["HS256"])\n'),
-        (p_1_32, "1.32", "new_ssh.py",    "client.set_missing_host_key_policy(paramiko.RejectPolicy())\n"),
-        (p_1_33, "1.33", "new_tls.py",    "ssl.wrap_socket(sock, cert_reqs=ssl.CERT_REQUIRED)\n"),
+        (p_1_26, "content.cert_verify_disabled", "new_client.py", "import requests\nr = requests.get(url, verify=True)\n"),
+        (p_1_28, "content.jwt_signature_disabled", "new_auth.py",   "import jwt\ndata = jwt.decode(token, key, algorithms=['HS256'])\n"),
+        (p_1_29, "content.cert_none_mode", "new_net.py",    "import ssl\nctx.verify_mode = ssl.CERT_REQUIRED\n"),
+        (p_1_31, "content.jwt_none_alg", "new_svc.py",    'jwt.decode(token, key, algorithms=["HS256"])\n'),
+        (p_1_32, "content.paramiko_host_key_weakened", "new_ssh.py",    "client.set_missing_host_key_policy(paramiko.RejectPolicy())\n"),
+        (p_1_33, "content.cert_reqs_none", "new_tls.py",    "ssl.wrap_socket(sock, cert_reqs=ssl.CERT_REQUIRED)\n"),
         # 1.30: a non-crypto equality in a new test file (no STRONG token) stays silent.
-        (p_1_30, "1.30", "tests/test_calc.py", "def test_sum():\n    assert result == expected\n"),
+        (p_1_30, "content.timing_unsafe_compare", "tests/test_calc.py", "def test_sum():\n    assert result == expected\n"),
     ]
     fired = [pid for pred, pid, path, content in near if _fires(pred, pid, path, content)]
     assert not fired, f"secure near-miss false-fired: {fired}"

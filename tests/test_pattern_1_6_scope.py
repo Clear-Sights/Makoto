@@ -13,10 +13,10 @@ import pytest
 
 from makoto.db import init_db
 from makoto.citations import refresh_if_stale
-from makoto.prechecks.precheck_1_6 import predicate, _governed_root
+from makoto.checks.phantomCitation import predicate, _governed_root
 from makoto.schema import load_prechecks
 
-_PAT = {p.id: p for p in load_prechecks()}["1.6"]
+_PAT = {p.id: p for p in load_prechecks()}["content.phantom_citation"]
 _PHANTOM = "See (Russo et al. 2018) for the method."   # a real paper, NOT in makoto's allowlist
 
 

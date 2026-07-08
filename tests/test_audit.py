@@ -36,15 +36,15 @@ def test_auditrow_fields_dataclass_round_trip():
         hook_kind="PreToolUse",
         session_id="abc123",
         project_root="/tmp/proj",
-        pattern_fires=["1.4"],
+        pattern_fires=["content.integrity_suppression_flag"],
         exit_code=2,
         retry_hint_emitted=True,
-        findings=[{"pattern_id": "1.4", "level": "error",
+        findings=[{"pattern_id": "content.integrity_suppression_flag", "level": "error",
                    "file": "x.md", "line": 5, "snippet": "Hill 1980"}],
     )
     d = asdict(row)
     assert d["ts"] == "2026-05-24T03:45:32.123456Z"
-    assert d["pattern_fires"] == ["1.4"]
+    assert d["pattern_fires"] == ["content.integrity_suppression_flag"]
     assert d["findings"][0]["snippet"] == "Hill 1980"
 
 
@@ -116,17 +116,57 @@ def test_read_rows_since_filter_drops_earlier_rows(tmp_path):
     assert rows[0]["ts"].startswith("2026-05-24T02")
 
 
+def test_append_row_also_chain_appends_with_matching_root(tmp_path):
+    """Task 2 slice 3b (owner decision: unify): append_row's row must ALSO land in the same
+    tmp_path's chain (kind='audit'), verifiable via ledger.verify_chain(root=tmp_path) -- proving
+    the chain write used the CALLER's explicit root, never MAKOTO_STATE_DIR (which is unset in
+    this test on purpose -- a leak to the real env would still pass a naive assertion but fail
+    this one, since the chain would be empty at tmp_path)."""
+    from makoto import ledger as _ledger
+    append_row(tmp_path, _sample_row(event="live.stop"))
+    assert _ledger.verify_chain(root=tmp_path) is None
+    rows = _ledger.read(root=tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "audit"
+    assert rows[0]["event"] == "live.stop"
+    assert rows[0]["prev_hash"] == ""
+
+
+def test_append_row_audit_jsonl_line_carries_additive_chain_fields(tmp_path):
+    """The audit.jsonl line itself gains prev_hash/row_hash as ADDITIVE fields (existing readers
+    use dict.get, so this is back-compatible), and two appends chain-link correctly."""
+    append_row(tmp_path, _sample_row(session_id="a"))
+    append_row(tmp_path, _sample_row(session_id="b"))
+    rows = list(read_rows(tmp_path))
+    assert len(rows) == 2
+    assert rows[0]["prev_hash"] == ""
+    assert rows[1]["prev_hash"] == rows[0]["row_hash"]
+
+
+def test_append_row_chain_fault_never_blocks_audit_jsonl_write(tmp_path, monkeypatch):
+    """A chain-append fault must never lose the older, more foundational fires log -- audit.jsonl
+    still gets its row even if the chain write raises."""
+    import makoto.ledger as _ledger
+    def _boom(*a, **k):
+        raise RuntimeError("chain unavailable")
+    monkeypatch.setattr(_ledger, "append", _boom)
+    append_row(tmp_path, _sample_row(event="live.stop"))
+    rows = list(read_rows(tmp_path))
+    assert len(rows) == 1
+    assert rows[0]["event"] == "live.stop"
+
+
 def test_append_error_writes_to_dispatch_errors_jsonl(tmp_path):
     """append_error writes one JSON line to <state_root>/dispatch_errors.jsonl."""
     try:
         raise ValueError("boom")
     except ValueError as exc:
-        append_error(tmp_path, event_id=42, pattern_id="1.6", exc=exc)
+        append_error(tmp_path, event_id=42, pattern_id="content.phantom_citation", exc=exc)
     log = tmp_path / "dispatch_errors.jsonl"
     assert log.is_file()
     row = json.loads(log.read_text().strip())
     assert row["event_id"] == 42
-    assert row["pattern_id"] == "1.6"
+    assert row["pattern_id"] == "content.phantom_citation"
     assert row["exc_type"] == "ValueError"
     assert "boom" in row["exc_message"]
     assert "ts" in row

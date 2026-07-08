@@ -3,8 +3,10 @@
 Pipeline:
   stdin -> parse JSON -> ensure DB exists (lazy init) -> connect (with retry)
   -> refresh citations -> INSERT event (lastrowid) -> SELECT recent slice
-  -> keyword prefilter -> iterate candidate predicates -> build decision
-  -> stdout JSON if any error-level finding -> append audit row -> exit 0.
+  -> keyword prefilter -> iterate candidate predicates -> fold worst outcome
+  through the configured posture (makoto.posture) -> render via the per-edge
+  wire table (makoto.wire) -> stdout JSON iff non-empty -> append audit row
+  -> exit 0.
 
 main() is the thin orchestrator. Each stage is a small helper:
   _ensure_db_initialized, _connect_with_retry, _ingest_event,
@@ -27,15 +29,18 @@ from typing import Optional
 
 from makoto.schema import load_prechecks, PreCheck, Finding
 from makoto.state import _state_dir
-from makoto import citations, audit
+from makoto import citations, audit, posture, wire
 from makoto.audit import AuditRow
 from makoto.lib import factories
-from makoto.stopchecks import load_stopchecks, GateContext
+from makoto.stopchecks import GateContext  # load_stopchecks itself is no longer called
+                                            # here (SPEC-C item 2) -- run_stop_checks now
+                                            # sources its catalog from checks._loader.
 
 
 _EVENT_MAP = {
-    "PreToolUse": "live.pre_tool_use",
-    "Stop":       "live.stop",
+    "PreToolUse":   "live.pre_tool_use",
+    "Stop":         "live.stop",
+    "SubagentStop": "live.subagent_stop",
 }
 
 
@@ -114,6 +119,25 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool) -
                            exc=_Unevaluable(f"{disposition}: {reason}"))
     except Exception:
         pass
+
+
+def _self_verify_chain(state_dir: Path) -> None:
+    """Task 2 slice 3 (owner: "Makoto should read its own ledger for verification -- its things
+    literally depend on it"). Re-derives the chain's own tamper-evidence at every dispatch, the
+    same every-event cadence Assay's kernel ran. OWNER DECISION (2026-07-07): advisory-first,
+    block-after-soak -- this ships ADVISORY ONLY (an on-the-record dispatch fact + a stderr line,
+    never a block) until real-session soak evidence earns the flip to block, itself a later,
+    separately-certified change. A clean or absent/empty chain is vacuously silent (verify_chain's
+    own contract). NEVER RAISES: a verification fault must not crash the hot path it protects."""
+    try:
+        from makoto import ledger as _ledger
+        broken_at = _ledger.verify_chain()
+    except Exception as exc:
+        _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}", blocked=False)
+        return
+    if broken_at is not None:
+        _dispatch_fact(state_dir, "chain_tamper",
+                       f"chain integrity broken at row index {broken_at}", blocked=False)
 
 
 def _ensure_db_initialized(state_dir: Path, db_path: Path) -> bool:
@@ -230,9 +254,18 @@ def _disabled_pattern_ids() -> frozenset[str]:
 
     Empty / unset env var -> empty set (no patterns disabled). Whitespace and
     blank entries are tolerated.
+
+    SPEC-C item 3 (one namespace): the configured set is closed under
+    `checks._aliases.canonical` so an operator's EXISTING config naming a check by its legacy id
+    (e.g. `MAKOTO_DISABLE_PATTERNS=makoto.contract_order`, from before that check was renamed to
+    `gate.contract_order`) keeps muting the same live check forever -- every discovered check's
+    own `.id` is always its CURRENT canonical form, so without this expansion a legacy-id config
+    would silently stop matching anything the moment a rename landed.
     """
+    from makoto.checks._aliases import canonical
     raw = os.environ.get("MAKOTO_DISABLE_PATTERNS", "")
-    return frozenset(p.strip() for p in raw.split(",") if p.strip())
+    configured = frozenset(p.strip() for p in raw.split(",") if p.strip())
+    return configured | frozenset(canonical(p) for p in configured)
 
 
 def _gates_enabled() -> bool:
@@ -255,18 +288,26 @@ def _gates_enabled() -> bool:
 
 @lru_cache(maxsize=1)
 def _blocking_gate_ids() -> frozenset:
-    """The Stop-gate finding ids that BLOCK when gates are enabled. DERIVED from load_stopchecks(),
-    not a hand-synced literal: discovered <=> live <=> blocking — there is no
-    audit-only (shadow) tier, so every discovered gate is in this set by construction (adding a gate
-    cannot create a silent shadow gate). The former check.quantity (§7.2) shadow gate was CUT
-    2026-06-02 (warning-tier-elimination cert): a gate that cannot block FP-safely is an illusory
-    word. Every makoto signal BLOCKS or does not exist.
+    """The Stop-gate finding ids that BLOCK when gates are enabled. SPEC-C item 2 (FABLE DECISION,
+    2026-07-07): DERIVED from each check's own declared `.posture` via `checks._loader.load_checks
+    (edge="Stop")`, not from mere presence in `load_stopchecks()`'s GATE discovery. Before this
+    change, "blocking-eligible" meant "discovered" and a SEPARATE, hand-maintained
+    `_ADVISORY_ALLOWLIST` (test_stop_gate_level_invariant.py) excused the 2 ids that are discovered
+    but must never actually block (gate.self_wired, gate.canon_fingerprints_advisory) — a
+    presence-based membership test that says "eligible" for two ids that structurally can't be.
+    Deriving from `.posture == BLOCK` instead makes "blocking-eligible" mean precisely what it
+    says: the word gets MORE checkable, not less (the falsifiability-preservation invariant this
+    project is built on). Same "no shadow tier" property, restated structurally: every check whose
+    posture says BLOCK is in this set, every check whose posture says otherwise is not — no
+    allowlist needed. Case-insensitive compare: check modules author their CHECK's posture value
+    two ways today (a literal "BLOCK" string in most files, or the actual `makoto.posture.BLOCK`
+    lowercase constant in a few) — both mean the same outcome tier, so this reads either.
 
-    Lazy + memoized: the loader imports every stopcheck_*.py module, and Pre/PostToolUse
-    dispatches (the per-event hot path) never consult this set — as a module-level constant they
-    paid that import cost on every event. Stop dispatches load the same modules via
-    run_stop_checks anyway, so laziness changes no Stop behavior."""
-    return frozenset(c.id for c in load_stopchecks())
+    Lazy + memoized: Stop dispatches load the same modules via run_stop_checks anyway, so
+    laziness changes no Stop behavior."""
+    from makoto.checks._loader import load_checks
+    return frozenset(c.id for c in load_checks(edge="Stop")
+                      if str(c.posture).strip().lower() == posture.BLOCK)
 
 
 def _run_predicates(conn, payload: dict, history: list, event_id: int,
@@ -321,7 +362,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     return findings
 
 
-def run_stop_checks(conn, payload: dict, history=()) -> list:
+def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
     """Source + evaluate the completion / advance / green_claim gates for a Stop event.
 
     Reads the REAL `last_assistant_message` field; records any newly-stated located
@@ -364,6 +405,11 @@ def run_stop_checks(conn, payload: dict, history=()) -> list:
         opens = _C.open_commitments(conn, sid)
         touched = _ledger.touched_keys(conn, sid)
         empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
+        from makoto import plan as _plan
+        try:
+            plan = _plan.load_plan(conn, sid)                # SPEC-5: the declared contract Plan
+        except Exception:
+            plan = None                                      # fail-open per-store, like every other read above
 
         def fs_exists(p):
             try:
@@ -387,26 +433,42 @@ def run_stop_checks(conn, payload: dict, history=()) -> list:
                 pass
             return None
 
-        # Build the Stop substrate ONCE, then evaluate every live gate discovered by load_stopchecks().
-        # discovered <=> live <=> blocking — there is no shadow tier. Each gate module owns its own
-        # adapter (GateContext -> the gate's heterogeneous signature), so this loop never names a
-        # gate. gate.dropped resolves against the agent's OWN ledger (touched_keys) + cwd-relative
-        # fs_exists/fs_read via ctx.roots=[cwd] — NOT an unbounded os.walk (a Stop-hot-path landmine).
-        # meaning_gate / hidden_retraction were CUT (io-purge B3): designs + measured FP evidence
-        # live in docs/MAKOTO-BIBLE.md; git history is the recovery path.
+        # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
+        # edge (SPEC-C item 2: unified via checks._loader.load_checks, superseding the old
+        # load_stopchecks()-only loop -- this ALSO now naturally includes makoto.stale_establisher
+        # and gate.undeclared_falsifiable, formerly special-cased direct-call carve-outs below this
+        # comment, because neither exports a GATE and load_stopchecks() never discovered them.
+        # Sorted by id for a stable, deterministic evaluation order (load_stopchecks() sorted the
+        # same way; preserved here as a behavior-neutral property of the migration, not a new one).
+        # Each check module owns its own adapter (GateContext -> the gate's heterogeneous
+        # signature), so this loop never names a gate. gate.dropped resolves against the agent's
+        # OWN ledger (touched_keys) + cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an
+        # unbounded os.walk (a Stop-hot-path landmine). meaning_gate / hidden_retraction were CUT
+        # (io-purge B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history
+        # is the recovery path.
+        from makoto.checks._loader import load_checks
         ctx = GateContext(
             text=text, touched=touched, empty=empty, opens=opens,
             testrun_output=_ledger.latest_testrun(conn, sid),
             cwd=cwd, fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
             history=history,   # faithful events-table rows (A1.3) — fabrication gates walk this
+            # Additive decode-layer extension (observability-only, no gate reads these yet):
+            # permission_mode/agent_id/agent_type are confirmed-real top-level hook payload
+            # fields (Claude Code hooks reference) that _dispatch.py never extracted before.
+            permission_mode=payload.get("permission_mode"),
+            agent_id=payload.get("agent_id"),
+            agent_type=payload.get("agent_type"),
+            plan=plan,   # SPEC-5: read by contractOrder's Stop GATE + staleEstablisher's CHECK.run
+            session_id=sid, transcript_path=payload.get("transcript_path"),
+            state_root=root,   # Task 2 slice 5: canonFingerprints.py's ack-block discharge
         )
         out = []
-        for check in load_stopchecks():
+        for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
             try:
                 finding = check.run(ctx)
             except Exception:
                 continue   # fail-open PER CHECK: one check's fault must not suppress the others
-            # StopCheck.run -> Optional[Finding] | list[Finding]: most gates yield one finding, but
+            # Check.run -> Optional[Finding] | list[Finding]: most gates yield one finding, but
             # gate.liveness yields a list (a closed unit can have many illusory statements).
             # Normalize: a list/tuple is extended, a single finding appended, None ignored.
             if finding is None:
@@ -429,8 +491,8 @@ def run_stop_checks(conn, payload: dict, history=()) -> list:
 # marker — the seal on the mint cannot be signed by the would-be forger; gate.* check claims
 # against the ledger, where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
-    "1.1", "1.2", "1.4", "1.5", "1.6", "1.26", "1.27", "1.28", "1.29", "1.30",
-    "1.31", "1.32", "1.33", "1.34"})
+    "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.cert_verify_disabled", "content.verifier_body_hollowed", "content.jwt_signature_disabled", "content.cert_none_mode", "content.timing_unsafe_compare",
+    "content.jwt_none_alg", "content.paramiko_host_key_weakened", "content.cert_reqs_none", "content.illusory_authorship_trailer"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
                "(any comment style) — an on-the-record, auditable rationale, never a disguise.")
@@ -447,7 +509,15 @@ def _jit_hint(finding: Finding) -> str:
 
 
 def _build_decision(findings: list[Finding]) -> Optional[dict]:
-    """emit block decision iff any error-level finding exists (v5 fix #25)."""
+    """emit block decision iff any error-level finding exists (v5 fix #25).
+
+    SPEC-5 Task 8: main()'s live emission no longer calls this — it folds findings through
+    posture.py/wire.py instead (see `_emit_decision`) so ADVISE/ASK-postured findings can reach
+    the wire too, not just error-level ones. This function is kept exactly as it was (same
+    ad-hoc shape: reason/retry_hint/additional_findings) because tests/test_conventions_jit.py
+    unit-tests it directly as the JIT-hint-composition primitive (which convention text a check
+    contributes, and whether it offers the makoto-allow hatch) independent of the wire shape.
+    """
     errors = [f for f in findings if f.level == "error"]
     if not errors:
         return None
@@ -459,11 +529,64 @@ def _build_decision(findings: list[Finding]) -> Optional[dict]:
     }
 
 
-def _emit_decision(findings: list[Finding], stream=None) -> None:
-    """write the block-decision JSON to stdout if any error-level finding exists."""
-    decision = _build_decision(findings)
-    if decision is not None:
-        (stream or sys.stdout).write(json.dumps(decision))
+_OUTCOME_FOR_LEVEL = {"error": posture.BLOCK, "advisory": posture.ADVISE}
+_OUTCOME_RANK = {posture.BLOCK: 3, posture.ASK: 2, posture.ADVISE: 1, posture.ALLOW: 0}
+# The live Claude Code hook-event name -> the edge name wire.dispatch_posture expects. Only
+# PreToolUse renames (to "Pre"); Stop/SubagentStop pass through unchanged (wire.py's Stop table
+# serves both, keyed by the SAME edge string "Stop"/"SubagentStop" it also echoes as hook_name).
+_HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post", "Stop": "Stop",
+                "SubagentStop": "SubagentStop"}
+# "PostToolUse" was missing until Task 3's test-delta redirect became the first PostToolUse
+# caller of _emit_decision -- previously latent (the .get(..., "Pre") fallback silently rendered
+# the WRONG edge's wire shape, with hookEventName="PreToolUse" on a PostToolUse response, had
+# anything ever called _emit_decision from the PostToolUse branch before now).
+
+
+def _worst_finding(findings: list[Finding]) -> Optional[tuple[str, Finding]]:
+    """Pick the worst-outcome finding — BLOCK > ASK > ADVISE > ALLOW, first one at that rank
+    (matching `_build_decision`'s old `errors[0]` precedent when multiple BLOCK findings fire).
+    A level this catalog never emits (anything but 'error'/'advisory') maps to ALLOW, per the
+    posture-vocabulary's own fail-open rule for an unrecognized outcome."""
+    best = None
+    for f in findings:
+        outcome = _OUTCOME_FOR_LEVEL.get(f.level, posture.ALLOW)
+        if best is None or _OUTCOME_RANK[outcome] > _OUTCOME_RANK[best[0]]:
+            best = (outcome, f)
+    return best
+
+
+def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
+                   permission_mode=None) -> None:
+    """Fold the worst fired outcome through the configured MAKOTO_MODE posture (posture.py) and
+    render it via wire.dispatch_posture's per-edge table, writing the body to stdout iff non-empty.
+
+    This is the real posture pipeline (SPEC-5 Task 8), replacing the old single ad-hoc
+    "decision":"block" shape that main() used identically for every edge. A BLOCK outcome carries
+    the finding's message plus its JIT hint (convention text / makoto-allow hatch / conventions
+    pointer — the same text `_build_decision` used to put in "retry_hint") as the Decision's
+    `.detail`, so wire.py's per-edge renderer surfaces it in place of its constant reason text.
+    An ADVISE/ASK outcome at an edge whose table has no entry for it (e.g. ADVISE at Stop/
+    SubagentStop — everything but BLOCK renders `{}` there by wire.py's own design) — and no
+    findings at all — both fall through to "write nothing", matching the old None-decision case.
+
+    `permission_mode` (D6, additive): threaded into `posture.apply` so a session running
+    bypassPermissions/dontAsk is clamped to STRICT regardless of the operator's configured
+    MAKOTO_MODE — see `posture.is_oversight_clamped`'s own docstring for why.
+    """
+    worst = _worst_finding(findings)
+    if worst is None:
+        return
+    outcome, finding = worst
+    detail = finding.message
+    if outcome == posture.BLOCK:
+        hint = _jit_hint(finding)
+        if hint:
+            detail = f"{detail}\n{hint}"
+    folded = posture.apply(posture.Decision(outcome, detail), posture.posture(),
+                           permission_mode=permission_mode)
+    body = wire.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
+    if body:
+        (stream or sys.stdout).write(json.dumps(body))
 
 
 def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> None:
@@ -475,6 +598,13 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
     if not findings:
         return
     hook_event_name = payload.get("hook_event_name", "")
+    permission_mode = payload.get("permission_mode")
+    # D6: record the clamp -- never override softening SILENTLY. None (the common case) when
+    # this event's permission_mode isn't one of the two reduced-oversight modes.
+    oversight_clamp = None
+    if posture.is_oversight_clamped(permission_mode):
+        oversight_clamp = {"active": True, "configured_mode": posture.posture(),
+                           "permission_mode": permission_mode}
     row = AuditRow(
         ts=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         event=_EVENT_MAP.get(hook_event_name, hook_event_name),
@@ -486,6 +616,7 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
         retry_hint_emitted=any(f.retry_hint for f in findings),
         findings=[asdict(f) for f in findings],
         tool_name=payload.get("tool_name", ""),
+        oversight_clamp=oversight_clamp,
     )
     audit.append_row(state_dir, row)
 
@@ -497,6 +628,7 @@ def main() -> int:
     on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md."""
     payload_raw = sys.stdin.read()
     state_dir = _state_dir()
+    _self_verify_chain(state_dir)
     payload = _parse_payload(payload_raw)
     if payload is _PARSE_FAILED:
         # unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON) ->
@@ -521,25 +653,64 @@ def main() -> int:
         citations.refresh_if_stale(conn)
         event_id = _ingest_event(conn, payload, payload_raw)
         hook_event = payload.get("hook_event_name", "")
-        if hook_event == "PostToolUse":
-            # Accumulation branch: store the event (already done by _ingest_event
-            # above so history-walking predicates can see tool_results), capture
-            # citations for research-class tools, and record the `update` ledger row
-            # (Write/Edit touch, Bash result; latest-wins). No predicate evaluation
-            # and no block — PostToolUse is for accumulation, never decision.
+        if hook_event == "SessionStart":
+            # SPEC-5 (Makoto absorbs Assay): admit a declared Plan from the on-disk artifact.
+            # SessionStart never blocks — it is an admission step, not a gate — so this always
+            # returns 0 regardless of whether a plan was actually declared.
             try:
-                citations.capture(
+                from makoto import plan as _plan
+                _plan.declare_from_session_artifact(
+                    payload.get("cwd") or os.getcwd(),
+                    payload.get("session_id", ""),
                     conn,
-                    payload.get("tool_name", ""),
-                    payload.get("tool_response", ""),
+                    source=payload.get("source", ""),
                 )
             except Exception as exc:
-                print(f"makoto._dispatch: capture failed (non-fatal): {exc}",
+                print(f"makoto._dispatch: plan declare failed (non-fatal): {exc}",
                       file=sys.stderr)
+            return 0
+        if hook_event == "PostToolUse":
+            # Accumulation branch: store the event (already done by _ingest_event
+            # above so history-walking predicates can see tool_results) and record
+            # the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
+            # No predicate evaluation and no block — PostToolUse is for accumulation,
+            # never decision. (SPEC-5 Task 8: citations.capture() removed here — see
+            # makoto/citations.py; refresh_if_stale above and record_update below are
+            # separate call sites and stay.)
             try:
                 from makoto import ledger as _ledger
+                from makoto.lib.io import bash_output_text, is_test_runner
+                from makoto.checks._testDelta import compute_delta
+                sid = payload.get("session_id", "")
+                delta_finding = None
+                # Task 3, the domain correction (test-delta redirect): compute the delta vs the
+                # PRIOR recorded testrun BEFORE record_update's upsert overwrites it -- the only
+                # point where "prior" is still readable. ADVISE-tier (Post has no fire_level
+                # invariant -- Pre's error-only rule doesn't apply here): a factual diff is always
+                # safe to surface, never a toothless hedge, so no discrimination problem exists.
+                if payload.get("tool_name") == "Bash":
+                    cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
+                    if is_test_runner(cmd):
+                        prior_output = _ledger.latest_testrun(conn, sid)
+                        tr = payload.get("tool_response", {})
+                        new_output = bash_output_text(tr) if isinstance(tr, dict) else ""
+                        delta = compute_delta(prior_output, new_output)
+                        if delta:
+                            delta_finding = Finding(
+                                pattern_id="makoto.test_delta", file="", line=0, level="advisory",
+                                message=f"Test delta vs the prior recorded run: {delta}",
+                                retry_hint="")
                 _ledger.record_update(conn, payload, event_id=event_id,
-                                      session_id=payload.get("session_id", ""))
+                                      session_id=sid, root=state_dir)
+                if delta_finding is not None:
+                    delta_finding = replace(delta_finding, source_event_id=event_id)
+                    _emit_decision([delta_finding], hook_event,
+                                   permission_mode=payload.get("permission_mode"))
+                    # Found while building the D9 demo corpus: without this, the delta redirect's
+                    # own finding was invisible to the audit trail and the chain -- contradicting
+                    # Task 2's "every dispatch audit row is chain-appended" invariant. The redirect
+                    # fired on the wire correctly; it just never left a record of having fired.
+                    _record_audit(state_dir, [delta_finding], payload)
             except Exception as exc:
                 print(f"makoto._dispatch: ledger update failed (non-fatal): {exc}",
                       file=sys.stderr)
@@ -547,22 +718,25 @@ def main() -> int:
         history = _select_recent(conn, payload.get("session_id", ""), event_id)
         findings = _run_predicates(conn, payload, history, event_id,
                                     state_dir, payload_raw)
-        # Gates evaluate on Stop (real last_assistant_message). The three Stop gates — completion,
-        # advance, and green_claim — block live under the single _gates_enabled() switch (each
-        # validated FP-clean on the 1335-session corpus; green_claim measured POWERED with real
-        # Bash output reconstructed in cert.replay_stop). All gate fires are always recorded to the
-        # audit log, block or not, so any future real-session FP can still be mined.
+        # Gates evaluate on Stop AND SubagentStop (real last_assistant_message) — a SubagentStop
+        # payload carries the same shape (last_assistant_message, session_id, cwd, etc.) as a
+        # main-thread Stop, so a sub-agent's own completion claim is checked by the same gates.
+        # The three Stop gates — completion, advance, and green_claim — block live under the
+        # single _gates_enabled() switch (each validated FP-clean on the 1335-session corpus;
+        # green_claim measured POWERED with real Bash output reconstructed in cert.replay_stop).
+        # All gate fires are always recorded to the audit log, block or not, so any future
+        # real-session FP can still be mined.
         gate_findings = []
-        if hook_event == "Stop":
-            # StopCheck findings get the same central provenance stamp: the Stop event they
-            # were evaluated against.
+        if hook_event in ("Stop", "SubagentStop"):
+            # StopCheck findings get the same central provenance stamp: the Stop/SubagentStop
+            # event they were evaluated against.
             gate_findings = [replace(f, source_event_id=event_id)
-                             for f in run_stop_checks(conn, payload, history)]
+                             for f in run_stop_checks(conn, payload, history, root=state_dir)]
         blocking = list(findings)
         if _gates_enabled():
             blocking += [gf for gf in gate_findings
                          if gf.pattern_id in _blocking_gate_ids()]
-        _emit_decision(blocking)
+        _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"))
         _record_audit(state_dir, findings + gate_findings, payload)
     except Exception as exc:
         # an unexpected fault in evaluation must never crash the hook to a non-zero exit, and must

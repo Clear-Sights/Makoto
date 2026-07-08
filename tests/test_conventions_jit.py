@@ -47,14 +47,14 @@ def test_installed_block_is_three_lines_and_complete(tmp_path):
 
 # --- (2) JIT hint at fire time ------------------------------------------------
 def test_block_decision_carries_hatch_for_exempting_check():
-    d = _build_decision([_err("1.1")])
+    d = _build_decision([_err("content.verifier_predicate_weakened")])
     assert d is not None and _HATCH in d["retry_hint"], "exempting check must offer the hatch"
     assert _POINTER in d["retry_hint"], "every block must point at the conventions"
     assert d["retry_hint"].startswith("fix it"), "the pattern's own convention stays first"
 
 
 def test_block_decision_suppresses_hatch_where_marker_is_refused():
-    for pid in ("1.23", "1.9", "1.21", "1.22", "gate.completion"):
+    for pid in ("content.self_mute_guard", "content.unsourced_webfetch", "content.verifier_exit_masking", "content.fabricated_commit_sha", "gate.completion"):
         d = _build_decision([_err(pid)])
         assert d is not None and _HATCH not in d["retry_hint"], \
             f"{pid} refuses the marker — offering the hatch is false guidance"

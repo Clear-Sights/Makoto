@@ -18,6 +18,7 @@ Tables (all idempotent via IF NOT EXISTS):
   config              — key/value seed (canonical_citations_path + _mtime)
   ledger              — results/touches keyed by normalized location, latest-wins
   commitments         — open located commitments the advance gate reads (un-windowed)
+  plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
 
 Spec: docs/archive/specs/2026-05-31-makoto-bidirectional-falsifiability-design.md §8 (stores).
 """
@@ -98,6 +99,17 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 retract_param   TEXT,
                 created_event_id INTEGER,
                 ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            )
+        """)
+        # plans — one declared contract Plan (SPEC-5 Makoto-absorbs-Assay merge) per session,
+        # latest-wins on the WHOLE plan (mirrors Assay's declare/_persist semantics: declare
+        # replaces the whole plan, mark_done+resync persists the whole plan again). `rows` is
+        # the JSON-encoded list of PlanNode row dicts, in plan (ledger) order.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS plans (
+                session_id TEXT PRIMARY KEY,
+                rows       TEXT NOT NULL,
+                ts         TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
         # config seed rows (single source of truth for citations path + mtime).

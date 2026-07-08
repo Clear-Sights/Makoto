@@ -45,7 +45,15 @@ def _cmd_pattern_list() -> int:
 
 
 def _cmd_pattern_show(pid: str) -> int:
-    """print full detail for one pattern + the first 30 lines of its predicate module."""
+    """print full detail for one pattern + the first 30 lines of its predicate module.
+
+    SPEC-C item 3: `pid` is resolved through the legacy-id alias table first, so an operator
+    who types a check's OLD id (from memory, an old script, a bookmarked doc) still gets the
+    same live check after a rename -- the CLI honors the same "an old id is never dead, it's
+    an alias" guarantee MAKOTO_DISABLE_PATTERNS already gets.
+    """
+    from makoto.checks._aliases import canonical
+    pid = canonical(pid)
     patterns = {p.id: p for p in load_prechecks()}
     if pid not in patterns:
         print(f"makoto: no pattern with id {pid!r}; available: {', '.join(sorted(patterns))}",
@@ -69,6 +77,15 @@ def _cmd_pattern_show(pid: str) -> int:
                 print(f"{i:>3}  {line}")
         except Exception as exc:
             print(f"(could not load predicate source: {exc})", file=sys.stderr)
+    return 0
+
+
+def _cmd_receipt(session_id: str | None) -> int:
+    """print the current receipt (Task 2 slice 4) as JSON -- a pure read-time view over the
+    chain, never a persisted row. Fail-soft: no chain yet -> a vacuous all-zero receipt, exit 0
+    (matching `_cmd_show`'s "no DB yet" discipline; this is inspection, never a gate)."""
+    from makoto.receipt import emit_receipt
+    print(json.dumps(emit_receipt(session_id=session_id), indent=2))
     return 0
 
 
@@ -107,6 +124,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("uninstall")
     sp_show = sub.add_parser("show", help="read the results ledger by key")
     sp_show.add_argument("key", help="normalized location key, e.g. src/auth.py")
+    sp_receipt = sub.add_parser("receipt", help="print the current chain receipt (JSON)")
+    sp_receipt.add_argument("--session", dest="session_id", default=None,
+                            help="scope the receipt to one session_id (default: whole chain)")
     pat = sub.add_parser("pattern", help="inspect the catalog")
     pat_sub = pat.add_subparsers(dest="pat_action", required=True)
     pat_sub.add_parser("list", help="show all patterns as a table")
@@ -129,6 +149,8 @@ def main() -> int:
         return cmd_uninstall()
     if args.cmd == "show":
         return _cmd_show(args.key)
+    if args.cmd == "receipt":
+        return _cmd_receipt(args.session_id)
     if args.cmd == "pattern":
         if args.pat_action == "list":
             return _cmd_pattern_list()
