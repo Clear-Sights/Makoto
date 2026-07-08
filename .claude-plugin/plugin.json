@@ -1,10 +1,10 @@
 {
   "name": "makoto",
-  "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned. Two-tier catalog (18 pre-checks, 8 Stop gates), each shipped at measured zero false positives.",
-  "version": "1.4.0",
-  "author": {"name": "skill-labV2"},
-  "homepage": "https://github.com/skill-labV2/Makoto",
-  "repository": "https://github.com/skill-labV2/Makoto",
+  "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned (two narrow advisory self-checks excepted). Two-tier catalog (22 pre-checks, 14 Stop gates), each shipped at measured zero false positives.",
+  "version": "2.0.0",
+  "author": {"name": "Clear-Sights"},
+  "homepage": "https://github.com/Clear-Sights/Makoto",
+  "repository": "https://github.com/Clear-Sights/Makoto",
   "license": "Apache-2.0",
   "keywords": ["claude-code", "guardrails", "integrity", "hooks", "makoto"]
 }

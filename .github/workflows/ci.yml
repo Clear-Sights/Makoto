@@ -25,7 +25,7 @@ jobs:
 
   test-macos:
     # public repo only: macOS minutes bill 10x on private repos (the dev mirror)
-    if: github.repository == 'skill-labV2/Makoto'
+    if: github.repository == 'Clear-Sights/Makoto'
     name: pytest (macos, py3.13)
     runs-on: macos-latest
     steps:

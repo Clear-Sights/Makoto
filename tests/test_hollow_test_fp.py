@@ -232,7 +232,12 @@ def test_corpus_fp_makoto_own_tests():
                     "git ls-files has nothing to enumerate")
     rep = measure(_corpus_py_files("makoto"))
     fires_by_func = {f["func"] for f in rep["detail"]}
-    assert fires_by_func == {"test_validate_predicate_modules_passes_on_current_catalog"}, (
+    # test_validate_predicate_modules_passes_on_current_catalog was the one known, accepted
+    # hollow-test-shaped fire here (relied on implicit SystemExit propagation with no explicit
+    # assertion); fixed 2026-07-08 (explicit try/except + assert not raised, teeth-verified
+    # against a monkeypatched broken catalog). The corpus is now genuinely FP-clean: no known
+    # artifact remains to pin.
+    assert fires_by_func == set(), (
         f"unexpected fire set (triage new fires before changing this assertion): {rep['detail']}")
 
 
