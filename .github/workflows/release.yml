@@ -1,0 +1,49 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 2.0.0), must match a CHANGELOG.md ## [X.Y.Z] heading'
+        required: true
+        default: '2.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          awk -v ver="$VERSION" '
+            $0 ~ ("^## \\[" ver "\\]") {flag=1; next}
+            flag && /^## \[/ {flag=0}
+            flag {print}
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "No CHANGELOG.md section found for version $VERSION (expected a '## [$VERSION]' heading)" >&2
+            exit 1
+          fi
+          echo "--- extracted notes ---"
+          cat release_notes.md
+
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TAG="v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -F release_notes.md
+          git push origin "$TAG"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release_notes.md
