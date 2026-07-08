@@ -1,6 +1,8 @@
 # Makoto
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Clear-Sights/Makoto)](https://github.com/Clear-Sights/Makoto/releases)
+[![License](https://img.shields.io/github/license/Clear-Sights/Makoto)](LICENSE)
 
 **An integrity hook for Claude Code that watches the agent's _own_ tool calls and blocks the ones
 that fake a check.** When Claude says it did something (ran the tests, cited a paper, committed the
@@ -317,6 +319,8 @@ corpus above) against a fresh, throwaway state dir each, and captures the genuin
 <img src="docs/demo/screenshots/block.svg" alt="a genuine PreToolUse block" width="700"><br>
 <img src="docs/demo/screenshots/receipt.svg" alt="word -> deed -> record -> receipt, end to end" width="700"><br>
 <img src="docs/demo/screenshots/configchange.svg" alt="a ConfigChange advisory fire" width="700">
+
+Each SVG is rendered directly from that scenario's real logged stdout/stderr, not hand-written.
 
 Regenerate: `python docs/demo/render_demo.py && python docs/demo/render_svg.py` (the latter needs
 `humanize`, `pip install humanize`, for demo-only friendlier byte counts; never a core-package
