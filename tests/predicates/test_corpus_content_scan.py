@@ -21,8 +21,8 @@ import os
 import re
 import importlib
 import pytest
-from makoto.checks._aliases import canonical
-from makoto.schema import PreCheck, load_prechecks
+from makoto.substrate._aliases import canonical
+from makoto.core.schema import PreCheck, load_prechecks
 
 # A file_path that matches each content-scan pattern's target_rx (so the gate passes).
 _PATH = {

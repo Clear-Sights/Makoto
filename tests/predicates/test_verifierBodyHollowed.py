@@ -12,7 +12,7 @@ permissive base-class/null-object `return True` methods (they live elsewhere).
 """
 from __future__ import annotations
 from makoto.checks.verifierBodyHollowed import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.verifier_body_hollowed", fire_level="error",
                description="verifier hollowed — body gutted to return-True/pass", retry_hint="x")

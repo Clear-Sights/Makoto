@@ -2,13 +2,13 @@ from __future__ import annotations
 import re
 from typing import Optional
 from makoto.checks import normalize_path
-from makoto.schema import Finding
-from makoto.lexicons import (
+from makoto.core.schema import Finding
+from makoto.core.lexicons import (
     _NEGATION_RX, _UNIVERSAL_DONE_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _ENUM_BEFORE_HEAD_RX,
 )
-from makoto.lib.claims import _code_spans
-from makoto.checks._shared import _discharged, _path_components
-from makoto.checks._shared import StopCheck
+from makoto.substrate.claims import _code_spans
+from makoto.substrate._shared import _discharged, _path_components
+from makoto.substrate._shared import StopCheck
 
 
 # A version/variant rename suffix on a basename stem: parser_v2, config_old, handler-final, foo_copy.
@@ -123,5 +123,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.advance", applies_at="Stop", posture="BLOCK", run=GATE.run)

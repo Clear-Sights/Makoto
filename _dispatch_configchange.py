@@ -5,7 +5,7 @@ entry invokes via `python3 -m makoto._dispatch_configchange`.
 authorization).** `.claude/settings.json` carries a live `ConfigChange` entry pointing at this
 module via `dispatch_configchange.sh`. See `docs/self-defense-asymmetry-followup.md`'s
 "2026-07-05 followup" sections for the design history; the pure predicate this module calls
-(`makoto.configchange_verdict.configchange_verdict`) is unit-tested against constructed payloads.
+(`makoto.verdict.configchange_verdict.configchange_verdict`) is unit-tested against constructed payloads.
 
 **TWO TIERS, both owner-authorized (D5, docs/DEFERRED.md):**
   1. **ADVISORY** (unconditional, per FABLE DECISION 6/9's precedent): the underlying verdict
@@ -39,9 +39,9 @@ import sys
 from datetime import datetime, timezone
 from typing import Optional
 
-from makoto.audit import AuditRow, append_row
-from makoto.configchange_verdict import configchange_verdict
-from makoto.state import _state_dir
+from makoto.record.audit import AuditRow, append_row
+from makoto.verdict.configchange_verdict import configchange_verdict
+from makoto.record.state import _state_dir
 
 
 def _make_fs_read(payload: dict):

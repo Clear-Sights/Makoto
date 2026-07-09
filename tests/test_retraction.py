@@ -13,10 +13,8 @@ contamination canary: a blanket clear-all reds the FP guards; a clear-none reds 
 """
 import sqlite3
 
-from makoto.retraction import surfaced_retraction_locations as surfaced
-from makoto import commitments as C
-
-
+from makoto.verdict.retraction import surfaced_retraction_locations as surfaced
+from makoto.session import commitments as C
 def _has(text, path):
     from makoto.checks import normalize_path
     return normalize_path(path) in surfaced(text)

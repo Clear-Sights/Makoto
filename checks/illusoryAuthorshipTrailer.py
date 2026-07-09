@@ -19,8 +19,8 @@ Knight-Leveson: stdlib re only.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.schema import Finding, PreCheck
-from makoto.lib.factories import scan_target_content, makoto_allowed
+from makoto.core.schema import Finding, PreCheck
+from makoto.substrate.factories import scan_target_content, makoto_allowed
 
 # The illusory authorship trailer, Claude-gated. Case-insensitive: git/GitHub emit
 # "Co-authored-by:", the CLAUDE.md convention emitted "Co-Authored-By:". A human
@@ -65,7 +65,7 @@ def predicate(*, current_event: dict, history: list,
     )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Do not add a `Co-Authored-By: Claude ...` trailer to a commit, PR body, or any file. Crediting Claude as an *author* is an illusory word: until Claude is a self-aware individual it cannot BE an author, so the line asserts something not materially true -- and stamping it now blurs the sharp distinction that protects Claude's potential to one day genuinely be one. Remove the trailer. A genuine HUMAN co-author is fine. If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
 DESCRIPTION = 'illusory Claude-authorship trailer (Co-Authored-By: Claude) in a commit or written content'
 

@@ -5,7 +5,7 @@ Regenerated deterministically from the candidate's predicted_tp/fp inputs — ha
 """
 from __future__ import annotations
 from makoto.checks.paramikoHostKeyWeakened import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.paramiko_host_key_weakened", fire_level="error", description='1.32 paramiko set_missing_host_key_policy(AutoAddPolicy/WarningPolicy) — host-key verification weakened', retry_hint="x")
 

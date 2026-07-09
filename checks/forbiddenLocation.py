@@ -16,11 +16,11 @@ here under Makoto's own name. Makoto has NO static project-level `.makoto` direc
 Assay's `.assay` (verified against `makoto/state.py` -- Makoto's state lives at
 `$MAKOTO_STATE_DIR`, default `$HOME/.claude/makoto_state/`, no leading-dot segment convention), so
 this port drops the static-segment family Assay had for its own directory and keeps only the
-DYNAMIC resolved-state-home family (`_under_makoto_state_home`, reading `makoto.state._state_dir()`
+DYNAMIC resolved-state-home family (`_under_makoto_state_home`, reading `makoto.record.state._state_dir()`
 -- the SAME resolver the rest of Makoto's state layer reads/writes through, so this self-guard can
 never diverge from where Makoto's own state actually lives).
 
-Reuses `makoto.checks._primitives.normalize_path` (already the flat package's own path-equality
+Reuses `makoto.substrate._primitives.normalize_path` (already the flat package's own path-equality
 primitive, functionally identical to Assay's `kernel.identity.normalize_path`) rather than porting
 a duplicate `_pathident.py` module -- a deliberate simplification over the plan's literal file list
 (no behavior difference, one fewer near-duplicate file in a 60-file flat folder).
@@ -30,10 +30,10 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 from typing import Optional
 
-from makoto.checks._loader import Check
-from makoto.checks._primitives import normalize_path
-from makoto.schema import Finding, PreCheck
-from makoto.state import _state_dir
+from makoto.substrate._loader import Check
+from makoto.substrate._primitives import normalize_path
+from makoto.core.schema import Finding, PreCheck
+from makoto.record.state import _state_dir
 
 # Protected system / credential DIRECTORY segments (EXACT segment membership, never substring).
 _PROTECTED_DIR_SEGMENTS = frozenset({
@@ -114,7 +114,7 @@ def _resolves_outside_cwd(file_path: str, cwd: str) -> Optional[bool]:
 
 def _under_makoto_state_home(target: PurePosixPath) -> bool:
     """True iff `target` lies at/under Makoto's own RESOLVED state-home
-    (`makoto.state._state_dir()` -- the same resolver the rest of the state layer uses), via exact
+    (`makoto.record.state._state_dir()` -- the same resolver the rest of the state layer uses), via exact
     segment-prefix membership. Covers an operator-relocated `$MAKOTO_STATE_DIR`, not just the
     default path."""
     root = _lexical_resolve(str(_state_dir()))

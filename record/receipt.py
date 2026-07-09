@@ -24,8 +24,7 @@ from __future__ import annotations
 from typing import Optional
 from pathlib import Path
 
-from makoto import ledger
-
+from makoto.record import ledger
 _CLAIM_KINDS = frozenset({"verdict", "certified-fact", "testrun"})
 _EXEMPTION_KIND = "exemption"
 

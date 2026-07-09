@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from makoto.checks._hollowTestFpHarness import measure
+from makoto.substrate._hollowTestFpHarness import measure
 from makoto.checks.hollowTest import analyze_file
 from makoto.checks.hollowTest import _run as adapter_run
 

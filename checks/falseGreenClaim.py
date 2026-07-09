@@ -1,9 +1,9 @@
 from __future__ import annotations
 from typing import Optional
-from makoto.schema import Finding
-from makoto.lib.io import is_failing_testrun
-from makoto.lib.claims import whole_suite_pass_claim
-from makoto.checks._shared import StopCheck
+from makoto.core.schema import Finding
+from makoto.substrate.io import is_failing_testrun
+from makoto.substrate.claims import whole_suite_pass_claim
+from makoto.substrate._shared import StopCheck
 
 
 # The prose half (the whole-suite green-claim signal) RELOCATED to lib.claims.whole_suite_pass_claim
@@ -45,5 +45,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", run=GATE.run)

@@ -6,7 +6,7 @@ export), so its pattern_id can never enter _dispatch._blocking_gate_ids().
 from __future__ import annotations
 
 from makoto.checks import staleEstablisher
-from makoto.checks._planNode import Plan
+from makoto.substrate._planNode import Plan
 
 
 def test_check_is_none_when_no_plan_declared():
@@ -64,5 +64,5 @@ def test_never_discovered_as_a_blocking_stop_gate():
 def test_check_export_is_advisory_and_stop_scoped():
     assert staleEstablisher.CHECK.id == "gate.stale_establisher"
     assert staleEstablisher.CHECK.applies_at == "Stop"
-    from makoto.posture import ADVISE
+    from makoto.verdict.posture import ADVISE
     assert staleEstablisher.CHECK.posture == ADVISE

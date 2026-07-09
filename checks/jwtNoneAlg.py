@@ -32,10 +32,10 @@ from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate, callee_chain
-from makoto.lexicons import JWT_CALLEE_RX
+from makoto.substrate.factories import ast_introduced_predicate, callee_chain
+from makoto.core.lexicons import JWT_CALLEE_RX
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 
 
 def _is_none_alg(node) -> bool:
@@ -68,7 +68,7 @@ def _jwt_none_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_jwt_none_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't put 'none' in a jwt/jose `decode(..., algorithms=[...])` allow-list. The JWT 'none' algorithm means NO signature, so whitelisting it makes `decode` ACCEPT a forged/unsigned token while still 'succeeding' -- the signature check becomes an illusory pass (CWE-347; PyJWT CVE-2022-29217). List only real signing algorithms (e.g. `algorithms=['RS256']`). If you are deliberately decoding a known-unsigned token in a test, annotate the line `makoto-allow: <reason>`."
 DESCRIPTION = "JWT decode allow-list whitelists the unsigned 'none' algorithm (alg-confusion bypass)"
 

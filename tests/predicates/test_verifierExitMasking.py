@@ -7,7 +7,7 @@ removed (stream redirect ≠ exit masking) — graduated to blocking (error).
 """
 import pytest
 from makoto.checks.verifierExitMasking import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 
 _PAT = PreCheck(

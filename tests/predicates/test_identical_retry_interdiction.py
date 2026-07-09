@@ -7,7 +7,7 @@ non-identical retry never fires.
 from __future__ import annotations
 
 from makoto.checks.identicalRetryInterdiction import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 PATTERN = PreCheck(id="event.identical_retry", fire_level="error", description="x", retry_hint="y")
 

@@ -8,12 +8,10 @@ claim. Unknown/edited/conventional-empty cases fail open (never a false block).
 import os
 import sqlite3
 
-from makoto.checks._shared import _discharged
+from makoto.substrate._shared import _discharged
 from makoto.checks.claimedProduceAbsent import completion_gate
 from makoto._dispatch import run_stop_checks
-from makoto import ledger as L
-
-
+from makoto.record import ledger as L
 def _conn():
     c = sqlite3.connect(":memory:", isolation_level=None)
     c.execute("CREATE TABLE ledger (key TEXT PRIMARY KEY, value TEXT, kind TEXT NOT NULL, "

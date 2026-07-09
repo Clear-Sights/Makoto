@@ -22,10 +22,13 @@ import os
 import re
 import sys
 from pathlib import Path
-from makoto.schema import load_prechecks
-
-
-_MAKOTO_CLAUDE_FLAG = "_makoto_managed"
+from makoto.core.schema import load_prechecks
+# Hoisted 2026-07-09 to makoto.substrate.wiring (shared with checks/selfWiredCheck.py, which the
+# gate-side layering firewall bars from importing this lifecycle module directly).
+from makoto.substrate.wiring import (
+    MAKOTO_CLAUDE_FLAG as _MAKOTO_CLAUDE_FLAG,
+    entry_dispatches_to_makoto as _entry_dispatches_to_makoto,
+)
 
 
 def _validate_predicate_modules() -> None:
@@ -69,22 +72,6 @@ def _install_bash_scripts(state_dir: Path) -> None:
         shim_dst = state_dir / "dispatch.sh"
         shim_dst.write_text(shim_src.read_text(encoding="utf-8"), encoding="utf-8")
         shim_dst.chmod(0o755)
-
-
-def _entry_dispatches_to_makoto(entry) -> bool:
-    """the functional wiring truth for ONE hook entry: does it reach makoto's dispatch?
-
-    True for the managed-flag entry cmd_install writes AND for a flag-less hand-wired /
-    shim entry (`…/makoto_state/dispatch.sh`, `python -m makoto._dispatch`). Shared by
-    wirer and status — keying either on the flag alone lies on a shim-wired device
-    (status: hooks_wired=false while firing, fixed v1.2.1; install: a duplicate entry
-    double-dispatching every event, the same bug on the write side)."""
-    if not isinstance(entry, dict):
-        return False
-    if entry.get(_MAKOTO_CLAUDE_FLAG):
-        return True
-    return any(isinstance(inner, dict) and "makoto" in str(inner.get("command", "")).lower()
-               for inner in entry.get("hooks", []))
 
 
 def _wire_claude_hooks(settings_path: Path) -> None:
@@ -193,7 +180,7 @@ def cmd_install() -> int:
     state_dir = Path.home() / ".claude" / "makoto_state"
     state_dir.mkdir(parents=True, exist_ok=True)
     _install_bash_scripts(state_dir)
-    from makoto import db
+    from makoto.record import db
     citations_path = Path(__file__).parent / "docs" / "CITATIONS.md"
     db.init_db(state_dir, citations_path)
     settings = Path.home() / ".claude" / "settings.json"

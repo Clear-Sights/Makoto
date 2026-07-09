@@ -9,7 +9,7 @@ The near-misses below pin the discrimination — a green corpus alone does not p
 """
 from __future__ import annotations
 from makoto.checks.certNoneMode import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.cert_none_mode", fire_level="error",
                description="cert verification disabled (verify_mode = CERT_NONE)", retry_hint="x")

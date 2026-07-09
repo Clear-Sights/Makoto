@@ -2,8 +2,6 @@
 only by the `_makoto_managed` marker the uninstaller keys on. A hand-wired / shim install
 (command -> makoto_state/dispatch.sh, no flag) is still wired and must read as such."""
 from makoto import install
-
-
 def test_flagged_managed_entry_is_wired():
     data = {"hooks": {"Stop": [{"_makoto_managed": True,
                                 "hooks": [{"type": "command", "command": "anything"}]}]}}

@@ -33,7 +33,7 @@ import ast
 import re
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate
+from makoto.substrate.factories import ast_introduced_predicate
 
 _TARGET_RX = re.compile(r"constitution/integrity/checks/[^/]+\.py$")
 # a verifier-named function: the name contains an integrity/verification verb. Narrow context
@@ -105,7 +105,7 @@ def _hollow_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_hollow_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't neuter a verifier on the integrity-check surface: gutting its body to `return True`/`pass`/`assert True`, or wrapping it in a broad `except Exception: pass`/`return True` that swallows the failure, makes a check that 'exists' but never verifies (the wholesale cousin of loosening a comparator, 1.1). Implement the real check; catch the SPECIFIC expected exception, not a bare/`Exception` swallow; if a trivially-true base or a documented degrade-open is genuinely intended, annotate `makoto-allow: <reason>`."
 DESCRIPTION = 'verifier neutered — body hollowed (return-True/pass/assert-True) or a broad except swallows the failure, on the integrity-check surface'
 

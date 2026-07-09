@@ -20,13 +20,13 @@ def chain(monkeypatch, tmp_path):
     # no reload needed: store_root() -> state._state_dir() reads the env var LIVE on every call,
     # and a reload would corrupt class identity (LedgerView) for every other already-imported
     # consumer in the same pytest process — a real pollution bug this fixture had at first.
-    import makoto.ledger as c
+    import makoto.record.ledger as c
     return c
 
 
 def _append_n(state_dir, n, tag):
     os.environ["MAKOTO_STATE_DIR"] = state_dir     # fresh child process: plain import suffices
-    import makoto.ledger as c
+    import makoto.record.ledger as c
     for i in range(n):
         c.append({"kind": "test", "key": f"{tag}-{i}"})
 

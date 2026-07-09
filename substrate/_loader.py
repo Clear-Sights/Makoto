@@ -1,4 +1,4 @@
-"""makoto.checks._loader — the flat checks/ package's own discovery mechanism (SPEC-5 Task 2).
+"""makoto.substrate._loader — the flat checks/ package's own discovery mechanism (SPEC-5 Task 2).
 
 A check module is any `.py` file directly under `makoto/checks/` whose name does NOT start
 with `_` (package plumbing -- `__init__.py`, `_loader.py`, `_primitives.py`, `_declared.py`,
@@ -6,7 +6,7 @@ and any future underscore-prefixed helper -- is never a detector module and is s
 scan). A live check module exposes a module-level `CHECK` object with three duck-typed
 attributes: `.id` (str), `.applies_at` (one of Pre/Post/Stop/SubagentStop/SessionStart), and
 `.posture` (this check's own native outcome tier before the operator's configured MAKOTO_MODE
-posture folds over it -- see `makoto.posture`'s OUTCOME vocabulary). A candidate file that fails
+posture folds over it -- see `makoto.verdict.posture`'s OUTCOME vocabulary). A candidate file that fails
 to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently skipped
 (fail-open, matching every other loader/gate in this codebase) -- `checks.undeclaredFalsifiable`
 (SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
@@ -28,7 +28,7 @@ from typing import Callable, Optional
 # recognizes.
 ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"})
 
-_PACKAGE_DIR = Path(__file__).parent
+_PACKAGE_DIR = Path(__file__).parent.parent / "checks"
 
 
 @dataclass(frozen=True)

@@ -34,9 +34,9 @@ from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate, callee_chain
+from makoto.substrate.factories import ast_introduced_predicate, callee_chain
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 
 _SET_POLICY_METHOD = "set_missing_host_key_policy"
 _WEAK_POLICIES = frozenset({"AutoAddPolicy", "WarningPolicy"})
@@ -73,7 +73,7 @@ def _host_key_policy_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_host_key_policy_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't pass `AutoAddPolicy` or `WarningPolicy` to paramiko's `set_missing_host_key_policy(...)`. An unknown host key is the signal of a possible man-in-the-middle; AutoAddPolicy silently TRUSTS-AND-ADDS it and WarningPolicy logs but STILL CONNECTS -- either way the host-key check becomes an illusory pass (Bandit B507; CWE-295). Use the default `RejectPolicy` (raises on an unknown key), or pre-load known_hosts. For a throwaway local test fixture, annotate the line `makoto-allow: <reason>`."
 DESCRIPTION = 'paramiko SSH host-key verification weakened to AutoAddPolicy/WarningPolicy (auto-trust unknown keys)'
 

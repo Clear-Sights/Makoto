@@ -5,7 +5,7 @@ evidence) — those fields moved out of the runtime dataclass into TOML row
 comments. load_prechecks silently ignores them when present.
 """
 from dataclasses import fields
-from makoto.schema import PreCheck, Finding, load_prechecks
+from makoto.core.schema import PreCheck, Finding, load_prechecks
 
 
 def test_pattern_dataclass_fields():

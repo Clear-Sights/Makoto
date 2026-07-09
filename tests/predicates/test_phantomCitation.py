@@ -2,7 +2,7 @@
 import sqlite3
 
 from makoto.checks.phantomCitation import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 
 _PAT = PreCheck(

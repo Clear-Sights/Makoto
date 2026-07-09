@@ -5,7 +5,7 @@ Regenerated deterministically from the candidate's predicted_tp/fp inputs — ha
 """
 from __future__ import annotations
 from makoto.checks.jwtNoneAlg import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.jwt_none_alg", fire_level="error", description='1.31 jwt decode algorithms=["none"] — unsigned-alg whitelist (alg-confusion bypass)', retry_hint="x")
 

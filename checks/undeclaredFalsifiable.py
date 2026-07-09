@@ -25,10 +25,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from makoto.checks._declared import DECLARED_IDS
-from makoto.checks._loader import Check, scan
-from makoto.posture import ADVISE
-from makoto.schema import Finding
+from makoto.substrate._declared import DECLARED_IDS
+from makoto.substrate._loader import Check, scan
+from makoto.verdict.posture import ADVISE
+from makoto.core.schema import Finding
 
 
 def orphan_modules(*, package_dir: Optional[Path] = None) -> list:

@@ -12,7 +12,7 @@ Provides:
 from __future__ import annotations
 import pytest
 
-from makoto.schema import PreCheck, load_prechecks
+from makoto.core.schema import PreCheck, load_prechecks
 
 
 @pytest.fixture

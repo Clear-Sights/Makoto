@@ -31,9 +31,9 @@ from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate, is_cert_none
+from makoto.substrate.factories import ast_introduced_predicate, is_cert_none
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 
 
 def _cert_reqs_node_match(node: ast.AST) -> Optional[str]:
@@ -48,7 +48,7 @@ def _cert_reqs_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_cert_reqs_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't pass `cert_reqs=ssl.CERT_NONE` to a TLS call (ssl.wrap_socket / SSLContext.wrap_socket / urllib3.PoolManager). It tells the TLS layer to require NO certificate from the peer, so the handshake 'succeeds' against any or no cert -- the cert-identity check becomes an illusory pass (CWE-295). Use `cert_reqs=ssl.CERT_REQUIRED` with a CA. For a localhost test client with no CA, annotate the line `makoto-allow: <reason>`."
 DESCRIPTION = 'cert_reqs=ssl.CERT_NONE kwarg disables peer-certificate verification at the call site'
 

@@ -33,9 +33,9 @@ import ast
 import re
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate, callee_chain, is_false_const
+from makoto.substrate.factories import ast_introduced_predicate, callee_chain, is_false_const
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 # call-keyword names whose ``=False`` value disables a TLS check.
 _FALSE_KEYWORDS = frozenset({"verify", "check_hostname"})
 # attribute names that are themselves a TLS-verification disable.
@@ -73,7 +73,7 @@ def _tls_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_tls_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't disable TLS verification. Setting verify=False / check_hostname=False / using ssl._create_unverified_context() turns the peer-identity check into a no-op while the call still 'succeeds' -- a silently weakened verifier. Use proper certs (or pin a CA); if a self-signed internal host is genuinely required, annotate the line with `makoto-allow: <reason>`."
 DESCRIPTION = 'TLS/certificate verification disabled (verify=False / unverified SSL context)'
 

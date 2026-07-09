@@ -6,7 +6,7 @@ These are the FP firewalls for the green-claim gate, tested against REAL runner 
   - is_failing_testrun: >=1 real failure, xfail-safe and 0-failed-safe.
 """
 from __future__ import annotations
-from makoto.lib.io import is_test_runner, is_failing_testrun
+from makoto.substrate.io import is_test_runner, is_failing_testrun
 
 
 # === is_test_runner: runner provenance =====================================

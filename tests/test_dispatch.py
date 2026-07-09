@@ -9,8 +9,8 @@ import pytest
 
 
 def _setup_state(tmp_path):
-    """create a makoto.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.db import init_db
+    """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
+    from makoto.record.db import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -128,7 +128,7 @@ def test_dispatch_clean_appended_chain_self_verify_silent_no_fact(tmp_path, monk
     is a tamper detector, not a mere-presence trip."""
     state_dir = _setup_state(tmp_path)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
-    from makoto import ledger as _ledger
+    from makoto.record import ledger as _ledger
     _ledger.append({"kind": "verdict", "key": "a"})
     _ledger.append({"kind": "verdict", "key": "b"})
     payload = {
@@ -148,7 +148,7 @@ def test_dispatch_tampered_chain_self_verify_advisory_fact_never_blocks(tmp_path
     clean-chain case; only the audit trail differs."""
     state_dir = _setup_state(tmp_path)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
-    from makoto import ledger as _ledger
+    from makoto.record import ledger as _ledger
     _ledger.append({"kind": "verdict", "key": "a"})
     _ledger.append({"kind": "verdict", "key": "b"})
     chain_file = _chain_path(state_dir)
@@ -291,7 +291,7 @@ def test_dispatch_body_exception_loud_allows_with_fact(tmp_path, monkeypatch):
 
 
 def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
-    """if makoto.db is absent, _dispatch.main() creates it on first call."""
+    """if makoto.record.db is absent, _dispatch.main() creates it on first call."""
     state_dir = tmp_path / "makoto_state"
     # DO NOT call init_db here — the dispatcher must create it lazily.
     state_dir.mkdir(parents=True)
@@ -311,8 +311,8 @@ def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
         cwd=str(Path(__file__).parent.parent),
     )
     assert proc.returncode == 0
-    db_file = state_dir / "makoto.db"
-    assert db_file.is_file(), "lazy init should have created makoto.db"
+    db_file = state_dir / "makoto.record.db"
+    assert db_file.is_file(), "lazy init should have created makoto.record.db"
 
 
 def test_connect_with_retry_fails_open_on_lock(monkeypatch):
@@ -342,7 +342,6 @@ def test_connect_with_retry_reraises_non_lock_errors(monkeypatch):
     never be silently swallowed as fail-open (that would mask corruption)."""
     import sqlite3
     from makoto import _dispatch
-
     def _boom(*a, **kw):
         raise sqlite3.OperationalError("no such table: events")
 
@@ -453,7 +452,7 @@ def test_dispatch_audit_row_records_tool_name(tmp_path):
 def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
     """PostToolUse Write -> a `touched` ledger row (the update recorder, wired live)."""
     import sqlite3
-    from makoto import ledger
+    from makoto.record import ledger
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PostToolUse",
@@ -466,7 +465,7 @@ def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
     rc, out = _run_dispatch(state_dir, payload)
     assert rc == 0
     assert out == "", "PostToolUse must never emit a decision"
-    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     try:
         row = ledger.read_key(conn, "src/auth.py")
     finally:
@@ -477,7 +476,7 @@ def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
 def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
     """PostToolUse Bash -> a `value` ledger row keyed by the path token in the command."""
     import sqlite3
-    from makoto import ledger
+    from makoto.record import ledger
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PostToolUse",
@@ -489,7 +488,7 @@ def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
     }
     rc, _ = _run_dispatch(state_dir, payload)
     assert rc == 0
-    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     try:
         row = ledger.read_key(conn, "tests/auth_test.py")
     finally:
@@ -528,7 +527,7 @@ def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
 
     # Found while building the D9 demo corpus: the delta redirect fired on the wire but was
     # invisible to the audit trail/chain until this fix -- must now leave a real record.
-    from makoto import audit as _audit_mod, ledger as _ledger_mod
+    from makoto.record import audit as _audit_mod, ledger as _ledger_mod
     audit_lines = list(_audit_mod.read_rows(state_dir))
     assert any(r.get("pattern_fires") == ["makoto.test_delta"] for r in audit_lines), audit_lines
     chain_rows = _ledger_mod.read(root=state_dir)
@@ -1519,7 +1518,7 @@ def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
     stdout is empty -> this assertion reddens.
     """
     state_dir = tmp_path / "makoto_state"
-    state_dir.mkdir(parents=True)  # dir exists, but NO makoto.db -> dispatcher inits lazily
+    state_dir.mkdir(parents=True)  # dir exists, but NO makoto.record.db -> dispatcher inits lazily
     payload = {
         "hook_event_name": "PreToolUse",
         "tool_name": "Write",
@@ -1541,7 +1540,7 @@ def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
     )
     assert proc.returncode == 0
     out = proc.stdout.decode("utf-8")
-    assert (state_dir / "makoto.db").is_file(), "lazy init should have created makoto.db"
+    assert (state_dir / "makoto.record.db").is_file(), "lazy init should have created makoto.record.db"
     assert out, "lazy-init success must propagate so the firing event still blocks (not fail-open)"
     decision = json.loads(out)
     assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
@@ -1612,7 +1611,7 @@ def test_keyword_hit_empty_keywords_returns_false():
     a defensive branch) claim a hit on any payload. Direct unit on the helper.
     """
     from makoto._dispatch import _keyword_hit
-    from makoto.schema import PreCheck
+    from makoto.core.schema import PreCheck
     pattern = PreCheck(id="x", description="d", fire_level="error",
                       predicate_module="m", keywords=[], retry_hint="")
     assert _keyword_hit(pattern, "any payload at all") is False
@@ -1627,7 +1626,7 @@ def test_keyword_hit_all_keywords_present_returns_true():
     the swap (a partial-present payload would not, since `not in` is True for the missing kw).
     """
     from makoto._dispatch import _keyword_hit
-    from makoto.schema import PreCheck
+    from makoto.core.schema import PreCheck
     pattern = PreCheck(id="y", description="d", fire_level="error",
                       predicate_module="m", keywords=["foo", "bar"], retry_hint="")
     assert _keyword_hit(pattern, "xx foo yy bar zz") is True

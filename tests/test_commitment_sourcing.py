@@ -13,8 +13,8 @@ _discharged must clear a commitment whose path is a path-component SUFFIX of a t
 (relative/bare commitment vs absolute write) while preserving the fakeexcuse firewall
 (auth.py never matches auth_helper.py). The two halves together are a contamination canary.
 """
-from makoto.commitments import source_commitment as S, _is_file_shaped
-from makoto.checks._shared import _discharged
+from makoto.session.commitments import source_commitment as S, _is_file_shaped
+from makoto.substrate._shared import _discharged
 
 
 # --- RECALL: a genuine first-person/imperative file-shaped promise MUST source ---------------

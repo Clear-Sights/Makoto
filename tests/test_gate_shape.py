@@ -53,7 +53,7 @@ GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # harnesses (never imported by a gate module itself — only by their own battery tests) that travel
 # with the gate catalog but are not gates. _canonAtoms.py is the same kind of shared substrate,
 # scoped to the two canonFingerprints* gates (SPEC-5 Task 9).
-EXPECTED_SHARED_FILES = {"_shared.py", "_fpHarness.py", "_hollowTestFpHarness.py", "_canonAtoms.py"}
+EXPECTED_SHARED_FILES = set()  # all former checks/ plumbing moved to substrate/
 EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # 14 files, the gate subset of checks/
 EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
@@ -66,7 +66,6 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output"
                            "permission_mode", "agent_id", "agent_type", "plan",
                            "session_id", "transcript_path", "state_root"}   # Task 2 slice 5
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
-    "_shared.py": 6,                                       # against the real merged file
     "claimedProduceAbsent.py": 2,
     "undischargedCommitment.py": 4,
     "falseGreenClaim.py": 1,
@@ -74,9 +73,14 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "fabricatedToolAction.py": 3,
     "namedTestTeeth.py": 6,
     "stalePytestCache.py": 1,
-    "deadPureStatement.py": 19,                            # engine + adapter merged (_run lives here)
-    "selfWiredCheck.py": 3,
-    "hollowTest.py": 35,                                   # engine + adapter merged (_run lives here)
+    "deadPureStatement.py": 15,                            # 19->15, 2026-07-09: _scratch_roots/_under/
+                                                            # _is_scratch/_read extracted to _stdlib_ast_helpers.py
+    "selfWiredCheck.py": 2,                                # 3->2, 2026-07-09: _entry_dispatches_to_makoto
+                                                            # hoisted to substrate/wiring.py (shared with
+                                                            # install.py -- the refactor the module's own
+                                                            # note asked for)
+    "hollowTest.py": 30,                                   # 35->30, 2026-07-09: _callee_chain/_scratch_roots/
+                                                            # _under/_is_scratch/_read extracted to _stdlib_ast_helpers.py
     "canonTimeoutRecur.py": 15,                            # engine + adapter merged (canon_gate lives here)
     "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
     "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
@@ -87,13 +91,16 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
 # (commitments / retraction / ledger). `makoto.checks` (bare) is the package's own re-exported L0
 # primitives module.
 ALLOWED_IMPORT_ROOTS = {
-    "makoto.checks", "makoto.checks._shared", "makoto.checks._loader", "makoto.checks._canonAtoms",
-    "makoto.checks._planNode",
-    "makoto.schema", "makoto.lib.io", "makoto.lib.claims", "makoto.lib.pytest_cache",
-    "makoto.lexicons",
-    "makoto.ackblock",   # Task 2 slice 5: canonFingerprints.py's ack-block discharge lookup --
+    "makoto.checks", "makoto.substrate._shared", "makoto.substrate._loader", "makoto.substrate._canonAtoms",
+    "makoto.substrate._planNode", "makoto.substrate._stdlib_ast_helpers",
+    "makoto.core.schema", "makoto.substrate.io", "makoto.substrate.claims", "makoto.substrate.pytest_cache",
+    "makoto.core.lexicons",
+    "makoto.record.ackblock",   # Task 2 slice 5: canonFingerprints.py's ack-block discharge lookup --
     #   named explicitly (never bare "makoto") so the firewall stays a curated allowlist, not a
     #   hole into makoto's whole namespace.
+    "makoto.substrate.wiring",  # 2026-07-09 dedup: the hook-wiring predicate selfWiredCheck.py and
+    #   install.py used to duplicate by hand, hoisted to one stdlib-only L0 home (the refactor
+    #   selfWiredCheck's own module note asked for). Named explicitly, same rule as above.
 }
 GATE_MODULE_PATHS = {f"makoto.checks.{stem}" for stem in GATE_MODULE_STEMS}
 
@@ -123,7 +130,7 @@ def _def_count(src: str) -> int:
 
 
 def _gate_source_files() -> list:
-    return sorted(GATES_DIR / f"{stem}.py" for stem in GATE_MODULE_STEMS) + [GATES_DIR / "_shared.py"]
+    return sorted(GATES_DIR / f"{stem}.py" for stem in GATE_MODULE_STEMS) + [GATES_DIR.parent / "substrate" / "_shared.py"]
 
 
 def _leads_with_future_import(src: str) -> bool:
@@ -213,14 +220,14 @@ def test_each_gate_module_follows_the_house_style():
 def test_TEETH_sibling_import_detector_discriminates():
     planted = "from makoto.checks.undischargedCommitment import advance_gate\nx = 1\n"
     assert sibling_gate_imports(planted) == {"makoto.checks.undischargedCommitment"}   # caught
-    clean = "from makoto.checks._shared import _discharged\n"
+    clean = "from makoto.substrate._shared import _discharged\n"
     assert sibling_gate_imports(clean) == set()                            # no false positive
 
 
 def test_TEETH_import_allowlist_catches_a_cross_l2_import():
-    planted = "from makoto.commitments import open_commitments\n"          # a sibling L2 — forbidden
+    planted = "from makoto.session.commitments import open_commitments\n"          # a sibling L2 — forbidden
     mods = imported_makoto_modules(planted)
-    assert mods == {"makoto.commitments"}
+    assert mods == {"makoto.session.commitments"}
     assert not (mods <= ALLOWED_IMPORT_ROOTS)              # the real allowlist assertion would FAIL here
 
 

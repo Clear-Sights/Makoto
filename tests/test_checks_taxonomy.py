@@ -1,4 +1,4 @@
-"""makoto.checks._loader.load_checks — the flat checks/ package's own discovery mechanism
+"""makoto.substrate._loader.load_checks — the flat checks/ package's own discovery mechanism
 (SPEC-5 Task 2). Supersedes nothing yet: `schema.load_prechecks`/`stopchecks.load_stopchecks`
 keep working unchanged this task (Task 3/4 migrate their real callers later).
 
@@ -13,12 +13,12 @@ import importlib
 
 import pytest
 
-from makoto.checks._loader import Check, load_checks
+from makoto.substrate._loader import Check, load_checks
 
 
 def _write(tmp_path, name, id_, applies_at, posture="advise"):
     (tmp_path / name).write_text(
-        "from makoto.checks._loader import Check\n"
+        "from makoto.substrate._loader import Check\n"
         f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture={posture!r})\n"
     )
 
@@ -91,7 +91,7 @@ def test_collapsed_packages_are_still_gone():
 def test_existing_prechecks_and_stopchecks_loaders_unaffected():
     # Non-breaking guarantee: the new checks/ taxonomy is additive. The two existing loaders
     # this task explicitly does not touch/supersede keep discovering their real catalogs.
-    from makoto.schema import load_prechecks
+    from makoto.core.schema import load_prechecks
     from makoto.stopchecks import load_stopchecks
 
     assert load_prechecks(), "prechecks still discovered unchanged"

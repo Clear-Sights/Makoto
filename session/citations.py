@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from makoto.lexicons import _CITATION_RX, _CITATION_AUTHOR_STOPWORDS
+from makoto.core.lexicons import _CITATION_RX, _CITATION_AUTHOR_STOPWORDS
 
 
 # --- extract: text -> [(cite, line, snippet)] for pattern-1.6 validation -----------

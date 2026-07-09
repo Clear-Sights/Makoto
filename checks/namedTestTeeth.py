@@ -2,10 +2,10 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from makoto.schema import Finding
-from makoto.lexicons import _ANSI_SGR_RX, _TEETH_FRAME_RX
-from makoto.lib.io import iter_tool_events
-from makoto.checks._shared import StopCheck
+from makoto.core.schema import Finding
+from makoto.core.lexicons import _ANSI_SGR_RX, _TEETH_FRAME_RX
+from makoto.substrate.io import iter_tool_events
+from makoto.substrate._shared import StopCheck
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -182,5 +182,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", run=GATE.run)

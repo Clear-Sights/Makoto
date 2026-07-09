@@ -10,7 +10,7 @@ discrimination — a green corpus alone does not prove low FP; these do.
 """
 from __future__ import annotations
 from makoto.checks.jwtSignatureDisabled import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.jwt_signature_disabled", fire_level="error",
                description="JWT signature verification disabled", retry_hint="x")

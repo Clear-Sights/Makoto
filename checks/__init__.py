@@ -16,7 +16,7 @@ docstring for the relocation note). Re-exported here so every existing
 `_dispatch.py`, `retraction.py`, `commitments.py`, several `stopchecks/*.py` modules, and their
 tests — is byte-for-byte unaffected by this package's introduction.
 """
-from makoto.checks._primitives import (
+from makoto.substrate._primitives import (
     normalize_path,
     location_match,
     quantity_match,

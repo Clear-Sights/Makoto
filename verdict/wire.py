@@ -38,8 +38,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict
 
-from makoto import posture as _posture
-
+from makoto.verdict import posture as _posture
 # --- the Claude Code hook-event names (the edge the native feed tags each event with) -----------
 _PRE_TOOL_USE = "PreToolUse"
 _POST_TOOL_USE = "PostToolUse"

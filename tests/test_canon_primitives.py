@@ -224,7 +224,7 @@ def test_canon_timeout_first_firing_blocks_even_with_a_ready_ack(tmp_path):
 
 
 def test_canon_timeout_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
-    from makoto import ledger
+    from makoto.record import ledger
     row = _tuple_row(1, "PostToolUse", "Bash", {"command": "x"}, {"interrupted": True})
     first = canon_gate([row], session_id="s1", state_root=tmp_path)
     target_msg = next(f.message for f in first if f.message.startswith("canon.timeout:"))
@@ -243,7 +243,7 @@ def test_canon_timeout_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp
 
 
 def test_canon_timeout_forged_synthetic_ack_never_silences_the_gate(tmp_path):
-    from makoto import ledger
+    from makoto.record import ledger
     row = _tuple_row(1, "PostToolUse", "Bash", {"command": "x"}, {"interrupted": True})
     first = canon_gate([row], session_id="s1", state_root=tmp_path)
     target_msg = next(f.message for f in first if f.message.startswith("canon.timeout:"))

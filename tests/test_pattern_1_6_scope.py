@@ -11,10 +11,10 @@ import sqlite3
 
 import pytest
 
-from makoto.db import init_db
-from makoto.citations import refresh_if_stale
+from makoto.record.db import init_db
+from makoto.session.citations import refresh_if_stale
 from makoto.checks.phantomCitation import predicate, _governed_root
-from makoto.schema import load_prechecks
+from makoto.core.schema import load_prechecks
 
 _PAT = {p.id: p for p in load_prechecks()}["content.phantom_citation"]
 _PHANTOM = "See (Russo et al. 2018) for the method."   # a real paper, NOT in makoto's allowlist
@@ -26,7 +26,7 @@ def conn(tmp_path):
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Knight 1986\nLeveson 1993\n")
     init_db(tmp_path / "state", cit)
-    c = sqlite3.connect(str(tmp_path / "state" / "makoto.db"), isolation_level=None)
+    c = sqlite3.connect(str(tmp_path / "state" / "makoto.record.db"), isolation_level=None)
     refresh_if_stale(c)
     return c
 
@@ -56,7 +56,7 @@ def test_governed_root_strips_docs_dir(conn, tmp_path):
     cit.parent.mkdir(parents=True, exist_ok=True)
     cit.write_text("Knight 1986\n")
     init_db(tmp_path / "s2", cit)
-    c = sqlite3.connect(str(tmp_path / "s2" / "makoto.db"), isolation_level=None)
+    c = sqlite3.connect(str(tmp_path / "s2" / "makoto.record.db"), isolation_level=None)
     assert _governed_root(c) == tmp_path
 
 

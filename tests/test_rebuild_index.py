@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import sqlite3
 
-from makoto import ledger
-from makoto.db import init_db
+from makoto.record import ledger
+from makoto.record.db import init_db
 from tools.rebuild_index import rebuild_ledger_table_from_chain
 
 
@@ -16,7 +16,7 @@ def _setup(tmp_path):
     state_dir = tmp_path / "state"
     (tmp_path / "CITATIONS.md").write_text("x")
     init_db(state_dir, tmp_path / "CITATIONS.md")
-    conn = sqlite3.connect(str(state_dir / "makoto.db"), isolation_level=None)
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"), isolation_level=None)
     return state_dir, conn
 
 
@@ -37,7 +37,7 @@ def test_rebuild_restores_ledger_table_after_it_is_deleted(tmp_path):
     before_testrun = ledger.latest_testrun(conn, "s1")
     assert before_touched is not None and before_testrun
 
-    # PLANT the fault: the ledger table is gone (simulating "makoto.db deleted/corrupted").
+    # PLANT the fault: the ledger table is gone (simulating "makoto.record.db deleted/corrupted").
     conn.execute("DELETE FROM ledger")
     conn.commit()
     assert ledger.read_key(conn, "src/a.py") is None                # SEE it fail first

@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import Optional
 
-from makoto.schema import Finding
-from makoto.lexicons import _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
-from makoto.lib.claims import whole_suite_pass_claim
-from makoto.lib.pytest_cache import stale_failing_node
-from makoto.checks._shared import StopCheck
+from makoto.core.schema import Finding
+from makoto.core.lexicons import _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
+from makoto.substrate.claims import whole_suite_pass_claim
+from makoto.substrate.pytest_cache import stale_failing_node
+from makoto.substrate._shared import StopCheck
 
 # gate.stale_pass — a WHOLE-SUITE pass-claim ✗ pytest's OWN on-disk failure record.
 #
@@ -74,5 +74,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK", run=GATE.run)

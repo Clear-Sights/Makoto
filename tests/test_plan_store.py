@@ -1,4 +1,4 @@
-"""makoto.plan -- sqlite persistence for a declared contract Plan (SPEC-5). Falsifying tests
+"""makoto.session.plan -- sqlite persistence for a declared contract Plan (SPEC-5). Falsifying tests
 for declare_plan's falsifiability gate + latest-wins semantics, load_plan's fail-open reads,
 and declare_from_session_artifact's SessionStart admission (STARTUP-only, fail-open on a bad
 artifact, fail-closed on a non-falsifiable one).
@@ -9,15 +9,16 @@ import sqlite3
 
 import pytest
 
-from makoto import db, plan as plan_store
-from makoto.checks._planNode import DONE, Plan
+from makoto.record import db
+from makoto.session import plan as plan_store
+from makoto.substrate._planNode import DONE, Plan
 
 
 @pytest.fixture
 def conn(tmp_path):
     state_dir = tmp_path / "state"
     db.init_db(state_dir, tmp_path / "CITATIONS.md")
-    c = sqlite3.connect(str(state_dir / "makoto.db"))
+    c = sqlite3.connect(str(state_dir / "makoto.record.db"))
     yield c
     c.close()
 

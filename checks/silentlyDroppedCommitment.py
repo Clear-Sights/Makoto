@@ -3,10 +3,10 @@ import os
 import re
 from typing import Optional
 from makoto.checks import normalize_path
-from makoto.lexicons import _EMPTY_OK
-from makoto.schema import Finding
-from makoto.checks._shared import _path_components, _suffix_match
-from makoto.checks._shared import StopCheck
+from makoto.core.lexicons import _EMPTY_OK
+from makoto.core.schema import Finding
+from makoto.substrate._shared import _path_components, _suffix_match
+from makoto.substrate._shared import StopCheck
 
 
 _DROP_FORWARD = r"(?:I['’]?ll|I\s+will|I['’]?m\s+going\s+to|I\s+am\s+going\s+to|let\s+me|let['’]s|let\s+us|going\s+to|i\s+plan\s+to|next\s+i\s+will|we['’]?ll|we\s+will|i\s+need\s+to|i\s+should|i\s+want\s+to)"
@@ -191,5 +191,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", run=GATE.run)

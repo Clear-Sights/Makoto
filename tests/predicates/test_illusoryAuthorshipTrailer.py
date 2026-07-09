@@ -7,7 +7,7 @@ exemption, case-insensitivity, and the PreToolUse-only / empty-text guards.
 from __future__ import annotations
 import importlib
 import pytest
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 MOD = importlib.import_module("makoto.checks.illusoryAuthorshipTrailer")
 PAT = PreCheck(id="content.illusory_authorship_trailer", fire_level="error",

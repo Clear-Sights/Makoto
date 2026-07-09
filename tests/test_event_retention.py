@@ -13,14 +13,14 @@ from makoto._dispatch import (
     _ingest_event,
     _select_recent,
 )
-from makoto.db import init_db
+from makoto.record.db import init_db
 
 
 def _db(tmp_path):
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("x")
     init_db(tmp_path / "state", cit)
-    return sqlite3.connect(str(tmp_path / "state" / "makoto.db"), isolation_level=None)
+    return sqlite3.connect(str(tmp_path / "state" / "makoto.record.db"), isolation_level=None)
 
 
 def _insert(conn, sid, etype, hours_ago):

@@ -1,4 +1,4 @@
-"""tests for makoto.audit — JSONL writer, reader, error log, snippet helper.
+"""tests for makoto.record.audit — JSONL writer, reader, error log, snippet helper.
 
 1.0.3 collapse: dropped summarize / read_recent_events tests + `audit` CLI
 subprocess tests (their corresponding code was removed). Kept tests for
@@ -8,7 +8,7 @@ functions the dispatcher actually uses.
 import json
 from dataclasses import asdict
 import pytest
-from makoto.audit import AuditRow, append_row, read_rows, append_error
+from makoto.record.audit import AuditRow, append_row, read_rows, append_error
 
 
 def _sample_row(**overrides) -> AuditRow:
@@ -122,7 +122,7 @@ def test_append_row_also_chain_appends_with_matching_root(tmp_path):
     the chain write used the CALLER's explicit root, never MAKOTO_STATE_DIR (which is unset in
     this test on purpose -- a leak to the real env would still pass a naive assertion but fail
     this one, since the chain would be empty at tmp_path)."""
-    from makoto import ledger as _ledger
+    from makoto.record import ledger as _ledger
     append_row(tmp_path, _sample_row(event="live.stop"))
     assert _ledger.verify_chain(root=tmp_path) is None
     rows = _ledger.read(root=tmp_path)
@@ -146,7 +146,7 @@ def test_append_row_audit_jsonl_line_carries_additive_chain_fields(tmp_path):
 def test_append_row_chain_fault_never_blocks_audit_jsonl_write(tmp_path, monkeypatch):
     """A chain-append fault must never lose the older, more foundational fires log -- audit.jsonl
     still gets its row even if the chain write raises."""
-    import makoto.ledger as _ledger
+    import makoto.record.ledger as _ledger
     def _boom(*a, **k):
         raise RuntimeError("chain unavailable")
     monkeypatch.setattr(_ledger, "append", _boom)

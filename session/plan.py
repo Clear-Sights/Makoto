@@ -31,7 +31,7 @@ import os
 from typing import Optional
 
 from makoto.checks import normalize_path
-from makoto.checks._planNode import Plan
+from makoto.substrate._planNode import Plan
 
 # SessionStart only declares from the artifact on a genuinely-new session (mirrors Assay's own
 # STARTUP-gated `declare_from_artifact`) -- a resume/clear/compact must never re-declare.

@@ -31,8 +31,8 @@ factory's optional `exempt_rx`. Knight-Leveson: stdlib re only.
 """
 from __future__ import annotations
 import re
-from makoto.lib.factories import regex_file_predicate
-from makoto.lexicons import _INTEG_VOCAB as _INTEG   # shared L0 integrity vocab (single source)
+from makoto.substrate.factories import regex_file_predicate
+from makoto.core.lexicons import _INTEG_VOCAB as _INTEG   # shared L0 integrity vocab (single source)
 
 _TARGET_RX = re.compile(r"\.toml$")
 
@@ -57,7 +57,7 @@ predicate = regex_file_predicate(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Suppression flags on an integrity/verification/audit-named key require an ADR backlink (*_rationale = "ADR-NNN") or a `makoto-allow: <reason>` marker. Add the rationale or remove the flag.'
 DESCRIPTION = 'integrity-named suppression flag (_skip/_bypass/_inapplicable=true) in a .toml without ADR backlink'
 

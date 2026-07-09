@@ -45,8 +45,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from makoto import ledger
-
+from makoto.record import ledger
 _ACK_RX = re.compile(
     r"makoto\s+(?:ack-block|release\.operator)\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
 # [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon

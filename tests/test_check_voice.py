@@ -17,7 +17,7 @@ from __future__ import annotations
 import ast
 import inspect
 
-from makoto.checks._loader import discover
+from makoto.substrate._loader import discover
 
 
 def _module_level_names(mod) -> set:

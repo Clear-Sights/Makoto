@@ -6,7 +6,7 @@ Knight-Leveson: stdlib re only.
 """
 from __future__ import annotations
 import re
-from makoto.lib.factories import regex_file_predicate
+from makoto.substrate.factories import regex_file_predicate
 
 
 predicate = regex_file_predicate(
@@ -15,7 +15,7 @@ predicate = regex_file_predicate(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
 DESCRIPTION = 'verifier predicate weakened — loose-comparator shape'
 

@@ -1,4 +1,4 @@
-"""makoto.checks._canonAtoms -- package plumbing (like _shared.py): the shared atom/decode
+"""makoto.substrate._canonAtoms -- package plumbing (like _shared.py): the shared atom/decode
 substrate for the two canon-fingerprint gates (canonFingerprints.py = BLOCK tier,
 canonFingerprintsAdvisory.py = ADVISE tier). Underscore-prefixed so checks._loader's scan skips
 it -- not itself a detector module.
@@ -37,8 +37,8 @@ import json
 import re
 from typing import Dict, Iterable, List, Tuple
 
-from makoto.lib.claims import whole_suite_pass_claim
-from makoto.lib.io import bash_output_text, is_failing_testrun, is_test_runner
+from makoto.substrate.claims import whole_suite_pass_claim
+from makoto.substrate.io import bash_output_text, is_failing_testrun, is_test_runner
 
 Call = dict  # {"name": tool_name, "input": tool_input dict, "result": tool_response dict}
 

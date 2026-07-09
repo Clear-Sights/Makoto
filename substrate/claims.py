@@ -4,7 +4,7 @@ claims_done / claims_success gate a Stop payload's final message. Imports L0 onl
 """
 from __future__ import annotations
 import re
-from makoto.lexicons import (
+from makoto.core.lexicons import (
     _DONE_WORDS_RX, _NEGATION_RX, _SUCCESS_WORDS_RX,
     _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
 )

@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from makoto.__main__ import build_parser
-from makoto.checks._aliases import canonical
-from makoto.schema import load_prechecks
+from makoto.substrate._aliases import canonical
+from makoto.core.schema import load_prechecks
 
 REPO = Path(__file__).resolve().parent.parent
 

@@ -2,7 +2,7 @@
 canonical form FOREVER, so a rename never breaks an operator's existing MAKOTO_DISABLE_PATTERNS
 config or a script/dashboard matching on the old string.
 """
-from makoto.checks._aliases import LEGACY_TO_CANONICAL, canonical, is_legacy
+from makoto.substrate._aliases import LEGACY_TO_CANONICAL, canonical, is_legacy
 
 
 def test_known_legacy_ids_resolve_to_their_canonical_form():
@@ -26,7 +26,7 @@ def test_is_legacy_distinguishes_aliased_from_canonical():
 def test_every_canonical_target_is_a_real_live_id():
     """A dangling alias (pointing at an id nothing discovers anymore) would be an illusory
     resolution -- it would "work" but land on a check that no longer exists."""
-    from makoto.checks._loader import discover
+    from makoto.substrate._loader import discover
     live_ids = {c.id for c in discover()}
     for legacy, canon in LEGACY_TO_CANONICAL.items():
         assert canon in live_ids, f"{legacy!r} aliases to {canon!r}, which is not a live check id"

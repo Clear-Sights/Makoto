@@ -10,7 +10,7 @@ def _conn():
 
 
 def test_ledger_read_helpers_exist_and_read():
-    from makoto import ledger as L
+    from makoto.record import ledger as L
     assert hasattr(L, "touched_keys") and hasattr(L, "empty_write_keys") and hasattr(L, "latest_testrun")
     c = _conn()
     c.execute("INSERT INTO ledger VALUES ('a.py','5','touched',NULL,1,'s','t1')")

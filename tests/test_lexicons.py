@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def test_lexicons_exports_all_regex_symbols():
-    from makoto import lexicons
+    from makoto.core import lexicons
     for name in (
         "_DONE_WORDS_RX", "_NEGATION_RX", "_MAKOTO_ALLOW_RX", "JWT_CALLEE_RX",
         "_TEST_RUNNER_RX", "_FAILURE_SUMMARY_RX", "_FAILURE_MARKER_RX",
@@ -21,7 +21,7 @@ def test_lexicons_exports_all_regex_symbols():
 
 
 def test_lexicons_is_L0_no_inpackage_imports():
-    src = Path(__file__).resolve().parent.parent / "lexicons.py"
+    src = Path(__file__).resolve().parent.parent / "core" / "lexicons.py"
     tree = ast.parse(src.read_text())
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
@@ -32,9 +32,9 @@ def test_lexicons_is_L0_no_inpackage_imports():
 
 
 def test_primitives_reuse_the_same_lexicon_objects():
-    from makoto import lexicons
-    from makoto.lib import claims, io
-    from makoto import citations
+    from makoto.core import lexicons
+    from makoto.substrate import claims, io
+    from makoto.session import citations
     # identity: one edit governs every surface — each L1 primitive reuses the L0 lexicon object,
     # never a private re-compile. Covers the homes the dissolved predicates.helpers split into.
     assert claims._NEGATION_RX is lexicons._NEGATION_RX
@@ -46,7 +46,7 @@ def test_primitives_reuse_the_same_lexicon_objects():
 def test_gate_and_retraction_lexicons_live_in_lexicons():
     """StopCheck + retraction regexes/word-sets are L0 vocabulary in lexicons.py (spec §3b row 5)."""
     import re
-    from makoto import lexicons as L
+    from makoto.core import lexicons as L
     assert L._PRODUCE_VERB_RX.search("I wrote the file")
     assert L._UNIVERSAL_DONE_RX.search("everything is done.")
     assert L._GREEN_CLAIM_RX.search("tests pass")
@@ -61,8 +61,9 @@ def test_fence_span_rx_is_the_single_source_for_fenced_spans():
     # lib.claims._code_spans and retraction._fenced_spans both consume THIS object (identity), so the
     # byte-identical `re.finditer(r"```.*?```", ..., re.DOTALL)` re-inline at lib/claims.py + retraction.py:63
     # is gone. Identity (not equality) is the re-checkable single-source artifact.
-    from makoto import lexicons, retraction
-    from makoto.lib import claims
+    from makoto.core import lexicons
+    from makoto.verdict import retraction
+    from makoto.substrate import claims
     text = "before ```done\ncode``` mid ```x``` end"
     spans = [(m.start(), m.end()) for m in lexicons._FENCE_SPAN_RX.finditer(text)]
     assert [text[a:b] for a, b in spans] == ["```done\ncode```", "```x```"]   # DOTALL: span crosses newline
@@ -75,7 +76,7 @@ def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():
     # (suppression-flag KEY) and pattern_1_2 (env-gated audit body/key) BOTH consume lexicons._INTEG_VOCAB
     # (identity), so the byte-identical `audit|verif|integrit|...` alternation is not re-declared per
     # detector. It is a raw alternation STRING (each consumer anchors it differently), not a PreCheck.
-    from makoto import lexicons
+    from makoto.core import lexicons
     from makoto.checks import integritySuppressionFlag, envGatedAudit
     assert isinstance(lexicons._INTEG_VOCAB, str)
     assert "audit" in lexicons._INTEG_VOCAB and "provenance" in lexicons._INTEG_VOCAB

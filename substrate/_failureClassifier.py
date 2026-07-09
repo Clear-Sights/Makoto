@@ -1,4 +1,4 @@
-"""makoto.checks._failureClassifier -- transient-vs-deterministic failure classification, the
+"""makoto.substrate._failureClassifier -- transient-vs-deterministic failure classification, the
 ship-bar Fable named for D1 (identical-retry interdiction, docs/DEFERRED.md). Two Fable
 consultations converged on this exact requirement: a BLOCK-tier check denying a retry must never
 deny a LEGITIMATE re-poll of a transient failure (a timeout, a 5xx, "still running"), so this

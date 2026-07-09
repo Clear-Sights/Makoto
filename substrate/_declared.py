@@ -1,4 +1,4 @@
-"""makoto.checks._declared -- the flat checks/ package's own hand-maintained manifest of
+"""makoto.substrate._declared -- the flat checks/ package's own hand-maintained manifest of
 pattern IDs that SHOULD resolve to a live module (SPEC-5 Task 2 Step 6). `{id: file_stem}`.
 
 Every check module landed in this package (Tasks 3-9's ~19 prechecks, ~11 stopchecks, the

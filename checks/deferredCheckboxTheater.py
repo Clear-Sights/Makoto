@@ -8,7 +8,7 @@ Knight-Leveson: stdlib re only.
 """
 from __future__ import annotations
 import re
-from makoto.lib.factories import regex_file_predicate
+from makoto.substrate.factories import regex_file_predicate
 
 
 predicate = regex_file_predicate(
@@ -17,7 +17,7 @@ predicate = regex_file_predicate(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Open T-items use '[ ]'; completed use '[x]'. The literal text 'DEFERRED' on a completed checkbox is theater. Either complete the task or leave the box unchecked."
 DESCRIPTION = 'DEFERRED checkbox theater on open T-item'
 

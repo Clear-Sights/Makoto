@@ -1,4 +1,4 @@
-from makoto.lib.claims import claims_success
+from makoto.substrate.claims import claims_success
 
 def _stop(text): return {"hook_event_name": "Stop", "last_assistant_message": text}
 

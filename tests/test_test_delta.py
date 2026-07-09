@@ -1,7 +1,7 @@
 """Tests for makoto.checks.testDelta.compute_delta -- Task 3's test-delta redirect."""
 from __future__ import annotations
 
-from makoto.checks._testDelta import compute_delta
+from makoto._testDelta import compute_delta
 
 
 def test_none_when_no_prior_output():

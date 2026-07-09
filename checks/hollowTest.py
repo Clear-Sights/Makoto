@@ -39,12 +39,10 @@ layout, only the file boundary moved.
 """
 from __future__ import annotations
 import ast
-import os
-import tempfile
-from pathlib import Path
 
-from makoto.checks._shared import StopCheck
-from makoto.schema import Finding
+from makoto.substrate._shared import StopCheck
+from makoto.substrate._stdlib_ast_helpers import _callee_chain, iter_touched_python_sources
+from makoto.core.schema import Finding
 
 _NESTED_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 _BROAD_EXC_NAMES = ("Exception", "BaseException")
@@ -95,24 +93,9 @@ def _iter_own_scope(stmts):
 
 
 # ---- the assertion recognizer (generous by design: an FN here only suppresses a fire) -----------
-def _callee_chain(call: ast.Call) -> str:
-    """Dotted callee name of a Call (`self.assertTrue`, `np.testing.assert_allclose`, `pytest.raises`).
-    Local duplicate of `lib/factories.py::callee_chain` — this module stays stdlib-only/self-contained,
-    like `deadPureStatement.py`, so it does not import `makoto.lib.factories`."""
-    parts: list = []
-    f = call.func
-    while True:
-        if isinstance(f, ast.Attribute):
-            parts.append(f.attr)
-            f = f.value
-        elif isinstance(f, ast.Call):
-            f = f.func                       # `X().<m>` -> keep walking X
-        elif isinstance(f, ast.Name):
-            parts.append(f.id)
-            break
-        else:
-            break
-    return ".".join(reversed(parts))
+# _callee_chain imported at module top from _stdlib_ast_helpers (2026-07-09: was a local duplicate
+# of both deadPureStatement.py's usage pattern and substrate/factories.py::callee_chain; extracted
+# rather than left duplicated -- see tests/test_detector_engines_are_stdlib_isolated.py).
 
 
 def _is_assertion_call(node) -> bool:
@@ -429,40 +412,6 @@ def analyze_file(src: str, path: str) -> list:
 # =============================================================================================
 # Stop-hook adapter (formerly stopchecks/stopcheck_hollow_test.py)
 # =============================================================================================
-def _scratch_roots() -> tuple[str, ...]:
-    roots = []
-    for d in (tempfile.gettempdir(), "/tmp", "/var/folders", os.path.expanduser("~/.claude")):
-        try:
-            roots.append(os.path.realpath(d))
-        except OSError:
-            pass
-    return tuple(roots)
-
-
-_SCRATCH_ROOTS = _scratch_roots()
-
-
-def _under(path: str, root: str) -> bool:
-    return path == root or path.startswith(root + os.sep)
-
-
-def _is_scratch(p, cwd) -> bool:
-    """Same closed-unit discipline as `deadPureStatement.py::_is_scratch` — a touched .py is
-    out-of-scope scratch only when cwd is KNOWN, the file is NOT inside it, AND it lives under a
-    known temp/scratch root. Suppression never fires on an unknown cwd (FN-safe)."""
-    if not cwd:
-        return False
-    rp = os.path.realpath(str(p))
-    if _under(rp, os.path.realpath(str(cwd))):
-        return False
-    return any(_under(rp, r) for r in _SCRATCH_ROOTS)
-
-
-def _read(ctx, p):
-    fn = getattr(ctx, "fs_read", None)
-    return fn(p) if callable(fn) else Path(p).read_text(encoding="utf-8")
-
-
 _KIND_MESSAGE = {
     "no_assertion": "test `{func}` (line {line}) contains no assertion of any kind — it passes "
                      "regardless of what the code under test does",
@@ -486,21 +435,9 @@ def _allowed(lineno, lines) -> bool:                          # on-the-record ov
 
 def _run(ctx) -> list:
     out = []
-    cwd = getattr(ctx, "cwd", None)
-    for p in getattr(ctx, "touched", ()):
-        if not str(p).endswith(".py"):
-            continue
-        # anchor a possibly-relative touched key to the event's OWN cwd, never the dispatch
-        # process's ambient one (matches _dispatch.py's real fs_read/fs_exists join)
-        real_p = p if not cwd or os.path.isabs(str(p)) else os.path.join(cwd, p)
-        if _is_scratch(real_p, cwd):
-            continue                                          # stray scratch outside the working project
-        try:
-            src = _read(ctx, real_p)
-        except OSError:
-            continue
-        if not isinstance(src, str):
-            continue                                          # fs_read miss (None) -> skip, never crash
+    # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
+    # deadPureStatement._run via the stdlib-isolated helper home -- 2026-07-09 dedup
+    for p, src in iter_touched_python_sources(ctx):
         lines = src.splitlines()
         for f in analyze_file(src, str(p)):
             if _allowed(f["line"], lines):
@@ -523,5 +460,5 @@ def _run(ctx) -> list:
 GATE = StopCheck(id="gate.hollow_test", fn=analyze_file, run=_run)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", run=GATE.run)

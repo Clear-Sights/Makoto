@@ -22,7 +22,7 @@ from makoto.checks.undeclaredFalsifiable import (
 
 def _good(tmp_path, name, id_, applies_at="Stop"):
     (tmp_path / name).write_text(
-        "from makoto.checks._loader import Check\n"
+        "from makoto.substrate._loader import Check\n"
         f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture='advise')\n"
     )
 
@@ -46,7 +46,7 @@ def test_module_with_a_malformed_check_is_an_orphan_module(tmp_path):
     # A CHECK object present but with a mismatched/invalid shape (no valid id) never resolves
     # via load_checks() -- unregistered in the loader's eyes despite the file existing.
     (tmp_path / "mismatched.py").write_text(
-        "from makoto.checks._loader import Check\n"
+        "from makoto.substrate._loader import Check\n"
         "CHECK = Check(id='', applies_at='Stop', posture='advise')\n"
     )
     assert orphan_modules(package_dir=tmp_path) == ["mismatched"]
@@ -92,7 +92,7 @@ def test_gate_reports_both_orphan_kinds_together(tmp_path):
 def test_gate_is_advisory_never_blocking():
     # Never "error" -- per this repo's advisory-over-blocking standing policy, same tier as
     # gate.self_wired.
-    from makoto.posture import ADVISE
+    from makoto.verdict.posture import ADVISE
     assert CHECK.posture == ADVISE
 
 
@@ -106,7 +106,7 @@ def test_real_catalog_has_zero_drift_at_rest():
 
 
 def test_check_is_discovered_by_load_checks():
-    from makoto.checks._loader import load_checks
+    from makoto.substrate._loader import load_checks
     ids = {c.id for c in load_checks(edge="Stop")}
     assert "gate.undeclared_falsifiable" in ids
 
@@ -129,7 +129,7 @@ def test_run_stop_checks_surfaces_undeclared_falsifiable_live(monkeypatch):
     no matter what the gate itself would report."""
     import makoto._dispatch as D
     from makoto.checks import undeclaredFalsifiable as _uf
-    from makoto.schema import Finding
+    from makoto.core.schema import Finding
 
     sentinel = Finding(pattern_id="gate.undeclared_falsifiable", file="x", line=0,
                         level="advisory", message="planted orphan for this test")
@@ -148,8 +148,8 @@ def test_run_stop_checks_surfaces_undeclared_falsifiable_live(monkeypatch):
         def fetchone(self):
             return None
 
-    import makoto.ledger as L
-    import makoto.commitments as C
+    import makoto.record.ledger as L
+    import makoto.session.commitments as C
     monkeypatch.setattr(L, "touched_keys", lambda conn, sid: frozenset())
     monkeypatch.setattr(L, "empty_write_keys", lambda conn, sid: frozenset())
     monkeypatch.setattr(L, "latest_testrun", lambda conn, sid: "")

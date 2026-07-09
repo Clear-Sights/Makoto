@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from makoto.schema import load_prechecks
+from makoto.core.schema import load_prechecks
 from makoto.stopchecks import load_stopchecks
 
 README = (Path(__file__).resolve().parent.parent / "README.md").read_text()

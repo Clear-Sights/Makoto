@@ -8,12 +8,10 @@ Three surfaces:
 from __future__ import annotations
 import sqlite3
 
-from makoto.lib.claims import whole_suite_pass_claim
+from makoto.substrate.claims import whole_suite_pass_claim
 from makoto.checks.falseGreenClaim import green_claim_gate
 from makoto._dispatch import run_stop_checks
-from makoto import ledger as L
-
-
+from makoto.record import ledger as L
 # === whole_suite_pass_claim: the whole-suite green claim ==============================
 
 def test_signal_tp_whole_suite_claims():

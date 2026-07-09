@@ -71,14 +71,26 @@ def append_row(state_root: Path, row: AuditRow) -> None:
     foundational fires log -- caught and swallowed; audit.jsonl still gets its row either way.
     """
     obj = asdict(row)
+    _chain_then_append(state_root, "audit.jsonl", "audit", obj)
+
+
+def _chain_then_append(state_root: Path, filename: str, structural_kind: str,
+                       obj: dict, chain_payload: dict | None = None) -> None:
+    """The one chain-then-file write path both append-only logs share (2026-07-09 dedup: this
+    block previously lived verbatim in append_row AND append_exemption). Chain-appends
+    `chain_payload` (default: obj) under the structural `kind`; `prev_hash`/`row_hash` come back
+    ADDITIVE on the jsonl line (readers use dict.get; the file's own history is NEVER rewritten,
+    append-only law). A chain-append fault must never block the older, more foundational file
+    log -- caught and swallowed; the jsonl file gets its row either way."""
     try:
-        from makoto import ledger as _ledger
-        chained = _ledger.append({"kind": "audit", **obj}, root=state_root)
+        from makoto.record import ledger as _ledger
+        payload = chain_payload if chain_payload is not None else obj
+        chained = _ledger.append({"kind": structural_kind, **payload}, root=state_root)
         obj["prev_hash"] = chained.get("prev_hash", "")
         obj["row_hash"] = chained.get("row_hash", "")
     except Exception:
         pass
-    _append_jsonl(state_root, "audit.jsonl", obj)
+    _append_jsonl(state_root, filename, obj)
 
 
 def _read_jsonl(state_root: Path, filename: str, since: str | None) -> Iterator[dict]:
@@ -153,19 +165,12 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
         "session_id": session_id,
         "tool_name": tool_name,
     }
-    try:
-        from makoto import ledger as _ledger
-        # obj's own "kind" field is the SUPPRESSION mechanism ('makoto-allow'/'disabled-pattern'),
-        # which collides with the chain row's STRUCTURAL kind ("exemption") -- renamed to
-        # exemption_kind in the chain payload only; the audit.jsonl line's own "kind" is untouched.
-        chain_payload = {k: v for k, v in obj.items() if k != "kind"}
-        chain_payload["exemption_kind"] = obj["kind"]
-        chained = _ledger.append({"kind": "exemption", **chain_payload}, root=state_root)
-        obj["prev_hash"] = chained.get("prev_hash", "")
-        obj["row_hash"] = chained.get("row_hash", "")
-    except Exception:
-        pass
-    _append_jsonl(state_root, "exemptions.jsonl", obj)
+    # obj's own "kind" field is the SUPPRESSION mechanism ('makoto-allow'/'disabled-pattern'),
+    # which collides with the chain row's STRUCTURAL kind ("exemption") -- renamed to
+    # exemption_kind in the chain payload only; the exemptions.jsonl line's own "kind" is untouched.
+    chain_payload = {k: v for k, v in obj.items() if k != "kind"}
+    chain_payload["exemption_kind"] = obj["kind"]
+    _chain_then_append(state_root, "exemptions.jsonl", "exemption", obj, chain_payload)
 
 
 def read_exemptions(state_root: Path, since: str | None = None) -> Iterator[dict]:

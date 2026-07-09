@@ -1,4 +1,4 @@
-"""Unit tests for makoto.ledger.view_for / LedgerView — the unified read-surface facade
+"""Unit tests for makoto.record.ledger.view_for / LedgerView — the unified read-surface facade
 (SPEC-5 Task 2) every check (Tasks 3-9) will consume instead of hand-rolling its own SQL.
 
 A thin FACADE, not new SQL: every LedgerView method delegates to this module's existing
@@ -8,8 +8,8 @@ re-proving the underlying SQL (already covered by test_ledger.py/test_ledger_rea
 """
 import sqlite3
 
-from makoto import ledger
-from makoto.ledger import view_for, LedgerView, record_update
+from makoto.record import ledger
+from makoto.record.ledger import view_for, LedgerView, record_update
 
 
 def _conn():

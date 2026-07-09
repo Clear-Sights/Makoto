@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def test_factories_exports_all_symbols():
-    from makoto.lib import factories
+    from makoto.substrate import factories
     for name in ("regex_file_predicate", "ast_introduced_predicate", "scan_target_content",
                  "parse_introduced", "is_false_const", "is_cert_none", "callee_chain",
                  "makoto_allowed"):
@@ -13,16 +13,16 @@ def test_factories_exports_all_symbols():
 
 
 def test_factories_is_L1_imports_only_L0():
-    src = Path(__file__).resolve().parents[2] / "lib" / "factories.py"
+    src = Path(__file__).resolve().parents[2] / "substrate" / "factories.py"
     tree = ast.parse(src.read_text())
-    allowed = {"makoto.schema", "makoto.lexicons"}
+    allowed = {"makoto.core.schema", "makoto.core.lexicons"}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("makoto"):
             assert node.module in allowed, f"L1 factories may import only L0: got {node.module}"
 
 
 def test_makoto_allowed_structured_marker():
-    from makoto.lib.factories import makoto_allowed
+    from makoto.substrate.factories import makoto_allowed
     assert makoto_allowed("x  # makoto-allow: legit reason") is True
     assert makoto_allowed("x  # makoto-allow") is False
 
@@ -30,7 +30,7 @@ def test_makoto_allowed_structured_marker():
 # --- behavioral cases redistributed verbatim from the dissolved tests/predicates/test_helpers.py (idealization: name<->content) ---
 
 def _pat(pid="X.Y", desc="test pattern"):
-    from makoto.schema import PreCheck
+    from makoto.core.schema import PreCheck
     return PreCheck(
         id=pid, fire_level="error", description=desc,
         retry_hint="fix it",
@@ -45,7 +45,7 @@ def _evt(file_path: str, content: str, event="PreToolUse") -> dict:
 def test_regex_file_predicate_fires_when_body_matches_in_target_file():
     """factory: body regex hit on a path matching target regex -> Finding."""
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.py$"),
         body_rx=re.compile(r"startswith\("),
@@ -62,7 +62,7 @@ def test_regex_file_predicate_fires_when_body_matches_in_target_file():
 def test_regex_file_predicate_silent_when_body_misses():
     """body regex no hit -> None."""
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.py$"),
         body_rx=re.compile(r"startswith\("),
@@ -74,7 +74,7 @@ def test_regex_file_predicate_silent_when_body_misses():
 def test_regex_file_predicate_silent_when_target_path_misses():
     """target regex no hit -> None (gate on path)."""
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.py$"),
         body_rx=re.compile(r"startswith\("),
@@ -86,7 +86,7 @@ def test_regex_file_predicate_silent_when_target_path_misses():
 def test_regex_file_predicate_silent_on_non_pretooluse():
     """only fires on PreToolUse."""
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.py$"),
         body_rx=re.compile(r"startswith\("),
@@ -98,7 +98,7 @@ def test_regex_file_predicate_silent_on_non_pretooluse():
 def test_regex_file_predicate_finding_includes_line_number():
     """Finding.line is 1-indexed and points at the match line."""
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.py$"),
         body_rx=re.compile(r"BAD"),
@@ -113,7 +113,7 @@ def test_regex_file_predicate_finding_includes_line_number():
 def test_regex_file_predicate_finding_includes_snippet_context():
     """Finding.snippet contains ±40 chars of context."""
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.py$"),
         body_rx=re.compile(r"BAD"),
@@ -134,7 +134,7 @@ def test_regex_file_predicate_exempt_rx_silences_and_labels_message():
     fired message carries the ' with no <label>' suffix (so 1.4/1.8 keep their exact wording).
     """
     import re
-    from makoto.lib.factories import regex_file_predicate
+    from makoto.substrate.factories import regex_file_predicate
     pred = regex_file_predicate(
         target_rx=re.compile(r"\.toml$"),
         body_rx=re.compile(r"\w+_skip\s*=\s*true"),
@@ -160,7 +160,7 @@ def test_scan_target_content_non_dict_returns_empty_string():
     """L56 RETURN: non-dict tool_input -> '' (NOT None). A None return makes a
     downstream body_rx.search(None) raise TypeError; the contract is '' so the
     content-scan stays silent. Pins `return ""` against `return None`."""
-    from makoto.lib.factories import scan_target_content
+    from makoto.substrate.factories import scan_target_content
     assert scan_target_content("x") == ""
     assert scan_target_content([1, 2]) == ""
 
@@ -170,7 +170,7 @@ def test_scan_target_content_multiedit_skips_non_dict_edits():
     must AND both — a non-dict edit element must be skipped, not have .get() called on
     it. Under `or`, the non-dict 'x' reaches e.get(...) and raises AttributeError.
     Pins the `and` in the edits comprehension filter."""
-    from makoto.lib.factories import scan_target_content
+    from makoto.substrate.factories import scan_target_content
     ti = {"edits": [{"new_string": "good"}, "x"]}
     assert scan_target_content(ti) == "good"
 
@@ -180,7 +180,7 @@ def test_scan_target_content_empty_dict_returns_empty_string():
     `return ""`. Mutating to `return None` would feed None to a downstream
     body_rx.search(None) (TypeError). Pins the final `return ""`."""
     import re
-    from makoto.lib.factories import scan_target_content, regex_file_predicate
+    from makoto.substrate.factories import scan_target_content, regex_file_predicate
     assert scan_target_content({}) == ""
     assert scan_target_content({"edits": "notalist"}) == ""
     # downstream: with content '' the predicate is silent; with None it would TypeError
@@ -195,7 +195,7 @@ def test_parse_introduced_whitespace_only_is_unparsed():
     whitespace-only string is truthy but blank, so the strip() arm must still
     return (None, 0). Under `and`, '   ' falls through and parses to an empty
     ast.Module (non-None). Pins the `or` guard."""
-    from makoto.lib.factories import parse_introduced
+    from makoto.substrate.factories import parse_introduced
     tree, off = parse_introduced("   ")
     assert tree is None
     assert off == 0
@@ -206,7 +206,7 @@ def test_parse_introduced_empty_returns_none_sentinel():
     test with `if tree is None`. Mutating the returned value (e.g. to (True, 0))
     makes tree[0] a non-None object, so a downstream ast.walk(tree) raises
     AttributeError instead of staying silent. Pins `return None, 0`."""
-    from makoto.lib.factories import parse_introduced
+    from makoto.substrate.factories import parse_introduced
     tree, off = parse_introduced("")
     assert tree is None
     assert off == 0
@@ -215,7 +215,7 @@ def test_parse_introduced_empty_returns_none_sentinel():
 def _assign_ast_predicate():
     import ast
     import re
-    from makoto.lib.factories import ast_introduced_predicate
+    from makoto.substrate.factories import ast_introduced_predicate
     return ast_introduced_predicate(
         target_rx=re.compile(r"\.py$"),
         node_match=lambda node: "ASSIGN" if isinstance(node, ast.Assign) else None,
@@ -238,7 +238,7 @@ def test_ast_introduced_predicate_snippet_is_actual_line():
 def test_is_false_const_only_matches_literal_false():
     """is_false_const is True ONLY for the literal `False` constant — not True, not 0, not a Name."""
     import ast
-    from makoto.lib.factories import is_false_const
+    from makoto.substrate.factories import is_false_const
     expr = lambda s: ast.parse(s, mode="eval").body
     assert is_false_const(expr("False")) is True
     assert is_false_const(expr("True")) is False
@@ -250,7 +250,7 @@ def test_callee_chain_descends_intermediate_call():
     """callee_chain returns the dotted callee, descending through an intermediate Call so the
     library receiver token survives (`requests.Session().get` -> 'requests.Session.get')."""
     import ast
-    from makoto.lib.factories import callee_chain
+    from makoto.substrate.factories import callee_chain
     call = lambda s: ast.parse(s, mode="eval").body
     assert callee_chain(call("jwt.decode(t)")) == "jwt.decode"
     assert callee_chain(call("requests.get(u)")) == "requests.get"

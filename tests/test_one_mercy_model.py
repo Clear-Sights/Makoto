@@ -14,9 +14,7 @@ import subprocess
 import sys as _sys
 from pathlib import Path
 
-from makoto import audit, ledger
-
-
+from makoto.record import audit, ledger
 def _kinds(chain_root: Path) -> set:
     return {row.get("kind") for row in ledger.read(root=chain_root)}
 
@@ -45,7 +43,7 @@ def test_advisory_tier_fire_is_a_chained_row(tmp_path, monkeypatch):
     """An ADVISE-tier finding (e.g. the test-delta redirect) is recorded via _record_audit ->
     audit.append_row -> the chain (kind="audit"), same as any BLOCK-tier fire -- the advisory
     tier is never a second-class, unrecorded mercy."""
-    from makoto.db import init_db
+    from makoto.record.db import init_db
     state_dir = tmp_path / "state"
     (tmp_path / "CITATIONS.md").write_text("x")
     init_db(state_dir, tmp_path / "CITATIONS.md")
@@ -74,7 +72,7 @@ def test_advisory_tier_fire_is_a_chained_row(tmp_path, monkeypatch):
 
 # ---- 4. ack-block --------------------------------------------------------------------------------
 def test_ack_block_is_a_chained_row(tmp_path):
-    from makoto.ackblock import record_ack_block_if_new
+    from makoto.record.ackblock import record_ack_block_if_new
     ack = {"fingerprint_id": "timeout", "reason": "reviewed", "ts": "2026-07-07T00:00:00Z"}
     record_ack_block_if_new(ack, session_id="s1", root=tmp_path)
     rows = [r for r in ledger.read(root=tmp_path) if r.get("kind") == "release.operator"]
@@ -86,7 +84,7 @@ def test_all_four_mercy_kinds_are_distinct_chained_kinds_never_a_silent_fifth_pa
     """The actual SPEC-C item 4 claim, in one assertion: every mercy this project has ever
     shipped lands as one of exactly these kinds on the chain -- no mercy mechanism exists that
     writes NOTHING (a silent look-away)."""
-    from makoto.ackblock import record_ack_block_if_new
+    from makoto.record.ackblock import record_ack_block_if_new
     audit.append_exemption(tmp_path, pattern_id="content.timing_unsafe_compare", kind="makoto-allow", file="h.py",
                            line=1, reason="r")
     audit.append_exemption(tmp_path, pattern_id="content.verifier_predicate_weakened", kind="disabled-pattern", file="x.py",

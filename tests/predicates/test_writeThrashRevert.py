@@ -3,7 +3,7 @@ A->B->C progress and a bare A->A repeat stay silent; a current Edit/MultiEdit fr
 judged (the canon.oscillate 7-FP lesson); whitespace-only differences are the same content."""
 import json
 
-from makoto.schema import Finding, PreCheck
+from makoto.core.schema import Finding, PreCheck
 from makoto.checks.writeThrashRevert import predicate
 
 _PAT = PreCheck(

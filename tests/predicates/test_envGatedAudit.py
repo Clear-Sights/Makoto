@@ -22,7 +22,7 @@ the near-misses pin (1) is dissolved by the active-code AST gate AND a bare feat
 """
 from __future__ import annotations
 from makoto.checks.envGatedAudit import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.env_gated_audit", fire_level="error",
                description="env-gated audit/verification code", retry_hint="x")

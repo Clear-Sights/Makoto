@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 from urllib.parse import urlparse
-from makoto.schema import Finding, PreCheck
+from makoto.core.schema import Finding, PreCheck
 
 
 # Allowlisted hosts the agent legitimately knows from training data.
@@ -69,7 +69,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
     )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Run WebSearch first; only WebFetch URLs that prior search results actually returned. Fabricated URLs typically reflect plausible host+path patterns from training data, not real pages.'
 DESCRIPTION = 'WebFetch URL never seen in any prior tool_result this session'
 

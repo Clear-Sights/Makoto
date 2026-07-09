@@ -5,7 +5,7 @@ TP: a checked DEFERRED box on that file. TN: the same on a different file (wrong
 UNCHECKED DEFERRED box (legit open item), a checked DONE box, and a non-PreToolUse event.
 """
 from makoto.checks.deferredCheckboxTheater import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.deferred_checkbox_theater", fire_level="error", description="DEFERRED checkbox theater", retry_hint="x")
 

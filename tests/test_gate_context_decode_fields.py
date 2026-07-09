@@ -11,13 +11,13 @@ subagent", surfaced here as the derived `GateContext.is_subagent` convenience.
 import sqlite3
 
 import makoto._dispatch as _dispatch
-import makoto.checks._loader as _loader
-from makoto.checks._loader import Check
+import makoto.substrate._loader as _loader
+from makoto.substrate._loader import Check
 from makoto.stopchecks import GateContext, StopCheck
 
 
 def _setup_state(tmp_path):
-    from makoto.db import init_db
+    from makoto.record.db import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -60,7 +60,7 @@ def _spy_check(sink: list):
 
 def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(tmp_path, monkeypatch):
     state_dir = _setup_state(tmp_path)
-    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
     monkeypatch.setattr(_loader, "load_checks", lambda edge=None, package_dir=None: [_spy_check(captured)])
     payload = {
@@ -80,7 +80,7 @@ def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(
 
 def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(tmp_path, monkeypatch):
     state_dir = _setup_state(tmp_path)
-    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
     monkeypatch.setattr(_loader, "load_checks", lambda edge=None, package_dir=None: [_spy_check(captured)])
     payload = {

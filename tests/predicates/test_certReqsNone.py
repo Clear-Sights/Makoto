@@ -5,7 +5,7 @@ Regenerated deterministically from the candidate's predicted_tp/fp inputs — ha
 """
 from __future__ import annotations
 from makoto.checks.certReqsNone import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.cert_reqs_none", fire_level="error", description='1.33 cert_reqs=ssl.CERT_NONE kwarg — peer-cert verification disabled at the call site', retry_hint="x")
 

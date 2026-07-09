@@ -5,8 +5,8 @@ one determined cache file, then only paths named inside it (Makoto-not-Historia 
 import json
 import os
 
-from makoto.lib import pytest_cache
-from makoto.lib.pytest_cache import stale_failing_node
+from makoto.substrate import pytest_cache
+from makoto.substrate.pytest_cache import stale_failing_node
 
 
 def _mkcache(tmp_path, entries):

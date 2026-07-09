@@ -2,7 +2,7 @@
 tool events (full command + full tool_response) from the events-table rows _select_recent returns."""
 import json
 
-from makoto.lib.io import iter_tool_events
+from makoto.substrate.io import iter_tool_events
 
 
 def test_iter_tool_events_yields_command_and_response():

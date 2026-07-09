@@ -18,7 +18,7 @@ disk), so a discharge/wiring regression that the pure-function unit tests miss r
 """
 import sqlite3
 
-from makoto import ledger as _L
+from makoto.record import ledger as _L
 from makoto._dispatch import run_stop_checks
 
 _COMMIT_DDL = (

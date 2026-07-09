@@ -28,7 +28,7 @@ from pathlib import Path
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    """open makoto.db in autocommit WAL mode (the one true connection idiom)."""
+    """open makoto.record.db in autocommit WAL mode (the one true connection idiom)."""
     conn = sqlite3.connect(str(db_path), isolation_level=None)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
@@ -36,14 +36,14 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_db(state_dir: Path, citations_path: Path) -> None:
-    """create (or update) <state_dir>/makoto.db with every table, idempotently.
+    """create (or update) <state_dir>/makoto.record.db with every table, idempotently.
 
     `kind ∈ {count,value,touched}`; `status ∈ {open,discharged,retracted}`.
     config seed rows are UPSERTed on every call (INSERT OR REPLACE) so re-install
     after moving CITATIONS.md does not leave stale path/mtime.
     """
     state_dir.mkdir(parents=True, exist_ok=True)
-    conn = _connect(state_dir / "makoto.db")
+    conn = _connect(state_dir / "makoto.record.db")
     try:
         # events — append-only event log
         conn.execute("""

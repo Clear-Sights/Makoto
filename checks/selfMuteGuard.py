@@ -21,8 +21,8 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from makoto.lib.factories import scan_target_content
-from makoto.schema import Finding, PreCheck
+from makoto.substrate.factories import scan_target_content
+from makoto.core.schema import Finding, PreCheck
 
 # The file makoto wires into: ~/.claude/settings.json (or settings.local.json).
 _SETTINGS_RX = re.compile(r"\.claude/settings(?:\.local)?\.json$")
@@ -101,7 +101,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
     )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 

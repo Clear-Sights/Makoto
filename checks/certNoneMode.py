@@ -29,9 +29,9 @@ from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate, is_cert_none
+from makoto.substrate.factories import ast_introduced_predicate, is_cert_none
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 
 
 def _cert_none_node_match(node: ast.AST) -> Optional[str]:
@@ -48,7 +48,7 @@ def _cert_none_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_cert_none_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't set an SSLContext's `verify_mode = ssl.CERT_NONE`. That makes the context accept ANY peer certificate -- the cert-identity check becomes a no-op while the handshake still 'succeeds'. Use CERT_REQUIRED with a proper trust store (or pin a CA); if a localhost test server with no CA is genuinely required, annotate the line `makoto-allow: <reason>`."
 DESCRIPTION = 'certificate verification disabled (SSLContext verify_mode = CERT_NONE)'
 

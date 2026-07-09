@@ -1,4 +1,4 @@
-"""Unit tests for makoto.ledger — update recording + read-by-key.
+"""Unit tests for makoto.record.ledger — update recording + read-by-key.
 
 Self-contained: builds its own in-memory `ledger` table (matches db.py schema),
 so it does not depend on the DuckDB->SQLite migration. Uses REAL Bash
@@ -6,7 +6,7 @@ tool_response dict shape (stdout/stderr/exitCode), not a hand-built string.
 """
 import sqlite3
 
-from makoto.ledger import record_update, read_key
+from makoto.record.ledger import record_update, read_key
 
 
 def _conn():
@@ -138,14 +138,14 @@ def test_record_update_no_root_never_chain_appends(tmp_path, monkeypatch):
             "tool_input": {"file_path": "src/x.py"}},
         event_id=1, session_id="s",
     )
-    from makoto import ledger as _ledger
+    from makoto.record import ledger as _ledger
     assert _ledger.read(root=tmp_path) == []
 
 
 def test_record_update_with_root_chain_appends_touched_row(tmp_path):
     """root=<explicit> (the real _dispatch.py call site's shape) chain-appends a 'touched' row
     at that exact root, verifiable via verify_chain(root=...)."""
-    from makoto import ledger as _ledger
+    from makoto.record import ledger as _ledger
     c = _conn()
     record_update(
         c, {"hook_event_name": "PostToolUse", "tool_name": "Write",
@@ -161,7 +161,7 @@ def test_record_update_with_root_chain_appends_touched_row(tmp_path):
 
 def test_record_update_chain_fault_never_blocks_sqlite_write(tmp_path, monkeypatch):
     """A chain-append fault must never lose the sqlite (latest-wins) write it accompanies."""
-    import makoto.ledger as _ledger_mod
+    import makoto.record.ledger as _ledger_mod
     def _boom(*a, **k):
         raise RuntimeError("chain unavailable")
     monkeypatch.setattr(_ledger_mod, "append", _boom)

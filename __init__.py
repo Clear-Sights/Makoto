@@ -2,8 +2,8 @@
 
 Hook dispatch is bash-driven (install-helpers/*.sh); Python provides only the
 schema dataclasses, the citation check (makoto.checks), the audit log query
-helpers (makoto.audit), and the install/uninstall/status CLI (makoto.__main__).
+helpers (makoto.record.audit), and the install/uninstall/status CLI (makoto.__main__).
 """
-from makoto.schema import PreCheck, Finding
+from makoto.core.schema import PreCheck, Finding
 
 __all__ = ["PreCheck", "Finding"]

@@ -8,17 +8,18 @@ import sqlite3
 
 import pytest
 
-from makoto import db, plan as plan_store
+from makoto.record import db
+from makoto.session import plan as plan_store
 from makoto.checks import contractOrder
-from makoto.checks._planNode import Plan
-from makoto.schema import PreCheck
+from makoto.substrate._planNode import Plan
+from makoto.core.schema import PreCheck
 
 
 @pytest.fixture
 def conn(tmp_path):
     state_dir = tmp_path / "state"
     db.init_db(state_dir, tmp_path / "CITATIONS.md")
-    c = sqlite3.connect(str(state_dir / "makoto.db"))
+    c = sqlite3.connect(str(state_dir / "makoto.record.db"))
     yield c
     c.close()
 

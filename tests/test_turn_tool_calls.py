@@ -9,7 +9,7 @@ temperance-side complement, not this verity signal.
 """
 from __future__ import annotations
 
-from makoto.checks._shared import turn_tool_calls
+from makoto.substrate._shared import turn_tool_calls
 
 
 def _prod(et):

@@ -2,11 +2,11 @@
 sqlite as a derived, disposable index.
 
 SCOPE, STATED PRECISELY (not overclaimed): this rebuilds ONLY the `ledger` sqlite table
-(touched/testrun/value rows) from the chain -- the one part of `makoto.db` that IS chain-backed
+(touched/testrun/value rows) from the chain -- the one part of `makoto.record.db` that IS chain-backed
 today (Task 2 routed `record_update`'s writes through the chain, additively, opt-in via an
 explicit `root`). The `events`/`commitments`/`plans` tables are NOT chain-backed yet -- no
 producer chain-appends full raw hook payloads, declared commitments, or plan state -- and are
-OUT OF SCOPE here. Claiming a full `makoto.db` rebuild today would overclaim what the chain
+OUT OF SCOPE here. Claiming a full `makoto.record.db` rebuild today would overclaim what the chain
 actually contains; item 1's larger end-state (the WHOLE db disposable) needs those three
 surfaces chain-backed first, which is its own separate, larger, unaddressed piece of work named
 here rather than silently assumed away.
@@ -16,8 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from makoto import ledger as _ledger
-
+from makoto.record import ledger as _ledger
 _LEDGER_KINDS = frozenset({"touched", "testrun", "value"})
 
 

@@ -16,7 +16,7 @@ This test fires EVERY live gate discovered by `load_stopchecks()` through its re
 entry point — the exact call `run_stop_checks` makes — with a scenario proven (via each gate's own
 existing sentinel tests / test_dispatch.py's behavioral pins, cited per-branch below) to make it
 emit at least one Finding, then asserts the emitted level is "error" (the only blocking level,
-makoto.schema._ALLOWED_FIRE_LEVELS) UNLESS the gate id is in the explicit, named allowlist below.
+makoto.core.schema._ALLOWED_FIRE_LEVELS) UNLESS the gate id is in the explicit, named allowlist below.
 A future gate that ships a silent advisory tier without updating the allowlist reddens here.
 """
 from __future__ import annotations
@@ -140,7 +140,7 @@ def _scenario_canon_fingerprints_advisory(tmp_path):
 
 def _scenario_contract_order(tmp_path):
     # fires: makoto.checks.contractOrder's Stop remainder guard -- a declared node still open.
-    from makoto.checks._planNode import Plan
+    from makoto.substrate._planNode import Plan
     plan = Plan()
     plan.add_node("Write", "auth.py", "/repo/auth.py", id="n1")
     return _ctx(plan=plan)
@@ -202,7 +202,7 @@ def test_every_gate_scenario_actually_fires(tmp_path):
 
 def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
     """The runtime invariant: every live Stop gate's emitted Finding.level is "error" (the sole
-    blocking level, makoto.schema._ALLOWED_FIRE_LEVELS) UNLESS its id is in _ADVISORY_ALLOWLIST.
+    blocking level, makoto.core.schema._ALLOWED_FIRE_LEVELS) UNLESS its id is in _ADVISORY_ALLOWLIST.
     A future gate that silently ships a second advisory-tier exception reddens THIS test, not just
     a shape/dataclass pin."""
     violations = []

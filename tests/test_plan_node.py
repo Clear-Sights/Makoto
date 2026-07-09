@@ -1,4 +1,4 @@
-"""makoto.checks._planNode -- pure PlanNode/Plan port from Assay's plan/node.py + plan/gaps.py
+"""makoto.substrate._planNode -- pure PlanNode/Plan port from Assay's plan/node.py + plan/gaps.py
 (SPEC-5). Falsifying tests for the GAP rule (deps as gaps read by passthrough-name, no DAG),
 mark_done/resolve, passthrough_locations, remainder, and the rows/from_rows/from_jsonl codec.
 """
@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks._planNode import DONE, OPEN, Plan, PlanNode
+from makoto.substrate._planNode import DONE, OPEN, Plan, PlanNode
 
 
 def test_plannode_id_defaults_to_composite():

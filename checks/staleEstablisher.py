@@ -30,10 +30,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from makoto.checks._loader import Check
-from makoto.checks._planNode import DONE, Plan
-from makoto.posture import ADVISE
-from makoto.schema import Finding
+from makoto.substrate._loader import Check
+from makoto.substrate._planNode import DONE, Plan
+from makoto.verdict.posture import ADVISE
+from makoto.core.schema import Finding
 
 
 def check(plan: Optional[Plan]) -> Optional[Finding]:

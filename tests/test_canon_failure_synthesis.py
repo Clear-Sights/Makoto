@@ -81,8 +81,8 @@ def test_normal_fully_paired_call_is_unaffected():
 
 # ---- end-to-end, through the real dispatch (mirrors test_dispatch.py's _run_dispatch pattern) --
 def _setup_state(tmp_path):
-    """create a makoto.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.db import init_db
+    """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
+    from makoto.record.db import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")

@@ -99,8 +99,8 @@ def load_prechecks(path: Path | None = None) -> list[PreCheck]:
     """
     if path is not None:
         return _load_prechecks_from_toml(path)
-    from makoto.checks._loader import discover
-    from makoto import posture as _posture
+    from makoto.substrate._loader import discover
+    from makoto.verdict import posture as _posture
     live = [c for c in discover() if c.applies_at == "Pre" and c.predicate_module]
     bad = [c for c in live if str(c.posture).strip().lower() != _posture.BLOCK]
     if bad:

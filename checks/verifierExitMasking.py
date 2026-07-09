@@ -23,8 +23,8 @@ Knight-Leveson: stdlib re only.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.schema import Finding, PreCheck
-from makoto.lexicons import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
+from makoto.core.schema import Finding, PreCheck
+from makoto.core.lexicons import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
 
 # Anchored at the (post-wrapper) START of a statement: the runner is INVOKED, not an argument.
 _LEAD_RUNNER_RX = re.compile(
@@ -101,7 +101,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
     return None
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / set +e. Run the test/build/lint and fix what fails -- a hidden failure that reads as success is a cheat."
 DESCRIPTION = 'verifier exit-code masking (|| true / ; true / set +e on a test/build/lint runner)'
 

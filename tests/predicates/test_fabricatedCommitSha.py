@@ -23,14 +23,14 @@ tuples — the production history-row shape.
 """
 import json
 
-from makoto.lib.io import raw_payload_str
+from makoto.substrate.io import raw_payload_str
 from makoto.checks.fabricatedCommitSha import (
     predicate,
     _claimed_shas,
     _real_commit_in_history,
     _stop_text,
 )
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 
 _PAT = PreCheck(

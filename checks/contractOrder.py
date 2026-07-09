@@ -18,7 +18,7 @@ guards:
 
 LAYERING FIREWALL: as a discovered Stop GATE this module is subject to the same L2-import
 firewall every gate module is (`tests/test_gate_shape.py`'s `ALLOWED_IMPORT_ROOTS`) -- it never
-imports `makoto.plan` (a sibling L2 store) directly. The PRE predicate instead reads the
+imports `makoto.session.plan` (a sibling L2 store) directly. The PRE predicate instead reads the
 `plans` table INLINE via its own `conn` argument (`_load_plan` below) -- a small, deliberate
 duplicate of `plan.load_plan`'s SQL, this repo's own boundary law ("shapes are copied, never
 imported") applied at this finer grain -- while the STOP side reads the already-loaded
@@ -30,10 +30,10 @@ import json
 from typing import Optional
 
 from makoto.checks import normalize_path
-from makoto.checks._loader import Check
-from makoto.checks._planNode import Plan
-from makoto.checks._shared import StopCheck
-from makoto.schema import Finding
+from makoto.substrate._loader import Check
+from makoto.substrate._planNode import Plan
+from makoto.substrate._shared import StopCheck
+from makoto.core.schema import Finding
 
 _LOCATING_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 _LOCATION_KEYS = ("file_path", "notebook_path")
@@ -41,7 +41,7 @@ _LOCATION_KEYS = ("file_path", "notebook_path")
 
 def _load_plan(conn, session_id: str) -> Optional[Plan]:
     """A small, deliberate duplicate of `plan.load_plan`'s SQL -- see module docstring
-    (contractOrder is a discovered Stop GATE, so it may not import the sibling L2 `makoto.plan`
+    (contractOrder is a discovered Stop GATE, so it may not import the sibling L2 `makoto.session.plan`
     store directly)."""
     if conn is None:
         return None

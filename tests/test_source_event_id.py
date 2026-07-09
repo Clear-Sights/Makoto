@@ -18,8 +18,8 @@ from pathlib import Path
 
 
 def _setup_state(tmp_path):
-    """create a makoto.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.db import init_db
+    """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
+    from makoto.record.db import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -47,7 +47,7 @@ def _only_event_id(state_dir) -> int:
     """the single hook event's id — _ingest_event is the only writer of `events`, so a
     fresh db has exactly one row after one dispatch. Returned to assert the stamp is the
     RIGHT event, not merely non-zero."""
-    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     try:
         ids = [r[0] for r in conn.execute("SELECT id FROM events").fetchall()]
     finally:

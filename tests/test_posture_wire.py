@@ -1,4 +1,4 @@
-"""Tests for makoto.posture + makoto.wire — the ported enforcement-posture skeleton (SPEC-5 Task 1).
+"""Tests for makoto.verdict.posture + makoto.verdict.wire — the ported enforcement-posture skeleton (SPEC-5 Task 1).
 
 Falsifier: python -m pytest makoto/tests/test_posture_wire.py -q
 
@@ -15,8 +15,8 @@ match Assay's source shape (``assay/assay/runtime/mode.py`` + ``assay/assay/adap
 
 from __future__ import annotations
 
-from makoto import posture
-from makoto.wire import dispatch_posture
+from makoto.verdict import posture
+from makoto.verdict.wire import dispatch_posture
 
 _ALL_POSTURES = (posture.BLOCK, posture.ASK, posture.ADVISE, posture.ALLOW)
 

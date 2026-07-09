@@ -1,4 +1,4 @@
-"""Unit tests for makoto.ackblock -- the transcript-re-derived discharge mechanism for
+"""Unit tests for makoto.record.ackblock -- the transcript-re-derived discharge mechanism for
 session-level canon fingerprints (Task 2 slice 5, FABLE DECISION Option A). Every positive case
 here proves a GENUINE host-written turn discharges; every negative case proves a specific one of
 the five contract points (role/toolUseResult/synthetic-marker/timing/token+reason) is what's
@@ -7,8 +7,8 @@ actually gating the result -- never a vaguer "it just didn't match".
 from __future__ import annotations
 import json
 
-from makoto import ledger
-from makoto.ackblock import find_ack_block, record_ack_block_if_new, _first_fired_ts
+from makoto.record import ledger
+from makoto.record.ackblock import find_ack_block, record_ack_block_if_new, _first_fired_ts
 
 
 def _write_transcript(tmp_path, entries):
@@ -97,7 +97,7 @@ def test_record_ack_block_if_new_dedupes_across_legacy_and_new_kind(tmp_path):
     """D8a: a prior chain row written under the LEGACY kind ("ack-block", from before this
     rename) must still be recognized as the same discharge -- a rename must never cause a second,
     duplicate chain row for a fingerprint/session pair already recorded under the old name."""
-    from makoto import ledger
+    from makoto.record import ledger
     ledger.append({"kind": "ack-block", "fingerprint_id": "timeout", "reason": "pre-rename ack",
                   "acked_at": "2026-07-07T00:00:00Z", "session_id": "s1"}, root=tmp_path)
     ack = {"fingerprint_id": "timeout", "reason": "post-rename attempt", "ts": "2026-07-08T00:00:00Z"}

@@ -2,10 +2,10 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from makoto.schema import Finding
-from makoto.lib.claims import _code_spans
-from makoto.checks._shared import turn_tool_calls
-from makoto.checks._shared import StopCheck
+from makoto.core.schema import Finding
+from makoto.substrate.claims import _code_spans
+from makoto.substrate._shared import turn_tool_calls
+from makoto.substrate._shared import StopCheck
 
 # gate.fabricated_action — the assistant claims a completed TOOL action ("I ran `X`", "I executed
 # scripts/deploy.sh") in a turn where it made NO tool calls at all. FP-safety is the whole design:
@@ -94,5 +94,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", run=GATE.run)

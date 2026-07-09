@@ -15,7 +15,7 @@ discrimination (a green corpus alone does not prove low FP — these do).
 """
 from __future__ import annotations
 from makoto.checks.certVerifyDisabled import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.cert_verify_disabled", fire_level="error",
                description="TLS/certificate verification disabled", retry_hint="x")

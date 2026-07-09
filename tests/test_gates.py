@@ -7,11 +7,11 @@ fails open against the live filesystem so a real edit never false-blocks.
 """
 import sqlite3
 
-from makoto import commitments as C
+from makoto.session import commitments as C
 from makoto.checks.undischargedCommitment import advance_gate
 from makoto.checks.claimedProduceAbsent import completion_gate
-from makoto.checks._shared import _discharged
-from makoto.retraction import reconcile, detect_hidden_retraction
+from makoto.substrate._shared import _discharged
+from makoto.verdict.retraction import reconcile, detect_hidden_retraction
 
 
 def _conn():
@@ -258,5 +258,5 @@ def test_path_components_drops_home_tilde():
     # gates.py `if c and c != "~"`: the home '~' (and empty components) are dropped so a
     # '~/.claude/...' commitment suffix-discharges against an absolute write. The `or` mutant would
     # retain '~' (and empties), breaking the suffix match.
-    from makoto.checks._shared import _path_components
+    from makoto.substrate._shared import _path_components
     assert _path_components("~/a/b") == ["a", "b"]

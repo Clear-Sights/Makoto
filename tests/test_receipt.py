@@ -1,12 +1,12 @@
-"""Tests for makoto.receipt -- the pure read-time receipt view (Task 2 slice 4).
+"""Tests for makoto.record.receipt -- the pure read-time receipt view (Task 2 slice 4).
 
 FABLE DECISION 2026-07-07: claim kinds = verdict/certified-fact/testrun only; a receipt is
 computed fresh every call, nothing persisted; every claim cites its own row_index/row_hash.
 """
 from __future__ import annotations
 
-from makoto import ledger
-from makoto.receipt import emit_receipt
+from makoto.record import ledger
+from makoto.record.receipt import emit_receipt
 
 
 def test_absent_chain_is_a_vacuous_all_zero_receipt(tmp_path):
@@ -64,7 +64,7 @@ def test_tampered_chain_excludes_claims_after_the_break_from_trace_bound(tmp_pat
 
 
 def test_exemption_count_reflects_chained_exemption_rows(tmp_path):
-    from makoto import audit
+    from makoto.record import audit
     audit.append_exemption(tmp_path, pattern_id="content.timing_unsafe_compare", kind="makoto-allow", file="h.py",
                            line=4, reason="r", snippet="s")
     r = emit_receipt(root=tmp_path)

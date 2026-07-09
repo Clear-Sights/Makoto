@@ -1,5 +1,5 @@
 """SPEC-5 Task 8 integration pins: the posture cutover (`_dispatch._emit_decision` now folds a
-fired finding through `makoto.posture`/`makoto.wire` instead of the old single ad-hoc
+fired finding through `makoto.verdict.posture`/`makoto.verdict.wire` instead of the old single ad-hoc
 "decision":"block" shape). Three behavioral claims, one test each:
 
   1. a BLOCK precheck (PreToolUse) denies via the NEW nested Pre shape.
@@ -82,7 +82,7 @@ def test_posttooluse_still_refreshes_and_records_without_capture(tmp_path):
     rc2, out2 = _run_dispatch(state_dir, webfetch)
     assert (rc1, out1) == (0, "")
     assert (rc2, out2) == (0, "")
-    conn = sqlite3.connect(str(state_dir / "makoto.db"))
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     try:
         cites = [r[0] for r in conn.execute("SELECT cite FROM canonical_citations").fetchall()]
         assert "Doe 2031" not in cites, (

@@ -9,9 +9,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Optional
-from makoto.schema import Finding, PreCheck
-from makoto.lib.factories import makoto_allowed, scan_target_content
-from makoto.citations import extract_citations
+from makoto.core.schema import Finding, PreCheck
+from makoto.substrate.factories import makoto_allowed, scan_target_content
+from makoto.session.citations import extract_citations
 
 
 _TARGET_RX = re.compile(r"\.md$")
@@ -95,7 +95,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
     )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Add the citation to docs/CITATIONS.md as an Author-Year entry."
 # FABLE DECISION (2026-07-08): this used to also say "OR add it to the [allowlist] citations
 # block in makoto/data/patterns.toml if it's in-flight" -- but nothing ever read that block (a

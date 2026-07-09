@@ -94,7 +94,7 @@ def test_unwire_is_idempotent(tmp_path):
 
 
 def test_cmd_install_creates_state_dir_db_and_wires_settings(tmp_path, monkeypatch):
-    """cmd_install creates state dir + makoto.db + wires settings.json (one command)."""
+    """cmd_install creates state dir + makoto.record.db + wires settings.json (one command)."""
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     (fake_home / ".claude").mkdir()
@@ -103,7 +103,7 @@ def test_cmd_install_creates_state_dir_db_and_wires_settings(tmp_path, monkeypat
     assert rc == 0
     state_dir = fake_home / ".claude" / "makoto_state"
     assert state_dir.is_dir()
-    assert (state_dir / "makoto.db").is_file()
+    assert (state_dir / "makoto.record.db").is_file()
     settings = fake_home / ".claude" / "settings.json"
     assert settings.exists()
     data = json.loads(settings.read_text())
@@ -179,7 +179,7 @@ def test_validate_predicate_modules_aborts_on_missing_callable(monkeypatch, caps
     import sys, types
     broken_mod = types.ModuleType("makoto.prechecks.precheck_broken")
     monkeypatch.setitem(sys.modules, "makoto.prechecks.precheck_broken", broken_mod)
-    from makoto.schema import PreCheck
+    from makoto.core.schema import PreCheck
     fake_patterns = [
         PreCheck(id="x", fire_level="error", description="d",
                 predicate_module="makoto.prechecks.precheck_broken",

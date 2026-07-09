@@ -47,9 +47,9 @@ import ast
 import re
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate
+from makoto.substrate.factories import ast_introduced_predicate
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 
 # STRONG: unambiguously cryptographic identifier tokens; a SINGLE such operand makes the compare
 # timing-sensitive. The polysemous credential words (token/sig/secret/password/mac/tag/key) are
@@ -109,7 +109,7 @@ def _cd_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_cd_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't compare a secret/HMAC/digest with `==`/`!=`. A byte-by-byte short-circuiting compare leaks match-length timing (CWE-208), letting a remote attacker recover the secret one byte at a time -- the check still 'passes' but its constant-time property, the thing that makes it a SAFE verifier, is gone. Use `hmac.compare_digest(a, b)`. If a value merely shares a crypto name but is not a live secret comparison (a test asserting a known-good digest), annotate the line `makoto-allow: <reason>`."
 DESCRIPTION = 'timing-unsafe ==/!= comparison of a secret/HMAC/digest (use hmac.compare_digest)'
 

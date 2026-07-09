@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 import pytest
 
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 
 CASES = json.loads((Path(__file__).parent / "regex_file_cases.json").read_text())

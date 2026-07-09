@@ -1,4 +1,4 @@
-"""makoto.checks._shared — the Stop-edge gate catalog's own shared substrate (SPEC-5 Task 4,
+"""makoto.substrate._shared — the Stop-edge gate catalog's own shared substrate (SPEC-5 Task 4,
 owner-revised layout). Combines the former `stopchecks/_types.py` (the `StopCheck`/`GateContext`
 schemas) and `stopchecks/_common.py` (the discharge/suffix-match/turn-tool-call helpers every
 ledger-gate shares) into ONE flat, underscore-prefixed file — package plumbing, never a detector
@@ -7,7 +7,7 @@ module itself, so `checks._loader`'s scan skips it exactly like `_primitives.py`
 Kept as ONE file (not split) because combined the two source files are ~150 lines — not the
 "gets unwieldy" threshold the migration ticket flags as the split trigger — and every gate that
 needs `GateContext`/`StopCheck` also tends to need at least one of the discharge helpers, so a
-single import line (`from makoto.checks._shared import ...`) serves every migrated gate module.
+single import line (`from makoto.substrate._shared import ...`) serves every migrated gate module.
 """
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
 from makoto.checks import normalize_path
-from makoto.checks._planNode import Plan
-from makoto.lexicons import _EMPTY_OK
-from makoto.schema import Finding
+from makoto.substrate._planNode import Plan
+from makoto.core.lexicons import _EMPTY_OK
+from makoto.core.schema import Finding
 
 
 # ---- schemas (formerly stopchecks/_types.py) --------------------------------------------------
@@ -48,12 +48,12 @@ class GateContext:
     agent_type: Optional[str] = None        # raw `agent_type` (e.g. "Explore") — companion to
     #   agent_id, present when the session uses --agent or the hook fires inside a subagent.
     plan: Optional[Plan] = None             # the declared contract Plan (SPEC-5) for this
-    #   session, loaded once by run_stop_checks via makoto.plan.load_plan; None when no plan is
+    #   session, loaded once by run_stop_checks via makoto.session.plan.load_plan; None when no plan is
     #   declared. Read by contractOrder's Stop GATE and staleEstablisher's advisory check.
     session_id: Optional[str] = None        # raw hook payload's `session_id` (Task 2 slice 5).
     transcript_path: Optional[str] = None   # raw `transcript_path` (CONFIRMED real, top-level on
     #   every hook event -- Claude Code hooks reference, fetched 2026-07-07: "Path to conversation
-    #   JSONL file"). Read by canonFingerprints.py's ack-block discharge (makoto.ackblock).
+    #   JSONL file"). Read by canonFingerprints.py's ack-block discharge (makoto.record.ackblock).
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the ack-block discharge can read/append the chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
@@ -138,7 +138,7 @@ def _discharged(location: str, touched_keys, fs_exists, *, empty_keys=None, fs_s
 
 
 # iter_tool_events RELOCATED to lib/io.py (consolidation T2.5): the history-row decoder lives at
-# L1 beside raw_payload_str/decode_payload; consumers import `from makoto.lib.io import iter_tool_events`.
+# L1 beside raw_payload_str/decode_payload; consumers import `from makoto.substrate.io import iter_tool_events`.
 def _event_type_of(row) -> str:
     """The hook event name of a history row, across both shapes: the production events-table tuple
     (id, ts, event_type, cwd, payload) carries it at index 2; the corpus-replay dict carries it

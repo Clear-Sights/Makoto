@@ -1,31 +1,15 @@
 from __future__ import annotations
 import json
 from typing import Optional
-from makoto.schema import Finding
-from makoto.checks._shared import StopCheck
+from makoto.core.schema import Finding
+from makoto.substrate._shared import StopCheck
+# The 2026-07-09 dedup pass performed exactly the hoist this module's old note asked for: the
+# wiring predicate now lives in makoto.substrate.wiring (an L0 primitive module, firewall-
+# allowlisted in tests/test_gate_shape.py's ALLOWED_IMPORT_ROOTS), shared with install.py
+# instead of mirrored by hand.
+from makoto.substrate.wiring import entry_dispatches_to_makoto as _entry_dispatches_to_makoto
 
-
-# Mirrors makoto.install._MAKOTO_CLAUDE_FLAG / ._entry_dispatches_to_makoto, duplicated here
-# rather than imported: this package's layering firewall (tests/test_gate_shape.py,
-# ALLOWED_IMPORT_ROOTS) restricts a gate module to L0/L1 primitives + the intra-package
-# _shared helper — install.py is lifecycle/CLI machinery, not a primitive, and importing it
-# would be a clean-cycle-wise but layering-wise import a gate module should not make. Keep this
-# predicate's logic byte-for-byte in step with install.py's by hand; a future refactor that
-# hoists both to a shared L0 module would let this duplication go away.
-_MAKOTO_CLAUDE_FLAG = "_makoto_managed"
 _MAKOTO_EVENTS = ("PreToolUse", "PostToolUse", "Stop")
-
-
-def _entry_dispatches_to_makoto(entry) -> bool:
-    """True iff ONE hook entry functionally reaches makoto's dispatch — the managed-flag entry
-    `makoto install` writes, OR a flag-less hand-wired/shim entry whose command names makoto.
-    Verbatim mirror of makoto.install._entry_dispatches_to_makoto (see module note above)."""
-    if not isinstance(entry, dict):
-        return False
-    if entry.get(_MAKOTO_CLAUDE_FLAG):
-        return True
-    return any(isinstance(inner, dict) and "makoto" in str(inner.get("command", "")).lower()
-               for inner in entry.get("hooks", []))
 
 
 def _missing_makoto_events(hooks) -> list:
@@ -112,5 +96,5 @@ GATE = StopCheck(
 # metadata. This CHECK object is purely additive discovery metadata (Task 9's load_checks(edge=
 # "Stop") seam) and does not change self_wired_gate's actual runtime behavior or its GATE/
 # load_stopchecks() wiring, which are byte-for-byte unchanged from before this migration.
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", run=GATE.run)

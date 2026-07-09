@@ -9,7 +9,7 @@ lib.io / lib.claims / lib.factories / citations); no compat shim (CLAUDE.md #4).
 from __future__ import annotations
 import json
 
-from makoto.lexicons import _TEST_RUNNER_RX, _FAILURE_SUMMARY_RX, _FAILURE_MARKER_RX, _ANSI_SGR_RX
+from makoto.core.lexicons import _TEST_RUNNER_RX, _FAILURE_SUMMARY_RX, _FAILURE_MARKER_RX, _ANSI_SGR_RX
 
 
 def raw_payload_str(entry) -> str:

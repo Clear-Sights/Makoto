@@ -17,7 +17,7 @@ from pathlib import Path
 
 from makoto import _dispatch
 from makoto._dispatch import _build_decision, _ALLOW_EXEMPT_IDS
-from makoto.schema import Finding, load_prechecks
+from makoto.core.schema import Finding, load_prechecks
 
 REPO = Path(_dispatch.__file__).resolve().parent
 

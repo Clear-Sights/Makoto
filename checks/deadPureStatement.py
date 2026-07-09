@@ -10,12 +10,10 @@ imports beyond stdlib `ast`.
 """
 from __future__ import annotations
 import ast
-import os
-import tempfile
-from pathlib import Path
 
-from makoto.checks._shared import StopCheck
-from makoto.schema import Finding
+from makoto.substrate._shared import StopCheck
+from makoto.substrate._stdlib_ast_helpers import iter_touched_python_sources
+from makoto.core.schema import Finding
 
 _PURE_BUILTINS = frozenset(
     "len str int float bool tuple list dict set frozenset abs min max sum "
@@ -409,62 +407,16 @@ def analyze_file(src: str, path: str) -> list:
 # =============================================================================================
 # Stop-hook adapter (formerly stopchecks/stopcheck_liveness.py)
 # =============================================================================================
-def _scratch_roots() -> tuple[str, ...]:
-    roots = []
-    for d in (tempfile.gettempdir(), "/tmp", "/var/folders", os.path.expanduser("~/.claude")):
-        try:
-            roots.append(os.path.realpath(d))
-        except OSError:
-            pass
-    return tuple(roots)
-
-
-_SCRATCH_ROOTS = _scratch_roots()
-
-
-def _under(path: str, root: str) -> bool:
-    return path == root or path.startswith(root + os.sep)
-
-
-def _is_scratch(p, cwd) -> bool:
-    """A touched .py is out-of-scope scratch iff cwd is KNOWN, the file is NOT inside that working
-    dir, AND it lives under a known temp/scratch root. A file under cwd is the closed unit under
-    construction (this is how pytest tmp fixtures and real project files appear) and always counts;
-    only stray scratch OUTSIDE the working project (e.g. /tmp/mining/*, the live-session
-    contamination vector) is skipped. This realizes "a block counts only when opened AND closed" at
-    the unit-closure layer: the analyzer's detection logic is untouched, the firing scope narrows to
-    closed work. Suppression requires a known cwd AND a scratch root -- never a blanket skip -- so an
-    unknown working dir keeps the gate's full teeth and a real (non-temp) file always fires."""
-    if not cwd:
-        return False                                         # working dir unknown -> never suppress (FN-safe)
-    rp = os.path.realpath(str(p))
-    if _under(rp, os.path.realpath(str(cwd))):
-        return False                                         # inside the working dir -> in scope
-    return any(_under(rp, r) for r in _SCRATCH_ROOTS)        # outside cwd AND in a scratch root -> stray scratch
-
-
-def _read(ctx, p):
-    fn = getattr(ctx, "fs_read", None)
-    return fn(p) if callable(fn) else Path(p).read_text(encoding="utf-8")
+# _scratch_roots/_is_scratch/_read/iter_touched_python_sources (imported at module top from
+# _stdlib_ast_helpers) are shared verbatim with hollowTest.py (2026-07-09: found alpha-equivalent
+# by AST canonicalization; extracted rather than left duplicated -- the stdlib-only helper module
+# preserves the same import-graph-isolation property both detectors need, enforced by
+# tests/test_detector_engines_are_stdlib_isolated.py).
 
 
 def _run(ctx) -> list:
     out = []
-    cwd = getattr(ctx, "cwd", None)
-    for p in getattr(ctx, "touched", ()):
-        if not str(p).endswith(".py"):
-            continue
-        # anchor a possibly-relative touched key to the event's OWN cwd, never the dispatch
-        # process's ambient one (matches _dispatch.py's real fs_read/fs_exists join)
-        real_p = p if not cwd or os.path.isabs(str(p)) else os.path.join(cwd, p)
-        if _is_scratch(real_p, cwd):
-            continue                                         # stray scratch outside the working project -> not a closed unit
-        try:
-            src = _read(ctx, real_p)
-        except OSError:
-            continue
-        if not isinstance(src, str):
-            continue                                         # fs_read miss (None) -> skip, never crash
+    for p, src in iter_touched_python_sources(ctx):
         for f in analyze_file(src, str(p)):
             out.append(Finding(
                 pattern_id="gate.liveness",
@@ -486,5 +438,5 @@ def _run(ctx) -> list:
 GATE = StopCheck(id="gate.liveness", fn=analyze_file, run=_run)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", run=GATE.run)

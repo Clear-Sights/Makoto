@@ -9,8 +9,8 @@ import ast
 import re
 import textwrap
 from typing import Callable, Optional
-from makoto.schema import Finding, PreCheck
-from makoto.lexicons import _MAKOTO_ALLOW_RX, _MAKOTO_ALLOW_REASON_RX
+from makoto.core.schema import Finding, PreCheck
+from makoto.core.lexicons import _MAKOTO_ALLOW_RX, _MAKOTO_ALLOW_REASON_RX
 
 
 def makoto_allowed(content: str) -> bool:

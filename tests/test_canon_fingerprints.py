@@ -1,12 +1,12 @@
 """SPEC-5 Task 9 both-polarity battery for the 17 in-scope canon session fingerprints
-(makoto.checks._canonAtoms.THE_CANON_17). For each fingerprint: a planted session that SHOULD fire
+(makoto.substrate._canonAtoms.THE_CANON_17). For each fingerprint: a planted session that SHOULD fire
 it, and one that should NOT. Also pins the BLOCK-vs-ADVISE split specified for this ticket, and
 that canonFingerprints.py (BLOCK) / canonFingerprintsAdvisory.py (ADVISE) each only ever emit their
 own fixed Finding.level.
 """
 from __future__ import annotations
 
-from makoto.checks._canonAtoms import BLOCK_IDS, THE_CANON_17, calls_from_history, compute_atoms
+from makoto.substrate._canonAtoms import BLOCK_IDS, THE_CANON_17, calls_from_history, compute_atoms
 from makoto.checks.canonFingerprints import canon_fingerprint_block_gate
 from makoto.checks.canonFingerprintsAdvisory import canon_fingerprint_advisory_gate
 
@@ -231,7 +231,7 @@ def test_first_firing_blocks_even_with_a_ready_ack_in_the_transcript(tmp_path):
 def test_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
     """PLANT the fault (first Stop fires and gets recorded), THEN a real ack turn -> the SECOND
     Stop's evaluation must be silent, and must chain-append an ack-block row."""
-    from makoto import ledger
+    from makoto.record import ledger
     first = canon_fingerprint_block_gate("", [_DESTRUCTIVE_ROW], session_id="s1", state_root=tmp_path)
     target_msg = next(f.message for f in first if f.message.startswith("canon.notestedit_destruct:"))
     ledger.append({"kind": "audit", "session_id": "s1", "ts": "2026-07-07T00:00:00Z",
@@ -258,7 +258,7 @@ def test_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
 def test_a_forged_synthetic_ack_never_silences_the_gate(tmp_path):
     """A `<system-reminder>`-wrapped or interrupted-request-shaped turn containing the exact ack
     token must NOT discharge -- only a genuine host-written user turn can."""
-    from makoto import ledger
+    from makoto.record import ledger
     first = canon_fingerprint_block_gate("", [_DESTRUCTIVE_ROW], session_id="s1", state_root=tmp_path)
     target_msg = next(f.message for f in first if f.message.startswith("canon.notestedit_destruct:"))
     ledger.append({"kind": "audit", "session_id": "s1", "ts": "2026-07-07T00:00:00Z",

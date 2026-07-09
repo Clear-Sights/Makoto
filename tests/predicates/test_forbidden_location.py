@@ -4,7 +4,7 @@ Makoto's predicate contract (SPEC-5 Task 5). Fast, direct `predicate(...)` calls
 from __future__ import annotations
 
 from makoto.checks.forbiddenLocation import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(
     id="event.forbidden_location",

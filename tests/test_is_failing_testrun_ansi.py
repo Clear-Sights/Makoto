@@ -7,7 +7,7 @@ failing run — 18 such failures slipped past gate.green_claim's resolver. Strip
 ` 2 failed` and the EXISTING tuned regex matches. FP-safe: stripping color cannot manufacture a
 failure, and the `[1-9]\d*` / xfail word-boundary guards are untouched.
 """
-from makoto.lib.io import is_failing_testrun
+from makoto.substrate.io import is_failing_testrun
 
 ESC = "\x1b"
 

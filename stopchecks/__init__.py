@@ -2,12 +2,12 @@
 (SPEC-5 Task 4, owner-revised layout) rather than this package's own directory.
 
 The 11 stop-gate modules (formerly `stopchecks/stopcheck_*.py` + their engines) moved to
-`makoto/checks/` with descriptive names (see `makoto.checks._declared.DECLARED_IDS` for the
+`makoto/checks/` with descriptive names (see `makoto.substrate._declared.DECLARED_IDS` for the
 id->filename map); their `.id`/`.run(ctx)` contract and the `StopCheck`/`GateContext` schemas are
 UNCHANGED. This module keeps `load_stopchecks()`'s public contract (memoized, sorted-by-id list of
 `StopCheck` `GATE` exports) working for every existing caller (`_dispatch.py`, and the many tests
 that still `from makoto.stopchecks import load_stopchecks` / `GateContext` / `StopCheck`) by
-routing its discovery through `makoto.checks._loader`'s own flat-file-candidate convention instead
+routing its discovery through `makoto.substrate._loader`'s own flat-file-candidate convention instead
 of the old `pkgutil.iter_modules` scan over this package's (now near-empty) directory -- ripping
 this loader out entirely in favor of `checks._loader.load_checks(edge="Stop")` is Task 8's job,
 not this one's (Task 4 must keep both discovery paths live side by side)."""
@@ -15,8 +15,8 @@ from __future__ import annotations
 import importlib
 from functools import lru_cache
 
-from makoto.checks._shared import StopCheck, GateContext  # re-exported package API
-from makoto.checks import _loader as _cl
+from makoto.substrate._shared import StopCheck, GateContext  # re-exported package API
+from makoto.substrate import _loader as _cl
 
 __all__ = ["StopCheck", "GateContext", "load_stopchecks"]
 

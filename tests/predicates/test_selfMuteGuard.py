@@ -12,7 +12,7 @@ FP discipline (must stay silent): unrelated settings edits, an unrelated env
 var, re-ENABLING makoto (DISABLE set to a falsey value), the same shape in a
 NON-settings file (docs/examples), an edit that KEEPS the managed hook.
 """
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 from makoto.checks import selfMuteGuard
 
 
@@ -208,7 +208,7 @@ def test_anti_goodhart_canary_fire_and_inert():
 
 def test_catalog_row_exists_and_matches():
     """the live catalog must declare 1.23 with the predicate wired (no test/catalog drift)."""
-    from makoto.schema import load_prechecks
+    from makoto.core.schema import load_prechecks
     # SPEC-5: this test moved from makoto/tests/ into makoto/tests/predicates/, one directory
     # deeper -- use load_prechecks()'s own default path resolution rather than a hand-rolled
     # relative path that silently breaks on the next move.

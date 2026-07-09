@@ -130,7 +130,7 @@ def test_plugin_description_predicate_count_matches_disk():
     pattern module), so each stated tier count is pinned to the live catalog here —
     bump the description when a check is added or removed.
     """
-    from makoto.schema import load_prechecks
+    from makoto.core.schema import load_prechecks
     from makoto.stopchecks import load_stopchecks
 
     desc = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())["description"]

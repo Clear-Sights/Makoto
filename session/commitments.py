@@ -20,7 +20,7 @@ import re
 from typing import Optional
 
 from makoto.checks import detect_locations, detect_quantity, normalize_path
-from makoto.lexicons import _BE_AUX_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
+from makoto.core.lexicons import _BE_AUX_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
 
 # A commitment is a FORWARD promise to produce/modify a named file: a PRODUCE VERB (add/
 # implement/build/create/write/wire/fix/introduce) that GOVERNS the path as its object/

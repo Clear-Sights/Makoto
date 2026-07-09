@@ -1,4 +1,4 @@
-"""makoto.checks._planNode -- the declared-Plan / contract-dependency shape (SPEC-5 Makoto
+"""makoto.substrate._planNode -- the declared-Plan / contract-dependency shape (SPEC-5 Makoto
 absorbs Assay). Ported BY SHAPE (rule 5 -- copy, never import) from Assay's
 `assay/assay/plan/node.py` (the ``PlanNode`` frozen dataclass) + `assay/assay/plan/gaps.py`
 (the ``Plan`` container + the GAP rule), combined into ONE Makoto module per the merge plan.

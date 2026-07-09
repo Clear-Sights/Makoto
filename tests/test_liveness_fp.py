@@ -14,7 +14,7 @@ A FIRING soundness sentinel means a real analyzer bug. NEVER weaken a sentinel t
 from __future__ import annotations
 import ast
 
-from makoto.checks._fpHarness import measure
+from makoto.substrate._fpHarness import measure
 from makoto.checks.deadPureStatement import (
     illusory_statements, analyze_file, live_locals, _assigned_name)
 

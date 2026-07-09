@@ -22,7 +22,7 @@ import json
 import sys
 from pathlib import Path
 
-from makoto.schema import load_prechecks
+from makoto.core.schema import load_prechecks
 
 
 def _cmd_pattern_list() -> int:
@@ -52,7 +52,7 @@ def _cmd_pattern_show(pid: str) -> int:
     same live check after a rename -- the CLI honors the same "an old id is never dead, it's
     an alias" guarantee MAKOTO_DISABLE_PATTERNS already gets.
     """
-    from makoto.checks._aliases import canonical
+    from makoto.substrate._aliases import canonical
     pid = canonical(pid)
     patterns = {p.id: p for p in load_prechecks()}
     if pid not in patterns:
@@ -84,7 +84,7 @@ def _cmd_receipt(session_id: str | None) -> int:
     """print the current receipt (Task 2 slice 4) as JSON -- a pure read-time view over the
     chain, never a persisted row. Fail-soft: no chain yet -> a vacuous all-zero receipt, exit 0
     (matching `_cmd_show`'s "no DB yet" discipline; this is inspection, never a gate)."""
-    from makoto.receipt import emit_receipt
+    from makoto.record.receipt import emit_receipt
     print(json.dumps(emit_receipt(session_id=session_id), indent=2))
     return 0
 
@@ -96,11 +96,11 @@ def _cmd_show(key: str) -> int:
     never blocks. Fail-soft: no DB yet -> a friendly note, exit 0.
     """
     import sqlite3
-    from makoto.state import _state_dir
-    from makoto import ledger
-    db_path = _state_dir() / "makoto.db"
+    from makoto.record.state import _state_dir
+    from makoto.record import ledger
+    db_path = _state_dir() / "makoto.record.db"
     if not db_path.exists():
-        print("makoto show: no makoto.db yet (run `makoto install`)", file=sys.stderr)
+        print("makoto show: no makoto.record.db yet (run `makoto install`)", file=sys.stderr)
         return 0
     conn = sqlite3.connect(str(db_path))
     try:

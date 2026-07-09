@@ -11,7 +11,7 @@ matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts)
 import re
 
 from makoto.checks import normalize_path
-from makoto.lib.io import bash_output_text, is_test_runner
+from makoto.substrate.io import bash_output_text, is_test_runner
 
 _PATH_IN_CMD_RX = re.compile(r"[\w.\-]+/[\w.\-]+\.\w+|`?([\w.\-]+\.\w+)`?")
 
@@ -182,7 +182,7 @@ def latest_testrun(conn, session_id: str) -> str:
 # The chained, tamper-evident surface (owner decision 2026-07-07: verification lives IN the
 # ledger — the gates' verdicts depend on these rows, so the store and its verifier share one
 # home). Ported by shape from Assay's kernel/ledger.py + identity (the substrate the SPEC-5
-# merge dropped), re-homed onto makoto.state._state_dir(). Append-only JSONL with
+# merge dropped), re-homed onto makoto.record.state._state_dir(). Append-only JSONL with
 # prev_hash/row_hash links; verify_chain names the exact broken row; an exclusive fcntl.flock
 # across tail-read+append means concurrent hook invocations can never fork the chain.
 # Relationship to the sqlite surface above: sqlite stays the latest-wins QUERY INDEX; this is
@@ -194,7 +194,7 @@ import json as _json
 from pathlib import Path
 from typing import Optional
 
-from makoto.state import _state_dir as _chain_state_dir
+from makoto.record.state import _state_dir as _chain_state_dir
 
 _DEFAULT_STREAM = "chain"
 OPEN = "open"

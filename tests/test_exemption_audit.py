@@ -7,11 +7,11 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-import makoto.db as vdb
+import makoto.record.db as vdb
 import makoto._dispatch  # noqa: F401 — importing the L3 orchestrator installs the exemption sink
-from makoto.schema import PreCheck, load_prechecks
-from makoto import audit
-from makoto.lib import factories
+from makoto.core.schema import PreCheck, load_prechecks
+from makoto.record import audit
+from makoto.substrate import factories
 
 
 def _state(tmp: Path) -> Path:
@@ -39,7 +39,7 @@ def _run(pid: str, evt: dict, conn):
 def test_exempted_real_match_is_recorded(tmp_path):
     """1.26 verify=False + makoto-allow reason -> still exempt (no block) BUT one exemption row."""
     st = _state(tmp_path)
-    conn = sqlite3.connect(str(st / "makoto.db"))
+    conn = sqlite3.connect(str(st / "makoto.record.db"))
     content = ("import requests\n"
                "requests.get(u, verify=False)  # makoto-allow: pinned internal dev host\n")
     out = _run("content.cert_verify_disabled", _evt("client.py", content), conn)
@@ -58,7 +58,7 @@ def test_exempted_real_match_is_recorded(tmp_path):
 def test_marker_without_a_real_match_records_nothing(tmp_path):
     """precision: a makoto-allow marker on clean code is NOT a suppression -> no noise row."""
     st = _state(tmp_path)
-    conn = sqlite3.connect(str(st / "makoto.db"))
+    conn = sqlite3.connect(str(st / "makoto.record.db"))
     content = "import requests\nrequests.get(u)  # makoto-allow: nothing wrong here\n"
     out = _run("content.cert_verify_disabled", _evt("client.py", content), conn)
     assert out is None
@@ -79,7 +79,7 @@ def test_pure_unit_call_without_conn_writes_nothing(tmp_path, monkeypatch):
 def test_regex_factory_path_also_records(tmp_path):
     """the OTHER factory (regex_file_predicate, 1.4 audit_skip) records its exempted match too."""
     st = _state(tmp_path)
-    conn = sqlite3.connect(str(st / "makoto.db"))
+    conn = sqlite3.connect(str(st / "makoto.record.db"))
     # reason deliberately free of an "ADR" token: 1.4 has its OWN exempt_rx (ADR backlink) that
     # would carve out silently before the makoto-allow path — we want the makoto-allow branch here.
     content = "audit_skip = true  # makoto-allow: legacy flag, owner aware\n"
@@ -95,9 +95,9 @@ def test_disabled_pattern_suppression_is_recorded(tmp_path, monkeypatch):
     """MAKOTO_DISABLE_PATTERNS muting a pattern that keyword-hits the payload leaves a record —
     the silent-disable gap closed; parity with the already-audited MAKOTO_DISABLE_GATES."""
     from makoto._dispatch import _run_predicates
-    from makoto.schema import load_prechecks
+    from makoto.core.schema import load_prechecks
     st = _state(tmp_path)
-    conn = sqlite3.connect(str(st / "makoto.db"))
+    conn = sqlite3.connect(str(st / "makoto.record.db"))
     pat = next(p for p in load_prechecks() if p.predicate_module and p.keywords)
     kw = pat.keywords[0]
     monkeypatch.setenv("MAKOTO_DISABLE_PATTERNS", pat.id)
@@ -132,7 +132,7 @@ def test_append_exemption_also_chain_appends_with_renamed_kind(tmp_path):
     'exemption'; the original suppression-mechanism kind ('makoto-allow'/'disabled-pattern') is
     renamed to exemption_kind in the chain payload only, so it never collides with the chain's
     own kind field -- the exemptions.jsonl line itself is untouched (still keyed 'kind')."""
-    from makoto import ledger as _ledger
+    from makoto.record import ledger as _ledger
     st = _state(tmp_path)
     audit.append_exemption(st, pattern_id="content.timing_unsafe_compare", kind="makoto-allow", file="h.py", line=4,
                            reason="constant-time compare not needed here", snippet="a == b")
@@ -160,9 +160,9 @@ def test_set_exemption_sink_is_restorable(tmp_path):
 def test_no_disable_env_means_no_suppression_work(tmp_path):
     """default case: MAKOTO_DISABLE_PATTERNS unset -> no disabled-pattern rows ever written."""
     from makoto._dispatch import _run_predicates
-    from makoto.schema import load_prechecks
+    from makoto.core.schema import load_prechecks
     st = _state(tmp_path)
-    conn = sqlite3.connect(str(st / "makoto.db"))
+    conn = sqlite3.connect(str(st / "makoto.record.db"))
     pat = next(p for p in load_prechecks() if p.predicate_module and p.keywords)
     payload = {"hook_event_name": "PreToolUse", "session_id": "s3", "tool_name": "Bash",
                "tool_input": {"command": pat.keywords[0] + " something"}}

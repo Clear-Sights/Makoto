@@ -2,12 +2,12 @@ from __future__ import annotations
 import re
 from typing import Optional
 from makoto.checks import detect_locations, normalize_path
-from makoto.schema import Finding
-from makoto.lexicons import (
+from makoto.core.schema import Finding
+from makoto.core.lexicons import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
-from makoto.checks._shared import _BIND_BEFORE, _discharged
-from makoto.checks._shared import StopCheck
+from makoto.substrate._shared import _BIND_BEFORE, _discharged
+from makoto.substrate._shared import StopCheck
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -100,5 +100,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", run=GATE.run)

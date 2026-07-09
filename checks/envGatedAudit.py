@@ -38,10 +38,10 @@ import ast
 import re
 from typing import Optional
 
-from makoto.lexicons import _INTEG_VOCAB
-from makoto.lib.factories import ast_introduced_predicate, callee_chain
+from makoto.core.lexicons import _INTEG_VOCAB
+from makoto.substrate.factories import ast_introduced_predicate, callee_chain
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX  # .py only — .md is prose (worst old FP was CLAUDE.md)
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX  # .py only — .md is prose (worst old FP was CLAUDE.md)
 _INTEG_RX = re.compile(_INTEG_VOCAB, re.I)  # the shared L0 integrity vocabulary (single source; pattern 1.4 too)
 
 # An env-var READ in CALL form (callee_chain) vs SUBSCRIPT form (value chain).
@@ -116,7 +116,7 @@ def _node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't gate an audit/verification check behind an env var — `if os.getenv('...'): <audit>` makes the check opt-in, so it silently does nothing unless someone sets the flag (a hollowed integrity check). Run the check unconditionally; if a genuinely-optional diagnostic is intended, annotate the line with `makoto-allow: <reason>`."
 DESCRIPTION = 'env-gated audit/verification code (if os.environ.get(...)/os.getenv(...) gating an integrity op)'
 

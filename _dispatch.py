@@ -4,8 +4,8 @@ Pipeline:
   stdin -> parse JSON -> ensure DB exists (lazy init) -> connect (with retry)
   -> refresh citations -> INSERT event (lastrowid) -> SELECT recent slice
   -> keyword prefilter -> iterate candidate predicates -> fold worst outcome
-  through the configured posture (makoto.posture) -> render via the per-edge
-  wire table (makoto.wire) -> stdout JSON iff non-empty -> append audit row
+  through the configured posture (makoto.verdict.posture) -> render via the per-edge
+  wire table (makoto.verdict.wire) -> stdout JSON iff non-empty -> append audit row
   -> exit 0.
 
 main() is the thin orchestrator. Each stage is a small helper:
@@ -27,11 +27,13 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from makoto.schema import load_prechecks, PreCheck, Finding
-from makoto.state import _state_dir
-from makoto import citations, audit, posture, wire
-from makoto.audit import AuditRow
-from makoto.lib import factories
+from makoto.core.schema import load_prechecks, PreCheck, Finding
+from makoto.record.state import _state_dir
+from makoto.session import citations
+from makoto.record import audit
+from makoto.verdict import posture, wire
+from makoto.record.audit import AuditRow
+from makoto.substrate import factories
 from makoto.stopchecks import GateContext  # load_stopchecks itself is no longer called
                                             # here (SPEC-C item 2) -- run_stop_checks now
                                             # sources its catalog from checks._loader.
@@ -130,7 +132,7 @@ def _self_verify_chain(state_dir: Path) -> None:
     separately-certified change. A clean or absent/empty chain is vacuously silent (verify_chain's
     own contract). NEVER RAISES: a verification fault must not crash the hot path it protects."""
     try:
-        from makoto import ledger as _ledger
+        from makoto.record import ledger as _ledger
         broken_at = _ledger.verify_chain()
     except Exception as exc:
         _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}", blocked=False)
@@ -141,10 +143,10 @@ def _self_verify_chain(state_dir: Path) -> None:
 
 
 def _ensure_db_initialized(state_dir: Path, db_path: Path) -> bool:
-    """create makoto.db on first call if absent. Return False on init failure (fail-open)."""
+    """create makoto.record.db on first call if absent. Return False on init failure (fail-open)."""
     if db_path.exists():
         return True
-    from makoto import db as _db_module
+    from makoto.record import db as _db_module
     citations_path = Path(__file__).parent / "docs" / "CITATIONS.md"
     try:
         _db_module.init_db(state_dir, citations_path)
@@ -155,7 +157,7 @@ def _ensure_db_initialized(state_dir: Path, db_path: Path) -> bool:
 
 
 def _connect_with_retry(db_path: Path):
-    """open a write connection to makoto.db; retry on lock contention, then fail open.
+    """open a write connection to makoto.record.db; retry on lock contention, then fail open.
 
     SQLite in WAL mode allows concurrent readers and a single writer. When two
     `python -m makoto._dispatch` processes write concurrently, the loser raises
@@ -262,7 +264,7 @@ def _disabled_pattern_ids() -> frozenset[str]:
     own `.id` is always its CURRENT canonical form, so without this expansion a legacy-id config
     would silently stop matching anything the moment a rename landed.
     """
-    from makoto.checks._aliases import canonical
+    from makoto.substrate._aliases import canonical
     raw = os.environ.get("MAKOTO_DISABLE_PATTERNS", "")
     configured = frozenset(p.strip() for p in raw.split(",") if p.strip())
     return configured | frozenset(canonical(p) for p in configured)
@@ -300,12 +302,12 @@ def _blocking_gate_ids() -> frozenset:
     project is built on). Same "no shadow tier" property, restated structurally: every check whose
     posture says BLOCK is in this set, every check whose posture says otherwise is not — no
     allowlist needed. Case-insensitive compare: check modules author their CHECK's posture value
-    two ways today (a literal "BLOCK" string in most files, or the actual `makoto.posture.BLOCK`
+    two ways today (a literal "BLOCK" string in most files, or the actual `makoto.verdict.posture.BLOCK`
     lowercase constant in a few) — both mean the same outcome tier, so this reads either.
 
     Lazy + memoized: Stop dispatches load the same modules via run_stop_checks anyway, so
     laziness changes no Stop behavior."""
-    from makoto.checks._loader import load_checks
+    from makoto.substrate._loader import load_checks
     return frozenset(c.id for c in load_checks(edge="Stop")
                       if str(c.posture).strip().lower() == posture.BLOCK)
 
@@ -378,10 +380,10 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             return []
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
-        from makoto import commitments as _C
-        from makoto import ledger as _ledger
+        from makoto.session import commitments as _C
+        from makoto.record import ledger as _ledger
         from makoto.checks import normalize_path
-        from makoto.retraction import surfaced_retraction_locations
+        from makoto.verdict.retraction import surfaced_retraction_locations
         commit = _C.source_commitment(text)
         if commit:
             try:
@@ -405,7 +407,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         opens = _C.open_commitments(conn, sid)
         touched = _ledger.touched_keys(conn, sid)
         empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
-        from makoto import plan as _plan
+        from makoto.session import plan as _plan
         try:
             plan = _plan.load_plan(conn, sid)                # SPEC-5: the declared contract Plan
         except Exception:
@@ -446,7 +448,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         # unbounded os.walk (a Stop-hot-path landmine). meaning_gate / hidden_retraction were CUT
         # (io-purge B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history
         # is the recovery path.
-        from makoto.checks._loader import load_checks
+        from makoto.substrate._loader import load_checks
         ctx = GateContext(
             text=text, touched=touched, empty=empty, opens=opens,
             testrun_output=_ledger.latest_testrun(conn, sid),
@@ -641,7 +643,7 @@ def main() -> int:
         _dispatch_fact(state_dir, "non_object_payload",
                        f"payload was {type(payload).__name__}, not a JSON object", blocked=True)
         return 2
-    db_path = state_dir / "makoto.db"
+    db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):
         _dispatch_fact(state_dir, "db_init_failed", "lazy DB init failed", blocked=False)
         return 0  # transient infra -> loud-allow
@@ -658,7 +660,7 @@ def main() -> int:
             # SessionStart never blocks — it is an admission step, not a gate — so this always
             # returns 0 regardless of whether a plan was actually declared.
             try:
-                from makoto import plan as _plan
+                from makoto.session import plan as _plan
                 _plan.declare_from_session_artifact(
                     payload.get("cwd") or os.getcwd(),
                     payload.get("session_id", ""),
@@ -678,9 +680,9 @@ def main() -> int:
             # makoto/citations.py; refresh_if_stale above and record_update below are
             # separate call sites and stay.)
             try:
-                from makoto import ledger as _ledger
-                from makoto.lib.io import bash_output_text, is_test_runner
-                from makoto.checks._testDelta import compute_delta
+                from makoto.record import ledger as _ledger
+                from makoto.substrate.io import bash_output_text, is_test_runner
+                from makoto._testDelta import compute_delta
                 sid = payload.get("session_id", "")
                 delta_finding = None
                 # Task 3, the domain correction (test-delta redirect): compute the delta vs the

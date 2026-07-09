@@ -9,7 +9,7 @@ test_collapsed_packages_are_still_gone` -- ONE guard, not two copies of the same
 independently. That file tests a genuinely different subject (the newer, not-yet-live
 `checks._loader.load_checks` discovery mechanism) and is NOT a duplicate of this one otherwise --
 both files stay, each testing its own real, still-live subsystem."""
-from makoto.schema import load_prechecks            # schema.py exposes the Pre-Check loader
+from makoto.core.schema import load_prechecks            # schema.py exposes the Pre-Check loader
 from makoto.stopchecks import load_stopchecks
 
 
@@ -21,7 +21,7 @@ def test_two_categories_load():
 def test_liveness_run_adapter_emits_findings(tmp_path):
     # The Stop adapter reads each touched .py file and emits a real Finding per illusory statement.
     from makoto.checks.deadPureStatement import _run
-    from makoto.schema import Finding
+    from makoto.core.schema import Finding
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
 
@@ -94,8 +94,8 @@ def test_run_stop_checks_includes_liveness_findings(tmp_path, monkeypatch):
 
     # Stub the ledger/commitment reads so the only substrate is the touched file.
     monkeypatch.setattr(D, "GateContext", D.GateContext)
-    import makoto.ledger as L
-    import makoto.commitments as C
+    import makoto.record.ledger as L
+    import makoto.session.commitments as C
     monkeypatch.setattr(L, "touched_keys", lambda conn, sid: frozenset({"m.py"}))
     monkeypatch.setattr(L, "empty_write_keys", lambda conn, sid: frozenset())
     monkeypatch.setattr(L, "latest_testrun", lambda conn, sid: "")

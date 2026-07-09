@@ -30,10 +30,10 @@ from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.lib.factories import ast_introduced_predicate, callee_chain, is_false_const
-from makoto.lexicons import JWT_CALLEE_RX
+from makoto.substrate.factories import ast_introduced_predicate, callee_chain, is_false_const
+from makoto.core.lexicons import JWT_CALLEE_RX
 
-from makoto.lexicons import _PY_FILE_RX as _TARGET_RX
+from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 # CALLEE GATE (shared via lexicons.JWT_CALLEE_RX, also used by 1.32): the bare keyword `verify=False`
 # is not jwt-specific, so (mirroring 1.26's TLS gate) it only fires when the call's CALLEE chain names
 # a JWT library/namespace, BOUNDARY-delimited so `myjwthelper` does not match.
@@ -69,7 +69,7 @@ def _jwt_node_match(node: ast.AST) -> Optional[str]:
 predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_jwt_node_match)
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't disable JWT signature verification. `jwt.decode(..., verify=False)` or `options={'verify_signature': False}` makes decode accept ANY token, including a forged one -- a silently neutered verifier and a textbook auth bypass. Verify the signature with the issuer's key/algorithm; if a test fixture must decode an intentionally-unsigned token, annotate the line `makoto-allow: <reason>`."
 DESCRIPTION = 'JWT signature verification disabled (jwt.decode verify=False / verify_signature=False)'
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 
 from makoto.checks import detect_locations, normalize_path, subject_binds
-from makoto.lexicons import (
+from makoto.core.lexicons import (
     _NEG_FRAME_RX, _FENCE_SPAN_RX,
     _RETRACT_VERB_RX, _RETRACT_NEGPROMISE_RX, _RETRACT_POST_RX, _RETRACT_REASON_RX,
     _RETRACT_CLAUSE_BREAK_RX, _WRONG_SUBJECT_RX, _ACCIDENTAL_RX, _RETRACT_KEPT_RX,

@@ -8,7 +8,7 @@ file layout. The engine half (primitives + the history->Call adapter) is PURE: s
 (json/dataclasses/typing/__future__) — no makoto import at all — so the gate-shape import
 firewall (tests/test_gate_shape.py, ALLOWED_IMPORT_ROOTS) is satisfied by construction for that
 half; the adapter half below (`canon_gate`/`GATE`/`CHECK`) is what actually imports
-`makoto.schema`/`makoto.checks._shared`.
+`makoto.core.schema`/`makoto.substrate._shared`.
 
 A primitive here reads ONLY the closed agnostic terminal set: {tool_name, tool_input identity,
 interrupted, self_error_code}. No language- or test-runner-specific regex appears — that is the
@@ -64,25 +64,25 @@ sub-primitive identity in the MESSAGE instead, prefixed `"canon.<id>: "` — cal
 to know which sub-primitive fired read the message, exactly as the ticket anticipated ("a
 `gate.canon` finding whose message reflects the timeout primitive").
 
-LEVEL: "error" — the ONLY blocking level in live makoto (makoto.schema._ALLOWED_FIRE_LEVELS ==
+LEVEL: "error" — the ONLY blocking level in live makoto (makoto.core.schema._ALLOWED_FIRE_LEVELS ==
 {"error"}; _dispatch._emit_decision maps level=="error" to posture.BLOCK, the only outcome that
 renders as a block). This is an ORDINARY blocking gate, NOT the one advisory exception
 `gate.self_wired` uses.
 
 IMPORT FIREWALL (tests/test_gate_shape.py::test_no_gate_module_imports_a_sibling_or_cross_l2):
-imports ONLY makoto.schema, makoto.checks._shared, and the pure primitives below (intra-module,
+imports ONLY makoto.core.schema, makoto.substrate._shared, and the pure primitives below (intra-module,
 no cross-module import needed post-merge — see the layout note above).
 """
 from __future__ import annotations
 import json
 from typing import Iterable, List
 
-from makoto.checks._shared import StopCheck
-from makoto.schema import Finding
+from makoto.substrate._shared import StopCheck
+from makoto.core.schema import Finding
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
 # "result": tool_response} — tool_input/tool_response are kept as full DICTS (not the flattened
-# strings makoto.lib.io.iter_tool_events produces) since the terminals below need real dict
+# strings makoto.substrate.io.iter_tool_events produces) since the terminals below need real dict
 # lookups (`result.get("interrupted")`, `result.get("error")`).
 Call = dict
 
@@ -211,7 +211,7 @@ def _decode_row(row):
     """Decode ONE history row into (etype, name, input_dict, result_dict), or None to skip.
     Accepts BOTH live events-table tuples (id, ts, event_type, cwd, raw_payload_json) and dict
     rows with a 'payload' key (corpus/replay-style callers) — the same row union
-    makoto.lib.io.iter_tool_events decodes. A malformed row is skipped (fail-open). Keeps both
+    makoto.substrate.io.iter_tool_events decodes. A malformed row is skipped (fail-open). Keeps both
     PreToolUse and PostToolUse rows (unlike the pre-FD14-A cut which dropped Pre at decode time)
     so `calls_from_history` can pair them and detect a dangling Pre."""
     wrapper_etype = None
@@ -307,7 +307,7 @@ CANON_SEQ_PRIMITIVES: dict = {
         # (purely structural); prose can never change it. The two REAL discharges: a later
         # successful call (calls[-1] becomes non-error), or (Task 0b part b) a ledger-recorded
         # release.operator (D8a rename of ack-block) for a genuinely unresolvable, operator-
-        # surfaced block -- the same mechanism gate.canon_fingerprints uses (makoto.ackblock),
+        # surfaced block -- the same mechanism gate.canon_fingerprints uses (makoto.record.ackblock),
         # not a third prose-only path.
         "A call errored (timeout / interrupted / error code) and the turn closed without "
         "resolving it. Re-run it (or the equivalent action) to a real successful result before "
@@ -351,13 +351,13 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     gate.canon_fingerprints when the last error is a genuinely unresolvable, operator-surfaced
     block (a permission block the agent correctly declines to retry) -- text cannot change
     calls[-1], so without a real discharge it re-fires at every subsequent Stop. Reuses
-    makoto.ackblock's SAME transcript-re-derived, spoof-proof discharge (never trusted from
+    makoto.record.ackblock's SAME transcript-re-derived, spoof-proof discharge (never trusted from
     chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model"."""
     out: List[Finding] = []
     for cid, stop_text, retry_hint in fired_primitives(history):
         ack = None
         try:
-            import makoto.ackblock as _ackblock
+            import makoto.record.ackblock as _ackblock
             ack = _ackblock.find_ack_block(cid, transcript_path=transcript_path,
                                            gate_pattern_id="gate.canon",
                                            session_id=session_id, root=state_root)
@@ -388,5 +388,5 @@ GATE = StopCheck(
 )
 
 
-from makoto.checks._loader import Check as _Check
+from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", run=GATE.run)

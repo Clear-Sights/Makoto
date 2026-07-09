@@ -10,7 +10,7 @@ the corpus simply never exhibited the TP; these sentinels do.)
 """
 from __future__ import annotations
 from makoto.checks.integritySuppressionFlag import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.integrity_suppression_flag", fire_level="error",
                description="suppression flag without rationale", retry_hint="x")

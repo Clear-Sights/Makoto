@@ -12,7 +12,7 @@ these adversarial near-misses pin the STRONG-only precision gate that keeps it z
 """
 from __future__ import annotations
 from makoto.checks.timingUnsafeCompare import predicate
-from makoto.schema import PreCheck
+from makoto.core.schema import PreCheck
 
 _PAT = PreCheck(id="content.timing_unsafe_compare", fire_level="error",
                description="timing-unsafe == of a secret/digest", retry_hint="x")
