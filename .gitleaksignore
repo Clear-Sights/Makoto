@@ -1,0 +1,5 @@
+# Synthetic test fixtures for Makoto's own secret_committed detector (checks/_canonAtoms.py) --
+# these strings are designed to LOOK like secrets so tests/test_canon_fingerprints.py can verify
+# the detector fires correctly. Not real credentials. Verified by direct inspection 2026-07-09.
+6840713a1522493f2324e4c294732da2d9f55760:tests/test_canon_fingerprints.py:stripe-access-token:61
+6840713a1522493f2324e4c294732da2d9f55760:tests/test_canon_fingerprints.py:generic-api-key:94
