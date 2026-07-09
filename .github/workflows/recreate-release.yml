@@ -1,0 +1,21 @@
+name: Recreate release (one-off)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recreate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release from existing v2.0.0 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v2.0.0 \
+            --title "v2.0.0" \
+            --notes-file release_notes_v2.0.0.md
