@@ -3,3 +3,5 @@
 # the detector fires correctly. Not real credentials. Verified by direct inspection 2026-07-09.
 6840713a1522493f2324e4c294732da2d9f55760:tests/test_canon_fingerprints.py:stripe-access-token:61
 6840713a1522493f2324e4c294732da2d9f55760:tests/test_canon_fingerprints.py:generic-api-key:94
+02f846319800506f8e983744add04cd7c1e93fdb:tests/test_canon_fingerprints.py:stripe-access-token:61
+02f846319800506f8e983744add04cd7c1e93fdb:tests/test_canon_fingerprints.py:generic-api-key:94
