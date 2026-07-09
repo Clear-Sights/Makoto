@@ -34,9 +34,7 @@ from makoto.record import audit
 from makoto.verdict import posture, wire
 from makoto.record.audit import AuditRow
 from makoto.substrate import factories
-from makoto.stopchecks import GateContext  # load_stopchecks itself is no longer called
-                                            # here (SPEC-C item 2) -- run_stop_checks now
-                                            # sources its catalog from checks._loader.
+from makoto.substrate._shared import GateContext
 
 
 _EVENT_MAP = {

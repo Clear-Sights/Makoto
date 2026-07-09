@@ -12,7 +12,7 @@ guards:
     _run_predicates`'s `checks._loader`-backed catalog, BLOCK): a Write/Edit/MultiEdit/
     NotebookEdit call advancing a plan node whose passthrough-establisher is not yet DONE is the
     partial-order contradiction.
-  * the STOP remainder guard (`GATE`, discovered by `stopchecks.load_stopchecks`; BLOCK by
+  * the STOP remainder guard (`GATE`, discovered by `substrate._loader.load_stopchecks`; BLOCK by
     construction -- discovered<=>live<=>blocking, no shadow tier, `checks/_shared.py`): the
     turn ending with the plan's `remainder()` non-empty.
 

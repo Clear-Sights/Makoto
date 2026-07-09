@@ -131,7 +131,7 @@ def test_plugin_description_predicate_count_matches_disk():
     bump the description when a check is added or removed.
     """
     from makoto.core.schema import load_prechecks
-    from makoto.stopchecks import load_stopchecks
+    from makoto.substrate._loader import load_stopchecks
 
     desc = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())["description"]
     for phrase_rx, loader, tier in (

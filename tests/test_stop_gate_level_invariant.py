@@ -24,7 +24,8 @@ from __future__ import annotations
 import json
 import os
 
-from makoto.stopchecks import load_stopchecks, GateContext
+from makoto.substrate._loader import load_stopchecks
+from makoto.substrate._shared import GateContext
 
 # The ONLY documented exception to "every Stop-gate finding blocks" (2026-07-05, FABLE DECISION 6):
 # gate.self_wired ships at level="advisory" so a partial hook-wiring strip is recorded to the audit
@@ -155,7 +156,7 @@ def _scenario_self_wired(tmp_path):
     return _ctx(fs_read=lambda p: wired if p == ".claude/settings.json" else None)
 
 
-# Every discovered gate id must have a firing scenario here — a new gate added to stopchecks/
+# Every discovered gate id must have a firing scenario here — a new gate added to checks/
 # without an entry below fails loudly (KeyError) rather than being silently skipped.
 _SCENARIOS = {
     "gate.completion": _scenario_completion,

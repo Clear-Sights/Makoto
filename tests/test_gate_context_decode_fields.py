@@ -13,7 +13,7 @@ import sqlite3
 import makoto._dispatch as _dispatch
 import makoto.substrate._loader as _loader
 from makoto.substrate._loader import Check
-from makoto.stopchecks import GateContext, StopCheck
+from makoto.substrate._shared import GateContext, StopCheck
 
 
 def _setup_state(tmp_path):

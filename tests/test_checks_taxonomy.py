@@ -92,7 +92,7 @@ def test_existing_prechecks_and_stopchecks_loaders_unaffected():
     # Non-breaking guarantee: the new checks/ taxonomy is additive. The two existing loaders
     # this task explicitly does not touch/supersede keep discovering their real catalogs.
     from makoto.core.schema import load_prechecks
-    from makoto.stopchecks import load_stopchecks
+    from makoto.substrate._loader import load_stopchecks
 
     assert load_prechecks(), "prechecks still discovered unchanged"
     assert load_stopchecks(), "stopchecks still discovered unchanged"

@@ -8,8 +8,9 @@ package <=> change these <=> the test moves with it (a re-checkable artifact, no
 SPEC-5 Task 4 (2026-07-07): the gate catalog moved from its own `makoto/stopchecks/` package (one
 file per adapter/engine/harness, `stopcheck_*.py` prefix) into the shared flat `makoto/checks/`
 package (SPEC-5 Task 2's home for every check, prechecks included) with descriptive names and each
-adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py` survives only as a
-thin compat shim (`load_stopchecks()` still works, still memoized) — the actual gate MODULES now live
+adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py` was deleted
+entirely (2026-07-09: no backwards-compat shims) -- `load_stopchecks()` now lives at
+`substrate._loader.load_stopchecks`, its real, permanent home, and the actual gate MODULES live
 in `checks/`, so this test's GATES_DIR and every design declaration below point there. Because
 `checks/` also holds every precheck, `forbiddenLocation`, and the completeness check itself, the
 file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness files must be present),
@@ -22,7 +23,8 @@ import dataclasses
 import importlib
 from pathlib import Path
 
-from makoto.stopchecks import load_stopchecks, StopCheck, GateContext
+from makoto.substrate._loader import load_stopchecks
+from makoto.substrate._shared import StopCheck, GateContext
 
 GATES_DIR = Path(__file__).resolve().parent.parent / "checks"
 

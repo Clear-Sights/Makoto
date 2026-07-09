@@ -53,10 +53,11 @@ def test_check_clean_when_establisher_still_open():
 
 def test_never_discovered_as_a_blocking_stop_gate():
     """Structural proof of the never-BLOCK guarantee: staleEstablisher has no GATE export, so
-    stopchecks.load_stopchecks (the sole source of _dispatch._blocking_gate_ids()) never
-    discovers it -- its pattern_id can never enter the blocking-eligible set, regardless of the
-    level its own Finding carries."""
-    from makoto.stopchecks import load_stopchecks
+    load_stopchecks() never discovers it -- and separately, its CHECK's own posture is never
+    BLOCK, so it can't enter _dispatch._blocking_gate_ids() (load_checks(edge="Stop")-derived,
+    SPEC-C item 2) either way -- its pattern_id can never enter the blocking-eligible set,
+    regardless of the level its own Finding carries."""
+    from makoto.substrate._loader import load_stopchecks
     assert not hasattr(staleEstablisher, "GATE")
     assert "gate.stale_establisher" not in {g.id for g in load_stopchecks()}
 

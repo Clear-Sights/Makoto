@@ -1439,7 +1439,7 @@ def test_no_shadow_gate_every_gate_blocks():
     passing vacuously). A future shadow gate (discoverable but routed around _blocking_gate_ids(),
     or wired into run_stop_checks without a `.posture` at all) turns THIS red because it will not
     appear in an independently-declared literal."""
-    from makoto.stopchecks import load_stopchecks
+    from makoto.substrate._loader import load_stopchecks
     from makoto._dispatch import _blocking_gate_ids
     discovered = {g.id for g in load_stopchecks()}
     assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",

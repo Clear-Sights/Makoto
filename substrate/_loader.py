@@ -12,15 +12,18 @@ to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently s
 (SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
 of silence.
 
-This coexists with, and does not yet supersede, `schema.load_prechecks` /
-`stopchecks.load_stopchecks` -- migrating their real callers onto this loader is Tasks 3/4's
-job, not this one's.
+This coexists with, and does not yet supersede, `schema.load_prechecks`. Stop-edge discovery
+itself WAS superseded (SPEC-C item 2, 2026-07-07): `_dispatch.py`'s Stop-finding loop and its
+`_blocking_gate_ids()` both run on `load_checks(edge="Stop")` now, not the former
+`stopchecks.load_stopchecks`/`GATE`-export mechanism kept below only for the tests that still
+assert against it directly (see `load_stopchecks`'s own docstring).
 """
 from __future__ import annotations
 
 import importlib
 import importlib.util
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -135,3 +138,31 @@ def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = Non
     if edge is not None:
         found = [c for c in found if c.applies_at == edge]
     return found
+
+
+@lru_cache(maxsize=1)
+def load_stopchecks() -> list:
+    """Every module directly under `makoto/checks/` that exports a `GATE` (a `StopCheck`,
+    distinct from that same module's `CHECK` used by `load_checks`). Memoized so a repeat call
+    never re-scans the filesystem.
+
+    Relocated here (2026-07-09) from the former `stopchecks/__init__.py` compat shim, which has
+    been removed entirely -- no callers should still import it from `makoto.stopchecks`; that
+    package no longer exists.
+
+    NOT called by production anymore in this repo: SPEC-C item 2 (2026-07-07) moved
+    `_dispatch.py`'s Stop-finding loop and `_blocking_gate_ids()` onto `load_checks(edge="Stop")`
+    before this relocation happened, so `GATE`/`load_stopchecks()` are vestigial here -- kept
+    only because a set of tests still assert Stop-gate properties (discovery, count, memoization,
+    firing behavior) directly against this mechanism. Whether to retire `GATE` from the 14 check
+    modules that still export it and rewrite those tests onto `load_checks(edge="Stop")` instead
+    is a separate, larger decision this relocation does not make (dev's own `_dispatch.py` still
+    calls `load_stopchecks()` live, so retiring `GATE` here would diverge the two repos' check
+    module contracts)."""
+    out = []
+    for path in _candidate_files(_PACKAGE_DIR):
+        mod = importlib.import_module(f"makoto.checks.{path.stem}")
+        g = getattr(mod, "GATE", None)
+        if g is not None:
+            out.append(g)
+    return sorted(out, key=lambda g: g.id)

@@ -10,7 +10,7 @@ independently. That file tests a genuinely different subject (the newer, not-yet
 `checks._loader.load_checks` discovery mechanism) and is NOT a duplicate of this one otherwise --
 both files stay, each testing its own real, still-live subsystem."""
 from makoto.core.schema import load_prechecks            # schema.py exposes the Pre-Check loader
-from makoto.stopchecks import load_stopchecks
+from makoto.substrate._loader import load_stopchecks
 
 
 def test_two_categories_load():
