@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to makoto. Versions follow the live check inventory
-(`load_prechecks` / `load_stopchecks`), which the README count is tested against.
+(`load_prechecks` / `load_checks(edge="Stop")`), which the README count is tested against.
 
 ## [Unreleased]
 
