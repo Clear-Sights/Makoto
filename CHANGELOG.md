@@ -5,6 +5,16 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Removed (epoch reset, owner decision 2026-07-10)
+- **The legacy-id alias table and every dual-form acceptance are gone.**
+  `substrate/_aliases.py`, the alias closure in `MAKOTO_DISABLE_PATTERNS`, the CLI's
+  legacy-id resolution, the `makoto ack-block` discharge phrase, and the `ack-block`
+  chain kind are all removed: `family.name` ids and `release.operator` are the only
+  forms. Rationale: the sole justification for the aliases was keeping immutable
+  historical state readable -- the owner retired that guarantee outright. Operators
+  upgrading across this reset archive (zip) or wipe `$MAKOTO_STATE_DIR` and start a
+  fresh epoch; records predating it cite retired names by design.
+
 ### Changed
 - **Public scope narrowed to the consumed artifact** (owner decision, 2026-07-10): this repo
   now ships exactly what a plugin consumer uses (the runtime package, hooks/commands wiring,

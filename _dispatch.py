@@ -251,22 +251,13 @@ def _keyword_hit(pattern: PreCheck, raw_payload: str) -> bool:
 
 
 def _disabled_pattern_ids() -> frozenset[str]:
-    """parse MAKOTO_DISABLE_PATTERNS=1.3,1.6,... into a frozenset of pattern ids.
+    """parse MAKOTO_DISABLE_PATTERNS=<id>,<id>,... into a frozenset of pattern ids.
 
-    Empty / unset env var -> empty set (no patterns disabled). Whitespace and
-    blank entries are tolerated.
-
-    SPEC-C item 3 (one namespace): the configured set is closed under
-    `checks._aliases.canonical` so an operator's EXISTING config naming a check by its legacy id
-    (e.g. `MAKOTO_DISABLE_PATTERNS=makoto.contract_order`, from before that check was renamed to
-    `gate.contract_order`) keeps muting the same live check forever -- every discovered check's
-    own `.id` is always its CURRENT canonical form, so without this expansion a legacy-id config
-    would silently stop matching anything the moment a rename landed.
-    """
-    from makoto.substrate._aliases import canonical
+    Epoch reset (2026-07-10): ids are their canonical family.name forms only -- the legacy-id
+    alias closure was retired with the alias table itself (operator state and configs predating
+    the reset are archived or wiped, so nothing left resolves through old ids)."""
     raw = os.environ.get("MAKOTO_DISABLE_PATTERNS", "")
-    configured = frozenset(p.strip() for p in raw.split(",") if p.strip())
-    return configured | frozenset(canonical(p) for p in configured)
+    return frozenset(p.strip() for p in raw.split(",") if p.strip())
 
 
 def _gates_enabled() -> bool:
@@ -459,7 +450,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             agent_type=payload.get("agent_type"),
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
-            state_root=root,   # Task 2 slice 5: canonFingerprints.py's ack-block discharge
+            state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):

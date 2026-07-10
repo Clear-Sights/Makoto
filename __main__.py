@@ -45,15 +45,7 @@ def _cmd_pattern_list() -> int:
 
 
 def _cmd_pattern_show(pid: str) -> int:
-    """print full detail for one pattern + the first 30 lines of its predicate module.
-
-    SPEC-C item 3: `pid` is resolved through the legacy-id alias table first, so an operator
-    who types a check's OLD id (from memory, an old script, a bookmarked doc) still gets the
-    same live check after a rename -- the CLI honors the same "an old id is never dead, it's
-    an alias" guarantee MAKOTO_DISABLE_PATTERNS already gets.
-    """
-    from makoto.substrate._aliases import canonical
-    pid = canonical(pid)
+    """print full detail for one pattern + the first 30 lines of its predicate module."""
     patterns = {p.id: p for p in load_prechecks()}
     if pid not in patterns:
         print(f"makoto: no pattern with id {pid!r}; available: {', '.join(sorted(patterns))}",

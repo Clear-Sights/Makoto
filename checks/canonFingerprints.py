@@ -26,7 +26,7 @@ from makoto.core.schema import Finding
 def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session_id=None,
                                  state_root=None) -> List[Finding]:
     """One BLOCKING Finding per robust-core canon fingerprint that fires on this session's call
-    stream (see _canonAtoms.BLOCK_IDS) -- UNLESS a qualifying ack-block discharges it (Task 2
+    stream (see _canonAtoms.BLOCK_IDS) -- UNLESS a qualifying release.operator discharges it (Task 2
     slice 5, FABLE DECISION Option A): a session-level fingerprint over immutable recorded
     history has no other legitimate discharge (narrowing the detector voids its 0-FP
     certificate; self-disabling normalizes the one action Makoto must never normalize), so once
@@ -64,7 +64,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
                         f"Re-examine the flagged behavior (a suppressed check, a destructive "
                         f"command, or an unresolved gap between claim and evidence) before "
                         f"continuing, OR if the flagged action was legitimate and already fully "
-                        f"re-examined, say exactly `makoto ack-block {name}: <reason>` in a "
+                        f"re-examined, say exactly `makoto release.operator {name}: <reason>` in a "
                         f"real (non-tool, non-quoted) reply -- the only discharge this gate can "
                         f"honor, per Task 2 slice 5."),
         ))
