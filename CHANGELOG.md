@@ -14,8 +14,6 @@ All notable changes to makoto. Versions follow the live check inventory
   public CI runs one self-contained end-to-end smoke test (catalog loads, install wires hooks
   + the ConfigChange manifest, a real forbidden-write deny and a clean allow on the wire).
   docs/CHAIN-FORMAT-v1.md moved to dev (not linked from anything shipped).
-
-### Changed
 - **Stop-gate discovery unified for real; `GATE`/`StopCheck`/`load_stopchecks()` retired.**
   Every gate is now a plain `CHECK` (or `EXTRA_CHECKS` entry for contractOrder's dual
   Pre+Stop surface) discovered by `load_checks(edge="Stop")`, with the new structural
