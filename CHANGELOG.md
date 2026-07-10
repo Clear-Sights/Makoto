@@ -5,6 +5,32 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Fixed
+- **`content.self_mute_guard` now catches a selective self-mute via
+  `MAKOTO_DISABLE_PATTERNS`.** The guard's env-var regex was truthy-only (`1|true|yes|on`)
+  -- right for the boolean-shaped `MAKOTO_DISABLE_GATES`/`MAKOTO_PAUSE`, but
+  `MAKOTO_DISABLE_PATTERNS` takes a LIST of check ids, and a canonical-id list
+  (`"content.self_mute_guard"`) starts with no truthy literal, so an in-session
+  settings.json edit disabling specific checks -- including this guard itself -- passed
+  unseen. Any non-empty, non-falsy value now fires; emptying the var (the re-enable
+  move) stays silent.
+
+### Changed
+- **Legacy numeric ids scrubbed from every live surface** (post-epoch-reset sweep):
+  check module docstrings self-identify by canonical id, cross-references between
+  checks use canonical ids, README's CLI examples use canonical ids, and
+  `content.phantom_citation`'s retry_hint names the real canonical-CITATIONS.md path
+  instead of the deleted `data/patterns.toml` allowlist. Dated historical notes keep
+  their period ids by design -- they are facts about that date.
+- **Package moved from repo root into `makoto/`** (owner decision, 2026-07-10): the repo
+  landing page now reads as a product -- README/LICENSE/CHANGELOG, `hooks/`, `commands/`,
+  `docs/`, `tests/`, one `makoto/` package -- instead of the package's own underscore
+  internals scattered at root. The package took its runtime data with it
+  (`makoto/docs/CITATIONS.md`, `makoto/docs/MAKOTO-CONVENTIONS.md`) and the dispatch shim
+  (`makoto/_dispatch_shim.sh`); every runtime path was already `__file__`-relative, so only
+  `pyproject.toml`'s package-dir mapping and `hooks/hooks.json`'s shim path changed. Dotted
+  module paths (`makoto._dispatch` etc.) are untouched -- existing installs keep working.
+
 ### Removed (epoch reset, owner decision 2026-07-10)
 - **The legacy-id alias table and every dual-form acceptance are gone.**
   `substrate/_aliases.py`, the alias closure in `MAKOTO_DISABLE_PATTERNS`, the CLI's

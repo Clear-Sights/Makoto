@@ -24,7 +24,7 @@ dependencies = []
 Homepage = "https://github.com/Clear-Sights/Makoto"
 
 [tool.setuptools]
-package-dir = {"makoto" = "."}
+package-dir = {"makoto" = "makoto"}
 packages = ["makoto"]
 include-package-data = true
 

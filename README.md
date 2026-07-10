@@ -71,7 +71,7 @@ that by design never block.
 - `gate.stale_establisher`: **advisory only, never blocks**, opt-in. A declared Plan node recorded DONE whose named artifact no longer exists on disk (the one filesystem read this check family makes, ported by shape from Assay's `stale_establisher`). A product decision to escalate this to blocking is left to the caller; it is not made here.
 - `gate.undeclared_falsifiable`: **advisory only, never blocks**. A completeness audit over the `checks/` catalog itself: an orphan module the loader can't discover, or a declared id with no corresponding live module. A maintenance signal about makoto's own catalog, never a live integrity finding about the agent's turn.
 
-Inspect the live catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show 1.6`.
+Inspect the live catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 
 ### Discharging a permanent session-level block
 
@@ -176,7 +176,7 @@ remain for forensic value. To fully reset, `rm -rf` the dir.
 ```bash
 python -m makoto status            # patterns loaded, hooks wired, state dir, any patterns muted
 python -m makoto pattern list      # the full live catalog as a table
-python -m makoto pattern show 1.6  # one pattern in detail
+python -m makoto pattern show content.phantom_citation  # one pattern in detail
 python -m makoto show src/auth.py  # ledger state for a normalized location key
 python -m makoto install           # legacy: wire settings.json (prefer the plugin)
 python -m makoto uninstall         # remove makoto-managed settings.json entries
