@@ -34,7 +34,7 @@ that by design never block.
 - `content.env_gated_audit` audit/verification code gated behind an env var · `content.integrity_suppression_flag` integrity-named suppression flag (`*_skip = true`)
 
 **Fabricated evidence**: a claim with no backing artifact
-- `content.phantom_citation` phantom citation (Author-Year not in `docs/CITATIONS.md`)
+- `content.phantom_citation` phantom citation (Author-Year not in `makoto/docs/CITATIONS.md`)
 - `content.unsourced_webfetch` WebFetch of a URL never seen in any prior tool result this session
 - `content.fabricated_commit_sha` fabricated commit SHA/tag presented as proof of a commit
 - `content.deferred_checkbox_theater` `DEFERRED`-style checkbox theater on an open to-do item
@@ -87,8 +87,7 @@ content, so no tool call or file write can forge it. Say, as a real message in t
 makoto release.operator <fingerprint-id>: <your reason>
 ```
 
-(the legacy phrase `makoto ack-block <fingerprint-id>: <reason>` is honored forever too: a phrase is
-never retired, only aliased). makoto verifies the turn is genuinely user-authored, non-synthetic, and
+makoto verifies the turn is genuinely user-authored, non-synthetic, and
 timestamped after the finding first fired, then discharges that exact fingerprint for the rest of the
 session. The discharge is chain-appended (`kind="release.operator"`) for the audit trail; the block
 decision itself is always re-derived from the transcript, never read back from that row.

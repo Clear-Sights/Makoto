@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="257" viewBox="0 0 700 257" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">
+<rect width="700" height="257" rx="8" fill="#0d1117"/>
+<rect width="700" height="30" rx="8" fill="#161b22"/>
+<rect y="22" width="700" height="8" fill="#161b22"/>
+<circle cx="18" cy="15" r="5" fill="#ff5f56"/>
+<circle cx="36" cy="15" r="5" fill="#ffbd2e"/>
+<circle cx="54" cy="15" r="5" fill="#27c93f"/>
+<text x="350" y="19" text-anchor="middle" fill="#8b949e">makoto demo — block</text>
+<text x="14" y="48" fill="#8b949e" font-style="italic" xml:space="preserve"># the agent tries to loosen a verifier (== -&gt; startswith)</text>
+<text x="14" y="63" fill="#3fb950" xml:space="preserve">$ PreToolUse Write constitution/integrity/checks/release_gate.py</text>
+<text x="14" y="78" fill="#f85149" xml:space="preserve">-&gt; permissionDecision: deny</text>
+<text x="14" y="93" fill="#f85149" xml:space="preserve">makoto: row content.verifier_predicate_weakened (verifier predicate weakened — loose-comparator </text>
+<text x="14" y="108" fill="#f85149" xml:space="preserve">  shape): matched 'startswith(' at line 2</text>
+<text x="14" y="123" fill="#c9d1d9" xml:space="preserve">Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. Loose comparat</text>
+<text x="14" y="138" fill="#c9d1d9" xml:space="preserve">  ors weaken the verifier per ADR-058 and CLAUDE.md commandment 3.</text>
+<text x="14" y="153" fill="#c9d1d9" xml:space="preserve">Legitimate instance? Annotate it `makoto-allow: &lt;reason&gt;` on or near the line (any comment style</text>
+<text x="14" y="168" fill="#c9d1d9" xml:space="preserve">  ) — an on-the-record, auditable rationale, never a disguise.</text>
+<text x="14" y="183" fill="#c9d1d9" xml:space="preserve">Conventions: makoto/docs/MAKOTO-CONVENTIONS.md</text>
+<text x="14" y="198" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="228" fill="#8b949e" font-style="italic" xml:space="preserve">captured 652 Bytes of genuine dispatcher output</text>
+</svg>

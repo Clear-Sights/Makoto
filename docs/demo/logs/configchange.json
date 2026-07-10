@@ -1,0 +1,19 @@
+{
+ "scenario": "configchange",
+ "steps": [
+  {
+   "title": "no evidence this path was ever wired -> ADVISORY only, never a block",
+   "display_cmd": "ConfigChange .claude/settings.json (makoto hooks absent)",
+   "payload": {
+    "hook_event_name": "ConfigChange",
+    "session_id": "demo-configchange-001",
+    "cwd": "/tmp/makoto-demo-j9f35qjc/configchange-proj",
+    "config_source": "project_settings",
+    "config_path": "/tmp/makoto-demo-j9f35qjc/configchange-proj/.claude/settings.json"
+   },
+   "exit": 0,
+   "stdout": "",
+   "stderr": "makoto._dispatch_configchange: ADVISORY missing makoto-dispatching entries for: PreToolUse, PostToolUse, Stop\n"
+  }
+ ]
+}

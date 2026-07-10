@@ -6,6 +6,18 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [Unreleased]
 
 ### Fixed
+- **The README's "Live demo" section is now backed by real artifacts.** Its three
+  embedded SVG screenshots and the `docs/demo/render_demo.py` / `render_svg.py` scripts
+  it names were absent from the tree -- the landing page showed broken images. The demo
+  is rebuilt for real: three scenarios driven through the actual dispatchers (a
+  PreToolUse block, the full word->deed->record->receipt chain including the test-delta
+  redirect, a ConfigChange advisory), genuine logged output under `docs/demo/logs/`,
+  SVGs rendered from those logs, and the receipt scenario reproducing the README's
+  promised numbers exactly. A new smoke test (`test_readme_references_exist`) fails CI
+  on any README reference to a missing file.
+- **README**: the revoked legacy `makoto ack-block` phrase is no longer documented
+  (`release.operator` is the only discharge, per the epoch reset below), and the
+  citations-seed path reflects the package layout (`makoto/docs/CITATIONS.md`).
 - **`content.self_mute_guard` now catches a selective self-mute via
   `MAKOTO_DISABLE_PATTERNS`.** The guard's env-var regex was truthy-only (`1|true|yes|on`)
   -- right for the boolean-shaped `MAKOTO_DISABLE_GATES`/`MAKOTO_PAUSE`, but

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="167" viewBox="0 0 700 167" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">
+<rect width="700" height="167" rx="8" fill="#0d1117"/>
+<rect width="700" height="30" rx="8" fill="#161b22"/>
+<rect y="22" width="700" height="8" fill="#161b22"/>
+<circle cx="18" cy="15" r="5" fill="#ff5f56"/>
+<circle cx="36" cy="15" r="5" fill="#ffbd2e"/>
+<circle cx="54" cy="15" r="5" fill="#27c93f"/>
+<text x="350" y="19" text-anchor="middle" fill="#8b949e">makoto demo — configchange</text>
+<text x="14" y="48" fill="#8b949e" font-style="italic" xml:space="preserve"># no evidence this path was ever wired -&gt; ADVISORY only, never a block</text>
+<text x="14" y="63" fill="#3fb950" xml:space="preserve">$ ConfigChange .claude/settings.json (makoto hooks absent)</text>
+<text x="14" y="78" fill="#d29922" xml:space="preserve">makoto._dispatch_configchange: ADVISORY missing makoto-dispatching entries for: PreToolUse, Post</text>
+<text x="14" y="93" fill="#d29922" xml:space="preserve">  ToolUse, Stop</text>
+<text x="14" y="108" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="138" fill="#8b949e" font-style="italic" xml:space="preserve">captured 110 Bytes of genuine dispatcher output</text>
+</svg>
