@@ -6,6 +6,16 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [Unreleased]
 
 ### Changed
+- **Public scope narrowed to the consumed artifact** (owner decision, 2026-07-10): this repo
+  now ships exactly what a plugin consumer uses (the runtime package, hooks/commands wiring,
+  the dispatch shim, install/CLI) plus what they are meant to read (README, LICENSE, CHANGELOG,
+  the runtime-read docs/MAKOTO-CONVENTIONS.md + docs/CITATIONS.md, and the README-linked
+  SPIRIT.md + demo). The full falsifiability suite (~130 test files) lives in makoto-dev;
+  public CI runs one self-contained end-to-end smoke test (catalog loads, install wires hooks
+  + the ConfigChange manifest, a real forbidden-write deny and a clean allow on the wire).
+  docs/CHAIN-FORMAT-v1.md moved to dev (not linked from anything shipped).
+
+### Changed
 - **Stop-gate discovery unified for real; `GATE`/`StopCheck`/`load_stopchecks()` retired.**
   Every gate is now a plain `CHECK` (or `EXTRA_CHECKS` entry for contractOrder's dual
   Pre+Stop surface) discovered by `load_checks(edge="Stop")`, with the new structural
