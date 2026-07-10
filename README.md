@@ -213,10 +213,10 @@ blocks at proven zero corpus-FP, or it is cut). This still governs all 22 pre-ch
 = {"error"}`, enforced at load) and 12 of the 14 end-of-turn gates.
 
 **Two narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05) and
-`gate.canon_fingerprints_advisory` (SPEC-5 Task 9, FABLE DECISION 26) fire at `level="advisory"`,
+`gate.canon_fingerprints_advisory` (SPEC-5 Task 9, DESIGN DECISION 26) fire at `level="advisory"`,
 not `"error"`, so each is recorded to the audit log but never emitted as a block decision. Neither
 is a reintroduction of the cut `warning` tier. `gate.self_wired` is a single, named check whose
-entire subject is makoto's own hook wiring, shipped advisory-only by explicit FABLE DECISION as
+entire subject is makoto's own hook wiring, shipped advisory-only by explicit DESIGN DECISION as
 partial-strip *detection*, not prevention (it cannot see, and does not claim to see, a simultaneous
 full strip of all three hook entries; see the ConfigChange watch section, which closes exactly this gap when wired). `gate.canon_fingerprints_advisory` covers 13 ported canon fingerprints that rest on a
 soft/claim atom or are explicitly disqualified against real-Claude gold, kept in the catalog at

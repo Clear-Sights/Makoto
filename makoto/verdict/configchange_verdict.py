@@ -15,7 +15,7 @@ hook adapter could call — no hook registration, no `.claude/settings.json` wir
 in a live session. Wiring a new hook entry, and deciding whether it should be advisory or blocking,
 is oversight-config territory (`CLAUDE.md` rule 4: hook wiring, enforcement tiers/defaults) requiring
 direct human/main authorization, not a dispatcher/worker-level build. See the followup doc's "Candidate
-for a future FABLE decision" section for what that would still take.
+for a future design decision" section for what that would still take.
 
 **Verified only against constructed payloads.** No real `ConfigChange` event has ever reached this
 code — it has not been wired into any hook, so there is no live event stream to test against. The
