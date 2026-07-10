@@ -8,8 +8,8 @@
 <text x="350" y="19" text-anchor="middle" fill="#8b949e">makoto demo — configchange</text>
 <text x="14" y="48" fill="#8b949e" font-style="italic" xml:space="preserve"># no evidence this path was ever wired -&gt; ADVISORY only, never a block</text>
 <text x="14" y="63" fill="#3fb950" xml:space="preserve">$ ConfigChange .claude/settings.json (makoto hooks absent)</text>
-<text x="14" y="78" fill="#d29922" xml:space="preserve">makoto._dispatch_configchange: ADVISORY missing makoto-dispatching entries for: PreToolUse, Post</text>
-<text x="14" y="93" fill="#d29922" xml:space="preserve">  ToolUse, Stop</text>
+<text x="14" y="78" fill="#d29922" xml:space="preserve">makoto._dispatch_configchange: ADVISORY missing makoto-dispatching entries for: PreToolUse,</text>
+<text x="14" y="93" fill="#d29922" xml:space="preserve">  PostToolUse, Stop</text>
 <text x="14" y="108" fill="#8b949e" xml:space="preserve">(exit 0)</text>
 <text x="14" y="138" fill="#8b949e" font-style="italic" xml:space="preserve">captured 110 Bytes of genuine dispatcher output</text>
 </svg>

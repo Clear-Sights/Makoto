@@ -38,7 +38,13 @@ COLORS = {
     "green": "#3fb950", "red": "#f85149", "yellow": "#d29922", "cyan": "#79c0ff",
     "title": "#c9d1d9",
 }
-MAX_CHARS = 96
+FONT_SIZE = 11.5
+# Monospace advance width: ui-monospace/Menlo/Consolas all sit at ~0.60 em per character, so the
+# per-char pixel width is 0.6023 * FONT_SIZE and the line capacity is exactly the content width
+# (frame minus both pads) over that -- derived, not eyeballed, so no line can overrun the frame.
+CHAR_W = 0.6023 * FONT_SIZE
+CAP = int((W - 2 * PAD) / CHAR_W)
+_HANG = "  "                       # continuation indent, deducted from the capacity
 
 
 def _esc(s: str) -> str:
@@ -46,14 +52,18 @@ def _esc(s: str) -> str:
 
 
 def _wrap(line: str) -> list:
-    if len(line) <= MAX_CHARS:
-        return [line]
-    out = []
-    while line:
-        out.append(line[:MAX_CHARS])
-        line = line[MAX_CHARS:]
-        if line:
-            line = "  " + line
+    """Word-boundary wrap into <= CAP-char pieces (continuations hang-indented): break at the
+    last space that fits; only an unbroken run longer than a whole line is ever split mid-word."""
+    out, indent = [], ""
+    while len(indent) + len(line) > CAP:
+        room = CAP - len(indent)
+        cut = line.rfind(" ", 0, room + 1)
+        if cut <= 0:
+            cut = room
+        out.append(indent + line[:cut].rstrip())
+        line = line[cut:].lstrip()
+        indent = _HANG
+    out.append(indent + line)
     return out
 
 
@@ -140,7 +150,7 @@ def _render(scenario: str) -> None:
     height = PAD * 2 + 34 + LINE_H * len(rows)
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{height}" '
-        f'viewBox="0 0 {W} {height}" font-family="{FONT}" font-size="11.5">',
+        f'viewBox="0 0 {W} {height}" font-family="{FONT}" font-size="{FONT_SIZE}">',
         f'<rect width="{W}" height="{height}" rx="8" fill="{COLORS["bg"]}"/>',
         f'<rect width="{W}" height="30" rx="8" fill="{COLORS["chrome"]}"/>',
         f'<rect y="22" width="{W}" height="8" fill="{COLORS["chrome"]}"/>',

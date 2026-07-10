@@ -9,12 +9,12 @@
 <text x="14" y="48" fill="#8b949e" font-style="italic" xml:space="preserve"># the agent tries to loosen a verifier (== -&gt; startswith)</text>
 <text x="14" y="63" fill="#3fb950" xml:space="preserve">$ PreToolUse Write constitution/integrity/checks/release_gate.py</text>
 <text x="14" y="78" fill="#f85149" xml:space="preserve">-&gt; permissionDecision: deny</text>
-<text x="14" y="93" fill="#f85149" xml:space="preserve">makoto: row content.verifier_predicate_weakened (verifier predicate weakened — loose-comparator </text>
+<text x="14" y="93" fill="#f85149" xml:space="preserve">makoto: row content.verifier_predicate_weakened (verifier predicate weakened — loose-comparator</text>
 <text x="14" y="108" fill="#f85149" xml:space="preserve">  shape): matched 'startswith(' at line 2</text>
-<text x="14" y="123" fill="#c9d1d9" xml:space="preserve">Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. Loose comparat</text>
-<text x="14" y="138" fill="#c9d1d9" xml:space="preserve">  ors weaken the verifier per ADR-058 and CLAUDE.md commandment 3.</text>
-<text x="14" y="153" fill="#c9d1d9" xml:space="preserve">Legitimate instance? Annotate it `makoto-allow: &lt;reason&gt;` on or near the line (any comment style</text>
-<text x="14" y="168" fill="#c9d1d9" xml:space="preserve">  ) — an on-the-record, auditable rationale, never a disguise.</text>
+<text x="14" y="123" fill="#c9d1d9" xml:space="preserve">Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. Loose</text>
+<text x="14" y="138" fill="#c9d1d9" xml:space="preserve">  comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3.</text>
+<text x="14" y="153" fill="#c9d1d9" xml:space="preserve">Legitimate instance? Annotate it `makoto-allow: &lt;reason&gt;` on or near the line (any comment style)</text>
+<text x="14" y="168" fill="#c9d1d9" xml:space="preserve">  — an on-the-record, auditable rationale, never a disguise.</text>
 <text x="14" y="183" fill="#c9d1d9" xml:space="preserve">Conventions: makoto/docs/MAKOTO-CONVENTIONS.md</text>
 <text x="14" y="198" fill="#8b949e" xml:space="preserve">(exit 0)</text>
 <text x="14" y="228" fill="#8b949e" font-style="italic" xml:space="preserve">captured 652 Bytes of genuine dispatcher output</text>
