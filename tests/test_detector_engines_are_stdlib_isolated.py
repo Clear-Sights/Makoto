@@ -6,7 +6,7 @@ contained"). The owner correctly rejected treating that claim as sufficient just
 own -- a claim of intent is not proof the intent holds. This test makes the property fail loudly
 the moment it stops being true, instead of resting on an assertion.
 
-`substrate/_stdlib_ast_helpers.py` is the one whitelisted shared import both engines may use --
+`checks/_stdlib_ast_helpers.py` is the one whitelisted shared import both engines may use --
 it exists specifically so the isolation property is real without duplicating the shared helper
 functions across both files.
 """

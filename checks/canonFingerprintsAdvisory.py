@@ -17,7 +17,6 @@ from __future__ import annotations
 from typing import List
 
 from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
-from makoto.substrate._shared import StopCheck
 from makoto.core.schema import Finding
 
 
@@ -41,13 +40,6 @@ def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
     return out
 
 
-GATE = StopCheck(
-    id="gate.canon_fingerprints_advisory",
-    fn=canon_fingerprint_advisory_gate,
-    run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history),
-)
-
-
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", posture="ADVISE",
-               run=GATE.run)
+               may_block=True, run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))

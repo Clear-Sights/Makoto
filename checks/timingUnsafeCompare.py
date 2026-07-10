@@ -42,6 +42,12 @@ ordering are out of scope (the timing-unsafe shape is ==/!=).
 
 Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against certVerifyDisabled.py. Verified: the matched
+# span is only this docstring's closing prose + the "Knight-Leveson" line + the standard
+# `from __future__ import annotations` / `import ast` / `import re` / `from typing import Optional`
+# header both modules need -- it ends before any function body, so no logic is shared (this
+# module's strong-token digest/HMAC compare logic is unrelated to certVerifyDisabled's TLS callee
+# gate). See tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import ast
 import re

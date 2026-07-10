@@ -25,6 +25,15 @@ mode``) is not a literal CERT_NONE at the assignment site -> not matched. (c) a 
 
 Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against paramikoHostKeyWeakened.py / certReqsNone.py /
+# jwtSignatureDisabled.py. Verified: the matched span is only this docstring's closing
+# "Knight-Leveson" line + the standard `from __future__ import annotations` / `import ast` /
+# `from typing import Optional` / `from makoto.substrate.factories import ast_introduced_predicate,
+# <fn>` header every ast_introduced_predicate-style check module repeats by house style -- it ends
+# before any function body, so no logic is duplicated. Python import statements and a repeated
+# documentation-convention sentence are not extractable into a shared helper. The package's real
+# duplicate-LOGIC gate is tests/test_no_alpha_duplicate_functions.py's AST alpha-equivalence scan,
+# which this file does not trip.
 from __future__ import annotations
 import ast
 from typing import Optional

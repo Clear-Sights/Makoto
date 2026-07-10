@@ -2,17 +2,18 @@
 
 makoto/schema.py's load_prechecks() enforces this invariant for prechecks at LOAD TIME:
 _ALLOWED_FIRE_LEVELS == {"error"} and the loader raises on any other fire_level (see
-schema.py:77-81). Stop gates have no equivalent load-time enforcement — StopCheck carries no
-`fire_level`/`blocking` field at all (by design: discovered <=> live <=> blocking); the level lives
-on the `Finding` each gate's predicate constructs when it actually fires.
-tests/test_gate_shape.py::test_gate_dataclass_has_no_shadow_tier_field only pins the StopCheck
+schema.py:77-81). Stop gates have no equivalent load-time enforcement — Check carries no
+`fire_level`/`blocking` field at all (only `may_block`, the structural discovery-eligibility
+signal; by design that is NOT the same as "blocks" — the level lives on the `Finding` each gate's
+predicate constructs when it actually fires).
+tests/test_gate_shape.py::test_gate_dataclass_has_no_undeclared_shadow_state only pins the Check
 dataclass SHAPE (no reintroduced 'blocking' field) — it never inspects what level a gate's
-predicate emits when triggered. `gate.self_wired` (stopchecks/stopcheck_self_wired.py) is the ONE
+predicate emits when triggered. `gate.self_wired` (formerly stopchecks/stopcheck_self_wired.py) is the ONE
 documented advisory exception (2026-07-05, FABLE DECISION 6: an advisory-only partial-hook-strip
 detector that must never block per the "advisory over blocking" standing policy). Nothing before
 this test caught a SECOND silent advisory (or any other non-"error") gate being added later.
 
-This test fires EVERY live gate discovered by `load_stopchecks()` through its real `.run(ctx)`
+This test fires EVERY live gate discovered by `_live_gates()` through its real `.run(ctx)`
 entry point — the exact call `run_stop_checks` makes — with a scenario proven (via each gate's own
 existing sentinel tests / test_dispatch.py's behavioral pins, cited per-branch below) to make it
 emit at least one Finding, then asserts the emitted level is "error" (the only blocking level,
@@ -24,8 +25,14 @@ from __future__ import annotations
 import json
 import os
 
-from makoto.substrate._loader import load_stopchecks
+from makoto.substrate._loader import load_checks
 from makoto.substrate._shared import GateContext
+
+
+def _live_gates() -> list:
+    """The checks eligible to reach the Stop decision pipeline at all (formerly:
+    load_stopchecks()'s GATE-export scan) -- Check.may_block=True."""
+    return [c for c in load_checks(edge="Stop") if c.may_block]
 
 # The ONLY documented exception to "every Stop-gate finding blocks" (2026-07-05, FABLE DECISION 6):
 # gate.self_wired ships at level="advisory" so a partial hook-wiring strip is recorded to the audit
@@ -148,7 +155,7 @@ def _scenario_contract_order(tmp_path):
 
 
 def _scenario_self_wired(tmp_path):
-    # fires: tests/test_stopcheck_self_wired.py (partial strip: Stop entry missing)
+    # fires: tests/test_self_wired_check.py (partial strip: Stop entry missing)
     wired = json.dumps({"hooks": {
         "PreToolUse": [{"hooks": [{"command": "python3 -m makoto._dispatch"}]}],
         "PostToolUse": [{"hooks": [{"command": "python3 -m makoto._dispatch"}]}],
@@ -190,14 +197,14 @@ def _findings_for(gate, tmp_path):
 def test_every_scenario_covers_a_discovered_gate():
     """The scenario map's keys must equal exactly the discovered gate ids — neither stale (a
     removed gate leaves a dead scenario) nor missing (a new gate ships without one)."""
-    discovered = {g.id for g in load_stopchecks()}
+    discovered = {g.id for g in _live_gates()}
     assert set(_SCENARIOS) == discovered
 
 
 def test_every_gate_scenario_actually_fires(tmp_path):
     """Sanity precondition for the level check below: each scenario must produce >=1 Finding, or
     the level assertion would be vacuously true and this whole test would be worthless."""
-    silent = [g.id for g in load_stopchecks() if not _findings_for(g, tmp_path / g.id)]
+    silent = [g.id for g in _live_gates() if not _findings_for(g, tmp_path / g.id)]
     assert not silent, f"scenario(s) did not fire (fixture drift?): {silent}"
 
 
@@ -207,7 +214,7 @@ def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
     A future gate that silently ships a second advisory-tier exception reddens THIS test, not just
     a shape/dataclass pin."""
     violations = []
-    for g in load_stopchecks():
+    for g in _live_gates():
         for finding in _findings_for(g, tmp_path / g.id):
             if g.id in _ADVISORY_ALLOWLIST:
                 if finding.level == "error":

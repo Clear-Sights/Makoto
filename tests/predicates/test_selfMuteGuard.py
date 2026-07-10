@@ -213,7 +213,7 @@ def test_catalog_row_exists_and_matches():
     # deeper -- use load_prechecks()'s own default path resolution rather than a hand-rolled
     # relative path that silently breaks on the next move.
     cat = {p.id: p for p in load_prechecks()}
-    assert "content.self_mute_guard" in cat, "live catalog missing content.self_mute_guard"
+    assert "content.self_mute_guard" in cat, "patterns.toml missing row 1.23"
     row = cat["content.self_mute_guard"]
     assert row.predicate_module == "makoto.checks.selfMuteGuard"
     assert row.fire_level == "error"

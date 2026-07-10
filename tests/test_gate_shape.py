@@ -1,6 +1,6 @@
 """The Stop-gate catalog's SHAPE is itself a word makoto emits about its own design — so it must be
 MATERIAL, not illusory. This test pins the design (the gate-related file subset, function counts,
-exports, the StopCheck schema, the shared/named-gate split, the layering firewall, the house style)
+exports, the Check schema, the shared/named-gate split, the layering firewall, the house style)
 AND proves each shape predicate has TEETH: a `test_TEETH_*` feeds it a planted violation and asserts
 it goes red. The single source for "the design" is the EXPECTED_* declarations below — change the
 package <=> change these <=> the test moves with it (a re-checkable artifact, not a comment).
@@ -8,14 +8,20 @@ package <=> change these <=> the test moves with it (a re-checkable artifact, no
 SPEC-5 Task 4 (2026-07-07): the gate catalog moved from its own `makoto/stopchecks/` package (one
 file per adapter/engine/harness, `stopcheck_*.py` prefix) into the shared flat `makoto/checks/`
 package (SPEC-5 Task 2's home for every check, prechecks included) with descriptive names and each
-adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py` was deleted
-entirely (2026-07-09: no backwards-compat shims) -- `load_stopchecks()` now lives at
-`substrate._loader.load_stopchecks`, its real, permanent home, and the actual gate MODULES live
-in `checks/`, so this test's GATES_DIR and every design declaration below point there. Because
-`checks/` also holds every precheck, `forbiddenLocation`, and the completeness check itself, the
-file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness files must be present),
-not an exact-set equality over the whole directory the way the old single-purpose `stopchecks/`
-package allowed.
+adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py` briefly survived
+as a thin compat shim (`load_stopchecks()` re-exported, still memoized); that shim was removed
+2026-07-09 (no backwards-compat shims policy). Then, 2026-07-10, `load_stopchecks()`/`GATE`/
+`StopCheck` themselves were retired entirely: every gate module now expresses its Stop-edge
+surface as a plain `CHECK` (or, for `contractOrder.py`'s dual Pre+Stop surface, an `EXTRA_CHECKS`
+entry) discovered by the SAME unified `checks._loader.load_checks(edge="Stop")` every Pre-tier
+check already used, with a new `Check.may_block` field marking exactly the checks that used to
+export a `GATE` -- the structural "reaches the decision pipeline at all" signal, independent of
+`.posture`/`.level` (see `_loader.py`'s `Check.may_block` docstring and `_dispatch.py`'s
+`_blocking_gate_ids()`). This test's GATES_DIR and every design declaration below point at
+`checks/`. Because `checks/` also holds every precheck, `forbiddenLocation`, and the completeness
+check itself, the file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness
+files must be present), not an exact-set equality over the whole directory the way the old
+single-purpose `stopchecks/` package allowed.
 """
 from __future__ import annotations
 import ast
@@ -23,8 +29,19 @@ import dataclasses
 import importlib
 from pathlib import Path
 
-from makoto.substrate._loader import load_stopchecks
-from makoto.substrate._shared import StopCheck, GateContext
+from makoto.substrate._loader import Check, load_checks
+from makoto.substrate._shared import GateContext
+
+
+def _live_gates() -> list:
+    """The checks eligible to reach the Stop decision pipeline at all (formerly: discovered via
+    load_stopchecks()'s GATE-export scan) -- Check.may_block=True, not every Stop-edge CHECK
+    (staleEstablisher/undeclaredFalsifiable are Stop-edge but structurally excluded, may_block
+    default False)."""
+    return sorted(
+        (c for c in load_checks(edge="Stop") if c.may_block),
+        key=lambda c: c.id,
+    )
 
 GATES_DIR = Path(__file__).resolve().parent.parent / "checks"
 
@@ -51,38 +68,44 @@ GATE_MODULE_STEMS = {
                              # worker has no standing to mint.
 }
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
-# the shared substrate (StopCheck/GateContext + common predicates) + the two test-only FP/soundness
+# the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
 # harnesses (never imported by a gate module itself — only by their own battery tests) that travel
 # with the gate catalog but are not gates. _canonAtoms.py is the same kind of shared substrate,
 # scoped to the two canonFingerprints* gates (SPEC-5 Task 9).
-EXPECTED_SHARED_FILES = set()  # all former checks/ plumbing moved to substrate/
+EXPECTED_SHARED_FILES = set()  # 2026-07-09: all former checks/ plumbing moved to substrate/
 EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # 14 files, the gate subset of checks/
 EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
                           "gate.self_wired", "gate.hollow_test", "gate.canon",
                           "gate.canon_fingerprints", "gate.canon_fingerprints_advisory",
                           "gate.contract_order"}
-EXPECTED_GATE_FIELDS = {"id", "fn", "run"}                 # NO 'blocking' — discovered<=>live<=>blocking
+EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
+                        "keywords", "retry_hint", "description", "predicate_module"}
 EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output",
                            "cwd", "fs_exists", "fs_size", "fs_read", "history",
                            "permission_mode", "agent_id", "agent_type", "plan",
-                           "session_id", "transcript_path", "state_root"}   # Task 2 slice 5
+                           "session_id", "transcript_path", "state_root"}
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
     "claimedProduceAbsent.py": 2,
     "undischargedCommitment.py": 4,
     "falseGreenClaim.py": 1,
     "silentlyDroppedCommitment.py": 6,
     "fabricatedToolAction.py": 3,
-    "namedTestTeeth.py": 6,
+    "namedTestTeeth.py": 7,                                # 6->7, 2026-07-09: recorded_failed_names/
+                                                            # recorded_passed_names now share one
+                                                            # extracted _recorded_names helper
     "stalePytestCache.py": 1,
-    "deadPureStatement.py": 15,                            # 19->15, 2026-07-09: _scratch_roots/_under/
+    "deadPureStatement.py": 15,                            # engine + adapter merged (_run lives here);
+                                                            # 19->15, 2026-07-09: _scratch_roots/_under/
                                                             # _is_scratch/_read extracted to _stdlib_ast_helpers.py
     "selfWiredCheck.py": 2,                                # 3->2, 2026-07-09: _entry_dispatches_to_makoto
                                                             # hoisted to substrate/wiring.py (shared with
                                                             # install.py -- the refactor the module's own
                                                             # note asked for)
-    "hollowTest.py": 30,                                   # 35->30, 2026-07-09: _callee_chain/_scratch_roots/
-                                                            # _under/_is_scratch/_read extracted to _stdlib_ast_helpers.py
+    "hollowTest.py": 30,                                   # engine + adapter merged (_run lives here);
+                                                            # 35->30, 2026-07-09: _callee_chain/_scratch_roots/
+                                                            # _under/_is_scratch/_read extracted to
+                                                            # _stdlib_ast_helpers.py
     "canonTimeoutRecur.py": 15,                            # engine + adapter merged (canon_gate lives here)
     "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
     "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
@@ -148,29 +171,41 @@ def _leads_with_future_import(src: str) -> bool:
 
 # ---- the design, pinned ----------------------------------------------------------------------
 def test_discovered_gates_match_the_design():
-    gs = load_stopchecks()
+    gs = _live_gates()
     assert {g.id for g in gs} == EXPECTED_LIVE_GATE_IDS
     assert len(gs) == len(EXPECTED_LIVE_GATE_IDS)
     assert [g.id for g in gs] == sorted(g.id for g in gs)   # deterministic: sorted by id
-    assert load_stopchecks() is load_stopchecks()                     # memoized (hot path never re-scans)
 
 
-def test_each_live_gate_exports_a_well_formed_GATE():
-    for g in load_stopchecks():
-        assert isinstance(g, StopCheck)
-        assert callable(g.fn) and callable(g.run)
-        # the GATE export lives in the merged adapter+engine module (where `run` is defined).
+def test_each_live_gate_exports_a_well_formed_CHECK():
+    for g in _live_gates():
+        assert isinstance(g, Check)
+        assert callable(g.run)
+        assert g.applies_at == "Stop"
+        assert g.may_block is True
+        # the CHECK (or EXTRA_CHECKS entry) lives in the merged adapter+engine module.
         home = g.run.__module__
         assert home.startswith("makoto.checks.")
         assert home.rsplit(".", 1)[-1] in GATE_MODULE_STEMS
         mod = importlib.import_module(home)
-        assert getattr(mod, "GATE") is g                    # the module's GATE export IS the gate
+        # the module's own CHECK export IS the gate, EXCEPT contractOrder's dual Pre+Stop surface,
+        # whose Stop-side lives in EXTRA_CHECKS instead (its CHECK is the Pre-side, applies_at=Pre).
+        assert getattr(mod, "CHECK", None) is g or g in (getattr(mod, "EXTRA_CHECKS", None) or [])
 
 
-def test_gate_dataclass_has_no_shadow_tier_field():
-    fields = {f.name for f in dataclasses.fields(StopCheck)}
+def test_gate_dataclass_has_no_undeclared_shadow_state():
+    fields = {f.name for f in dataclasses.fields(Check)}
     assert fields == EXPECTED_GATE_FIELDS
-    assert "blocking" not in fields                         # discovered<=>live<=>blocking is STRUCTURAL
+    # may_block IS the structural blocking-eligibility signal (replacing GATE-export presence) --
+    # not a shadow tier because it's a total, testable partition: every live gate id is may_block
+    # True, and nothing else claims to be. staleEstablisher/undeclaredFalsifiable are Stop-edge
+    # CHECKs too but stay may_block=False -- discovered and run, but structurally excluded from
+    # _blocking_gate_ids() regardless of their own .level, never a silent in-between state.
+    live_ids = {g.id for g in _live_gates()}
+    assert live_ids == EXPECTED_LIVE_GATE_IDS
+    non_blocking_stop_checks = [c for c in load_checks(edge="Stop") if not c.may_block]
+    assert non_blocking_stop_checks, "expected at least staleEstablisher/undeclaredFalsifiable"
+    assert {c.id for c in non_blocking_stop_checks}.isdisjoint(EXPECTED_LIVE_GATE_IDS)
 
 
 def test_gate_context_carries_the_substrate_and_derives_roots():
@@ -215,7 +250,8 @@ def test_each_gate_module_follows_the_house_style():
         f = GATES_DIR / f"{stem}.py"
         src = f.read_text()
         assert _leads_with_future_import(src), f"{f.name}: missing future header"
-        assert "\nGATE = StopCheck(" in src, f"{f.name}: GATE export missing/misplaced"
+        assert "\nCHECK = " in src or "\nEXTRA_CHECKS = " in src, \
+            f"{f.name}: Stop-edge CHECK/EXTRA_CHECKS export missing/misplaced"
 
 
 # ---- teeth: every shape predicate must go RED on a planted violation --------------------------
@@ -237,11 +273,18 @@ def test_TEETH_no_shadow_field_check_catches_a_planted_blocking_field():
     @dataclasses.dataclass(frozen=True)
     class PlantedGate:
         id: str
-        fn: object
+        applies_at: str
+        posture: str
         run: object
-        blocking: bool                                     # a re-introduced shadow tier
+        may_block: bool
+        blocking: bool                                     # a re-introduced SECOND shadow field
     fields = {f.name for f in dataclasses.fields(PlantedGate)}
     assert "blocking" in fields and fields != EXPECTED_GATE_FIELDS  # the real assertion would redden
+
+
+def test_TEETH_may_block_partition_catches_a_leaked_advisory_id():
+    planted_non_blocking_ids = {"gate.stale_establisher", "gate.undeclared_falsifiable", "gate.completion"}
+    assert not planted_non_blocking_ids.isdisjoint(EXPECTED_LIVE_GATE_IDS)  # the real assertion would redden
 
 
 def test_TEETH_function_count_check_catches_a_drift():
@@ -252,5 +295,5 @@ def test_TEETH_function_count_check_catches_a_drift():
 
 def test_TEETH_discovery_count_is_load_bearing():
     # planting a 5th discovered id (or dropping one) would move this equality — the design count bites.
-    assert len(load_stopchecks()) == len(EXPECTED_LIVE_GATE_IDS)
+    assert len(_live_gates()) == len(EXPECTED_LIVE_GATE_IDS)
     assert {"gate.completion", "gate.advance"} < EXPECTED_LIVE_GATE_IDS    # proper subset: set is real

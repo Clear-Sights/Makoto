@@ -13,17 +13,18 @@ to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently s
 of silence.
 
 This coexists with, and does not yet supersede, `schema.load_prechecks`. Stop-edge discovery
-itself WAS superseded (SPEC-C item 2, 2026-07-07): `_dispatch.py`'s Stop-finding loop and its
-`_blocking_gate_ids()` both run on `load_checks(edge="Stop")` now, not the former
-`stopchecks.load_stopchecks`/`GATE`-export mechanism kept below only for the tests that still
-assert against it directly (see `load_stopchecks`'s own docstring).
-"""
+itself now runs entirely through this module: `_dispatch.py`'s Stop-finding loop and
+`_blocking_gate_ids()` both call `load_checks(edge="Stop")` (2026-07-10 -- the former
+`load_stopchecks()`/`GATE`-export mechanism, itself relocated here 2026-07-09 from the deleted
+`stopchecks/__init__.py` compat shim, has been retired entirely; every check that used to export
+a `GATE` now expresses the same Stop-edge surface as a plain `CHECK` (or an `EXTRA_CHECKS` entry
+for `contractOrder.py`'s dual Pre+Stop surface), with `may_block=True` where `GATE`'s presence
+used to imply blocking-eligibility -- see `Check.may_block`'s own docstring)."""
 from __future__ import annotations
 
 import importlib
 import importlib.util
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -38,21 +39,31 @@ _PACKAGE_DIR = Path(__file__).parent.parent / "checks"
 class Check:
     """A convenience shape a check module MAY use for its `CHECK` export -- not required, the
     loader only duck-types `.id` / `.applies_at` / `.posture`, so a module exporting its own
-    richer dataclass (e.g. one shaped like `stopchecks._types.StopCheck`) is equally
-    discoverable.
+    richer dataclass is equally discoverable.
 
-    SPEC-C item 2 (Pre-tier cutover, 2026-07-07): `keywords`/`retry_hint`/`description`/
-    `predicate_module` are additive fields, consumed only by `schema.load_prechecks()`'s
+    `may_block` (added when `load_stopchecks()`/`GATE` was retired -- FABLE DECISION): a Stop-edge
+    check is blocking-eligible only when BOTH `may_block is True` AND `posture == BLOCK` --
+    two independent signals, not one. Before this field existed, blocking-eligibility was
+    `posture == BLOCK` alone; `may_block` restores the second, structural layer the old
+    `GATE`-export-presence mechanism used to provide (a check with no `GATE` export could
+    never enter `_blocking_gate_ids()`, regardless of its posture -- see
+    `staleEstablisher.py`/`undeclaredFalsifiable.py`, which stay `may_block=False` on purpose:
+    their pattern_id must never enter the blocking-eligible set even if `posture` were ever
+    mistagged). A Pre-tier CHECK never sets this; it reads back False and is irrelevant there
+    (`_blocking_gate_ids()` only ever consults Stop-edge checks).
+
+    `keywords`/`retry_hint`/`description`/`predicate_module` (SPEC-C item 2, Pre-tier cutover,
+    backported from public 2026-07-10): additive fields consumed only by `schema.load_prechecks()`'s
     loader-backed default path and by the Pre-tier predicates themselves (which read
-    `pattern.retry_hint`/`pattern.description` directly to build their Finding -- see
-    `phantomCitation.py`/`forbiddenLocation.py`). A Stop-tier CHECK never sets them and reads
-    them back as their safe empty defaults. `predicate_module` is conventionally set to the
-    module's own `__name__` at CHECK-construction time (self-referential, never a
-    hand-typed/stale dotted string)."""
+    `pattern.retry_hint`/`pattern.description` directly to build their Finding). A Stop-tier CHECK
+    never sets them and reads them back as their safe empty defaults. `predicate_module` is
+    conventionally set to the module's own `__name__` at CHECK-construction time
+    (self-referential, never a hand-typed/stale dotted string)."""
     id: str
     applies_at: str
     posture: str
     run: Optional[Callable] = None
+    may_block: bool = False
     keywords: tuple = ()
     retry_hint: str = ""
     description: str = ""
@@ -108,13 +119,12 @@ def discover(*, package_dir: Optional[Path] = None) -> list:
     """Every valid `CHECK` found directly in `package_dir` (defaults to the real `checks/`
     package), in file-stem order. A module MAY additionally export `EXTRA_CHECKS: list` for a
     second (or more) firing surface sharing the same file/id at a DIFFERENT `applies_at` edge --
-    e.g. `contractOrder.py`'s Stop-side GATE, which shares the id `gate.contract_order` with
-    that same module's Pre-side CHECK/predicate (SPEC-C item 2, FABLE DECISION 2026-07-07: the
-    only module in the catalog with two firing surfaces under one id; this is a small, explicit
-    generalization of the loader's contract rather than a special-cased carve-out for it). Each
-    `EXTRA_CHECKS` entry is validated the same way as a primary CHECK (`_valid_check`) and
-    silently skipped (not fatal) if malformed -- consistent with every other loader failure mode
-    in this module."""
+    `contractOrder.py`'s Stop-side surface, which shares the id "gate.contract_order" with that
+    same module's Pre-side CHECK/predicate, is the only module in the catalog with two firing
+    surfaces under one id (ported from public Clear-Sights/Makoto's identical mechanism, SPEC-C
+    item 2). Each `EXTRA_CHECKS` entry is validated the same way as a primary CHECK
+    (`_valid_check`) and silently skipped (not fatal) if malformed -- consistent with every other
+    loader failure mode in this module."""
     directory = package_dir or _PACKAGE_DIR
     out = [chk for chk in scan(package_dir=directory).values() if chk is not None]
     for path in _candidate_files(directory):
@@ -138,31 +148,3 @@ def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = Non
     if edge is not None:
         found = [c for c in found if c.applies_at == edge]
     return found
-
-
-@lru_cache(maxsize=1)
-def load_stopchecks() -> list:
-    """Every module directly under `makoto/checks/` that exports a `GATE` (a `StopCheck`,
-    distinct from that same module's `CHECK` used by `load_checks`). Memoized so a repeat call
-    never re-scans the filesystem.
-
-    Relocated here (2026-07-09) from the former `stopchecks/__init__.py` compat shim, which has
-    been removed entirely -- no callers should still import it from `makoto.stopchecks`; that
-    package no longer exists.
-
-    NOT called by production anymore in this repo: SPEC-C item 2 (2026-07-07) moved
-    `_dispatch.py`'s Stop-finding loop and `_blocking_gate_ids()` onto `load_checks(edge="Stop")`
-    before this relocation happened, so `GATE`/`load_stopchecks()` are vestigial here -- kept
-    only because a set of tests still assert Stop-gate properties (discovery, count, memoization,
-    firing behavior) directly against this mechanism. Whether to retire `GATE` from the 14 check
-    modules that still export it and rewrite those tests onto `load_checks(edge="Stop")` instead
-    is a separate, larger decision this relocation does not make (dev's own `_dispatch.py` still
-    calls `load_stopchecks()` live, so retiring `GATE` here would diverge the two repos' check
-    module contracts)."""
-    out = []
-    for path in _candidate_files(_PACKAGE_DIR):
-        mod = importlib.import_module(f"makoto.checks.{path.stem}")
-        g = getattr(mod, "GATE", None)
-        if g is not None:
-            out.append(g)
-    return sorted(out, key=lambda g: g.id)

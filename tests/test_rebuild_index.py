@@ -9,7 +9,7 @@ import sqlite3
 
 from makoto.record import ledger
 from makoto.record.db import init_db
-from tools.rebuild_index import rebuild_ledger_table_from_chain
+from tests.rebuild_index import rebuild_ledger_table_from_chain
 
 
 def _setup(tmp_path):

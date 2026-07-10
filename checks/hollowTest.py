@@ -40,7 +40,6 @@ layout, only the file boundary moved.
 from __future__ import annotations
 import ast
 
-from makoto.substrate._shared import StopCheck
 from makoto.substrate._stdlib_ast_helpers import _callee_chain, iter_touched_python_sources
 from makoto.core.schema import Finding
 
@@ -94,10 +93,8 @@ def _iter_own_scope(stmts):
 
 # ---- the assertion recognizer (generous by design: an FN here only suppresses a fire) -----------
 # _callee_chain imported at module top from _stdlib_ast_helpers (2026-07-09: was a local duplicate
-# of both deadPureStatement.py's usage pattern and substrate/factories.py::callee_chain; extracted
-# rather than left duplicated -- see tests/test_detector_engines_are_stdlib_isolated.py).
-
-
+# of both deadPureStatement.py's usage pattern and lib/factories.py::callee_chain; extracted rather
+# than left duplicated -- see tests/test_detector_engines_are_stdlib_isolated.py).
 def _is_assertion_call(node) -> bool:
     """Generous recognizer: any Call whose dotted callee has a component (case-insensitive)
     starting with `assert` (`self.assertTrue`, `assert_that(...)`, `mock.assert_called_with`), OR
@@ -412,6 +409,11 @@ def analyze_file(src: str, path: str) -> list:
 # =============================================================================================
 # Stop-hook adapter (formerly stopchecks/stopcheck_hollow_test.py)
 # =============================================================================================
+# _is_scratch/_read (imported at module top from _stdlib_ast_helpers) are shared verbatim with
+# deadPureStatement.py (2026-07-09: found alpha-equivalent by AST canonicalization; extracted
+# rather than left duplicated -- see tests/test_detector_engines_are_stdlib_isolated.py).
+
+
 _KIND_MESSAGE = {
     "no_assertion": "test `{func}` (line {line}) contains no assertion of any kind — it passes "
                      "regardless of what the code under test does",
@@ -436,7 +438,7 @@ def _allowed(lineno, lines) -> bool:                          # on-the-record ov
 def _run(ctx) -> list:
     out = []
     # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
-    # deadPureStatement._run via the stdlib-isolated helper home -- 2026-07-09 dedup
+    # deadPureStatement._run via the stdlib-isolated helper home -- 2026-07-09 dedup round 2
     for p, src in iter_touched_python_sources(ctx):
         lines = src.splitlines()
         for f in analyze_file(src, str(p)):
@@ -457,8 +459,5 @@ def _run(ctx) -> list:
 # A Stop gate (fires on the Stop hook, like every gate). Its `fn` is the AST analyzer rather than a
 # claim-vs-ledger predicate — mirrors gate.liveness's split exactly. `run` returns list[Finding] (a
 # closed test file can have many hollow tests); run_stop_checks normalizes a list like a single finding.
-GATE = StopCheck(id="gate.hollow_test", fn=analyze_file, run=_run)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=_run)

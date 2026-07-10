@@ -118,7 +118,7 @@ _KNOWN_DOTLESS = {"makefile", "dockerfile", "license", "readme", "copying", "cha
 # A plausible file EXTENSION: short, LOWERCASE, alphanumeric, not purely numeric. This is the
 # firewall that separates a filename ('x.py', 'README.md') from a dotted CODE IDENTIFIER
 # ('Finding.source_event_id' — tail 'source_event_id' is long+underscored; 'Module.Class' — tail
-# is capitalized; 'obj.method' — tail too long), a version/pattern id ('v1.2', '1.4' — tail is
+# is capitalized; 'obj.method' — tail too long), a version/pattern id ('v1.2', 'content.integrity_suppression_flag' — tail is
 # digits), or a dotted-attr chain ('schema.load_prechecks'). Real extensions are lowercase by
 # convention, so requiring lowercase rejects 'Class'/'PY' identifier tails 0-FN on real promises.
 _FILE_EXT_RX = re.compile(r"[a-z0-9]{1,5}")
@@ -132,7 +132,7 @@ def _is_file_shaped(loc: str) -> bool:
     name whose LAST segment is a plausible file extension, OR a known dotless convention spelled
     with a capital (LICENSE, Makefile). A bare lowercase word ("main", "data"), a dotted CODE
     IDENTIFIER ("Finding.source_event_id", "Module.Class", "obj.method" — the tail is not a real
-    extension), a version/pattern id ("v1.2", "1.4"), or a slash-command ("/loop") is prose/code
+    extension), a version/pattern id ("v1.2", "content.integrity_suppression_flag"), or a slash-command ("/loop") is prose/code
     that detect_locations over-matched — never the object of a real file promise (the live
     advance-gate FP this guard closes: a class attribute persisted as a phantom open commitment)."""
     if _SLASH_COMMAND_RX.fullmatch(loc):
@@ -246,23 +246,3 @@ def set_status(conn, key: str, status: str, *, retract_param: Optional[str] = No
     conn.commit()
 
 
-def retire_unsourceable_commitments(
-        conn, session_id: str, *,
-        reason: str = "stale mis-source: location not file-shaped under current sourcing rules"
-) -> list[dict]:
-    """Sanctioned GC of stale PHANTOM commitments. Retire OPEN commitments whose location is NOT
-    file-shaped under the CURRENT `_is_file_shaped` rules — rows the live sourcer would never
-    create (a pre-hardening mis-source: a dotted code identifier like 'Finding.source_event_id',
-    a branch name 'main', a function 'detect_location', a slash-command '/loop').
-
-    FN-SAFE BY CONSTRUCTION: a genuine file-shaped commitment (a real promised file, dischargeable
-    normally) is NEVER touched — this can only clear provable non-obligations, never a real open
-    promise. Auditable: the rationale is recorded in `retract_param`. Returns the retired rows
-    [{location, commitment_key}]. NOT a self-bypass: it cannot clear a commitment whose location
-    the current rules WOULD accept as a producible file."""
-    retired = []
-    for c in open_commitments(conn, session_id):
-        if not _is_file_shaped(c["location"]):
-            set_status(conn, c["commitment_key"], "retracted", retract_param=reason)
-            retired.append({"location": c["location"], "commitment_key": c["commitment_key"]})
-    return retired

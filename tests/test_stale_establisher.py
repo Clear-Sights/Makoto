@@ -1,7 +1,8 @@
 """makoto.checks.staleEstablisher -- the opt-in ADVISORY (never blocking) ground-truth
 staleness detector (SPEC-5). Falsifying tests for the check() logic itself, and a structural
-proof that it can never block: it is not discovered by stopchecks.load_stopchecks (no GATE
-export), so its pattern_id can never enter _dispatch._blocking_gate_ids().
+proof that it can never block: its CHECK export stays `may_block=False` (2026-07-10, retiring
+`load_stopchecks()`/`GATE`), so its pattern_id can never enter _dispatch._blocking_gate_ids()
+regardless of what `.level` its own Finding carries.
 """
 from __future__ import annotations
 
@@ -52,14 +53,13 @@ def test_check_clean_when_establisher_still_open():
 
 
 def test_never_discovered_as_a_blocking_stop_gate():
-    """Structural proof of the never-BLOCK guarantee: staleEstablisher has no GATE export, so
-    load_stopchecks() never discovers it -- and separately, its CHECK's own posture is never
-    BLOCK, so it can't enter _dispatch._blocking_gate_ids() (load_checks(edge="Stop")-derived,
-    SPEC-C item 2) either way -- its pattern_id can never enter the blocking-eligible set,
-    regardless of the level its own Finding carries."""
-    from makoto.substrate._loader import load_stopchecks
-    assert not hasattr(staleEstablisher, "GATE")
-    assert "gate.stale_establisher" not in {g.id for g in load_stopchecks()}
+    """Structural proof of the never-BLOCK guarantee: staleEstablisher's CHECK stays
+    may_block=False, so it never enters _dispatch._blocking_gate_ids() (load_checks(edge="Stop")-
+    derived, filtered on may_block) regardless of what `.level` its own Finding carries."""
+    assert staleEstablisher.CHECK.may_block is False
+    from makoto.substrate._loader import load_checks
+    live_ids = {c.id for c in load_checks(edge="Stop") if c.may_block}
+    assert "gate.stale_establisher" not in live_ids
 
 
 def test_check_export_is_advisory_and_stop_scoped():

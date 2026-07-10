@@ -112,18 +112,26 @@ def _resolves_outside_cwd(file_path: str, cwd: str) -> Optional[bool]:
     return True
 
 
-def _under_makoto_state_home(target: PurePosixPath) -> bool:
-    """True iff `target` lies at/under Makoto's own RESOLVED state-home
-    (`makoto.record.state._state_dir()` -- the same resolver the rest of the state layer uses), via exact
-    segment-prefix membership. Covers an operator-relocated `$MAKOTO_STATE_DIR`, not just the
-    default path."""
-    root = _lexical_resolve(str(_state_dir()))
+def _is_under(root: PurePosixPath, target: PurePosixPath) -> bool:
+    """True iff `target` lies at/under `root` via exact segment-prefix membership. A non-absolute
+    `root` can never validly bound anything (False) -- callers only ever pass a lexically-resolved
+    root, so this only guards a genuinely-relative resolution. Shared tail of
+    `_under_makoto_state_home` / `_under_harness_plans` (found duplicated by jscpd, 2026-07-09 --
+    the two self-guard membership checks repeated this exact 3-statement test by hand)."""
     if not root.is_absolute():
         return False
     root_parts, target_parts = root.parts, target.parts
     if len(target_parts) < len(root_parts):
         return False
     return target_parts[: len(root_parts)] == root_parts
+
+
+def _under_makoto_state_home(target: PurePosixPath) -> bool:
+    """True iff `target` lies at/under Makoto's own RESOLVED state-home
+    (`makoto.record.state._state_dir()` -- the same resolver the rest of the state layer uses), via exact
+    segment-prefix membership. Covers an operator-relocated `$MAKOTO_STATE_DIR`, not just the
+    default path."""
+    return _is_under(_lexical_resolve(str(_state_dir())), target)
 
 
 def _under_harness_plans(target: PurePosixPath) -> bool:
@@ -136,13 +144,7 @@ def _under_harness_plans(target: PurePosixPath) -> bool:
     root-escape fallback: nothing under `.claude/plans` can shadow `settings.json` or
     `makoto_state`, which are matched and returned before this is ever reached. Live FP this
     closes: root-escape fired three times on the harness's own plan file, 2026-07-07."""
-    root = _lexical_resolve(str(PurePosixPath(Path.home().as_posix()) / ".claude" / "plans"))
-    if not root.is_absolute():
-        return False
-    root_parts, target_parts = root.parts, target.parts
-    if len(target_parts) < len(root_parts):
-        return False
-    return target_parts[: len(root_parts)] == root_parts
+    return _is_under(_lexical_resolve(str(PurePosixPath(Path.home().as_posix()) / ".claude" / "plans")), target)
 
 
 def _location_reason(name: str, file_path: str, cwd: str) -> Optional[str]:

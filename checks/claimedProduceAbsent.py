@@ -6,8 +6,7 @@ from makoto.core.schema import Finding
 from makoto.core.lexicons import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
-from makoto.substrate._shared import _BIND_BEFORE, _discharged
-from makoto.substrate._shared import StopCheck
+from makoto.substrate._shared import _BIND_BEFORE, _discharge_kwargs, _discharged
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -93,12 +92,6 @@ def completion_gate(text, *, touched_keys, fs_exists=None, empty_keys=None, fs_s
     )
 
 
-GATE = StopCheck(
-    id="gate.completion",
-    fn=completion_gate,
-    run=lambda c: completion_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: completion_gate(c.text, **_discharge_kwargs(c)))

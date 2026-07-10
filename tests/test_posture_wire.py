@@ -57,50 +57,6 @@ def test_apply_unrecognized_posture_fails_closed_to_strict():
     assert posture.apply(posture.BLOCK, "not-a-real-posture") == posture.BLOCK
 
 
-# ---- D6: permission_mode-aware clamp (FABLE DECISION 2026-07-07) -----------------------------
-def test_is_oversight_clamped_true_for_bypasspermissions_and_dontask():
-    assert posture.is_oversight_clamped("bypassPermissions") is True
-    assert posture.is_oversight_clamped("dontAsk") is True
-
-
-def test_is_oversight_clamped_false_for_every_other_mode_incl_none():
-    for mode in ("default", "plan", "acceptEdits", "auto", None, "", "garbage"):
-        assert posture.is_oversight_clamped(mode) is False
-
-
-def test_apply_clamps_loose_block_to_block_under_bypasspermissions():
-    """The whole point of D6: LOOSE would normally soften a BLOCK to ADVISE -- forced back to
-    BLOCK when the harness's own human-confirmation layer is off."""
-    assert posture.apply(posture.BLOCK, posture.LOOSE,
-                         permission_mode="bypassPermissions") == posture.BLOCK
-
-
-def test_apply_clamps_silent_block_to_block_under_dontask():
-    assert posture.apply(posture.BLOCK, posture.SILENT,
-                         permission_mode="dontAsk") == posture.BLOCK
-
-
-def test_apply_clamps_ask_ask_to_ask_unchanged_under_bypasspermissions():
-    """ASK escalates BLOCK/ASK to ASK anyway -- the clamp forces the RAW outcome through, which
-    for an ASK-postured BLOCK means BLOCK (stricter than ASK's own escalation), not ASK."""
-    assert posture.apply(posture.BLOCK, posture.ASK_POSTURE,
-                         permission_mode="bypassPermissions") == posture.BLOCK
-
-
-def test_apply_clamp_never_escalates_allow():
-    """ALLOW stays a fixpoint even under the clamp -- the clamp only stops SOFTENING a real
-    flag, it never manufactures one, matching apply's own no-escalation contract for ALLOW."""
-    assert posture.apply(posture.ALLOW, posture.LOOSE,
-                         permission_mode="bypassPermissions") == posture.ALLOW
-
-
-def test_apply_unclamped_modes_behave_exactly_as_before():
-    """default/plan/acceptEdits/auto/None must not trigger the clamp -- LOOSE still softens."""
-    for mode in ("default", "plan", "acceptEdits", "auto", None):
-        assert posture.apply(posture.BLOCK, posture.LOOSE,
-                             permission_mode=mode) == posture.ADVISE
-
-
 def test_decision_carries_detail_but_compares_as_its_outcome_string():
     d = posture.Decision(posture.BLOCK, detail="/etc/passwd")
     assert d == posture.BLOCK

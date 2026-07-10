@@ -8,10 +8,9 @@ the plan BY PASSTHROUGH-NAME (`Plan.order_violation`/`Plan.unmet_deps`), never a
 
 TWO firing surfaces from ONE module, mirroring Assay's single `ContractOrder` class's two
 guards:
-  * the PRE gap guard (`predicate`, wired via this module's own CHECK export + `_dispatch.
-    _run_predicates`'s `checks._loader`-backed catalog, BLOCK): a Write/Edit/MultiEdit/
-    NotebookEdit call advancing a plan node whose passthrough-establisher is not yet DONE is the
-    partial-order contradiction.
+  * the PRE gap guard (`predicate`, wired via `data/patterns.toml` + `_dispatch._run_predicates`,
+    BLOCK): a Write/Edit/MultiEdit/NotebookEdit call advancing a plan node whose passthrough-
+    establisher is not yet DONE is the partial-order contradiction.
   * the STOP remainder guard (`GATE`, discovered by `substrate._loader.load_stopchecks`; BLOCK by
     construction -- discovered<=>live<=>blocking, no shadow tier, `checks/_shared.py`): the
     turn ending with the plan's `remainder()` non-empty.
@@ -32,7 +31,6 @@ from typing import Optional
 from makoto.checks import normalize_path
 from makoto.substrate._loader import Check
 from makoto.substrate._planNode import Plan
-from makoto.substrate._shared import StopCheck
 from makoto.core.schema import Finding
 
 _LOCATING_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
@@ -132,23 +130,17 @@ def _stop_finding(plan: Optional[Plan]) -> Optional[Finding]:
     )
 
 
-GATE = StopCheck(
-    id="gate.contract_order",
-    fn=_stop_finding,
-    run=lambda ctx: _stop_finding(ctx.plan),
-)
-
 RETRY_HINT = 'Finish the node(s) that establish this passthrough (the unmet ids named in the message) before advancing this one -- deps are gaps in the declared plan, read by passthrough name, never a declared edge.'
 DESCRIPTION = 'declared-plan contract gap -- a Write/Edit/MultiEdit/NotebookEdit advances a plan node whose passthrough-establisher is not yet DONE'
 
 CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=predicate, predicate_module=__name__, keywords=('file_path', 'notebook_path'), retry_hint=RETRY_HINT, description=DESCRIPTION)
 
-# SPEC-C item 2 (FABLE DECISION, 2026-07-07): this module's Stop-side GATE above shares the SAME
-# id as its Pre-side CHECK but fires at a different edge -- checks._loader.discover()'s
-# EXTRA_CHECKS convention (added for exactly this module, the sole dual-surface case in the
-# catalog) makes the Stop-side visible to the unified loader instead of needing a direct-call
-# carve-out in run_stop_checks.
+# This module's Stop-side surface shares the SAME id as its Pre-side CHECK above but fires at a
+# different edge -- checks._loader.discover()'s EXTRA_CHECKS convention (the sole dual-surface
+# case in the catalog) makes the Stop-side visible to the unified loader instead of needing a
+# direct-call carve-out in run_stop_checks. may_block=True: this Stop-side surface used to be
+# discoverable via the now-retired GATE/load_stopchecks() mechanism.
 EXTRA_CHECKS = [
-    Check(id="gate.contract_order", applies_at="Stop", posture="BLOCK",
+    Check(id="gate.contract_order", applies_at="Stop", posture="BLOCK", may_block=True,
           run=lambda ctx: _stop_finding(ctx.plan)),
 ]

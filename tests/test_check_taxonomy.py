@@ -1,21 +1,25 @@
 """The two firing categories load under their loaders: Pre-Checks (prechecks/, load_prechecks) and
-Stop-Checks (stopchecks/, load_stopchecks). The former Close-Checks and Post-Checks PACKAGES were
-collapsed away — the taxonomy is by TRIGGER EVENT, and liveness already fired on Stop, so it is now
-the gate.liveness StopCheck; the empty post tier (PostToolUse, never populated) was deleted.
-
-SPEC-C item 7 (dead weight sweep): the dead-package regression guard this file used to carry
-(`test_collapsed_packages_are_gone`) is now `test_checks_taxonomy.py::
-test_collapsed_packages_are_still_gone` -- ONE guard, not two copies of the same assertion drifting
-independently. That file tests a genuinely different subject (the newer, not-yet-live
-`checks._loader.load_checks` discovery mechanism) and is NOT a duplicate of this one otherwise --
-both files stay, each testing its own real, still-live subsystem."""
+Stop-Checks (checks/, load_checks(edge="Stop")). The former Close-Checks and Post-Checks PACKAGES
+were collapsed away — the taxonomy is by TRIGGER EVENT, and liveness already fired on Stop, so it
+is now the gate.liveness Stop CHECK; the empty post tier (PostToolUse, never populated) was
+deleted."""
+import importlib
+import pytest
 from makoto.core.schema import load_prechecks            # schema.py exposes the Pre-Check loader
-from makoto.substrate._loader import load_stopchecks
+from makoto.substrate._loader import load_checks
 
 
 def test_two_categories_load():
     assert load_prechecks(), "prechecks discovered"
-    assert load_stopchecks(), "stopchecks discovered"
+    assert load_checks(edge="Stop"), "stop checks discovered"
+
+
+def test_collapsed_packages_are_gone():
+    # The collapse is MATERIAL, not just a rename: the old packages must not import. A reintroduced
+    # closechecks/ or postchecks/ tier (the empty-room regression this change removed) reddens here.
+    for dead in ("makoto.closechecks", "makoto.postchecks"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(dead)
 
 
 def test_liveness_run_adapter_emits_findings(tmp_path):
@@ -52,7 +56,7 @@ def test_liveness_run_adapter_skips_nonpy_and_missing(tmp_path):
 
 
 def test_liveness_gate_fires_on_touched_file(tmp_path):
-    from makoto.checks.deadPureStatement import GATE
+    from makoto.checks.deadPureStatement import CHECK
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
 
@@ -62,14 +66,14 @@ def test_liveness_gate_fires_on_touched_file(tmp_path):
         def fs_read(self, p):
             return open(p).read()
 
-    findings = GATE.run(Ctx())
+    findings = CHECK.run(Ctx())
     assert findings, "fires on the dead pure statement"
     assert all("illusory" in getattr(x, "message", "") for x in findings)
 
 
-def test_liveness_gate_is_discovered_as_a_stopcheck():
-    # gate.liveness is now discovered by load_stopchecks (no separate close-check loader).
-    assert "gate.liveness" in {g.id for g in load_stopchecks()}
+def test_liveness_gate_is_discovered_as_a_stop_check():
+    # gate.liveness is discovered by load_checks(edge="Stop") (no separate close-check loader).
+    assert "gate.liveness" in {c.id for c in load_checks(edge="Stop")}
 
 
 def test_run_stop_checks_includes_liveness_findings(tmp_path, monkeypatch):

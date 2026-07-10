@@ -131,12 +131,15 @@ def test_plugin_description_predicate_count_matches_disk():
     bump the description when a check is added or removed.
     """
     from makoto.core.schema import load_prechecks
-    from makoto.substrate._loader import load_stopchecks
+    from makoto.substrate._loader import load_checks
+
+    def _live_gates():
+        return [c for c in load_checks(edge="Stop") if c.may_block]
 
     desc = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())["description"]
     for phrase_rx, loader, tier in (
         (r"(\d+)\s+pre-checks", load_prechecks, "pre-check"),
-        (r"(\d+)\s+Stop gates", load_stopchecks, "Stop gate"),
+        (r"(\d+)\s+Stop gates", _live_gates, "Stop gate"),
     ):
         m = re.search(phrase_rx, desc)
         assert m, f"plugin.json description must state the {tier} count ({phrase_rx})"

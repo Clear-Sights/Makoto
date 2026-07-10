@@ -51,15 +51,16 @@ so `timed_out_at_turn_end` reads whatever real call preceded it, exactly as befo
 PATTERN_ID CONVENTION (deliberate divergence from the read-only ancestor `makoto-dev`, found
 while porting): the ancestor's canon_gate emitted pattern_id=f"canon.{cid}" (e.g. "canon.timeout",
 "canon.recur") per fired sub-primitive. Live makoto's `_dispatch._blocking_gate_ids()` derives the
-blocking set from `{c.id for c in load_stopchecks()}` — i.e. the StopCheck's OWN id ("gate.canon")
-— and filters gate_findings by `finding.pattern_id in _blocking_gate_ids()`. EVERY other live gate
-(gate.dropped, gate.liveness, gate.hollow_test, gate.self_wired, ...) always stamps
-`pattern_id == its own StopCheck id`, one shape per gate, even when a gate can yield several
-findings (gate.liveness/gate.hollow_test can fire more than once per turn, always under their own
-single pattern_id). Keeping the ancestor's per-primitive pattern_id here would make `canon.timeout`
-/ `canon.recur` findings silently INVISIBLE to `_blocking_gate_ids()` — discovered, audited, but
-never actually blocking, defeating the whole point of this being a blocking gate. So this port
-stamps `pattern_id="gate.canon"` (matching the StopCheck id, like every sibling gate) and keeps the
+blocking set from `{c.id for c in load_checks(edge="Stop") if c.may_block and c.posture == BLOCK}`
+— i.e. the CHECK's OWN id ("gate.canon") — and filters gate_findings by `finding.pattern_id in
+_blocking_gate_ids()`. EVERY other live gate (gate.dropped, gate.liveness, gate.hollow_test,
+gate.self_wired, ...) always stamps `pattern_id == its own CHECK id`, one shape per gate, even when
+a gate can yield several findings (gate.liveness/gate.hollow_test can fire more than once per turn,
+always under their own single pattern_id). Keeping the ancestor's per-primitive pattern_id here
+would make `canon.timeout` / `canon.recur` findings silently INVISIBLE to `_blocking_gate_ids()` —
+discovered, audited, but never actually blocking, defeating the whole point of this being a
+blocking gate. So this port stamps `pattern_id="gate.canon"` (matching the CHECK id, like every
+sibling gate) and keeps the
 sub-primitive identity in the MESSAGE instead, prefixed `"canon.<id>: "` — callers/tests that need
 to know which sub-primitive fired read the message, exactly as the ticket anticipated ("a
 `gate.canon` finding whose message reflects the timeout primitive").
@@ -77,7 +78,6 @@ from __future__ import annotations
 import json
 from typing import Iterable, List
 
-from makoto.substrate._shared import StopCheck
 from makoto.core.schema import Finding
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
@@ -306,15 +306,14 @@ CANON_SEQ_PRIMITIVES: dict = {
         # -- a discharge the detector cannot honor. timed_out_at_turn_end reads ONLY calls[-1]
         # (purely structural); prose can never change it. The two REAL discharges: a later
         # successful call (calls[-1] becomes non-error), or (Task 0b part b) a ledger-recorded
-        # release.operator (D8a rename of ack-block) for a genuinely unresolvable, operator-
-        # surfaced block -- the same mechanism gate.canon_fingerprints uses (makoto.record.ackblock),
-        # not a third prose-only path.
+        # ack-block for a genuinely unresolvable, operator-surfaced block -- the same mechanism
+        # gate.canon_fingerprints uses (makoto.record.ackblock), not a third prose-only path.
         "A call errored (timeout / interrupted / error code) and the turn closed without "
         "resolving it. Re-run it (or the equivalent action) to a real successful result before "
         "closing, OR if the error is a genuinely unresolvable, already-reviewed block, say "
-        "exactly `makoto release.operator timeout: <reason>` in a real (non-tool, non-quoted) "
-        "reply -- text alone cannot discharge this any other way; the detector reads only "
-        "whether the LAST call in the turn succeeded.",
+        "exactly `makoto ack-block timeout: <reason>` in a real (non-tool, non-quoted) reply -- "
+        "text alone cannot discharge this any other way; the detector reads only whether the "
+        "LAST call in the turn succeeded.",
     ),
     "recur": (
         recur_stuck,
@@ -380,13 +379,7 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     return out
 
 
-GATE = StopCheck(
-    id="gate.canon",
-    fn=canon_gate,
-    run=lambda c: canon_gate(c.history, transcript_path=c.transcript_path,
-                             session_id=c.session_id, state_root=c.state_root),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: canon_gate(c.history, transcript_path=c.transcript_path,
+                                         session_id=c.session_id, state_root=c.state_root))

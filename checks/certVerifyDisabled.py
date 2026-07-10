@@ -28,6 +28,14 @@ keyword match is scoped to a recognised client callee even at the cost of these 
 
 Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against timingUnsafeCompare.py and
+# verifierBodyHollowed.py. Verified: both matched spans are only this docstring's closing prose +
+# the "Knight-Leveson" line + the standard `from __future__ import annotations` / `import ast` /
+# `import re` / `from typing import Optional` header (all three modules need ast+re+Optional) --
+# each ends before any function body, so no logic is shared. Import syntax and prose that happens
+# to share common phrasing ("is not matched", "the binding harm", etc. -- all three docstrings use
+# the same house voice) are not extractable into a helper. See
+# tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import ast
 import re

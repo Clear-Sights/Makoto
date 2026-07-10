@@ -1,5 +1,5 @@
 """makoto.substrate._loader.load_checks — the flat checks/ package's own discovery mechanism
-(SPEC-5 Task 2). Supersedes nothing yet: `schema.load_prechecks`/`stopchecks.load_stopchecks`
+(SPEC-5 Task 2). Supersedes nothing yet: `schema.load_prechecks`/`substrate._loader.load_stopchecks`
 keep working unchanged this task (Task 3/4 migrate their real callers later).
 
 Every scenario here scans an ISOLATED tmp_path directory via `load_checks(package_dir=...)`
@@ -92,7 +92,7 @@ def test_existing_prechecks_and_stopchecks_loaders_unaffected():
     # Non-breaking guarantee: the new checks/ taxonomy is additive. The two existing loaders
     # this task explicitly does not touch/supersede keep discovering their real catalogs.
     from makoto.core.schema import load_prechecks
-    from makoto.substrate._loader import load_stopchecks
+    from makoto.substrate._loader import load_checks
 
     assert load_prechecks(), "prechecks still discovered unchanged"
-    assert load_stopchecks(), "stopchecks still discovered unchanged"
+    assert load_checks(edge="Stop"), "stop checks still discovered unchanged"

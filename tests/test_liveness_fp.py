@@ -14,7 +14,8 @@ A FIRING soundness sentinel means a real analyzer bug. NEVER weaken a sentinel t
 from __future__ import annotations
 import ast
 
-from makoto.substrate._fpHarness import measure
+from makoto.checks import deadPureStatement as _analyzer
+from tests._fpHarness import measure
 from makoto.checks.deadPureStatement import (
     illusory_statements, analyze_file, live_locals, _assigned_name)
 
@@ -27,7 +28,7 @@ def _f(src):
 def test_harness_counts_fires_over_corpus(tmp_path):
     (tmp_path / "a.py").write_text("def f():\n d = 1+1\n return 0\n")   # 1 illusory
     (tmp_path / "b.py").write_text("def g(c):\n r = c+1\n return 0\n")  # 0 (impure operand)
-    rep = measure([str(tmp_path / "a.py"), str(tmp_path / "b.py")])
+    rep = measure([str(tmp_path / "a.py"), str(tmp_path / "b.py")], _analyzer)
     assert rep["fires"] == 1
     assert len(rep["detail"]) == 1
 
@@ -138,7 +139,7 @@ def test_sole_killer_purity_guard():
 #   measurement: fires == 0  (no candidate FPs to triage; pre-registered falsifier did NOT fire)
 def test_fp_zero_on_makoto_source():
     from makoto.tests._repo_scope import tracked_py_files
-    rep = measure(tracked_py_files())        # scope pinned to makoto/, cwd-independent
+    rep = measure(tracked_py_files(), _analyzer)        # scope pinned to makoto/, cwd-independent
     assert rep["fires"] == 0, f"pre-registered falsifier FIRED — triage each candidate FP: {rep['detail']}"
 
 

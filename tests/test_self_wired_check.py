@@ -8,7 +8,7 @@ coverage against that canonical full-strip attack — see docs/self-defense-asym
 import json
 
 from makoto.checks.selfWiredCheck import (
-    GATE,
+    CHECK,
     _entry_dispatches_to_makoto,
     _missing_makoto_events,
     self_wired_gate,
@@ -114,9 +114,17 @@ def test_entry_dispatches_to_makoto_matches_install_semantics():
     assert _entry_dispatches_to_makoto("not-a-dict") is False
 
 
-def test_gate_export_shape():
-    assert GATE.id == "gate.self_wired"
-    assert GATE.fn is self_wired_gate
+def test_check_export_shape():
+    assert CHECK.id == "gate.self_wired"
+    assert CHECK.applies_at == "Stop"
+    assert CHECK.posture == "ADVISE"
+
+
+def test_check_run_adapter_delegates_to_self_wired_gate():
+    # No separate `.fn` attribute anymore (GATE/StopCheck retired) -- prove delegation
+    # behaviorally: CHECK.run(ctx) must produce exactly what self_wired_gate(ctx.fs_read) does.
+    ctx = type("Ctx", (), {"fs_read": staticmethod(_reader(_settings(stop=False)))})()
+    assert CHECK.run(ctx) == self_wired_gate(ctx.fs_read)
 
 
 def test_gate_run_adapter_reads_relative_settings_path():
@@ -127,5 +135,5 @@ def test_gate_run_adapter_reads_relative_settings_path():
         return _settings()
 
     ctx = type("Ctx", (), {"fs_read": staticmethod(fs_read)})()
-    assert GATE.run(ctx) is None
+    assert CHECK.run(ctx) is None
     assert seen["path"] == ".claude/settings.json"

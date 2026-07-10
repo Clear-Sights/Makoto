@@ -51,6 +51,13 @@ def _within_governed_tree(fp: str, cwd: str, root: Optional[Path]) -> bool:
         return False
 
 
+# jscpd note (2026-07-09): flagged as a clone against fabricatedCommitSha.py. Verified: the matched
+# span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
+# history: list, pattern: PreCheck, conn=None) -> Optional[Finding]` -- byte-identical across 9
+# check modules (grep '^def predicate(' checks/*.py) -- plus a coincidental preceding `return False`
+# from this file's own unrelated `_within_governed_tree` helper. A dispatcher-invoked entrypoint's
+# signature is a structural contract, not extractable logic; the two functions' bodies do unrelated
+# things (SHA-fabrication detection vs. citation-allowlist path scoping).
 def predicate(*, current_event: dict, history: list, pattern: PreCheck,
               conn=None) -> Optional[Finding]:
     """fire on first Author-Year string not present in canonical_citations."""
@@ -96,12 +103,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
 
 
 from makoto.substrate._loader import Check as _Check
-RETRY_HINT = "Add the citation to docs/CITATIONS.md as an Author-Year entry."
-# FABLE DECISION (2026-07-08): this used to also say "OR add it to the [allowlist] citations
-# block in makoto/data/patterns.toml if it's in-flight" -- but nothing ever read that block (a
-# genuinely dead feature); an unbuilt escape hatch advertised in a check's own retry_hint is
-# itself an illusory word, so the claim was retired rather than built out post-hoc to make it
-# retroactively true. See docs/DEFERRED.md for the citation this closed.
+RETRY_HINT = "Add the citation to docs/CITATIONS.md as an Author-Year entry, OR add it to the [allowlist] citations block in makoto/data/patterns.toml if it's in-flight."
 DESCRIPTION = 'phantom citation — Author-Year not in docs/CITATIONS.md canonical set'
 
 CHECK = _Check(id='content.phantom_citation', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('et al', ' 19', ' 20'), retry_hint=RETRY_HINT, description=DESCRIPTION)

@@ -3,7 +3,7 @@ Sentinels (a)-(d) per spec §1; (d) is the teeth arm (sole-killer for the gate b
 import json
 import time
 
-from makoto.checks.stalePytestCache import stale_pass_gate, GATE
+from makoto.checks.stalePytestCache import stale_pass_gate, CHECK
 
 
 def _cache(tmp_path, entries, live=()):
@@ -61,7 +61,10 @@ def test_green_cache_silent(tmp_path):
 
 
 def test_gate_export_shape():
-    assert GATE.id == "gate.stale_pass"
+    assert CHECK.id == "gate.stale_pass"
+    assert CHECK.applies_at == "Stop"
+    assert CHECK.posture == "BLOCK"
+    assert CHECK.may_block is True
 
 
 def test_latency_budget_literal_lookup_class(tmp_path):

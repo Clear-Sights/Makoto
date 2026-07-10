@@ -26,17 +26,25 @@ variant is a DIFFERENT shape, out of this pattern's honest scope.
 
 Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): also flagged as a clone against certNoneMode.py (separately from the
+# jwtNoneAlg.py clone this file resolves below via jwt_decode_callee_chain). Verified: the
+# certNoneMode match is only this docstring's closing "Knight-Leveson" line + the standard
+# house-style import header (`from __future__ import annotations` / `import ast` /
+# `from typing import Optional` / `from makoto.substrate.factories import
+# ast_introduced_predicate, <fn>`) -- it ends before any function body, so no logic is shared with
+# certNoneMode.py specifically (the real shared logic, the jwt callee gate, lives with jwtNoneAlg.py
+# and is merged below). See tests/test_no_alpha_duplicate_functions.py for the real dedup gate.
 from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.substrate.factories import ast_introduced_predicate, callee_chain, is_false_const
-from makoto.core.lexicons import JWT_CALLEE_RX
+from makoto.substrate.factories import ast_introduced_predicate, is_false_const, jwt_decode_callee_chain
 
 from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
-# CALLEE GATE (shared via lexicons.JWT_CALLEE_RX, also used by 1.32): the bare keyword `verify=False`
-# is not jwt-specific, so (mirroring 1.26's TLS gate) it only fires when the call's CALLEE chain names
-# a JWT library/namespace, BOUNDARY-delimited so `myjwthelper` does not match.
+# CALLEE GATE (shared via factories.jwt_decode_callee_chain, also used by 1.31 -- extracted
+# 2026-07-09 from two hand-duplicated copies): the bare keyword `verify=False` is not jwt-specific,
+# so (mirroring 1.26's TLS gate) it only fires when the call's CALLEE chain names a JWT
+# library/namespace, BOUNDARY-delimited so `myjwthelper` does not match.
 
 
 def _options_disables_signature(value) -> bool:
@@ -50,13 +58,7 @@ def _options_disables_signature(value) -> bool:
 
 
 def _jwt_node_match(node: ast.AST) -> Optional[str]:
-    if not isinstance(node, ast.Call):
-        return None
-    chain = callee_chain(node)
-    if not JWT_CALLEE_RX.search(chain):
-        return None
-    # only the `decode` entry point verifies a signature; encode/other calls are out of scope.
-    if chain.split(".")[-1] != "decode":
+    if jwt_decode_callee_chain(node) is None:
         return None
     for kw in node.keywords:
         if kw.arg == "verify" and is_false_const(kw.value):

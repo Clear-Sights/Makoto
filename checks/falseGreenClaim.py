@@ -3,7 +3,6 @@ from typing import Optional
 from makoto.core.schema import Finding
 from makoto.substrate.io import is_failing_testrun
 from makoto.substrate.claims import whole_suite_pass_claim
-from makoto.substrate._shared import StopCheck
 
 
 # The prose half (the whole-suite green-claim signal) RELOCATED to lib.claims.whole_suite_pass_claim
@@ -38,12 +37,6 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
     )
 
 
-GATE = StopCheck(
-    id="gate.green_claim",
-    fn=green_claim_gate,
-    run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output))

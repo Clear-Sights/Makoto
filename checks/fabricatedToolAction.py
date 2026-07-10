@@ -5,7 +5,6 @@ from typing import Optional
 from makoto.core.schema import Finding
 from makoto.substrate.claims import _code_spans
 from makoto.substrate._shared import turn_tool_calls
-from makoto.substrate._shared import StopCheck
 
 # gate.fabricated_action — the assistant claims a completed TOOL action ("I ran `X`", "I executed
 # scripts/deploy.sh") in a turn where it made NO tool calls at all. FP-safety is the whole design:
@@ -87,12 +86,6 @@ def fabricated_action_gate(text, *, history=()) -> Optional[Finding]:
         retry_hint="Actually run the command/tool, or drop the claim that you did it.")
 
 
-GATE = StopCheck(
-    id="gate.fabricated_action",
-    fn=fabricated_action_gate,
-    run=lambda c: fabricated_action_gate(c.text, history=c.history),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: fabricated_action_gate(c.text, history=c.history))

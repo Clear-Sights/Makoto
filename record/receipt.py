@@ -5,9 +5,9 @@ re-deriving it" and nothing emitted it. This closes that gap.
 FABLE DECISION 2026-07-07 (curated brief: claim kinds, shape, persistence):
   1. Only `verdict`/`certified-fact`/`testrun` chain rows count as CLAIMS -- kinds that assert
      something about the world (the ancestor canon/mint.py's "spendable if backed by a real
-     deed" test). `audit`/`touched`/`release.operator` (D8a rename of `ack-block`)/`fetch`/
-     `exemption` are records of deeds and machinery, not claims, and folding them in would blur
-     exactly the distinction the receipt exists to expose.
+     deed" test). `audit`/`touched`/`ack-block`/`fetch`/`exemption` are records of deeds and
+     machinery, not claims, and folding them in would blur exactly the distinction the receipt
+     exists to expose.
   2. One dict per call: {ts, session_id, chain_name, verified_through, claims, claim_count,
      trace_bound_count, exemption_count} -- a list of citations plus PARALLEL counts, never
      combined into one score (HOURGLASS: a measure you optimize for stops measuring). Every

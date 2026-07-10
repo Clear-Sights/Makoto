@@ -289,12 +289,6 @@ def append(row: dict, *, name: str = _DEFAULT_STREAM, root: Optional[Path] = Non
         prev_hash = existing[-1].get("row_hash", "") if existing else ""
         stored = dict(row)
         stored.setdefault("status", OPEN)
-        # CHAIN-FORMAT v1: every row names its producer. setdefault (not overwrite) so a
-        # different producer using this implementation by shape can stamp its own name; a row
-        # with NO src (all pre-v1 history) reads as makoto-legacy -- only Makoto ever wrote
-        # before the spec existed. See docs/CHAIN-FORMAT-v1.md (epistemic tiers: judgment kinds
-        # are Makoto-only; observation kinds are any-producer).
-        stored.setdefault("src", "makoto")
         stored["prev_hash"] = prev_hash
         stored.pop("row_hash", None)
         stored["row_hash"] = _row_hash(prev_hash, stored)

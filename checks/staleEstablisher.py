@@ -10,7 +10,7 @@ filesystem-blind design (an `os.path.exists` call). DETECTIVE tier: a fired verd
 ADVISORY, never a deny -- escalating this to a blocking tier is a product decision left to the
 caller, not made here.
 
-WIRING (deliberately NOT via `stopchecks.load_stopchecks`'s GATE discovery): every id that
+WIRING (deliberately NOT via `substrate._loader.load_stopchecks`'s GATE discovery): every id that
 mechanism discovers auto-BLOCKS by construction ("discovered<=>live<=>blocking -- no shadow
 tier", see `checks/_shared.py`) -- exactly the tier this check must never enter. Instead,
 `makoto/_dispatch.py`'s `run_stop_checks` calls `check(ctx.plan)` directly and appends its

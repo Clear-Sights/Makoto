@@ -112,6 +112,23 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 ts         TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
+        # plan_item_commitments -- a forward promise to a PLAN/TASK-LABELED item ("§9.3",
+        # "Task #19"), never a file path -- so it cannot reuse `commitments`' filesystem-touch
+        # discharge (_discharged reads touched_keys/fs_exists, meaningless for a label). Sourced
+        # and discharged PURELY TEXTUALLY (a later first-person completion/retraction statement
+        # naming the same label); un-windowed by session, same "a promise doesn't expire because
+        # an hour passed" rule `commitments` follows. See session/planItems.py.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS plan_item_commitments (
+                commitment_key  TEXT PRIMARY KEY,
+                session_id      TEXT,
+                label           TEXT,
+                description     TEXT,
+                status          TEXT NOT NULL DEFAULT 'open',
+                retract_param   TEXT,
+                ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            )
+        """)
         # config seed rows (single source of truth for citations path + mtime).
         # Seed the mtime to the "-1" ALWAYS-STALE sentinel — NOT the file's current mtime.
         # init_db only CREATES the (empty) canonical_citations table; the first

@@ -21,9 +21,9 @@ def test_pattern_dataclass_fields():
 
 def test_finding_dataclass_fields():
     """Finding has the spec's fields; source_event_id defaults to 0 (unstamped)."""
-    f = Finding(pattern_id="1.1", file="lab/foo.py", line=42,
+    f = Finding(pattern_id="content.verifier_predicate_weakened", file="lab/foo.py", line=42,
                 level="error", message="matched 'startswith(' at line 42")
-    assert f.pattern_id == "1.1"
+    assert f.pattern_id == "content.verifier_predicate_weakened"
     assert f.line == 42
     assert f.retry_hint == ""
     assert f.snippet == ""
@@ -32,7 +32,7 @@ def test_finding_dataclass_fields():
 
 def test_finding_carries_source_event_id():
     """source_event_id is a settable provenance field — the events.id a finding came from."""
-    f = Finding(pattern_id="1.1", file="lab/foo.py", line=42,
+    f = Finding(pattern_id="content.verifier_predicate_weakened", file="lab/foo.py", line=42,
                 level="error", message="x", source_event_id=99)
     assert f.source_event_id == 99
 
@@ -49,14 +49,14 @@ def test_load_prechecks_parses_toml(tmp_path):
     toml_path = tmp_path / "patterns.toml"
     toml_path.write_text("""
 [[pattern]]
-id = "1.1"
+id = "content.verifier_predicate_weakened"
 fire_level = "error"
 description = "loosened verifier"
 keywords = ["startswith("]
 """, encoding="utf-8")
     patterns = load_prechecks(toml_path)
     assert len(patterns) == 1
-    assert patterns[0].id == "1.1"
+    assert patterns[0].id == "content.verifier_predicate_weakened"
     assert patterns[0].fire_level == "error"
 
 
@@ -89,8 +89,7 @@ some_future_field = "ignored"
 
 
 def test_load_prechecks_default_path_resolves_to_package_data():
-    """load_prechecks() with no arg resolves to the live checks/ catalog (SPEC-C item 2 Pre-tier
-    cutover -- the default path is loader-backed, not a direct patterns.toml parse anymore)."""
+    """load_prechecks() with no arg loads makoto/data/patterns.toml automatically."""
     patterns = load_prechecks()
     assert len(patterns) >= 8
     ids = {p.id for p in patterns}

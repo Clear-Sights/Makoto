@@ -14,10 +14,11 @@ verification is nominally ON but the allow-list whitelists the no-signature algo
 AST node (a literal list on the ``algorithms`` kwarg). 1.28's docstring explicitly declares this
 variant out of its scope and names 1.31 as the home for it.
 
-Reuses the proven ``lexicons.JWT_CALLEE_RX`` + ``lib.factories.callee_chain`` jwt/jose callee gate (so a
-non-jwt ``decode`` whose ``algorithms`` list contains ``"none"`` — e.g. a compression layer where
-``"none"`` means "no compression" — stays silent), and ``lib.factories.ast_introduced_predicate`` for the
-active-code AST gate (a comment/string MENTION never fires). A legitimate case (a test decoding a
+Reuses ``lib.factories.jwt_decode_callee_chain`` (the shared jwt/jose ``decode``-call gate, also used
+by 1.28 — extracted 2026-07-09 from what were two hand-duplicated copies) so a non-jwt ``decode``
+whose ``algorithms`` list contains ``"none"`` — e.g. a compression layer where ``"none"`` means "no
+compression" — stays silent, and ``lib.factories.ast_introduced_predicate`` for the active-code AST
+gate (a comment/string MENTION never fires). A legitimate case (a test decoding a
 deliberately-unsigned token) is annotated ``makoto-allow: <reason>`` and stays silent.
 
 ACKNOWLEDGED FN (v1): (a) a non-literal ``algorithms`` (``algorithms=algs`` / built dynamically) is
@@ -32,8 +33,7 @@ from __future__ import annotations
 import ast
 from typing import Optional
 
-from makoto.substrate.factories import ast_introduced_predicate, callee_chain
-from makoto.core.lexicons import JWT_CALLEE_RX
+from makoto.substrate.factories import ast_introduced_predicate, jwt_decode_callee_chain
 
 from makoto.core.lexicons import _PY_FILE_RX as _TARGET_RX
 
@@ -51,13 +51,7 @@ def _algorithms_whitelists_none(value) -> bool:
 
 
 def _jwt_none_node_match(node: ast.AST) -> Optional[str]:
-    if not isinstance(node, ast.Call):
-        return None
-    chain = callee_chain(node)
-    if not JWT_CALLEE_RX.search(chain):
-        return None
-    # only the `decode` entry point verifies a signature; encode/other calls are out of scope.
-    if chain.split(".")[-1] != "decode":
+    if jwt_decode_callee_chain(node) is None:
         return None
     for kw in node.keywords:
         if kw.arg == "algorithms" and _algorithms_whitelists_none(kw.value):

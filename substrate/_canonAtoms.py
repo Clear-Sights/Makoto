@@ -33,12 +33,11 @@ POSTURE (BLOCK vs ADVISE): see BLOCK_IDS below for the full citation trail.
 """
 from __future__ import annotations
 
-import json
 import re
 from typing import Dict, Iterable, List, Tuple
 
 from makoto.substrate.claims import whole_suite_pass_claim
-from makoto.substrate.io import bash_output_text, is_failing_testrun, is_test_runner
+from makoto.substrate.io import bash_output_text, decode_history_row, is_failing_testrun, is_test_runner
 
 Call = dict  # {"name": tool_name, "input": tool_input dict, "result": tool_response dict}
 
@@ -50,18 +49,11 @@ _EDIT_TOOLS = ("Write", "Edit", "MultiEdit")  # makoto/ledger.py's own edit-tool
 # actions, and a real PostToolUse payload already carries both tool_input AND tool_response for
 # the same call -- so no Pre/Post pairing or dangling-Pre synthesis is needed here.
 def _decode_row(row):
-    if isinstance(row, (tuple, list)) and len(row) > 4:
-        raw = row[4]
-    elif hasattr(row, "get"):
-        raw = row.get("payload")
-    else:
-        raw = None
-    if not raw:
-        return None
-    try:
-        ev = raw if isinstance(raw, dict) else json.loads(raw)
-    except Exception:
-        return None
+    # Row-decode step shared via substrate.io.decode_history_row (2026-07-09 dedup: this function
+    # and checks.writeThrashRevert._prior_whole_file_writes each re-derived the same tuple/dict-
+    # payload sniff + json.loads by hand -- found duplicated by jscpd). Only this function's own
+    # hook_event_name filter + Call-dict shaping stays local.
+    ev = decode_history_row(row)
     if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
         return None
     name = ev.get("tool_name", "") or ""

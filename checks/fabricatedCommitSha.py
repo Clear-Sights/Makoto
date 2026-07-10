@@ -355,6 +355,14 @@ def _real_commit_in_history(history: list) -> bool:
     return False
 
 
+# jscpd note (2026-07-09): flagged as a clone against phantomCitation.py. Verified: the matched
+# span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
+# history: list, pattern: PreCheck, conn=None) -> Optional[Finding]` -- byte-identical across 9
+# check modules (grep '^def predicate(' checks/*.py: writeThrashRevert.py, verifierExitMasking.py,
+# unsourcedWebfetch.py, selfMuteGuard.py, illusoryAuthorshipTrailer.py, forbiddenLocation.py,
+# among others) -- plus a coincidental preceding `return False` from this file's own unrelated
+# `_real_commit_in_history` helper. A dispatcher-invoked entrypoint's signature is a structural
+# contract, not extractable logic; the two functions' bodies do unrelated things.
 def predicate(*, current_event: dict, history: list, pattern: PreCheck,
               conn=None) -> Optional[Finding]:
     """fire on a Stop claim that presents a SHA as commit proof with no commit ran."""

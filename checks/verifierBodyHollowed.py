@@ -28,6 +28,12 @@ Prior art (static analysis): the swallow arm mirrors bandit B110 (try_except_pas
 CodeQL py/empty-except; no mainstream rule targets ``assert True``-as-sole-check, the gap the
 assert arm fills. Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against certVerifyDisabled.py. Verified: the matched
+# span is only this docstring's closing prose + the "Knight-Leveson" line + the standard
+# `from __future__ import annotations` / `import ast` / `import re` / `from typing import Optional`
+# header both modules need -- it ends before any function body, so no logic is shared (this
+# module's hollow-body/swallowed-except analysis is unrelated to certVerifyDisabled's TLS callee
+# gate). See tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import ast
 import re

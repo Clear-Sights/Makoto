@@ -86,7 +86,7 @@ def test_sourcing_is_neither_source_all_nor_source_none():
 # --- _is_file_shaped: a commitment location is a real FILE token, not a code identifier --------
 # Regression (live advance-gate FP, 2026-06-02): _is_file_shaped accepted ANY dotted token, so a
 # class attribute ('Finding.source_event_id'), a method ref ('obj.method'), a class ('Module.Class'),
-# a version ('v1.2'), or a pattern id ('1.4') were mis-read as filenames and sourced as phantom
+# a version ('v1.2'), or a pattern id ('content.integrity_suppression_flag') were mis-read as filenames and sourced as phantom
 # commitments the advance gate then false-fired on. A dotted token is a file ONLY if its last
 # segment is a plausible (lowercase, non-numeric) file extension; a slash-command ('/loop') is a
 # command token, not a path. FN-critical: every real file token must STILL be file-shaped.
@@ -94,7 +94,7 @@ _FILE_SHAPED = ["README.md", "src/auth.py", "config.json", "a/b/c.py", "my.confi
                 "style.scss", "component.jsx", "LICENSE", "Makefile", "pyproject.toml",
                 "data.yaml", "x.h", "notes.txt"]
 _NOT_FILE_SHAPED = ["Finding.source_event_id", "obj.method", "Module.Class", "schema.load_prechecks",
-                    "v1.2", "1.4", "1.33", "/loop", "/makoto:status", "main", "detect_location"]
+                    "v1.2", "content.integrity_suppression_flag", "content.cert_reqs_none", "/loop", "/makoto:status", "main", "detect_location"]
 
 
 def test_is_file_shaped_accepts_real_files_rejects_code_identifiers():

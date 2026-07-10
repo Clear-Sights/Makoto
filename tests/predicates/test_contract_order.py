@@ -92,7 +92,7 @@ def test_predicate_clean_for_a_non_locating_tool():
 def test_stop_gate_fires_on_open_remainder():
     plan = Plan()
     plan.add_node("Write", "auth.py", "/repo/auth.py", id="n1")
-    finding = contractOrder.GATE.run(_FakeCtx(plan))
+    finding = contractOrder.EXTRA_CHECKS[0].run(_FakeCtx(plan))
     assert finding is not None
     assert finding.pattern_id == "gate.contract_order"
     assert finding.level == "error"
@@ -102,11 +102,11 @@ def test_stop_gate_clean_when_plan_fully_done():
     plan = Plan()
     plan.add_node("Write", "auth.py", "/repo/auth.py", id="n1")
     plan.mark_done("n1")
-    assert contractOrder.GATE.run(_FakeCtx(plan)) is None
+    assert contractOrder.EXTRA_CHECKS[0].run(_FakeCtx(plan)) is None
 
 
 def test_stop_gate_clean_when_no_plan_declared():
-    assert contractOrder.GATE.run(_FakeCtx(None)) is None
+    assert contractOrder.EXTRA_CHECKS[0].run(_FakeCtx(None)) is None
 
 
 class _FakeCtx:

@@ -11,7 +11,6 @@ imports beyond stdlib `ast`.
 from __future__ import annotations
 import ast
 
-from makoto.substrate._shared import StopCheck
 from makoto.substrate._stdlib_ast_helpers import iter_touched_python_sources
 from makoto.core.schema import Finding
 
@@ -407,15 +406,16 @@ def analyze_file(src: str, path: str) -> list:
 # =============================================================================================
 # Stop-hook adapter (formerly stopchecks/stopcheck_liveness.py)
 # =============================================================================================
-# _scratch_roots/_is_scratch/_read/iter_touched_python_sources (imported at module top from
-# _stdlib_ast_helpers) are shared verbatim with hollowTest.py (2026-07-09: found alpha-equivalent
-# by AST canonicalization; extracted rather than left duplicated -- the stdlib-only helper module
-# preserves the same import-graph-isolation property both detectors need, enforced by
-# tests/test_detector_engines_are_stdlib_isolated.py).
+# The iteration scaffold (iter_touched_python_sources, imported from _stdlib_ast_helpers) is shared with
+# hollowTest.py (2026-07-09: found alpha-equivalent by AST canonicalization; extracted rather than
+# left duplicated -- the stdlib-only helper module preserves the same import-graph-isolation
+# property both detectors need, enforced by tests/test_detector_engines_are_stdlib_isolated.py).
 
 
 def _run(ctx) -> list:
     out = []
+    # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
+    # hollowTest._run via the stdlib-isolated helper home -- 2026-07-09 dedup round 2
     for p, src in iter_touched_python_sources(ctx):
         for f in analyze_file(src, str(p)):
             out.append(Finding(
@@ -435,8 +435,5 @@ def _run(ctx) -> list:
 # test_dispatch_liveness_gate_blocks), not by falsify's single-fn mutation harness — see
 # scripts/falsify._BEHAVIORAL_TEETH. `run` returns list[Finding] (a closed unit can have many
 # illusory statements); run_stop_checks normalizes a list exactly like a single finding.
-GATE = StopCheck(id="gate.liveness", fn=analyze_file, run=_run)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=_run)

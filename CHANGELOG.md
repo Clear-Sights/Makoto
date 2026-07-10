@@ -6,6 +6,28 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [Unreleased]
 
 ### Changed
+- **Stop-gate discovery unified for real; `GATE`/`StopCheck`/`load_stopchecks()` retired.**
+  Every gate is now a plain `CHECK` (or `EXTRA_CHECKS` entry for contractOrder's dual
+  Pre+Stop surface) discovered by `load_checks(edge="Stop")`, with the new structural
+  `Check.may_block` field replacing GATE-export-presence as the blocking-eligibility
+  signal -- two independent signals (may_block AND the Finding's own level), preserving
+  the never-blocks guarantee for staleEstablisher/undeclaredFalsifiable by construction.
+- **Repo now produced by an explicit allowlist sync from makoto-dev**
+  (tools/restructure_public.py step_sync_from_dev in dev): every shipped file is named on
+  the manifest and copied verbatim; dev-only features are stripped by asserted patches.
+  Replaces the ignore-list/hand-patch mechanism whose July-8 "sync" silently diverged
+  the repos in both directions.
+
+### Removed (bedrock audit, 2026-07-10)
+- `data/purpose.toml` (orphaned: claimed coverage-gating by files that do not exist),
+  `docs/THREAT-MODEL.md` (zero references), the zero-caller `__init__.py` re-exports,
+  `_dispatch._build_decision` and `session/commitments.retire_unsourceable_commitments`
+  (production functions kept alive only by their own tests).
+- Test-only tooling re-homed to `tests/`: `_fpHarness.py` (the `_hollowTestFpHarness.py`
+  twin folded into it), `tools/rebuild_index.py`; `_testDelta.py` moved under
+  `substrate/` (dispatch plumbing, not a root entry point). `data/` and `tools/`
+  directories are gone.
+
 - **`stopchecks/` compat shim removed entirely.** `load_stopchecks()` relocated to its real,
   permanent home in `substrate/_loader.py` (alongside `load_checks`); its 11 callers
   (`_dispatch.py` + 10 test files) now import `GateContext`/`StopCheck`/`load_stopchecks` from

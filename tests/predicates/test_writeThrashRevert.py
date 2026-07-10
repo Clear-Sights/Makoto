@@ -1,4 +1,4 @@
-"""CANON-PORT-1 falsifier for event.thrash_revert: an A->B->A whole-file Write self-revert fires;
+"""CANON-PORT-1 falsifier for write.thrash_revert: an A->B->A whole-file Write self-revert fires;
 A->B->C progress and a bare A->A repeat stay silent; a current Edit/MultiEdit fragment is never
 judged (the canon.oscillate 7-FP lesson); whitespace-only differences are the same content."""
 import json

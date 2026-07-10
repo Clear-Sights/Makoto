@@ -20,10 +20,10 @@ engine. The ONLY content read is through ByteIdentity (==/len/hash only), so thi
 content MEANING — only content IDENTITY. Stdlib only; imports only makoto.core.schema + makoto.substrate."""
 from __future__ import annotations
 
-import json
 from typing import Optional
 
 from makoto.substrate.byte_identity import ByteIdentity
+from makoto.substrate.io import decode_history_row
 from makoto.core.schema import Finding, PreCheck
 
 
@@ -32,21 +32,14 @@ def _prior_whole_file_writes(history, path: str) -> list:
     ONLY tool_name=='Write' rows carrying a `content` key are counted — Edit/MultiEdit/NotebookEdit
     fragments are deliberately excluded (the canon.oscillate 7-FP lesson). Rows are either the
     (id, ts, event_type, cwd, raw_payload_json) tuples _select_recent returns OR dicts with a
-    'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped."""
+    'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped.
+
+    Row-decode step shared via substrate.io.decode_history_row (2026-07-09 dedup: this function and
+    substrate._canonAtoms._decode_row each re-derived the same tuple/dict-payload sniff + json.loads
+    by hand -- found duplicated by jscpd). Only this function's own Write/content filter stays local."""
     out: list = []
     for row in history or ():
-        if isinstance(row, (tuple, list)) and len(row) > 4:
-            raw = row[4]
-        elif hasattr(row, "get"):
-            raw = row.get("payload")
-        else:
-            raw = None
-        if not raw:
-            continue
-        try:
-            ev = raw if isinstance(raw, dict) else json.loads(raw)
-        except Exception:
-            continue
+        ev = decode_history_row(row)
         if not isinstance(ev, dict) or ev.get("tool_name") != "Write":
             continue
         inp = ev.get("tool_input") or {}

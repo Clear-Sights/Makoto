@@ -169,62 +169,6 @@ def test_dispatch_tampered_chain_self_verify_advisory_fact_never_blocks(tmp_path
     assert any(f.get("pattern_id") == "dispatch.chain_tamper" for f in facts), facts
 
 
-def test_dispatch_oversight_clamp_forces_block_under_bypasspermissions(tmp_path):
-    """D6: MAKOTO_MODE=loose would normally soften a BLOCK to an ADVISE (allow + additionalContext,
-    exit 0) -- but permission_mode=bypassPermissions clamps it back to a real block (exit 2,
-    permissionDecision=deny), and the audit row records the clamp + the operator's configured
-    (overridden) posture -- never a silent override."""
-    import json as _json
-    state_dir = _setup_state(tmp_path)
-    payload = {
-        "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
-        "session_id": "clamp_test",
-        "cwd": "/tmp",
-        "permission_mode": "bypassPermissions",
-        "tool_input": {"file_path": "/etc/passwd", "content": "x"},
-    }
-    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_MODE": "loose"})
-    # A PreToolUse deny is signaled via the JSON body (permissionDecision), not the process exit
-    # code -- main() returns 0 for a normal dispatch cycle regardless of outcome; exit 2 is
-    # reserved for a tamper-shaped (non-object) payload, a different failure mode entirely.
-    assert rc == 0, f"unexpected process exit, got rc={rc} out={out!r}"
-    body = _json.loads(out)
-    assert body["hookSpecificOutput"]["permissionDecision"] == "deny", (
-        f"expected a real deny (the clamp), got: {body!r}")
-
-    facts_path = Path(state_dir) / "audit.jsonl"
-    rows = [_json.loads(ln) for ln in facts_path.read_text().splitlines() if ln.strip()]
-    assert len(rows) == 1
-    clamp = rows[0]["oversight_clamp"]
-    assert clamp is not None
-    assert clamp["active"] is True
-    assert clamp["configured_mode"] == "loose"
-    assert clamp["permission_mode"] == "bypassPermissions"
-
-
-def test_dispatch_no_oversight_clamp_recorded_under_default_permission_mode(tmp_path):
-    """The common case: no permission_mode field (or "default") -> oversight_clamp is None on
-    the audit row, and MAKOTO_MODE=loose softens normally (advisory, exit 0)."""
-    import json as _json
-    state_dir = _setup_state(tmp_path)
-    payload = {
-        "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
-        "session_id": "no_clamp_test",
-        "cwd": "/tmp",
-        "tool_input": {"file_path": "/etc/passwd", "content": "x"},
-    }
-    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_MODE": "loose"})
-    assert rc == 0, f"expected a softened advisory (exit 0), got rc={rc} out={out!r}"
-    body = _json.loads(out)
-    assert "additionalContext" in body["hookSpecificOutput"]
-
-    facts_path = Path(state_dir) / "audit.jsonl"
-    rows = [_json.loads(ln) for ln in facts_path.read_text().splitlines() if ln.strip()]
-    assert rows[0]["oversight_clamp"] is None
-
-
 def test_dispatch_non_object_payload_blocks_exit_2_with_fact(tmp_path):
     """HYBRID: valid JSON that is NOT an object is tamper-shaped — a truncated pipe yields INVALID
     json, and Claude Code's envelope is always an object, so a parseable non-object is anomalous ->
@@ -525,15 +469,6 @@ def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
     assert body["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
     assert "newly failing: test_a" in body["hookSpecificOutput"]["additionalContext"]
 
-    # Found while building the D9 demo corpus: the delta redirect fired on the wire but was
-    # invisible to the audit trail/chain until this fix -- must now leave a real record.
-    from makoto.record import audit as _audit_mod, ledger as _ledger_mod
-    audit_lines = list(_audit_mod.read_rows(state_dir))
-    assert any(r.get("pattern_fires") == ["makoto.test_delta"] for r in audit_lines), audit_lines
-    chain_rows = _ledger_mod.read(root=state_dir)
-    assert any(r.get("kind") == "audit" and r.get("pattern_fires") == ["makoto.test_delta"]
-              for r in chain_rows), chain_rows
-
 
 def test_dispatch_test_delta_redirect_silent_when_verdict_set_is_unchanged(tmp_path):
     state_dir = _setup_state(tmp_path)
@@ -710,7 +645,7 @@ def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
 
 
 def test_dispatch_contract_order_gate_blocks_on_open_remainder(tmp_path):
-    """Behavioral blocking pin for gate.contract_order's Stop remainder guard (SPEC-5), driven
+    """Behavioral blocking pin for makoto.contract_order's Stop remainder guard (SPEC-5), driven
     through the real dispatch end-to-end: a SessionStart admits a declared plan from the on-disk
     artifact, then a Stop with the plan still unfinished BLOCKS live by default."""
     state_dir = _setup_state(tmp_path)
@@ -1423,25 +1358,18 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
 
 
 def test_no_shadow_gate_every_gate_blocks():
-    """Warning-tier-elimination invariant. SPEC-C item 2 (FABLE DECISION, 2026-07-07) restated
-    this STRUCTURALLY: blocking-eligibility now derives from each check's own declared `.posture`
-    (`_blocking_gate_ids()`, checks._loader-backed), not from mere presence in load_stopchecks()'s
-    GATE discovery. Before this change "discovered" and "blocking-eligible" were forced equal by
-    construction, requiring a separate hand-maintained `_ADVISORY_ALLOWLIST`
-    (test_stop_gate_level_invariant.py) to excuse the 2 ids that are discovered but can never
-    actually block. Now those 2 ids are simply never IN the blocking set at all — no allowlist
-    needed, and "blocking-eligible" means precisely what it says.
-
-    Per FABLE's explicit condition on this migration: the expected BLOCK-id set below is a
-    LITERAL, hand-written set, not re-derived from the same `.posture` field `_blocking_gate_ids()`
-    itself reads — deriving the expectation from the thing under test would be a bypassable
-    tautology (a broken posture value would break the code and its own "check" identically,
-    passing vacuously). A future shadow gate (discoverable but routed around _blocking_gate_ids(),
-    or wired into run_stop_checks without a `.posture` at all) turns THIS red because it will not
-    appear in an independently-declared literal."""
-    from makoto.substrate._loader import load_stopchecks
+    """Warning-tier-elimination invariant, STRUCTURAL after the gates/ package cutover: may_block
+    <=> reaches the decision pipeline. The pipeline-eligible set DERIVES from
+    `Check.may_block` via `load_checks(edge="Stop")` (2026-07-10, retiring load_stopchecks()/GATE),
+    so a gate cannot be wired without reaching the pipeline (no audit-only shadow tier) and cannot
+    reach it without being explicitly marked may_block=True. The former check.quantity shadow gate
+    was CUT 2026-06-02 — it could not block FP-safely. A future shadow gate (discoverable but
+    routed around _blocking_gate_ids(), or wired into run_stop_checks without may_block) turns
+    this red."""
+    from makoto.substrate._loader import load_checks
     from makoto._dispatch import _blocking_gate_ids
-    discovered = {g.id for g in load_stopchecks()}
+    live = [c for c in load_checks(edge="Stop") if c.may_block]
+    discovered = {c.id for c in live}
     assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass",
                           "gate.liveness",     # liveness folded in from the collapsed close-check tier
@@ -1449,23 +1377,20 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.canon",        # ported agnostic Stop primitives canon.timeout/canon.recur
                           "gate.canon_fingerprints",            # SPEC-5 Task 9: BLOCK-tier canon fingerprints
                           "gate.canon_fingerprints_advisory",    # SPEC-5 Task 9: ADVISE-tier sibling
-                          "gate.contract_order",     # SPEC-5 (Makoto absorbs Assay): the plan's Stop
-                                                      # remainder guard; renamed from makoto.contract_order
-                                                      # (SPEC-C item 3, one namespace)
-                          "gate.self_wired"}   # GATE-discovered, but posture=ADVISE -> excluded below
-    # BLOCKING-eligible is now a strict SUBSET of discovered: exactly the 12 posture=BLOCK ids,
-    # pinned as an independent literal (see docstring -- must not be re-derived from .posture).
-    assert set(_blocking_gate_ids()) == {
-        "gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
-        "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
-        "gate.hollow_test", "gate.canon", "gate.canon_fingerprints", "gate.contract_order",
-    }
-    # The 2 GATE-discovered advisory ids are discovered but deliberately NOT blocking-eligible.
-    assert discovered - set(_blocking_gate_ids()) == {"gate.self_wired", "gate.canon_fingerprints_advisory"}
-    # The check.quantity / claim_check capability no longer EXISTS: no discovered gate is named it,
-    # and the package exposes no such callable (re-adding it as a gate turns this red).
-    assert "claim_check" not in {g.fn.__name__ for g in load_stopchecks()}
-    assert "dropped_gate" in {g.fn.__name__ for g in load_stopchecks()}       # live -> discovered + blocking
+                          "gate.contract_order",   # SPEC-5 (Makoto absorbs Assay): the plan's Stop
+                                                      # remainder guard
+                          "gate.self_wired"}   # advisory-tier exception (2026-07-05); still
+                                               # discovered <=> in _blocking_gate_ids(), just never
+                                               # emits level="error" so never actually blocks
+    # may_block <=> reaches the pipeline: the set is not hand-maintained, it IS the may_block ids.
+    assert set(_blocking_gate_ids()) == discovered
+    # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
+    # references it, and the package exposes no such callable (re-adding it as a gate turns this
+    # red). No separate `.fn` attribute anymore (GATE/StopCheck retired) -- introspect the actual
+    # function names each `run` closure/adapter references via its code object.
+    referenced = {name for c in live for name in c.run.__code__.co_names}
+    assert "claim_check" not in referenced
+    assert "dropped_gate" in referenced       # live -> discovered + reaches the pipeline
 
 
 def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():

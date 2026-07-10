@@ -11,9 +11,8 @@ subagent", surfaced here as the derived `GateContext.is_subagent` convenience.
 import sqlite3
 
 import makoto._dispatch as _dispatch
-import makoto.substrate._loader as _loader
 from makoto.substrate._loader import Check
-from makoto.substrate._shared import GateContext, StopCheck
+from makoto.substrate._shared import GateContext
 
 
 def _setup_state(tmp_path):
@@ -48,21 +47,18 @@ def test_gate_context_carries_permission_agent_fields_when_set():
 
 
 # ---- end-to-end: run_stop_checks decodes the raw payload onto the built GateContext ------------
-def _spy_check(sink: list):
-    # SPEC-C item 2: run_stop_checks now sources its Stop-tier catalog from
-    # checks._loader.load_checks(edge="Stop") (posture-driven, not load_stopchecks() presence),
-    # so the spy must be injected via that same call site to still observe the built GateContext.
+def _spy_stopcheck(sink: list):
     def _run(ctx):
         sink.append(ctx)
         return None
-    return Check(id="test.spy", applies_at="Stop", posture="ADVISE", run=_run)
+    return Check(id="test.spy", applies_at="Stop", posture="BLOCK", run=_run)
 
 
 def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(tmp_path, monkeypatch):
     state_dir = _setup_state(tmp_path)
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
-    monkeypatch.setattr(_loader, "load_checks", lambda edge=None, package_dir=None: [_spy_check(captured)])
+    monkeypatch.setattr(_dispatch, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
     payload = {
         "hook_event_name": "Stop", "session_id": "s1", "cwd": str(tmp_path),
         "last_assistant_message": "done.",
@@ -82,7 +78,7 @@ def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(tmp_path, mo
     state_dir = _setup_state(tmp_path)
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
-    monkeypatch.setattr(_loader, "load_checks", lambda edge=None, package_dir=None: [_spy_check(captured)])
+    monkeypatch.setattr(_dispatch, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
     payload = {
         "hook_event_name": "Stop", "session_id": "s2", "cwd": str(tmp_path),
         "last_assistant_message": "done.",

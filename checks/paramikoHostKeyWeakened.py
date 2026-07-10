@@ -30,6 +30,13 @@ binding harm and is structurally excluded.
 
 Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against certNoneMode.py. Verified: the matched span
+# is only this docstring's closing "Knight-Leveson" line + the standard house-style import header
+# (`from __future__ import annotations` / `import ast` / `from typing import Optional` /
+# `from makoto.substrate.factories import ast_introduced_predicate, <fn>`) shared by every
+# ast_introduced_predicate-style check module -- it ends before any function body. Import syntax
+# and a repeated doc-convention sentence are not extractable into a helper; see
+# tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import ast
 from typing import Optional

@@ -16,6 +16,13 @@ Exempt an on-the-record legitimate instance with `makoto-allow: <reason>` in the
 content (e.g. a test fixture or this policy's own documentation).
 Knight-Leveson: stdlib re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against verifierExitMasking.py. Verified: the matched
+# span is only this docstring's closing "Knight-Leveson" line + the standard
+# `from __future__ import annotations` / `import re` / `from typing import Optional` /
+# `from makoto.core.schema import Finding, PreCheck` header both Pre-hook predicate modules need --
+# it ends before any function body, so no logic is shared (this module's Claude-authorship-trailer
+# regex is unrelated to verifierExitMasking's runner/exit-mask detection). See
+# tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from typing import Optional

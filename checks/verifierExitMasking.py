@@ -20,6 +20,13 @@ runner, FP-safe). The bare `<tool> test/check` fallback (unknown tool, no launch
 
 Knight-Leveson: stdlib re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against illusoryAuthorshipTrailer.py. Verified: the
+# matched span is only this docstring's closing "Knight-Leveson" line + the standard
+# `from __future__ import annotations` / `import re` / `from typing import Optional` /
+# `from makoto.core.schema import Finding, PreCheck` header both Pre-hook predicate modules need --
+# it ends before any function body, so no logic is shared (this module's runner/exit-mask
+# detection is unrelated to illusoryAuthorshipTrailer's Claude-authorship-trailer regex). See
+# tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from typing import Optional

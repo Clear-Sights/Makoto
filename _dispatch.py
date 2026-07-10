@@ -34,6 +34,7 @@ from makoto.record import audit
 from makoto.verdict import posture, wire
 from makoto.record.audit import AuditRow
 from makoto.substrate import factories
+from makoto.substrate._loader import load_checks
 from makoto.substrate._shared import GateContext
 
 
@@ -288,26 +289,25 @@ def _gates_enabled() -> bool:
 
 @lru_cache(maxsize=1)
 def _blocking_gate_ids() -> frozenset:
-    """The Stop-gate finding ids that BLOCK when gates are enabled. SPEC-C item 2 (FABLE DECISION,
-    2026-07-07): DERIVED from each check's own declared `.posture` via `checks._loader.load_checks
-    (edge="Stop")`, not from mere presence in `load_stopchecks()`'s GATE discovery. Before this
-    change, "blocking-eligible" meant "discovered" and a SEPARATE, hand-maintained
-    `_ADVISORY_ALLOWLIST` (test_stop_gate_level_invariant.py) excused the 2 ids that are discovered
-    but must never actually block (gate.self_wired, gate.canon_fingerprints_advisory) — a
-    presence-based membership test that says "eligible" for two ids that structurally can't be.
-    Deriving from `.posture == BLOCK` instead makes "blocking-eligible" mean precisely what it
-    says: the word gets MORE checkable, not less (the falsifiability-preservation invariant this
-    project is built on). Same "no shadow tier" property, restated structurally: every check whose
-    posture says BLOCK is in this set, every check whose posture says otherwise is not — no
-    allowlist needed. Case-insensitive compare: check modules author their CHECK's posture value
-    two ways today (a literal "BLOCK" string in most files, or the actual `makoto.verdict.posture.BLOCK`
-    lowercase constant in a few) — both mean the same outcome tier, so this reads either.
+    """The Stop-gate finding ids eligible to reach `_emit_decision` at all (BLOCK or surfaced
+    ADVISE) when gates are enabled -- misnamed by history (kept for callers/tests already using
+    it), but NOT a hand-synced literal: DERIVED from `Check.may_block` via
+    `checks._loader.load_checks(edge="Stop")` (2026-07-10, retiring the former
+    `load_stopchecks()`/`GATE`-export mechanism). `may_block=True` marks exactly the checks that
+    used to export a `GATE` -- every one of them reaches this pipeline regardless of its own
+    `.level`/posture (the actual BLOCK-vs-ADVISE split happens inside `_emit_decision`/
+    `_worst_finding`, keyed on each Finding's own `.level`, unchanged by this migration).
+    `staleEstablisher`/`undeclaredFalsifiable` stay `may_block=False` ON PURPOSE: their
+    pattern_id must never enter this set at all, a STRUCTURAL exclusion independent of whatever
+    `.level` their own `run()` might ever compute -- the former GATE-export-presence mechanism
+    provided the exact same guarantee; this preserves it under the unified loader rather than
+    collapsing to a single posture-only signal.
 
-    Lazy + memoized: Stop dispatches load the same modules via run_stop_checks anyway, so
-    laziness changes no Stop behavior."""
-    from makoto.substrate._loader import load_checks
-    return frozenset(c.id for c in load_checks(edge="Stop")
-                      if str(c.posture).strip().lower() == posture.BLOCK)
+    Lazy + memoized: the loader imports every checks/*.py module, and Pre/PostToolUse dispatches
+    (the per-event hot path) never consult this set — as a module-level constant they paid that
+    import cost on every event. Stop dispatches load the same modules via run_stop_checks
+    anyway, so laziness changes no Stop behavior."""
+    return frozenset(c.id for c in load_checks(edge="Stop") if c.may_block)
 
 
 def _run_predicates(conn, payload: dict, history: list, event_id: int,
@@ -434,19 +434,18 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             return None
 
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
-        # edge (SPEC-C item 2: unified via checks._loader.load_checks, superseding the old
-        # load_stopchecks()-only loop -- this ALSO now naturally includes makoto.stale_establisher
-        # and gate.undeclared_falsifiable, formerly special-cased direct-call carve-outs below this
-        # comment, because neither exports a GATE and load_stopchecks() never discovered them.
-        # Sorted by id for a stable, deterministic evaluation order (load_stopchecks() sorted the
-        # same way; preserved here as a behavior-neutral property of the migration, not a new one).
-        # Each check module owns its own adapter (GateContext -> the gate's heterogeneous
-        # signature), so this loop never names a gate. gate.dropped resolves against the agent's
-        # OWN ledger (touched_keys) + cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an
-        # unbounded os.walk (a Stop-hot-path landmine). meaning_gate / hidden_retraction were CUT
-        # (io-purge B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history
-        # is the recovery path.
-        from makoto.substrate._loader import load_checks
+        # edge (2026-07-10: unified via checks._loader.load_checks, retiring the former
+        # load_stopchecks()-only loop -- this ALSO now naturally includes staleEstablisher and
+        # undeclaredFalsifiable, formerly special-cased direct-call/never-invoked carve-outs below
+        # this comment, since neither exported a GATE and load_stopchecks() never discovered them;
+        # `may_block=False` on both keeps their pattern_id structurally out of
+        # `_blocking_gate_ids()` regardless of this unification, exactly as before). Each gate
+        # module owns its own adapter (GateContext -> the gate's heterogeneous signature), so this
+        # loop never names a gate. gate.dropped resolves against the agent's OWN ledger
+        # (touched_keys) + cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an unbounded
+        # os.walk (a Stop-hot-path landmine). meaning_gate / hidden_retraction were CUT (io-purge
+        # B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history is the
+        # recovery path.
         ctx = GateContext(
             text=text, touched=touched, empty=empty, opens=opens,
             testrun_output=_ledger.latest_testrun(conn, sid),
@@ -458,7 +457,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             permission_mode=payload.get("permission_mode"),
             agent_id=payload.get("agent_id"),
             agent_type=payload.get("agent_type"),
-            plan=plan,   # SPEC-5: read by contractOrder's Stop GATE + staleEstablisher's CHECK.run
+            plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # Task 2 slice 5: canonFingerprints.py's ack-block discharge
         )
@@ -468,7 +467,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
                 finding = check.run(ctx)
             except Exception:
                 continue   # fail-open PER CHECK: one check's fault must not suppress the others
-            # Check.run -> Optional[Finding] | list[Finding]: most gates yield one finding, but
+            # CHECK.run -> Optional[Finding] | list[Finding]: most gates yield one finding, but
             # gate.liveness yields a list (a closed unit can have many illusory statements).
             # Normalize: a list/tuple is extended, a single finding appended, None ignored.
             if finding is None:
@@ -506,27 +505,6 @@ def _jit_hint(finding: Finding) -> str:
         parts.append(_HATCH_LINE)
     parts.append(f"Conventions: {_CONVENTIONS_PATH}")
     return "\n".join(parts)
-
-
-def _build_decision(findings: list[Finding]) -> Optional[dict]:
-    """emit block decision iff any error-level finding exists (v5 fix #25).
-
-    SPEC-5 Task 8: main()'s live emission no longer calls this — it folds findings through
-    posture.py/wire.py instead (see `_emit_decision`) so ADVISE/ASK-postured findings can reach
-    the wire too, not just error-level ones. This function is kept exactly as it was (same
-    ad-hoc shape: reason/retry_hint/additional_findings) because tests/test_conventions_jit.py
-    unit-tests it directly as the JIT-hint-composition primitive (which convention text a check
-    contributes, and whether it offers the makoto-allow hatch) independent of the wire shape.
-    """
-    errors = [f for f in findings if f.level == "error"]
-    if not errors:
-        return None
-    return {
-        "decision": "block",
-        "reason": errors[0].message,
-        "retry_hint": _jit_hint(errors[0]),
-        "additional_findings": [asdict(f) for f in errors[1:]],
-    }
 
 
 _OUTCOME_FOR_LEVEL = {"error": posture.BLOCK, "advisory": posture.ADVISE}
@@ -680,7 +658,7 @@ def main() -> int:
             try:
                 from makoto.record import ledger as _ledger
                 from makoto.substrate.io import bash_output_text, is_test_runner
-                from makoto._testDelta import compute_delta
+                from makoto.substrate._testDelta import compute_delta
                 sid = payload.get("session_id", "")
                 delta_finding = None
                 # Task 3, the domain correction (test-delta redirect): compute the delta vs the
@@ -728,7 +706,7 @@ def main() -> int:
         # real-session FP can still be mined.
         gate_findings = []
         if hook_event in ("Stop", "SubagentStop"):
-            # StopCheck findings get the same central provenance stamp: the Stop/SubagentStop
+            # Stop-edge CHECK findings get the same central provenance stamp: the Stop/SubagentStop
             # event they were evaluated against.
             gate_findings = [replace(f, source_event_id=event_id)
                              for f in run_stop_checks(conn, payload, history, root=state_dir)]

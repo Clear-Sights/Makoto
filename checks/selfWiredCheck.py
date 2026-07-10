@@ -2,7 +2,6 @@ from __future__ import annotations
 import json
 from typing import Optional
 from makoto.core.schema import Finding
-from makoto.substrate._shared import StopCheck
 # The 2026-07-09 dedup pass performed exactly the hoist this module's old note asked for: the
 # wiring predicate now lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowlisted in tests/test_gate_shape.py's ALLOWED_IMPORT_ROOTS), shared with install.py
@@ -81,20 +80,14 @@ def self_wired_gate(fs_read) -> Optional[Finding]:
     )
 
 
-GATE = StopCheck(
-    id="gate.self_wired",
-    fn=self_wired_gate,
-    run=lambda c: self_wired_gate(c.fs_read),
-)
-
-
 # NOTE (owner-revised deviation, logged): this CHECK's posture is "ADVISE", not "BLOCK" like every
-# sibling Stop gate migrated in this same ticket. gate.self_wired's own Finding.level is documented
-# and behaviorally pinned (tests/test_stop_gate_level_invariant.py) as ALWAYS "advisory", never
-# "error" (the one FABLE-DECISION-cited advisory exception among the Stop gates, FD6 2026-07-05) —
-# declaring it CHECK.posture="BLOCK" here would misrepresent that in the flat checks/ catalog's own
-# metadata. This CHECK object is purely additive discovery metadata (Task 9's load_checks(edge=
-# "Stop") seam) and does not change self_wired_gate's actual runtime behavior or its GATE/
-# load_stopchecks() wiring, which are byte-for-byte unchanged from before this migration.
+# sibling Stop gate. gate.self_wired's own Finding.level is documented and behaviorally pinned
+# (tests/test_stop_gate_level_invariant.py) as ALWAYS "advisory", never "error" (the one
+# FABLE-DECISION-cited advisory exception among the Stop gates, FD6 2026-07-05) -- declaring it
+# CHECK.posture="BLOCK" here would misrepresent that in the flat checks/ catalog's own metadata.
+# `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
+# were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
+# guarantee still rests on posture=="ADVISE", same as always.
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", run=GATE.run)
+CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", may_block=True,
+               run=lambda c: self_wired_gate(c.fs_read))

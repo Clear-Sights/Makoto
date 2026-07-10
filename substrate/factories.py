@@ -10,7 +10,7 @@ import re
 import textwrap
 from typing import Callable, Optional
 from makoto.core.schema import Finding, PreCheck
-from makoto.core.lexicons import _MAKOTO_ALLOW_RX, _MAKOTO_ALLOW_REASON_RX
+from makoto.core.lexicons import _MAKOTO_ALLOW_RX, _MAKOTO_ALLOW_REASON_RX, JWT_CALLEE_RX
 
 
 def makoto_allowed(content: str) -> bool:
@@ -61,6 +61,40 @@ def _record_exemption(current_event: dict, conn, *, pattern_id: str, file: str,
              file=file, line=line, reason=reason, snippet=snippet)
     except Exception:
         pass
+
+
+def _gated_content(*, current_event: dict, target_rx: re.Pattern,
+                    exempt_rx: Optional[re.Pattern]) -> Optional[tuple]:
+    """Shared gate scaffold of both content-scan factories below (found duplicated by jscpd,
+    2026-07-09): PreToolUse-only, `target_rx` gates `file_path`, `exempt_rx` gates content.
+    Returns `(fp, content)` to continue, or None to stay silent (mirrors each predicate's own
+    "no opinion" return)."""
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    ti = current_event.get("tool_input", {}) or {}
+    fp = ti.get("file_path", "")
+    if not target_rx.search(fp):
+        return None
+    content = scan_target_content(ti)
+    if exempt_rx is not None and exempt_rx.search(content):
+        return None  # documented code-level carve-out (e.g. an ADR backlink) -> silent
+    return fp, content
+
+
+def _exempt_or_finding(*, current_event: dict, conn, pattern: PreCheck, fp: str, line_no: int,
+                       snippet: str, content: str, message: str) -> Optional[Finding]:
+    """Shared tail of both content-scan factories below (found duplicated by jscpd, 2026-07-09,
+    lines 174-181/242-249 and 201-208/262-272 of the pre-extraction file): DETECT-THEN-EXEMPT --
+    record a suppressed match rather than silently drop it (R5b), else build the real Finding."""
+    if makoto_allowed(content):
+        _record_exemption(current_event, conn, pattern_id=pattern.id, file=fp,
+                          line=line_no, reason=makoto_allow_reason(content) or "",
+                          snippet=snippet)
+        return None  # AI documented this instance as legitimate (see CLAUDE.md) — recorded
+    return Finding(
+        pattern_id=pattern.id, file=fp, line=line_no, level=pattern.fire_level,
+        message=message, retry_hint=pattern.retry_hint, snippet=snippet,
+    )
 
 
 def scan_target_content(tool_input: dict) -> str:
@@ -154,6 +188,24 @@ def callee_chain(call: ast.Call) -> str:
     return ".".join(reversed(parts))
 
 
+def jwt_decode_callee_chain(node) -> Optional[str]:
+    """The callee-chain string iff `node` is an `ast.Call` targeting a jwt/jose `decode` entry
+    point (JWT_CALLEE_RX matches the chain, AND the chain's tail is literally `decode`); None
+    otherwise. Shared callee gate for 1.28 (verify=False / options-dict disable) and 1.31
+    (algorithms=["none"] whitelisting) — both patterns need this SAME 'is this really a
+    jwt.decode(...) call' precondition before inspecting their own distinct keyword (found
+    duplicated by jscpd, 2026-07-09: the two predicates' node_match functions repeated this exact
+    4-statement gate by hand)."""
+    if not isinstance(node, ast.Call):
+        return None
+    chain = callee_chain(node)
+    if not JWT_CALLEE_RX.search(chain):
+        return None
+    if chain.split(".")[-1] != "decode":
+        return None
+    return chain
+
+
 def ast_introduced_predicate(
     *,
     target_rx: re.Pattern,
@@ -177,15 +229,10 @@ def ast_introduced_predicate(
 
     def _predicate(*, current_event: dict, history: list,
                    pattern: PreCheck, conn=None) -> Optional[Finding]:
-        if current_event.get("hook_event_name") != "PreToolUse":
+        gated = _gated_content(current_event=current_event, target_rx=target_rx, exempt_rx=exempt_rx)
+        if gated is None:
             return None
-        ti = current_event.get("tool_input", {}) or {}
-        fp = ti.get("file_path", "")
-        if not target_rx.search(fp):
-            return None
-        content = scan_target_content(ti)
-        if exempt_rx is not None and exempt_rx.search(content):
-            return None  # documented code-level carve-out (e.g. an ADR backlink) -> silent
+        fp, content = gated
         tree, off = parse_introduced(content)
         if tree is None:
             return None  # unparseable fragment -> not confirmed active -> silent (FN-safe)
@@ -196,19 +243,11 @@ def ast_introduced_predicate(
             line_no = max(1, getattr(node, "lineno", 1) - off)
             lines = content.splitlines()
             snippet = lines[line_no - 1].strip()[:120] if 0 < line_no <= len(lines) else str(label)
-            # DETECT-THEN-EXEMPT: the marker now suppresses a CONFIRMED match (not the whole scan),
-            # so the escape valve leaves an on-the-record trace instead of a silent pass (R5b).
-            if makoto_allowed(content):
-                _record_exemption(current_event, conn, pattern_id=pattern.id, file=fp,
-                                  line=line_no, reason=makoto_allow_reason(content) or "",
-                                  snippet=snippet)
-                return None  # AI documented this instance as legitimate (see CLAUDE.md) — recorded
-            return Finding(
-                pattern_id=pattern.id, file=fp, line=line_no, level=pattern.fire_level,
+            return _exempt_or_finding(
+                current_event=current_event, conn=conn, pattern=pattern, fp=fp, line_no=line_no,
+                snippet=snippet, content=content,
                 message=f"row {pattern.id} ({pattern.description}): active-code match {label!r} "
-                        f"at line {line_no}{suffix}",
-                retry_hint=pattern.retry_hint, snippet=snippet,
-            )
+                        f"at line {line_no}{suffix}")
         return None
 
     return _predicate
@@ -245,32 +284,17 @@ def regex_file_predicate(
 
     def _predicate(*, current_event: dict, history: list,
                    pattern: PreCheck, conn=None) -> Optional[Finding]:
-        if current_event.get("hook_event_name") != "PreToolUse":
+        gated = _gated_content(current_event=current_event, target_rx=target_rx, exempt_rx=exempt_rx)
+        if gated is None:
             return None
-        fp = current_event.get("tool_input", {}).get("file_path", "")
-        if not target_rx.search(fp):
-            return None
-        content = scan_target_content(current_event.get("tool_input", {}))
-        if exempt_rx is not None and exempt_rx.search(content):
-            return None  # documented carve-out (e.g. an ADR-NNN backlink) -> silent
+        fp, content = gated
         m = body_rx.search(content)
         if not m:
             return None
         line_no = content[: m.start()].count("\n") + 1
         snippet = content[max(0, m.start() - 40): m.end() + 40]
-        # DETECT-THEN-EXEMPT: record the suppressed match before honoring the marker (R5b).
-        if makoto_allowed(content):
-            _record_exemption(current_event, conn, pattern_id=pattern.id, file=fp,
-                              line=line_no, reason=makoto_allow_reason(content) or "",
-                              snippet=snippet)
-            return None  # AI documented this instance as legitimate (see CLAUDE.md) — recorded
-        return Finding(
-            pattern_id=pattern.id,
-            file=fp,
-            line=line_no,
-            level=pattern.fire_level,
-            message=f"row {pattern.id} ({pattern.description}): matched {m.group(0)!r} at line {line_no}{suffix}",
-            retry_hint=pattern.retry_hint,
-            snippet=snippet,
-        )
+        return _exempt_or_finding(
+            current_event=current_event, conn=conn, pattern=pattern, fp=fp, line_no=line_no,
+            snippet=snippet, content=content,
+            message=f"row {pattern.id} ({pattern.description}): matched {m.group(0)!r} at line {line_no}{suffix}")
     return _predicate

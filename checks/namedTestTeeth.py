@@ -5,7 +5,6 @@ from typing import Optional
 from makoto.core.schema import Finding
 from makoto.core.lexicons import _ANSI_SGR_RX, _TEETH_FRAME_RX
 from makoto.substrate.io import iter_tool_events
-from makoto.substrate._shared import StopCheck
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -116,20 +115,23 @@ def claimed_passing_names(text: str) -> set:
     return out
 
 
-def recorded_failed_names(text: str) -> set:
-    """Exact test names recorded as FAILED/ERROR in a tool output (both verdict orderings)."""
+def _recorded_names(text: str, lead_rx, trail_rx) -> set:
+    """Shared shape of recorded_failed_names/recorded_passed_names (found alpha-equivalent by AST
+    canonicalization, 2026-07-09) -- same extraction, different verdict regex pair."""
     if not text:
         return set()
-    return ({m.group("name") for m in _REC_FAIL_LEAD_RX.finditer(text)}
-            | {m.group("name") for m in _REC_FAIL_TRAIL_RX.finditer(text)})
+    return ({m.group("name") for m in lead_rx.finditer(text)}
+            | {m.group("name") for m in trail_rx.finditer(text)})
+
+
+def recorded_failed_names(text: str) -> set:
+    """Exact test names recorded as FAILED/ERROR in a tool output (both verdict orderings)."""
+    return _recorded_names(text, _REC_FAIL_LEAD_RX, _REC_FAIL_TRAIL_RX)
 
 
 def recorded_passed_names(text: str) -> set:
     """Exact test names recorded as PASSED (the discharge evidence; both verdict orderings)."""
-    if not text:
-        return set()
-    return ({m.group("name") for m in _REC_PASS_LEAD_RX.finditer(text)}
-            | {m.group("name") for m in _REC_PASS_TRAIL_RX.finditer(text)})
+    return _recorded_names(text, _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX)
 
 
 def current_named_verdicts(history) -> dict:
@@ -175,12 +177,6 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
     )
 
 
-GATE = StopCheck(
-    id="gate.named_test",
-    fn=named_test_gate,
-    run=lambda c: named_test_gate(c.text, history=c.history),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: named_test_gate(c.text, history=c.history))

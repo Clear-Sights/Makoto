@@ -21,14 +21,13 @@ import os
 import re
 import importlib
 import pytest
-from makoto.substrate._aliases import canonical
 from makoto.core.schema import PreCheck, load_prechecks
 
 # A file_path that matches each content-scan pattern's target_rx (so the gate passes).
 _PATH = {
-    "1.1": "constitution/integrity/checks/sample.py",
-    "1.4": "sample.toml",
-    "1.5": "docs/pristine-baseline.md",
+    "content.verifier_predicate_weakened": "constitution/integrity/checks/sample.py",
+    "content.integrity_suppression_flag": "sample.toml",
+    "content.deferred_checkbox_theater": "docs/pristine-baseline.md",
 }
 # corpus filename -> xfail reason (pattern disagrees with its own corpus; fix is FP/FN-precision work)
 _KNOWN_BUGS = {
@@ -66,11 +65,7 @@ def _params():
 def test_content_scan_corpus(name, pid, expects_fire, body):
     # SPEC-5: prechecks now live in the flat makoto.checks package under descriptive names, not a
     # name derivable from the pattern id -- resolve via the real catalog's predicate_module.
-    # SPEC-C item 3: `pid` here is derived from the corpus FILENAME (TP_1_1_*.md -> "1.1"), which
-    # stays numeric on purpose (renaming ~8 fixture files for no operator-facing benefit is exactly
-    # the churn this project's own discipline argues against) -- canonical() bridges it to the
-    # live catalog's renamed id, the same alias resolution every other consumer gets.
-    _mod_path = next(p.predicate_module for p in load_prechecks() if p.id == canonical(pid))
+    _mod_path = next(p.predicate_module for p in load_prechecks() if p.id == pid)
     mod = importlib.import_module(_mod_path)
     pat = PreCheck(id=pid, fire_level="error", description="corpus", retry_hint="x")
     evt = {"hook_event_name": "PreToolUse", "tool_input": {"file_path": _PATH[pid], "content": body}}

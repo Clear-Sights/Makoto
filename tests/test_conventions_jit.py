@@ -16,7 +16,7 @@ import inspect
 from pathlib import Path
 
 from makoto import _dispatch
-from makoto._dispatch import _build_decision, _ALLOW_EXEMPT_IDS
+from makoto._dispatch import _jit_hint, _worst_finding, _ALLOW_EXEMPT_IDS
 from makoto.core.schema import Finding, load_prechecks
 
 REPO = Path(_dispatch.__file__).resolve().parent
@@ -46,23 +46,26 @@ def test_installed_block_is_three_lines_and_complete(tmp_path):
 
 
 # --- (2) JIT hint at fire time ------------------------------------------------
-def test_block_decision_carries_hatch_for_exempting_check():
-    d = _build_decision([_err("content.verifier_predicate_weakened")])
-    assert d is not None and _HATCH in d["retry_hint"], "exempting check must offer the hatch"
-    assert _POINTER in d["retry_hint"], "every block must point at the conventions"
-    assert d["retry_hint"].startswith("fix it"), "the pattern's own convention stays first"
+# Pinned directly on _jit_hint (the live composition primitive _emit_decision renders through)
+# since the bedrock audit (2026-07-10) cut _build_decision -- a wrapper main() had already
+# stopped calling, kept alive only by these tests' old import.
+def test_jit_hint_carries_hatch_for_exempting_check():
+    hint = _jit_hint(_err("content.verifier_predicate_weakened"))
+    assert _HATCH in hint, "exempting check must offer the hatch"
+    assert _POINTER in hint, "every block must point at the conventions"
+    assert hint.startswith("fix it"), "the pattern's own convention stays first"
 
 
-def test_block_decision_suppresses_hatch_where_marker_is_refused():
+def test_jit_hint_suppresses_hatch_where_marker_is_refused():
     for pid in ("content.self_mute_guard", "content.unsourced_webfetch", "content.verifier_exit_masking", "content.fabricated_commit_sha", "gate.completion"):
-        d = _build_decision([_err(pid)])
-        assert d is not None and _HATCH not in d["retry_hint"], \
+        hint = _jit_hint(_err(pid))
+        assert _HATCH not in hint, \
             f"{pid} refuses the marker — offering the hatch is false guidance"
-        assert _POINTER in d["retry_hint"], f"{pid} block must still point at the conventions"
+        assert _POINTER in hint, f"{pid} block must still point at the conventions"
 
 
-def test_no_error_no_decision_unchanged():
-    assert _build_decision([]) is None
+def test_no_findings_no_worst_outcome():
+    assert _worst_finding([]) is None
 
 
 # --- (3) the exempt-id set is DERIVED, not asserted ---------------------------

@@ -1,13 +1,14 @@
 """makoto.substrate._shared — the Stop-edge gate catalog's own shared substrate (SPEC-5 Task 4,
-owner-revised layout). Combines the former `stopchecks/_types.py` (the `StopCheck`/`GateContext`
-schemas) and `stopchecks/_common.py` (the discharge/suffix-match/turn-tool-call helpers every
-ledger-gate shares) into ONE flat, underscore-prefixed file — package plumbing, never a detector
-module itself, so `checks._loader`'s scan skips it exactly like `_primitives.py`/`_declared.py`.
+owner-revised layout). Combines the former `stopchecks/_types.py` (the `GateContext` schema --
+`StopCheck` itself was retired 2026-07-10 alongside `load_stopchecks()`, see `_loader.py`) and
+`stopchecks/_common.py` (the discharge/suffix-match/turn-tool-call helpers every ledger-gate
+shares) into ONE flat, underscore-prefixed file — package plumbing, never a detector module
+itself, so `checks._loader`'s scan skips it exactly like `_primitives.py`/`_declared.py`.
 
 Kept as ONE file (not split) because combined the two source files are ~150 lines — not the
 "gets unwieldy" threshold the migration ticket flags as the split trigger — and every gate that
-needs `GateContext`/`StopCheck` also tends to need at least one of the discharge helpers, so a
-single import line (`from makoto.substrate._shared import ...`) serves every migrated gate module.
+needs `GateContext` also tends to need at least one of the discharge helpers, so a single import
+line (`from makoto.substrate._shared import ...`) serves every migrated gate module.
 """
 from __future__ import annotations
 
@@ -18,7 +19,6 @@ from typing import Callable, Optional, Sequence
 from makoto.checks import normalize_path
 from makoto.substrate._planNode import Plan
 from makoto.core.lexicons import _EMPTY_OK
-from makoto.core.schema import Finding
 
 
 # ---- schemas (formerly stopchecks/_types.py) --------------------------------------------------
@@ -69,15 +69,6 @@ class GateContext:
         return bool(self.agent_id)
 
 
-@dataclass(frozen=True)
-class StopCheck:
-    """A live Stop gate. NO `blocking` field: discovered <=> live <=> blocking (no shadow tier)."""
-    id: str
-    fn: Callable
-    run: Callable  # GateContext -> Optional[Finding] | list[Finding] (gate.liveness yields a list;
-    #                run_stop_checks normalizes a list/tuple, a single Finding, and None alike)
-
-
 # ---- shared discharge/suffix-match helpers (formerly stopchecks/_common.py) --------------------
 _BIND_BEFORE = 70
 def _path_components(p: str):
@@ -102,6 +93,15 @@ def _safe_size(fs_size, location):
         return fs_size(location)
     except Exception:
         return None
+def _discharge_kwargs(c) -> dict:
+    """The four GateContext fields a `_discharged()`-style gate needs, forwarded as kwargs from a
+    GateContext `c`. Single-sources the "these are the discharge-relevant fields" convention so a
+    gate's `run=lambda c: ...` wiring doesn't hand-repeat `touched_keys=c.touched,
+    fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size` at every call site (found
+    duplicated by jscpd, 2026-07-09, between gate.completion and gate.advance's own `run=` lambdas)."""
+    return dict(touched_keys=c.touched, fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size)
+
+
 def _discharged(location: str, touched_keys, fs_exists, *, empty_keys=None, fs_size=None) -> bool:
     """A located commitment is discharged if a recorded touch or the live filesystem backs it —
     now CONTENT-deep (§7.1): a touch whose Write was zero-byte, or a file the disk shows at zero

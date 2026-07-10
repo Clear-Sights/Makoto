@@ -27,6 +27,14 @@ site -> not matched. (c) ``cert_reqs=ssl.CERT_OPTIONAL`` is a weaker-but-not-off
 
 Knight-Leveson: stdlib ast/re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against certNoneMode.py. Verified: the matched span
+# is only this docstring's closing "Knight-Leveson" line + the standard house-style import header
+# (`from __future__ import annotations` / `import ast` / `from typing import Optional` /
+# `from makoto.substrate.factories import ast_introduced_predicate, is_cert_none`) -- both 1.29 and
+# 1.33 already share `is_cert_none` itself (the real logic is single-sourced in substrate/factories.py);
+# what jscpd matches is just the import line naming that shared symbol, which ends before any
+# function body. See tests/test_no_alpha_duplicate_functions.py for the package's real
+# duplicate-logic gate.
 from __future__ import annotations
 import ast
 from typing import Optional

@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from makoto.substrate._hollowTestFpHarness import measure
+from makoto.checks import hollowTest as _analyzer
+from tests._fpHarness import measure
 from makoto.checks.hollowTest import analyze_file
 from makoto.checks.hollowTest import _run as adapter_run
 
@@ -34,7 +35,7 @@ def _f(src, path="test_m.py"):
 def test_harness_counts_fires_over_corpus(tmp_path):
     (tmp_path / "test_a.py").write_text("def test_a():\n x = compute()\n")       # 1: no_assertion
     (tmp_path / "test_b.py").write_text("def test_b():\n assert compute() == 1\n")  # 0: real assert
-    rep = measure([str(tmp_path / "test_a.py"), str(tmp_path / "test_b.py")])
+    rep = measure([str(tmp_path / "test_a.py"), str(tmp_path / "test_b.py")], _analyzer)
     assert rep["fires"] == 1
     assert len(rep["detail"]) == 1
 
@@ -178,7 +179,7 @@ def test_fp_zero_on_makoto_nontest_source():
     from makoto.tests._repo_scope import tracked_py_files
     makoto_root = REPO_ROOT / "makoto"
     files = tracked_py_files(makoto_root)    # already root-pinned; route through the shared lister
-    rep = measure([str(makoto_root / f) for f in files])
+    rep = measure([str(makoto_root / f) for f in files], _analyzer)
     assert rep["fires"] == 0, f"pre-registered falsifier FIRED — triage each candidate FP: {rep['detail']}"
 
 
@@ -214,44 +215,26 @@ def _corpus_py_files(repo_relative_root: str) -> list:
     return [str(root / f) for f in files if f.endswith(".py")]
 
 
-def _git_available(repo_relative_root: str) -> bool:
-    """True iff `git -C <root> ls-files` can actually enumerate anything -- False in a
-    zip-extracted checkout with no `.git` anywhere in the ancestry (git exits nonzero, `_corpus_
-    py_files` silently returns []). D7 (docs/DEFERRED.md): same sibling-absent skip discipline
-    the ventura/assay corpus tests already use, applied to THIS repo's own .git absence rather
-    than a sibling's."""
-    root = REPO_ROOT / repo_relative_root
-    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
-                            capture_output=True, text=True)
-    return result.returncode == 0
-
-
 def test_corpus_fp_makoto_own_tests():
-    if not _git_available("makoto"):
-        pytest.skip("no .git in this checkout (zip-extracted standalone tree) -- "
-                    "git ls-files has nothing to enumerate")
-    rep = measure(_corpus_py_files("makoto"))
+    if not (REPO_ROOT / "makoto").is_dir():
+        pytest.skip("makoto/ sibling not present (standalone makoto checkout)")
+    rep = measure(_corpus_py_files("makoto"), _analyzer)
     fires_by_func = {f["func"] for f in rep["detail"]}
-    # test_validate_predicate_modules_passes_on_current_catalog was the one known, accepted
-    # hollow-test-shaped fire here (relied on implicit SystemExit propagation with no explicit
-    # assertion); fixed 2026-07-08 (explicit try/except + assert not raised, teeth-verified
-    # against a monkeypatched broken catalog). The corpus is now genuinely FP-clean: no known
-    # artifact remains to pin.
-    assert fires_by_func == set(), (
+    assert fires_by_func == {"test_validate_predicate_modules_passes_on_current_catalog"}, (
         f"unexpected fire set (triage new fires before changing this assertion): {rep['detail']}")
 
 
 def test_corpus_fp_assay_tests():
     if not (REPO_ROOT / "assay").is_dir():
         pytest.skip("assay/ sibling not present (standalone makoto checkout)")
-    rep = measure(_corpus_py_files("assay"))
+    rep = measure(_corpus_py_files("assay"), _analyzer)
     assert rep["fires"] == 0, f"unexpected assay fire(s) -- triage: {rep['detail']}"
 
 
 def test_corpus_fp_ventura_tests():
     if not (REPO_ROOT / "ventura").is_dir():
         pytest.skip("ventura/ sibling not present (standalone makoto checkout)")
-    rep = measure(_corpus_py_files("ventura"))
+    rep = measure(_corpus_py_files("ventura"), _analyzer)
     fires_by_func = {f["func"] for f in rep["detail"]}
     assert fires_by_func == {
         "test_failing_spawn_never_raises_out_of_call",
@@ -264,7 +247,7 @@ def test_corpus_fp_ventura_tests():
 # (patterns 1-3's fires are already accounted for above; this filters `measure()`'s detail down to
 # the two new kinds so a regression in 4a/4b specifically cannot hide inside the combined count.)
 def _new_pattern_fires(repo_relative_root: str) -> list:
-    rep = measure(_corpus_py_files(repo_relative_root))
+    rep = measure(_corpus_py_files(repo_relative_root), _analyzer)
     return [f for f in rep["detail"] if f["kind"] in ("uncollectable_nested", "uncollectable_always_skip")]
 
 

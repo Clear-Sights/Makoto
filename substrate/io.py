@@ -28,6 +28,32 @@ def raw_payload_str(entry) -> str:
     return raw if isinstance(raw, str) else ""
 
 
+def decode_history_row(row):
+    """Decode one history row's raw JSON payload into an event dict, or None if the row is
+    malformed/absent/unparseable. Rows are either the (id, ts, event_type, cwd, raw_payload_json)
+    5-tuples the events table returns, or dict-likes carrying a 'payload' key (corpus replay).
+    Fail-open: an undecodable row yields None rather than raising, so one malformed row can never
+    crash a caller's scan.
+
+    The ONE canonical row-decode step (found triplicated by jscpd, 2026-07-09: iter_tool_events
+    below, substrate._canonAtoms._decode_row, and checks.writeThrashRevert._prior_whole_file_writes
+    each re-derived this same tuple/dict-payload sniff + json.loads by hand). Callers keep their own
+    downstream shape/filter (a Call dict, a (name, command, response) tuple, a ByteIdentity list) --
+    only the shared decode-to-dict step lives here."""
+    if isinstance(row, (tuple, list)) and len(row) > 4:
+        raw = row[4]
+    elif hasattr(row, "get"):
+        raw = row.get("payload")
+    else:
+        raw = None
+    if not raw:
+        return None
+    try:
+        return raw if isinstance(raw, dict) else json.loads(raw)
+    except Exception:
+        return None
+
+
 def bash_output_text(tool_response) -> str:
     """extract captured stdout+stderr from a Bash tool_response.
 
@@ -78,19 +104,15 @@ def iter_tool_events(history):
     history-row decoder lives at L1 beside raw_payload_str; consumers (named_test,
     precheck_1_22's _real_commit_in_history) import from here. NOTE: tolerates dict payloads
     (raw if isinstance(raw, dict)), deliberately MORE permissive than the str-only
-    raw_payload_str path — corpus byte-comparison (T2.6) arbitrates that the union changes nothing."""
+    raw_payload_str path — corpus byte-comparison (T2.6) arbitrates that the union changes nothing.
+
+    Decode step delegates to decode_history_row (2026-07-09 dedup); the isinstance(row, ...) sniff
+    is intentionally NOT re-inlined here so this stays a single source, but the caller-side
+    behavior is unchanged bit-for-bit — a non-dict `ev` (e.g. a JSON array payload) still falls
+    through to `ev.get(...)` exactly as before, rather than gaining a new silent-skip branch."""
     for row in history or ():
-        if isinstance(row, (tuple, list)) and len(row) > 4:
-            raw = row[4]
-        elif hasattr(row, "get"):
-            raw = row.get("payload")
-        else:
-            raw = None
-        if not raw:
-            continue
-        try:
-            ev = raw if isinstance(raw, dict) else json.loads(raw)
-        except Exception:
+        ev = decode_history_row(row)
+        if ev is None:
             continue
         ti = ev.get("tool_input", {}) or {}
         tr = ev.get("tool_response", {})

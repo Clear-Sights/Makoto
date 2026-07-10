@@ -1,11 +1,11 @@
 """Shared stdlib-only helpers for the detector engines that deliberately isolate themselves from
 mutable Makoto substrate (`deadPureStatement.py`, `hollowTest.py`) -- so tampering with shared
-plugin logic (substrate.factories, checks._shared, ...) can't silently blind either detector.
+plugin logic (lib.factories, checks._shared, ...) can't silently blind either detector.
 
-This module exists to satisfy that property WITHOUT duplicating the functions below byte-for-byte
-across both files (found via AST alpha-equivalence, 2026-07-09): both detectors import ONLY this
-module, which itself imports nothing beyond `os`/`tempfile`/`pathlib`/`ast` -- so the
-import-graph-isolation property is preserved and enforced (see
+This module exists to satisfy that property WITHOUT duplicating the six functions below
+byte-for-byte across both files (found via AST alpha-equivalence, 2026-07-09): both detectors
+import ONLY this module, which itself imports nothing beyond `os`/`tempfile`/`pathlib`/`ast` --
+so the import-graph-isolation property is preserved and enforced (see
 tests/test_detector_engines_are_stdlib_isolated.py), not just asserted by a docstring.
 
 Do not add an import of anything outside the stdlib to this file -- doing so would break the one
@@ -41,15 +41,16 @@ def _is_scratch(p, cwd) -> bool:
     dir, AND it lives under a known temp/scratch root. A file under cwd is the closed unit under
     construction (this is how pytest tmp fixtures and real project files appear) and always counts;
     only stray scratch OUTSIDE the working project (e.g. /tmp/mining/*, the live-session
-    contamination vector) is skipped. Suppression requires a known cwd AND a scratch root -- never
-    a blanket skip -- so an unknown working dir keeps the gate's full teeth and a real (non-temp)
-    file always fires."""
+    contamination vector) is skipped. This realizes "a block counts only when opened AND closed" at
+    the unit-closure layer: the analyzer's detection logic is untouched, the firing scope narrows to
+    closed work. Suppression requires a known cwd AND a scratch root -- never a blanket skip -- so an
+    unknown working dir keeps the gate's full teeth and a real (non-temp) file always fires."""
     if not cwd:
-        return False
+        return False                                         # working dir unknown -> never suppress (FN-safe)
     rp = os.path.realpath(str(p))
     if _under(rp, os.path.realpath(str(cwd))):
-        return False
-    return any(_under(rp, r) for r in _SCRATCH_ROOTS)
+        return False                                         # inside the working dir -> in scope
+    return any(_under(rp, r) for r in _SCRATCH_ROOTS)        # outside cwd AND in a scratch root -> stray scratch
 
 
 def _read(ctx, p):
@@ -58,11 +59,7 @@ def _read(ctx, p):
 
 
 def _callee_chain(call: ast.Call) -> str:
-    """Dotted callee name of a Call (`self.assertTrue`, `np.testing.assert_allclose`,
-    `pytest.raises`). Alpha-equivalent to `substrate/factories.py::callee_chain` -- kept as a
-    separate, exempted duplicate (see tests/test_no_alpha_duplicate_functions.py) so this module
-    stays stdlib-only/self-contained: importing makoto.substrate.factories would break the
-    import-graph isolation the whole module exists to protect."""
+    """Dotted callee name of a Call (`self.assertTrue`, `np.testing.assert_allclose`, `pytest.raises`)."""
     parts: list = []
     f = call.func
     while True:
@@ -70,7 +67,7 @@ def _callee_chain(call: ast.Call) -> str:
             parts.append(f.attr)
             f = f.value
         elif isinstance(f, ast.Call):
-            f = f.func
+            f = f.func                       # `X().<m>` -> keep walking X
         elif isinstance(f, ast.Name):
             parts.append(f.id)
             break

@@ -20,7 +20,6 @@ from __future__ import annotations
 from typing import List
 
 from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
-from makoto.substrate._shared import StopCheck
 from makoto.core.schema import Finding
 
 
@@ -65,21 +64,15 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
                         f"Re-examine the flagged behavior (a suppressed check, a destructive "
                         f"command, or an unresolved gap between claim and evidence) before "
                         f"continuing, OR if the flagged action was legitimate and already fully "
-                        f"re-examined, say exactly `makoto release.operator {name}: <reason>` in a "
+                        f"re-examined, say exactly `makoto ack-block {name}: <reason>` in a "
                         f"real (non-tool, non-quoted) reply -- the only discharge this gate can "
-                        f"honor, per Task 2 slice 5 / D8a."),
+                        f"honor, per Task 2 slice 5."),
         ))
     return out
 
 
-GATE = StopCheck(
-    id="gate.canon_fingerprints",
-    fn=canon_fingerprint_block_gate,
-    run=lambda c: canon_fingerprint_block_gate(
-        c.text, c.history, transcript_path=c.transcript_path,
-        session_id=c.session_id, state_root=c.state_root),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: canon_fingerprint_block_gate(
+                   c.text, c.history, transcript_path=c.transcript_path,
+                   session_id=c.session_id, state_root=c.state_root))

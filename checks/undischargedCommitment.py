@@ -7,8 +7,7 @@ from makoto.core.lexicons import (
     _NEGATION_RX, _UNIVERSAL_DONE_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _ENUM_BEFORE_HEAD_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.substrate._shared import _discharged, _path_components
-from makoto.substrate._shared import StopCheck
+from makoto.substrate._shared import _discharge_kwargs, _discharged, _path_components
 
 
 # A version/variant rename suffix on a basename stem: parser_v2, config_old, handler-final, foo_copy.
@@ -116,12 +115,6 @@ def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys
     return None
 
 
-GATE = StopCheck(
-    id="gate.advance",
-    fn=advance_gate,
-    run=lambda c: advance_gate(c.text, c.opens, touched_keys=c.touched, fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size),
-)
-
-
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.advance", applies_at="Stop", posture="BLOCK", run=GATE.run)
+CHECK = _Check(id="gate.advance", applies_at="Stop", posture="BLOCK", may_block=True,
+               run=lambda c: advance_gate(c.text, c.opens, **_discharge_kwargs(c)))

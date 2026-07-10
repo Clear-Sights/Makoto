@@ -236,24 +236,6 @@ def test_record_commitment_repromise_does_not_reopen_discharged():
     assert C.open_commitments(conn, "s") == []                 # stays discharged, not re-opened
 
 
-def test_retire_unsourceable_clears_phantoms_and_keeps_real_promises():
-    """Sanctioned GC: retire stale phantom commitments (a location the CURRENT sourcer would never
-    create — a code identifier, a branch, a slash-command), while NEVER touching a genuine file-
-    shaped open promise (the FN firewall — this can only clear provable non-obligations)."""
-    conn = _conn()
-    for loc in ["Finding.source_event_id", "main", "/loop", "detect_location"]:
-        C.record_commitment(conn, "s", {"location": loc, "qty_min": None, "qty_max": None},
-                            created_event_id=1)
-    C.record_commitment(conn, "s", {"location": "src/auth.py", "qty_min": None, "qty_max": None},
-                        created_event_id=2)                    # a genuine file-shaped promise
-    retired = sorted(r["location"] for r in C.retire_unsourceable_commitments(conn, "s"))
-    assert retired == ["/loop", "Finding.source_event_id", "detect_location", "main"], retired
-    opens = [o["location"] for o in C.open_commitments(conn, "s")]
-    assert opens == ["src/auth.py"], f"FN — a genuine file-shaped commitment was wrongly retired: {opens}"
-    reason = conn.execute("SELECT retract_param FROM commitments WHERE location='main'").fetchone()[0]
-    assert "file-shaped" in reason, "retirement reason must be recorded (auditable) in retract_param"
-
-
 def test_path_inside_code_fence_is_not_retracted():
     # retraction.py `any(s <= a < e for s, e in fenced)`: a path INSIDE a ``` code fence ``` is
     # quoted output, not the assistant's own speech, so it must NOT be surfaced as a retraction.

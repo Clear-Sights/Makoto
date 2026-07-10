@@ -9,9 +9,17 @@ import re
 from pathlib import Path
 
 from makoto.core.schema import load_prechecks
-from makoto.substrate._loader import load_stopchecks
+from makoto.substrate._loader import load_checks
 
 README = (Path(__file__).resolve().parent.parent / "README.md").read_text()
+
+
+def _live_gates():
+    # "end-of-turn gates" means the checks eligible to reach the Stop decision pipeline at all
+    # (formerly: had a GATE export / discovered by load_stopchecks()) -- may_block=True, not
+    # every Stop-edge CHECK (staleEstablisher/undeclaredFalsifiable are Stop-edge but were never
+    # counted among the README's stated gates).
+    return [c for c in load_checks(edge="Stop") if c.may_block]
 
 
 def _stated(pattern: str) -> int:
@@ -26,11 +34,11 @@ def test_readme_precheck_count_matches_live():
 
 
 def test_readme_stop_gate_count_matches_live():
-    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") == len(load_stopchecks())
+    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") == len(_live_gates())
 
 
 def test_readme_lists_every_live_gate_id():
-    for g in load_stopchecks():
+    for g in _live_gates():
         assert g.id in README, f"README does not mention live gate {g.id}"
 
 
@@ -38,10 +46,10 @@ def test_readme_lists_the_liveness_gate():
     # gate.liveness folded into the Stop tier from the collapsed close-check package; the gate-id
     # listing test above already covers it, but pin its README mention explicitly so the doc keeps
     # describing the code-materiality gate, not only the claim-vs-ledger ones.
-    assert "gate.liveness" in {g.id for g in load_stopchecks()}
+    assert "gate.liveness" in {g.id for g in _live_gates()}
     assert "gate.liveness" in README
 
 
 def test_TEETH_stated_parser_would_catch_a_drift():
     # the parser reads a real number, so a stale count (e.g. the old "3") would mismatch the live 6.
-    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") != 3 or len(load_stopchecks()) == 3
+    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") != 3 or len(_live_gates()) == 3
