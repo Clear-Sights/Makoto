@@ -1,0 +1,12 @@
+{
+ "v1.4.0": {
+  "target": "bc57f7352fdcde4ec2ea7810b999a083df543874",
+  "annotated": true,
+  "message": "makoto 1.4.0 \u2014 two-tier collapse (18 pre-checks + 8 Stop gates), exemption audit, Apache-2.0"
+ },
+ "v2.0.0": {
+  "target": "fd7006b324f8dbbbb1c3df2a396ead5eee0501c0",
+  "annotated": false,
+  "message": ""
+ }
+}
