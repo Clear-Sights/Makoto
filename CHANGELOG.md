@@ -5,6 +5,18 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Changed
+- **`stopchecks/` compat shim removed entirely.** `load_stopchecks()` relocated to its real,
+  permanent home in `substrate/_loader.py` (alongside `load_checks`); its 11 callers
+  (`_dispatch.py` + 10 test files) now import `GateContext`/`StopCheck`/`load_stopchecks` from
+  their real locations instead of the deleted `makoto.stopchecks` package.
+  `tests/test_stopcheck_self_wired.py` renamed to `test_self_wired_check.py`. Ported from
+  makoto-dev via `tools/restructure_public.py`, not hand-patched. Note: this repo's
+  `_dispatch.py` already runs its Stop-finding loop on `load_checks(edge="Stop")` (SPEC-C item 2),
+  so `load_stopchecks()`/the `GATE = StopCheck(...)` exports are vestigial in production here,
+  kept only for the tests that still assert against them directly — see the note in
+  `substrate/_loader.py`'s `load_stopchecks` docstring.
+
 ## [2.0.0] — 2026-07-08
 
 ### Changed (breaking)
