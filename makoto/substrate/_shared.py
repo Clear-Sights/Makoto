@@ -57,9 +57,6 @@ class GateContext:
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the release.operator discharge can read/append the chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
-    open_plan_items: Sequence = ()          # session/planItems.py's still-open label-shaped
-    #   commitments ("§9.3", "Task #19"), synced once by run_stop_checks. Read by
-    #   planItemDrift.py's ADVISORY-only reminder.
 
     @property
     def roots(self):

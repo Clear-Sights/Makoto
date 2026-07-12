@@ -451,7 +451,6 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
-            open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
@@ -641,14 +640,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # Task #19c (2026-07-10): the harness's own TaskCreate/TaskUpdate calls are the
-        # GROUND-TRUTH source for the plan-item store the prose sourcer only approximates
-        # -- an explicit create opens `task:<id>`, an explicit completed/deleted
-        # transition discharges it, and planItemDrift.py's ADVISORY Stop reminder then
-        # surfaces anything still open. Same fail-open umbrella as the ledger write.
-        if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
-            from makoto.session import planItems as _plan_items
-            _plan_items.record_task_event(conn, sid, payload)
         if delta_finding is not None:
             delta_finding = replace(delta_finding, source_event_id=event_id)
             _emit_decision([delta_finding], payload.get("hook_event_name", ""),
