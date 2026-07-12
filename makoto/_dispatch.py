@@ -451,6 +451,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
+            open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
@@ -590,11 +591,129 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
     audit.append_row(state_dir, row)
 
 
+def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
+    """SessionStart — SPEC-5 (Makoto absorbs Assay): admit a declared Plan from the on-disk
+    artifact. SessionStart never blocks — it is an admission step, not a gate — so this always
+    completes silently regardless of whether a plan was actually declared."""
+    try:
+        from makoto.session import plan as _plan
+        _plan.declare_from_session_artifact(
+            payload.get("cwd") or os.getcwd(),
+            payload.get("session_id", ""),
+            conn,
+            source=payload.get("source", ""),
+        )
+    except Exception as exc:
+        print(f"makoto._dispatch: plan declare failed (non-fatal): {exc}",
+              file=sys.stderr)
+
+
+def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
+    """PostToolUse — accumulation: store the event (already done by _ingest_event
+    upstream so history-walking predicates can see tool_results) and record
+    the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
+    No predicate evaluation and no block — PostToolUse is for accumulation,
+    never decision. (SPEC-5 Task 8: citations.capture() removed here — see
+    makoto/citations.py; refresh_if_stale upstream and record_update below are
+    separate call sites and stay.)"""
+    try:
+        from makoto.record import ledger as _ledger
+        from makoto.substrate.io import bash_output_text, is_test_runner
+        from makoto.substrate._testDelta import compute_delta
+        sid = payload.get("session_id", "")
+        delta_finding = None
+        # Task 3, the domain correction (test-delta redirect): compute the delta vs the
+        # PRIOR recorded testrun BEFORE record_update's upsert overwrites it -- the only
+        # point where "prior" is still readable. ADVISE-tier (Post has no fire_level
+        # invariant -- Pre's error-only rule doesn't apply here): a factual diff is always
+        # safe to surface, never a toothless hedge, so no discrimination problem exists.
+        if payload.get("tool_name") == "Bash":
+            cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
+            if is_test_runner(cmd):
+                prior_output = _ledger.latest_testrun(conn, sid)
+                tr = payload.get("tool_response", {})
+                new_output = bash_output_text(tr) if isinstance(tr, dict) else ""
+                delta = compute_delta(prior_output, new_output)
+                if delta:
+                    delta_finding = Finding(
+                        pattern_id="makoto.test_delta", file="", line=0, level="advisory",
+                        message=f"Test delta vs the prior recorded run: {delta}",
+                        retry_hint="")
+        _ledger.record_update(conn, payload, event_id=event_id,
+                              session_id=sid, root=state_dir)
+        # Task #19c (2026-07-10): the harness's own TaskCreate/TaskUpdate calls are the
+        # GROUND-TRUTH source for the plan-item store the prose sourcer only approximates
+        # -- an explicit create opens `task:<id>`, an explicit completed/deleted
+        # transition discharges it, and planItemDrift.py's ADVISORY Stop reminder then
+        # surfaces anything still open. Same fail-open umbrella as the ledger write.
+        if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
+            from makoto.session import planItems as _plan_items
+            _plan_items.record_task_event(conn, sid, payload)
+        if delta_finding is not None:
+            delta_finding = replace(delta_finding, source_event_id=event_id)
+            _emit_decision([delta_finding], payload.get("hook_event_name", ""),
+                           permission_mode=payload.get("permission_mode"))
+            # Found while building the D9 demo corpus: without this, the delta redirect's
+            # own finding was invisible to the audit trail and the chain -- contradicting
+            # Task 2's "every dispatch audit row is chain-appended" invariant. The redirect
+            # fired on the wire correctly; it just never left a record of having fired.
+            _record_audit(state_dir, [delta_finding], payload)
+    except Exception as exc:
+        print(f"makoto._dispatch: ledger update failed (non-fatal): {exc}",
+              file=sys.stderr)
+
+
+def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
+    """PreToolUse / Stop / SubagentStop — and the wildcard law for any event without its own
+    row: keyword-prefiltered predicates, plus the Stop gates where the event carries a
+    completion claim. Gates evaluate on Stop AND SubagentStop (real last_assistant_message) —
+    a SubagentStop payload carries the same shape (last_assistant_message, session_id, cwd,
+    etc.) as a main-thread Stop, so a sub-agent's own completion claim is checked by the same
+    gates. The three Stop gates — completion, advance, and green_claim — block live under the
+    single _gates_enabled() switch (each validated FP-clean on the 1335-session corpus;
+    green_claim measured POWERED with real Bash output reconstructed in cert.replay_stop).
+    All gate fires are always recorded to the audit log, block or not, so any future
+    real-session FP can still be mined."""
+    hook_event = payload.get("hook_event_name", "")
+    history = _select_recent(conn, payload.get("session_id", ""), event_id)
+    findings = _run_predicates(conn, payload, history, event_id,
+                                state_dir, payload_raw)
+    gate_findings = []
+    if hook_event in ("Stop", "SubagentStop"):
+        # Stop-edge CHECK findings get the same central provenance stamp: the Stop/SubagentStop
+        # event they were evaluated against.
+        gate_findings = [replace(f, source_event_id=event_id)
+                         for f in run_stop_checks(conn, payload, history, root=state_dir)]
+    blocking = list(findings)
+    if _gates_enabled():
+        blocking += [gf for gf in gate_findings
+                     if gf.pattern_id in _blocking_gate_ids()]
+    _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"))
+    _record_audit(state_dir, findings + gate_findings, payload)
+
+
+# The table: hook_event_name -> the event's pipeline. This is the whole routing — adding an
+# event is adding one row plus (at most) one handler above, never another branch in main()
+# (the same "a capability is a row, never a module" discipline as Detent's MOVES). The
+# lookup's default is _evaluate_and_gate, the wildcard law: an event with no specialist row
+# is held to the predicate catalog, so a newly wired event can never silently bypass
+# evaluation — exactly the fall-through main()'s old if/elif chain provided, now as data.
+HANDLERS: dict[str, Any] = {
+    "SessionStart": _admit_plan,
+    "PostToolUse": _accumulate,
+    "PreToolUse": _evaluate_and_gate,
+    "Stop": _evaluate_and_gate,
+    "SubagentStop": _evaluate_and_gate,
+}
+
+
 def main() -> int:
     """orchestrator — HYBRID fail-mode (never silent, never blind-open): a tamper-shaped payload
     fails CLOSED (block, exit 2 + reason); transient infra (unparseable pipe, DB init/lock failure,
     unexpected body fault) fails LOUD-ALLOW (exit 0 + stderr); every can't-evaluate writes an
-    on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md."""
+    on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md.
+    Routing is HANDLERS, the row table above — main() knows the common prologue (parse, verify,
+    ingest) and nothing about any event."""
     payload_raw = sys.stdin.read()
     state_dir = _state_dir()
     _self_verify_chain(state_dir)
@@ -622,91 +741,8 @@ def main() -> int:
         citations.refresh_if_stale(conn)
         event_id = _ingest_event(conn, payload, payload_raw)
         hook_event = payload.get("hook_event_name", "")
-        if hook_event == "SessionStart":
-            # SPEC-5 (Makoto absorbs Assay): admit a declared Plan from the on-disk artifact.
-            # SessionStart never blocks — it is an admission step, not a gate — so this always
-            # returns 0 regardless of whether a plan was actually declared.
-            try:
-                from makoto.session import plan as _plan
-                _plan.declare_from_session_artifact(
-                    payload.get("cwd") or os.getcwd(),
-                    payload.get("session_id", ""),
-                    conn,
-                    source=payload.get("source", ""),
-                )
-            except Exception as exc:
-                print(f"makoto._dispatch: plan declare failed (non-fatal): {exc}",
-                      file=sys.stderr)
-            return 0
-        if hook_event == "PostToolUse":
-            # Accumulation branch: store the event (already done by _ingest_event
-            # above so history-walking predicates can see tool_results) and record
-            # the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
-            # No predicate evaluation and no block — PostToolUse is for accumulation,
-            # never decision. (SPEC-5 Task 8: citations.capture() removed here — see
-            # makoto/citations.py; refresh_if_stale above and record_update below are
-            # separate call sites and stay.)
-            try:
-                from makoto.record import ledger as _ledger
-                from makoto.substrate.io import bash_output_text, is_test_runner
-                from makoto.substrate._testDelta import compute_delta
-                sid = payload.get("session_id", "")
-                delta_finding = None
-                # Task 3, the domain correction (test-delta redirect): compute the delta vs the
-                # PRIOR recorded testrun BEFORE record_update's upsert overwrites it -- the only
-                # point where "prior" is still readable. ADVISE-tier (Post has no fire_level
-                # invariant -- Pre's error-only rule doesn't apply here): a factual diff is always
-                # safe to surface, never a toothless hedge, so no discrimination problem exists.
-                if payload.get("tool_name") == "Bash":
-                    cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
-                    if is_test_runner(cmd):
-                        prior_output = _ledger.latest_testrun(conn, sid)
-                        tr = payload.get("tool_response", {})
-                        new_output = bash_output_text(tr) if isinstance(tr, dict) else ""
-                        delta = compute_delta(prior_output, new_output)
-                        if delta:
-                            delta_finding = Finding(
-                                pattern_id="makoto.test_delta", file="", line=0, level="advisory",
-                                message=f"Test delta vs the prior recorded run: {delta}",
-                                retry_hint="")
-                _ledger.record_update(conn, payload, event_id=event_id,
-                                      session_id=sid, root=state_dir)
-                if delta_finding is not None:
-                    delta_finding = replace(delta_finding, source_event_id=event_id)
-                    _emit_decision([delta_finding], hook_event,
-                                   permission_mode=payload.get("permission_mode"))
-                    # Found while building the D9 demo corpus: without this, the delta redirect's
-                    # own finding was invisible to the audit trail and the chain -- contradicting
-                    # Task 2's "every dispatch audit row is chain-appended" invariant. The redirect
-                    # fired on the wire correctly; it just never left a record of having fired.
-                    _record_audit(state_dir, [delta_finding], payload)
-            except Exception as exc:
-                print(f"makoto._dispatch: ledger update failed (non-fatal): {exc}",
-                      file=sys.stderr)
-            return 0
-        history = _select_recent(conn, payload.get("session_id", ""), event_id)
-        findings = _run_predicates(conn, payload, history, event_id,
-                                    state_dir, payload_raw)
-        # Gates evaluate on Stop AND SubagentStop (real last_assistant_message) — a SubagentStop
-        # payload carries the same shape (last_assistant_message, session_id, cwd, etc.) as a
-        # main-thread Stop, so a sub-agent's own completion claim is checked by the same gates.
-        # The three Stop gates — completion, advance, and green_claim — block live under the
-        # single _gates_enabled() switch (each validated FP-clean on the 1335-session corpus;
-        # green_claim measured POWERED with real Bash output reconstructed in cert.replay_stop).
-        # All gate fires are always recorded to the audit log, block or not, so any future
-        # real-session FP can still be mined.
-        gate_findings = []
-        if hook_event in ("Stop", "SubagentStop"):
-            # Stop-edge CHECK findings get the same central provenance stamp: the Stop/SubagentStop
-            # event they were evaluated against.
-            gate_findings = [replace(f, source_event_id=event_id)
-                             for f in run_stop_checks(conn, payload, history, root=state_dir)]
-        blocking = list(findings)
-        if _gates_enabled():
-            blocking += [gf for gf in gate_findings
-                         if gf.pattern_id in _blocking_gate_ids()]
-        _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"))
-        _record_audit(state_dir, findings + gate_findings, payload)
+        handler = HANDLERS.get(hook_event, _evaluate_and_gate)
+        handler(conn, payload, payload_raw, event_id, state_dir)
     except Exception as exc:
         # an unexpected fault in evaluation must never crash the hook to a non-zero exit, and must
         # never be silent -> loud-allow + fact. (Exception, not BaseException: Ctrl-C propagates.)
