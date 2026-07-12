@@ -5,7 +5,13 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-07-12
+
 ### Fixed
+- **SessionStart and SubagentStop now actually fire.** Both hook handlers had real,
+  tested implementation code that never ran in the shipped plugin because
+  `hooks/hooks.json` never wired either event -- graduated from dead code to wired,
+  verified by a live-fire subprocess smoke test.
 - **The README's "Live demo" section is now backed by real artifacts.** Its three
   embedded SVG screenshots and the `docs/demo/render_demo.py` / `render_svg.py` scripts
   it names were absent from the tree -- the landing page showed broken images. The demo
@@ -94,6 +100,16 @@ All notable changes to makoto. Versions follow the live check inventory
   so `load_stopchecks()`/the `GATE = StopCheck(...)` exports are vestigial in production here,
   kept only for the tests that still assert against them directly — see the note in
   `substrate/_loader.py`'s `load_stopchecks` docstring.
+
+### Added
+- **One-command marketplace install** via `.claude-plugin/marketplace.json`, mirroring
+  Detent's two-line install.
+
+### Changed
+- **Dispatch routing consolidated onto a `HANDLERS` row table.** `main()`'s per-event
+  if/elif chain replaced by a plain dict lookup keyed on hook event name -- the same
+  "capability is a row, never a branch" discipline as the runtime's other tables. No
+  behavior change.
 
 ## [2.0.0] — 2026-07-08
 
