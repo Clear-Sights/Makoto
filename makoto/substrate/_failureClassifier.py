@@ -1,10 +1,10 @@
 """makoto.substrate._failureClassifier -- transient-vs-deterministic failure classification, the
-ship-bar the design review named for D1 (identical-retry interdiction, docs/DEFERRED.md). Two
-design consultations converged on this exact requirement: a BLOCK-tier check denying a retry must never
+ship-bar Fable named for D1 (identical-retry interdiction, docs/DEFERRED.md). Two Fable
+consultations converged on this exact requirement: a BLOCK-tier check denying a retry must never
 deny a LEGITIMATE re-poll of a transient failure (a timeout, a 5xx, "still running"), so this
 classifier is conservative -- it fails toward UNCERTAIN (None), never toward "assume
 deterministic", whenever the signal is ambiguous. "If the runtime cannot discriminate, the
-honest outcome is to cut or defer the check, not demote it to advisory" (design ruling, verbatim) -- this
+honest outcome is to cut or defer the check, not demote it to advisory" (Fable, verbatim) -- this
 module is what makes discrimination possible at all; identicalRetryInterdiction.py refuses to
 fire on anything but a confident True.
 

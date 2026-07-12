@@ -106,18 +106,18 @@ if os.environ.get("ENABLE_AUDIT_TRAIL"):  # makoto-allow: app feature, gates use
 a word is real the way water is wet, a constitutive property, not an after-the-fact audit.
 
 
-## Install (recommended: Claude Code plugin)
+## Install (plugin)
 
-```bash
-# In Claude Code:
-/plugin install https://github.com/Clear-Sights/Makoto
-# (or a local clone path)
+```
+/plugin marketplace add Clear-Sights/Makoto
+/plugin install makoto@makoto
 ```
 
-Claude Code reads `hooks/hooks.json` and registers `PreToolUse`, `PostToolUse`, and `Stop` hooks
-pointing at `${CLAUDE_PLUGIN_ROOT}/_dispatch_shim.sh` automatically (which `exec`s
-`python -m makoto._dispatch`). `~/.claude/settings.json` is NOT modified; the plugin system manages
-its own hook registry.
+Enabling the plugin is the whole install: `.claude-plugin/plugin.json` + `hooks/hooks.json`
+auto-wire dispatch on enable. Claude Code registers `PreToolUse`, `PostToolUse`, `Stop`,
+`SubagentStop`, and `SessionStart` hooks pointing at `${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh`
+automatically (which `exec`s `python -m makoto._dispatch`). `~/.claude/settings.json` is NOT
+modified; the plugin system manages its own hook registry.
 
 State dir + `makoto.db` are created lazily on the first hook invocation.
 
@@ -144,7 +144,7 @@ double-dispatch. Migrate cleanly:
 
 ```bash
 python -m makoto uninstall                   # removes old settings.json entries
-/plugin install https://github.com/Clear-Sights/Makoto  # installs the plugin
+/plugin marketplace add Clear-Sights/Makoto  # then: /plugin install makoto@makoto
 ```
 
 ## Non-plugin install (power users)

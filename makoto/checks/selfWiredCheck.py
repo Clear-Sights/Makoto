@@ -83,7 +83,7 @@ def self_wired_gate(fs_read) -> Optional[Finding]:
 # NOTE (owner-revised deviation, logged): this CHECK's posture is "ADVISE", not "BLOCK" like every
 # sibling Stop gate. gate.self_wired's own Finding.level is documented and behaviorally pinned
 # (tests/test_stop_gate_level_invariant.py) as ALWAYS "advisory", never "error" (the one
-# DESIGN-DECISION-cited advisory exception among the Stop gates, FD6 2026-07-05) -- declaring it
+# FABLE-DECISION-cited advisory exception among the Stop gates, FD6 2026-07-05) -- declaring it
 # CHECK.posture="BLOCK" here would misrepresent that in the flat checks/ catalog's own metadata.
 # `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
 # were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks

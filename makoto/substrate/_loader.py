@@ -41,7 +41,7 @@ class Check:
     loader only duck-types `.id` / `.applies_at` / `.posture`, so a module exporting its own
     richer dataclass is equally discoverable.
 
-    `may_block` (added when `load_stopchecks()`/`GATE` was retired -- DESIGN DECISION): a Stop-edge
+    `may_block` (added when `load_stopchecks()`/`GATE` was retired -- FABLE DECISION): a Stop-edge
     check is blocking-eligible only when BOTH `may_block is True` AND `posture == BLOCK` --
     two independent signals, not one. Before this field existed, blocking-eligibility was
     `posture == BLOCK` alone; `may_block` restores the second, structural layer the old

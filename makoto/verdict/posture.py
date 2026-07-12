@@ -93,7 +93,7 @@ def posture(env=None) -> str:
     return value if value in _POSTURES else DEFAULT_POSTURE
 
 
-# D6 (docs/DEFERRED.md, DESIGN DECISION 2026-07-07): the two permission_mode values where Claude
+# D6 (docs/DEFERRED.md, FABLE DECISION 2026-07-07): the two permission_mode values where Claude
 # Code's OWN human-confirmation layer is off. When the harness already isn't asking a human to
 # confirm a tool call, an operator-configured softening (LOOSE/SILENT) makes a flagged check
 # uncheckable in name only -- neither ADVISE (surfaces to an agent that auto-approves) nor ASK

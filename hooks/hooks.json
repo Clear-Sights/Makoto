@@ -32,6 +32,27 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+          }
+        ]
+      }
     ]
   }
 }

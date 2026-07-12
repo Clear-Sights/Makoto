@@ -61,7 +61,7 @@ def append_row(state_root: Path, row: AuditRow) -> None:
 
     Task 2 slice 3b (owner decision: unify -- every dispatch audit row is chain-appended). The
     SAME row is also appended to the chained, tamper-evident stream via
-    `ledger.append(..., root=state_root)` (an explicit root, per DESIGN DECISION 2026-07-07 --
+    `ledger.append(..., root=state_root)` (an explicit root, per FABLE DECISION 2026-07-07 --
     audit.py's whole contract is an explicit `state_root`, never an env var, so the chain write
     must land in exactly the caller's root, not wherever MAKOTO_STATE_DIR happens to point).
     `prev_hash`/`row_hash` come back ADDITIVE on the audit.jsonl line -- existing readers use
@@ -149,7 +149,7 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
     it can no longer be silent. This makes claim C3 ('on-the-record, auditable rationale, never a
     disguise') hold against the audit stream, not only the in-source annotation.
 
-    Task 2 slice 4 (review-flagged gap, closed): also chain-appended (kind="exemption", root=
+    Task 2 slice 4 (Fable-flagged gap, closed): also chain-appended (kind="exemption", root=
     state_root) so the receipt emitter's exemption_count cites a real `verify_chain`-backed row
     instead of an unchained file the receipt's own "every line re-runnable" claim couldn't honor.
     Same fault-tolerance as append_row's chain wire: a chain fault never blocks this write.

@@ -1,0 +1,15 @@
+{
+  "name": "makoto",
+  "owner": {"name": "Clear-Sights", "url": "https://github.com/Clear-Sights"},
+  "plugins": [
+    {
+      "name": "makoto",
+      "source": "./",
+      "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned (four narrow advisory self-checks excepted). Two-tier catalog (22 pre-checks, 16 Stop gates), each shipped at measured zero false positives.",
+      "category": "workflow",
+      "tags": ["integrity", "guardrails", "hooks", "claims"],
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/Clear-Sights/Makoto"
+    }
+  ]
+}

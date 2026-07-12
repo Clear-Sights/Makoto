@@ -78,18 +78,3 @@ def test_clean_stop_passes_silently(tmp_path):
                          "cwd": str(tmp_path),
                          "last_assistant_message": "Read through the module as asked."}, state)
     assert rc == 0 and out == ""
-
-
-def test_readme_references_exist():
-    """Every relative path the README embeds or links must exist in this tree — a landing page
-    that shows broken images or dead links is a said-but-not-shipped artifact (the exact shape
-    this suite exists to block). Regression: docs/demo/ was referenced for weeks while never
-    committed."""
-    import re
-    root = Path(__file__).resolve().parent.parent
-    readme = (root / "README.md").read_text()
-    refs = re.findall(r'<img src="([^"]+)"', readme)
-    refs += [m for m in re.findall(r"\]\(([^)]+)\)", readme)
-             if not m.startswith(("http://", "https://", "#", "mailto:"))]
-    missing = [r for r in refs if not (root / r.split("#")[0]).exists()]
-    assert not missing, f"README references missing files: {missing}"

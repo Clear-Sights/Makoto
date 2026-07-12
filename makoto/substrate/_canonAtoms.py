@@ -334,7 +334,7 @@ THE_CANON_17: Dict[str, str] = {
 # 7 (docs/findings/2026-06-23-gold-oracle-certification.md) AND (b) actually in this 17-fingerprint
 # scope -- 3 of the original 7 (nosrc_claim_red, nogreen_admit_destruct, checkdisabled_dne_revert)
 # depend on the missing assistant_admit/does_not_exist atoms and are among the 10 NOT ported here
-# (see DEFERRED.md's "SPEC-5 Task 9" entry). DESIGN DECISION 26 ratifies this exact count -- 4, not
+# (see DEFERRED.md's "SPEC-5 Task 9" entry). FABLE DECISION 26 ratifies this exact count -- 4, not
 # 7 and not 3 -- after an initial dispatcher miscount during this same session.
 #
 # Everything else in the 17 either rests on a soft/claim atom (claimed_pass_no_run, tool_timeout,

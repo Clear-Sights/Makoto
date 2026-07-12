@@ -75,7 +75,7 @@ def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=Non
     conn.commit()
     # chain-append the pre-upsert row too (append-only -- preserves what the sqlite upsert is
     # about to overwrite). ONLY when `root` is explicitly given: unlike ledger.append's own
-    # additive-default contract (env-var fallback, design-decided for that layer), this convenience
+    # additive-default contract (env-var fallback, Fable-decided for that layer), this convenience
     # wire is NEW here, and record_update has many pre-existing bare unit-test call sites with no
     # state-dir isolation at all -- guessing a default root for them would leak chain writes into
     # the real environment. root=None means "no chain append attempted", not "guess a location".
@@ -227,7 +227,7 @@ def store_root(*, root: Optional[Path] = None) -> Path:
     `root`, when given, overrides env-var resolution entirely (additive -- every existing zero-arg
     call site keeps today's behavior unchanged). For a caller that already holds its own explicit
     state root (audit.py's whole contract is `state_root: Path` params, never env vars) rather
-    than relying on `MAKOTO_STATE_DIR` -- DESIGN DECISION 2026-07-07 (Task 2 slice 3b): this beats
+    than relying on `MAKOTO_STATE_DIR` -- FABLE DECISION 2026-07-07 (Task 2 slice 3b): this beats
     a second, duplicate hash-chain implementation inside audit.py, which would let two copies of
     the canonicalization/hashing logic silently drift."""
     return root if root is not None else _chain_state_dir()
