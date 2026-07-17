@@ -1,0 +1,24 @@
+# One-shot release: tag v2.1.1 at the shim-fix squash-merge commit and publish the GitHub
+# Release. The session's git proxy refuses tag writes; Actions pushes the ref with the repo's
+# own token instead (owner-directed channel, 2026-07-17). workflow_dispatch so it fires exactly
+# once, and both steps are idempotent so a re-dispatch cannot go red. Removed after the release
+# verifies (same convention as DetIO-Dev's retired repoint-v010.yml).
+name: release-v2.1.1
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET: c157ba6dcc5a3287d4c41272a8d0b519a5226f17
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git push origin "$TARGET:refs/tags/v2.1.1"
+      - run: |
+          gh release view v2.1.1 >/dev/null 2>&1 || gh release create v2.1.1 --verify-tag \
+            --title "v2.1.1 — the marketplace install actually enforces" \
+            --notes "Fixes the defect that made every marketplace install inert: the dispatch shim ran \`python3 -m makoto._dispatch\` with no path setup, so every hook (PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart) died with ModuleNotFoundError exit 1 — a measured 100% failure rate, zero enforcement delivered. The shim now cd-pins to the plugin root (nothing in a session's working tree can shadow the package) and fails OPEN with a guaranteed-loud stderr line when the plugin root itself is unusable, matching _dispatch's documented HYBRID fail-mode. Regression-pinned by tests/test_dispatch_shim.py against a bare venv interpreter. Also aligns plugin.json (2.0.0 → 2.1.1) with pyproject so the marketplace reports the real version. See CHANGELOG [2.1.1]."
