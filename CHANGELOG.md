@@ -5,6 +5,22 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.1.1] — 2026-07-17
+
+### Fixed
+- **The dispatch shim can no longer be shadowed or silently die.** `_dispatch_shim.sh` ran
+  `python3 -m makoto._dispatch` with no path setup, so resolution depended entirely on the
+  hook process's working directory: any stray `makoto/` directory there shadowed the plugin
+  package, and in the common case (no `makoto/` in cwd at all) EVERY hook died with
+  `ModuleNotFoundError` exit 1 — a 100% failure rate on the marketplace install, observed
+  live. The shim now cd-pins to `$CLAUDE_PLUGIN_ROOT` before exec, and an unset/unusable
+  plugin root fails OPEN with a guaranteed-loud stderr line and an empty envelope, matching
+  `_dispatch`'s own HYBRID fail-mode. Pinned by `tests/test_dispatch_shim.py`, which runs the
+  shim against a bare venv interpreter so a dev editable install can't mask the regression.
+- **`plugin.json` version no longer lags the release.** It still said 2.0.0 while
+  `pyproject.toml` said 2.1.0, so the marketplace reported a stale version; both now carry
+  the release version.
+
 ## [2.1.0] — 2026-07-12
 
 ### Fixed
