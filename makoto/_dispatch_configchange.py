@@ -8,7 +8,7 @@ module via `dispatch_configchange.sh`. See `docs/self-defense-asymmetry-followup
 (`makoto.verdict.configchange_verdict.configchange_verdict`) is unit-tested against constructed payloads.
 
 **TWO TIERS, both owner-authorized (D5, docs/DEFERRED.md):**
-  1. **ADVISORY** (unconditional, per FABLE DECISION 6/9's precedent): the underlying verdict
+  1. **ADVISORY** (unconditional, per DESIGN DECISION 6/9's precedent): the underlying verdict
      firing on a path that has NEVER been recorded as wired or previously-clean always logs a
      stderr line + a best-effort audit-row append. Never blocks. This is the ambiguous
      "never wired vs. just stripped" case `configchange_verdict` itself cannot resolve.
