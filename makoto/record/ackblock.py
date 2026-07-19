@@ -1,5 +1,5 @@
 """ackblock: Task 2 slice 5 -- the discharge mechanism for session-level canon fingerprints
-(FABLE DECISION 2026-07-07, recorded verbatim in the plan). A SESSION-LEVEL fingerprint
+(DESIGN DECISION 2026-07-07, recorded verbatim in the plan). A SESSION-LEVEL fingerprint
 (gate.canon_fingerprints) matches over the whole recorded call stream; once its atoms go true
 they stay true forever (recorded history is immutable), so without a real discharge path it
 becomes a PERMANENT block for the rest of the session after any one matching action -- even a
@@ -8,7 +8,7 @@ certificate + teaches a gaming recipe), and operator self-disable (normalizes th
 Makoto must never normalize). The decided discharge: an OPERATOR-ATTRIBUTABLE
 `release.operator` record, never prose, never atom-narrowing.
 
-D8a (docs/DEFERRED.md, FABLE DECISION 2026-07-08, rename-only, owner-authorized 2026-07-08):
+D8a (docs/DEFERRED.md, DESIGN DECISION 2026-07-08, rename-only, owner-authorized 2026-07-08):
 this mechanism is the `release.operator` tier of Makoto's `release` family (`release.green` --
 world-verified, agent-earnable -- is a distinct, not-yet-built future item; this module
 implements ONLY the host-transcript-attributed tier). Epoch reset (2026-07-10, owner

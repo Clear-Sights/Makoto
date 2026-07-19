@@ -51,16 +51,20 @@ def test_install_wires_hooks_and_records_manifest(tmp_path, monkeypatch):
     assert manifest.exists(), "install must record the ConfigChange manifest"
 
 
-def test_forbidden_write_is_denied_on_the_wire(tmp_path):
+def test_env_gated_audit_is_denied_on_the_wire(tmp_path):
+    # forbiddenLocation moved to Ward, 2026-07-13 (github.com/Clear-Sights/Ward) -- content.env_gated_audit
+    # is the still-live substitute exercising the same PreToolUse-Write-deny wire shape.
     state = _state(tmp_path)
     rc, out = _dispatch({"hook_event_name": "PreToolUse", "session_id": "smoke-block",
                          "cwd": str(tmp_path), "tool_name": "Write",
-                         "tool_input": {"file_path": "/root/.ssh/x", "content": "k"},
+                         "tool_input": {"file_path": str(tmp_path / "app.py"),
+                                       "content": "if os.environ.get('ENABLE_AUDIT_TRAIL'):\n"
+                                                  "    write_audit_trail()\n"},
                          "tool_use_id": "t1"}, state)
     assert rc == 0
     decision = json.loads(out)["hookSpecificOutput"]
     assert decision["permissionDecision"] == "deny"
-    assert "forbidden location" in decision["permissionDecisionReason"]
+    assert "env" in decision["permissionDecisionReason"].lower()
 
 
 def test_benign_write_passes_silently(tmp_path):
@@ -78,3 +82,18 @@ def test_clean_stop_passes_silently(tmp_path):
                          "cwd": str(tmp_path),
                          "last_assistant_message": "Read through the module as asked."}, state)
     assert rc == 0 and out == ""
+
+
+def test_readme_references_exist():
+    """Every relative path the README embeds or links must exist in this tree — a landing page
+    that shows broken images or dead links is a said-but-not-shipped artifact (the exact shape
+    this suite exists to block). Regression: docs/demo/ was referenced for weeks while never
+    committed."""
+    import re
+    root = Path(__file__).resolve().parent.parent
+    readme = (root / "README.md").read_text()
+    refs = re.findall(r'<img src="([^"]+)"', readme)
+    refs += [m for m in re.findall(r"\]\(([^)]+)\)", readme)
+             if not m.startswith(("http://", "https://", "#", "mailto:"))]
+    missing = [r for r in refs if not (root / r.split("#")[0]).exists()]
+    assert not missing, f"README references missing files: {missing}"
