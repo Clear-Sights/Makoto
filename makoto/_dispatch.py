@@ -402,22 +402,48 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         except Exception:
             plan = None                                      # fail-open per-store, like every other read above
 
+        # cwd-first, and on a miss resolve against git work-trees this session synced
+        # (checks/_worldpaths.py) — a file produced remotely over ssh and landed here via
+        # `git pull` is on disk under a repo root, not under cwd, and a bare-name claim
+        # ("index.md") false-blocked gate.completion (issue #2). Observation widens; the
+        # verdict doesn't: every alternate path still ends in a live os.path.exists.
+        _wp = {"roots": None, "cache": {}}
+
+        def _world_path(p):
+            if p in _wp["cache"]:
+                return _wp["cache"][p]
+            full = os.path.join(cwd, p)
+            try:
+                if not os.path.exists(full):
+                    if _wp["roots"] is None:
+                        from makoto.checks._worldpaths import synced_repo_roots
+                        _wp["roots"] = synced_repo_roots(history, cwd)
+                    if _wp["roots"]:
+                        from makoto.checks._worldpaths import resolve_in_synced_repos
+                        alt = resolve_in_synced_repos(p, _wp["roots"])
+                        if alt:
+                            full = alt
+            except Exception:
+                pass                                     # resolution failure -> original verdict
+            _wp["cache"][p] = full
+            return full
+
         def fs_exists(p):
             try:
-                return os.path.exists(os.path.join(cwd, p))
+                return os.path.exists(_world_path(p))
             except Exception:
                 return False
 
         def fs_size(p):
             try:
-                full = os.path.join(cwd, p)
+                full = _world_path(p)
                 return os.path.getsize(full) if os.path.isfile(full) else None
             except Exception:
                 return None
 
         def fs_read(p):
             try:
-                full = os.path.join(cwd, p)
+                full = _world_path(p)
                 if os.path.isfile(full):
                     return open(full, encoding="utf-8", errors="replace").read()
             except Exception:
@@ -481,8 +507,8 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
 # marker — the seal on the mint cannot be signed by the would-be forger; gate.* check claims
 # against the ledger, where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
-    "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.cert_verify_disabled", "content.verifier_body_hollowed", "content.jwt_signature_disabled", "content.cert_none_mode", "content.timing_unsafe_compare",
-    "content.jwt_none_alg", "content.paramiko_host_key_weakened", "content.cert_reqs_none", "content.illusory_authorship_trailer"})
+    "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_body_hollowed",
+    "content.illusory_authorship_trailer"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
                "(any comment style) — an on-the-record, auditable rationale, never a disguise.")

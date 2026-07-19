@@ -27,7 +27,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
                                  state_root=None) -> List[Finding]:
     """One BLOCKING Finding per robust-core canon fingerprint that fires on this session's call
     stream (see _canonAtoms.BLOCK_IDS) -- UNLESS a qualifying release.operator discharges it (Task 2
-    slice 5, FABLE DECISION Option A): a session-level fingerprint over immutable recorded
+    slice 5, DESIGN DECISION Option A): a session-level fingerprint over immutable recorded
     history has no other legitimate discharge (narrowing the detector voids its 0-FP
     certificate; self-disabling normalizes the one action Makoto must never normalize), so once
     fired it would otherwise re-fire at every subsequent Stop for the rest of the session.

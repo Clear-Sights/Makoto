@@ -5,6 +5,22 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Fixed
+- **`gate.completion` no longer false-blocks a true claim about a file landed via a local
+  `git pull` from another machine.** A file produced on a remote machine over ssh and synced
+  locally is on disk under that repo's root, not under `cwd`, so a bare-name claim
+  (`"index.md"`) missed it. `makoto/checks/_worldpaths.py` widens the Stop-gate's
+  `fs_exists`/`fs_size`/`fs_read` closures: on a cwd-relative miss, resolve against git
+  work-trees this session actually synced (from the session's own Bash history), requiring
+  the candidate be git-tracked and suffix-match the claim at a path-separator boundary. Every
+  alternate path still ends in a live `os.path.exists`, so a claim about a file that exists
+  nowhere still blocks — this widens observation, never the verdict. (#2)
+- **8 hard-deny security checks (cert/JWT/SSH-host-key/timing-safe-compare/forbidden-location)
+  removed** — moved to a new sibling project, [Clear-Sights/Ward](https://github.com/Clear-Sights/Ward),
+  already re-implemented there with parity tests. `_ALLOW_EXEMPT_IDS`, `docs/MAKOTO-CONVENTIONS.md`,
+  and the pre-check count (22 → 14, README/plugin.json/marketplace.json) now agree with the
+  actually-shipped catalog.
+
 ## [2.1.1] — 2026-07-17
 
 ### Fixed

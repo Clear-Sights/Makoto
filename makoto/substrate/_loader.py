@@ -41,7 +41,7 @@ class Check:
     loader only duck-types `.id` / `.applies_at` / `.posture`, so a module exporting its own
     richer dataclass is equally discoverable.
 
-    `may_block` (added when `load_stopchecks()`/`GATE` was retired -- FABLE DECISION): a Stop-edge
+    `may_block` (added when `load_stopchecks()`/`GATE` was retired -- DESIGN DECISION): a Stop-edge
     check is blocking-eligible only when BOTH `may_block is True` AND `posture == BLOCK` --
     two independent signals, not one. Before this field existed, blocking-eligibility was
     `posture == BLOCK` alone; `may_block` restores the second, structural layer the old
@@ -58,7 +58,32 @@ class Check:
     `pattern.retry_hint`/`pattern.description` directly to build their Finding). A Stop-tier CHECK
     never sets them and reads them back as their safe empty defaults. `predicate_module` is
     conventionally set to the module's own `__name__` at CHECK-construction time
-    (self-referential, never a hand-typed/stale dotted string)."""
+    (self-referential, never a hand-typed/stale dotted string).
+
+    `layer` ("object" | "meta", default "object" -- DESIGN DECISION, session pass after the
+    envGatedAudit/selfMuteGuard/integritySuppressionFlag/selfWiredCheck grouping was proposed and
+    then narrowed on re-examination): "meta" marks a check whose ONLY possible trigger is
+    tampering with Makoto's own audit/enforcement machinery -- as opposed to "object", which
+    watches claims/artifacts about the assistant's OWN WORK. This is a real, distinct axis (is
+    the assistant lying about its work vs. is the assistant disabling the thing that would catch
+    the lie), but it is NOT a blanket tag for "checks that mention integrity/audit concepts" --
+    envGatedAudit.py and integritySuppressionFlag.py are GENERAL-PURPOSE detectors (any env-gated
+    audit code, any integrity-named suppression flag in a .toml, regardless of whether it has
+    anything to do with Makoto itself) and were deliberately left "object" rather than "meta":
+    tagging them meta and stripping their `makoto-allow` escape hatch would regress real FP-
+    tuning work (see each file's own "ACKNOWLEDGED FN" sections) for a case that isn't actually
+    self-referential. Only `content.self_mute_guard` and `gate.self_wired` are unambiguously
+    meta -- both can ONLY ever fire on Makoto's own settings.json/hook-wiring, nothing else.
+    `layer="meta"` has exactly ONE consumer today: `tests/test_meta_layer.py` asserts the two
+    known-meta check ids are tagged, catching drift if either is ever un-tagged or a new
+    Makoto-self-referential check ships untagged. It does NOT (yet) change enforcement/posture-
+    folding behavior -- selfMuteGuard's makoto-allow immunity is already hardcoded in its own
+    predicate (never calls the shared `makoto_allowed` path), and selfWiredCheck is Stop-tier
+    ADVISE (never BLOCK) and never reads `makoto-allow` at all, so neither needs the fold logic
+    touched to be correct. Wiring `layer` into `makoto.verdict.posture.apply()`'s fold rules
+    (e.g. a meta BLOCK never softening below ASK under LOOSE/SILENT) is a separate, higher-
+    blast-radius change affecting all 32 checks' shared fold path -- deliberately NOT bundled
+    into this additive schema field."""
     id: str
     applies_at: str
     posture: str
@@ -68,6 +93,7 @@ class Check:
     retry_hint: str = ""
     description: str = ""
     predicate_module: str = ""
+    layer: str = "object"
 
 
 def _candidate_files(directory: Path) -> list:

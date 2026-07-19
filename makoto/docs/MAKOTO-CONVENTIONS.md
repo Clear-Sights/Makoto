@@ -45,14 +45,7 @@ Content shapes — `makoto-allow: <reason>` exempts a legitimate instance:
 - `content.integrity_suppression_flag` — an integrity-named suppression flag (`*_skip` / `*_bypass` / `*_inapplicable = true`) in a `.toml` with no ADR backlink
 - `content.deferred_checkbox_theater` — DEFERRED checkbox theater on an open T-item
 - `content.phantom_citation` — a phantom citation: an Author-Year cite not in the project's canonical `CITATIONS.md` (also exemptable via the catalog's citations allowlist)
-- `content.cert_verify_disabled` — TLS/certificate verification disabled (`verify=False` / an unverified SSL context)
 - `content.verifier_body_hollowed` — a verifier neutered: body hollowed (`return True` / `pass` / `assert True`) or a broad `except` swallowing the failure, on the integrity-check surface
-- `content.jwt_signature_disabled` — JWT signature verification disabled (`jwt.decode` with `verify=False` / `verify_signature: False`)
-- `content.cert_none_mode` — certificate verification disabled (`SSLContext.verify_mode = CERT_NONE`)
-- `content.timing_unsafe_compare` — a timing-unsafe `==`/`!=` comparison of a secret/HMAC/digest (use `hmac.compare_digest`)
-- `content.jwt_none_alg` — a JWT decode allow-list whitelisting the unsigned `none` algorithm (alg-confusion bypass)
-- `content.paramiko_host_key_weakened` — paramiko SSH host-key verification weakened to `AutoAddPolicy`/`WarningPolicy`
-- `content.cert_reqs_none` — `cert_reqs=ssl.CERT_NONE` disabling peer-certificate verification at the call site
 - `content.illusory_authorship_trailer` — an illusory AI-authorship trailer in a commit command or written content (the agent claiming an authorship identity it does not hold)
 
 Event shapes — `makoto-allow` does NOT apply (the evidence is the event itself, not file content):
@@ -62,7 +55,6 @@ Event shapes — `makoto-allow` does NOT apply (the evidence is the event itself
 - `content.fabricated_commit_sha` — a fabricated commit SHA/tag presented as proof of a commit no `git commit`/`tag` produced
 - `content.self_mute_guard` — makoto self-mute: disabling/un-wiring makoto via `settings.json`. Never exemptable, in-band or out: the seal on the mint cannot be signed by the would-be forger.
 - `event.thrash_revert` — a whole-file `Write` reverts a file back to an earlier byte-identical whole-file content after an intervening different-content `Write` to the same path (an A->B->A self-revert with no net progress); no `makoto-allow` escape hatch is implemented for it.
-- `event.forbidden_location` — a Write/Edit whose target resolves outside the working directory (root-escape) or into a protected system/credential location (SPEC-5, ported by shape from Assay's `forbidden_location`). The evidence is the resolved target path itself, not annotatable file content; touching makoto's own wiring or state dir is out-of-band operator action, not an in-session edit.
 - `event.identical_retry`: a byte-identical Bash retry immediately following that SAME call's DETERMINISTIC failure (a syntax/import/permission/not-found error), with no intervening state change. The proactive twin of `canon.recur`: kills a stuck retry loop at length 1, before the redundant call even runs. Never fires on a transient failure (timeout, connection-refused, 5xx/429) or an ambiguous one: `checks/_failureClassifier.py`'s own fail-toward-uncertain contract.
 - `gate.contract_order` — a result-producing tool call issued while a declared Plan's dependency for that step is still undischarged (SPEC-5, ported by shape from Assay's `ContractOrder`); its Stop-time sibling gate of the same id guards the remainder at turn end. The evidence is the plan store's own recorded order, not file content.
 

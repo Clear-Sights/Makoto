@@ -4,7 +4,7 @@ a byte-identical Bash retry immediately following a DETERMINISTIC failure of the
 reactive at Stop, judging a run of >=2 consecutive identical failing calls after the fact). This
 fires BEFORE the redundant call even runs.
 
-Ship bar (two Fable consultations, docs/DEFERRED.md D1): BLOCK-tier only, and ONLY when
+Ship bar (two design consultations, docs/DEFERRED.md D1): BLOCK-tier only, and ONLY when
 `_failureClassifier.classify_failure` returns a CONFIDENT True (deterministic) for the prior
 call's result -- never on a transient failure (a timeout, a 5xx, "still running"), and never on
 an uncertain classification. An advisory version was rejected outright (this project's own

@@ -113,4 +113,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
-CHECK = _Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=RETRY_HINT, description=DESCRIPTION, layer="meta")

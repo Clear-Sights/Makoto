@@ -15,13 +15,11 @@ completeness check reports zero drift at rest; grows by one line per module Task
 """
 DECLARED_IDS: dict = {
     "gate.undeclared_falsifiable": "undeclaredFalsifiable",
-    "content.cert_verify_disabled": "certVerifyDisabled",
-    "content.jwt_signature_disabled": "jwtSignatureDisabled",
-    "content.cert_none_mode": "certNoneMode",
-    "content.timing_unsafe_compare": "timingUnsafeCompare",
-    "content.jwt_none_alg": "jwtNoneAlg",
-    "content.paramiko_host_key_weakened": "paramikoHostKeyWeakened",
-    "content.cert_reqs_none": "certReqsNone",
+    # content.cert_verify_disabled, content.jwt_signature_disabled, content.cert_none_mode,
+    # content.timing_unsafe_compare, content.jwt_none_alg, content.paramiko_host_key_weakened,
+    # content.cert_reqs_none moved to Ward, 2026-07-13 (github.com/Clear-Sights/Ward) -- hard
+    # denies with no deterministic substitute, dangerous regardless of intent or honesty, a
+    # third axis distinct from this project's sincerity charter.
     "content.verifier_predicate_weakened": "verifierPredicateWeakened",
     "content.env_gated_audit": "envGatedAudit",
     "content.integrity_suppression_flag": "integritySuppressionFlag",

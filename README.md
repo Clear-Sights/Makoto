@@ -19,7 +19,7 @@ accept without re-deriving it.
 
 makoto fires on mechanical hook events: every `PreToolUse`, `PostToolUse`, `Stop`, and (advisory-only;
 see [ConfigChange watch](#configchange-watch-advisory--evidence-gated-blocking) below) `ConfigChange`.
-It **blocks** (exit 2, which Claude Code treats as block-and-retry) on **22 pre-checks** across five
+It **blocks** (exit 2, which Claude Code treats as block-and-retry) on **14 pre-checks** across five
 families and **14 end-of-turn gates** (plus `gate.stale_establisher` and `gate.undeclared_falsifiable`,
 two permanently-advisory catalog-completeness checks outside this 14-gate contract entirely: 16 live
 Stop-tier checks in total). Every pre-check and every one of the 14 end-of-turn gates but two blocks;
@@ -40,17 +40,11 @@ that by design never block.
 - `content.deferred_checkbox_theater` `DEFERRED`-style checkbox theater on an open to-do item
 - `content.illusory_authorship_trailer` an illusory AI-authorship commit trailer the agent never actually wrote
 
-**Security-verifier disabling**: each a named CWE
-- `content.cert_verify_disabled` / `content.cert_none_mode` / `content.cert_reqs_none` TLS / peer-certificate verification disabled (`verify=False`, `CERT_NONE`)
-- `content.jwt_signature_disabled` / `content.jwt_none_alg` JWT signature verification off / `none` algorithm whitelisted
-- `content.paramiko_host_key_weakened` paramiko SSH host-key check weakened to `AutoAddPolicy` · `content.timing_unsafe_compare` timing-unsafe `==` on a secret/HMAC/digest
-
 **Self-defense**
 - `content.self_mute_guard` makoto self-mute (disabling or un-wiring makoto via `settings.json`)
 
 **Scope & contract discipline**: illusory progress and out-of-contract action (SPEC-5, ported by shape from Assay)
 - `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
-- `event.forbidden_location` a Write/Edit whose target resolves outside the working directory or into a protected system/credential location
 - `gate.contract_order` a result-producing call issued while a declared Plan's dependency for that step is still undischarged (its Stop-time sibling gate guards the remainder at turn end)
 
 **End-of-turn gates**: fire on the agent's closing claims, checked against the recorded ledger:
@@ -209,7 +203,7 @@ Every live pattern blocks (`fire_level = "error"` → exit 2). makoto deliberate
 non-blocking tier**: a `warning`/`disabled` resting state (witnessing a violation and letting the
 tool through) is itself an illusory word, the exact weakening shape makoto exists to catch. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
-blocks at proven zero corpus-FP, or it is cut). This still governs all 22 pre-checks (`_ALLOWED_FIRE_LEVELS
+blocks at proven zero corpus-FP, or it is cut). This still governs all 14 pre-checks (`_ALLOWED_FIRE_LEVELS
 = {"error"}`, enforced at load) and 12 of the 14 end-of-turn gates.
 
 **Two narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05) and
@@ -260,7 +254,7 @@ mis-block or mis-allow a tool call: a fundamental separation-of-concerns invaria
 
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
-Separate from the 22 pre-checks and 16 end-of-turn checks above: an optional `ConfigChange` hook
+Separate from the 14 pre-checks and 16 end-of-turn checks above: an optional `ConfigChange` hook
 entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
 being stripped. Two tiers, both fail-open on any unexpected fault:
 
