@@ -1,0 +1,26 @@
+name: One-shot branch cleanup (2026-07-19)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete already-merged branches
+        run: |
+          set -e
+          for b in \
+            "claude/shim-cd-pin-v2.1.1" \
+            "claude/github-issue-2-0dtwyo"; do
+            if git ls-remote --exit-code --heads origin "$b" >/dev/null 2>&1; then
+              git push origin --delete "$b"
+              echo "deleted: $b"
+            else
+              echo "already gone: $b"
+            fi
+          done
