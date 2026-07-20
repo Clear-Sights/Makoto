@@ -46,7 +46,8 @@ Content shapes — `makoto-allow: <reason>` exempts a legitimate instance:
 - `content.deferred_checkbox_theater` — DEFERRED checkbox theater on an open T-item
 - `content.phantom_citation` — a phantom citation: an Author-Year cite not in the project's canonical `CITATIONS.md` (also exemptable via the catalog's citations allowlist)
 - `content.verifier_body_hollowed` — a verifier neutered: body hollowed (`return True` / `pass` / `assert True`) or a broad `except` swallowing the failure, on the integrity-check surface
-- `content.illusory_authorship_trailer` — an illusory AI-authorship trailer in a commit command or written content (the agent claiming an authorship identity it does not hold)
+- `content.illusory_authorship_trailer` — an illusory Claude/Anthropic authorship or generation attribution (the literal trailer form, a `Claude-Session:` link, the routing address, or "Generated with/by Claude") in a commit command or written content <!-- makoto-allow: documenting the policy verbatim, not adding the trailer --> (a plain "Claude Code" product-name mention is not matched)
+- `content.illusory_interruption_claim` — a fabricated "interrupted by user" claim in a commit command or written content, with no genuine harness-set interruption anywhere in this session's recorded history
 
 Event shapes — `makoto-allow` does NOT apply (the evidence is the event itself, not file content):
 

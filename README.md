@@ -19,7 +19,7 @@ accept without re-deriving it.
 
 makoto fires on mechanical hook events: every `PreToolUse`, `PostToolUse`, `Stop`, and (advisory-only;
 see [ConfigChange watch](#configchange-watch-advisory--evidence-gated-blocking) below) `ConfigChange`.
-It **blocks** (exit 2, which Claude Code treats as block-and-retry) on **14 pre-checks** across five
+It **blocks** (exit 2, which Claude Code treats as block-and-retry) on **15 pre-checks** across five
 families and **14 end-of-turn gates** (plus `gate.stale_establisher` and `gate.undeclared_falsifiable`,
 two permanently-advisory catalog-completeness checks outside this 14-gate contract entirely: 16 live
 Stop-tier checks in total). Every pre-check and every one of the 14 end-of-turn gates but two blocks;
@@ -38,7 +38,8 @@ that by design never block.
 - `content.unsourced_webfetch` WebFetch of a URL never seen in any prior tool result this session
 - `content.fabricated_commit_sha` fabricated commit SHA/tag presented as proof of a commit
 - `content.deferred_checkbox_theater` `DEFERRED`-style checkbox theater on an open to-do item
-- `content.illusory_authorship_trailer` an illusory AI-authorship commit trailer the agent never actually wrote
+- `content.illusory_authorship_trailer` an illusory Claude/Anthropic authorship or generation attribution (trailer, session link, routing address, or "Generated with/by Claude" footer) — a plain "Claude Code" product-name mention is not matched
+- `content.illusory_interruption_claim` a fabricated "interrupted by user" claim with no genuine harness-set interruption anywhere in this session's recorded history
 
 **Self-defense**
 - `content.self_mute_guard` makoto self-mute (disabling or un-wiring makoto via `settings.json`)
@@ -58,7 +59,7 @@ that by design never block.
 - `gate.liveness`: fires on the code itself, not a claim: a statement with no live effect inside a closed function (dead/illusory work the present-closure model can prove inert). It walks the turn's touched `.py` ASTs, so it yields a finding per illusory statement rather than one per turn.
 - `gate.self_wired`: **advisory only, never blocks** (see [Fire level](#fire-level)). Partial-strip detection of makoto's own `.claude/settings.json` hook wiring: fires if `PreToolUse`/`PostToolUse`/`Stop` is missing a makoto-dispatching entry while at least one other still has one. It has a documented blind spot: a single edit that strips all three simultaneously disables this check in the same instant it would have fired (Claude Code reloads hook config live, not once at session start), so it provides zero coverage against that full-strip case. See the [ConfigChange watch](#configchange-watch-advisory--evidence-gated-blocking) section below, which closes exactly this gap when wired.
 - `gate.hollow_test`: fires on the code itself, not a claim: a HOLLOWED test (SPIRIT.md §4), one that survives in name while its content is gutted, so it can never actually fail. Four sub-patterns: no assertion of any kind in the test body; an asserted tautology (`assert True`, or comparing an expression to itself); a broad, no-op `try`/`except` that silently swallows the only call-under-test's failure; and a test-shaped function that can never fire independently, either nested inside another function (pytest's collector never discovers it) or gated behind a `skipif`/`skipIf` condition that is provably always true.
-- `gate.canon`: **blocking** (`level="error"`, unlike the advisory exceptions below). Two language-agnostic Stop primitives over the turn's own call stream, reading only closed protocol fields (tool_name/tool_input identity, `tool_response.interrupted`/`.error`), no test-runner regex, no language token. `canon.timeout` fires when the turn's LAST tool call ended in a direct error state (interrupted, or a self-emitted error code) and closed without resurfacing or resolving it; an error resolved by a later successful call stays silent. `canon.recur` fires when the SAME tool call (identical name + byte-identical input) was re-issued back-to-back and every call in that consecutive run ended in the same direct error state: a stuck retry loop with nothing changed between attempts; a later success in the same run silences it. Certified via held-out adversarial RED fixtures (planted cases that must fire) plus a near-vacuous corpus-FP check: the honest corpus almost never carries the triggering precondition (`interrupted`/`self_error_code`) at all, so a clean corpus replay alone is inconclusive, not a certification (see `ANCESTRY.md` §2 Part B for the corrected framing).
+- `gate.canon`: **blocking** (`level="error"`, unlike the advisory exceptions below). Two language-agnostic Stop primitives over the turn's own call stream, reading only closed protocol fields (tool_name/tool_input identity, `tool_response.interrupted`/`.error`), no test-runner regex, no language token. `canon.timeout` fires when the turn's LAST tool call ended in a direct error state (interrupted, or a self-emitted error code) and closed without resurfacing or resolving it; an error resolved by a later successful call stays silent. `canon.recur` fires when the SAME tool call (identical name + byte-identical input) was re-issued back-to-back and every call in that consecutive run ended in the same direct error state: a stuck retry loop with nothing changed between attempts; judged per (tool, input) key, so a later success for that same key silences it even with other, different calls in between. Certified via held-out adversarial RED fixtures (planted cases that must fire) plus a near-vacuous corpus-FP check: the honest corpus almost never carries the triggering precondition (`interrupted`/`self_error_code`) at all, so a clean corpus replay alone is inconclusive, not a certification (see `ANCESTRY.md` §2 Part B for the corrected framing).
 - `gate.canon_fingerprints`: **blocking**. 4 of 17 ported session-level "canon" fingerprints (SPEC-5 Task 9, from `REF-lever-graded-primitives/signalminer/grade_planted.py`'s 27-fingerprint `THE_CANON`) that are robust-core, blocking-capable by construction: 0-FP on both the planted-clean and real-Claude-gold negative sets per the gold-oracle certification (`nogreen_checkdisabled`, `nosrc_destruct`, `nosrc_green_timeout`, `notestedit_destruct`).
 - `gate.canon_fingerprints_advisory`: **advisory only, never blocks**. The other 13 of the same 17 fingerprints, each either resting on a soft/claim atom (`claimed_pass_no_run`, `tool_timeout`, `assertion_weakened`) the gold-oracle finding doesn't certify as robust, or one of that finding's explicitly-named worst-disqualified fingerprints. Recorded to the audit log per SPEC-5's total-retention rule, never emitted as a block decision.
 - `gate.contract_order`: **blocking**. The Stop-time remainder guard over a declared Plan (SPEC-5, ported by shape from Assay's `ContractOrder` pattern); fires when the turn ends with the plan's dependency remainder still non-empty. Its PreToolUse sibling guard is a pre-check, not a Stop gate; see `makoto/checks/contractOrder.py`.
@@ -203,7 +204,7 @@ Every live pattern blocks (`fire_level = "error"` → exit 2). makoto deliberate
 non-blocking tier**: a `warning`/`disabled` resting state (witnessing a violation and letting the
 tool through) is itself an illusory word, the exact weakening shape makoto exists to catch. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
-blocks at proven zero corpus-FP, or it is cut). This still governs all 14 pre-checks (`_ALLOWED_FIRE_LEVELS
+blocks at proven zero corpus-FP, or it is cut). This still governs all 15 pre-checks (`_ALLOWED_FIRE_LEVELS
 = {"error"}`, enforced at load) and 12 of the 14 end-of-turn gates.
 
 **Two narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05) and
@@ -254,7 +255,7 @@ mis-block or mis-allow a tool call: a fundamental separation-of-concerns invaria
 
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
-Separate from the 14 pre-checks and 16 end-of-turn checks above: an optional `ConfigChange` hook
+Separate from the 15 pre-checks and 16 end-of-turn checks above: an optional `ConfigChange` hook
 entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
 being stripped. Two tiers, both fail-open on any unexpected fault:
 
