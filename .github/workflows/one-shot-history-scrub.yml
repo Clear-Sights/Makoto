@@ -1,0 +1,39 @@
+name: One-shot history scrub apply (2026-07-20)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Safety gate - tree identity between main and the scrubbed branch
+        run: |
+          set -e
+          git fetch origin claude/history-scrub-test
+          diff_out="$(git diff main origin/claude/history-scrub-test --stat)"
+          if [ -n "$diff_out" ]; then
+            echo "ABORT: tree differs between main and claude/history-scrub-test" >&2
+            echo "$diff_out" >&2
+            exit 1
+          fi
+          count_main=$(git rev-list --count main)
+          count_scrub=$(git rev-list --count origin/claude/history-scrub-test)
+          if [ "$count_main" != "$count_scrub" ]; then
+            echo "ABORT: commit count differs ($count_main vs $count_scrub)" >&2
+            exit 1
+          fi
+          echo "tree identity + commit count confirmed ($count_main commits)"
+      - name: Force-update main to the message-scrubbed history
+        run: git push origin origin/claude/history-scrub-test:refs/heads/main --force
+      - name: Repoint v2.1.1 tag to the scrubbed commit
+        run: |
+          new_sha="$(git rev-parse origin/claude/history-scrub-test)"
+          git push origin "${new_sha}:refs/tags/v2.1.1" --force
