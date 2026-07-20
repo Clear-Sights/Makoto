@@ -20,8 +20,11 @@ boundary (design's method B). Two primitives are installed:
   * canon.recur   — `recur_stuck`: the SAME tool call (identical tool_name + byte-identical
     tool_input) re-issued in a CONSECUTIVE run of length >=2 where EVERY call in that run is in
     a direct error state — a stuck retry loop with nothing changed between attempts. Verdict is
-    judged at the END of each maximal consecutive run, so a later success in the same run
-    silences it.
+    judged per KEY at the END of each of that key's maximal consecutive runs, and the LAST
+    judgment for each key wins — so a later success for the same key silences it even when other,
+    different calls happened in between (a bugfix: the original judged the instant a bad run
+    closed and never looked further ahead, so a retry loop that failed twice, had an unrelated
+    call intervene, then genuinely succeeded on a later attempt still read as permanently stuck).
 
 ADAPTATION NOTE (the substrate divergence from the ancestor, revised for FD14-A): the ancestor's
 `calls_from_history` turned every PreToolUse OR PostToolUse row into a Call. Live makoto's real
@@ -154,19 +157,33 @@ def timed_out(c: Call) -> bool:
 
 # ---- sequence-aware primitives (read a span of the call stream, not one call) ----------------
 def recur_stuck(calls: list) -> bool:
-    """RECUR / non-refire: a STUCK RETRY LOOP. Fires iff the SAME tool call — identical tool_name
-    AND identical tool_input — appears in a CONSECUTIVE run (no intervening *different* call) of
-    length >= 2 where EVERY call in that run is in a direct error state (`timed_out`).
+    """RECUR / non-refire: a STUCK RETRY LOOP. Fires iff, for at least one (tool_name,
+    tool_input) key, that key's MOST RECENT maximal consecutive run (no intervening *different*
+    call) in the call stream has length >= 2 and every call in it is in a direct error state
+    (`timed_out`).
 
     Deliberately conservative: silent if any retry changed the input (real progress), if any
-    different action intervened (loop broken), or if any occurrence succeeded (no error state).
-    Verdict is DEFERRED to the END of each maximal consecutive identical run (run boundary or end
-    of list): fire only when a run ENDS with run_len>=2 and every call in it was in the no-info
-    error state. So [ERR, ERR, OK] does NOT fire — the later identical SUCCESS lands in the same
-    run and flips run_all_err False before the run ends, silencing the loop."""
+    different action intervened (loop broken) with nothing further from that same key, or if any
+    occurrence in the run succeeded (no error state). Each key's verdict is DEFERRED to the END
+    of each maximal consecutive run for that key (run boundary or end of list): a run is judged
+    bad only when it ends with run_len>=2 and every call in it was in the no-info error state. So
+    [ERR, ERR, OK] does NOT fire — the later identical SUCCESS lands in the same run and flips
+    run_all_err False before the run ends, silencing the loop.
+
+    BUGFIX (this ticket, live-observed): the original judged each run the instant it closed and
+    returned True immediately on the first bad one, permanently for the rest of the calls list —
+    so [ERR, ERR, <different call>, ERR, ERR, ..., <same key succeeds>] stayed stuck-True even
+    though the SAME call went on to genuinely resolve later, just not immediately back-to-back
+    with the failing run (a different, unrelated call sat in between, e.g. checking a PR's status
+    between retries against a flaky API). A key whose retries eventually succeed, however many
+    unrelated calls sit in between, is not a stuck loop by the time the turn ends — only a key
+    whose MOST RECENT run is itself still bad should fire. Every run is now judged as it closes,
+    per key, and the LAST judgment for each key wins; a fresh success (even a lone one, not
+    itself part of a run>=2) for a key overwrites an earlier bad verdict for that same key."""
     def _no_info_err(c) -> bool:
         return interrupted(c) or bool(self_error_code(c))
 
+    last_bad: dict = {}     # key -> whether that key's most-recently-closed run was stuck-bad
     run_key = None          # (name, canonical_input) of the current consecutive identical run
     run_all_err = False     # every call in the current run so far was in a no-info error state
     run_len = 0
@@ -177,13 +194,15 @@ def recur_stuck(calls: list) -> bool:
             run_all_err = run_all_err and _no_info_err(c)
         else:
             # the previous run just ENDED — judge it now that it's complete
-            if run_len >= 2 and run_all_err:
-                return True
+            if run_key is not None:
+                last_bad[run_key] = run_len >= 2 and run_all_err
             run_key = key
             run_len = 1
             run_all_err = _no_info_err(c)
     # judge the final run at end-of-list
-    return run_len >= 2 and run_all_err
+    if run_key is not None:
+        last_bad[run_key] = run_len >= 2 and run_all_err
+    return any(last_bad.values())
 
 
 def timed_out_at_turn_end(calls: list) -> bool:

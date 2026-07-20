@@ -1,6 +1,6 @@
 {
   "name": "makoto",
-  "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned (two narrow advisory self-checks excepted). Two-tier catalog (14 pre-checks, 14 Stop gates), each shipped at measured zero false positives.",
+  "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned (two narrow advisory self-checks excepted). Two-tier catalog (15 pre-checks, 14 Stop gates), each shipped at measured zero false positives.",
   "version": "2.1.1",
   "author": {"name": "Clear-Sights"},
   "homepage": "https://github.com/Clear-Sights/Makoto",

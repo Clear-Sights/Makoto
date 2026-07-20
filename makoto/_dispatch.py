@@ -508,7 +508,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
 # against the ledger, where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
     "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_body_hollowed",
-    "content.illusory_authorship_trailer"})
+    "content.illusory_authorship_trailer", "content.illusory_interruption_claim"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
                "(any comment style) — an on-the-record, auditable rationale, never a disguise.")

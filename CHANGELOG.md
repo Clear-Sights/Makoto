@@ -6,6 +6,20 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [Unreleased]
 
 ### Fixed
+- **`canon.recur` no longer stays permanently stuck once a retry loop genuinely resolves.**
+  Verdict is now judged per (tool, input) key, and the last judgment for each key wins: a later
+  success for that key silences it even when different calls happened in between, while a
+  genuinely still-stuck key still fires.
+
+### Added
+- **`content.illusory_authorship_trailer` widened** to also catch the routing address
+  (`noreply@anthropic.com`), a `Claude-Session:` trailer, and "Generated with/by Claude"
+  prose — not just the literal git trailer. A plain "Claude Code" product-name mention is
+  deliberately not matched.
+- **New `content.illusory_interruption_claim`**: catches a fabricated "interrupted by user"
+  claim, grounded against this session's own recorded history.
+
+### Fixed
 - **`gate.completion` no longer false-blocks a true claim about a file landed via a local
   `git pull` from another machine.** A file produced on a remote machine over ssh and synced
   locally is on disk under that repo's root, not under `cwd`, so a bare-name claim
