@@ -243,6 +243,49 @@ def _select_recent(conn, session_id: str, event_id: int) -> list:
     ).fetchall()
 
 
+def _history_for_agent(history, stop_payload: dict) -> list:
+    """Return only history positively attributable to the thread ending in ``stop_payload``.
+
+    Claude Code gives subagent hooks a non-empty top-level ``agent_id`` while the ordinary main
+    loop is structurally a plain ``Stop`` with no ``agent_id`` key.  Preserve that distinction:
+    exact-id subagents see exact-id rows, and a structurally plain main Stop sees only rows that
+    are likewise structurally agentless.  An empty/malformed id, a SubagentStop with no id, or an
+    undecodable row is ambiguous and contributes no history rather than entering a shared None
+    bucket.  This intentionally fails open for an unidentifiable thread: pooling would let another
+    agent's dangling PreToolUse synthesize failures and false-block every later Stop in a session.
+    """
+    if not isinstance(stop_payload, dict):
+        return []
+    if "agent_id" in stop_payload:
+        agent_id = stop_payload.get("agent_id")
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            return []
+
+        def belongs(payload):
+            return payload.get("agent_id") == agent_id
+    elif stop_payload.get("hook_event_name") == "Stop":
+        def belongs(payload):
+            return "agent_id" not in payload
+    else:
+        return []
+
+    scoped = []
+    for row in history or ():
+        if isinstance(row, (tuple, list)) and len(row) > 4:
+            raw = row[4]
+        elif hasattr(row, "get"):
+            raw = row.get("payload")
+        else:
+            continue
+        try:
+            payload = raw if isinstance(raw, dict) else json.loads(raw)
+        except Exception:
+            continue
+        if isinstance(payload, dict) and belongs(payload):
+            scoped.append(row)
+    return scoped
+
+
 def _keyword_hit(pattern: PreCheck, raw_payload: str) -> bool:
     """True iff any of pattern.keywords is a substring of raw_payload."""
     if not pattern.keywords:
@@ -364,6 +407,10 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
     gates are explicitly enabled) or are audit-only (shadow mode for corpus FP mining).
     """
     try:
+        # Thread-boundary firewall: no Stop gate may linearize another agent's events into this
+        # agent's call stream. In particular, canon FD14-A must never synthesize a failure from a
+        # dangling PreToolUse owned by a sibling subagent.
+        history = _history_for_agent(history, payload)
         text = payload.get("last_assistant_message") or ""
         if not text:
             return []
