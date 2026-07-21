@@ -118,16 +118,30 @@ def _is_test_path(fp) -> bool:
 # ponytail: heuristic denylist of canonically-destructive shell operations; expand as real corpus
 # misses surface -- an FN-safe recall bound (it only ever ADDS an alternative), never a false-block
 # source.
+#
+# Five entries below scan `[^|;&\n]*` past the base command rather than requiring the trigger
+# token immediately adjacent to it (git-issue #10's own dd fix, generalized: `\bdd\s+if=` missed
+# `dd of=X if=Y` for the same reason `git\s+push\s+(?:-f|--force)` misses `git push origin main
+# --force`, and `git\s+reset\s+--hard` misses `git reset --quiet --hard` -- all three required the
+# trigger to be the very next token). The stop-set excludes a pipe/semicolon/`&`/newline so the
+# scan can't wander into an unrelated chained command on either side. `git clean` and `git push`
+# additionally veto on a real `-n`/`--dry-run` flag found anywhere in that same span, since neither
+# command does anything on a dry run regardless of what else is present. `mkfs.*` deliberately does
+# NOT get a dry-run veto: `-n` means "dry run" for mkfs.ext4 but "volume label" for mkfs.vfat, so a
+# blanket exclusion would silently create a false negative on a real mkfs.vfat format. `rm`'s own
+# long-form gap (`rm --recursive --force`) is left unfixed for the same kind of reason -- closing
+# it needs a real flag parser, not a wider letter-class scan (a loose scan for a bare "r" collides
+# with unrelated flags like --preserve-root).
 _DESTRUCTIVE_RX = re.compile(
     r"\brm\s+-\w*(?:rf|fr)\w*\b"
-    r"|\bgit\s+reset\s+--hard\b"
-    r"|\bgit\s+clean\s+-\w*[dfx]\w*\b"
-    r"|\bgit\s+push\s+(?:-f\b|--force\b)"
-    r"|\bgit\s+checkout\s+--\s+\.\b"
+    r"|\bgit\s+reset\b(?=[^|;&\n]*--hard\b)"
+    r"|\bgit\s+clean\b(?=[^|;&\n]*(?:\s-\w*[dfx]\w*\b|--force\b))(?![^|;&\n]*(?:\s-\w*n\w*\b|--dry-run\b))"
+    r"|\bgit\s+push\b(?=[^|;&\n]*(?:\s-f\b|--force\b))(?![^|;&\n]*(?:\s-n\b|--dry-run\b))"
+    r"|\bgit\s+checkout\s+--\s+\.(?!\w)"
     r"|\bdrop\s+(?:table|database)\b"
     r"|\btruncate\s+table\b"
     r"|\bmkfs\.\w+"
-    r"|\bdd\s+if=",
+    r"|\bdd\b[^|;&\n]*\bof=",
     re.IGNORECASE)
 
 # ponytail: a bash bypass-flag denylist for "a check was disabled" -- not a general flag parser.
