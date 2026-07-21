@@ -6,6 +6,17 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [Unreleased]
 
 ### Fixed
+- **`canon.destructive_command` no longer false-blocks a read-only `dd`, and now catches a
+  force-push/hard-reset/interactive-clean wherever its trigger flag actually sits.** `dd if=`
+  fired on any `dd` invocation regardless of whether it also wrote anywhere (`of=`) — using
+  `dd` as a byte-range reader (piped to `fold`/`xxd`, no `of=`) tripped `destructive_command`
+  for the rest of the session. Also generalized the same fix to the rest of the denylist:
+  `git clean`/`git push`/`git reset --hard` required their trigger flag immediately after the
+  base command, missing e.g. `git push origin main --force`; `git clean`/`git push` now also
+  veto on a real `-n`/`--dry-run` found anywhere in the command; and `git checkout -- .` had a
+  regex bug that made it dead code (it could never actually match). `mkfs.*`'s own `-n` was
+  deliberately left alone — it means dry-run for `mkfs.ext4` but volume-label for `mkfs.vfat`,
+  so a blanket exclusion would have silently created a false negative on a real format. (#10)
 - **`canon.recur` no longer stays permanently stuck once a retry loop genuinely resolves.**
   Verdict is now judged per (tool, input) key, and the last judgment for each key wins: a later
   success for that key silences it even when different calls happened in between, while a
