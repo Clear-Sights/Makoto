@@ -12,8 +12,16 @@ Stdlib-only, no makoto-internal imports: safe for anything to depend on.
 """
 from __future__ import annotations
 
+import json
+import os
+
 # The managed-entry marker `makoto install` writes into settings.json hook entries.
 MAKOTO_CLAUDE_FLAG = "_makoto_managed"
+
+# The plugin manifest's own path, relative to a resolved plugin root (matches hooks/hooks.json
+# in this repo, the same file Claude Code reads to wire PreToolUse/PostToolUse/Stop/SubagentStop/
+# SessionStart to ${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh for a plugin-packaged install).
+PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 
 
 def entry_dispatches_to_makoto(entry) -> bool:
@@ -28,3 +36,40 @@ def entry_dispatches_to_makoto(entry) -> bool:
         return True
     return any(isinstance(inner, dict) and "makoto" in str(inner.get("command", "")).lower()
                for inner in entry.get("hooks", []))
+
+
+def event_wired(hooks, event: str) -> bool:
+    """True iff a hooks-shaped dict (either settings.json's own "hooks" key, or a plugin
+    manifest's "hooks" key -- same shape, same semantics) wires `event` to makoto. Shared by both
+    wiring sources so selfWiredCheck's two-source check applies IDENTICAL rigor to each -- this is
+    not "does a file exist", it is "does a real entry for this exact event name makoto"."""
+    if not isinstance(hooks, dict):
+        return False
+    return any(entry_dispatches_to_makoto(h) for h in hooks.get(event, []) or ())
+
+
+def read_plugin_manifest_hooks(plugin_root, fs_read) -> dict:
+    """Best-effort read of <plugin_root>/hooks/hooks.json's own "hooks" dict, or {} on ANY
+    failure (no plugin_root, unreadable, malformed JSON, non-dict payload, non-dict "hooks").
+    Fails CLOSED toward "confirms nothing" -- {} never suppresses a gate.self_wired finding,
+    only an actually-parsed, actually-declaring manifest can. `plugin_root` should be the live
+    $CLAUDE_PLUGIN_ROOT (the same pointer Claude Code substitutes into the hook command itself),
+    never a guessed/cached path -- a forged or stale root would make this a decoy an attacker
+    could plant, not a live wiring signal; a genuinely unresolvable root must degrade to alarm
+    (report missing), never to silent-wired."""
+    if not plugin_root:
+        return {}
+    try:
+        raw = fs_read(os.path.join(plugin_root, PLUGIN_MANIFEST_RELPATH))
+    except Exception:
+        return {}
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    hooks = data.get("hooks")
+    return hooks if isinstance(hooks, dict) else {}
