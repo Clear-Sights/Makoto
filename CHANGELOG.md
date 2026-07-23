@@ -5,6 +5,21 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Added
+- **`gate.claimed_running`** — a new blocking end-of-turn gate: the assistant claims an ongoing
+  process/service liveness state ("the server is running", "it's up and listening on port 5173")
+  that this session's own recorded Bash evidence contradicts — either no process-start or
+  liveness-check command ran at all this session, or the most recently recorded one ended in a
+  direct error state (interrupted, or a non-zero exit code). The claim signal requires a
+  co-occurring first-person process-start verb ("I started / launched / ran ...") in the same
+  message, so generic explanatory prose about a tool's default behavior doesn't trip it. 17th
+  end-of-turn gate; see `makoto/checks/claimedRunningAbsent.py`.
+- **`gate.run_promised`** — a new blocking end-of-turn gate, the forward-looking sibling of
+  `gate.claimed_running`: the immediately prior turn made a first-person run-intent promise
+  ("I'll run the tests", "let me deploy this") with no Bash call anywhere in the session's
+  recorded history since. One-turn grace period: a promise made this turn can only be checked
+  starting at the next one. 18th end-of-turn gate; see `makoto/checks/runIntentUnfulfilled.py`.
+
 ### Fixed
 - **`canon.destructive_command` no longer false-blocks a read-only `dd`, and now catches a
   force-push/hard-reset/interactive-clean wherever its trigger flag actually sits.** `dd if=`

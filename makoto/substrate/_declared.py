@@ -56,4 +56,10 @@ DECLARED_IDS: dict = {
     # by shape from Assay's plan/gaps.py + patterns/{contract_order,stale_establisher}.py.
     "gate.contract_order": "contractOrder",
     "gate.stale_establisher": "staleEstablisher",
+    # An agnostic (gate.canon-sense) claimed-running-but-nothing-runs check, mirroring
+    # gate.completion's claim-vs-ledger shape but for ongoing process/service liveness.
+    "gate.claimed_running": "claimedRunningAbsent",
+    # The forward-looking sibling of gate.claimed_running: a first-person run-intent promise
+    # ("I'll run the tests") left with no Bash evidence anywhere in history by the next turn.
+    "gate.run_promised": "runIntentUnfulfilled",
 }

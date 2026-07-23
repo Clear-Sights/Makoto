@@ -57,6 +57,15 @@ class GateContext:
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the release.operator discharge can read/append the chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
+    history_all_agents: Sequence = ()       # the SAME _select_recent time-windowed slice as
+    #   `history`, but NOT narrowed by _history_for_agent's thread-boundary firewall -- every
+    #   agent's PostToolUse rows pooled. Exists ONLY for gate.claimed_running's Bash-launch
+    #   evidence (2026-07-23): a subagent dispatched to start/verify a process is real session
+    #   evidence the main thread's own running-claim must see. `history` narrows to the calling
+    #   thread specifically to stop a DANGLING (in-flight) PreToolUse from synthesizing a FAILURE
+    #   across threads -- a risk that does not apply to a completed PostToolUse Bash call. Every
+    #   other gate should keep reading `history`; widen a gate onto this field only with the same
+    #   reasoning claimedRunningAbsent.py's module docstring documents.
 
     @property
     def roots(self):

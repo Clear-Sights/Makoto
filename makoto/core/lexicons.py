@@ -298,6 +298,114 @@ _TEETH_FRAME_RX = re.compile(
 _EMPTY_OK = frozenset({"__init__.py", ".gitkeep", ".keep", ".empty", ".placeholder", "py.typed"})
 
 
+# --- gate.claimed_running vocabulary (an ongoing process/service liveness claim) ---
+# A CLOSED set of process-referring subjects — mirrors _GREEN_CLAIM_RX's closed-subject-head
+# shape: an unrelated/unlisted subject fails open (precision over recall, same tradeoff every
+# closed-lexicon gate in this file makes).
+_RUNNING_SUBJECT = (
+    r"(?:it|this|that|the\s+(?:dev(?:elopment)?\s+)?server|the\s+app(?:lication)?|"
+    r"the\s+service|the\s+api|the\s+backend|the\s+frontend|the\s+process|"
+    r"the\s+container|the\s+daemon|the\s+worker|the\s+job|the\s+bot|the\s+site|"
+    r"the\s+database|the\s+program)"
+)
+# Present-tense copula ONLY (is/are/'s/'re) — 'was/were running' is an honest past-tense
+# admission (possibly of a crash) and fails open by construction; no separate past-tense veto
+# needed. `\s*` (not `\s+`) between subject and copula so a fused contraction ("it's", "that's")
+# still binds — the copula alternation itself is the effective right-boundary (no spurious
+# mid-word match: "itinerary" cannot satisfy `(?:is|are|'s|'re)` at the position right after
+# "it", so that alternative fails there and the engine moves on).
+_RUNNING_PRED = (
+    r"(?:is|are|'s|'re)\s*(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+)?"
+    r"(?:up\s+and\s+running|running|live|up|listening|serving)\b"
+)
+# Two subject-less alternatives for banner-style status prose ("Now running.", "listening on
+# port 5173", "serving at http://...") — each anchored on a recency/port/URL token so a bare
+# "serving" alone (too generic on its own) cannot match without one.
+_RUNNING_CLAIM_RX = re.compile(
+    rf"\b{_RUNNING_SUBJECT}\s*{_RUNNING_PRED}"
+    r"|\bnow\s+(?:running|listening|serving)\b"
+    r"|\b(?:running|listening|serving)\s+(?:on|at)\s+(?:https?://|port\s+|:)\S+",
+    re.IGNORECASE)
+# A first-person process-lifecycle ACTION verb (past/perfective) — checks.claimedRunningAbsent
+# requires this to co-occur ANYWHERE in the claim text as a precision firewall: generic
+# explanatory prose ("Vite's dev server is running on port 5173 by default") essentially never
+# ALSO narrates the assistant itself starting something, so this co-occurrence kills that FP
+# class at the cost of a documented recall bound (a bare re-confirmation with no start narrated
+# in the same turn, e.g. "checked again — still running fine", fails open). State words
+# (running/live/up/listening/serving) are deliberately EXCLUDED from this list — including one
+# would make the co-occurrence requirement circular against _RUNNING_CLAIM_RX's own predicate.
+_PROCESS_START_VERB_RX = re.compile(
+    r"\bI(?:'ve|'d|\s+have)?\s+(?:just\s+)?(?:started|launched|spun\s+up|spinning\s+up|"
+    r"brought\s+up|booted|kicked\s+off|fired\s+up|restarted|re-started|ran|deployed|stood\s+up)\b",
+    re.IGNORECASE)
+# Bash-command classifier for "this call concerns a long-lived process's lifecycle" — open-world,
+# deliberately broad like _TEST_RUNNER_RX: an unlisted launcher/healthcheck shape is a documented
+# RECALL bound, never a false-block source. Three families: shell backgrounding operators (the
+# one truly ecosystem-agnostic signal, present regardless of language/framework), common
+# launch/serve commands across several ecosystems, and common liveness-check commands (curl/ps/
+# docker ps/...) — the strongest evidence, since a healthcheck's own exit code is a direct
+# verdict, not merely "we tried to start something".
+_PROCESS_LIFECYCLE_CMD_RX = re.compile(
+    r"&\s*$|\bnohup\b|\bdisown\b|\bsetsid\b|"
+    r"\bpm2\s+(?:start|restart)\b|\bdocker\s+(?:run|start|compose\s+up)\b|\bdocker-compose\s+up\b|"
+    r"\bsystemctl\s+(?:start|restart)\b|\bservice\s+\S+\s+start\b|"
+    r"\bnpm\s+(?:run\s+)?(?:start|dev|serve)\b|\byarn\s+(?:start|dev)\b|\bpnpm\s+(?:start|dev)\b|"
+    r"\bflask\s+run\b|\brails\s+(?:server|s)\b|\b(?:uvicorn|gunicorn|hypercorn)\b|"
+    r"\bpython[0-9.]*\s+-m\s+http\.server\b|\bmanage\.py\s+runserver\b|"
+    r"\bnode\s+\S+\.js\b|\bnext\s+(?:dev|start)\b|\bvite\b|"
+    r"\bcargo\s+run\b|\bgo\s+run\b|\bjava\s+-jar\b|"
+    r"\bcurl\b|\bwget\b|\bnc\s+-z\b|\blsof\s+-i\b|\bnetstat\b|\bss\s+-\w*l\w*\b|"
+    r"\bps\s+(?:aux|-ef|-e)\b|\bpgrep\b|\bdocker\s+ps\b|\bsystemctl\s+status\b|\bpm2\s+(?:status|list)\b",
+    re.IGNORECASE)
+
+
+# --- gate.run_promised vocabulary (a first-person FORWARD run-intent promise) ---
+# The forward-looking sibling of gate.claimed_running's vocabulary above: mirrors
+# _PROCESS_START_VERB_RX's own closed process-lifecycle verb set, base/infinitive form instead of
+# past-tense, bound to a first-person FORWARD auxiliary instead of "I ...ed". Closed subject
+# (always first-person here) plus closed verb by construction -- the same precision trade every
+# closed-lexicon gate in this file makes: "it's going to rain today" cannot match (wrong subject,
+# and 'rain' is nowhere in the verb set).
+_RUN_INTENT_AUX_RX_SRC = (
+    r"(?:I(?:['’]m|\s+am)\s+(?:going\s+to|about\s+to)|I(?:['’]ll|\s+will)|"
+    r"let\s+me|I\s+plan\s+to)"
+)
+# At most ONE filler adverb between the auxiliary and the verb ("I'll now run ...", "I'm going to
+# quickly restart ..."). Deliberately a CLOSED set, not `\w+`: a hedge ("probably", "maybe") or a
+# negation ("never", "not") sitting in this slot must break the match outright rather than being
+# silently swallowed as filler -- "I'll probably run ..." is not a firm commitment, and a match
+# that had to be vetoed post-hoc is a weaker guarantee than one that never fires in the first place.
+_RUN_INTENT_GAP_RX_SRC = r"(?:\s+(?:just|now|right\s+now|quickly|immediately|also|then))?\s+"
+# Bare "start" is EXCLUDED from the shared verb set below -- unlike run/launch/deploy/..., "start"
+# is heavily overloaded for beginning any activity at all ("I'm going to start writing the
+# tests"), not specifically a process/command. It only qualifies paired with a closed
+# process-object noun (mirrors _RUNNING_SUBJECT's own object list) -- a forward promise needs a
+# concrete named object, unlike a state-claim which can lean on discourse anaphora (it/this/that)
+# for something already introduced.
+_RUN_INTENT_START_OBJECT_RX_SRC = (
+    r"start\s+(?:up\s+)?(?:the\s+(?:dev(?:elopment)?\s+)?server|the\s+app(?:lication)?|"
+    r"the\s+service|the\s+api|the\s+backend|the\s+frontend|the\s+process|the\s+container|"
+    r"the\s+daemon|the\s+worker|the\s+job|the\s+bot|the\s+site|the\s+database|the\s+program)"
+)
+_RUN_INTENT_VERB_RX_SRC = (
+    r"(?:run|launch|spin\s+up|bring\s+up|boot(?:\s+up)?|kick\s+off|fire\s+up|re-?start|deploy|"
+    r"stand\s+up)"
+)
+_RUN_INTENT_CLAIM_RX = re.compile(
+    rf"\b{_RUN_INTENT_AUX_RX_SRC}\b{_RUN_INTENT_GAP_RX_SRC}"
+    rf"(?:{_RUN_INTENT_VERB_RX_SRC}|{_RUN_INTENT_START_OBJECT_RX_SRC})\b",
+    re.IGNORECASE)
+# Narrow, targeted idiom vetoes for the verb "run" specifically -- checked by the caller against
+# the text IMMEDIATELY following the match (checks.runIntentUnfulfilled._run_intent_claim): "run X
+# BY Y" is the approval idiom ("I'll run this by you first"), "run THROUGH X" is a walkthrough/
+# review idiom, "run the/some numbers" is a mental-math idiom -- none of them is execution intent.
+_RUN_INTENT_IDIOM_VETO_RX = re.compile(
+    r"^\s*(?:\w+\s+){0,3}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
+    r"|^\s*through\b"
+    r"|^\s*(?:the\s+|some\s+)?numbers\b",
+    re.IGNORECASE)
+
+
 # --- Retraction vocabulary (relocated from engine.py, §3b/§6 — L0) ---
 
 # A commitment is cleared (status='retracted') only when the assistant DELIBERATELY drops it
