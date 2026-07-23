@@ -409,7 +409,11 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
     try:
         # Thread-boundary firewall: no Stop gate may linearize another agent's events into this
         # agent's call stream. In particular, canon FD14-A must never synthesize a failure from a
-        # dangling PreToolUse owned by a sibling subagent.
+        # dangling PreToolUse owned by a sibling subagent. Preserved BEFORE narrowing as
+        # history_all_agents (below) -- gate.claimed_running's Bash-launch evidence deliberately
+        # pools every thread, a completed PostToolUse row carrying none of the dangling-PreToolUse
+        # risk this firewall exists to stop (see GateContext.history_all_agents).
+        history_all_agents = history
         history = _history_for_agent(history, payload)
         text = payload.get("last_assistant_message") or ""
         if not text:
@@ -515,6 +519,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             testrun_output=_ledger.latest_testrun(conn, sid),
             cwd=cwd, fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
             history=history,   # faithful events-table rows (A1.3) — fabrication gates walk this
+            history_all_agents=history_all_agents,   # unnarrowed twin — see GateContext's own doc
             # Additive decode-layer extension (observability-only, no gate reads these yet):
             # permission_mode/agent_id/agent_type are confirmed-real top-level hook payload
             # fields (Claude Code hooks reference) that _dispatch.py never extracted before.
@@ -692,7 +697,10 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         from makoto.record import ledger as _ledger
         from makoto.substrate.io import bash_output_text, is_test_runner
         from makoto.substrate._testDelta import compute_delta
+        from makoto.checks.contractOrder import _LOCATING_TOOLS, _event_location
+        from makoto.substrate._shared import _path_components
         sid = payload.get("session_id", "")
+        cwd = payload.get("cwd") or os.getcwd()
         delta_finding = None
         # Task 3, the domain correction (test-delta redirect): compute the delta vs the
         # PRIOR recorded testrun BEFORE record_update's upsert overwrites it -- the only
@@ -713,6 +721,34 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
+        # SPEC-5 live plan wiring (2026-07-23), two halves of the same gap: DECLARE and ADVANCE.
+        # Before this, the ONLY way to populate a plan was a `.claude/makoto-plan.jsonl` already
+        # sitting on disk BEFORE SessionStart fired -- nothing let Claude declare a plan
+        # mid-session at all -- AND even a SessionStart-declared plan could never CLOSE: Plan.
+        # mark_done/plan.persist_plan previously had zero live callers, so gate.contract_order's
+        # Stop remainder would block every subsequent Stop forever once any plan existed
+        # (contractOrder.py's Pre/Stop sides only ever READ the plan). Both halves key off the
+        # SAME resolution contractOrder.py's Pre-gap-guard already uses (`_event_location`/
+        # `Plan.resolve`), imported rather than duplicated -- this orchestrator carries no
+        # L2-import firewall (contractOrder.py's own docstring scopes that firewall to discovered
+        # Stop GATE modules, which _dispatch.py is not). A no-op when the tool isn't a locating
+        # one, nothing resolves, or (advance side) no plan is declared.
+        if payload.get("tool_name") in _LOCATING_TOOLS:
+            from makoto.session import plan as _plan
+            loc = _event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
+            if loc is not None:
+                if _path_components(loc)[-2:] == [".claude", "makoto-plan.jsonl"]:
+                    # DECLARE: a locating call wrote the artifact itself -- (re-)admit it live,
+                    # LATEST-WINS, the same falsifiability gate declare_plan always enforces.
+                    _plan.declare_from_live_write(cwd, sid, conn)
+                else:
+                    # ADVANCE: a locating call at an OPEN node's own `where` marks it DONE.
+                    plan_obj = _plan.load_plan(conn, sid)
+                    if plan_obj is not None:
+                        nid = plan_obj.resolve(loc, payload.get("tool_name", ""))
+                        if nid is not None and nid in plan_obj.open_nodes():
+                            plan_obj.mark_done(nid)
+                            _plan.persist_plan(conn, sid, plan_obj)
         if delta_finding is not None:
             delta_finding = replace(delta_finding, source_event_id=event_id)
             _emit_decision([delta_finding], payload.get("hook_event_name", ""),

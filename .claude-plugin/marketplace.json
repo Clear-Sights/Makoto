@@ -5,7 +5,7 @@
     {
       "name": "makoto",
       "source": "./",
-      "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned (four narrow advisory self-checks excepted). Two-tier catalog (15 pre-checks, 16 Stop gates), each shipped at measured zero false positives.",
+      "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned (four narrow advisory self-checks excepted). Two-tier catalog (15 pre-checks, 18 Stop gates), each shipped at measured zero false positives.",
       "category": "workflow",
       "tags": ["integrity", "guardrails", "hooks", "claims"],
       "license": "Apache-2.0",

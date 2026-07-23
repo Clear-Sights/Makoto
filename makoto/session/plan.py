@@ -103,6 +103,27 @@ def load_plan(conn, session_id: str) -> Optional[Plan]:
     return Plan.from_rows(rows)
 
 
+def _read_artifact_plan(cwd: str) -> Optional[Plan]:
+    """Read + parse `<cwd>/.claude/makoto-plan.jsonl` into an un-declared `Plan`, or `None` on
+    any absence/malformation (fail-open). The shared core BOTH admission paths use --
+    `declare_from_session_artifact` (SessionStart) and `declare_from_live_write` (a live
+    mid-session tool call writing the artifact itself) -- so the read/parse contract lives in
+    exactly one place."""
+    artifact = os.path.join(cwd, _PLAN_ARTIFACT) if cwd else _PLAN_ARTIFACT
+    try:
+        with open(artifact, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, ValueError):
+        return None
+    try:
+        raw = Plan.from_jsonl(text)
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not raw.rows():
+        return None
+    return raw
+
+
 def declare_from_session_artifact(
     cwd: str, session_id: str, conn, *, source: str = ""
 ) -> Optional[Plan]:
@@ -116,17 +137,29 @@ def declare_from_session_artifact(
     """
     if source != STARTUP:
         return None
-    artifact = os.path.join(cwd, _PLAN_ARTIFACT) if cwd else _PLAN_ARTIFACT
-    try:
-        with open(artifact, "r", encoding="utf-8") as fh:
-            text = fh.read()
-    except (OSError, ValueError):
+    raw = _read_artifact_plan(cwd)
+    if raw is None:
         return None
     try:
-        raw = Plan.from_jsonl(text)
-    except (ValueError, KeyError, TypeError):
+        declare_plan(conn, session_id, raw)
+    except ValueError:
         return None
-    if not raw.rows():
+    return load_plan(conn, session_id)
+
+
+def declare_from_live_write(cwd: str, session_id: str, conn) -> Optional[Plan]:
+    """Mid-session admission (2026-07-23): a locating tool call (Write/Edit/MultiEdit) touched
+    the plan artifact itself -- re-read `<cwd>/.claude/makoto-plan.jsonl` and re-declare
+    LATEST-WINS, the SAME falsifiability gate and whole-plan-replace semantics
+    `declare_from_session_artifact` uses, just triggered by a live tool call instead of session
+    boot. Before this existed, the ONLY way to populate a plan was a file already sitting on disk
+    BEFORE SessionStart fired -- nothing let Claude declare (or replace) a plan mid-session at
+    all. Called from `makoto/_dispatch.py`'s PostToolUse handler (`_accumulate`); see
+    `makoto/events.py`'s PostToolUse entry. Same fail-open contract: absent, unreadable,
+    malformed, empty, or non-falsifiable content declares nothing and returns `None`.
+    """
+    raw = _read_artifact_plan(cwd)
+    if raw is None:
         return None
     try:
         declare_plan(conn, session_id, raw)
