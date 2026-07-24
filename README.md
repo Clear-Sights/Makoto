@@ -20,9 +20,9 @@ accept without re-deriving it.
 makoto fires on mechanical hook events: every `PreToolUse`, `PostToolUse`, `Stop`, and (advisory-only;
 see [ConfigChange watch](#configchange-watch-advisory--evidence-gated-blocking) below) `ConfigChange`.
 It **blocks** (exit 2, which Claude Code treats as block-and-retry) on **15 pre-checks** across five
-families and **14 end-of-turn gates** (plus `gate.stale_establisher` and `gate.undeclared_falsifiable`,
-two permanently-advisory catalog-completeness checks outside this 14-gate contract entirely: 16 live
-Stop-tier checks in total). Every pre-check and every one of the 14 end-of-turn gates but two blocks;
+families and **17 end-of-turn gates** (plus `gate.stale_establisher` and `gate.undeclared_falsifiable`,
+two permanently-advisory catalog-completeness checks outside this 17-gate contract entirely: 19 live
+Stop-tier checks in total). Every pre-check and every one of the 17 end-of-turn gates but two blocks;
 there is no silent "warning" tier for those (see [Fire level](#fire-level)). The two documented
 exceptions are `gate.self_wired` and `gate.canon_fingerprints_advisory` (below), advisory-only checks
 that by design never block.
@@ -56,6 +56,9 @@ that by design never block.
 - `gate.fabricated_action`: "I ran `X` / executed `Y`" in a turn with no tool call at all (presence-of-work, not command-text match)
 - `gate.named_test`: "`test_foo` passes" against a recorded `FAILED` of that exact named test (coreference-pinned; the green_claim delta)
 - `gate.stale_pass`: "all tests pass" against pytest's own `lastfailed` record still naming a live failing test (the runner's ledger, existence-filtered for staleness)
+- `gate.claimed_running`: "the server is running" / "it's up and listening on port 5173" but this session's own recorded Bash evidence contradicts it — no process-start or liveness-check command ran at all this session, or the most recently recorded one ended in a direct error state (`interrupted`, or a non-zero exit code). Agnostic in the `gate.canon` sense: the failure verdict reads only those two protocol terminals, never a test-runner regex or a language/framework token; the command classifier is a broad, open-world, multi-ecosystem net (like `is_test_runner`'s), so an unlisted launcher/healthcheck shape is a documented recall bound, never a false-block source.
+- `gate.run_promised`: the forward-looking sibling of `gate.claimed_running` — the immediately prior turn's own message promised a first-person run-intent action ("I'll run the tests", "I'm going to restart the server", "let me deploy this") but no Bash call appears anywhere in this session's recorded history since. Closed first-person-auxiliary + closed process-lifecycle-verb lexicon (mirroring `gate.claimed_running`'s own verb set), checked one turn later: the one-turn grace period falls out of `history` structurally never containing the row for the Stop currently being evaluated, so a promise made this turn can only be checked starting at the next one.
+- `gate.claimed_shipped`: a completed-action sibling to `gate.claimed_running`/`gate.run_promised`, scoped to REMOTE mutations instead of local process liveness — "I merged the PR", "pushed it to main", "it's live now" with no successful remote-mutating tool call anywhere in this session's recorded history. Evidence is a non-dry-run `git push` over Bash, or a successful call from a closed non-Bash tool set (`merge_pull_request` — requiring `merged: true`, not just an error-free response — and `push_files`); `create_pull_request` is deliberately excluded, since opening a PR establishes intent but does not substantiate "merged" or "live". Reads pooled cross-agent history so a subagent's own real push/merge grounds a main-thread claim. Immediate check, no grace period. `gate.completion` keeps sole ownership of local file-production claims.
 - `gate.liveness`: fires on the code itself, not a claim: a statement with no live effect inside a closed function (dead/illusory work the present-closure model can prove inert). It walks the turn's touched `.py` ASTs, so it yields a finding per illusory statement rather than one per turn.
 - `gate.self_wired`: **advisory only, never blocks** (see [Fire level](#fire-level)). Partial-strip detection of makoto's own `.claude/settings.json` hook wiring: fires if `PreToolUse`/`PostToolUse`/`Stop` is missing a makoto-dispatching entry while at least one other still has one. It has a documented blind spot: a single edit that strips all three simultaneously disables this check in the same instant it would have fired (Claude Code reloads hook config live, not once at session start), so it provides zero coverage against that full-strip case. See the [ConfigChange watch](#configchange-watch-advisory--evidence-gated-blocking) section below, which closes exactly this gap when wired.
 - `gate.hollow_test`: fires on the code itself, not a claim: a HOLLOWED test (SPIRIT.md §4), one that survives in name while its content is gutted, so it can never actually fail. Four sub-patterns: no assertion of any kind in the test body; an asserted tautology (`assert True`, or comparing an expression to itself); a broad, no-op `try`/`except` that silently swallows the only call-under-test's failure; and a test-shaped function that can never fire independently, either nested inside another function (pytest's collector never discovers it) or gated behind a `skipif`/`skipIf` condition that is provably always true.
@@ -205,7 +208,7 @@ non-blocking tier**: a `warning`/`disabled` resting state (witnessing a violatio
 tool through) is itself an illusory word, the exact weakening shape makoto exists to catch. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
 blocks at proven zero corpus-FP, or it is cut). This still governs all 15 pre-checks (`_ALLOWED_FIRE_LEVELS
-= {"error"}`, enforced at load) and 12 of the 14 end-of-turn gates.
+= {"error"}`, enforced at load) and 15 of the 17 end-of-turn gates.
 
 **Two narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05) and
 `gate.canon_fingerprints_advisory` (SPEC-5 Task 9, DESIGN DECISION 26) fire at `level="advisory"`,
@@ -255,7 +258,7 @@ mis-block or mis-allow a tool call: a fundamental separation-of-concerns invaria
 
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
-Separate from the 15 pre-checks and 16 end-of-turn checks above: an optional `ConfigChange` hook
+Separate from the 15 pre-checks and 19 end-of-turn checks above: an optional `ConfigChange` hook
 entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
 being stripped. Two tiers, both fail-open on any unexpected fault:
 

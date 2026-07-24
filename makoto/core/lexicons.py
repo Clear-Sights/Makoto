@@ -10,6 +10,14 @@ import re
 
 _DONE_WORDS_RX = re.compile(r"\b(done|complete|completed|finished)\b", re.IGNORECASE)
 
+# File extensions recognized by the location detector. Kept at L0 because both the detector
+# and shared path-suffix discharge logic must recognize precisely the same extension set.
+_PATH_EXT = (
+    r"py|pyi|md|rst|txt|toml|json|jsonl|ndjson|ya?ml|ini|cfg|conf|env|lock|"
+    r"sh|bash|zsh|fish|js|jsx|mjs|cjs|ts|tsx|rs|go|rb|java|kt|swift|c|h|hpp|cc|cpp|"
+    r"sql|html?|css|scss|sass|xml|csv|tsv|sock|proto|graphql|tf|svg|ipynb|dockerfile"
+)
+
 _NEGATION_RX = re.compile(r"\b(not|never|no)\b|n['’]t\b", re.IGNORECASE)
 
 # Universal exemption marker (2026-05-29). Makoto's bundled CLAUDE.md (written by the
@@ -403,6 +411,43 @@ _RUN_INTENT_IDIOM_VETO_RX = re.compile(
     r"^\s*(?:\w+\s+){0,3}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
     r"|^\s*through\b"
     r"|^\s*(?:the\s+|some\s+)?numbers\b",
+    re.IGNORECASE)
+
+
+# --- gate.claimed_shipped vocabulary (a completed remote/external mutation claim) ---
+# Two deliberately CLOSED claim families. The action family binds a first-person subject to a
+# past/perfective shipping verb; the second alternative permits the conventional subject-less
+# status-report form only at a sentence/list-item boundary ("Pushed it to main.", "Merged #42.").
+# That boundary is the precision firewall: ordinary explanatory prose such as "the hook pushes
+# artifacts" and third-party narration cannot acquire an implied first-person subject merely by
+# containing a ship-shaped word. Present/base forms are absent, so "this deploys to a CDN" is
+# inert by construction.
+_SHIPPED_ACTION_CLAIM_RX = re.compile(
+    r"\bI(?:['’]ve|\s+have)?\s+(?:just\s+|now\s+|successfully\s+|already\s+)?"
+    r"(?:pushed|merged|published|deployed|shipped|released)\b"
+    r"|(?:^|(?<=[.!?\n]))[ \t]*(?:[-*]\s+)?"
+    r"(?:pushed|merged|published|deployed|shipped|released)\b",
+    re.IGNORECASE | re.MULTILINE)
+# State claims use present tense plus a CLOSED remote-result predicate. "Live" is anchored by
+# `now`/`already` because bare "it is live" is routinely descriptive (a fixture, connection, or
+# UI state), while "it's live now" is the high-confidence completion report this gate owns.
+# Past copulas are deliberately absent: "it was merged" is passive/third-party history. The
+# subject set likewise excludes arbitrary nouns, accepting the recall bound rather than turning
+# every technical use of "published"/"deployed" into a claim about the assistant's own action.
+_SHIPPED_STATE_CLAIM_RX = re.compile(
+    r"\b(?:it|this|that|the\s+(?:pr|pull\s+request|change|commit|package|release|"
+    r"deployment|site|app(?:lication)?|service))\s*"
+    r"(?:is|are|['’]s|['’]re)\s*"
+    r"(?:(?:now|already|successfully)\s+"
+    r"(?:merged|published|deployed|shipped|released|live)"
+    r"|live\s+now)\b",
+    re.IGNORECASE)
+# Bash evidence for this gate is intentionally narrower than canon's destructive classifier:
+# any real `git push` mutates a remote, not only a forced push. The bounded command span and the
+# `-n`/`--dry-run` veto exactly mirror _canonAtoms._DESTRUCTIVE_RX's hardened push alternative,
+# including the `(?!-)` boundary that keeps unrelated long options from masquerading as flags.
+_REMOTE_GIT_PUSH_CMD_RX = re.compile(
+    r"\bgit\s+push\b(?![^|;&\n]*(?:\s-n\b|--dry-run\b))",
     re.IGNORECASE)
 
 

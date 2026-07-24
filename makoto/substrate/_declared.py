@@ -62,4 +62,7 @@ DECLARED_IDS: dict = {
     # The forward-looking sibling of gate.claimed_running: a first-person run-intent promise
     # ("I'll run the tests") left with no Bash evidence anywhere in history by the next turn.
     "gate.run_promised": "runIntentUnfulfilled",
+    # Immediate completed-remote-action sibling: a pushed/merged/live claim must be backed by a
+    # successful Bash git-push or an explicitly recognized remote-mutating tool call.
+    "gate.claimed_shipped": "claimedShippedAbsent",
 }

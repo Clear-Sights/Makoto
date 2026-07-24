@@ -12,15 +12,39 @@ All notable changes to makoto. Versions follow the live check inventory
   liveness-check command ran at all this session, or the most recently recorded one ended in a
   direct error state (interrupted, or a non-zero exit code). The claim signal requires a
   co-occurring first-person process-start verb ("I started / launched / ran ...") in the same
-  message, so generic explanatory prose about a tool's default behavior doesn't trip it. 17th
+  message, so generic explanatory prose about a tool's default behavior doesn't trip it. 15th
   end-of-turn gate; see `makoto/checks/claimedRunningAbsent.py`.
 - **`gate.run_promised`** — a new blocking end-of-turn gate, the forward-looking sibling of
   `gate.claimed_running`: the immediately prior turn made a first-person run-intent promise
   ("I'll run the tests", "let me deploy this") with no Bash call anywhere in the session's
   recorded history since. One-turn grace period: a promise made this turn can only be checked
-  starting at the next one. 18th end-of-turn gate; see `makoto/checks/runIntentUnfulfilled.py`.
+  starting at the next one. 16th end-of-turn gate; see `makoto/checks/runIntentUnfulfilled.py`.
+- **`gate.claimed_shipped`** — a new blocking end-of-turn gate, sibling to `gate.claimed_running`/
+  `gate.run_promised`: the assistant claims a REMOTE mutation is already done ("I merged the PR",
+  "pushed it to main", "it's live now") but no successful remote-mutating tool call appears
+  anywhere in the session's recorded history. Evidence is a non-dry-run `git push` over Bash, or
+  a successful call from a closed GitHub MCP tool set (`merge_pull_request` — requiring `merged:
+  true`, not just an error-free response — and `push_files`); `create_pull_request` is
+  deliberately excluded, since opening a PR establishes intent but does not substantiate "merged"
+  or "live". Reads pooled cross-agent history so a subagent's real push/merge grounds a
+  main-thread claim, same reasoning as `gate.claimed_running`. Immediate check, no grace period.
+  `gate.completion` keeps sole ownership of local file-production claims. 17th end-of-turn gate;
+  see `makoto/checks/claimedShippedAbsent.py`.
 
 ### Fixed
+- **`_DESTRUCTIVE_RX`/`_DISABLE_RX` no longer false-block a safe `git push --force-with-lease` or
+  `--force-if-includes`.** Both regexes' bare-force checks matched `--force\b` — a word boundary
+  fires right after "force" regardless of what follows, so a hyphen (a non-word character) let
+  these safe flags match identically to a bare `--force`, even though both are git's own SAFE
+  alternative (each refuses to push if the remote ref moved since the last fetch). Every
+  bare-force alternative is now `--force\b(?!-)`, excluding both safe flags while leaving bare
+  `--force`, `-f`, and every other destructive/disable clause unaffected.
+- **`gate.completion` no longer false-blocks a true claim that refers to a well-known file by its
+  bare, extensionless name** (e.g. "I updated the CHANGELOG" against a real `CHANGELOG.md` touch).
+  `_suffix_match` required the final path component to match exactly, so a claim binding to bare
+  "CHANGELOG" never matched a real touch at `.../CHANGELOG.md`. It now also accepts an
+  extensionless short side against a long side whose final component is `<short>.<recognized
+  extension>`; the existing firewall (`auth.py` never matches `auth_helper.py`) is unaffected.
 - **`canon.destructive_command` no longer false-blocks a read-only `dd`, and now catches a
   force-push/hard-reset/interactive-clean wherever its trigger flag actually sits.** `dd if=`
   fired on any `dd` invocation regardless of whether it also wrote anywhere (`of=`) — using

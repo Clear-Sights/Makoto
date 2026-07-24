@@ -135,8 +135,8 @@ def _is_test_path(fp) -> bool:
 _DESTRUCTIVE_RX = re.compile(
     r"\brm\s+-\w*(?:rf|fr)\w*\b"
     r"|\bgit\s+reset\b(?=[^|;&\n]*--hard\b)"
-    r"|\bgit\s+clean\b(?=[^|;&\n]*(?:\s-\w*[dfx]\w*\b|--force\b))(?![^|;&\n]*(?:\s-\w*n\w*\b|--dry-run\b))"
-    r"|\bgit\s+push\b(?=[^|;&\n]*(?:\s-f\b|--force\b))(?![^|;&\n]*(?:\s-n\b|--dry-run\b))"
+    r"|\bgit\s+clean\b(?=[^|;&\n]*(?:\s-\w*[dfx]\w*\b|--force\b(?!-)))(?![^|;&\n]*(?:\s-\w*n\w*\b|--dry-run\b))"
+    r"|\bgit\s+push\b(?=[^|;&\n]*(?:\s-f\b|--force\b(?!-)))(?![^|;&\n]*(?:\s-n\b|--dry-run\b))"
     r"|\bgit\s+checkout\s+--\s+\.(?!\w)"
     r"|\bdrop\s+(?:table|database)\b"
     r"|\btruncate\s+table\b"
@@ -146,7 +146,7 @@ _DESTRUCTIVE_RX = re.compile(
 
 # ponytail: a bash bypass-flag denylist for "a check was disabled" -- not a general flag parser.
 _DISABLE_RX = re.compile(
-    r"--no-verify\b|--no-gpg-sign\b|--no-hooks?\b|--force\b|SKIP=\S|--skip-tests?\b",
+    r"--no-verify\b|--no-gpg-sign\b|--no-hooks?\b|--force\b(?!-)|SKIP=\S|--skip-tests?\b",
     re.IGNORECASE)
 
 # a test command combined with a failure-swallowing suffix.
