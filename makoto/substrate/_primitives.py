@@ -15,6 +15,8 @@ byte-for-byte unchanged from the old `checks.py`.
 import os
 import re
 
+from makoto.core.lexicons import _PATH_EXT
+
 
 def normalize_path(p: str) -> str:
     """Case-folded, normalized, trailing-separator-stripped path for equality.
@@ -65,11 +67,6 @@ def subject_binds(commitment_location: str, result_key: str) -> bool:
 # arbitrary backtick content — those name no file and were the completion gate's measured
 # false-positive source (5.83% irreducible on the 1200-msg honest corpus). A backticked
 # path still matches: the path token is found wherever it sits, backticks or not.
-_PATH_EXT = (
-    r"py|pyi|md|rst|txt|toml|json|jsonl|ndjson|ya?ml|ini|cfg|conf|env|lock|"
-    r"sh|bash|zsh|fish|js|jsx|mjs|cjs|ts|tsx|rs|go|rb|java|kt|swift|c|h|hpp|cc|cpp|"
-    r"sql|html?|css|scss|sass|xml|csv|tsv|sock|proto|graphql|tf|svg|ipynb|dockerfile"
-)
 # Well-known extensionless files that ARE locations (so "created the Dockerfile" binds).
 _DOTLESS_FILES = r"Makefile|Dockerfile|README|LICENSE|CHANGELOG|Gemfile|Procfile|CODEOWNERS"
 _LOC_RX = re.compile(

@@ -13,12 +13,13 @@ line (`from makoto.substrate._shared import ...`) serves every migrated gate mod
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
 from makoto.checks import normalize_path
 from makoto.substrate._planNode import Plan
-from makoto.core.lexicons import _EMPTY_OK
+from makoto.core.lexicons import _EMPTY_OK, _PATH_EXT
 
 
 # ---- schemas (formerly stopchecks/_types.py) --------------------------------------------------
@@ -59,13 +60,14 @@ class GateContext:
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
     history_all_agents: Sequence = ()       # the SAME _select_recent time-windowed slice as
     #   `history`, but NOT narrowed by _history_for_agent's thread-boundary firewall -- every
-    #   agent's PostToolUse rows pooled. Exists ONLY for gate.claimed_running's Bash-launch
-    #   evidence (2026-07-23): a subagent dispatched to start/verify a process is real session
-    #   evidence the main thread's own running-claim must see. `history` narrows to the calling
+    #   agent's PostToolUse rows pooled. Exists for completed cross-agent evidence used by
+    #   gate.claimed_running and gate.claimed_shipped: a subagent dispatched to start/verify a
+    #   process or perform a remote mutation is real session evidence the main thread's own claim
+    #   must see. `history` narrows to the calling
     #   thread specifically to stop a DANGLING (in-flight) PreToolUse from synthesizing a FAILURE
     #   across threads -- a risk that does not apply to a completed PostToolUse Bash call. Every
     #   other gate should keep reading `history`; widen a gate onto this field only with the same
-    #   reasoning claimedRunningAbsent.py's module docstring documents.
+    #   completed-evidence reasoning these claim gates document.
 
     @property
     def roots(self):
@@ -80,6 +82,8 @@ class GateContext:
 
 # ---- shared discharge/suffix-match helpers (formerly stopchecks/_common.py) --------------------
 _BIND_BEFORE = 70
+_KNOWN_PATH_EXT_RX = re.compile(r"(?:" + _PATH_EXT + r")\Z", re.IGNORECASE)
+
 def _path_components(p: str):
     """Normalized path split into components, dropping empties and a leading '~' (a home
     reference that never appears in a touched key)."""
@@ -89,11 +93,26 @@ def _suffix_match(a_comps, b_comps) -> bool:
     relative commitment ('settings.json', '~/.claude/CLAUDE.md') discharges against an absolute
     write ('/repo/.claude/CLAUDE.md'). The match is at a path-SEPARATOR boundary, which preserves
     the fakeexcuse firewall: 'auth.py' is NOT a suffix of 'auth_helper.py' (components
-    ['auth_helper.py'] != ['auth.py']), only of '.../auth.py'."""
+    ['auth_helper.py'] != ['auth.py']), only of '.../auth.py'. A dotless final component may
+    also match that exact basename with one recognized extension (for informal references such
+    as 'CHANGELOG' to the real file 'CHANGELOG.md')."""
     if not a_comps or not b_comps:
         return False
     short, long = (a_comps, b_comps) if len(a_comps) <= len(b_comps) else (b_comps, a_comps)
-    return long[-len(short):] == short
+    if long[-len(short):] == short:
+        return True
+
+    # Component prefixes must still be an exact suffix; only the final component gets the
+    # deliberate dotless-file leniency. On equal-length one-component inputs, prefer the
+    # dotless side as the informal reference.
+    if len(a_comps) == len(b_comps) and "." not in b_comps[-1] and "." in a_comps[-1]:
+        short, long = b_comps, a_comps
+    if long[-len(short):-1] != short[:-1]:
+        return False
+    short_final, long_final = short[-1], long[-1]
+    if "." in short_final or not long_final.startswith(short_final + "."):
+        return False
+    return bool(_KNOWN_PATH_EXT_RX.fullmatch(long_final[len(short_final) + 1:]))
 def _safe_size(fs_size, location):
     """fs_size(location) -> int|None, swallowing errors. None means 'size unknown' (fail-open)."""
     if fs_size is None:
