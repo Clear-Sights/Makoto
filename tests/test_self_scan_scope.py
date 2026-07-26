@@ -16,6 +16,7 @@ def _repo(tmp_path):
     _git(["init", "-q"], tmp_path)
     _git(["config", "user.email", "t@t"], tmp_path)
     _git(["config", "user.name", "t"], tmp_path)
+    _git(["config", "commit.gpgsign", "false"], tmp_path)
     return tmp_path
 
 

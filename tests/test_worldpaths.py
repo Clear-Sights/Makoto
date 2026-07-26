@@ -29,6 +29,7 @@ def _make_repo(root: Path, files: dict) -> Path:
     _git("init", "-q", cwd=root)
     _git("config", "user.email", "t@example.com", cwd=root)
     _git("config", "user.name", "T", cwd=root)
+    _git("config", "commit.gpgsign", "false", cwd=root)
     for rel, content in files.items():
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
