@@ -5,15 +5,15 @@ owner-revised layout). Combines the former `stopchecks/_types.py` (the `GateCont
 shares) into ONE flat, underscore-prefixed file — package plumbing, never a detector module
 itself, so `checks._loader`'s scan skips it exactly like `_primitives.py`/`_declared.py`.
 
-Kept as ONE file (not split) because combined the two source files are ~150 lines — not the
-"gets unwieldy" threshold the migration ticket flags as the split trigger — and every gate that
-needs `GateContext` also tends to need at least one of the discharge helpers, so a single import
-line (`from makoto.substrate._shared import ...`) serves every migrated gate module.
+Kept as ONE file because every gate that needs `GateContext` also tends to need at least one of
+the discharge/world-evidence helpers, so a single architecture-approved import line serves every
+migrated gate module without forbidden L2-to-L2 gate imports.
 """
 from __future__ import annotations
 
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
@@ -58,6 +58,9 @@ class GateContext:
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the release.operator discharge can read/append the chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
+    open_plan_items: Sequence = ()          # session/planItems.py's still-open label-shaped
+    #   commitments ("§9.3", "Task #19"), synced once by run_stop_checks. Read by
+    #   planItemDrift.py's ADVISORY-only reminder.
     history_all_agents: Sequence = ()       # the SAME _select_recent time-windowed slice as
     #   `history`, but NOT narrowed by _history_for_agent's thread-boundary firewall -- every
     #   agent's PostToolUse rows pooled. Exists for completed cross-agent evidence used by
@@ -83,6 +86,12 @@ class GateContext:
 # ---- shared discharge/suffix-match helpers (formerly stopchecks/_common.py) --------------------
 _BIND_BEFORE = 70
 _KNOWN_PATH_EXT_RX = re.compile(r"(?:" + _PATH_EXT + r")\Z", re.IGNORECASE)
+_LOCAL_GIT_TIMEOUT = 0.75
+_PUSH_BRANCH_RX = re.compile(
+    r"""\bpushed\b(?:(?![.!?\n]).){0,80}?\b(?:to|branch)\s+[`'"]?"""
+    r"""(?:origin/)?([A-Za-z0-9][A-Za-z0-9._/-]*)""",
+    re.IGNORECASE,
+)
 
 def _path_components(p: str):
     """Normalized path split into components, dropping empties and a leading '~' (a home
@@ -163,6 +172,71 @@ def _discharged(location: str, touched_keys, fs_exists, *, empty_keys=None, fs_s
             return False                             # exists but empty -> no production discharge
         return True
     return False
+
+
+def resolve_in_worktree(loc, cwd):
+    """Resolve a repo-relative claim from `cwd`'s Git worktree root.
+
+    Return an existing path or None. The candidate is confined to the worktree root, and every
+    successful return ends in a live existence check. Tracking is not required: the cwd-relative
+    filesystem discharge already accepts a newly-created, untracked deliverable.
+    """
+    if not loc or not cwd:
+        return None
+    try:
+        if os.path.isabs(loc):
+            return os.path.normpath(loc) if os.path.exists(loc) else None
+        root_result = subprocess.run(
+            ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,
+        )
+        if root_result.returncode != 0:
+            return None
+        root = os.path.realpath(root_result.stdout.strip())
+        if not root:
+            return None
+        candidate = os.path.realpath(os.path.join(root, loc))
+        if os.path.commonpath((root, candidate)) != root:
+            return None
+        return candidate if os.path.exists(candidate) else None
+    except Exception:
+        return None
+
+
+def pushed_ref_matches_world(text, cwd):
+    """True iff local and origin remote-tracking refs back a pushed-branch claim."""
+    if not text or not cwd:
+        return False
+    try:
+        match = _PUSH_BRANCH_RX.search(text)
+        if match:
+            branch = match.group(1).rstrip("`'\",:;.")
+        else:
+            branch_result = subprocess.run(
+                ["git", "-C", cwd, "symbolic-ref", "--quiet", "--short", "HEAD"],
+                capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,
+            )
+            if branch_result.returncode != 0:
+                return False
+            branch = branch_result.stdout.strip()
+        if (
+            not branch
+            or branch.startswith(("-", ".", "/"))
+            or branch.endswith((".", "/", ".lock"))
+            or ".." in branch
+            or "@{" in branch
+            or "//" in branch
+        ):
+            return False
+        refs = (f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")
+        result = subprocess.run(
+            ["git", "-C", cwd, "show-ref", "--verify", "--hash", *refs],
+            capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,
+        )
+        object_ids = result.stdout.splitlines()
+        return result.returncode == 0 and len(object_ids) == 2 and object_ids[0] == object_ids[1]
+    except Exception:
+        return False
 
 
 # iter_tool_events RELOCATED to lib/io.py (consolidation T2.5): the history-row decoder lives at

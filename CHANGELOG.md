@@ -5,85 +5,49 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
-### Added
-- **`gate.claimed_running`** — a new blocking end-of-turn gate: the assistant claims an ongoing
-  process/service liveness state ("the server is running", "it's up and listening on port 5173")
-  that this session's own recorded Bash evidence contradicts — either no process-start or
-  liveness-check command ran at all this session, or the most recently recorded one ended in a
-  direct error state (interrupted, or a non-zero exit code). The claim signal requires a
-  co-occurring first-person process-start verb ("I started / launched / ran ...") in the same
-  message, so generic explanatory prose about a tool's default behavior doesn't trip it. 15th
-  end-of-turn gate; see `makoto/checks/claimedRunningAbsent.py`.
-- **`gate.run_promised`** — a new blocking end-of-turn gate, the forward-looking sibling of
-  `gate.claimed_running`: the immediately prior turn made a first-person run-intent promise
-  ("I'll run the tests", "let me deploy this") with no Bash call anywhere in the session's
-  recorded history since. One-turn grace period: a promise made this turn can only be checked
-  starting at the next one. 16th end-of-turn gate; see `makoto/checks/runIntentUnfulfilled.py`.
-- **`gate.claimed_shipped`** — a new blocking end-of-turn gate, sibling to `gate.claimed_running`/
-  `gate.run_promised`: the assistant claims a REMOTE mutation is already done ("I merged the PR",
-  "pushed it to main", "it's live now") but no successful remote-mutating tool call appears
-  anywhere in the session's recorded history. Evidence is a non-dry-run `git push` over Bash, or
-  a successful call from a closed GitHub MCP tool set (`merge_pull_request` — requiring `merged:
-  true`, not just an error-free response — and `push_files`); `create_pull_request` is
-  deliberately excluded, since opening a PR establishes intent but does not substantiate "merged"
-  or "live". Reads pooled cross-agent history so a subagent's real push/merge grounds a
-  main-thread claim, same reasoning as `gate.claimed_running`. Immediate check, no grace period.
-  `gate.completion` keeps sole ownership of local file-production claims. 17th end-of-turn gate;
-  see `makoto/checks/claimedShippedAbsent.py`.
+## [2.2.0] — 2026-07-26
 
 ### Fixed
-- **`_DESTRUCTIVE_RX`/`_DISABLE_RX` no longer false-block a safe `git push --force-with-lease` or
-  `--force-if-includes`.** Both regexes' bare-force checks matched `--force\b` — a word boundary
-  fires right after "force" regardless of what follows, so a hyphen (a non-word character) let
-  these safe flags match identically to a bare `--force`, even though both are git's own SAFE
-  alternative (each refuses to push if the remote ref moved since the last fetch). Every
-  bare-force alternative is now `--force\b(?!-)`, excluding both safe flags while leaving bare
-  `--force`, `-f`, and every other destructive/disable clause unaffected.
-- **`gate.completion` no longer false-blocks a true claim that refers to a well-known file by its
-  bare, extensionless name** (e.g. "I updated the CHANGELOG" against a real `CHANGELOG.md` touch).
-  `_suffix_match` required the final path component to match exactly, so a claim binding to bare
-  "CHANGELOG" never matched a real touch at `.../CHANGELOG.md`. It now also accepts an
-  extensionless short side against a long side whose final component is `<short>.<recognized
-  extension>`; the existing firewall (`auth.py` never matches `auth_helper.py`) is unaffected.
-- **`canon.destructive_command` no longer false-blocks a read-only `dd`, and now catches a
-  force-push/hard-reset/interactive-clean wherever its trigger flag actually sits.** `dd if=`
-  fired on any `dd` invocation regardless of whether it also wrote anywhere (`of=`) — using
-  `dd` as a byte-range reader (piped to `fold`/`xxd`, no `of=`) tripped `destructive_command`
-  for the rest of the session. Also generalized the same fix to the rest of the denylist:
-  `git clean`/`git push`/`git reset --hard` required their trigger flag immediately after the
-  base command, missing e.g. `git push origin main --force`; `git clean`/`git push` now also
-  veto on a real `-n`/`--dry-run` found anywhere in the command; and `git checkout -- .` had a
-  regex bug that made it dead code (it could never actually match). `mkfs.*`'s own `-n` was
-  deliberately left alone — it means dry-run for `mkfs.ext4` but volume-label for `mkfs.vfat`,
-  so a blanket exclusion would have silently created a false negative on a real format. (#10)
-- **`canon.recur` no longer stays permanently stuck once a retry loop genuinely resolves.**
-  Verdict is now judged per (tool, input) key, and the last judgment for each key wins: a later
-  success for that key silences it even when different calls happened in between, while a
-  genuinely still-stuck key still fires.
-
-### Added
-- **`content.illusory_authorship_trailer` widened** to also catch the routing address
-  (`noreply@anthropic.com`), a `Claude-Session:` trailer, and "Generated with/by Claude"
-  prose — not just the literal git trailer. A plain "Claude Code" product-name mention is
-  deliberately not matched.
-- **New `content.illusory_interruption_claim`**: catches a fabricated "interrupted by user"
-  claim, grounded against this session's own recorded history.
-
-### Fixed
-- **`gate.completion` no longer false-blocks a true claim about a file landed via a local
-  `git pull` from another machine.** A file produced on a remote machine over ssh and synced
-  locally is on disk under that repo's root, not under `cwd`, so a bare-name claim
-  (`"index.md"`) missed it. `makoto/checks/_worldpaths.py` widens the Stop-gate's
-  `fs_exists`/`fs_size`/`fs_read` closures: on a cwd-relative miss, resolve against git
-  work-trees this session actually synced (from the session's own Bash history), requiring
-  the candidate be git-tracked and suffix-match the claim at a path-separator boundary. Every
-  alternate path still ends in a live `os.path.exists`, so a claim about a file that exists
-  nowhere still blocks — this widens observation, never the verdict. (#2)
-- **8 hard-deny security checks (cert/JWT/SSH-host-key/timing-safe-compare/forbidden-location)
-  removed** — moved to a new sibling project, [Clear-Sights/Ward](https://github.com/Clear-Sights/Ward),
-  already re-implemented there with parity tests. `_ALLOW_EXEMPT_IDS`, `docs/MAKOTO-CONVENTIONS.md`,
-  and the pre-check count (22 → 14, README/plugin.json/marketplace.json) now agree with the
-  actually-shipped catalog.
+- **The `check_disabled` and `destructive_command` canon atoms no longer decide from raw shell
+  substrings.** A shared `shlex`-based normalizer now supplies command segments and argv tokens to
+  every command-reading atom: quoted commands and comments stay inert, lowercase `dd skip=` no
+  longer folds onto the case-sensitive `SKIP=` test-skip assignment, exact `--force` no longer
+  consumes `--force-with-lease`/`--force-reinstall`, and the audited split-flag/global-option
+  command forms are classified from their argv positions. The two explicit recall bounds remain:
+  `mkfs.* -n` is ambiguous across implementations, and `rm --recursive --force` stays outside the
+  short-option predicate. Reported with local repros by [@AliceLJY in #14](https://github.com/Clear-Sights/Makoto/issues/14)
+  and [#15](https://github.com/Clear-Sights/Makoto/issues/15); #14's proposed `(?-i:SKIP=)`
+  case pin ships verbatim inside the generalized sweep.
+- **The `test_run_green` and `test_run_red` canon atoms no longer infer a pass from output that
+  merely lacks a failure word.** A green verdict now requires a recognized runner argv, positive
+  success-summary evidence, and exit 0 when the protocol recorded an exit status; a recorded
+  nonzero exit wins red. Failure verdicts now cover rspec, mocha, Maven, and PHPUnit forms;
+  positive summaries include Go, Cargo, and Gradle; colon-form SGR is stripped; and a caught
+  traceback does not override a later positive pass summary.
+- **The `check_disabled`, `assertion_weakened`, `revert_loop`, `test_edited`, and `source_edited`
+  canon atoms no longer misclassify edits from deleted prose, top-level-only fields, or
+  Python-only paths.** Test neutering is decided by the edited file path and semantic old/new
+  pairs; MultiEdit arrays and NotebookEdit fields are consumed; and Python, JS/TS, Go, and Ruby
+  test/spec conventions now decide the test/source split.
+- **The `tool_timeout`, `oracle_read`, and `secret_committed` canon atoms no longer decide from
+  synthetic or over-broad proxies.** Timeout evidence now reads `interrupted`, `error`, and
+  `error_code` instead of the undocumented `failed` key; oracle reads require an expected-output
+  path component/stem and cover Read/Grep/Glob/`cat`; and secret matching excludes the AWS example
+  key and named placeholders while recognizing prefixed secret variable names. Together with the
+  command/edit repairs, these are pinned by 40 paired false-positive/true-positive cases.
+- **`gate.claimed_shipped` no longer false-blocks a true delegated push solely because its tool
+  call is absent from session history.** A push claim now also discharges when the claimed local
+  branch and `refs/remotes/origin/<branch>` both exist and name the same object. The decision is a
+  bounded local Git-metadata read with no network call; a missing or divergent tracking ref still
+  blocks. The measured Stop path is 71.76 us/call without a shipping claim and 2119.96 us/call
+  when one is present. `gate.claimed_running` and `gate.run_promised` remain history-bound because
+  their generic prose names no durable PID, executable, command, or port to verify without scanning
+  unrelated processes.
+- **`gate.completion` no longer false-blocks a real repo-relative artifact produced by a child
+  process from a nested working directory.** After the existing ledger/cwd checks miss, the gate
+  resolves the claimed path inside the current Git worktree root, confines it to that root, and
+  requires the file to exist now while preserving the existing nonempty-artifact rule. The
+  shipping and completion repairs are pinned by 2 paired false-positive/true-positive cases.
 
 ## [2.1.1] — 2026-07-17
 
@@ -269,6 +233,25 @@ All notable changes to makoto. Versions follow the live check inventory
   `release.operator`) is what it now says.
 - `README.md` / `docs/MAKOTO-CONVENTIONS.md` count and mechanism claims re-audited against the
   live catalog; stale `skill-labV2` URLs updated to the project's current home.
+
+## [1.4.1] — 2026-07-09
+
+### Changed
+- **Internal duplication cleanup, no behavior change.** `record/audit.py`'s `append_row` /
+  `append_exemption` chain-append block (previously duplicated verbatim) is now one shared
+  `_chain_then_append` helper. `deadPureStatement.py` / `hollowTest.py`'s duplicated
+  scratch-detection + touched-file iteration scaffold is extracted to a new stdlib-only
+  `substrate/_stdlib_ast_helpers.py`, with an enforced isolation test
+  (`tests/test_detector_engines_are_stdlib_isolated.py`) replacing what used to be a docstring-only
+  claim. The hook-wiring predicate `selfWiredCheck.py` and `install.py` used to hand-mirror is
+  hoisted to `substrate/wiring.py` (one L0-primitive home, firewall-allowlisted). Remaining
+  cross-file clone pairs across `checks/` triaged: each merged into a shared helper or left
+  duplicated with an on-the-record reason (layering-firewall boundary, or independent
+  security-boundary code that must not share a failure mode) — see `tests/test_gate_shape.py`'s
+  `ALLOWED_IMPORT_ROOTS` and `tests/test_no_alpha_duplicate_functions.py`'s exemption list for the
+  specifics. `tests/test_no_alpha_duplicate_functions.py`'s scan set widened from `checks/` +
+  `substrate/` to the whole package, catching 2 previously-invisible duplicates in the same pass.
+  Check inventory unchanged (18 pre-checks, 8 Stop gates).
 
 ## [1.4.0] — 2026-06-12
 

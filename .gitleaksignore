@@ -1,7 +1,51 @@
-# Synthetic test fixtures for Makoto's own secret_committed detector (checks/_canonAtoms.py) --
-# these strings are designed to LOOK like secrets so tests/test_canon_fingerprints.py can verify
-# the detector fires correctly. Not real credentials. Verified by direct inspection 2026-07-09;
-# fingerprints regenerated 2026-07-10 after the full-history author-identity rewrite changed
-# every commit SHA (fingerprints embed the SHA, so the old entries all went stale at once).
-459dd2117826328661f7416ad829e09ab5b63e85:tests/test_canon_fingerprints.py:generic-api-key:94
-459dd2117826328661f7416ad829e09ab5b63e85:tests/test_canon_fingerprints.py:stripe-access-token:61
+# Gitleaks allowlist. Fingerprints regenerated 2026-07-10 after the full-history
+# author-identity rewrite changed every commit SHA (fingerprints embed the SHA, so the
+# prior entries all went stale at once). Two categories, each verified by direct
+# inspection of the flagged history content (2026-07-10):
+#
+# 1) Synthetic fixtures: strings DESIGNED to look like secrets so Makoto's own
+#    secret-detection checks can be tested (keyboard-run fakes: alphabet-sequence AWS-style
+#    keys, sk-abcdefghij..., ghp_0123...), plus detector-corpus pattern literals (lab/slots.toml's
+#    "-----BEGIN RSA PRIVATE KEY-----" header string in a suspicious-patterns list) and
+#    fabricated case-study corpus text (data/honest_corpus.json). Not real credentials.
+0f49caefb7339cfc1811a13dd22e3102dbedaafb:scripts/connectivity.py:generic-api-key:98
+3ac685622c0ded986e52cfe4b86a650fa08d97ea:tests/canon/test_deed_primitives.py:generic-api-key:68
+420ebfae94c68d952b0adbd53140a2f3c363137f:tests/test_postcheck_secret_in_written_content.py:aws-access-token:74
+420ebfae94c68d952b0adbd53140a2f3c363137f:tests/test_postcheck_secret_in_written_content.py:generic-api-key:117
+420ebfae94c68d952b0adbd53140a2f3c363137f:tests/test_postcheck_secret_in_written_content.py:generic-api-key:123
+420ebfae94c68d952b0adbd53140a2f3c363137f:tests/test_postcheck_secret_in_written_content.py:generic-api-key:68
+420ebfae94c68d952b0adbd53140a2f3c363137f:tests/test_postcheck_secret_in_written_content.py:generic-api-key:86
+420ebfae94c68d952b0adbd53140a2f3c363137f:tests/test_postcheck_secret_in_written_content.py:github-pat:80
+6fc98c552e0f7223300be9a556824a218fcff917:tests/axiom/test_g4.py:aws-access-token:32
+6fc98c552e0f7223300be9a556824a218fcff917:tests/axiom/test_g4.py:generic-api-key:28
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/corpora/bfcl.toml:generic-api-key:14804
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/corpora/bfcl.toml:generic-api-key:15604
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/corpora/bfcl.toml:generic-api-key:16404
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/corpora/bfcl.toml:generic-api-key:17204
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/slots.toml:private-key:980
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/templates/install.py.tmpl:generic-api-key:65
+83e276a66120bdc4b64aa7452c1201f6453ba440:lab/templates/install.py.tmpl:generic-api-key:67
+8c2c27aa924345245c449605ecc2bdf859258539:data/honest_corpus.json:sourcegraph-access-token:1
+8c2c27aa924345245c449605ecc2bdf859258539:data/honest_corpus.json:sourcegraph-access-token:1
+a7263f55edfb0495f959bf38a0d6ca700904d4e6:tests/test_precheck_secret_committed.py:aws-access-token:35
+a7263f55edfb0495f959bf38a0d6ca700904d4e6:tests/test_precheck_secret_committed.py:generic-api-key:30
+a7263f55edfb0495f959bf38a0d6ca700904d4e6:tests/test_precheck_secret_committed.py:generic-api-key:53
+b3b6b05fd94199b723334b7f0e2a8ef05677c40a:tests/test_canon_fingerprints.py:generic-api-key:94
+b3b6b05fd94199b723334b7f0e2a8ef05677c40a:tests/test_canon_fingerprints.py:stripe-access-token:61
+6e9ebe68c6ec30757bd64d5a3c9d8e29d0a04e0f:tests/test_canon_fingerprints.py:generic-api-key:94
+6e9ebe68c6ec30757bd64d5a3c9d8e29d0a04e0f:tests/test_canon_fingerprints.py:stripe-access-token:61
+5fcb2c937acf78ed209c41ac4f85567345762662:tests/test_canon_fingerprints.py:generic-api-key:94
+5fcb2c937acf78ed209c41ac4f85567345762662:tests/test_canon_fingerprints.py:stripe-access-token:61
+#
+# 2) Real-but-adjudicated: two HF tokens in old history (a workflow fallback literal and
+#    the token quoted inside DEFERRED.md's own leak-report entry). On-the-record user
+#    judgment 2026-05-10: zero risk -- private repo, public read-only scope token;
+#    recommendation to rotate at next convenient opportunity stands (history retains them).
+83e276a66120bdc4b64aa7452c1201f6453ba440:DEFERRED.md:huggingface-access-token:2909
+83e276a66120bdc4b64aa7452c1201f6453ba440:DEFERRED.md:huggingface-access-token:406
+83e276a66120bdc4b64aa7452c1201f6453ba440:DEFERRED.md:huggingface-access-token:9189
+83e276a66120bdc4b64aa7452c1201f6453ba440:scaffolding/docs/v3-0-honest-bench-outcome.md:huggingface-access-token:47
+83e276a66120bdc4b64aa7452c1201f6453ba440:scaffolding/docs/v3-0-honest-bench-outcome.md:huggingface-access-token:53
+83e276a66120bdc4b64aa7452c1201f6453ba440:scaffolding/workflows/apps-fetch.yml:huggingface-access-token:25
+83e276a66120bdc4b64aa7452c1201f6453ba440:scaffolding/workflows/hf-fetch-and-commit.yml:huggingface-access-token:44
+83e276a66120bdc4b64aa7452c1201f6453ba440:scaffolding/workflows/mmlu-pro-fetch.yml:huggingface-access-token:27

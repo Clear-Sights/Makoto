@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import re
 from typing import Optional
 from makoto.checks import detect_locations, normalize_path
@@ -6,7 +7,12 @@ from makoto.core.schema import Finding
 from makoto.core.lexicons import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
-from makoto.substrate._shared import _BIND_BEFORE, _discharge_kwargs, _discharged
+from makoto.substrate._shared import (
+    _BIND_BEFORE,
+    _discharge_kwargs,
+    _discharged,
+    resolve_in_worktree,
+)
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -61,7 +67,9 @@ def _production_claim_location(text):
                 continue                              # "didn't add X" -> admission (2.8), not a false claim
             return loc
     return None
-def completion_gate(text, *, touched_keys, fs_exists=None, empty_keys=None, fs_size=None) -> Optional[Finding]:
+def completion_gate(
+    text, *, touched_keys, fs_exists=None, empty_keys=None, fs_size=None, cwd=None,
+) -> Optional[Finding]:
     """Fire iff the assistant CLAIMS it produced a specific file (a produce verb governs a
     located path, non-forward, non-negated) but that file is neither in the results ledger
     nor on disk — a verifiable contradiction between the word and the world.
@@ -80,6 +88,15 @@ def completion_gate(text, *, touched_keys, fs_exists=None, empty_keys=None, fs_s
         return None                                  # no verifiable production claim -> inert
     if _discharged(loc, touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
         return None                                  # verified (ledger) or fail-open (filesystem)
+    worktree_path = resolve_in_worktree(loc, cwd)
+    if worktree_path:
+        # Preserve _discharged's content-depth law for this widened path: a zero-byte
+        # non-conventional artifact still does not substantiate a production claim.
+        if _discharged(
+            loc, (), lambda _p: True,
+            fs_size=lambda _p: os.path.getsize(worktree_path),
+        ):
+            return None
     loc_n = normalize_path(loc)
     return Finding(
         pattern_id="gate.completion",
@@ -94,4 +111,4 @@ def completion_gate(text, *, touched_keys, fs_exists=None, empty_keys=None, fs_s
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: completion_gate(c.text, **_discharge_kwargs(c)))
+               run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))

@@ -1,4 +1,4 @@
-"""Cross-machine world resolution for the Stop-gate fs closures (issue #2).
+"""Cross-machine and cross-process world resolution for Stop gates.
 
 gate.completion verifies a production claim against the results ledger and a cwd-relative
 os.path.exists. That observation window has a measured blind spot (FP, 2026-07-16): a file
@@ -16,9 +16,24 @@ This module WIDENS THE OBSERVATION, never the verdict:
     firewall from substrate._shared: auth.py never matches auth_helper.py) AND exist on disk
     right now.
 
-A claim about a file that exists nowhere still blocks: every path out of this module ends in a
-live os.path.exists on a tracked file. Falsifiability is preserved — the check sees more of the
-world; it does not believe more of the word.
+A claim about a file that exists nowhere still blocks: every successful file resolution ends in
+a live os.path.exists (and the synced-repo route additionally requires a tracked file).
+Falsifiability is preserved — the check sees more of the world; it does not believe more of the
+word.
+
+Cross-process observations follow the same law:
+
+  - a repo-relative artifact is resolved from the local Git worktree root, then must exist on
+    disk now (a child process need not have emitted a visible Write event);
+  - a pushed-branch claim is backed only when the local branch and its
+    `refs/remotes/origin/<branch>` world-trace both exist and point to the same object.
+
+Both are bounded local Git metadata reads. There is deliberately no `git ls-remote`: network I/O
+does not belong on the Stop hot path.
+
+The cross-process implementations live in `substrate._shared`, the architecture-approved common
+home imported by gate modules; this module re-exports them beside the earlier cross-machine
+resolver so callers have one world-resolution facade.
 
 Deliberate non-goal: commands inside an `ssh <host> '...'` string can match the cd-form and
 yield a REMOTE path. Harmless by construction — the path only survives if it is ALSO a local
@@ -29,7 +44,12 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from makoto.substrate._shared import _path_components, _suffix_match
+from makoto.substrate._shared import (
+    _path_components,
+    _suffix_match,
+    pushed_ref_matches_world,
+    resolve_in_worktree,
+)
 from makoto.substrate.io import iter_tool_events
 
 # `git -C <dir> pull|fetch` — the dir may be bare, or single/double quoted (spaces, CJK).

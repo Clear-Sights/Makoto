@@ -3,11 +3,13 @@ from typing import Optional
 
 from makoto.core.schema import Finding
 from makoto.core.lexicons import (
-    _SHIPPED_ACTION_CLAIM_RX, _SHIPPED_STATE_CLAIM_RX, _REMOTE_GIT_PUSH_CMD_RX,
+    _SHIPPED_ACTION_CLAIM_RX, _SHIPPED_STATE_CLAIM_RX,
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
 from makoto.substrate.io import decode_history_row
+from makoto.substrate._shared import pushed_ref_matches_world
+from makoto.core._shell import _command_pushes_git
 
 # gate.claimed_shipped -- an immediate claim-vs-record integrity gate for completed REMOTE
 # mutations. It owns "I pushed/merged/published/deployed/shipped/released X" and present-result
@@ -84,7 +86,7 @@ def _successful_remote_mutation(history) -> bool:
         response = ev.get("tool_response")
         if name == "Bash":
             command = str(tool_input.get("command", "") or "") if isinstance(tool_input, dict) else ""
-            if (_REMOTE_GIT_PUSH_CMD_RX.search(command)
+            if (_command_pushes_git(command)
                     and isinstance(response, dict)
                     and response.get("exitCode", response.get("exit")) == 0
                     and _response_succeeded(response)):
@@ -96,23 +98,27 @@ def _successful_remote_mutation(history) -> bool:
     return False
 
 
-def claimed_shipped_gate(text, *, history=()) -> Optional[Finding]:
+def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
     """Fire immediately when a completed remote-shipping claim has no successful mutation
-    evidence anywhere in the session's pooled history."""
+    evidence in pooled history or, for a push, a matching local remote-tracking ref."""
     claim = _shipped_claim(text)
-    if claim is None or _successful_remote_mutation(history):
+    if claim is None:
+        return None
+    push_claim = "pushed" in claim.group(0).lower()
+    if (_successful_remote_mutation(history)
+            or (push_claim and pushed_ref_matches_world(text, cwd))):
         return None
     return Finding(
         pattern_id="gate.claimed_shipped", file="", line=0, level="error",
         message=(f"Claim states a remote change was shipped "
-                 f"(\"{claim.group(0).strip()}\") but no successful remote-mutating tool call "
-                 "appears anywhere in this session's recorded history — the word must match "
-                 "the world."),
-        retry_hint=("Actually push/merge it with a successful recorded tool call, or "
+                 f"(\"{claim.group(0).strip()}\") but neither recorded mutation evidence nor "
+                 "a matching local remote-tracking ref backs it — the word must match the world."),
+        retry_hint=("Actually push/merge it so the world records the mutation, or "
                     "retract/rescope the shipping claim."),
     )
 
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: claimed_shipped_gate(c.text, history=c.history_all_agents))
+               run=lambda c: claimed_shipped_gate(
+                   c.text, history=c.history_all_agents, cwd=c.cwd))

@@ -44,13 +44,12 @@ _MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE
 JWT_CALLEE_RX = re.compile(r"(?i)(?:^|\.)(?:jwt|jose|pyjwt)(?:\.|$)")
 
 # ---- Test-runner provenance + failure-verdict (shared by the ledger + the green-claim gate) ----
-# Two shared signals for gate.green_claim (gates.green_claim_gate):
-#   _TEST_RUNNER_RX  — does a Bash COMMAND invoke a recognized test runner? (read at record time
-#                      by ledger.record_update, which then files the output under kind='testrun').
-#                      This is the FP firewall: only genuine test-runner output is consulted, so a
-#                      `cat old_failure.log` that happens to print "=== 3 failed ===" is NEVER a
-#                      testrun row. Open-world by nature — an unlisted runner is a documented RECALL
-#                      bound (the gate stays silent), never a false block.
+# Shared vocabulary for gate.green_claim (gates.green_claim_gate):
+#   _TEST_RUNNER_RX  — the legacy lexical runner vocabulary, retained as an import-compatible
+#                      lexicon export. Actual command provenance is argv-structured in
+#                      core._shell._command_runs_tests: a runner word inside `cat pytest.log`,
+#                      quoted prose, or a comment is not an invocation and never becomes a
+#                      `testrun` ledger row.
 #   is_failing_testrun — does test-runner OUTPUT show >=1 REAL failure? xfail-safe by
 #                      construction: `\bfailed\b` cannot match inside `xfailed`/`xpassed` (no word
 #                      boundary), and the count must be >=1, so `=== 681 passed, 3 xfailed ===` and
@@ -68,13 +67,29 @@ _TEST_RUNNER_RX = re.compile(
     r")\b",
     re.IGNORECASE)
 
-# A SUMMARY/count denoting >=1 real failure or error (case-insensitive: pytest/jest print these
-# lowercase). xfail/xpassed are excluded by the word boundary; "0 failed" by requiring [1-9]\d*.
+# A SUMMARY/count denoting >=1 real failure or error. The count-first alternatives cover
+# pytest/jest (`N failed`), rspec (`N failures`), and mocha (`N failing`); label-first covers
+# Maven/PHPUnit (`Failures: N`). A traceback is a failure only when no later positive pass summary
+# resolves it -- runners can print a caught cleanup traceback and still finish green.
 _FAILURE_SUMMARY_RX = re.compile(
-    r"\b[1-9]\d*\s+failed\b"                      # pytest/jest: 'N failed' (N>=1), xfail-safe
-    r"|\b[1-9]\d*\s+errors?\b"                    # pytest: 'N errors'
-    r"|Traceback \(most recent call last\):",     # an uncaught exception tail
-    re.IGNORECASE)
+    r"\b[1-9]\d*\s+(?:failed|failures?|failing)\b"
+    r"|\b[1-9]\d*\s+errors?\b"
+    r"|\b(?:failures?|errors?)\s*:\s*[1-9]\d*\b"
+    r"|^FAILURES!\s*$"
+    r"|Traceback \(most recent call last\):(?![\s\S]*\b[1-9]\d*\s+passed\b)",
+    re.IGNORECASE | re.MULTILINE)
+
+# Positive test-run evidence. Canon's green atom combines this with a recognized runner command
+# and the protocol exit status (when present); output merely lacking a failure is never success.
+_SUCCESS_SUMMARY_RX = re.compile(
+    r"\b[1-9]\d*\s+passed\b"                       # pytest/jest
+    r"|\b[1-9]\d*\s+passing\b"                     # mocha
+    r"|\b[1-9]\d*\s+examples?,\s+0\s+failures?\b" # rspec
+    r"|^test result:\s+ok\b"                       # cargo
+    r"|^ok\s+\S+"                                  # go test
+    r"|^BUILD SUCCESS\b"                           # Maven/Gradle
+    r"|^OK \([1-9]\d*\s+tests?\b",                 # PHPUnit
+    re.IGNORECASE | re.MULTILINE)
 
 # Per-test / per-package FAILURE markers — case-SENSITIVE (uppercase runner markers only), so prose
 # like "failed to connect" never matches. Anchored at line start.
@@ -86,7 +101,7 @@ _FAILURE_MARKER_RX = re.compile(
 # that abuts the count ('\x1b[31m2 failed'), killing the \b before `[1-9]\d* failed` so a REAL
 # failing run reads as green. Stripped before failure detection (is_failing_testrun) — FP-safe:
 # removing color cannot manufacture a failure, and the count/xfail word-boundary guards are untouched.
-_ANSI_SGR_RX = re.compile(r"\x1b\[[0-9;]*m")
+_ANSI_SGR_RX = re.compile(r"\x1b\[[0-9;:]*m")
 
 # _ADMIT_CORE — the retrospective first-person admission shapes.
 _ADMIT_CORE_RX = re.compile(

@@ -85,7 +85,7 @@ def load_prechecks(path: Path | None = None) -> list[PreCheck]:
     Pre-tier module's own self-describing `CHECK` export. This is the "one registration"
     unification: a check's keywords/retry_hint/description live in ONE place (the module
     itself), not duplicated between a TOML row and the Python file. SPEC-C item 2 step 3
-    (2026-07-08): `data/patterns.toml` itself is DELETED -- it was already superseded for the
+    (2026-07-08): `config/patterns.toml` itself is DELETED -- it was already superseded for the
     default path, and its own consumers (install.py's patterns_path re-count, tests/conftest.py's
     `loaded_pattern` fixture) were migrated to the same default, loader-backed path first.
     `_load_prechecks_from_toml` (below) still exists and is still exercised -- by tests that hand

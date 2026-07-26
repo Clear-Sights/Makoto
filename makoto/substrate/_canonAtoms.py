@@ -24,8 +24,8 @@ PRECEDES, CONJ, REVERTS) and every field read (which Call key each field-test co
 NEW authorship (per the ticket's own "this is real authorship, not scope to re-investigate"
 carve-out): the regex BODIES themselves, written fresh here -- reusing Makoto's OWN existing
 equivalents wherever one already exists (is_test_runner/is_failing_testrun for test-run atoms,
-whole_suite_pass_claim for the claim atom, ("Write","Edit","MultiEdit") for the edit-tool set per
-makoto/ledger.py's own convention) rather than re-deriving a text-extraction Makoto already has.
+whole_suite_pass_claim for the claim atom, plus Makoto's four locating edit tools) rather than
+re-deriving a text-extraction Makoto already has.
 Each NEW regex is marked `# ponytail:` with its ceiling (a heuristic denylist/keyword set) and the
 obvious upgrade path -- none of them claim to reproduce gaming_atoms' unrecoverable exact pattern.
 
@@ -36,12 +36,19 @@ from __future__ import annotations
 import re
 from typing import Dict, Iterable, List, Tuple
 
+from makoto.core.lexicons import _SUCCESS_SUMMARY_RX
 from makoto.substrate.claims import whole_suite_pass_claim
-from makoto.substrate.io import bash_output_text, decode_history_row, is_failing_testrun, is_test_runner
+from makoto.substrate.io import bash_output_text, decode_history_row, is_failing_testrun
+from makoto.core._shell import (
+    _effective_argv,
+    _git_subcommand,
+    _is_test_argv,
+    _shell_segments,
+)
 
 Call = dict  # {"name": tool_name, "input": tool_input dict, "result": tool_response dict}
 
-_EDIT_TOOLS = ("Write", "Edit", "MultiEdit")  # makoto/ledger.py's own edit-tool convention
+_EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 
 
 # ---- history -> Call decode (PostToolUse rows only) -----------------------------------------------
@@ -78,19 +85,25 @@ def _cmd(c: Call) -> str:
 
 
 def _fp(c: Call):
-    return c["input"].get("file_path")
+    return c["input"].get("file_path") or c["input"].get("notebook_path")
 
 
-def _old(c: Call) -> str:
-    return str(c["input"].get("old_string", ""))
-
-
-def _new(c: Call) -> str:
-    return str(c["input"].get("new_string", ""))
+def _edit_pairs(c: Call):
+    """Yield each semantic old/new pair once across Edit, MultiEdit, Write, and NotebookEdit."""
+    edits = c["input"].get("edits")
+    if c["name"] == "MultiEdit" and isinstance(edits, list):
+        for edit in edits:
+            if isinstance(edit, dict):
+                yield (str(edit.get("old_string", "")), str(edit.get("new_string", "")))
+        return
+    yield (str(c["input"].get("old_string", "")),
+           str(c["input"].get("new_string", "") or c["input"].get("new_source", "")))
 
 
 def _body(c: Call) -> str:
-    return str(c["input"].get("new_string", "") or c["input"].get("content", ""))
+    parts = [new for _, new in _edit_pairs(c) if new]
+    content = c["input"].get("content", "")
+    return "\n".join(([str(content)] if content else []) + parts)
 
 
 def _is_edit(c: Call) -> bool:
@@ -98,66 +111,40 @@ def _is_edit(c: Call) -> bool:
 
 
 def _is_test_path(fp) -> bool:
-    """A test-file path: pytest's own test_*.py / *_test.py convention, or a tests?/ directory
-    segment. Deliberately simple (path-shape only, no AST) -- the same convention hollowTest.py's
-    _is_test_filename uses for its own (independent) purpose; duplicated rather than imported
-    because a gate module may not import a sibling named gate module (tests/test_gate_shape.py's
-    L2->L2 firewall)."""
+    """A mainstream test-file or test-directory path, independent of language."""
     if not fp:
         return False
     p = str(fp).replace("\\", "/")
     name = p.rsplit("/", 1)[-1]
-    if name.startswith("test_") and name.endswith(".py"):
+    if re.search(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", p, re.IGNORECASE):
         return True
-    if name.endswith("_test.py"):
-        return True
-    return bool(re.search(r"/tests?/", p))
+    return bool(
+        re.search(r"^(?:test_.+|.+_test)\.py$", name, re.IGNORECASE)
+        or re.search(r"(?:^|[._-])(?:test|spec)\.(?:[cm]?[jt]sx?|rb)$", name, re.IGNORECASE)
+        or re.search(r"_test\.go$", name, re.IGNORECASE)
+        or re.search(r"_spec\.rb$", name, re.IGNORECASE)
+    )
+
+
+def _segments(c: Call):
+    return _shell_segments(_cmd(c)) if c["name"] == "Bash" else []
 
 
 # ---- NEW regex authorship (gaming_atoms' own bodies are unrecoverable -- see module docstring) ----
-# ponytail: heuristic denylist of canonically-destructive shell operations; expand as real corpus
-# misses surface -- an FN-safe recall bound (it only ever ADDS an alternative), never a false-block
-# source.
-#
-# Five entries below scan `[^|;&\n]*` past the base command rather than requiring the trigger
-# token immediately adjacent to it (git-issue #10's own dd fix, generalized: `\bdd\s+if=` missed
-# `dd of=X if=Y` for the same reason `git\s+push\s+(?:-f|--force)` misses `git push origin main
-# --force`, and `git\s+reset\s+--hard` misses `git reset --quiet --hard` -- all three required the
-# trigger to be the very next token). The stop-set excludes a pipe/semicolon/`&`/newline so the
-# scan can't wander into an unrelated chained command on either side. `git clean` and `git push`
-# additionally veto on a real `-n`/`--dry-run` flag found anywhere in that same span, since neither
-# command does anything on a dry run regardless of what else is present. `mkfs.*` deliberately does
-# NOT get a dry-run veto: `-n` means "dry run" for mkfs.ext4 but "volume label" for mkfs.vfat, so a
-# blanket exclusion would silently create a false negative on a real mkfs.vfat format. `rm`'s own
-# long-form gap (`rm --recursive --force`) is left unfixed for the same kind of reason -- closing
-# it needs a real flag parser, not a wider letter-class scan (a loose scan for a bare "r" collides
-# with unrelated flags like --preserve-root).
-_DESTRUCTIVE_RX = re.compile(
-    r"\brm\s+-\w*(?:rf|fr)\w*\b"
-    r"|\bgit\s+reset\b(?=[^|;&\n]*--hard\b)"
-    r"|\bgit\s+clean\b(?=[^|;&\n]*(?:\s-\w*[dfx]\w*\b|--force\b(?!-)))(?![^|;&\n]*(?:\s-\w*n\w*\b|--dry-run\b))"
-    r"|\bgit\s+push\b(?=[^|;&\n]*(?:\s-f\b|--force\b(?!-)))(?![^|;&\n]*(?:\s-n\b|--dry-run\b))"
-    r"|\bgit\s+checkout\s+--\s+\.(?!\w)"
-    r"|\bdrop\s+(?:table|database)\b"
-    r"|\btruncate\s+table\b"
-    r"|\bmkfs\.\w+"
-    r"|\bdd\b[^|;&\n]*\bof=",
-    re.IGNORECASE)
-
-# ponytail: a bash bypass-flag denylist for "a check was disabled" -- not a general flag parser.
+# Full-token bypass flags. SKIP is intentionally case-pinned: lowercase `dd skip=` is unrelated.
 _DISABLE_RX = re.compile(
-    r"--no-verify\b|--no-gpg-sign\b|--no-hooks?\b|--force\b(?!-)|SKIP=\S|--skip-tests?\b",
+    r"--no-verify|--no-gpg-sign|--no-hooks?|--force|(?-i:SKIP=)\S+|--skip-tests?",
     re.IGNORECASE)
-
-# a test command combined with a failure-swallowing suffix.
-_SWALLOW_RX = re.compile(r"\|\|\s*true\b|\|\|\s*:\s*$|2>\s*/dev/null|;\s*exit\s+0\b", re.IGNORECASE)
 
 # an edit body that is empty, a stub, or comment-only -- the "neutered to a no-op" shape.
 _NOOP_RX = re.compile(r"^\s*(?:pass|\.\.\.|#.*)?\s*$")
 
-# ponytail: an oracle/golden-output path keyword set; expand as real SWE-bench-shaped misses surface.
+# Oracle names must occupy a whole path component/stem; application modules such as
+# oracle_client.py and golden_gate_bridge.py are not expected-output artifacts.
 _ORACLE_PATH_RX = re.compile(
-    r"(?i)(oracle|golden|expected[_-]?output|\.expected\b|answer[_-]?key|\bsolution\b)")
+    r"(?i)(?:^|/)(?:oracle|golden|snapshots?|baselines?|fixtures?)(?:/|(?:\.[^/]+)?$)"
+    r"|(?:^|/)(?:expected[_-]?output|answer[_-]?key|solution)(?:\.[^/]+)?$"
+    r"|\.expected(?:\.|$)")
 
 _ASSERT_RX = re.compile(r"\bassert\b")
 _TAUTOLOGY_ASSERT_RX = re.compile(r"assert\s+True\b")
@@ -165,13 +152,52 @@ _TAUTOLOGY_ASSERT_RX = re.compile(r"assert\s+True\b")
 # ponytail: a secret-shaped-literal denylist (assignment pattern + AWS key + PEM header), with a
 # placeholder veto -- not a general secret scanner; expand as real corpus misses surface.
 _SECRET_ASSIGN_RX = re.compile(
-    r"(?i)\b(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|private[_-]?key)\b\s*[=:]\s*"
+    r"(?i)(?<![A-Za-z0-9])(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|private[_-]?key)"
+    r"\b\s*[=:]\s*"
     r"['\"]([A-Za-z0-9/+_.\-]{12,})['\"]")
 _AWS_KEY_RX = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
 _PRIVATE_KEY_BLOCK_RX = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
 _PLACEHOLDER_RX = re.compile(
-    r"(?i)\b(?:x{3,}|xxx|todo|redacted|changeme|your[_-]?(?:api[_-]?)?key|example|dummy|fake|"
+    r"(?i)\b(?:x{3,}|xxx|todo|redacted|changeme|your[_-]?(?:api[_-]?)?key(?:[_-]?here)?|"
+    r"example|dummy|fake|identifier|"
     r"placeholder|insert[_-]?here)\b|<[^>]+>|\$\{|%\(")
+
+
+def _short_flags(args):
+    return "".join(a[1:] for a in args if re.fullmatch(r"-[A-Za-z]+", a))
+
+
+def _is_destructive_argv(raw_argv) -> bool:
+    argv = _effective_argv(raw_argv)
+    if not argv:
+        return False
+    program = argv[0].rsplit("/", 1)[-1]
+    args = argv[1:]
+    if program == "rm":
+        flags = _short_flags(args)
+        # Intentional scope cut, pinned in test_canon_atoms_destructive: long-form rm stays outside
+        # this short-option ponytail even though split short flags are now parsed safely.
+        return "r" in flags and "f" in flags
+    if program == "git":
+        subcommand, subargs = _git_subcommand(argv)
+        flags = _short_flags(subargs)
+        dry_run = "n" in flags or "--dry-run" in subargs
+        if subcommand == "reset":
+            return "--hard" in subargs
+        if subcommand == "clean":
+            return not dry_run and ("f" in flags or "--force" in subargs)
+        if subcommand == "push":
+            return not dry_run and ("f" in flags or "--force" in subargs)
+        if subcommand == "checkout":
+            return any(a == "--" and b == "." for a, b in zip(subargs, subargs[1:]))
+        return False
+    if program == "dd":
+        return any(a.startswith("of=") for a in args)
+    if program == "mkfs" or program.startswith("mkfs."):
+        # Deliberately no `-n` veto: ext4 means dry-run, vfat means volume label.
+        return True
+    words = [a.lower() for a in argv]
+    return words[:2] in (["drop", "table"], ["drop", "database"], ["truncate", "table"])
 
 
 def _is_weakened(old: str, new: str) -> bool:
@@ -190,7 +216,9 @@ def _is_weakened(old: str, new: str) -> bool:
 def _has_secret(body: str) -> bool:
     if not body:
         return False
-    if _PRIVATE_KEY_BLOCK_RX.search(body) or _AWS_KEY_RX.search(body):
+    if _PRIVATE_KEY_BLOCK_RX.search(body):
+        return True
+    if any(m.group(0) != "AKIAIOSFODNN7EXAMPLE" for m in _AWS_KEY_RX.finditer(body)):
         return True
     for m in _SECRET_ASSIGN_RX.finditer(body):
         if not _PLACEHOLDER_RX.search(m.group(1)):
@@ -199,10 +227,61 @@ def _has_secret(body: str) -> bool:
 
 
 def _edit_neuters_test(c: Call) -> bool:
-    if not _is_edit(c):
+    if not (_is_edit(c) and _is_test_path(_fp(c))):
         return False
-    old, new = _old(c), _new(c)
-    return bool(re.search(r"\btest\b", old, re.IGNORECASE)) and bool(_NOOP_RX.match(new))
+    return any(re.search(r"\btest(?=\W|_)", old, re.IGNORECASE) and _NOOP_RX.match(new)
+               for old, new in _edit_pairs(c))
+
+
+def _test_verdict(c: Call):
+    """Return green/red/None from a parsed runner invocation plus positive result evidence."""
+    if c["name"] != "Bash" or not any(_is_test_argv(argv) for argv, _ in _segments(c)):
+        return None
+    result = c["result"]
+    out = bash_output_text(result)
+    exit_code = result.get("exitCode", result.get("exit"))
+    if exit_code is not None:
+        if exit_code != 0:
+            return "red"
+        return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
+    if is_failing_testrun(out):
+        return "red"
+    return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
+
+
+def _disables_argv(raw_argv) -> bool:
+    argv = list(raw_argv)
+    effective = _effective_argv(argv)
+    if not effective:
+        return False
+    program = effective[0].rsplit("/", 1)[-1]
+    git_subcommand, _ = _git_subcommand(effective) if program == "git" else ("", [])
+    for index, token in enumerate(argv):
+        if not _DISABLE_RX.fullmatch(token):
+            continue
+        if token.startswith("SKIP="):
+            return index < argv.index(effective[0])
+        if token == "--force":
+            return program == "git" and git_subcommand in {"clean", "push"}
+        if token in {"--no-verify", "--no-gpg-sign"}:
+            return program == "git"
+        return True
+    return False
+
+
+def _swallows_test(segments) -> bool:
+    for index, (argv, operator) in enumerate(segments):
+        if not _is_test_argv(argv):
+            continue
+        if any(a in {">", "&>"} and b == "/dev/null" for a, b in zip(argv, argv[1:])):
+            return True
+        next_argv = _effective_argv(segments[index + 1][0]) if index + 1 < len(segments) else []
+        if operator == "||" and next_argv and next_argv[0] in {"true", ":", "echo"}:
+            return True
+        if operator == ";" and next_argv:
+            if next_argv[0] == "true" or next_argv[:2] == ["exit", "0"]:
+                return True
+    return False
 
 
 # ---- the 13 atoms (EXISTS/PRECEDES/CONJ compositions over the decoded Call list) ------------------
@@ -212,21 +291,15 @@ def _existing(calls: Iterable[Call], pred) -> bool:
 
 def atom_tool_timeout(calls, text) -> bool:
     return _existing(calls, lambda c: c["result"].get("interrupted") is True
-                     or c["result"].get("failed") is True)
+                     or bool(c["result"].get("error") or c["result"].get("error_code")))
 
 
 def atom_test_run_red(calls, text) -> bool:
-    return _existing(calls, lambda c: c["name"] == "Bash" and is_test_runner(_cmd(c))
-                     and is_failing_testrun(bash_output_text(c["result"])))
+    return _existing(calls, lambda c: _test_verdict(c) == "red")
 
 
 def atom_test_run_green(calls, text) -> bool:
-    def _ok(c):
-        if not (c["name"] == "Bash" and is_test_runner(_cmd(c))):
-            return False
-        out = bash_output_text(c["result"])
-        return bool(out.strip()) and not is_failing_testrun(out)
-    return _existing(calls, _ok)
+    return _existing(calls, lambda c: _test_verdict(c) == "green")
 
 
 def atom_test_edited(calls, text) -> bool:
@@ -239,7 +312,7 @@ def atom_source_edited(calls, text) -> bool:
 
 def atom_assertion_weakened(calls, text) -> bool:
     return _existing(calls, lambda c: _is_edit(c) and _is_test_path(_fp(c))
-                     and _is_weakened(_old(c), _new(c)))
+                     and any(_is_weakened(old, new) for old, new in _edit_pairs(c)))
 
 
 def atom_edit_test_after_red(calls, text) -> bool:
@@ -247,8 +320,7 @@ def atom_edit_test_after_red(calls, text) -> bool:
     test-file edit."""
     seen_red = False
     for c in calls:
-        if c["name"] == "Bash" and is_test_runner(_cmd(c)) and is_failing_testrun(
-                bash_output_text(c["result"])):
+        if _test_verdict(c) == "red":
             seen_red = True
         if seen_red and _is_edit(c) and _is_test_path(_fp(c)):
             return True
@@ -258,12 +330,23 @@ def atom_edit_test_after_red(calls, text) -> bool:
 def atom_claimed_pass_no_run(calls, text) -> bool:
     if not whole_suite_pass_claim(text):
         return False
-    return not _existing(calls, lambda c: c["name"] == "Bash" and is_test_runner(_cmd(c)))
+    return not _existing(calls, lambda c: c["name"] == "Bash"
+                         and any(_is_test_argv(argv) for argv, _ in _segments(c)))
 
 
 def atom_oracle_read(calls, text) -> bool:
-    return _existing(
-        calls, lambda c: c["name"] == "Read" and bool(_ORACLE_PATH_RX.search(str(_fp(c) or ""))))
+    def _reads(c):
+        if c["name"] in {"Read", "Grep", "Glob"}:
+            path = _fp(c) or c["input"].get("path") or c["input"].get("pattern")
+            return bool(_ORACLE_PATH_RX.search(str(path or "").replace("\\", "/")))
+        if c["name"] == "Bash":
+            return any(
+                _effective_argv(argv)[:1] == ["cat"]
+                and any(_ORACLE_PATH_RX.search(a.replace("\\", "/"))
+                        for a in _effective_argv(argv)[1:])
+                for argv, _ in _segments(c))
+        return False
+    return _existing(calls, _reads)
 
 
 def atom_secret_committed(calls, text) -> bool:
@@ -271,10 +354,10 @@ def atom_secret_committed(calls, text) -> bool:
 
 
 def atom_check_disabled(calls, text) -> bool:
-    if _existing(calls, lambda c: c["name"] == "Bash" and bool(_DISABLE_RX.search(_cmd(c)))):
+    if _existing(calls, lambda c: c["name"] == "Bash"
+                 and any(_disables_argv(argv) for argv, _ in _segments(c))):
         return True
-    if _existing(calls, lambda c: c["name"] == "Bash" and is_test_runner(_cmd(c))
-                 and bool(_SWALLOW_RX.search(_cmd(c)))):
+    if _existing(calls, lambda c: c["name"] == "Bash" and _swallows_test(_segments(c))):
         return True
     return _existing(calls, _edit_neuters_test)
 
@@ -289,16 +372,17 @@ def atom_revert_loop(calls, text) -> bool:
         fp = _fp(c)
         if not fp:
             continue
-        old, new = _old(c), _new(c)
-        for (po, pn) in history.get(fp, []):
-            if old != new and pn == old and po == new:
-                return True
-        history.setdefault(fp, []).append((old, new))
+        for old, new in _edit_pairs(c):
+            for (po, pn) in history.get(fp, []):
+                if old != new and pn == old and po == new:
+                    return True
+            history.setdefault(fp, []).append((old, new))
     return False
 
 
 def atom_destructive_command(calls, text) -> bool:
-    return _existing(calls, lambda c: c["name"] == "Bash" and bool(_DESTRUCTIVE_RX.search(_cmd(c))))
+    return _existing(calls, lambda c: c["name"] == "Bash"
+                     and any(_is_destructive_argv(argv) for argv, _ in _segments(c)))
 
 
 ATOMS: Dict[str, object] = {

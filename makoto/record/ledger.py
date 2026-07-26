@@ -69,7 +69,8 @@ def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=Non
         "INSERT INTO ledger (key, value, kind, exit, source_event_id, session_id, ts) "
         "VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now')) "
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value, kind=excluded.kind, "
-        "exit=excluded.exit, source_event_id=excluded.source_event_id, ts=excluded.ts",
+        "exit=excluded.exit, source_event_id=excluded.source_event_id, "
+        "session_id=excluded.session_id, ts=excluded.ts",
         [key, value, kind, exit_code, event_id, session_id],
     )
     conn.commit()

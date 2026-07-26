@@ -82,7 +82,7 @@ def _run_intent_claim(text: str):
 
 def _last_stop_index(history) -> Optional[int]:
     """The index (in `history`, session order) of the most recent Stop/SubagentStop-event row, or
-    None if neither appears anywhere in the window. `history` is already `ORDER BY ts`
+    None if neither appears anywhere in the window. `history` is already `ORDER BY id`
     (_select_recent) -- treated as one equivalence class the same way `_dispatch.py` itself
     documents them ("Gates evaluate on Stop AND SubagentStop")."""
     idx = None

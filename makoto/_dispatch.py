@@ -238,7 +238,7 @@ def _select_recent(conn, session_id: str, event_id: int) -> list:
         "SELECT id, ts, event_type, cwd, payload "
         "FROM events WHERE session_id = ? "
         "AND ts >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour') "
-        "AND id < ? ORDER BY ts",
+        "AND id < ? ORDER BY id",
         [session_id, event_id]
     ).fetchall()
 
@@ -452,6 +452,12 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             plan = _plan.load_plan(conn, sid)                # SPEC-5: the declared contract Plan
         except Exception:
             plan = None                                      # fail-open per-store, like every other read above
+        from makoto.session import planItems as _plan_items
+        try:
+            _plan_items.sync_plan_items(conn, sid, text)     # source/discharge label-shaped commitments
+            open_plan_items = _plan_items.open_plan_items(conn, sid)
+        except Exception:
+            open_plan_items = []                             # fail-open per-store, like every other read above
 
         # cwd-first, and on a miss resolve against git work-trees this session synced
         # (checks/_worldpaths.py) — a file produced remotely over ssh and landed here via
@@ -529,6 +535,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
+            open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
@@ -749,6 +756,14 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         if nid is not None and nid in plan_obj.open_nodes():
                             plan_obj.mark_done(nid)
                             _plan.persist_plan(conn, sid, plan_obj)
+        # Task #19c (2026-07-10): the harness's own TaskCreate/TaskUpdate calls are the
+        # GROUND-TRUTH source for the plan-item store the prose sourcer only approximates
+        # -- an explicit create opens `task:<id>`, an explicit completed/deleted
+        # transition discharges it, and planItemDrift.py's ADVISORY Stop reminder then
+        # surfaces anything still open. Same fail-open umbrella as the ledger write.
+        if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
+            from makoto.session import planItems as _plan_items
+            _plan_items.record_task_event(conn, sid, payload)
         if delta_finding is not None:
             delta_finding = replace(delta_finding, source_event_id=event_id)
             _emit_decision([delta_finding], payload.get("hook_event_name", ""),

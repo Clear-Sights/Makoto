@@ -1,0 +1,39 @@
+# Gitleaks config. Extends the stock ruleset; adds one path allowlist.
+#
+# WHY THIS EXISTS, and why it is not more .gitleaksignore entries.
+#
+# A .gitleaksignore fingerprint is `commit-sha:path:rule:line`, so it is bound to a
+# commit SHA. Two consequences made the fingerprint list unmaintainable here:
+#
+#   1. The public repo is a republished copy of this one, so the same fixture line
+#      carries a DIFFERENT SHA there. One list cannot cover both repos, and the
+#      publish copies this file verbatim.
+#   2. Every publish mints a new public SHA, so a fixture that was ignored yesterday
+#      is flagged again today. The list's own header records this already happening
+#      once: "Fingerprints regenerated 2026-07-10 after the full-history author-identity
+#      rewrite changed every commit SHA (fingerprints embed the SHA, so the prior
+#      entries all went stale at once)."
+#
+# Regenerating a list after every publish is a downstream guard for an upstream fact:
+# two files in this repo exist to hold strings that are supposed to look like secrets.
+# Allowlisting those two paths states that fact once, and no SHA appears in it.
+#
+# THE COST, stated plainly: a real credential pasted into either of these two files
+# would not be scanned. That is accepted because neither file has any purpose other
+# than carrying fixtures for makoto's own secret-detection checks, and because every
+# other path in both repos stays fully scanned. If either file ever grows a
+# non-fixture role, delete its entry here.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """Fixture files whose entire content is deliberately secret-shaped: the \
+false-positive/true-positive battery for atom_secret_committed, and the canon-fingerprint \
+corpus. The flagged literals are keyboard runs -- AKIA1234567890ABCDEF, \
+sk_live_abcdefghijklmnop -- carried as the TP half of paired cases that prove the \
+detector still fires. Not credentials."""
+paths = [
+  '''tests/test_denylist_fp_battery\.py''',
+  '''tests/test_canon_fingerprints\.py''',
+]

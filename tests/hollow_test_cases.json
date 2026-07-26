@@ -1,0 +1,66 @@
+[
+  {
+    "id": "fires-no_assertion",
+    "bucket": "fires",
+    "source": "def test_a():\n    x = compute()\n    y = x + 1\n",
+    "path": "test_m.py",
+    "expect_fire": true,
+    "note": "the test body asserts nothing at all -- passes regardless of what compute() does."
+  },
+  {
+    "id": "fires-tautology",
+    "bucket": "fires",
+    "source": "def test_a():\n    assert True\n",
+    "path": "test_m.py",
+    "expect_fire": true,
+    "note": "assert True can never fail."
+  },
+  {
+    "id": "fires-swallowed_failure",
+    "bucket": "fires",
+    "source": "def test_a():\n    try:\n        compute()\n    except Exception:\n        pass\n",
+    "path": "test_m.py",
+    "expect_fire": true,
+    "note": "the only call-under-test is wrapped in a broad no-op except, with no assertion elsewhere."
+  },
+  {
+    "id": "fires-uncollectable_nested",
+    "bucket": "fires",
+    "source": "def test_outer():\n    def test_inner():\n        assert compute()\n    test_inner()\n",
+    "path": "test_m.py",
+    "expect_fire": true,
+    "note": "test_inner is test-shaped and has its own assertion, but pytest's collector never descends into a function body looking for further defs -- it can never be independently run, skipped, or reported."
+  },
+  {
+    "id": "fires-uncollectable_always_skip",
+    "bucket": "fires",
+    "source": "import pytest\n\n\n@pytest.mark.skipif(True, reason='x')\ndef test_a():\n    assert compute()\n",
+    "path": "test_m.py",
+    "expect_fire": true,
+    "note": "the skipif condition is a literal tautology (True) -- the test can never actually run."
+  },
+  {
+    "id": "silent-legitimate-equality-check",
+    "bucket": "silent-legitimate-equality-check",
+    "source": "def test_a():\n    x = 1\n    y = 2\n    assert x == y\n",
+    "path": "test_m.py",
+    "expect_fire": false,
+    "note": "comparing two DIFFERENT expressions is a real equality check, not a tautology (assert x == x)."
+  },
+  {
+    "id": "silent-real-assertion-with-similar-shape",
+    "bucket": "silent-real-assertion-with-similar-shape",
+    "source": "def _clean(x):\n    assert not x\n\n\ndef test_a():\n    try:\n        _clean(compute())\n    except ValueError:\n        pass\n",
+    "path": "test_m.py",
+    "expect_fire": false,
+    "note": "superficially resembles the swallowed_failure shape (a try/except around a call), but the except is NARROW (ValueError, not broad/no-op-Exception) and the call chains to a same-file helper that itself asserts -- a legitimate narrow-except-around-a-real-check pattern, not hollow."
+  },
+  {
+    "id": "silent-off-file",
+    "bucket": "silent-off-file",
+    "source": "def test_a():\n    x = compute()\n",
+    "path": "helpers.py",
+    "expect_fire": false,
+    "note": "a hollow-shaped (no_assertion) function, but the file doesn't match pytest's test-file discovery convention (test_*.py / *_test.py), so it is never scanned at all."
+  }
+]

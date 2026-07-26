@@ -9,7 +9,13 @@ lib.io / substrate.claims / substrate.factories / citations); no compat shim (CL
 from __future__ import annotations
 import json
 
-from makoto.core.lexicons import _TEST_RUNNER_RX, _FAILURE_SUMMARY_RX, _FAILURE_MARKER_RX, _ANSI_SGR_RX
+from makoto.core.lexicons import (
+    _TEST_RUNNER_RX,  # compatibility export pinned by tests/test_lexicons.py
+    _FAILURE_SUMMARY_RX,
+    _FAILURE_MARKER_RX,
+    _ANSI_SGR_RX,
+)
+from makoto.core._shell import _command_runs_tests
 
 
 def raw_payload_str(entry) -> str:
@@ -49,9 +55,10 @@ def decode_history_row(row):
     if not raw:
         return None
     try:
-        return raw if isinstance(raw, dict) else json.loads(raw)
+        decoded = raw if isinstance(raw, dict) else json.loads(raw)
     except Exception:
         return None
+    return decoded if isinstance(decoded, dict) else None
 
 
 def bash_output_text(tool_response) -> str:
@@ -90,7 +97,7 @@ def is_failing_testrun(output: str) -> bool:
 
 def is_test_runner(command: str) -> bool:
     """True iff a Bash command invokes a recognized test runner (open-world; unlisted -> recall bound)."""
-    return bool(command) and bool(_TEST_RUNNER_RX.search(command))
+    return bool(command) and _command_runs_tests(command)
 
 
 def iter_tool_events(history):
@@ -106,10 +113,8 @@ def iter_tool_events(history):
     (raw if isinstance(raw, dict)), deliberately MORE permissive than the str-only
     raw_payload_str path — corpus byte-comparison (T2.6) arbitrates that the union changes nothing.
 
-    Decode step delegates to decode_history_row (2026-07-09 dedup); the isinstance(row, ...) sniff
-    is intentionally NOT re-inlined here so this stays a single source, but the caller-side
-    behavior is unchanged bit-for-bit — a non-dict `ev` (e.g. a JSON array payload) still falls
-    through to `ev.get(...)` exactly as before, rather than gaining a new silent-skip branch."""
+    Decode step delegates to decode_history_row (2026-07-09 dedup); parsed JSON with the wrong
+    envelope shape is skipped there just like invalid JSON, so it cannot crash this iterator."""
     for row in history or ():
         ev = decode_history_row(row)
         if ev is None:
