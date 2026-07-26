@@ -50,26 +50,26 @@ def _messages(history, cwd, text):
     return [f.message for f in findings if getattr(f, "pattern_id", "") == "gate.claimed_shipped"]
 
 
-# RED population: actual completed claims with no successful remote mutation.
+# RED population: actual completed non-push claims with no successful remote mutation.
 def test_red_bare_unbacked_merge_claim_fires(tmp_path):
     msgs = _messages([], str(tmp_path), "I merged the PR.")
     assert msgs, f"gate.claimed_shipped MUST fire on an unbacked merge claim: {msgs}"
 
 
-def test_red_failed_push_does_not_back_claim(tmp_path):
+def test_not_evaluable_failed_push_transcript_is_not_a_remote_verdict(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "git push origin main"},
                     {"exitCode": 1, "stderr": "rejected"})]
     msgs = _messages(history, cwd, "I've pushed it to main.")
-    assert msgs, f"gate.claimed_shipped MUST fire when the recorded push failed: {msgs}"
+    assert not msgs, f"a transcript without remote observation is NOT_EVALUABLE: {msgs}"
 
 
-def test_red_dry_run_push_does_not_back_claim(tmp_path):
+def test_not_evaluable_dry_run_transcript_is_not_a_remote_verdict(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "git push origin main --dry-run"},
                     {"exitCode": 0})]
     msgs = _messages(history, cwd, "Pushed it to main.")
-    assert msgs, f"gate.claimed_shipped MUST fire when the only push was a dry run: {msgs}"
+    assert not msgs, f"a transcript without remote observation is NOT_EVALUABLE: {msgs}"
 
 
 def test_red_failed_github_merge_does_not_back_claim(tmp_path):
@@ -80,12 +80,12 @@ def test_red_failed_github_merge_does_not_back_claim(tmp_path):
     assert msgs, f"gate.claimed_shipped MUST fire when the merge tool errored: {msgs}"
 
 
-def test_red_pretooluse_is_not_completed_evidence(tmp_path):
+def test_not_evaluable_pretooluse_push_record_is_not_a_remote_verdict(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "push_files", {"branch": "main"}, {},
                     event="PreToolUse")]
     msgs = _messages(history, cwd, "I pushed it to main.")
-    assert msgs, f"gate.claimed_shipped MUST fire on dangling PreToolUse-only evidence: {msgs}"
+    assert not msgs, f"a transcript without remote observation is NOT_EVALUABLE: {msgs}"
 
 
 # TN population: real evidence and adjacent linguistic near-misses.

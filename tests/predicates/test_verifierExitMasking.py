@@ -76,6 +76,15 @@ def test_silent_on_verb_inside_quotes():
     assert predicate(current_event=_bash('echo "run: pytest || true"'), history=[], pattern=_PAT) is None
 
 
+def test_silent_when_prohibition_is_a_shell_comment_after_a_verifier():
+    # The verifier is executed, but the masking text is prose in a comment, not shell syntax.
+    assert predicate(current_event=_bash("pytest tests/ -q  # never mask this with || true"), history=[], pattern=_PAT) is None
+
+
+def test_still_fires_when_mask_is_executed_after_a_verifier():
+    assert predicate(current_event=_bash("pytest tests/ -q || true"), history=[], pattern=_PAT) is not None
+
+
 # --- TP: launcher-delegated runners (closes the deferred python -m / poetry run / npx FNs) ---
 
 def test_fires_on_python_m_pytest_or_true():

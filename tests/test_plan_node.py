@@ -68,6 +68,12 @@ def test_establisher_has_no_unmet_deps():
     assert plan.order_violation(n.id) is False
 
 
+def test_unmet_deps_unknown_id_raises_keyerror():
+    """The dependency lookup's unknown-id law is independent of mark_done's lookup."""
+    with pytest.raises(KeyError, match="missing-node"):
+        Plan().unmet_deps("missing-node")
+
+
 def test_dependent_on_open_establisher_is_unmet_gap():
     plan = Plan()
     establisher = plan.add_node("Write", "auth.py", "/repo/auth.py", id="e1")

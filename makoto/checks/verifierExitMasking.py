@@ -11,8 +11,14 @@ failure into a green. The devnull branch detected honest stderr-noise suppressio
 (a category error), and was the predicate's only false-positive source on the real corpus (2 fires,
 both honest diagnostics). Removing it drives corpus-FP to 0 → graduated to BLOCKING.
 
-FP-SAFE BY RUNNER-GATING, and the runner must be the LEADING command of a statement (an actual
-invocation), NOT an argument — so `find / -name pytest || true` does NOT fire (find is the command).
+FP-SAFE BY SHELL COMMAND POSITION: this check tokenizes the Bash command and only treats a runner,
+mask, or `set +e` as evidence when it is an executed command/operator, not prose in a comment,
+quoted string, or Markdown/code-fence payload. This is necessarily heuristic rather than a Bash
+interpreter: malformed shell, heredocs, `eval`, and dynamically-built commands can still be
+misclassified or missed.
+
+The runner must be the LEADING command of a statement (an actual invocation), NOT an argument — so
+`find / -name pytest || true` does NOT fire (find is the command).
 Legit masks on NON-runners (pip uninstall||true, rm -rf build || true) carry no leading runner ->
 never fire. The mask must be in the SAME statement as the runner. `python -m` / `poetry run` / `npx`
 / `pnpm exec|dlx` / `uv|pdm|hatch|pipenv run` launcher prefixes ARE handled (stripped to the delegated
@@ -31,7 +37,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 from makoto.core.schema import Finding, PreCheck
-from makoto.core.lexicons import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
+from makoto.core._shell import _shell_segments
 
 # Anchored at the (post-wrapper) START of a statement: the runner is INVOKED, not an argument.
 _LEAD_RUNNER_RX = re.compile(
@@ -41,10 +47,6 @@ _LEAD_RUNNER_RX = re.compile(
     r"|dune\s+(?:test|build)|swift\s+test)\b"
 )
 _WRAPPERS = ("sudo", "env", "time", "nice", "exec", "command", "builtin")
-_MASK_TAIL_RX = re.compile(r"(?:\|\|\s*(?:true|:))(?:\s|$)")  # ; true handled separately (it splits)
-_SETE_RX = re.compile(r"\bset\s+\+e\b")
-
-
 def _is_runner_command(c: str) -> bool:
     """True iff the statement's LEADING command (after VAR= / wrappers / launcher prefixes) is a verifier.
 
@@ -81,18 +83,17 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
     if current_event.get("tool_name") != "Bash":
         return None
     raw = current_event.get("tool_input", {}).get("command", "")
-    cmd = _QUOTED_RX.sub(" ", raw)
-    parts = re.split(r"(&&|;|\n)", cmd)  # commands at even indices, separators at odd
-    set_e = bool(_SETE_RX.search(cmd))
+    segments = _shell_segments(raw)
+    set_e = any(argv[:2] == ["set", "+e"] for argv, _operator in segments)
 
     reason = None
-    for idx in range(0, len(parts), 2):
-        c = parts[idx]
-        if not _is_runner_command(c):
+    for idx, (argv, operator) in enumerate(segments):
+        if not _is_runner_command(" ".join(argv)):
             continue
-        if _MASK_TAIL_RX.search(c):  # `|| true` / `|| :` within the runner statement
+        next_argv = segments[idx + 1][0] if idx + 1 < len(segments) else []
+        if operator == "||" and next_argv in (["true"], [":"]):
             reason = "verifier failure masked by `|| true`"
-        elif idx + 2 < len(parts) and parts[idx + 1].strip() == ";" and parts[idx + 2].strip() in ("true", ":"):
+        elif operator == ";" and next_argv in (["true"], [":"]):
             reason = "verifier failure masked by `; true`"  # `; true` makes exit 0 regardless
         elif set_e:
             reason = "`set +e` disables exit-on-error around a verifier"

@@ -179,13 +179,11 @@ def _bash_history(command: str) -> list:
     })]
 
 
-def test_tp_echoed_git_push_cannot_discharge_claimed_shipped():
-    finding = claimed_shipped_gate(
+def test_not_evaluable_echoed_git_push_is_not_remote_evidence():
+    assert claimed_shipped_gate(
         "I've pushed it to main.",
         history=_bash_history("echo 'git push origin main'"),
-    )
-    assert finding is not None
-    assert finding.pattern_id == "gate.claimed_shipped"
+    ) is None
 
 
 def test_fp_real_git_push_still_discharges_claimed_shipped():

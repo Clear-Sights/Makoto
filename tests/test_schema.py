@@ -5,6 +5,7 @@ evidence) — those fields moved out of the runtime dataclass into TOML row
 comments. load_prechecks silently ignores them when present.
 """
 from dataclasses import fields
+import pytest
 from makoto.core.schema import PreCheck, Finding, load_prechecks
 
 
@@ -118,9 +119,23 @@ def test_every_pattern_blocks_no_warning_tier():
         {p.id: p.fire_level for p in patterns if p.fire_level != "error"}
 
 
+def test_load_prechecks_default_rejects_non_block_posture(monkeypatch):
+    """The loader-backed path enforces its own BLOCK law, independently of TOML validation."""
+    from makoto.substrate import _loader
+    fake = _loader.Check(
+        id="content.only_bad_posture",
+        applies_at="Pre",
+        posture="ADVISE",
+        predicate_module="makoto.checks.only_bad_posture",
+    )
+    monkeypatch.setattr(_loader, "discover", lambda: [fake])
+    with pytest.raises(ValueError, match="every Pre-tier check must be posture=BLOCK") as excinfo:
+        load_prechecks()
+    assert "content.only_bad_posture='ADVISE'" in str(excinfo.value)
+
+
 def test_load_prechecks_rejects_non_error_fire_level(tmp_path):
     """load_prechecks REJECTS any warning/disabled/shadow row — the tier cannot silently return."""
-    import pytest
     for bad in ("warning", "disabled", "shadow", "info"):
         toml = tmp_path / f"p_{bad}.toml"
         toml.write_text(

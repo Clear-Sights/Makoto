@@ -2,7 +2,8 @@
 import json
 
 from makoto.checks.claimedShippedAbsent import (
-    _shipped_claim, _successful_remote_mutation, claimed_shipped_gate,
+    PushTipStatus, _shipped_claim, _successful_remote_mutation, claimed_shipped_gate,
+    pushed_tip_matches_remote,
 )
 
 
@@ -194,3 +195,34 @@ def test_tuple_history_shape_is_supported():
     })
     row = (1, "t", "PostToolUse", "/repo", payload)
     assert claimed_shipped_gate("Pushed it to main.", history=[row]) is None
+
+
+def test_push_tip_match_upholds_claim(monkeypatch, tmp_path):
+    def run(argv, **_kwargs):
+        if "ls-remote" in argv:
+            return type("R", (), {"returncode": 0, "stdout": "abc123\trefs/heads/main\n", "stderr": ""})()
+        return type("R", (), {"returncode": 0, "stdout": "abc123\n", "stderr": ""})()
+    monkeypatch.setattr("makoto.checks.claimedShippedAbsent.subprocess.run", run)
+    result = pushed_tip_matches_remote("I've pushed it to main.", tmp_path)
+    assert result.status is PushTipStatus.MATCH
+
+
+def test_push_tip_mismatch_refutes_claim_with_both_shas(monkeypatch, tmp_path):
+    def run(argv, **_kwargs):
+        if "ls-remote" in argv:
+            return type("R", (), {"returncode": 0, "stdout": "remote456\trefs/heads/main\n", "stderr": ""})()
+        return type("R", (), {"returncode": 0, "stdout": "local123\n", "stderr": ""})()
+    monkeypatch.setattr("makoto.checks.claimedShippedAbsent.subprocess.run", run)
+    result = pushed_tip_matches_remote("I've pushed it to main.", tmp_path)
+    assert result.status is PushTipStatus.MISMATCH
+    assert (result.local_sha, result.remote_sha) == ("local123", "remote456")
+
+
+def test_push_tip_without_remote_is_not_evaluable(monkeypatch, tmp_path):
+    def run(argv, **_kwargs):
+        if "ls-remote" in argv:
+            return type("R", (), {"returncode": 128, "stdout": "", "stderr": "no remote"})()
+        return type("R", (), {"returncode": 0, "stdout": "local123\n", "stderr": ""})()
+    monkeypatch.setattr("makoto.checks.claimedShippedAbsent.subprocess.run", run)
+    result = pushed_tip_matches_remote("I've pushed it to main.", tmp_path)
+    assert result.status is PushTipStatus.NOT_EVALUABLE

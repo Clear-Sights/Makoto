@@ -176,6 +176,43 @@ def test_validate_predicate_modules_aborts_on_missing_callable(monkeypatch, caps
     assert "predicate" in captured.err.lower()
 
 
+def test_validate_predicate_modules_aborts_on_import_error(monkeypatch, capsys):
+    """An unimportable predicate module is its own install failure, not a later callable failure."""
+    from makoto.core.schema import PreCheck
+    import makoto.install as install_mod
+    fake_patterns = [
+        PreCheck(id="import.broken", fire_level="error", description="d",
+                 predicate_module="makoto.checks.module_that_does_not_exist_makhard",
+                 keywords=["x"]),
+    ]
+    monkeypatch.setattr(install_mod, "load_prechecks", lambda *a, **kw: fake_patterns)
+    with pytest.raises(SystemExit) as excinfo:
+        install_mod._validate_predicate_modules()
+    assert excinfo.value.code == 1
+    assert "failed to import" in capsys.readouterr().err
+
+
+def test_validate_predicate_modules_aborts_on_empty_keywords(monkeypatch, capsys):
+    """A callable predicate with no keywords reaches the prefilter-specific exit."""
+    import sys
+    import types
+    from makoto.core.schema import PreCheck
+    import makoto.install as install_mod
+    module_name = "makoto.checks.makhard_callable_without_keywords"
+    valid_mod = types.ModuleType(module_name)
+    valid_mod.predicate = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, module_name, valid_mod)
+    fake_patterns = [
+        PreCheck(id="keywords.empty", fire_level="error", description="d",
+                 predicate_module=module_name, keywords=[]),
+    ]
+    monkeypatch.setattr(install_mod, "load_prechecks", lambda *a, **kw: fake_patterns)
+    with pytest.raises(SystemExit) as excinfo:
+        install_mod._validate_predicate_modules()
+    assert excinfo.value.code == 1
+    assert "empty keywords" in capsys.readouterr().err
+
+
 def test_install_conventions_writes_block_idempotent_preserves_user_content(tmp_path):
     """_install_claude_conventions writes the makoto-allow conventions block, preserves user
     content, is idempotent (exactly one block on repeat), and uninstall removes it cleanly."""

@@ -1,5 +1,6 @@
 """tests for makoto/refresh_citations.py — refresh_if_stale(conn)."""
 import sqlite3
+import pytest
 
 
 def _conn_with_config(tmp_path, citations_path_str, mtime_str="-1"):
@@ -72,6 +73,24 @@ def test_refresh_if_stale_rebuilds_when_mtime_row_missing(tmp_path):
     refresh_if_stale(conn)  # ORIGINAL: rebuilds; MUTANT (mrow or mrow[0]): TypeError
     cites = {r[0] for r in conn.execute("SELECT cite FROM canonical_citations").fetchall()}
     assert "Smith 2020" in cites
+    conn.close()
+
+
+def test_refresh_if_stale_reraises_rebuild_failure_after_rollback(tmp_path, monkeypatch):
+    """Rollback is not a discharge: the exact rebuild failure must still escape."""
+    from makoto.session import citations
+    cit = tmp_path / "CITATIONS.md"
+    cit.write_text("Smith 2020\n")
+    conn = _conn_with_config(tmp_path, str(cit), mtime_str="-1")
+
+    def fail_rebuild(_conn, _path):
+        raise RuntimeError("makhard rebuild sentinel")
+
+    monkeypatch.setattr(citations, "_rebuild_canonical", fail_rebuild)
+    with pytest.raises(RuntimeError, match="makhard rebuild sentinel"):
+        citations.refresh_if_stale(conn)
+    # BEGIN was rolled back before the error escaped; the connection is usable.
+    assert conn.execute("SELECT COUNT(*) FROM canonical_citations").fetchone()[0] == 0
     conn.close()
 
 

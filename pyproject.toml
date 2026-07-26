@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "makoto"
-version = "2.1.1"
+version = "2.2.0"
 description = "Integrity hook for Claude Code — holds the agent's claims against its own logged deeds and blocks faked checks; every check ships at measured zero false positives"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{name = "Clear-Sights"}]
+authors = [{name = "skill-labV2"}]
 license = {text = "Apache-2.0"}
 keywords = ["claude-code", "guardrails", "integrity", "hooks"]
 classifiers = [
@@ -21,7 +21,7 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/Clear-Sights/Makoto"
+Homepage = "https://github.com/skill-labV2/makoto"
 
 [tool.setuptools]
 package-dir = {"makoto" = "makoto"}
@@ -29,7 +29,7 @@ packages = ["makoto"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-makoto = ["data/*.toml"]
+makoto = ["config/*.toml"]
 
 [tool.setuptools.exclude-package-data]
 makoto = ["tests/*", "docs/*", "*.bak"]

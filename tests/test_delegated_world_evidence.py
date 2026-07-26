@@ -83,10 +83,10 @@ def test_fp_delegated_push_remote_tracking_ref_matches_with_empty_history(tmp_pa
     assert "gate.claimed_shipped" not in messages, messages
 
 
-def test_tp_claimed_push_still_fires_when_remote_tracking_ref_points_elsewhere(tmp_path):
+def test_not_evaluable_local_tracking_ref_mismatch_is_not_remote_evidence(tmp_path):
     repo = _repo_with_ref(tmp_path, remote_matches=False)
     messages = _messages(repo, "I've pushed it to main.", history=[])
-    assert "gate.claimed_shipped" in messages, messages
+    assert "gate.claimed_shipped" not in messages, messages
 
 
 def test_fp_subprocess_produced_repo_relative_file_with_empty_history(tmp_path):

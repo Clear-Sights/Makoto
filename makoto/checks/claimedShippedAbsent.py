@@ -1,4 +1,7 @@
 from __future__ import annotations
+from dataclasses import dataclass
+from enum import Enum
+import subprocess
 from typing import Optional
 
 from makoto.core.schema import Finding
@@ -8,18 +11,70 @@ from makoto.core.lexicons import (
 )
 from makoto.substrate.claims import _code_spans
 from makoto.substrate.io import decode_history_row
-from makoto.substrate._shared import pushed_ref_matches_world
+from makoto.substrate._shared import _PUSH_BRANCH_RX
 from makoto.core._shell import _command_pushes_git
+
+
+class PushTipStatus(Enum):
+    """The remote comparison's honest outcomes; NOT_EVALUABLE is outside a pass/fail verdict."""
+    MATCH = "match"
+    MISMATCH = "mismatch"
+    NOT_EVALUABLE = "not_evaluable"
+
+
+@dataclass(frozen=True)
+class PushTipResult:
+    status: PushTipStatus
+    local_sha: str = ""
+    remote_sha: str = ""
+    detail: str = ""
+
+
+def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
+    """Compare local HEAD to ``origin/<branch>`` with `ls-remote`.
+
+    A missing branch, remote, network, or remote branch is NOT_EVALUABLE: no tool transcript is
+    accepted as a proxy for this world fact. Git output and failures are deliberately treated as
+    bounded evidence, so unusual ref output or a timeout also remains NOT_EVALUABLE.
+    """
+    if not text or not cwd:
+        return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="missing claim text or cwd")
+    match = _PUSH_BRANCH_RX.search(text)
+    if not match:
+        return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="push claim names no branch")
+    branch = match.group(1).rstrip("`'\",:;.")
+    if not branch:
+        return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="empty branch")
+    try:
+        local = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=3.0,
+        )
+        remote = subprocess.run(
+            ["git", "-C", str(cwd), "ls-remote", "origin", branch],
+            capture_output=True, text=True, timeout=3.0,
+        )
+    except Exception as exc:
+        return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail=f"git observation unavailable: {exc}")
+    local_sha = local.stdout.strip()
+    remote_fields = remote.stdout.strip().split()
+    remote_sha = remote_fields[0] if remote_fields else ""
+    if local.returncode != 0 or not local_sha:
+        return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="local HEAD unavailable")
+    if remote.returncode != 0 or not remote_sha:
+        return PushTipResult(PushTipStatus.NOT_EVALUABLE, local_sha=local_sha,
+                             detail="origin or branch unavailable")
+    status = PushTipStatus.MATCH if local_sha == remote_sha else PushTipStatus.MISMATCH
+    return PushTipResult(status, local_sha=local_sha, remote_sha=remote_sha)
 
 # gate.claimed_shipped -- an immediate claim-vs-record integrity gate for completed REMOTE
 # mutations. It owns "I pushed/merged/published/deployed/shipped/released X" and present-result
 # claims such as "it's live now"; gate.completion continues to own local file-production claims.
 #
-# EVIDENCE is existential across the session's recorded PostToolUse history: (1) a successful,
-# non-dry-run Bash `git push`, or (2) a successful call from the closed remote-mutation tool set
-# below. Like gate.run_promised, this deliberately does not attempt semantic coreference between
-# "it"/"#42" and a command's owner/repo/ref fields: guessing that mapping would create false
-# blocks. Any successful remote mutation is enough grounding to fail open.
+# EVIDENCE is existential across the session's recorded PostToolUse history for merge/publish-like
+# claims. A push claim is different: it is decided by comparing `git rev-parse HEAD` with
+# `git ls-remote origin <branch>`, so a successful-looking push transcript is never accepted as a
+# proxy. Like gate.run_promised, the non-push evidence deliberately does not attempt semantic
+# coreference between "it"/"#42" and a command's owner/repo/ref fields.
 #
 # CLOSED NON-BASH SET: GitHub's merge_pull_request and push_files are actual shipping actions.
 # create_pull_request is intentionally excluded: opening a PR establishes review intent but does
@@ -99,14 +154,27 @@ def _successful_remote_mutation(history) -> bool:
 
 
 def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
-    """Fire immediately when a completed remote-shipping claim has no successful mutation
-    evidence in pooled history or, for a push, a matching local remote-tracking ref."""
+    """Fire an unbacked shipping claim; pushes use the remote tip, not a tool signature.
+
+    A remote observation precondition failure is NOT_EVALUABLE and returns no pass/fail finding.
+    """
     claim = _shipped_claim(text)
     if claim is None:
         return None
     push_claim = "pushed" in claim.group(0).lower()
-    if (_successful_remote_mutation(history)
-            or (push_claim and pushed_ref_matches_world(text, cwd))):
+    if push_claim:
+        tip = pushed_tip_matches_remote(text, cwd)
+        if tip.status is PushTipStatus.MATCH:
+            return None
+        if tip.status is PushTipStatus.NOT_EVALUABLE:
+            return None
+        return Finding(
+            pattern_id="gate.claimed_shipped", file="", line=0, level="error",
+            message=(f"Push claim (\"{claim.group(0).strip()}\") is false: local HEAD is "
+                     f"{tip.local_sha}, but origin has {tip.remote_sha}."),
+            retry_hint="Push the local HEAD, or retract/rescope the push claim.",
+        )
+    if _successful_remote_mutation(history):
         return None
     return Finding(
         pattern_id="gate.claimed_shipped", file="", line=0, level="error",

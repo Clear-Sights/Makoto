@@ -141,7 +141,7 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "planItemDrift.py": 1,
     "claimedRunningAbsent.py": 4,
     "runIntentUnfulfilled.py": 4,
-    "claimedShippedAbsent.py": 4,
+    "claimedShippedAbsent.py": 5,
 }
 # a gate module may import ONLY L0/L1 primitives + the intra-package `_shared`/`_loader`/
 # `_canonAtoms` — never a sibling NAMED gate (checks.<other-gate-stem>) nor a sibling L2 detector
