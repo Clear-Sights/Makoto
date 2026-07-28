@@ -5,6 +5,19 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Fixed
+- **A built wheel/sdist now ships the whole runtime, not just `makoto/*.py`.** `pyproject.toml`
+  declared `packages = ["makoto"]`, so every subpackage the dispatcher imports at fire time
+  (`makoto.core`, `.checks`, `.record`, `.session`, `.substrate`, `.verdict`) was dropped from the
+  distribution: a `pip install` of the built artifact produced a runtime that died on
+  `ModuleNotFoundError: No module named 'makoto.core'` at first invocation. Packages are now
+  discovered (`[tool.setuptools.packages.find] include = ["makoto*"]`), and the non-`.py` files the
+  runtime reads at fire time ship with them — `_dispatch_shim.sh` (executable bit preserved) plus
+  the packaged `docs/CITATIONS.md` and `docs/MAKOTO-CONVENTIONS.md`. The stale `config/*.toml`
+  package-data entry is dropped (`config/patterns.toml` was deleted 2026-07-08); `docs/*` is no
+  longer excluded, since `makoto/docs/` is runtime data rather than repo documentation. The
+  editable non-plugin install (`pip install -e`) and the plugin install path were never affected.
+
 ## [2.2.0] — 2026-07-26
 
 ### Fixed
