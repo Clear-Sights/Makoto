@@ -6,7 +6,8 @@ Reuses the verified real-payload extractor `lib.io.bash_output_text` so we
 read the fields the live hook actually emits — never a hand-built shape.
 
 Pure data layer: callers pass an open sqlite3 connection whose `ledger` table
-matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts).
+matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts),
+keyed by (session_id, key).
 """
 import re
 
@@ -68,7 +69,7 @@ def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=Non
     conn.execute(
         "INSERT INTO ledger (key, value, kind, exit, source_event_id, session_id, ts) "
         "VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now')) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, kind=excluded.kind, "
+        "ON CONFLICT DO UPDATE SET value=excluded.value, kind=excluded.kind, "
         "exit=excluded.exit, source_event_id=excluded.source_event_id, "
         "session_id=excluded.session_id, ts=excluded.ts",
         [key, value, kind, exit_code, event_id, session_id],
@@ -89,12 +90,21 @@ def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=Non
             pass
 
 
-def read_key(conn, key: str):
-    """Read the latest ledger row for a normalized key, or None."""
-    r = conn.execute(
-        "SELECT key, value, kind, exit, source_event_id FROM ledger WHERE key = ?",
-        [normalize_path(key)],
-    ).fetchone()
+def read_key(conn, key: str, session_id=None):
+    """Read the latest ledger row for a key, optionally scoped to one session."""
+    normalized = normalize_path(key)
+    if session_id is None:
+        r = conn.execute(
+            "SELECT key, value, kind, exit, source_event_id FROM ledger WHERE key = ? "
+            "ORDER BY source_event_id DESC, rowid DESC LIMIT 1",
+            [normalized],
+        ).fetchone()
+    else:
+        r = conn.execute(
+            "SELECT key, value, kind, exit, source_event_id FROM ledger "
+            "WHERE key = ? AND session_id = ?",
+            [normalized, session_id],
+        ).fetchone()
     if not r:
         return None
     return {"key": r[0], "value": r[1], "kind": r[2], "exit": r[3], "source_event_id": r[4]}
@@ -145,7 +155,7 @@ class LedgerView:
         return latest_testrun(self._conn, self._session_id)
 
     def read_key(self, key: str):
-        return read_key(self._conn, key)
+        return read_key(self._conn, key, self._session_id)
 
 
 def view_for(conn, session) -> "LedgerView":

@@ -88,7 +88,7 @@ def test_read_key_delegates():
         event_id=1, session_id="s1",
     )
     v = view_for(c, "s1")
-    assert v.read_key("src/auth.py") == ledger.read_key(c, "src/auth.py")
+    assert v.read_key("src/auth.py") == ledger.read_key(c, "src/auth.py", "s1")
     assert v.read_key("src/auth.py")["kind"] == "touched"
 
 

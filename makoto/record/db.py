@@ -16,7 +16,7 @@ Tables (all idempotent via IF NOT EXISTS):
   events              — append-only event log; (session_id, ts) + event_type indexes
   canonical_citations — Author-Year lookup populated by refresh_citations
   config              — key/value seed (canonical_citations_path + _mtime)
-  ledger              — results/touches keyed by normalized location, latest-wins
+  ledger              — results/touches keyed by session plus normalized location, latest-wins
   commitments         — open located commitments the advance gate reads (un-windowed)
   plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
 
@@ -33,6 +33,46 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
+
+
+def _create_ledger_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ledger (
+            key             TEXT NOT NULL,
+            value           TEXT,
+            kind            TEXT NOT NULL,
+            exit            INTEGER,
+            source_event_id INTEGER,
+            session_id      TEXT NOT NULL DEFAULT '',
+            ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            PRIMARY KEY (session_id, key)
+        )
+    """)
+
+
+def _ensure_ledger_table(conn: sqlite3.Connection) -> None:
+    """Create the session-scoped ledger, migrating the legacy key-only table in place."""
+    _create_ledger_table(conn)
+    info = conn.execute("PRAGMA table_info(ledger)").fetchall()
+    primary_key = tuple(row[1] for row in sorted(info, key=lambda row: row[5]) if row[5])
+    if primary_key != ("key",):
+        return
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute("ALTER TABLE ledger RENAME TO ledger_key_only")
+        _create_ledger_table(conn)
+        conn.execute("""
+            INSERT INTO ledger
+                (key, value, kind, exit, source_event_id, session_id, ts)
+            SELECT key, value, kind, exit, source_event_id, COALESCE(session_id, ''), ts
+            FROM ledger_key_only
+        """)
+        conn.execute("DROP TABLE ledger_key_only")
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
 
 
 def init_db(state_dir: Path, citations_path: Path) -> None:
@@ -75,18 +115,8 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 value TEXT
             )
         """)
-        # ledger — recorded `update`s keyed by normalized location, latest-wins
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS ledger (
-                key             TEXT PRIMARY KEY,
-                value           TEXT,
-                kind            TEXT NOT NULL,
-                exit            INTEGER,
-                source_event_id INTEGER,
-                session_id      TEXT,
-                ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-            )
-        """)
+        # ledger — latest update per (session, normalized location)
+        _ensure_ledger_table(conn)
         # commitments — open located commitments the advance gate reads (un-windowed)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS commitments (
