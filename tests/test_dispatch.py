@@ -1216,20 +1216,18 @@ def test_dispatch_fabricated_action_gate_blocks(tmp_path):
 
 
 def test_dispatch_fabricated_action_silent_when_command_ran(tmp_path):
-    """Control proving the gate DISCRIMINATES end-to-end on PRESENCE of tool work: the SAME action
-    claim, but a tool call really happened this turn (a PreToolUse event — every tool call emits one,
-    matcher '*') -> turn_tool_calls > 0 -> discharged -> no block. The discharge is presence-of-work,
-    NOT command-text matching, so it is immune to paraphrase and to invisible tools."""
+    """The same canonical command in a settled PostToolUse deed certifies the action claim."""
     state_dir = _setup_state(tmp_path)
-    pre = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "fab_ok",
-           "cwd": str(tmp_path),
-           "tool_input": {"command": "python -m pytest tests/zzz_unrun.py -q --tb=short"}}
-    _run_dispatch(state_dir, pre)                  # a tool call really happened this turn
+    post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "fab_ok",
+            "cwd": str(tmp_path),
+            "tool_input": {"command": "pytest tests/zzz_unrun.py -q"},
+            "tool_response": {"stdout": "1 passed", "stderr": "", "exitCode": 0}}
+    _run_dispatch(state_dir, post)
     stop = {"hook_event_name": "Stop", "session_id": "fab_ok", "cwd": str(tmp_path),
             "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed."}
     rc, out = _run_dispatch(state_dir, stop)
     assert rc == 0
-    assert out == "", "a tool call this turn discharges the action claim -> must not block"
+    assert out == "", "the exact settled command should certify the action claim"
 
 
 def test_dispatch_named_test_gate_blocks_after_recorded_named_red(tmp_path):
@@ -1293,7 +1291,7 @@ def test_dispatch_claimed_shipped_gate_blocks_on_unbacked_remote_claim(tmp_path)
     assert out, "claimed_shipped gate must block an unbacked completed remote-action claim"
     decision = json.loads(out)
     assert decision["decision"] == "block"
-    assert "remote change was shipped" in decision["reason"]
+    assert "remote.merge" in decision["reason"]
     rows = [json.loads(line) for line in (state_dir / "audit.jsonl").read_text().splitlines()
             if line.strip()]
     assert any("gate.claimed_shipped" in row.get("pattern_fires", []) for row in rows), \

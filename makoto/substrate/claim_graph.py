@@ -46,6 +46,7 @@ from makoto.core.lexicons import (
     _SHIPPED_ACTION_CLAIM_RX,
     _SHIPPED_STATE_CLAIM_RX,
     _TEETH_FRAME_RX,
+    _EMPTY_OK,
 )
 from makoto.substrate._primitives import detect_locations, normalize_path
 from makoto.substrate.claims import _code_spans
@@ -362,6 +363,15 @@ class ClaimGraph:
             and edge.target_id == deed.node_id
         ), None)
 
+    def _asserts_edge(self, claim: Claim) -> Optional[Edge]:
+        host_event = f"event:{claim.session_id}:{claim.source_event_id}"
+        return next((
+            edge for edge in self.edges.values()
+            if edge.edge_kind == "asserts" and edge.source_id == host_event
+            and edge.target_id == claim.node_id and edge.resolver_id == "host-stop"
+            and str(edge.source_event_id) == str(claim.source_event_id)
+        ), None)
+
     def _delegation_path(self, claim: Claim, evidence, object_id: str) -> tuple[list[str], list[str]]:
         evidence_actor = getattr(evidence, "actor_id", "")
         if not evidence_actor or evidence_actor == claim.actor_id:
@@ -395,20 +405,27 @@ class ClaimGraph:
         evidence = self._node(edge.source_id)
         if not isinstance(evidence, (Deed, Observation)) or self._is_superseded(edge.source_id):
             return None
+        asserted = self._asserts_edge(claim)
+        if asserted is None or claim.target_id not in self.objects:
+            return None
         allowed = _RESOLVER_PREDICATES.get(edge.resolver_id, frozenset())
         if claim.predicate not in allowed or edge.resolver_version != RESOLVER_VERSION:
             return None
-        claim_target_edges = self.target_edges(claim.node_id)
-        evidence_target_edges = self.target_edges(edge.source_id)
-        common = {
-            c.target_id for c in claim_target_edges
-        } & {e.target_id for e in evidence_target_edges}
-        if not common or edge.object_id not in common:
+        if edge.object_id != claim.target_id:
+            return None
+        claim_target_edges = [target for target in self.target_edges(claim.node_id)
+                              if target.target_id == claim.target_id
+                              and target.object_id == claim.target_id]
+        evidence_target_edges = [target for target in self.target_edges(edge.source_id)
+                                 if target.target_id == claim.target_id
+                                 and target.object_id == claim.target_id]
+        if not claim_target_edges or not evidence_target_edges:
             return None
         if isinstance(evidence, Deed) and evidence.source_event_id == claim.source_event_id:
             return None
         derived_nodes: list[str] = []
         derived_edges: list[str] = []
+        source_deed: Optional[Deed] = evidence if isinstance(evidence, Deed) else None
         if isinstance(evidence, Observation) and evidence.source == "tool-result":
             derived = next((
                 e for e in self.edges.values()
@@ -420,24 +437,36 @@ class ClaimGraph:
             deed = self.deeds[derived.target_id]
             if deed.source_event_id == claim.source_event_id:
                 return None
+            source_deed = deed
             derived_nodes.append(deed.node_id)
             derived_edges.append(derived.edge_id)
 
+        # Tool evidence is only authoritative when the graph also records who
+        # performed the settled deed.  Independent world observations (for
+        # example filesystem and git-remote resolvers) deliberately have no
+        # claimant actor and therefore need neither performed nor delegation.
+        if source_deed is not None:
+            performed = self._performed_edge(source_deed)
+            if performed is None or performed.source_id not in self.objects:
+                return None
+            derived_nodes.append(actor_object_id(source_deed.actor_id))
+            derived_edges.append(performed.edge_id)
+
         delegation_nodes: list[str] = []
         delegation_edges: list[str] = []
-        if getattr(evidence, "actor_id", "") != claim.actor_id:
+        if source_deed is not None and source_deed.actor_id != claim.actor_id:
             delegation_nodes, delegation_edges = self._delegation_path(
                 claim, evidence, edge.object_id,
             )
             if not delegation_edges:
                 return None
 
-        claim_target = next(e for e in claim_target_edges if e.target_id == edge.object_id)
-        evidence_target = next(e for e in evidence_target_edges if e.target_id == edge.object_id)
+        claim_target = claim_target_edges[0]
+        evidence_target = evidence_target_edges[0]
         path_nodes = [claim.node_id, edge.object_id, evidence.node_id]
         path_nodes.extend(derived_nodes)
         path_nodes.extend(delegation_nodes)
-        path_edges = [claim_target.edge_id, evidence_target.edge_id, edge.edge_id]
+        path_edges = [asserted.edge_id, claim_target.edge_id, evidence_target.edge_id, edge.edge_id]
         path_edges.extend(derived_edges)
         path_edges.extend(delegation_edges)
         return (
@@ -694,6 +723,16 @@ def canonical_path(value: str, cwd: Optional[str]) -> str:
     if not value:
         return ""
     if cwd and not os.path.isabs(value):
+        # A Stop can run from a nested directory while naming a repository-root artifact.
+        # Preserve the existing bounded worktree resolution, but make its successful world
+        # identity the graph object's canonical path so the receipt names what was observed.
+        try:
+            from makoto.substrate._shared import resolve_in_worktree
+            resolved = resolve_in_worktree(value, cwd)
+        except Exception:
+            resolved = None
+        if resolved:
+            return normalize_path(os.path.realpath(resolved))
         return normalize_path(os.path.realpath(os.path.join(cwd, value)))
     return normalize_path(os.path.realpath(value)) if os.path.isabs(value) else value
 
@@ -955,7 +994,8 @@ def extract_claims(graph: ClaimGraph, text: str, *, source_event_id, actor_id: s
         elif "push" in lower:
             predicate = "remote.push"
             branch_match = _BRANCH_RX.search(sentence)
-            target = (_repo_ref_object(graph.session_id, cwd, branch_match.group(1), run=run)
+            branch = branch_match.group(1).rstrip("`'\",:;.") if branch_match else ""
+            target = (_repo_ref_object(graph.session_id, cwd, branch, run=run)
                       if branch_match else _unknown_target(graph.session_id, predicate, sentence))
         else:
             action = next((word for word in ("published", "deployed", "shipped", "released")
@@ -1107,6 +1147,9 @@ def ingest_deed_event(graph: ClaimGraph, payload: Mapping, *, source_event_id,
     response = payload.get("tool_response")
     actor_id = canonical_actor_id(payload.get("agent_id"))
     actions = _deed_actions(tool, tool_input)
+    status = _response_status(response)
+    if tool.endswith("merge_pull_request"):
+        status = "success" if isinstance(response, Mapping) and response.get("merged") is True else "failed"
     deed = Deed.make(
         session_id=graph.session_id,
         source_event_id=source_event_id,
@@ -1114,7 +1157,7 @@ def ingest_deed_event(graph: ClaimGraph, payload: Mapping, *, source_event_id,
         tool=tool,
         tool_input=tool_input,
         tool_response=response,
-        status=_response_status(response),
+        status=status,
         actions=actions,
     )
     targets: list[ObjectNode] = []
@@ -1246,6 +1289,18 @@ def observe_filesystem_claims(graph: ClaimGraph, claim_ids: Sequence[str], *, so
             size = fs_size(claim.target_value) if exists and fs_size is not None else None
         except Exception:
             continue
+        if not exists and any(
+            "file.write" in deed.actions
+            and deed.status != "failed"
+            and _substantive_file_deed(deed, claim)
+            and any(edge.target_id == claim.target_id
+                    for edge in graph.target_edges(deed.node_id))
+            for deed in graph.deeds.values()
+        ):
+            # A separately captured, substantive exact-path write proves the past production
+            # claim even when the artifact is no longer present at Stop time.  Absence remains
+            # a contradiction only when no such deed exists (including zero-byte writes).
+            continue
         status = "PRESENT" if exists and size != 0 else "ABSENT"
         target = graph.objects.get(claim.target_id)
         if target is None:
@@ -1312,6 +1367,20 @@ def _deed_matches_command_claim(deed: Deed, claim: Claim, graph: ClaimGraph) -> 
     }):
         return False
     return any(edge.target_id == claim.target_id for edge in graph.target_edges(deed.node_id))
+
+
+def _substantive_file_deed(deed: Deed, claim: Claim) -> bool:
+    """A zero-byte Write cannot certify production of an ordinary artifact."""
+    if deed.tool != "Write":
+        return True
+    try:
+        tool_input = json.loads(deed.canonical_input)
+    except (TypeError, ValueError):
+        return False
+    content = tool_input.get("content") if isinstance(tool_input, Mapping) else None
+    if content != "":
+        return True
+    return os.path.basename(claim.target_value) in _EMPTY_OK
 
 
 def _matching_deeds(graph: ClaimGraph, claim: Claim, *, after: bool) -> list[Deed]:
@@ -1454,6 +1523,21 @@ def link_claims(graph: ClaimGraph, *, history: Sequence = ()) -> None:
                 "test.pass.suite": "suite-test",
                 "file.produced": "filesystem-path",
             }[claim.predicate]
+            if claim.predicate == "file.produced":
+                for deed in _matching_deeds(graph, claim, after=False):
+                    if "file.write" not in deed.actions or deed.status == "failed":
+                        continue
+                    if not _substantive_file_deed(deed, claim):
+                        continue
+                    if not any(edge.target_id == claim.target_id
+                               for edge in graph.target_edges(deed.node_id)):
+                        continue
+                    _add_semantic_edge(
+                        graph, evidence_id=deed.node_id, claim=claim, kind="supports",
+                        resolver_id="filesystem-path",
+                        reason="settled write deed names the same canonical path",
+                        source_event_id=deed.source_event_id,
+                    )
             for observation in graph.observations.values():
                 if observation.predicate != claim.predicate or observation.target_id != claim.target_id:
                     continue

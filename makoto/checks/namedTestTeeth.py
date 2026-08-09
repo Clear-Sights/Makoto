@@ -5,6 +5,7 @@ from typing import Optional
 from makoto.core.schema import Finding
 from makoto.core.lexicons import _ANSI_SGR_RX, _TEETH_FRAME_RX
 from makoto.substrate.io import iter_tool_events
+import makoto.substrate.claim_graph as _claim_graph
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -153,16 +154,27 @@ def current_named_verdicts(history) -> dict:
     return verdict
 
 
-def named_test_gate(text, *, history=()) -> Optional[Finding]:
+def named_test_gate(text, *, history=(), graph=None, claim_ids=()) -> Optional[Finding]:
     """Fire iff the assistant claims a SPECIFIC NAMED test passes while that exact test's CURRENT
     recorded verdict is FAILED (not discharged by a later recorded PASS of that same name). Silent on
     a whole-suite claim (green_claim's), a different test, a discharged test, or a claim with no
     recorded run of that name."""
-    names = claimed_passing_names(text)
-    if not names:
-        return None
-    verdict = current_named_verdicts(history)
-    failing = sorted(nm for nm in names if verdict.get(nm) == "FAIL")
+    if graph is not None:
+        claims = [
+            graph.claims[claim_id] for claim_id in claim_ids
+            if claim_id in graph.claims
+            and graph.claims[claim_id].predicate == "test.pass.named"
+        ]
+        failing = sorted(
+            claim.target_value for claim in claims
+            if graph.adjudicate(claim.node_id).verdict is _claim_graph.Verdict.CONTRADICTED
+        )
+    else:
+        names = claimed_passing_names(text)
+        if not names:
+            return None
+        verdict = current_named_verdicts(history)
+        failing = sorted(nm for nm in names if verdict.get(nm) == "FAIL")
     if not failing:
         return None
     nm = failing[0]
@@ -179,4 +191,6 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: named_test_gate(c.text, history=c.history))
+               run=lambda c: named_test_gate(
+                   c.text, history=c.history, graph=c.claim_graph,
+                   claim_ids=c.current_claim_ids))

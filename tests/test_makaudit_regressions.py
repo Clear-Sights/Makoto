@@ -179,18 +179,18 @@ def _bash_history(command: str) -> list:
     })]
 
 
-def test_not_evaluable_echoed_git_push_is_not_remote_evidence():
+def test_not_evaluable_echoed_git_push_cannot_certify_claim():
     assert claimed_shipped_gate(
         "I've pushed it to main.",
         history=_bash_history("echo 'git push origin main'"),
-    ) is None
+    ) is not None
 
 
-def test_fp_real_git_push_still_discharges_claimed_shipped():
+def test_push_transcript_without_remote_observation_cannot_certify_claim():
     assert claimed_shipped_gate(
         "I've pushed it to main.",
         history=_bash_history("git -C /repo push origin main"),
-    ) is None
+    ) is not None
 
 
 _INTENTIONAL_HOLLOW = (

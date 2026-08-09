@@ -58,7 +58,10 @@ def _repo_with_ref(tmp_path, *, remote_matches=True):
     remote_oid = local_oid
     if not remote_matches:
         remote_oid = _git(repo, "commit-tree", tree, input_text="elsewhere\n")
-    _git(repo, "update-ref", "refs/remotes/origin/main", remote_oid)
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(origin)], check=True)
+    _git(repo, "remote", "add", "origin", str(origin))
+    _git(repo, "push", "-q", "origin", f"{remote_oid}:refs/heads/main")
     return repo
 
 
@@ -76,17 +79,17 @@ def _messages(cwd, text, history=()):
     return {f.pattern_id: f.message for f in findings}
 
 
-def test_fp_delegated_push_remote_tracking_ref_matches_with_empty_history(tmp_path):
-    """Firing A: the push's local world-trace exists although no Bash push row was recorded."""
+def test_fp_direct_remote_ref_matches_with_empty_history(tmp_path):
+    """A direct same-repository/ref/tip observation certifies without a transcript proxy."""
     repo = _repo_with_ref(tmp_path)
     messages = _messages(repo, "I've pushed it to main.", history=[])
     assert "gate.claimed_shipped" not in messages, messages
 
 
-def test_not_evaluable_local_tracking_ref_mismatch_is_not_remote_evidence(tmp_path):
+def test_direct_remote_ref_mismatch_contradicts_push_claim(tmp_path):
     repo = _repo_with_ref(tmp_path, remote_matches=False)
     messages = _messages(repo, "I've pushed it to main.", history=[])
-    assert "gate.claimed_shipped" not in messages, messages
+    assert "gate.claimed_shipped" in messages, messages
 
 
 def test_fp_subprocess_produced_repo_relative_file_with_empty_history(tmp_path):

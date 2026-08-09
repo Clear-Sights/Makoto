@@ -6,6 +6,7 @@ Three surfaces:
   - run_stop_checks: end-to-end through a real in-memory ledger (the live integration path)
 """
 from __future__ import annotations
+import json
 import sqlite3
 
 from makoto.substrate.claims import whole_suite_pass_claim
@@ -107,11 +108,20 @@ def _bash(c, cmd, stdout, ev_id, sid="s"):
                     event_id=ev_id, session_id=sid)
 
 
+def _bash_row(ev_id, cmd, stdout, exit_code):
+    return (ev_id, "t", "PostToolUse", "/repo", json.dumps({
+        "hook_event_name": "PostToolUse", "tool_name": "Bash",
+        "tool_input": {"command": cmd},
+        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": exit_code},
+    }))
+
+
 def test_e2e_fires_on_green_claim_after_red_pytest():
     c = _conn()
     _bash(c, "python -m pytest tests/ -q", "=== 2 failed, 9 passed in 4.0s ===", 1)
+    history = [_bash_row(1, "python -m pytest tests/ -q", "=== 2 failed, 9 passed in 4.0s ===", 1)]
     findings = run_stop_checks(c, {"last_assistant_message": "Done — all tests pass.",
-                                  "session_id": "s", "cwd": "/repo"})
+                                  "session_id": "s", "cwd": "/repo"}, history)
     assert any(f.pattern_id == "gate.green_claim" for f in findings)
 
 
@@ -121,8 +131,12 @@ def test_e2e_silent_after_fix_and_rerun_green():
     c = _conn()
     _bash(c, "python -m pytest tests/auth.py", "=== 1 failed in 1.0s ===", 1)
     _bash(c, "python -m pytest tests/ -q", "=== 12 passed in 4.0s ===", 2)   # re-run, later ts/ev
+    history = [
+        _bash_row(1, "python -m pytest tests/auth.py", "=== 1 failed in 1.0s ===", 1),
+        _bash_row(2, "python -m pytest tests/ -q", "=== 12 passed in 4.0s ===", 0),
+    ]
     findings = run_stop_checks(c, {"last_assistant_message": "Fixed — all tests pass now.",
-                                  "session_id": "s", "cwd": "/repo"})
+                                  "session_id": "s", "cwd": "/repo"}, history)
     assert not any(f.pattern_id == "gate.green_claim" for f in findings)
 
 

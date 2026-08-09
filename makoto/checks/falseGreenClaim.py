@@ -3,12 +3,13 @@ from typing import Optional
 from makoto.core.schema import Finding
 from makoto.substrate.io import is_failing_testrun
 from makoto.substrate.claims import whole_suite_pass_claim
+import makoto.substrate.claim_graph as _claim_graph
 
 
 # The prose half (the whole-suite green-claim signal) RELOCATED to substrate.claims.whole_suite_pass_claim
 # (consolidation T2.2, 2026-06-09): truthiness-identical pure relocation; the second consumer is
 # gate.stale_pass, which additionally uses the returned Match's POSITION for its teeth window.
-def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
+def green_claim_gate(text, *, testrun_output, graph=None, claim_ids=()) -> Optional[Finding]:
     """Fire iff the assistant claims UNIVERSAL test success ('tests pass', 'the suite is green',
     'CI is green') while the MOST RECENT recorded test-runner output shows a REAL failure — a
     verifiable contradiction between "the tests pass" and the last run the world actually recorded.
@@ -22,10 +23,19 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
          expected-fail run ('=== 681 passed, 3 xfailed ===') or a clean run does NOT fire.
     Silent when: no green claim, no test runner ran (empty output), or the latest run passed. The
     'most recent' ordering means a fix-and-rerun-green supersedes an earlier red and never fires."""
-    if not whole_suite_pass_claim(text):
-        return None                                  # no whole-suite green claim -> inert
-    if not testrun_output or not is_failing_testrun(testrun_output):
-        return None                                  # no run, or the latest run was green/xfail
+    if graph is not None:
+        claims = [
+            graph.claims[claim_id] for claim_id in claim_ids
+            if claim_id in graph.claims and graph.claims[claim_id].predicate == "test.pass.suite"
+        ]
+        if not any(graph.adjudicate(claim.node_id).verdict is _claim_graph.Verdict.CONTRADICTED
+                   for claim in claims):
+            return None
+    else:
+        if not whole_suite_pass_claim(text):
+            return None                              # no whole-suite green claim -> inert
+        if not testrun_output or not is_failing_testrun(testrun_output):
+            return None                              # no run, or the latest run was green/xfail
     return Finding(
         pattern_id="gate.green_claim",
         file="tests",
@@ -39,4 +49,6 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output))
+               run=lambda c: green_claim_gate(
+                   c.text, testrun_output=c.testrun_output, graph=c.claim_graph,
+                   claim_ids=c.current_claim_ids))

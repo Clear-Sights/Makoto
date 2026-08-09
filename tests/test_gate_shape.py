@@ -154,6 +154,7 @@ ALLOWED_IMPORT_ROOTS = {
     "makoto.core.schema", "makoto.substrate.io", "makoto.substrate.claims", "makoto.substrate.pytest_cache",
     "makoto.core.lexicons",
     "makoto.core._shell",
+    "makoto.substrate.claim_graph",
     "makoto.record.ackblock",   # Task 2 slice 5: canonFingerprints.py's release.operator discharge lookup --
     #   named explicitly (never bare "makoto") so the firewall stays a curated allowlist, not a
     #   hole into makoto's whole namespace.

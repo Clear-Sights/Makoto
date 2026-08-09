@@ -273,6 +273,16 @@ def test_silent_when_the_discharging_bash_call_failed():
     assert run_promised_gate(history=hist) is None
 
 
+def test_unrelated_bash_call_does_not_discharge_a_targeted_deploy_promise():
+    hist = [
+        _stop("I'll deploy `release-2026-08` to production."),
+        _post("printf unrelated", exitCode=0),
+    ]
+    finding = run_promised_gate(history=hist)
+    assert finding is not None
+    assert "release-2026-08" in finding.message
+
+
 def test_fires_only_for_the_most_recent_prior_turn():
     # an OLDER promise, superseded by a more recent inert Stop, is not re-litigated -- only the
     # immediately prior turn is ever checked

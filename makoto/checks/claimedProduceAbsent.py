@@ -13,6 +13,7 @@ from makoto.substrate._shared import (
     _discharged,
     resolve_in_worktree,
 )
+import makoto.substrate.claim_graph as _claim_graph
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -69,6 +70,7 @@ def _production_claim_location(text):
     return None
 def completion_gate(
     text, *, touched_keys, fs_exists=None, empty_keys=None, fs_size=None, cwd=None,
+    graph=None, claim_ids=(),
 ) -> Optional[Finding]:
     """Fire iff the assistant CLAIMS it produced a specific file (a produce verb governs a
     located path, non-forward, non-negated) but that file is neither in the results ledger
@@ -83,6 +85,25 @@ def completion_gate(
     A produced-claim that IS touched, or that the filesystem confirms, is silent (fail-open).
     Only an unbacked production claim bites.
     """
+    if graph is not None:
+        claims = [
+            graph.claims[claim_id] for claim_id in claim_ids
+            if claim_id in graph.claims and graph.claims[claim_id].predicate == "file.produced"
+        ]
+        unsupported = next((
+            claim for claim in claims
+            if graph.adjudicate(claim.node_id).verdict is not _claim_graph.Verdict.CERTIFIED
+        ), None)
+        if unsupported is None:
+            return None
+        loc_n = normalize_path(unsupported.target_value)
+        return Finding(
+            pattern_id="gate.completion", file=loc_n, line=0, level="error",
+            message=(f"Claim states {loc_n} was produced, but the claim graph has no valid "
+                     "same-path deed or filesystem-observation support path."),
+            retry_hint="Produce/touch the cited location, or retract with a checked reason.",
+        )
+
     loc = _production_claim_location(text)
     if not loc:
         return None                                  # no verifiable production claim -> inert
@@ -111,4 +132,6 @@ def completion_gate(
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
+               run=lambda c: completion_gate(
+                   c.text, cwd=c.cwd, graph=c.claim_graph, claim_ids=c.current_claim_ids,
+                   **_discharge_kwargs(c)))
