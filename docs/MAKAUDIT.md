@@ -1,5 +1,11 @@
 # MAKAUDIT findings ledger
 
+Update 2026-08-09: the persisted claim graph resolves findings 6–9 below. Concrete actions,
+run promises, running endpoints, and shipping mutations now require versioned predicate-and-target
+support paths; unrelated activity remains NOT-EVALUABLE. The live dispatcher/chain/receipt floor is
+`tests/test_claim_graph_contract.py` (G01–G12). The dated audit text below is retained as the
+fault record that motivated the redesign, not as a description of current association behavior.
+
 Audit date: 2026-07-26. Baseline: commit `36c434f` was read in full before the sweep. The audit
 walked all 15 Pre checks and all 21 discovered Stop surfaces (19 `may_block` surfaces plus the two
 structurally advisory-only surfaces), their dispatcher wiring, the history/ledger ingest paths, and

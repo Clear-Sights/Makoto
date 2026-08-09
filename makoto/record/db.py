@@ -17,6 +17,8 @@ Tables (all idempotent via IF NOT EXISTS):
   canonical_citations — Author-Year lookup populated by refresh_citations
   config              — key/value seed (canonical_citations_path + _mtime)
   ledger              — results/touches keyed by session plus normalized location, latest-wins
+  claim_graph_nodes    — disposable session-scoped projection of chained graph nodes
+  claim_graph_edges    — disposable session-scoped projection of chained semantic edges
   commitments         — open located commitments the advance gate reads (un-windowed)
   plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
 

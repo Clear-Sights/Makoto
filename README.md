@@ -48,12 +48,12 @@ silent "warning" tier for those (see [Fire level](#fire-level)) — the four doc
 - `gate.advance` — advancing a phase whose precondition isn't recorded as met
 - `gate.green_claim` — "suite green" against a recorded test failure
 - `gate.dropped` — a forward promise carrying identifying info ("I'll add `def X` to `Y`", "3 tests in `Z`") left undischarged at turn-end — said-but-not-done, checked against the agent's own touched-keys
-- `gate.fabricated_action` — "I ran `X` / executed `Y`" in a turn with no tool call at all (presence-of-work, not command-text match)
+- `gate.fabricated_action` — "I ran `X` / executed `Y`" without a distinct settled deed for the same canonical command/executable target
 - `gate.named_test` — "`test_foo` passes" against a recorded `FAILED` of that exact named test (coreference-pinned; the green_claim delta)
 - `gate.stale_pass` — "all tests pass" against pytest's own `lastfailed` record still naming a live failing test (the runner's ledger, existence-filtered for staleness)
-- `gate.claimed_running` — "the server is running" / "it's up and listening on port 5173" but this session's own recorded Bash evidence contradicts it: no process-start or liveness-check command ran at all this session, or the most recently recorded one ended in a direct error state (`interrupted`, or a non-zero exit code). Agnostic in the `gate.canon` sense — the failure verdict reads only those two protocol terminals, never a test-runner regex or a language/framework token; the command classifier is a broad, open-world, multi-ecosystem net (like `is_test_runner`'s), so an unlisted launcher/healthcheck shape is a documented recall bound, never a false-block source.
-- `gate.run_promised` — the forward-looking sibling of `gate.claimed_running`: the immediately prior turn's own message promised a first-person run-intent action ("I'll run the tests", "I'm going to restart the server", "let me deploy this") but no Bash call appears anywhere in this session's recorded history since — the word must match the world, checked one turn later. Closed first-person-auxiliary + closed process-lifecycle-verb lexicon (mirroring `gate.claimed_running`'s own verb set), so "it's going to rain today" cannot match on either the subject or the verb axis. Stateless: the one-turn grace period falls out of `history` structurally never containing the row for the Stop currently being evaluated, so a promise made THIS turn can only ever be checked starting at the NEXT one — no new persistence, no `Plan`/`PlanNode` extension (a run-intent promise's only evidence is "a Bash call happened", not a located file write).
-- `gate.claimed_shipped` — a completed-action sibling to `gate.claimed_running`/`gate.run_promised`, but scoped to REMOTE mutations instead of local process liveness: "I merged the PR", "pushed it to main", "it's live now" with no successful remote-mutating tool call anywhere in this session's recorded history. Evidence is a non-dry-run `git push` over Bash, or a successful call from a closed non-Bash tool set (`merge_pull_request` — requiring `merged: true`, not just an error-free response — and `push_files`, plus their `mcp__github__`-qualified forms); `create_pull_request` is deliberately excluded, since opening a PR establishes intent but does not substantiate "merged" or "live". Reads `history_all_agents` so a subagent's own real push/merge grounds a main-thread claim. Immediate check, no grace period — this claims something already done. `gate.completion` keeps sole ownership of local file-production claims; this gate never duplicates it.
+- `gate.claimed_running` — "the server is running on port 5173" without a successful exact-endpoint health observation, or against a failed observation for that same endpoint. A clean launcher exit is not ongoing-liveness proof, and another port cannot certify the claim.
+- `gate.run_promised` — the immediately prior turn promised a run/test/deploy/launch action but no later settled deed corefers with its action and target. The promise is persisted at its first Stop; the structural one-turn grace period remains.
+- `gate.claimed_shipped` — a completed remote-mutation claim without exact remote identity: merges require the same owner/repository/PR and `merged: true`; pushes require local HEAD and `ls-remote` to agree for the same repository/remote/ref. Publish/deploy/release claims without a provider-specific resolver remain uncertified.
 - `gate.liveness` — fires on the code itself, not a claim: a statement with no live effect inside a closed function (dead/illusory work the present-closure model can prove inert). It walks the turn's touched `.py` ASTs, so it yields a finding per illusory statement rather than one per turn.
 - `gate.self_wired` — **advisory only, never blocks** (see [Fire level](#fire-level)): partial-strip detection of makoto's own `.claude/settings.json` hook wiring — fires if `PreToolUse`/`PostToolUse`/`Stop` is missing a makoto-dispatching entry while at least one other still has one. It has a documented blind spot: a single edit that strips all three simultaneously disables this check in the same instant it would have fired (Claude Code reloads hook config live, not once at session start), so it provides zero coverage against that full-strip case — see `docs/self-defense-asymmetry-followup.md`.
 - `gate.hollow_test` — fires on the code itself, not a claim: a HOLLOWED test (SPIRIT.md §4) — one that survives in name while its content is gutted, so it can never actually fail. Four sub-patterns: no assertion of any kind in the test body; an asserted tautology (`assert True`, or comparing an expression to itself); a broad, no-op `try`/`except` that silently swallows the only call-under-test's failure; and a test-shaped function that can never fire independently — either nested inside another function (pytest's collector never discovers it) or gated behind a `skipif`/`skipIf` condition that is provably always true.
@@ -280,30 +280,30 @@ Makoto blocks the illusory word, but until this session's work, it never issued 
 KEPT one. Here is the whole chain for one small, real, synthetic session
 (`docs/demo/`; regenerate instructions there):
 
-1. **WORD**: the agent writes `src/auth.py`, then claims `"test_login passes now."` at Stop.
-2. **DEED**: the write lands (`kind="touched"`); a test run fails (`kind="testrun"`,
-   `FAILED tests/test_auth.py::test_login`); a fix lands; a second test run passes
-   (`kind="testrun"`, `PASSED tests/test_auth.py::test_login`): three tamper-evident,
-   hash-chained rows, each linked to the one before it.
-3. **RECORD**: the test-delta redirect (Task 3) fires on the pass/fail flip and is ITSELF
-   chain-appended (`kind="audit"`); the redirect's own firing is part of the permanent record,
-   not just a line on someone's terminal.
-4. **RECEIPT**: `makoto receipt --session demo-session-001` reports 2 claims, both trace-bound
-   to a `verify_chain`-checkable row, 0 exemptions:
+1. **WORD**: a host-captured Stop contains the assertion `"test_login passes now."`; Makoto
+   persists its exact span, digest, actor, predicate, and normalized test target as a claim node.
+2. **DEED**: settled tool events become separate deed nodes. Their named-test results become
+   observations linked back to the deed, never claims merely because they are hash-chained.
+3. **RECORD**: versioned resolvers add support or contradiction edges only when predicate and
+   canonical target corefer. A later exact observation supersedes an earlier one only in that
+   same predicate/target equivalence class.
+4. **RECEIPT**: `makoto receipt --session demo-session-001` starts at the actual claim and reports
+   its verdict plus a complete, `verify_chain`-checkable support path:
 
 ```json
 {
   "session_id": "demo-session-001",
   "verified_through": null,
-  "claim_count": 2,
-  "trace_bound_count": 2,
+  "claim_count": 1,
+  "trace_bound_count": 1,
   "exemption_count": 0
 }
 ```
 
-The claim `"test_login passes now."` is never re-derived by a human or a reviewer; it cites two
-specific rows anyone can independently re-verify with `verify_chain`. That is the whole pitch:
-chained, receipted claims, not a linter that yells and leaves no trace.
+The claim is never inferred from a `testrun`, `verdict`, or other evidence-row kind. Its receipt
+cites the claim node, target, observation, deed provenance, and semantic edges by chain row index
+and hash. Corrupt any cited row and the claim remains visible but becomes non-trace-bound and
+NOT-EVALUABLE.
 
 ### Live demo: real terminal sessions
 
@@ -319,4 +319,3 @@ Each SVG is rendered directly from that scenario's real logged stdout/stderr, no
 Regenerate: `python docs/demo/render_demo.py && python docs/demo/render_svg.py` (the latter needs
 `humanize`, `pip install humanize`, for demo-only friendlier byte counts; never a core-package
 dependency, see that script's own docstring).
-
