@@ -71,6 +71,10 @@ class GateContext:
     #   across threads -- a risk that does not apply to a completed PostToolUse Bash call. Every
     #   other gate should keep reading `history`; widen a gate onto this field only with the same
     #   completed-evidence reasoning these claim gates document.
+    claim_graph: Optional[object] = None     # common persisted ClaimGraph assembled once by the
+    #   dispatcher; gates query typed claim/evidence paths instead of reparsing flat event bags.
+    current_claim_ids: Sequence = ()         # claims extracted from this exact Stop event.
+    prior_promise_claim_ids: Sequence = ()   # future claims from the immediately prior Stop.
 
     @property
     def roots(self):

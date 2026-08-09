@@ -107,9 +107,10 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output"
                            "permission_mode", "agent_id", "agent_type", "plan",
                            "session_id", "transcript_path", "state_root",
                            "open_plan_items",   # Task 2 slice 5 / 2026-07-09 planItemDrift
-                           "history_all_agents"}   # 2026-07-23: gate.claimed_running's
+                           "history_all_agents",   # 2026-07-23: gate.claimed_running's
                            # cross-agent-pooled Bash evidence twin of `history` (see GateContext's
                            # own field doc)
+                           "claim_graph", "current_claim_ids", "prior_promise_claim_ids"}
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
     "claimedProduceAbsent.py": 2,
     "undischargedCommitment.py": 4,

@@ -75,6 +75,50 @@ def _ensure_ledger_table(conn: sqlite3.Connection) -> None:
         raise
 
 
+def _create_claim_graph_tables(conn: sqlite3.Connection) -> None:
+    """Create the disposable SQLite projection of claim-graph chain rows.
+
+    Identity is explicitly session-scoped.  Object ids are content-derived and may legitimately
+    repeat across sessions, while claim/deed ids already include the session in their digest;
+    the composite key preserves both cases without allowing one session to erase another.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS claim_graph_nodes (
+            session_id      TEXT NOT NULL,
+            node_id         TEXT NOT NULL,
+            node_kind       TEXT NOT NULL,
+            source_event_id TEXT,
+            actor_id        TEXT,
+            payload         TEXT NOT NULL,
+            chain_row_index INTEGER,
+            chain_row_hash  TEXT,
+            PRIMARY KEY (session_id, node_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS claim_graph_edges (
+            session_id      TEXT NOT NULL,
+            edge_id         TEXT NOT NULL,
+            edge_kind       TEXT NOT NULL,
+            source_id       TEXT NOT NULL,
+            target_id       TEXT NOT NULL,
+            resolver_id     TEXT,
+            payload         TEXT NOT NULL,
+            chain_row_index INTEGER,
+            chain_row_hash  TEXT,
+            PRIMARY KEY (session_id, edge_id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS claim_graph_nodes_event_idx "
+        "ON claim_graph_nodes(session_id, source_event_id, node_kind)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS claim_graph_edges_target_idx "
+        "ON claim_graph_edges(session_id, target_id, edge_kind)"
+    )
+
+
 def init_db(state_dir: Path, citations_path: Path) -> None:
     """create (or update) <state_dir>/makoto.record.db with every table, idempotently.
 
@@ -117,6 +161,8 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
         """)
         # ledger — latest update per (session, normalized location)
         _ensure_ledger_table(conn)
+        # claim graph — disposable projection of append-only node/edge chain rows
+        _create_claim_graph_tables(conn)
         # commitments — open located commitments the advance gate reads (un-windowed)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS commitments (

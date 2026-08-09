@@ -396,7 +396,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     return findings
 
 
-def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
+def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None) -> list:
     """Source + evaluate the completion / advance / green_claim gates for a Stop event.
 
     Reads the REAL `last_assistant_message` field; records any newly-stated located
@@ -507,6 +507,20 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
                 pass
             return None
 
+        # Build the semantic substrate once.  Claim nodes (including exact Stop event/span
+        # provenance) are persisted before any resolver creates support/contradiction edges.
+        # The broad history view is safe here because cross-agent consumption is enforced by an
+        # explicit target-bound delegation edge inside the graph, never by pooling alone.
+        stop_graph = None
+        try:
+            from makoto.record import claim_graph as _claim_graph
+            stop_graph = _claim_graph.build_stop_graph(
+                conn, payload, history_all_agents, event_id=event_id, root=root,
+                fs_exists=fs_exists, fs_size=fs_size,
+            )
+        except Exception:
+            stop_graph = None
+
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
         # edge (2026-07-10: unified via checks._loader.load_checks, retiring the former
         # load_stopchecks()-only loop -- this ALSO now naturally includes staleEstablisher and
@@ -536,6 +550,11 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
+            claim_graph=(stop_graph.graph if stop_graph is not None else None),
+            current_claim_ids=(stop_graph.current_claim_ids if stop_graph is not None else ()),
+            prior_promise_claim_ids=(
+                stop_graph.prior_promise_claim_ids if stop_graph is not None else ()
+            ),
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
@@ -728,6 +747,16 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
+        # Every settled PostToolUse becomes a deed node (and, where applicable, a typed
+        # observation) in the same append-only chain.  SQLite remains only its rebuildable view.
+        try:
+            from makoto.record import claim_graph as _claim_graph
+            _claim_graph.record_deed(
+                conn, payload, event_id=event_id, session_id=sid, cwd=cwd, root=state_dir,
+            )
+        except Exception as exc:
+            print(f"makoto._dispatch: claim graph deed update failed (non-fatal): {exc}",
+                  file=sys.stderr)
         # SPEC-5 live plan wiring (2026-07-23), two halves of the same gap: DECLARE and ADVANCE.
         # Before this, the ONLY way to populate a plan was a `.claude/makoto-plan.jsonl` already
         # sitting on disk BEFORE SessionStart fired -- nothing let Claude declare a plan
@@ -798,7 +827,9 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
         # Stop-edge CHECK findings get the same central provenance stamp: the Stop/SubagentStop
         # event they were evaluated against.
         gate_findings = [replace(f, source_event_id=event_id)
-                         for f in run_stop_checks(conn, payload, history, root=state_dir)]
+                         for f in run_stop_checks(
+                             conn, payload, history, root=state_dir, event_id=event_id
+                         )]
     blocking = list(findings)
     if _gates_enabled():
         blocking += [gf for gf in gate_findings
