@@ -1,4 +1,4 @@
-# Makoto
+# Makoto — 32 checks that test an agent's claims against its own recorded deeds
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
 
