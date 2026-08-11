@@ -12,10 +12,11 @@ hand-written into the image. Two DISPLAY-ONLY transforms, both decoding rather t
      shortened, so the image shows `makoto/docs/MAKOTO-CONVENTIONS.md`, not this machine's
      `/home/...` layout.
 
-Needs `humanize` (`pip install humanize`) for the demo-only friendlier byte counts in each
-footer line ("captured 1.4 kB output"). That nicety is the ONLY reason for the dependency, and it
-is deliberately demo-only: adding a cosmetic library to the core package for this would be
-exactly the kind of unearned weight the core refuses; the dispatchers never import it.
+Standard library only, like the rest of the package. The one formatting nicety this script wants
+is the footer's human-readable byte count ("captured 1.4 kB output"), and `_naturalsize` below
+does it in six lines. It used to come from `humanize`: a whole third-party package, installed
+by everyone who touched the repo, for a single call in a single demo caption. That trade was
+never worth making — the core refuses unearned weight, and a demo script is not an exemption.
 """
 from __future__ import annotations
 
@@ -23,7 +24,6 @@ import json
 import re
 from pathlib import Path
 
-import humanize
 
 DEMO_DIR = Path(__file__).parent
 LOGS_DIR = DEMO_DIR / "logs"
@@ -49,6 +49,18 @@ _HANG = "  "                       # continuation indent, deducted from the capa
 
 def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _naturalsize(count: int) -> str:
+    """Decimal byte units — 1000, not 1024 — which is what `humanize.naturalsize` defaults to,
+    so the captions this renders read exactly as they did before: whole Bytes below 1000, one
+    decimal place above ("999 Bytes", "1.0 kB", "1.2 MB"), saturating at TB."""
+    size = float(count)
+    for unit in ("Bytes", "kB", "MB", "GB", "TB"):
+        if size < 1000 or unit == "TB":
+            return f"{int(size)} {unit}" if unit == "Bytes" else f"{size:.1f} {unit}"
+        size /= 1000
+    return f"{size:.1f} TB"
 
 
 def _wrap(line: str) -> list:
@@ -144,7 +156,7 @@ def _render(scenario: str) -> None:
                 rows.append((piece, _color_for(raw), False))
         rows.append((f"(exit {step['exit']})", COLORS["dim"], False))
         rows.append(("", COLORS["text"], False))
-    rows.append((f"captured {humanize.naturalsize(total_bytes)} of genuine dispatcher output",
+    rows.append((f"captured {_naturalsize(total_bytes)} of genuine dispatcher output",
                  COLORS["dim"], True))
 
     height = PAD * 2 + 34 + LINE_H * len(rows)

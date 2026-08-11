@@ -15,7 +15,7 @@ Scenarios (matching the README's "Live demo" section):
                  evidence on record; the ConfigChange watch logs its ADVISORY and allows.
 
 Run from the repo root:  python docs/demo/render_demo.py
-Then render the SVGs:    python docs/demo/render_svg.py   (needs `humanize`; see its docstring)
+Then render the SVGs:    python docs/demo/render_svg.py
 """
 from __future__ import annotations
 

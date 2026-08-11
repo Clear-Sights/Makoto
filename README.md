@@ -316,6 +316,5 @@ corpus above) against a fresh, throwaway state dir each, and captures the genuin
 
 Each SVG is rendered directly from that scenario's real logged stdout/stderr, not hand-written.
 
-Regenerate: `python docs/demo/render_demo.py && python docs/demo/render_svg.py` (the latter needs
-`humanize`, `pip install humanize`, for demo-only friendlier byte counts; never a core-package
-dependency, see that script's own docstring).
+Regenerate: `python docs/demo/render_demo.py && python docs/demo/render_svg.py`. Both are
+standard library only, like everything else here — nothing to install.
