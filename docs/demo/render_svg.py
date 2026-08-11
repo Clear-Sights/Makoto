@@ -52,15 +52,23 @@ def _esc(s: str) -> str:
 
 
 def _naturalsize(count: int) -> str:
-    """Decimal byte units — 1000, not 1024 — which is what `humanize.naturalsize` defaults to,
-    so the captions this renders read exactly as they did before: whole Bytes below 1000, one
-    decimal place above ("999 Bytes", "1.0 kB", "1.2 MB"), saturating at TB."""
+    """Decimal byte units — 1000, not 1024 — matching `humanize.naturalsize` defaults on every
+    non-negative input: "0 Bytes", "1 Byte", "999 Bytes", "1.0 kB", "1.2 MB", "1.0 TB".
+
+    The carry test is on the ROUNDED value, not the raw one. 999_999_999_999 divides down to
+    999.999999999 GB, which is under 1000 and so looks like it belongs in GB — but it prints as
+    "1000.0 GB", a unit boundary crossed by the formatting rather than by the arithmetic. Testing
+    `round(size, 1)` promotes it to "1.0 TB", which is what humanize says.
+    """
+    if count == 1:
+        return "1 Byte"
+    if count < 1000:
+        return f"{count} Bytes"
     size = float(count)
-    for unit in ("Bytes", "kB", "MB", "GB", "TB"):
-        if size < 1000 or unit == "TB":
-            return f"{int(size)} {unit}" if unit == "Bytes" else f"{size:.1f} {unit}"
+    for unit in ("kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "RB", "QB"):
         size /= 1000
-    return f"{size:.1f} TB"
+        if round(size, 1) < 1000 or unit == "QB":
+            return f"{size:.1f} {unit}"
 
 
 def _wrap(line: str) -> list:
