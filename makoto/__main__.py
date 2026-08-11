@@ -22,17 +22,17 @@ import json
 import sys
 from pathlib import Path
 
-from makoto.core.schema import load_prechecks
+from makoto.substrate._loader import load_checks
 
 
 def _cmd_pattern_list() -> int:
-    """print every loaded pattern as a tab-aligned table."""
-    patterns = load_prechecks()
+    """Print every check surface registered by the live loader as a tab-aligned table."""
+    patterns = load_checks()
     if not patterns:
         print("makoto: no patterns loaded")
         return 0
-    print(f"{'ID':<6} {'LEVEL':<10} {'KEYWORDS':<32} DESCRIPTION")
-    print(f"{'-'*6} {'-'*10} {'-'*32} {'-'*40}")
+    print(f"{'ID':<36} {'EDGE':<12} {'POSTURE':<10} {'KEYWORDS':<32} DESCRIPTION")
+    print(f"{'-'*36} {'-'*12} {'-'*10} {'-'*32} {'-'*40}")
     for p in patterns:
         kw = ",".join(p.keywords[:3])
         if len(p.keywords) > 3:
@@ -40,28 +40,36 @@ def _cmd_pattern_list() -> int:
         if len(kw) > 30:
             kw = kw[:29] + "…"
         desc = p.description if len(p.description) <= 60 else p.description[:59] + "…"
-        print(f"{p.id:<6} {p.fire_level:<10} {kw:<32} {desc}")
+        print(f"{p.id:<36} {p.applies_at:<12} {p.posture:<10} {kw:<32} {desc}")
     return 0
 
 
 def _cmd_pattern_show(pid: str) -> int:
-    """print full detail for one pattern + the first 30 lines of its predicate module."""
-    patterns = {p.id: p for p in load_prechecks()}
-    if pid not in patterns:
-        print(f"makoto: no pattern with id {pid!r}; available: {', '.join(sorted(patterns))}",
+    """Print every registered surface for one ID and its first 30 source lines."""
+    matches = [p for p in load_checks() if p.id == pid]
+    if not matches:
+        available = sorted({p.id for p in load_checks()})
+        print(f"makoto: no pattern with id {pid!r}; available: {', '.join(available)}",
               file=sys.stderr)
         return 2
-    p = patterns[pid]
-    print(f"id              {p.id}")
-    print(f"fire_level      {p.fire_level}")
-    print(f"description     {p.description}")
-    print(f"retry_hint      {p.retry_hint}")
-    print(f"predicate       {p.predicate_module}")
-    print(f"keywords        {p.keywords}")
-    print("---")
-    if p.predicate_module:
+    for index, p in enumerate(matches):
+        if index:
+            print("===")
+        module_name = p.predicate_module
+        if not module_name and p.run is not None:
+            module_name = getattr(p.run, "__module__", "")
+        print(f"id              {p.id}")
+        print(f"applies_at      {p.applies_at}")
+        print(f"posture         {p.posture}")
+        print(f"description     {p.description}")
+        print(f"retry_hint      {p.retry_hint}")
+        print(f"predicate       {module_name}")
+        print(f"keywords        {p.keywords}")
+        print("---")
+        if not module_name:
+            continue
         try:
-            mod = importlib.import_module(p.predicate_module)
+            mod = importlib.import_module(module_name)
             src_file = inspect.getsourcefile(mod) or "<unknown>"
             print(f"source: {src_file}")
             src_lines = Path(src_file).read_text(encoding="utf-8").splitlines()[:30]

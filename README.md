@@ -255,7 +255,7 @@ stderr line and continues with its original exit code. The audit subsystem canno
 mis-block or mis-allow a tool call — a fundamental separation-of-concerns invariant.
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
-Separate from the 15 pre-checks and 19 end-of-turn checks above: an optional `ConfigChange` hook
+Separate from the 15 pre-checks and 19 end-of-turn checks above, the packaged `ConfigChange` hook
 entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
 being stripped. Two tiers, both fail-open on any unexpected fault:
 
@@ -270,9 +270,8 @@ being stripped. Two tiers, both fail-open on any unexpected fault:
   no matter how many times it evaluates as stripped: a project that never had makoto's hooks wired
   must never be blocked from editing its own settings.
 
-Never fires for `policy_settings` (organization-managed policy is out of scope). Not yet part of the
-plugin-install path; wire it manually, the same way as the [manual wiring](#manual-wiring-fallback)
-below, via a `ConfigChange` hook entry pointing at `_dispatch_configchange.py`.
+Never fires for `policy_settings` (organization-managed policy is out of scope). The packaged hook
+manifest wires project/local settings changes to `_dispatch_configchange.py`.
 
 ## Receipt: word → deed → record → receipt
 

@@ -36,7 +36,7 @@ namespaces = false
 # non-.py files the runtime reads at fire time: the hook shim settings.json/hooks.json
 # point at, the packaged canonical citation list, and the just-in-time conventions doc.
 [tool.setuptools.package-data]
-makoto = ["_dispatch_shim.sh", "docs/*.md"]
+makoto = ["_dispatch_shim.sh", "_dispatch_configchange_shim.sh", "docs/*.md"]
 
 [tool.setuptools.exclude-package-data]
 makoto = ["*.bak"]
