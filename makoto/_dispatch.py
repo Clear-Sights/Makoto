@@ -867,7 +867,17 @@ def main() -> int:
     if payload is _PARSE_FAILED:
         # unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON) ->
         # loud-allow; never block agent work on a pipe glitch.
-        _dispatch_fact(state_dir, "unparseable_payload", "stdin was not valid JSON", blocked=False)
+        #
+        # EMPTY AND UNPARSEABLE SHARE THE DISPOSITION AND DIFFER IN THE REASON. Both are truncation
+        # in the limit, so both still allow: the fail-mode above is deliberate and is not changed
+        # here. But the operator reading this fact has to act on it, and the two mean different
+        # things. No bytes at all is the hook being invoked with nothing attached -- a wiring fault
+        # that will recur on every event. Bytes that did not parse is a pipe cut mid-write, which
+        # is transient. One reason for both told the reader the payload "was not valid JSON" when
+        # there had been no payload to be valid or otherwise.
+        reason = ("stdin was empty -- no payload arrived at all"
+                  if not payload_raw.strip() else "stdin was not valid JSON")
+        _dispatch_fact(state_dir, "unparseable_payload", reason, blocked=False)
         return 0
     if not isinstance(payload, dict):
         # valid JSON but not an object: a truncated pipe yields INVALID json, never valid-non-dict,

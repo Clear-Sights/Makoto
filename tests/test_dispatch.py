@@ -363,11 +363,17 @@ def test_dispatch_env_disable_silences_specific_pattern(tmp_path):
     rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_PATTERNS": "content.verifier_predicate_weakened"})
     assert rc == 0
     assert out == "", f"disabled pattern must not emit block JSON; got {out!r}"
+    # only-fires audit policy: a missing audit.jsonl means ZERO patterns fired, which already
+    # proves the disabled one did not. A regression that fired it would recreate the file with a
+    # content.verifier_predicate_weakened row, flipping the any(...) below to True. Written this
+    # way rather than under `if audit_path.exists():`, which SKIPPED the assertion entirely -- and
+    # a disabled pattern writing no audit file is exactly the expected state, so the claim never
+    # ran. Same reasoning, and same shape, as the gate.advance check further down this file.
     audit_path = state_dir / "audit.jsonl"
-    if audit_path.exists():
-        rows = [json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
-        assert not any("content.verifier_predicate_weakened" in r.get("pattern_fires", []) for r in rows), \
-            "disabled pattern must not record a fire row"
+    rows = ([json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
+            if audit_path.exists() else [])
+    assert not any("content.verifier_predicate_weakened" in r.get("pattern_fires", []) for r in rows), \
+        "disabled pattern must not record a fire row"
 
 
 def test_dispatch_audit_row_records_tool_name(tmp_path):
@@ -2000,3 +2006,68 @@ def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
         "an error-level finding must record exit_code=2 in the audit row; "
         f"got {fire_rows[0].get('exit_code')!r}"
     )
+
+
+def _run_raw(state_dir, raw: bytes) -> tuple[int, str, str]:
+    """Invoke the dispatcher with RAW bytes on stdin, bypassing json.dumps.
+
+    _run_dispatch serialises a dict, so it cannot express the two cases this test is about --
+    no bytes at all, and bytes that are not JSON.
+    """
+    env = os.environ.copy()
+    env["MAKOTO_STATE_DIR"] = str(state_dir)
+    proc = subprocess.run(
+        [sys.executable, "-m", "makoto._dispatch"],
+        input=raw, capture_output=True, env=env,
+        cwd=str(Path(__file__).parent.parent),
+    )
+    return proc.returncode, proc.stdout.decode("utf-8"), proc.stderr.decode("utf-8")
+
+
+def test_an_empty_payload_and_an_unparseable_one_get_different_reasons(tmp_path):
+    """Same disposition, different reason -- because the operator has to act on the difference.
+
+    Found by driving the dispatcher as Claude Code drives it. Both cases loud-allow, which is the
+    deliberate fail-mode (a truncated pipe must never block agent work) and is NOT changed. But
+    both recorded "stdin was not valid JSON", including when no bytes arrived at all -- telling
+    the reader the payload was invalid when there had been no payload.
+
+    They need different fixes: no bytes is the hook invoked with nothing attached, a wiring fault
+    that recurs on every event; unparseable bytes is a pipe cut mid-write, which is transient.
+    """
+    state = _setup_state(tmp_path)
+
+    code, stdout, stderr = _run_raw(state, b"")
+    assert code == 0, stderr                      # allow: the fail-mode is unchanged
+    assert stdout == ""
+    assert "stdin was empty" in stderr, stderr
+    assert "no payload arrived at all" in stderr, stderr
+
+    code, stdout, stderr = _run_raw(state, b"not json at all {{{")
+    assert code == 0, stderr
+    assert "stdin was not valid JSON" in stderr, stderr
+    assert "stdin was empty" not in stderr, stderr
+
+    # The field is pattern_id, read from a real fact rather than guessed. An earlier draft of
+    # this test asserted on fact["kind"], which does not exist: every row returned None, so the
+    # count was 0 and the assertion failed for a reason unrelated to the behaviour under test.
+    # A test that guesses a schema can fail while the code is right -- or pass while it is wrong.
+    facts = _dispatch_facts(state)
+    ids = [fact.get("pattern_id") for fact in facts]
+    assert ids.count("dispatch.unparseable_payload") == 2, facts
+    messages = " | ".join(fact.get("exc_message", "") for fact in facts)
+    assert "stdin was empty" in messages, facts
+    assert "stdin was not valid JSON" in messages, facts
+
+
+def test_a_valid_non_object_payload_still_fails_closed(tmp_path):
+    """The control. Distinguishing empty from unparseable must not soften the tamper-shaped case.
+
+    A truncated pipe yields INVALID json, never valid-non-object, so valid JSON that is not an
+    object is anomalous rather than transient and blocks at exit 2. If this ever joins the
+    loud-allow branch, the fail-mode has been widened by accident.
+    """
+    state = _setup_state(tmp_path)
+    code, _, stderr = _run_raw(state, b'"a valid json string, not an object"')
+    assert code == 2, stderr
+    assert "non_object_payload" in stderr, stderr
