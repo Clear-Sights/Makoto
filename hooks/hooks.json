@@ -53,6 +53,17 @@
           }
         ]
       }
+    ],
+    "ConfigChange": [
+      {
+        "matcher": "project_settings|local_settings",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_configchange_shim.sh"
+          }
+        ]
+      }
     ]
   }
 }

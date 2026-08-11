@@ -52,6 +52,16 @@ def test_hooks_json_declares_all_three_events():
                 assert "CLAUDE_PLUGIN_ROOT" in h["command"]
 
 
+def test_hooks_json_declares_configchange_adapter():
+    """The shipped plugin must deliver ConfigChange events to its dedicated adapter."""
+    data = json.loads((REPO_ROOT / "hooks" / "hooks.json").read_text())
+    configchange = data["hooks"].get("ConfigChange")
+    assert configchange, "hooks/hooks.json must register ConfigChange"
+    commands = [h["command"] for entry in configchange for h in entry["hooks"]]
+    assert any("_dispatch_configchange" in command for command in commands), commands
+    assert any("CLAUDE_PLUGIN_ROOT" in command for command in commands), commands
+
+
 def test_dispatch_shim_exists_and_executable():
     """_dispatch_shim.sh exists inside the package, is a POSIX sh script."""
     shim = REPO_ROOT / "makoto" / "_dispatch_shim.sh"
@@ -66,6 +76,14 @@ def test_dispatch_shim_invokes_makoto_dispatch():
     shim_text = (REPO_ROOT / "makoto" / "_dispatch_shim.sh").read_text()
     assert "makoto._dispatch" in shim_text
     assert "MAKOTO_PYTHON" in shim_text or "python3" in shim_text
+
+
+def test_configchange_shim_exists_and_invokes_its_adapter():
+    """The manifest target is a packaged executable, not a dangling command string."""
+    shim = REPO_ROOT / "makoto" / "_dispatch_configchange_shim.sh"
+    assert shim.is_file(), "missing ConfigChange dispatch shim"
+    assert shim.stat().st_mode & 0o100, "ConfigChange shim must be executable"
+    assert "makoto._dispatch_configchange" in shim.read_text(encoding="utf-8")
 
 
 def _exec_commands(md_text: str) -> list[str]:

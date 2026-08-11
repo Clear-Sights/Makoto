@@ -1,16 +1,17 @@
 """tests for `makoto pattern list` and `makoto pattern show <id>` CLI."""
+from makoto.substrate._loader import load_checks
 from makoto.__main__ import _cmd_pattern_list, _cmd_pattern_show
 
 
 def test_pattern_list_prints_table_of_all_patterns(capsys):
-    """`makoto pattern list` shows header + every pattern id from the live catalog."""
+    """The CLI prints exactly every check surface the live loader registered."""
     rc = _cmd_pattern_list()
     assert rc == 0
     out = capsys.readouterr().out
-    assert "ID" in out and "LEVEL" in out and "DESCRIPTION" in out
-    # A representative span of live catalog ids appears
-    for pid in ("content.verifier_predicate_weakened", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_exit_masking", "content.fabricated_commit_sha", "content.self_mute_guard"):
-        assert pid in out, f"pattern {pid} missing from list output"
+    lines = out.splitlines()
+    assert "ID" in lines[0] and "DESCRIPTION" in lines[0]
+    listed_ids = [line.split(maxsplit=1)[0] for line in lines[2:]]
+    assert listed_ids == [check.id for check in load_checks()]
 
 
 def test_pattern_show_known_id_prints_full_detail(capsys):
@@ -19,11 +20,20 @@ def test_pattern_show_known_id_prints_full_detail(capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "id" in out and "content.verifier_predicate_weakened" in out
-    assert "fire_level" in out
+    assert "posture" in out
     assert "keywords" in out
     assert "predicate" in out
     # source preview present
     assert "source:" in out or "regex_file_predicate" in out
+
+
+def test_pattern_show_accepts_a_live_stop_check_id(capsys):
+    """An id discoverable from the loader is also inspectable through the CLI."""
+    rc = _cmd_pattern_show("gate.stale_establisher")
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "id" in out and "gate.stale_establisher" in out
+    assert "applies_at" in out and "Stop" in out
 
 
 def test_pattern_show_unknown_id_returns_2_with_helpful_stderr(capsys):

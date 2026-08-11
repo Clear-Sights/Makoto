@@ -124,6 +124,32 @@ def test_clean_fully_wired_project_settings_event_no_fire(tmp_path):
     assert _audit_rows(state_dir) == []
 
 
+def test_documented_configchange_shape_reaches_adapter_end_to_end(tmp_path):
+    """Replay Claude Code's documented ``source``/``file_path`` payload through the adapter.
+
+    This deliberately avoids the legacy internal field names.  The regression it guards was
+    invisible while every end-to-end fixture reconstructed the adapter's old internal shape.
+    """
+    state_dir = tmp_path / "makoto_state"
+    settings_path = _write_settings(tmp_path, pre=True, post=True, stop=False)
+    payload = {
+        "hook_event_name": "ConfigChange",
+        "session_id": "cc_documented_shape",
+        "cwd": str(tmp_path),
+        "source": "project_settings",
+        "file_path": settings_path,
+    }
+    rc, out = _run_json(state_dir, payload)
+    assert rc == 0
+    assert out == b""
+    rows = _audit_rows(state_dir)
+    assert len(rows) == 1
+    assert rows[0]["pattern_fires"] == ["gate.configchange_advisory"]
+    assert rows[0]["session_id"] == "cc_documented_shape"
+    assert rows[0]["findings"][0]["file"] == settings_path
+    assert "Stop" in rows[0]["findings"][0]["message"]
+
+
 # --- full simultaneous strip: fires, but STILL empty stdout / exit 0 -------------------------------
 
 def test_full_strip_fires_advisory_audit_row_but_stdout_stays_empty(tmp_path):
