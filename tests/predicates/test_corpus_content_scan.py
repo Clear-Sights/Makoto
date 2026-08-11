@@ -63,6 +63,11 @@ def _parse(path: str):
 
 def _params():
     stem_to_id = {p.predicate_module.rsplit(".", 1)[-1]: p.id for p in load_prechecks()}
+    # The three exact regex members now share one predicate module. Corpus fixture stems remain
+    # the old check-specific labels, so recover their IDs from the table rather than pretending
+    # the central module is three differently named files.
+    from makoto.checks.agnosticRegex import SPECS
+    stem_to_id.update({spec.corpus_stem: spec.id for spec in SPECS})
     out = []
     for p in sorted(glob.glob(os.path.join(_CDIR, "T[PN]_*.md"))):
         name = os.path.basename(p)

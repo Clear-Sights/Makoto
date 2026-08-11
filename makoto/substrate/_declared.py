@@ -20,12 +20,12 @@ DECLARED_IDS: dict = {
     # content.cert_reqs_none moved to Ward, 2026-07-13 (github.com/Clear-Sights/Ward) -- hard
     # denies with no deterministic substitute, dangerous regardless of intent or honesty, a
     # third axis distinct from this project's sincerity charter.
-    "content.verifier_predicate_weakened": "verifierPredicateWeakened",
+    "content.verifier_predicate_weakened": "agnosticRegex",
     "content.env_gated_audit": "envGatedAudit",
-    "content.integrity_suppression_flag": "integritySuppressionFlag",
+    "content.integrity_suppression_flag": "agnosticRegex",
     "content.verifier_exit_masking": "verifierExitMasking",
     "content.verifier_body_hollowed": "verifierBodyHollowed",
-    "content.deferred_checkbox_theater": "deferredCheckboxTheater",
+    "content.deferred_checkbox_theater": "agnosticRegex",
     "content.phantom_citation": "phantomCitation",
     "content.unsourced_webfetch": "unsourcedWebfetch",
     "content.fabricated_commit_sha": "fabricatedCommitSha",

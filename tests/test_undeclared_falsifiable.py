@@ -70,6 +70,16 @@ def test_declared_id_with_no_backing_module_is_an_orphan_id(tmp_path):
     assert orphan_ids(package_dir=tmp_path, declared=declared) == ["x.ghost"]
 
 
+def test_extra_checks_are_live_members_for_manifest_completeness(tmp_path):
+    (tmp_path / "family.py").write_text(
+        "from makoto.substrate._loader import Check\n"
+        "CHECK = Check(id='x.first', applies_at='Pre', posture='BLOCK')\n"
+        "EXTRA_CHECKS = [Check(id='x.second', applies_at='Pre', posture='BLOCK')]\n"
+    )
+    declared = {"x.first": "family", "x.second": "family"}
+    assert orphan_ids(package_dir=tmp_path, declared=declared) == []
+
+
 def test_empty_manifest_yields_no_orphan_ids(tmp_path):
     _good(tmp_path, "live.py", "x.live")
     assert orphan_ids(package_dir=tmp_path, declared={}) == []

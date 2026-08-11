@@ -77,8 +77,8 @@ def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():
     # (identity), so the byte-identical `audit|verif|integrit|...` alternation is not re-declared per
     # detector. It is a raw alternation STRING (each consumer anchors it differently), not a PreCheck.
     from makoto.core import lexicons
-    from makoto.checks import integritySuppressionFlag, envGatedAudit
+    from makoto.checks import agnosticRegex, envGatedAudit
     assert isinstance(lexicons._INTEG_VOCAB, str)
     assert "audit" in lexicons._INTEG_VOCAB and "provenance" in lexicons._INTEG_VOCAB
-    assert integritySuppressionFlag._INTEG is lexicons._INTEG_VOCAB        # p14._INTEG stays the L0 object
+    assert agnosticRegex._INTEG is lexicons._INTEG_VOCAB  # table keeps the L0 object; no second copy
     assert envGatedAudit._INTEG_VOCAB is lexicons._INTEG_VOCAB  # content.env_gated_audit consumes the same source, no second copy

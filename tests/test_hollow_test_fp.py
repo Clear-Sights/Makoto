@@ -212,7 +212,12 @@ def _corpus_py_files(repo_relative_root: str) -> list:
     root = REPO_ROOT / repo_relative_root
     listed = subprocess.run(["git", "-C", str(root), "ls-files"], capture_output=True, text=True)
     if listed.returncode == 0:
-        return [str(root / f) for f in listed.stdout.split() if f.endswith(".py")]
+        # `git ls-files` reads the index, which legitimately still names a file deleted in an
+        # unstaged working tree. The corpus is the files analyzable on disk, not stale index
+        # entries; filtering preserves the committed-tree result and lets a deletion be tested
+        # before it is staged.
+        return [str(path) for f in listed.stdout.split() if f.endswith(".py")
+                if (path := root / f).is_file()]
     # The publish verifier intentionally receives an rsync tree with no .git directory.  It is
     # still a corpus, so measure its files instead of silently measuring an empty git index.
     return [str(f) for f in sorted(root.rglob("*.py")) if f.is_file()]
@@ -294,4 +299,3 @@ def test_corpus_fp_4a_4b_ventura_tests():
     # ventura's one real skipif usage (test_live_smoke_one_token_round_trip) is gated on a genuine
     # env-var check, not a tautology -- correctly silent. See the H8 comment block above.
     assert _new_pattern_fires("ventura") == []
-

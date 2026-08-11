@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from makoto.substrate._declared import DECLARED_IDS
-from makoto.substrate._loader import Check, scan
+from makoto.substrate._loader import Check, discover, scan
 from makoto.verdict.posture import ADVISE
 from makoto.core.schema import Finding
 
@@ -43,8 +43,9 @@ def orphan_ids(*, package_dir: Optional[Path] = None, declared: Optional[dict] =
     so a test can plant a dangling ID without touching the real manifest). Sorted for
     determinism."""
     reg = DECLARED_IDS if declared is None else declared
-    live_ids = {getattr(chk, "id", None) for chk in scan(package_dir=package_dir).values()
-                if chk is not None}
+    # A data-driven family may expose additional live members through EXTRA_CHECKS.  Discovery,
+    # rather than scan's one-primary-CHECK-per-file view, is the authoritative ID surface.
+    live_ids = {chk.id for chk in discover(package_dir=package_dir)}
     return sorted(pid for pid in reg if pid not in live_ids)
 
 
