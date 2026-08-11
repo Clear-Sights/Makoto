@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="700" height="752" viewBox="0 0 700 752" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">
-<rect width="700" height="752" rx="8" fill="#0d1117"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="3077" viewBox="0 0 700 3077" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">
+<rect width="700" height="3077" rx="8" fill="#0d1117"/>
 <rect width="700" height="30" rx="8" fill="#161b22"/>
 <rect y="22" width="700" height="8" fill="#161b22"/>
 <circle cx="18" cy="15" r="5" fill="#ff5f56"/>
@@ -30,20 +30,175 @@
 <text x="14" y="438" fill="#79c0ff" xml:space="preserve">  "verified_through": null,</text>
 <text x="14" y="453" fill="#79c0ff" xml:space="preserve">  "claims": [</text>
 <text x="14" y="468" fill="#79c0ff" xml:space="preserve">    {</text>
-<text x="14" y="483" fill="#79c0ff" xml:space="preserve">      "claim_kind": "testrun",</text>
-<text x="14" y="498" fill="#79c0ff" xml:space="preserve">      "row_index": 1,</text>
-<text x="14" y="513" fill="#79c0ff" xml:space="preserve">      "row_hash": "0b292d91a914552ccf3d3e3b31656ad32235488d1af43415dad2a2b2425683d3"</text>
-<text x="14" y="528" fill="#79c0ff" xml:space="preserve">    },</text>
-<text x="14" y="543" fill="#79c0ff" xml:space="preserve">    {</text>
-<text x="14" y="558" fill="#79c0ff" xml:space="preserve">      "claim_kind": "testrun",</text>
-<text x="14" y="573" fill="#79c0ff" xml:space="preserve">      "row_index": 3,</text>
-<text x="14" y="588" fill="#79c0ff" xml:space="preserve">      "row_hash": "d8ecd377ce046050cb513c1be9c0f59fd77689425b54df69183a63413849a674"</text>
-<text x="14" y="603" fill="#79c0ff" xml:space="preserve">    }</text>
-<text x="14" y="618" fill="#c9d1d9" xml:space="preserve">  ],</text>
-<text x="14" y="633" fill="#79c0ff" xml:space="preserve">  "claim_count": 2,</text>
-<text x="14" y="648" fill="#79c0ff" xml:space="preserve">  "trace_bound_count": 2,</text>
-<text x="14" y="663" fill="#79c0ff" xml:space="preserve">  "exemption_count": 0</text>
-<text x="14" y="678" fill="#79c0ff" xml:space="preserve">}</text>
-<text x="14" y="693" fill="#8b949e" xml:space="preserve">(exit 0)</text>
-<text x="14" y="723" fill="#8b949e" font-style="italic" xml:space="preserve">captured 636 Bytes of genuine dispatcher output</text>
+<text x="14" y="483" fill="#79c0ff" xml:space="preserve">      "claim_id": "claim:735804949a801eb7a4e6af07989db31c21c78d20b7fddce82364712b5e9aec85",</text>
+<text x="14" y="498" fill="#79c0ff" xml:space="preserve">      "source_event_id": 5,</text>
+<text x="14" y="513" fill="#79c0ff" xml:space="preserve">      "actor": "assistant",</text>
+<text x="14" y="528" fill="#79c0ff" xml:space="preserve">      "actor_id": "agent:main",</text>
+<text x="14" y="543" fill="#79c0ff" xml:space="preserve">      "text_sha256": "9572005adc9ebd26e4897f3266ed8fd330f393960a9e4cb82561c80fb3e021c7",</text>
+<text x="14" y="558" fill="#79c0ff" xml:space="preserve">      "claim_text": "test_login",</text>
+<text x="14" y="573" fill="#79c0ff" xml:space="preserve">      "span": {</text>
+<text x="14" y="588" fill="#79c0ff" xml:space="preserve">        "start": 20,</text>
+<text x="14" y="603" fill="#79c0ff" xml:space="preserve">        "end": 30</text>
+<text x="14" y="618" fill="#79c0ff" xml:space="preserve">      },</text>
+<text x="14" y="633" fill="#79c0ff" xml:space="preserve">      "parser_version": "claim-parser-v1",</text>
+<text x="14" y="648" fill="#79c0ff" xml:space="preserve">      "predicate": "test.pass.named",</text>
+<text x="14" y="663" fill="#79c0ff" xml:space="preserve">      "target": {</text>
+<text x="14" y="678" fill="#79c0ff" xml:space="preserve">        "object_id": "object:12f234307673c60a6620d33a3c37c9416d79731c903204daee4c80f7978eaf39",</text>
+<text x="14" y="693" fill="#79c0ff" xml:space="preserve">        "type": "named-test",</text>
+<text x="14" y="708" fill="#79c0ff" xml:space="preserve">        "canonical_value": "test_login",</text>
+<text x="14" y="723" fill="#79c0ff" xml:space="preserve">        "display_value": "test_login"</text>
+<text x="14" y="738" fill="#79c0ff" xml:space="preserve">      },</text>
+<text x="14" y="753" fill="#79c0ff" xml:space="preserve">      "tense": "present",</text>
+<text x="14" y="768" fill="#79c0ff" xml:space="preserve">      "polarity": "positive",</text>
+<text x="14" y="783" fill="#79c0ff" xml:space="preserve">      "verdict": "CERTIFIED",</text>
+<text x="14" y="798" fill="#79c0ff" xml:space="preserve">      "resolver": {</text>
+<text x="14" y="813" fill="#79c0ff" xml:space="preserve">        "id": "named-test",</text>
+<text x="14" y="828" fill="#79c0ff" xml:space="preserve">        "version": "1"</text>
+<text x="14" y="843" fill="#79c0ff" xml:space="preserve">      },</text>
+<text x="14" y="858" fill="#79c0ff" xml:space="preserve">      "support_path": [</text>
+<text x="14" y="873" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="888" fill="#79c0ff" xml:space="preserve">          "kind": "object",</text>
+<text x="14" y="903" fill="#79c0ff" xml:space="preserve">          "id": "object:44a29c9a9f9abb9f90dd0a37d113f1978ccb7801e405e2cb7c4592e350a006fa",</text>
+<text x="14" y="918" fill="#79c0ff" xml:space="preserve">          "row_index": 1,</text>
+<text x="14" y="933" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="948" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="963" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="978" fill="#79c0ff" xml:space="preserve">          "kind": "object",</text>
+<text x="14" y="993" fill="#79c0ff" xml:space="preserve">          "id": "object:12f234307673c60a6620d33a3c37c9416d79731c903204daee4c80f7978eaf39",</text>
+<text x="14" y="1008" fill="#79c0ff" xml:space="preserve">          "row_index": 11,</text>
+<text x="14" y="1023" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1038" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1053" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1068" fill="#79c0ff" xml:space="preserve">          "kind": "deed",</text>
+<text x="14" y="1083" fill="#79c0ff" xml:space="preserve">          "id": "deed:dc6619698ef1172f69429db4043a3413f4fcf0fa0af67ab3a9ed3a5dd6144484",</text>
+<text x="14" y="1098" fill="#79c0ff" xml:space="preserve">          "row_index": 29,</text>
+<text x="14" y="1113" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1128" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1143" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1158" fill="#79c0ff" xml:space="preserve">          "kind": "observation",</text>
+<text x="14" y="1173" fill="#79c0ff" xml:space="preserve">          "id": "observation:229a8a8a18aba3f13b1773fc3e1469dfe24f324c223a8f46e0df7f9b4ab4ee31",</text>
+<text x="14" y="1188" fill="#79c0ff" xml:space="preserve">          "row_index": 31,</text>
+<text x="14" y="1203" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1218" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1233" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1248" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="1263" fill="#79c0ff" xml:space="preserve">          "id": "edge:97490f9826a244aeddd05385adc29dc1c1b928ec709a7762de76423107a1cd13",</text>
+<text x="14" y="1278" fill="#79c0ff" xml:space="preserve">          "row_index": 32,</text>
+<text x="14" y="1293" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1308" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1323" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1338" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="1353" fill="#79c0ff" xml:space="preserve">          "id": "edge:67984df41f6aecda983af8d5615c5403e75479292ecc2b0605c74286927464bc",</text>
+<text x="14" y="1368" fill="#79c0ff" xml:space="preserve">          "row_index": 40,</text>
+<text x="14" y="1383" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1398" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1413" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1428" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="1443" fill="#79c0ff" xml:space="preserve">          "id": "edge:e0fd7e2d7f01e1a601963e59226de78010853e7212a38eaee55eaa45ed2bd8a1",</text>
+<text x="14" y="1458" fill="#79c0ff" xml:space="preserve">          "row_index": 41,</text>
+<text x="14" y="1473" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1488" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1503" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1518" fill="#79c0ff" xml:space="preserve">          "kind": "node",</text>
+<text x="14" y="1533" fill="#79c0ff" xml:space="preserve">          "id": "claim:735804949a801eb7a4e6af07989db31c21c78d20b7fddce82364712b5e9aec85",</text>
+<text x="14" y="1548" fill="#79c0ff" xml:space="preserve">          "row_index": 44,</text>
+<text x="14" y="1563" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1578" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1593" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1608" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="1623" fill="#79c0ff" xml:space="preserve">          "id": "edge:81f93449c6a391eb7aabacc8ebae4d42993f84f06539d66b5e572b6cf7e3a6f8",</text>
+<text x="14" y="1638" fill="#79c0ff" xml:space="preserve">          "row_index": 45,</text>
+<text x="14" y="1653" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1668" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1683" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1698" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="1713" fill="#79c0ff" xml:space="preserve">          "id": "edge:99b472834f97b2f6fa6daf5d49fdbaea0274af11bebcab9d1d78ca013784f0c8",</text>
+<text x="14" y="1728" fill="#79c0ff" xml:space="preserve">          "row_index": 46,</text>
+<text x="14" y="1743" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1758" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1773" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1788" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="1803" fill="#79c0ff" xml:space="preserve">          "id": "edge:21d74baae96fdb32cf289805351626016fd73cb465c8ebbcc0c0ce473b63470b",</text>
+<text x="14" y="1818" fill="#79c0ff" xml:space="preserve">          "row_index": 48,</text>
+<text x="14" y="1833" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1848" fill="#79c0ff" xml:space="preserve">        }</text>
+<text x="14" y="1863" fill="#c9d1d9" xml:space="preserve">      ],</text>
+<text x="14" y="1878" fill="#79c0ff" xml:space="preserve">      "contradiction_path": [],</text>
+<text x="14" y="1893" fill="#79c0ff" xml:space="preserve">      "cited_chain_rows": [</text>
+<text x="14" y="1908" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="1923" fill="#79c0ff" xml:space="preserve">          "kind": "object",</text>
+<text x="14" y="1938" fill="#79c0ff" xml:space="preserve">          "id": "object:44a29c9a9f9abb9f90dd0a37d113f1978ccb7801e405e2cb7c4592e350a006fa",</text>
+<text x="14" y="1953" fill="#79c0ff" xml:space="preserve">          "row_index": 1,</text>
+<text x="14" y="1968" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="1983" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="1998" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2013" fill="#79c0ff" xml:space="preserve">          "kind": "object",</text>
+<text x="14" y="2028" fill="#79c0ff" xml:space="preserve">          "id": "object:12f234307673c60a6620d33a3c37c9416d79731c903204daee4c80f7978eaf39",</text>
+<text x="14" y="2043" fill="#79c0ff" xml:space="preserve">          "row_index": 11,</text>
+<text x="14" y="2058" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2073" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2088" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2103" fill="#79c0ff" xml:space="preserve">          "kind": "deed",</text>
+<text x="14" y="2118" fill="#79c0ff" xml:space="preserve">          "id": "deed:dc6619698ef1172f69429db4043a3413f4fcf0fa0af67ab3a9ed3a5dd6144484",</text>
+<text x="14" y="2133" fill="#79c0ff" xml:space="preserve">          "row_index": 29,</text>
+<text x="14" y="2148" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2163" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2178" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2193" fill="#79c0ff" xml:space="preserve">          "kind": "observation",</text>
+<text x="14" y="2208" fill="#79c0ff" xml:space="preserve">          "id": "observation:229a8a8a18aba3f13b1773fc3e1469dfe24f324c223a8f46e0df7f9b4ab4ee31",</text>
+<text x="14" y="2223" fill="#79c0ff" xml:space="preserve">          "row_index": 31,</text>
+<text x="14" y="2238" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2253" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2268" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2283" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="2298" fill="#79c0ff" xml:space="preserve">          "id": "edge:97490f9826a244aeddd05385adc29dc1c1b928ec709a7762de76423107a1cd13",</text>
+<text x="14" y="2313" fill="#79c0ff" xml:space="preserve">          "row_index": 32,</text>
+<text x="14" y="2328" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2343" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2358" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2373" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="2388" fill="#79c0ff" xml:space="preserve">          "id": "edge:67984df41f6aecda983af8d5615c5403e75479292ecc2b0605c74286927464bc",</text>
+<text x="14" y="2403" fill="#79c0ff" xml:space="preserve">          "row_index": 40,</text>
+<text x="14" y="2418" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2433" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2448" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2463" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="2478" fill="#79c0ff" xml:space="preserve">          "id": "edge:e0fd7e2d7f01e1a601963e59226de78010853e7212a38eaee55eaa45ed2bd8a1",</text>
+<text x="14" y="2493" fill="#79c0ff" xml:space="preserve">          "row_index": 41,</text>
+<text x="14" y="2508" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2523" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2538" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2553" fill="#79c0ff" xml:space="preserve">          "kind": "node",</text>
+<text x="14" y="2568" fill="#79c0ff" xml:space="preserve">          "id": "claim:735804949a801eb7a4e6af07989db31c21c78d20b7fddce82364712b5e9aec85",</text>
+<text x="14" y="2583" fill="#79c0ff" xml:space="preserve">          "row_index": 44,</text>
+<text x="14" y="2598" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2613" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2628" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2643" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="2658" fill="#79c0ff" xml:space="preserve">          "id": "edge:81f93449c6a391eb7aabacc8ebae4d42993f84f06539d66b5e572b6cf7e3a6f8",</text>
+<text x="14" y="2673" fill="#79c0ff" xml:space="preserve">          "row_index": 45,</text>
+<text x="14" y="2688" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2703" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2718" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2733" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="2748" fill="#79c0ff" xml:space="preserve">          "id": "edge:99b472834f97b2f6fa6daf5d49fdbaea0274af11bebcab9d1d78ca013784f0c8",</text>
+<text x="14" y="2763" fill="#79c0ff" xml:space="preserve">          "row_index": 46,</text>
+<text x="14" y="2778" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2793" fill="#79c0ff" xml:space="preserve">        },</text>
+<text x="14" y="2808" fill="#79c0ff" xml:space="preserve">        {</text>
+<text x="14" y="2823" fill="#79c0ff" xml:space="preserve">          "kind": "edge",</text>
+<text x="14" y="2838" fill="#79c0ff" xml:space="preserve">          "id": "edge:21d74baae96fdb32cf289805351626016fd73cb465c8ebbcc0c0ce473b63470b",</text>
+<text x="14" y="2853" fill="#79c0ff" xml:space="preserve">          "row_index": 48,</text>
+<text x="14" y="2868" fill="#79c0ff" xml:space="preserve">          "row_hash": "&lt;chain-row-hash&gt;"</text>
+<text x="14" y="2883" fill="#79c0ff" xml:space="preserve">        }</text>
+<text x="14" y="2898" fill="#c9d1d9" xml:space="preserve">      ],</text>
+<text x="14" y="2913" fill="#79c0ff" xml:space="preserve">      "trace_bound": true</text>
+<text x="14" y="2928" fill="#79c0ff" xml:space="preserve">    }</text>
+<text x="14" y="2943" fill="#c9d1d9" xml:space="preserve">  ],</text>
+<text x="14" y="2958" fill="#79c0ff" xml:space="preserve">  "claim_count": 1,</text>
+<text x="14" y="2973" fill="#79c0ff" xml:space="preserve">  "trace_bound_count": 1,</text>
+<text x="14" y="2988" fill="#79c0ff" xml:space="preserve">  "exemption_count": 0</text>
+<text x="14" y="3003" fill="#79c0ff" xml:space="preserve">}</text>
+<text x="14" y="3018" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="3048" fill="#8b949e" font-style="italic" xml:space="preserve">captured 5.9 kB of genuine dispatcher output</text>
 </svg>

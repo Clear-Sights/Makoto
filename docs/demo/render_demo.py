@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -28,32 +29,54 @@ from pathlib import Path
 
 DEMO_DIR = Path(__file__).parent
 LOGS_DIR = DEMO_DIR / "logs"
+REPO_DIR = DEMO_DIR.parent.parent.resolve()
+_DEMO_TMP = "<demo-tmp>"
+_REPO = "<repo>"
+_DEMO_WORKSPACE = Path("/tmp/makoto-demo")
+_CHAIN_ROW_HASH = "<chain-row-hash>"
+_ROW_HASH = re.compile(r'("row_hash":\s*")[0-9a-f]{64}(")')
 
 
 def _run(module: list, payload: dict | None, state_dir: Path, display_cmd: str, title: str) -> dict:
     """Run one real dispatcher step; capture its genuine exit/stdout/stderr."""
-    env = dict(os.environ, MAKOTO_STATE_DIR=str(state_dir))
+    pythonpath = os.pathsep.join(filter(None, (str(REPO_DIR), os.environ.get("PYTHONPATH"))))
+    env = dict(os.environ, MAKOTO_STATE_DIR=state_dir.name, PYTHONPATH=pythonpath)
     proc = subprocess.run(
         [sys.executable, "-m", *module],
         input=json.dumps(payload) if payload is not None else None,
-        capture_output=True, text=True, env=env,
+        capture_output=True, text=True, env=env, cwd=state_dir.parent,
     )
     return {"title": title, "display_cmd": display_cmd, "payload": payload,
             "exit": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
 
 
-def _log(scenario: str, steps: list) -> None:
+def _normalized_for_log(value: object, tmp: Path) -> object:
+    """Replace run-specific paths after real dispatch, before committing the capture."""
+    if isinstance(value, str):
+        value = (value.replace(str(tmp / _DEMO_TMP), _DEMO_TMP)
+                      .replace(str(tmp), _DEMO_TMP)
+                      .replace(str(_DEMO_WORKSPACE), _DEMO_TMP)
+                      .replace(str(REPO_DIR), _REPO))
+        return _ROW_HASH.sub(rf'\1{_CHAIN_ROW_HASH}\2', value)
+    if isinstance(value, dict):
+        return {key: _normalized_for_log(child, tmp) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_normalized_for_log(child, tmp) for child in value]
+    return value
+
+
+def _log(scenario: str, steps: list, tmp: Path) -> None:
     LOGS_DIR.mkdir(exist_ok=True)
     out = LOGS_DIR / f"{scenario}.json"
-    out.write_text(json.dumps({"scenario": scenario, "steps": steps}, indent=1))
+    log = _normalized_for_log({"scenario": scenario, "steps": steps}, tmp)
+    out.write_text(json.dumps(log, indent=1))
     print(f"wrote {out} ({len(steps)} steps)")
 
 
 def scenario_block(tmp: Path) -> None:
     """A genuine PreToolUse block: the agent tries to loosen a verifier comparator."""
     state = tmp / "block-state"
-    proj = tmp / "block-proj"
-    proj.mkdir(parents=True)
+    proj = _DEMO_WORKSPACE / "block-proj"
     steps = [_run(["makoto._dispatch"], {
         "hook_event_name": "PreToolUse",
         "tool_name": "Write",
@@ -65,14 +88,13 @@ def scenario_block(tmp: Path) -> None:
         },
     }, state, "PreToolUse Write constitution/integrity/checks/release_gate.py",
         "the agent tries to loosen a verifier (== -> startswith)")]
-    _log("block", steps)
+    _log("block", steps, tmp)
 
 
 def scenario_receipt(tmp: Path) -> None:
     """word -> deed -> record -> receipt, end to end, one synthetic session."""
     state = tmp / "receipt-state"
-    proj = tmp / "receipt-proj"
-    proj.mkdir(parents=True)
+    proj = _DEMO_WORKSPACE / "receipt-proj"
     sid = "demo-session-001"
 
     def post_write(content: str, title: str) -> dict:
@@ -114,7 +136,7 @@ def scenario_receipt(tmp: Path) -> None:
              f"python -m makoto receipt --session {sid}",
              "RECEIPT: every claim cites a verify_chain-checkable row"),
     ]
-    _log("receipt", steps)
+    _log("receipt", steps, tmp)
 
 
 def scenario_configchange(tmp: Path) -> None:
@@ -133,7 +155,7 @@ def scenario_configchange(tmp: Path) -> None:
         "config_path": str(settings),
     }, state, "ConfigChange .claude/settings.json (makoto hooks absent)",
         "no evidence this path was ever wired -> ADVISORY only, never a block")]
-    _log("configchange", steps)
+    _log("configchange", steps, tmp)
 
 
 def main() -> None:

@@ -8,9 +8,8 @@ hand-written into the image. Two DISPLAY-ONLY transforms, both decoding rather t
   1. A stdout line that parses as a hook-decision JSON object (`hookSpecificOutput`) is unfolded
      into the decision tag plus the reason/context text the agent actually sees — the text is the
      log's own string value, verbatim, just JSON-unescaped and split on its real newlines.
-  2. Machine-local absolute path prefixes (the throwaway temp project, the local checkout) are
-     shortened, so the image shows `makoto/docs/MAKOTO-CONVENTIONS.md`, not this machine's
-     `/home/...` layout.
+  2. `render_demo.py` records stable placeholders for its temporary workspace and checkout before
+     these logs are committed, so no renderer-side path redaction is needed.
 
 Standard library only, like the rest of the package. The one formatting nicety this script wants
 is the footer's human-readable byte count ("captured 1.4 kB output"), and `_naturalsize` below
@@ -21,7 +20,6 @@ never worth making — the core refuses unearned weight, and a demo script is no
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 
@@ -100,20 +98,6 @@ def _color_for(line: str) -> str:
     return COLORS["text"]
 
 
-# display-only redaction (docstring point 2): machine-local prefixes -> stable display forms.
-_REDACTIONS = [
-    (re.compile(r"/[\w./-]*?/(makoto/docs/MAKOTO-CONVENTIONS\.md)"), r"\1"),
-    (re.compile(r"/tmp/makoto-demo-[^/\s]+/[a-z]+-proj"), "~/project"),
-    (re.compile(r"/tmp/makoto-demo-[^/\s]+/[a-z]+-state"), "~/.claude/makoto_state"),
-]
-
-
-def _redact(line: str) -> str:
-    for rx, repl in _REDACTIONS:
-        line = rx.sub(repl, line)
-    return line
-
-
 def _unfold_decision(stdout: str) -> list | None:
     """docstring point 1: a hook-decision JSON stdout -> the lines the agent actually sees.
     Returns [(text, color)] or None if this stdout is not a single hook-decision object."""
@@ -149,18 +133,18 @@ def _render(scenario: str) -> None:
         unfolded = _unfold_decision(step["stdout"])
         if unfolded is not None:
             for raw, color in unfolded:
-                for piece in _wrap(_redact(raw)):
+                for piece in _wrap(raw):
                     rows.append((piece, color, False))
         else:
             for raw in step["stdout"].splitlines():
                 if raw.strip() == "":
                     continue
-                for piece in _wrap(_redact(raw)):
+                for piece in _wrap(raw):
                     rows.append((piece, _color_for(raw), False))
         for raw in step["stderr"].splitlines():
             if raw.strip() == "":
                 continue
-            for piece in _wrap(_redact(raw)):
+            for piece in _wrap(raw):
                 rows.append((piece, _color_for(raw), False))
         rows.append((f"(exit {step['exit']})", COLORS["dim"], False))
         rows.append(("", COLORS["text"], False))

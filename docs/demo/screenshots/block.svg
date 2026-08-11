@@ -15,7 +15,7 @@
 <text x="14" y="138" fill="#c9d1d9" xml:space="preserve">  comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3.</text>
 <text x="14" y="153" fill="#c9d1d9" xml:space="preserve">Legitimate instance? Annotate it `makoto-allow: &lt;reason&gt;` on or near the line (any comment style)</text>
 <text x="14" y="168" fill="#c9d1d9" xml:space="preserve">  — an on-the-record, auditable rationale, never a disguise.</text>
-<text x="14" y="183" fill="#c9d1d9" xml:space="preserve">Conventions: makoto/docs/MAKOTO-CONVENTIONS.md</text>
+<text x="14" y="183" fill="#c9d1d9" xml:space="preserve">Conventions: &lt;repo&gt;/makoto/docs/MAKOTO-CONVENTIONS.md</text>
 <text x="14" y="198" fill="#8b949e" xml:space="preserve">(exit 0)</text>
-<text x="14" y="228" fill="#8b949e" font-style="italic" xml:space="preserve">captured 652 Bytes of genuine dispatcher output</text>
+<text x="14" y="228" fill="#8b949e" font-style="italic" xml:space="preserve">captured 637 Bytes of genuine dispatcher output</text>
 </svg>

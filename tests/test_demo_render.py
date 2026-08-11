@@ -19,12 +19,15 @@ Two properties, both of which have already caught a real defect:
 from __future__ import annotations
 
 import importlib.util
+import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DEMO = REPO / "docs" / "demo"
+_ABSOLUTE_PATH = re.compile(r"(?<![\w>])(/[^\s\"'`<>]+)")
 
 # humanize 4.16.0, naturalsize(value), recorded from actual calls.
 HUMANIZE_TABLE = [
@@ -63,18 +66,56 @@ def test_naturalsize_matches_the_recorded_humanize_output():
 
 
 def test_rerendering_reproduces_the_committed_screenshots_exactly():
-    """Regenerate in place and ask git whether anything moved. Nothing should."""
-    before = subprocess.run(["git", "status", "--porcelain", "docs/demo/screenshots"],
-                            cwd=REPO, capture_output=True, text=True, check=True).stdout
-    assert before == "", f"screenshots were already dirty before rendering:\n{before}"
+    """Regenerating must leave the committed screenshots byte-for-byte unchanged."""
+    scenarios = ("block", "receipt", "configchange")
+    screenshot_paths = [DEMO / "screenshots" / f"{scenario}.svg" for scenario in scenarios]
+    before = {path: path.read_bytes() for path in screenshot_paths}
 
     render = subprocess.run([sys.executable, str(DEMO / "render_svg.py")],
                             cwd=REPO, capture_output=True, text=True)
     assert render.returncode == 0, f"render_svg.py exited {render.returncode}:\n{render.stderr}"
 
-    after = subprocess.run(["git", "status", "--porcelain", "docs/demo/screenshots"],
-                           cwd=REPO, capture_output=True, text=True, check=True).stdout
-    assert after == "", (
-        "re-rendering changed the committed screenshots -- either an SVG was edited by hand, or "
-        f"the renderer changed and the images were not regenerated:\n{after}"
-    )
+    after = {path: path.read_bytes() for path in screenshot_paths}
+    assert before == after, "re-rendering changed the committed screenshots"
+
+
+def test_regenerating_demo_logs_is_byte_identical_and_machine_independent():
+    """The README's committed demo logs must reproduce without local paths leaking in."""
+    scenarios = ("block", "receipt", "configchange")
+    log_paths = [DEMO / "logs" / f"{scenario}.json" for scenario in scenarios]
+    before = {path: path.read_bytes() for path in log_paths}
+
+    first = subprocess.run([sys.executable, str(DEMO / "render_demo.py")],
+                           cwd=REPO, capture_output=True, text=True)
+    assert first.returncode == 0, f"first render_demo.py exited {first.returncode}:\n{first.stderr}"
+    first_logs = {path: path.read_bytes() for path in log_paths}
+
+    second = subprocess.run([sys.executable, str(DEMO / "render_demo.py")],
+                            cwd=REPO, capture_output=True, text=True)
+    assert second.returncode == 0, f"second render_demo.py exited {second.returncode}:\n{second.stderr}"
+    second_logs = {path: path.read_bytes() for path in log_paths}
+
+    assert first_logs == second_logs, "two consecutive demo renders produced different logs"
+
+    changed = [path.relative_to(REPO) for path in log_paths if before[path] != first_logs[path]]
+    assert not changed, f"regenerating changed committed demo logs: {changed}"
+
+    repo = REPO.resolve()
+    leaked = []
+    for path, contents in second_logs.items():
+        for value in _strings(json.loads(contents)):
+            for absolute_path in _ABSOLUTE_PATH.findall(value):
+                if not Path(absolute_path).is_relative_to(repo):
+                    leaked.append((path.relative_to(REPO), absolute_path))
+    assert not leaked, f"demo logs contain absolute paths outside the repository: {leaked}"
+
+
+def _strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _strings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _strings(child)

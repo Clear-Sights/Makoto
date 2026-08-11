@@ -7,9 +7,9 @@
    "payload": {
     "hook_event_name": "ConfigChange",
     "session_id": "demo-configchange-001",
-    "cwd": "/tmp/makoto-demo-j9f35qjc/configchange-proj",
+    "cwd": "<demo-tmp>/configchange-proj",
     "config_source": "project_settings",
-    "config_path": "/tmp/makoto-demo-j9f35qjc/configchange-proj/.claude/settings.json"
+    "config_path": "<demo-tmp>/configchange-proj/.claude/settings.json"
    },
    "exit": 0,
    "stdout": "",
