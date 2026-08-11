@@ -34,9 +34,8 @@ def _prior_whole_file_writes(history, path: str) -> list:
     (id, ts, event_type, cwd, raw_payload_json) tuples _select_recent returns OR dicts with a
     'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped.
 
-    Row-decode step shared via substrate.io.decode_history_row (2026-07-09 dedup: this function and
-    substrate._canonAtoms._decode_row each re-derived the same tuple/dict-payload sniff + json.loads
-    by hand -- found duplicated by jscpd). Only this function's own Write/content filter stays local."""
+    Row-decode step shared via substrate.io.decode_history_row. Only this function's own
+    Write/content filter stays local."""
     out: list = []
     for row in history or ():
         ev = decode_history_row(row)

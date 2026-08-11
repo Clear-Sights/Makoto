@@ -129,17 +129,12 @@ conventions are enforced by habit — §7.8, closed.)*
 
 ## 6. Every Detector, Derived From the Principle
 
-Each detector keeps one word and prevents one emptiness. As of the **2026-06-02 warning-tier
-elimination, every surviving detector blocks live at error.** A detector that could only ever *warn*
-— never reach a material zero-FP block — is itself an illusory word, so makoto *cut* those rather
-than list them as decoration (§8; the cuts are named at the end of this section). makoto blocks live
-on three Stop **gates** — completion, advance, and green-claim — and on the **pattern** catalog:
-`1_1`, `1_4`, `1_5`, `1_6`, `1_9`, `1_21`, `1_22`, `1_23`, and the eight-strong **verifier-neutered**
-security family `1_26`-`1_33`. *(The live roster has since grown to **eight** Stop gates — the three
-above plus `dropped`, `fabricated_action`, `named_test`, `stale_pass`, and `liveness` (function-
-internal dead-code, an AST walk over the turn's touched `.py` files rather than a claim-vs-ledger
-read); see README. The pattern catalog also now carries live `1_2` (rebuilt as an active-code
-env-gated-audit AST detector) and `1_34` (illusory Claude-authorship trailer).)*
+Each detector keeps one word and prevents one emptiness. The **2026-06-02 warning-tier
+elimination** cut the warning-only catalog that existed then. That historical rule is not the
+current inventory: the live Stop edge has 19 checks, of which 17 are decision-eligible (14 error,
+3 advisory), while 2 more are structurally nonblocking. The live counts and IDs are maintained in
+README. The table below records the earlier detector vocabulary and its historical status; it is
+not a current catalog listing.
 
 | Detector | Word it keeps | Emptiness | Status |
 |---|---|---|---|

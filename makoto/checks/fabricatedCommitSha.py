@@ -359,7 +359,7 @@ def _real_commit_in_history(history: list) -> bool:
 # span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
 # history: list, pattern: PreCheck, conn=None) -> Optional[Finding]` -- byte-identical across 9
 # check modules (grep '^def predicate(' checks/*.py: writeThrashRevert.py, verifierExitMasking.py,
-# unsourcedWebfetch.py, selfMuteGuard.py, illusoryAuthorshipTrailer.py, forbiddenLocation.py,
+# unsourcedWebfetch.py, selfMuteGuard.py, forbiddenLocation.py,
 # among others) -- plus a coincidental preceding `return False` from this file's own unrelated
 # `_real_commit_in_history` helper. A dispatcher-invoked entrypoint's signature is a structural
 # contract, not extractable logic; the two functions' bodies do unrelated things.

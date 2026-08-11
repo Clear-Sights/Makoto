@@ -36,7 +36,7 @@ from makoto.substrate._shared import GateContext
 def _live_gates() -> list:
     """The checks eligible to reach the Stop decision pipeline at all (formerly: discovered via
     load_stopchecks()'s GATE-export scan) -- Check.may_block=True, not every Stop-edge CHECK
-    (staleEstablisher/undeclaredFalsifiable are Stop-edge but structurally excluded, may_block
+    (staleEstablisher/catalogCompleteness are Stop-edge but structurally excluded, may_block
     default False)."""
     return sorted(
         (c for c in load_checks(edge="Stop") if c.may_block),
@@ -57,8 +57,6 @@ GATE_MODULE_STEMS = {
                             # — partial-strip detection of makoto's own settings.json hook wiring.
     "hollowTest",           # hollow_test gate: adapter + its own AST analyzer engine, one file
     "canonTimeoutRecur",    # canon gate: adapter + its own pure engine (canon.timeout/canon.recur)
-    "canonFingerprints",           # SPEC-5 Task 9: BLOCK-tier half of the 17 canon fingerprints
-    "canonFingerprintsAdvisory",   # SPEC-5 Task 9: ADVISE-tier half (shares _canonAtoms.py)
     "contractOrder",        # SPEC-5 (Makoto absorbs Assay): the plan's Stop remainder guard.
                              # staleEstablisher.py is its DETECTIVE/advisory sibling but is
                              # DELIBERATELY NOT a discovered GATE (no GATE export) -- it is
@@ -87,14 +85,12 @@ GATE_MODULE_STEMS = {
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
 # harnesses (never imported by a gate module itself — only by their own battery tests) that travel
-# with the gate catalog but are not gates. _canonAtoms.py is the same kind of shared substrate,
-# scoped to the two canonFingerprints* gates (SPEC-5 Task 9).
+# with the gate catalog but are not gates.
 EXPECTED_SHARED_FILES = set()  # 2026-07-09: all former checks/ plumbing moved to substrate/
-EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # 14 files, the gate subset of checks/
+EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # 17 files, the gate subset of checks/
 EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
                           "gate.self_wired", "gate.hollow_test", "gate.canon",
-                          "gate.canon_fingerprints", "gate.canon_fingerprints_advisory",
                           "gate.contract_order",
                           "gate.relative_path_citation", "gate.plan_item_drift",
                           "gate.claimed_running", "gate.run_promised", "gate.claimed_shipped"}
@@ -135,8 +131,6 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
                                                             # _under/_is_scratch/_read extracted to
                                                             # _stdlib_ast_helpers.py
     "canonTimeoutRecur.py": 15,                            # engine + adapter merged (canon_gate lives here)
-    "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
-    "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
     "contractOrder.py": 5,
     "relativePathCitation.py": 4,
     "planItemDrift.py": 1,
@@ -145,17 +139,17 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "claimedShippedAbsent.py": 5,
 }
 # a gate module may import ONLY L0/L1 primitives + the intra-package `_shared`/`_loader`/
-# `_canonAtoms` — never a sibling NAMED gate (checks.<other-gate-stem>) nor a sibling L2 detector
+# shared substrate — never a sibling NAMED gate (checks.<other-gate-stem>) nor a sibling L2 detector
 # (commitments / retraction / ledger). `makoto.checks` (bare) is the package's own re-exported L0
 # primitives module.
 ALLOWED_IMPORT_ROOTS = {
-    "makoto.checks", "makoto.substrate._shared", "makoto.substrate._loader", "makoto.substrate._canonAtoms",
+    "makoto.checks", "makoto.substrate._shared", "makoto.substrate._loader",
     "makoto.substrate._planNode", "makoto.substrate._stdlib_ast_helpers",
     "makoto.core.schema", "makoto.substrate.io", "makoto.substrate.claims", "makoto.substrate.pytest_cache",
     "makoto.core.lexicons",
     "makoto.core._shell",
     "makoto.substrate.claim_graph",
-    "makoto.record.ackblock",   # Task 2 slice 5: canonFingerprints.py's release.operator discharge lookup --
+    "makoto.record.ackblock",   # gate.canon's release.operator discharge lookup --
     #   named explicitly (never bare "makoto") so the firewall stays a curated allowlist, not a
     #   hole into makoto's whole namespace.
     "makoto.substrate.wiring",  # 2026-07-09 dedup: the hook-wiring predicate selfWiredCheck.py and
@@ -233,13 +227,13 @@ def test_gate_dataclass_has_no_undeclared_shadow_state():
     assert fields == EXPECTED_GATE_FIELDS
     # may_block IS the structural blocking-eligibility signal (replacing GATE-export presence) --
     # not a shadow tier because it's a total, testable partition: every live gate id is may_block
-    # True, and nothing else claims to be. staleEstablisher/undeclaredFalsifiable are Stop-edge
+    # True, and nothing else claims to be. staleEstablisher/catalogCompleteness are Stop-edge
     # CHECKs too but stay may_block=False -- discovered and run, but structurally excluded from
     # _blocking_gate_ids() regardless of their own .level, never a silent in-between state.
     live_ids = {g.id for g in _live_gates()}
     assert live_ids == EXPECTED_LIVE_GATE_IDS
     non_blocking_stop_checks = [c for c in load_checks(edge="Stop") if not c.may_block]
-    assert non_blocking_stop_checks, "expected at least staleEstablisher/undeclaredFalsifiable"
+    assert non_blocking_stop_checks, "expected at least staleEstablisher/catalogCompleteness"
     assert {c.id for c in non_blocking_stop_checks}.isdisjoint(EXPECTED_LIVE_GATE_IDS)
 
 
@@ -262,8 +256,8 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 19                # 7 ledger-gates + liveness + self_wired +
-    # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + contractOrder (SPEC-5,
+    assert len(GATE_MODULE_FILES & present) == 17                # 7 ledger-gates + liveness + self_wired +
+    # hollow_test + canon + contractOrder (SPEC-5,
     # Makoto absorbs Assay) + relativePathCitation + planItemDrift (2026-07-09) + claimedRunningAbsent
     # (2026-07-23) + runIntentUnfulfilled (2026-07-23)
 
@@ -319,7 +313,7 @@ def test_TEETH_no_shadow_field_check_catches_a_planted_blocking_field():
 
 
 def test_TEETH_may_block_partition_catches_a_leaked_advisory_id():
-    planted_non_blocking_ids = {"gate.stale_establisher", "gate.undeclared_falsifiable", "gate.completion"}
+    planted_non_blocking_ids = {"gate.stale_establisher", "gate.catalog_completeness", "gate.completion"}
     assert not planted_non_blocking_ids.isdisjoint(EXPECTED_LIVE_GATE_IDS)  # the real assertion would redden
 
 

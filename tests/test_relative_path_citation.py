@@ -46,6 +46,8 @@ def test_gate_fires_finding_advisory_never_error():
     assert f is not None
     assert f.level == "advisory"
     assert "checks/hollowTest.py:146" in f.message
+    assert "clickability is host-dependent" in f.message
+    assert "not clickable in most hosts" not in f.message
 
 
 def test_gate_silent_on_no_citations():

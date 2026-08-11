@@ -8,7 +8,7 @@ honest outcome is to cut or defer the check, not demote it to advisory" (design 
 module is what makes discrimination possible at all; identicalRetryInterdiction.py refuses to
 fire on anything but a confident True.
 
-Package plumbing (underscore-prefixed, like _canonAtoms.py/_primitives.py) -- shared classification
+Package plumbing (underscore-prefixed, like _primitives.py) -- shared classification
 logic, not itself a detector module; checks._loader's scan skips it.
 """
 from __future__ import annotations

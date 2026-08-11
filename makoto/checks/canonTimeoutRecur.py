@@ -325,8 +325,7 @@ CANON_SEQ_PRIMITIVES: dict = {
         # -- a discharge the detector cannot honor. timed_out_at_turn_end reads ONLY calls[-1]
         # (purely structural); prose can never change it. The two REAL discharges: a later
         # successful call (calls[-1] becomes non-error), or (Task 0b part b) a ledger-recorded
-        # release.operator for a genuinely unresolvable, operator-surfaced block -- the same mechanism
-        # gate.canon_fingerprints uses (makoto.record.ackblock), not a third prose-only path.
+        # release.operator for a genuinely unresolvable, operator-surfaced block, not a prose-only path.
         "A call errored (timeout / interrupted / error code) and the turn closed without "
         "resolving it. Re-run it (or the equivalent action) to a real successful result before "
         "closing, OR if the error is a genuinely unresolvable, already-reviewed block, say "
@@ -365,12 +364,11 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     ("canon.timeout: ..." / "canon.recur: ..."). Returns [] (silent) when no installed primitive
     fires — the discriminator's true-negative path.
 
-    Task 0b part (b): canon.timeout has the SAME no-clean-terminal-state gap as
-    gate.canon_fingerprints when the last error is a genuinely unresolvable, operator-surfaced
+    canon.timeout has a no-clean-terminal-state gap when the last error is a genuinely unresolvable, operator-surfaced
     block (a permission block the agent correctly declines to retry) -- text cannot change
     calls[-1], so without a real discharge it re-fires at every subsequent Stop. Reuses
     makoto.record.ackblock's SAME transcript-re-derived, spoof-proof discharge (never trusted from
-    chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model"."""
+    chain content)."""
     out: List[Finding] = []
     for cid, stop_text, retry_hint in fired_primitives(history):
         ack = None

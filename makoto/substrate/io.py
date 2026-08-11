@@ -41,9 +41,8 @@ def decode_history_row(row):
     Fail-open: an undecodable row yields None rather than raising, so one malformed row can never
     crash a caller's scan.
 
-    The ONE canonical row-decode step (found triplicated by jscpd, 2026-07-09: iter_tool_events
-    below, substrate._canonAtoms._decode_row, and checks.writeThrashRevert._prior_whole_file_writes
-    each re-derived this same tuple/dict-payload sniff + json.loads by hand). Callers keep their own
+    The ONE canonical row-decode step (deduplicated from iter_tool_events below and
+    checks.writeThrashRevert._prior_whole_file_writes). Callers keep their own
     downstream shape/filter (a Call dict, a (name, command, response) tuple, a ByteIdentity list) --
     only the shared decode-to-dict step lives here."""
     if isinstance(row, (tuple, list)) and len(row) > 4:

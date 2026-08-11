@@ -8,7 +8,7 @@ attributes: `.id` (str), `.applies_at` (one of Pre/Post/Stop/SubagentStop/Sessio
 `.posture` (this check's own native outcome tier before the operator's configured MAKOTO_MODE
 posture folds over it -- see `makoto.verdict.posture`'s OUTCOME vocabulary). A candidate file that fails
 to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently skipped
-(fail-open, matching every other loader/gate in this codebase) -- `checks.undeclaredFalsifiable`
+(fail-open, matching every other loader/gate in this codebase) -- `checks.catalogCompleteness`
 (SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
 of silence.
 
@@ -47,7 +47,7 @@ class Check:
     `posture == BLOCK` alone; `may_block` restores the second, structural layer the old
     `GATE`-export-presence mechanism used to provide (a check with no `GATE` export could
     never enter `_blocking_gate_ids()`, regardless of its posture -- see
-    `staleEstablisher.py`/`undeclaredFalsifiable.py`, which stay `may_block=False` on purpose:
+    `staleEstablisher.py`/`catalogCompleteness.py`, which stay `may_block=False` on purpose:
     their pattern_id must never enter the blocking-eligible set even if `posture` were ever
     mistagged). A Pre-tier CHECK never sets this; it reads back False and is irrelevant there
     (`_blocking_gate_ids()` only ever consults Stop-edge checks).
@@ -127,7 +127,7 @@ def _valid_check(chk) -> bool:
 def scan(*, package_dir: Optional[Path] = None) -> dict:
     """`{file_stem: CHECK-or-None}` for every candidate file in `package_dir` (defaults to the
     real `checks/` package). `None` means the file failed to produce a valid,
-    loader-discoverable `CHECK` -- an orphan module, in `checks.undeclaredFalsifiable`'s
+    loader-discoverable `CHECK` -- an orphan module, in `checks.catalogCompleteness`'s
     vocabulary. Never raises: an import failure is recorded as `None`, not propagated."""
     directory = package_dir or _PACKAGE_DIR
     out = {}

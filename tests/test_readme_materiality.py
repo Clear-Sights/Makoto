@@ -17,7 +17,7 @@ README = (Path(__file__).resolve().parent.parent / "README.md").read_text()
 def _live_gates():
     # "end-of-turn gates" means the checks eligible to reach the Stop decision pipeline at all
     # (formerly: had a GATE export / discovered by load_stopchecks()) -- may_block=True, not
-    # every Stop-edge CHECK (staleEstablisher/undeclaredFalsifiable are Stop-edge but were never
+    # every Stop-edge CHECK (staleEstablisher/catalogCompleteness are Stop-edge but were never
     # counted among the README's stated gates).
     return [c for c in load_checks(edge="Stop") if c.may_block]
 

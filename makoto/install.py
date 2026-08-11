@@ -227,8 +227,8 @@ def cmd_status() -> int:
     """report patterns_count, hooks_wired, state_dir."""
     state_dir = Path.home() / ".claude" / "makoto_state"
     # The count a user reads must be the catalog the tool actually has. This was
-    # len(load_prechecks()) -- the Pre edge ALONE, which is 15 of 35 distinct ids -- so `status`
-    # reported a catalog 20 smaller than `pattern list` showed from the same install. Two commands
+    # len(load_prechecks()) -- the Pre edge ALONE (15 of 35 distinct ids at the time) -- so `status`
+    # reported a catalog 20 smaller than `pattern list` showed from that install. Two commands
     # in one CLI answering the same question with different numbers, and the user-facing one
     # under-reporting. Sourced from load_checks(), deduplicated by id because gate.contract_order
     # registers on both its Pre and Stop edges and is one pattern, not two.

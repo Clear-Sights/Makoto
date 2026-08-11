@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "makoto"
 version = "2.2.0"
-description = "Integrity hook for Claude Code — holds the agent's claims against its own logged deeds and blocks faked checks; every check ships at measured zero false positives"
+description = "Integrity hook for Claude Code — checks the agent's claims against its own logged deeds; regression fixtures are not an independent false-positive survey"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "skill-labV2"}]

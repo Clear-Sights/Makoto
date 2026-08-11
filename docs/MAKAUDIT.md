@@ -62,7 +62,7 @@ specific false decision or silent-failure path.
 
 3. **BLOCK — a broken check can disappear at import time.**
    `makoto/substrate/_loader.py:127-163` converts import errors and malformed `CHECK`/`EXTRA_CHECKS`
-   exports to `None`/skip. `gate.undeclared_falsifiable` can advise only if it itself still imports;
+   exports to `None`/skip. `gate.catalog_completeness` can advise only if it itself still imports;
    it is not an independent root of trust. Existing taxonomy fault-injection tests deliberately
    prove the skip. A fix needs a manifest outside the scanned package or a loader error surface
    whose own import cannot disappear with the catalog; failing closed on arbitrary import errors

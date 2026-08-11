@@ -10,8 +10,8 @@ none of which the old scan could ever have seen. A gate that scans a subset sile
 the rest; the scan set is now the package, minus tests/ (test files legitimately repeat shapes).
 
 Exemption list is EXPLICIT and justified, never a blanket suppression: an entry here means the
-duplication was checked and found necessary, not merely convenient. See
-docs/CANON-17-VALIDATION.md's neighbor for the reasoning template this follows.
+duplication was checked and found necessary, not merely convenient. Each exemption records its
+reason inline below.
 """
 from __future__ import annotations
 

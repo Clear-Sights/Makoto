@@ -26,9 +26,9 @@ flowchart TD
     P -->|"empty or unparseable"| LA["loud-allow + audit fact<br/>a pipe glitch must not block work"]
     P -->|"valid JSON, not an object"| FC["fail CLOSED<br/>exit 2 — tamper-shaped"]
     P -->|"an object"| I["ingest into the session record"]
-    I --> PRE["PreToolUse → 15 pre-checks"]
+    I --> PRE["PreToolUse → 14 pre-checks"]
     I --> POST["PostToolUse → consumed as history"]
-    I --> STOP["Stop → 21 end-of-turn gates"]
+    I --> STOP["Stop → 19 checks"]
     PRE --> W{"verdict"}
     STOP --> W
     W -->|BLOCK| DENY["JSON deny<br/>permissionDecision: deny (Pre)<br/>decision: block (Stop)<br/>process exit 0"]
@@ -53,7 +53,7 @@ event, while bytes that did not parse is a transient cut mid-write.
 
 ```console
 $ python3 -m pytest -q
-1706 passed, 5 skipped, 1 xfailed in 34.56s
+1540 passed, 5 skipped, 1 xfailed in 38.60s
 ```
 
 The repository drives three real scenarios end-to-end through the actual dispatchers against a
@@ -90,34 +90,34 @@ different numbers.
 
 ## The catalog
 
-Counts here come from `load_checks()`, not from prose: **15 pre-checks** on the Pre edge and 21
-checks on the Stop edge, 36 rows over **35 distinct ids** — `gate.contract_order` registers on both
+Counts here come from `load_checks()`, not from prose: **14 pre-checks** on the Pre edge and 19
+checks on the Stop edge, 33 rows over **32 distinct ids** — `gate.contract_order` registers on both
 edges and is one pattern, not two. The Pre edge has no advisory tier: a pre-check either denies or
 is silent.
 
 | edge | family | count |
 |---|---|---|
-| Pre | `content.*` — verifier weakening, fabricated evidence, self-defense | 12 |
+| Pre | `content.*` — verifier weakening, fabricated evidence, self-defense | 11 |
 | Pre | `event.*` — `event.identical_retry`, `event.thrash_revert` | 2 |
 | Pre | `gate.contract_order` (its PreToolUse sibling guard) | 1 |
-| Stop | `gate.*` — checks on the agent's closing claims | 21 |
+| Stop | `gate.*` — checks on the agent's closing claims | 19 |
 
-Those 21 are not one tier. A Stop check is blocking-**eligible** only when both `may_block` is true
-and its posture is `BLOCK`. That eligible set is the **19 end-of-turn gates**, and it splits again
+Those 19 are not one tier. A Stop check is blocking-**eligible** only when `may_block` is true.
+That eligible set is the **17 end-of-turn gates**, and it splits again
 by posture:
 
-- **15 block.** `gate.advance`, `gate.canon`, `gate.canon_fingerprints`, `gate.claimed_running`,
+- **14 block.** `gate.advance`, `gate.canon`, `gate.claimed_running`,
   `gate.claimed_shipped`, `gate.completion`, `gate.contract_order`, `gate.dropped`,
   `gate.fabricated_action`, `gate.green_claim`, `gate.hollow_test`, `gate.liveness`,
   `gate.named_test`, `gate.run_promised`, `gate.stale_pass`.
-- **4 are advisory by posture** — eligible to block, deliberately set not to: `gate.self_wired`,
-  `gate.canon_fingerprints_advisory`, `gate.relative_path_citation`, `gate.plan_item_drift`.
+- **3 are advisory by posture** — decision-eligible, deliberately set not to block:
+  `gate.self_wired`, `gate.relative_path_citation`, `gate.plan_item_drift`.
 
 The **other 2 Stop-edge checks are structurally excluded** from blocking: `may_block=False`, so
-`gate.stale_establisher` and `gate.undeclared_falsifiable` cannot reach a block decision at all,
+`gate.stale_establisher` and `gate.catalog_completeness` cannot reach a block decision at all,
 whatever their posture. They ship, they run, and they record. Naming them is the honest addition
-here — the stated gate count is 19 because it counts blocking-eligible gates, while the loader
-holds 21 Stop-edge checks, and this page previously mentioned only the 19.
+here — the stated Stop-check count is 19 because it counts every Stop-edge check, while the
+end-of-turn gate count is 17 because it excludes these two.
 
 `tests/test_readme_materiality.py` binds both stated counts and every live gate id back to the
 loader, so this section cannot drift from the code without a test going red. It did exactly that
@@ -158,21 +158,26 @@ manifests are pinned too:
 
 | artifact | sha256 (first 16) |
 |---|---|
-| `.claude-plugin/plugin.json` | `db1179fec1c82d54` |
-| `.claude-plugin/marketplace.json` | `e871a8684cf562d5` |
+| `.claude-plugin/plugin.json` | `2be6899a6140ecec` |
+| `.claude-plugin/marketplace.json` | `7a092e1c0a50550f` |
 | `hooks/hooks.json` | `1bee8f42a19436a5` |
 
 ## What it does not do
 
+- **It does not authenticate tool output.** A genuine `PostToolUse` envelope proves that the host
+  recorded those bytes; it does not prove which process produced them or that they are an honest
+  result. An agent can invoke a recognized runner without running the suite and print a fabricated
+  passing summary into the same stdout shape. Makoto cannot distinguish that text from
+  runner-produced output and may certify it. It checks envelope and command provenance, not output
+  origin.
 - **It does not know whether a claim is true of the world.** Only whether it is supported by this
   session's own record. An agent that honestly reports a fact makoto has no deed for is treated the
   same as one that invented it — makoto's answer is "not evidenced here", never "false".
 - **It does not judge danger.** A write that is perfectly honest and perfectly catastrophic passes
   makoto untouched. That is Ward's question, and merging them would make both answers softer.
 - **It does not claim a measured false-positive rate on your sessions.** The TP/TN corpora are
-  fixtures. Where a check has no corpus-measured FP rate it ships advisory rather than blocking,
-  and `gate.canon_fingerprints_advisory` exists precisely to hold the 13 of 17 fingerprints whose
-  robustness the gold-oracle finding does not certify.
+  regression fixtures, not an independent survey. Posture alone does not imply that a check has a
+  corpus-measured false-positive rate.
 - **A clean corpus replay is not a certification.** For `gate.canon`, the honest corpus almost
   never carries the triggering precondition at all, so zero fires there is inconclusive rather than
   evidence. The blocking claim rests on held-out adversarial RED fixtures instead.

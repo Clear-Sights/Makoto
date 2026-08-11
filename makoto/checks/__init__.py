@@ -1,7 +1,6 @@
 """makoto.checks — ONE flat detector-catalog package (SPEC-5 Task 2, owner-revised layout).
 
-Every standalone check (today's ~19 prechecks, ~11 stopchecks, the merging Assay checks, and the
-27 canon fingerprints, per Tasks 3-9) lands as ONE descriptively-named `.py` file directly in
+Every standalone check lands as ONE descriptively-named `.py` file directly in
 this directory — no category sub-folders. A family whose members are *exactly* parameterized
 instances of one algorithm may instead share a named data-driven module, with its first member as
 `CHECK` and further members in `EXTRA_CHECKS`; `agnosticRegex.py` is the concrete example. A

@@ -4,16 +4,58 @@ keep working unchanged this task (Task 3/4 migrate their real callers later).
 
 Every scenario here scans an ISOLATED tmp_path directory via `load_checks(package_dir=...)`
 rather than the real `makoto/checks/` package, so this file stays correct forever regardless of
-how many real detector modules Tasks 3-9 land into the real folder (today: zero besides
-`undeclaredFalsifiable.py`, landed by this same task's Part B; eventually ~60). The one
+how many real detector modules land into the real folder. The one
 exception is the dead-package regression guard, which is about import identity, not catalog
 contents.
 """
 import importlib
+from pathlib import Path
 
 import pytest
 
 from makoto.substrate._loader import Check, load_checks
+
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def test_m2_retired_checks_are_absent_from_the_real_catalog_and_filesystem():
+    """A removed semantic claim must leave with its module, support, and catalog id.
+
+    Denominators are asserted first: a missing package/docs root or empty live loader is a failed
+    audit, never a vacuous absence pass.
+    """
+    checks_dir = REPO / "makoto" / "checks"
+    substrate_dir = REPO / "makoto" / "substrate"
+    docs_dir = REPO / "docs"
+    assert checks_dir.is_dir() and substrate_dir.is_dir() and docs_dir.is_dir()
+    present_check_files = {p.name for p in checks_dir.glob("*.py")}
+    live_ids = {c.id for c in load_checks()}
+    assert present_check_files and live_ids
+
+    retired_files = {
+        "illusoryAuthorshipTrailer.py",
+        "canonFingerprints.py",
+        "canonFingerprintsAdvisory.py",
+        "undeclaredFalsifiable.py",
+    }
+    retired_ids = {
+        "content.illusory_authorship_trailer",
+        "gate.canon_fingerprints",
+        "gate.canon_fingerprints_advisory",
+        "gate.undeclared_falsifiable",
+    }
+    violations = {
+        "check_files": sorted(retired_files & present_check_files),
+        "check_ids": sorted(retired_ids & live_ids),
+        "support_files": sorted(
+            p.name for p in [substrate_dir / "_canonAtoms.py"] if p.exists()
+        ),
+        "docs": sorted(
+            p.name for p in [docs_dir / "CANON-17-VALIDATION.md"] if p.exists()
+        ),
+    }
+    assert violations == {"check_files": [], "check_ids": [], "support_files": [], "docs": []}
 
 
 def _write(tmp_path, name, id_, applies_at, posture="advise"):

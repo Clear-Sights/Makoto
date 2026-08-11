@@ -1,5 +1,5 @@
 """content.illusory_interruption_claim predicate — a fabricated "interrupted by user" excuse
-(誠: material-not-illusory; same genre as content.illusory_authorship_trailer).
+(誠: material-not-illusory).
 
 Fires PreToolUse when a tool call would INTRODUCE a claim that the USER interrupted this
 session — either in a git commit (Bash `command`) or in written file content (Write / Edit /

@@ -40,13 +40,7 @@ def _live_gates() -> list:
 # pin: tests/test_dispatch.py::test_dispatch_self_wired_gate_never_blocks_even_when_it_fires).
 # Adding a gate id here must cite its own DESIGN DECISION the same way.
 #
-# gate.canon_fingerprints_advisory (SPEC-5 Task 9, DESIGN DECISION 26) is the second: 13 of the 17
-# ported canon session fingerprints rest on a soft/claim atom the gold-oracle finding doc's robust
-# core does not name, or are among that doc's explicitly-named WORST DISQUALIFIED fingerprints —
-# SPEC-5's own total-retention rule keeps them in the catalog, evaluated and recorded, but never
-# blocking. Its sibling gate.canon_fingerprints (the 4 robust-core, blocking-capable fingerprints)
-# is intentionally NOT here — it always emits level="error" (see canonFingerprints.py).
-_ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
+_ADVISORY_ALLOWLIST = frozenset({"gate.self_wired",
                                   "gate.relative_path_citation", "gate.plan_item_drift"})  # FD6, FD26, 2026-07-09
 
 
@@ -127,26 +121,6 @@ def _scenario_canon(tmp_path):
     return _ctx(history=[row])
 
 
-def _scenario_canon_fingerprints(tmp_path):
-    # fires nosrc_destruct (BLOCK, robust-core): a destructive Bash command, no test-run-red, no
-    # source edit at all -> NOT_edit_test_after_red ∧ NOT_source_edited ∧ destructive_command.
-    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
-                        "tool_input": {"command": "rm -rf /tmp/scratch"},
-                        "tool_response": {"stdout": "", "stderr": "", "exitCode": 0}}}
-    return _ctx(history=[row])
-
-
-def _scenario_canon_fingerprints_advisory(tmp_path):
-    # fires nogreen_weakened (ADVISE, soft atom): an Edit on a test file that degenerates a real
-    # assertion into a tautology, with no green test run recorded.
-    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Edit",
-                        "tool_input": {"file_path": "tests/test_x.py",
-                                       "old_string": "assert x == 5",
-                                       "new_string": "assert True"},
-                        "tool_response": {}}}
-    return _ctx(history=[row])
-
-
 def _scenario_contract_order(tmp_path):
     # fires: makoto.checks.contractOrder's Stop remainder guard -- a declared node still open.
     from makoto.substrate._planNode import Plan
@@ -205,8 +179,6 @@ _SCENARIOS = {
     "gate.liveness": _scenario_liveness,
     "gate.hollow_test": _scenario_hollow_test,
     "gate.canon": _scenario_canon,
-    "gate.canon_fingerprints": _scenario_canon_fingerprints,
-    "gate.canon_fingerprints_advisory": _scenario_canon_fingerprints_advisory,
     "gate.self_wired": _scenario_self_wired,
     "gate.contract_order": _scenario_contract_order,
     "gate.relative_path_citation": _scenario_relative_path_citation,

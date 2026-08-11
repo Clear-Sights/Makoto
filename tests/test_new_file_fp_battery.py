@@ -69,7 +69,7 @@ def test_real_violation_fires_when_written_as_new_file():
 def test_legit_new_repro_file_is_silent_across_all_patterns():
     """(B) The legit new-test/new-repro class (assert False / assert 0 / xfail / null-object
     return True) matches NONE of the 9 AST-introduced patterns. This is the heredoc-new-repro-file
-    FP class the cut content.illusory_authorship_trailer prototype tripped on — proven absent from the shipped signal."""
+    FP class a retired authorship-attribution prototype tripped on — proven absent from the shipped signal."""
     fires = []
     for path, content in _LEGIT_NEW_FILES:
         for pred, pid, _p, _c in _VIOLATIONS:

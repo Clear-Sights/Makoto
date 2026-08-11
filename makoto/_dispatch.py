@@ -331,7 +331,7 @@ def _blocking_gate_ids() -> frozenset:
     used to export a `GATE` -- every one of them reaches this pipeline regardless of its own
     `.level`/posture (the actual BLOCK-vs-ADVISE split happens inside `_emit_decision`/
     `_worst_finding`, keyed on each Finding's own `.level`, unchanged by this migration).
-    `staleEstablisher`/`undeclaredFalsifiable` stay `may_block=False` ON PURPOSE: their
+    `staleEstablisher`/`catalogCompleteness` stay `may_block=False` ON PURPOSE: their
     pattern_id must never enter this set at all, a STRUCTURAL exclusion independent of whatever
     `.level` their own `run()` might ever compute -- the former GATE-export-presence mechanism
     provided the exact same guarantee; this preserves it under the unified loader rather than
@@ -524,7 +524,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
         # edge (2026-07-10: unified via checks._loader.load_checks, retiring the former
         # load_stopchecks()-only loop -- this ALSO now naturally includes staleEstablisher and
-        # undeclaredFalsifiable, formerly special-cased direct-call/never-invoked carve-outs below
+        # catalogCompleteness, formerly special-cased direct-call/never-invoked carve-outs below
         # this comment, since neither exported a GATE and load_stopchecks() never discovered them;
         # `may_block=False` on both keeps their pattern_id structurally out of
         # `_blocking_gate_ids()` regardless of this unification, exactly as before). Each gate
@@ -548,7 +548,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None
             agent_type=payload.get("agent_type"),
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
-            state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
+            state_root=root,   # gate.canon's release.operator discharge
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
             claim_graph=(stop_graph.graph if stop_graph is not None else None),
             current_claim_ids=(stop_graph.current_claim_ids if stop_graph is not None else ()),
@@ -586,7 +586,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None
 # against the ledger, where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
     "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_body_hollowed",
-    "content.illusory_authorship_trailer", "content.illusory_interruption_claim"})
+    "content.illusory_interruption_claim"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
                "(any comment style) — an on-the-record, auditable rationale, never a disguise.")

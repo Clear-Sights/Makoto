@@ -126,8 +126,8 @@ def scan_target_content(tool_input: dict) -> str:
 def introduced_text(tool_name: str, tool_input: dict) -> str:
     """The text a PreToolUse call would introduce, across every tool that can carry it: a
     Bash `command` verbatim, or the Write/Edit/MultiEdit new content (`scan_target_content`).
-    Shared by every "would this call INTRODUCE a flagged string" predicate (content.illusory_authorship_trailer,
-    content.illusory_interruption_claim, ...) — factored out (2026-07-19) after
+    Shared by every "would this call INTRODUCE a flagged string" predicate (currently
+    content.illusory_interruption_claim) — factored out (2026-07-19) after
     test_no_alpha_duplicate_functions caught two checks carrying a byte-identical local copy."""
     if not isinstance(tool_input, dict):
         return ""

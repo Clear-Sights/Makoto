@@ -10,7 +10,7 @@ package PLUMBING, not a detector -- it exports no ``CHECK``/``GATE`` and answers
 directly. Every other non-detector file in this package (``_shared.py``, ``_primitives.py``,
 ``_loader.py``, ``_declared.py``) is underscore-prefixed so ``checks._loader``'s scan skips it;
 a bare ``planNode.py`` would instead be treated as an ORPHAN detector module (no CHECK export)
-by ``checks.undeclaredFalsifiable``'s completeness audit, a false completeness-drift signal
+by ``checks.catalogCompleteness``'s completeness audit, a false completeness-drift signal
 for a file that was never meant to be a detector. Consumers: ``makoto/plan.py`` (the sqlite
 persistence layer) and ``makoto/checks/{contractOrder,staleEstablisher}.py`` (the two checks
 built over this grammar).
