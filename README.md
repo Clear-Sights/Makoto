@@ -53,7 +53,7 @@ event, while bytes that did not parse is a transient cut mid-write.
 
 ```console
 $ python3 -m pytest -q
-1540 passed, 5 skipped, 1 xfailed in 38.60s
+1541 passed, 5 skipped, 1 xfailed in 33.99s
 ```
 
 The repository drives three real scenarios end-to-end through the actual dispatchers against a

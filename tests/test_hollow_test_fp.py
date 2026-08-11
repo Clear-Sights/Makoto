@@ -241,11 +241,21 @@ def _corpus_py_files(repo_relative_root: str) -> list:
         # unstaged working tree. The corpus is the files analyzable on disk, not stale index
         # entries; filtering preserves the committed-tree result and lets a deletion be tested
         # before it is staged.
-        return [str(path) for f in listed.stdout.split() if f.endswith(".py")
-                if (path := root / f).is_file()]
-    # The publish verifier intentionally receives an rsync tree with no .git directory.  It is
-    # still a corpus, so measure its files instead of silently measuring an empty git index.
-    return [str(f) for f in sorted(root.rglob("*.py")) if f.is_file()]
+        files = [str(path) for f in listed.stdout.split() if f.endswith(".py")
+                 if (path := root / f).is_file()]
+    else:
+        # The publish verifier intentionally receives an rsync tree with no .git directory.  It is
+        # still a corpus, so measure its files instead of silently measuring an empty git index.
+        files = [str(f) for f in sorted(root.rglob("*.py")) if f.is_file()]
+    assert files, f"{repo_relative_root} corpus is empty at {root} — nothing was measured"
+    return files
+
+
+def test_corpus_file_lister_refuses_an_empty_corpus(tmp_path, monkeypatch):
+    (tmp_path / "assay").mkdir()
+    monkeypatch.setitem(globals(), "MONOREPO_ROOT", tmp_path)
+    with pytest.raises(AssertionError, match=r"assay corpus is empty .* nothing was measured"):
+        _corpus_py_files("assay")
 
 
 def _annotated_hollow_test_functions(files: list[str]) -> set[str]:
