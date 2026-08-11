@@ -1,4 +1,4 @@
-"""Fresh-eye regressions from MAKAUDIT.
+"""Regression coverage for previously fixed dispatch defects.
 
 Every defect has a precision control beside its recall/failure reproducer.  A fix that merely
 turns a check off therefore cannot make this file green.

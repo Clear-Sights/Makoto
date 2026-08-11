@@ -85,15 +85,8 @@ All notable changes to makoto. Versions follow the live check inventory
   tested implementation code that never ran in the shipped plugin because
   `hooks/hooks.json` never wired either event -- graduated from dead code to wired,
   verified by a live-fire subprocess smoke test.
-- **The README's "Live demo" section is now backed by real artifacts.** Its three
-  embedded SVG screenshots and the `docs/demo/render_demo.py` / `render_svg.py` scripts
-  it names were absent from the tree -- the landing page showed broken images. The demo
-  is rebuilt for real: three scenarios driven through the actual dispatchers (a
-  PreToolUse block, the full word->deed->record->receipt chain including the test-delta
-  redirect, a ConfigChange advisory), genuine logged output under `docs/demo/logs/`,
-  SVGs rendered from those logs, and the receipt scenario reproducing the README's
-  promised numbers exactly. A new smoke test (`test_readme_references_exist`) fails CI
-  on any README reference to a missing file.
+- **The README's live block transcript is backed by a real artifact.** The smoke test
+  (`test_readme_references_exist`) fails CI on any README reference to a missing file.
 - **README**: the revoked legacy `makoto ack-block` phrase is no longer documented
   (`release.operator` is the only discharge, per the epoch reset below), and the
   citations-seed path reflects the package layout (`makoto/docs/CITATIONS.md`).
@@ -233,10 +226,6 @@ All notable changes to makoto. Versions follow the live check inventory
   Bash retry with no intervening state change is redirected before the redundant call even runs,
   gated on `checks/_failureClassifier.py`'s deterministic-vs-transient discrimination (never
   fires on a legitimate timeout/5xx/429 re-poll).
-- **A runnable demo** (`docs/demo/render_demo.py` + `render_svg.py`): 3 real scenarios driven
-  through the actual dispatchers (a genuine block, the full receipt story, a ConfigChange
-  advisory fire), rendered to committed SVG "screenshots" via a small stdlib-only text-to-SVG
-  renderer (no terminal-recorder dependency).
 
 ### Fixed
 - `event.forbidden_location` now carves out the harness's own plan directory

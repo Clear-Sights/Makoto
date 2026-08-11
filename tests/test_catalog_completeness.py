@@ -1,7 +1,7 @@
 """Tests for the structural ``gate.catalog_completeness`` check.
 
 The check owns loader/manifest structure only. It does not claim that registered predicates are
-behaviorally falsifiable; that semantic audit is recorded separately in docs/FALSIFIERS.md.
+behaviorally falsifiable.
 """
 from makoto.checks.catalogCompleteness import (
     CHECK,
