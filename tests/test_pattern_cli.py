@@ -44,3 +44,37 @@ def test_pattern_show_unknown_id_returns_2_with_helpful_stderr(capsys):
     assert "9.99" in err
     assert "available" in err.lower()
     assert "content.verifier_predicate_weakened" in err  # at least one real id is suggested
+
+
+def test_status_reports_the_same_catalog_the_pattern_command_lists():
+    """`makoto status` counted only the Pre edge: 15 of 35.
+
+    A delete-and-rerun pass reported commands/status.md as UNNOTICED -- the slash command a user
+    actually runs, checked by nothing. Driving it found the number wrong:
+
+        $ python3 -m makoto status      -> "patterns_count": 15
+        $ python3 -m makoto pattern list -> 36 registered surfaces (35 distinct ids)
+
+    `pattern list` was corrected earlier to source its catalog from load_checks(); status was left
+    on load_prechecks(), which is the Pre edge alone. Two commands in one CLI answering the same
+    question with different numbers, and the user-facing one under-reporting by 20.
+
+    This asserts EQUALITY WITH THE LOADER rather than any literal, so the two cannot drift apart
+    again -- the same reason the list test asserts equality instead of a count.
+    """
+    import json as _json
+    import subprocess as _subprocess
+    import sys as _sys
+    from makoto.substrate._loader import load_checks
+
+    finished = _subprocess.run([_sys.executable, "-m", "makoto", "status"],
+                               capture_output=True, text=True)
+    assert finished.returncode == 0, finished.stdout + finished.stderr
+    reported = _json.loads(finished.stdout)
+
+    expected = len({check.id for check in load_checks()})
+    assert reported["patterns_count"] == expected, (
+        f"status says {reported['patterns_count']} patterns; the loader registers {expected} "
+        f"distinct ids. A user reading status must not see a smaller catalog than the tool has."
+    )
+    assert expected > 0, "the loader registered nothing -- an empty catalog is not a count"
