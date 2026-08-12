@@ -12,7 +12,7 @@ a promise doesn't expire because an hour passed. commitment_key = sha1(session +
 normalized location + span) so re-stating the same promise doesn't duplicate.
 
 Stdlib only; no LLM, no HTTP.
-Spec: docs/archive/specs/2026-05-31-makoto-bidirectional-falsifiability-design.md §5 (gates), §8 (stores).
+The current sourcing and persistence contracts are exercised by the commitment tests.
 """
 from __future__ import annotations
 import hashlib
@@ -244,5 +244,4 @@ def set_status(conn, key: str, status: str, *, retract_param: Optional[str] = No
         "UPDATE commitments SET status = ?, retract_param = ? WHERE commitment_key = ?",
         [status, retract_param, key])
     conn.commit()
-
 

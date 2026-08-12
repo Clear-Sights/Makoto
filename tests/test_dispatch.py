@@ -85,9 +85,8 @@ def test_dispatch_loose_comparator_emits_block_json(tmp_path):
     assert "content.verifier_predicate_weakened" in reason or "loose" in reason.lower() or "startswith" in reason
 
 
-def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
-    """HYBRID: unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON)
-    -> loud-ALLOW (exit 0, empty stdout) AND an on-the-record fact. Never a silent fail-open."""
+def test_dispatch_unparseable_stdin_refuses_with_fact(tmp_path):
+    """An unparseable envelope is not evaluable: exit 2 plus an auditable fact."""
     state_dir = _setup_state(tmp_path)
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
@@ -98,7 +97,7 @@ def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
         env=env,
         cwd=str(Path(__file__).parent.parent),
     )
-    assert proc.returncode == 0
+    assert proc.returncode == 2
     assert proc.stdout == b""
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.unparseable_payload" for f in facts), facts
@@ -1974,27 +1973,18 @@ def _run_raw(state_dir, raw: bytes) -> tuple[int, str, str]:
     return proc.returncode, proc.stdout.decode("utf-8"), proc.stderr.decode("utf-8")
 
 
-def test_an_empty_payload_and_an_unparseable_one_get_different_reasons(tmp_path):
-    """Same disposition, different reason -- because the operator has to act on the difference.
-
-    Found by driving the dispatcher as Claude Code drives it. Both cases loud-allow, which is the
-    deliberate fail-mode (a truncated pipe must never block agent work) and is NOT changed. But
-    both recorded "stdin was not valid JSON", including when no bytes arrived at all -- telling
-    the reader the payload was invalid when there had been no payload.
-
-    They need different fixes: no bytes is the hook invoked with nothing attached, a wiring fault
-    that recurs on every event; unparseable bytes is a pipe cut mid-write, which is transient.
-    """
+def test_an_empty_payload_and_an_unparseable_one_refuse_with_different_reasons(tmp_path):
+    """Both are refused, but the diagnostic distinguishes missing bytes from bad bytes."""
     state = _setup_state(tmp_path)
 
     code, stdout, stderr = _run_raw(state, b"")
-    assert code == 0, stderr                      # allow: the fail-mode is unchanged
+    assert code == 2, stderr
     assert stdout == ""
     assert "stdin was empty" in stderr, stderr
     assert "no payload arrived at all" in stderr, stderr
 
     code, stdout, stderr = _run_raw(state, b"not json at all {{{")
-    assert code == 0, stderr
+    assert code == 2, stderr
     assert "stdin was not valid JSON" in stderr, stderr
     assert "stdin was empty" not in stderr, stderr
 
@@ -2008,6 +1998,16 @@ def test_an_empty_payload_and_an_unparseable_one_get_different_reasons(tmp_path)
     messages = " | ".join(fact.get("exc_message", "") for fact in facts)
     assert "stdin was empty" in messages, facts
     assert "stdin was not valid JSON" in messages, facts
+
+
+def test_an_empty_json_object_refuses_with_fact(tmp_path):
+    state = _setup_state(tmp_path)
+    code, stdout, stderr = _run_raw(state, b"{}")
+    assert code == 2, stderr
+    assert stdout == ""
+    assert "empty_payload" in stderr
+    facts = _dispatch_facts(state)
+    assert any(f.get("pattern_id") == "dispatch.empty_payload" for f in facts), facts
 
 
 def test_a_valid_non_object_payload_still_fails_closed(tmp_path):

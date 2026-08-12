@@ -6,6 +6,15 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [Unreleased]
 
 ### Fixed
+- **Unevaluable hook input no longer returns a green exit code.** Missing, empty, malformed,
+  non-object, and unknown-event envelopes now return exit 2 with an explicit diagnostic through
+  both Python adapters and both shell shims. A complete envelope may still retain its documented
+  verdict behavior; the change is limited to claims Makoto cannot evaluate.
+- **Local source citations are now resolved, not syntax-checked.** CI runs
+  `python -m makoto.reference_integrity --root .` over local Markdown links plus JSON/TOML
+  manifest paths. Its negative test plants a missing relative source path in a throwaway copy and proves
+  the gate fails. The stale Spirit and self-wiring notes were replaced with current
+  links rather than references to deleted trees or sibling projects.
 - **A built wheel/sdist now ships the whole runtime, not just `makoto/*.py`.** `pyproject.toml`
   declared `packages = ["makoto"]`, so every subpackage the dispatcher imports at fire time
   (`makoto.core`, `.checks`, `.record`, `.session`, `.substrate`, `.verdict`) was dropped from the

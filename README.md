@@ -23,8 +23,8 @@ result is makoto's and stays dishonest however safe the write is.
 ```mermaid
 flowchart TD
     E["hook event<br/>PreToolUse · PostToolUse · Stop"] --> P["parse stdin"]
-    P -->|"empty or unparseable"| LA["loud-allow + audit fact<br/>a pipe glitch must not block work"]
-    P -->|"valid JSON, not an object"| FC["fail CLOSED<br/>exit 2 — tamper-shaped"]
+    P -->|"missing, empty, or malformed"| FC["NOT_EVALUABLE<br/>exit 2 + audit fact"]
+    P -->|"valid JSON, not an object"| FC
     P -->|"an object"| I["ingest into the session record"]
     I --> PRE["PreToolUse → 14 pre-checks"]
     I --> POST["PostToolUse → consumed as history"]
@@ -38,23 +38,25 @@ flowchart TD
     style DENY fill:#fee,stroke:#c00
 ```
 
-**A block is a JSON decision, not an exit code.** The dispatcher returns 0 on every normal path and
-communicates the block in its stdout envelope — `permissionDecision: "deny"` for PreToolUse,
-`decision: "block"` for Stop. Process exit 2 is reserved for exactly one case: a payload that is
-valid JSON but not an object, which a truncated pipe cannot produce and which is therefore treated
-as tamper-shaped and failed closed.
-
-The two left-hand branches are the fail-open half, and they are deliberate. Empty stdin and
-unparseable stdin both allow, because a truncated pipe must never block the agent's work — but they
-record *different* reasons, because no bytes at all is a wiring fault that will recur on every
-event, while bytes that did not parse is a transient cut mid-write.
+**A decision is a JSON decision, not an exit code.** Complete hook envelopes return 0 and carry a
+block in stdout — `permissionDecision: "deny"` for PreToolUse and `decision: "block"` for Stop.
+Process exit 2 means **NOT_EVALUABLE**: stdin was missing or malformed, the payload was empty or
+not a JSON object, or the event name was unknown. A missing envelope is not evidence of an allow,
+so it must not become a green result.
 
 ## Run it
 
 ```console
 $ python3 -m pytest -q
 1541 passed, 5 skipped, 1 xfailed in 33.99s
+
+$ python3 -m makoto.reference_integrity --root .
+reference-integrity: PASS (all local references resolve)
 ```
+
+The reference-integrity gate resolves local Markdown source links plus JSON and TOML manifest
+paths; it does not merely validate their syntax. CI runs it separately from pytest, and its own
+test plants a missing citation in a throwaway copy to prove the gate goes red.
 
 The repository drives three real scenarios end-to-end through the actual dispatchers against a
 fresh throwaway state dir, and captures the genuine stdout. Here is a real block, from
@@ -198,8 +200,9 @@ Every dispatch appends one JSON line to `$MAKOTO_STATE_DIR/audit.jsonl` (default
 `{pattern_id, level, file, line, snippet}`. Enough to triage true- from false-positives without
 copying whole files.
 
-Audit writes are best-effort. If the append fails, dispatch prints one stderr line and continues
-with its original decision — the audit subsystem cannot cause makoto to mis-block or mis-allow.
+Audit writes are best-effort. If the append fails after a complete envelope was evaluated, dispatch
+prints one stderr line and continues with its original decision — the audit subsystem cannot cause
+makoto to invent a block or an allow.
 
 ## Layout
 
