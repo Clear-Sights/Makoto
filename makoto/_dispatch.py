@@ -95,9 +95,7 @@ _PARSE_FAILED = object()  # sentinel: stdin was not valid JSON at all (distinct 
 
 
 def _parse_payload(raw: str) -> object:
-    """Parse stdin JSON. Return the parsed value, or the _PARSE_FAILED sentinel if `raw` was not
-    valid JSON — distinct from a valid JSON `null` (which returns None). main()'s HYBRID fail-mode
-    treats an unparseable pipe (loud-allow) and a non-object payload (block) differently."""
+    """Parse stdin JSON, returning the distinct sentinel on invalid JSON."""
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -854,10 +852,11 @@ HANDLERS: dict[str, Any] = {
 
 
 def main() -> int:
-    """orchestrator — HYBRID fail-mode (never silent, never blind-open): a tamper-shaped payload
-    fails CLOSED (block, exit 2 + reason); transient infra (unparseable pipe, DB init/lock failure,
-    unexpected body fault) fails LOUD-ALLOW (exit 0 + stderr); every can't-evaluate writes an
-    on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md.
+    """Orchestrate a complete hook envelope.
+
+    An absent, malformed, empty, non-object, or unknown-event envelope is not evaluable and fails
+    closed with exit 2.  Infrastructure failures after a valid envelope remain loud-allow so a
+    transient database problem cannot silently turn into a denial.
     Routing is HANDLERS, the row table above — main() knows the common prologue (parse, verify,
     ingest) and nothing about any event."""
     payload_raw = sys.stdin.read()
@@ -865,25 +864,24 @@ def main() -> int:
     _self_verify_chain(state_dir)
     payload = _parse_payload(payload_raw)
     if payload is _PARSE_FAILED:
-        # unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON) ->
-        # loud-allow; never block agent work on a pipe glitch.
-        #
-        # EMPTY AND UNPARSEABLE SHARE THE DISPOSITION AND DIFFER IN THE REASON. Both are truncation
-        # in the limit, so both still allow: the fail-mode above is deliberate and is not changed
-        # here. But the operator reading this fact has to act on it, and the two mean different
-        # things. No bytes at all is the hook being invoked with nothing attached -- a wiring fault
-        # that will recur on every event. Bytes that did not parse is a pipe cut mid-write, which
-        # is transient. One reason for both told the reader the payload "was not valid JSON" when
-        # there had been no payload to be valid or otherwise.
         reason = ("stdin was empty -- no payload arrived at all"
                   if not payload_raw.strip() else "stdin was not valid JSON")
-        _dispatch_fact(state_dir, "unparseable_payload", reason, blocked=False)
-        return 0
+        _dispatch_fact(state_dir, "unparseable_payload", reason, blocked=True)
+        return 2
     if not isinstance(payload, dict):
         # valid JSON but not an object: a truncated pipe yields INVALID json, never valid-non-dict,
         # and Claude Code's envelope is always an object -> anomalous/tamper-shaped -> fail CLOSED.
         _dispatch_fact(state_dir, "non_object_payload",
                        f"payload was {type(payload).__name__}, not a JSON object", blocked=True)
+        return 2
+    if not payload:
+        _dispatch_fact(state_dir, "empty_payload", "payload was an empty JSON object", blocked=True)
+        return 2
+    event = payload.get("hook_event_name")
+    if event not in HANDLERS:
+        _dispatch_fact(state_dir, "unknown_event",
+                       f"hook_event_name was {event!r}; expected one of {', '.join(HANDLERS)}",
+                       blocked=True)
         return 2
     db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):

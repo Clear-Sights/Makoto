@@ -25,6 +25,13 @@ from pathlib import Path
 from makoto.substrate._loader import load_checks
 
 
+def _nonempty_argument(value: str) -> str:
+    """Argparse type for a supplied value that must not be blank."""
+    if not value.strip():
+        raise argparse.ArgumentTypeError("must not be empty")
+    return value
+
+
 def _cmd_pattern_list() -> int:
     """Print every check surface registered by the live loader as a tab-aligned table."""
     patterns = load_checks()
@@ -123,15 +130,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("install")
     sub.add_parser("uninstall")
     sp_show = sub.add_parser("show", help="read the results ledger by key")
-    sp_show.add_argument("key", help="normalized location key, e.g. src/auth.py")
+    sp_show.add_argument("key", type=_nonempty_argument,
+                         help="normalized location key, e.g. src/auth.py")
     sp_receipt = sub.add_parser("receipt", help="print the current chain receipt (JSON)")
-    sp_receipt.add_argument("--session", dest="session_id", default=None,
+    sp_receipt.add_argument("--session", dest="session_id", default=None, type=_nonempty_argument,
                             help="scope the receipt to one session_id (default: whole chain)")
     pat = sub.add_parser("pattern", help="inspect the catalog")
     pat_sub = pat.add_subparsers(dest="pat_action", required=True)
     pat_sub.add_parser("list", help="show all patterns as a table")
     pat_show = pat_sub.add_parser("show", help="show full detail for one pattern")
-    pat_show.add_argument("id", help="pattern id, e.g. content.verifier_predicate_weakened")
+    pat_show.add_argument("id", type=_nonempty_argument,
+                          help="pattern id, e.g. content.verifier_predicate_weakened")
     return p
 
 

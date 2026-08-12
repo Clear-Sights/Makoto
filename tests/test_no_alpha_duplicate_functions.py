@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+from copy import copy
 from collections import defaultdict
 from pathlib import Path
 
@@ -46,7 +47,10 @@ def _canonicalize(node: ast.AST, names: dict) -> ast.AST:
     if isinstance(node, ast.arg):
         names.setdefault(node.arg, f"_v{len(names)}")
         return ast.arg(arg=names[node.arg], annotation=None)
-    new = type(node)()
+    # Preserve constructor-only fields introduced by newer Python AST node classes.  Constructing
+    # a blank node and filling only iter_fields worked through 3.12 but emits one deprecation
+    # warning per node on 3.13 (and becomes an error in 3.15).
+    new = copy(node)
     for field, value in ast.iter_fields(node):
         if isinstance(value, list):
             setattr(new, field, [_canonicalize(v, names) if isinstance(v, ast.AST) else v for v in value])

@@ -22,7 +22,7 @@ Tables (all idempotent via IF NOT EXISTS):
   commitments         — open located commitments the advance gate reads (un-windowed)
   plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
 
-Spec: docs/archive/specs/2026-05-31-makoto-bidirectional-falsifiability-design.md §8 (stores).
+The schema contract is exercised by tests/test_db.py.
 """
 from __future__ import annotations
 import sqlite3

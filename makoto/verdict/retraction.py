@@ -9,7 +9,7 @@ advance gate must still catch, never silently honor. Firewall: NORMALIZED-EQUALI
 only (retracting cache.py never clears auth.py); fail-safe to the empty set on any internal
 error (never mass-clear, never crash the hook). Stdlib only; no LLM, no HTTP.
 
-Spec: docs/archive/specs/2026-05-31-makoto-bidirectional-falsifiability-design.md §4 (retraction).
+The current behavioral contract is exercised by tests/test_retraction.py.
 """
 from __future__ import annotations
 import re
