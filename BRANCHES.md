@@ -9,7 +9,7 @@ branch inventory.
 | Branch | Tip | Class | Action |
 |---|---|---|---|
 | `main` | `22da88f` | FULLY-MERGED | Retain: default branch |
-| `claude/cleanup-makoto` | `22da88f` | FULLY-MERGED | Delete after backup verification |
+| `claude/cleanup-makoto` | `22da88f` | FULLY-MERGED | Retain: deletion denied by remote (HTTP 403) |
 | `claude/finish` | `1af9e5d` | UNMERGED-VALUABLE | Retain for human review |
 | `claude/handoff` | `b65e1c9` | UNMERGED-VALUABLE | Retain for human review |
 | `backup-20260812/main` | `22da88f` | BACKUP | Never touch |
@@ -35,9 +35,12 @@ findings that are not recorded on `main`:
 
 - `b65e1c9b3105ffa4df99d32c526b8cc6440e4f1d` — docs: add cold-session handoff
 
-## Restore deleted branches
+## Recovery
 
-- `claude/cleanup-makoto`: `git fetch origin refs/heads/backup-20260812/claude/cleanup-makoto && git push origin FETCH_HEAD:refs/heads/claude/cleanup-makoto`
+No deletion completed: the remote rejected deletion of
+`claude/cleanup-makoto` after its backup and ancestry were verified. If that
+permission is corrected and the branch is deleted, restore it with
+`git fetch origin refs/heads/backup-20260812/claude/cleanup-makoto && git push origin FETCH_HEAD:refs/heads/claude/cleanup-makoto`.
 
 ## Naming convention
 
