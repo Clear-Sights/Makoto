@@ -36,8 +36,7 @@ def test_plugin_json_has_required_fields():
 def test_hooks_json_declares_all_three_events():
     """hooks.json registers PreToolUse + PostToolUse + Stop pointing at _dispatch_shim.sh.
 
-    PostToolUse added 1.0.5 to enable history-walking predicates (content.unsourced_webfetch, 2.5)
-    and citation capture (capture.py).
+    PostToolUse enables history-walking predicates and records completed tool events.
     """
     p = REPO_ROOT / "hooks" / "hooks.json"
     assert p.is_file(), "missing hooks/hooks.json"
@@ -217,3 +216,26 @@ def test_the_marketplace_entry_names_this_plugin():
     plugin = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
     assert plugin["name"] in json.dumps(marketplace), (
         f"marketplace.json never names the plugin {plugin['name']!r}")
+
+
+def test_distribution_metadata_names_the_canonical_repository():
+    """Published links and owner-gated CI must follow the current public repository."""
+    canonical = "https://github.com/Clear-Sights/Makoto"
+    plugin = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())
+    marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text())
+    assert plugin["homepage"] == canonical
+    assert plugin["repository"] == canonical
+    assert marketplace["plugins"][0]["homepage"] == canonical
+    assert f'Homepage = "{canonical}"' in (REPO_ROOT / "pyproject.toml").read_text()
+    ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    assert "github.repository == 'Clear-Sights/Makoto'" in ci
+
+
+def test_release_input_has_no_stale_default_and_is_checked_against_both_manifests():
+    """Accepting a release form must not retag history or disagree with either manifest."""
+    workflow = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text()
+    assert "default:" not in workflow
+    assert "pyproject.toml" in workflow
+    assert ".claude-plugin/plugin.json" in workflow
+    assert '"$RELEASE_VERSION" != "$PACKAGE_VERSION"' in workflow
+    assert '"$RELEASE_VERSION" != "$PLUGIN_VERSION"' in workflow

@@ -21,7 +21,7 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/skill-labV2/makoto"
+Homepage = "https://github.com/Clear-Sights/Makoto"
 
 [tool.setuptools]
 include-package-data = true
