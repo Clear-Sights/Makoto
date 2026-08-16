@@ -5,6 +5,36 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-08-16
+
+### Added
+- **Meta-BLOCK immunity.** A check whose only possible trigger is tampering with makoto's own
+  audit/enforcement machinery (`Check.layer="meta"`) now has its BLOCK verdict wired into the
+  posture fold so it cannot be softened below a real block under a loose or silent permission
+  posture — closing a gap where a self-tampering finding could previously be downgraded the
+  same way an ordinary content finding can.
+
+### Fixed
+- **`content.illusory_authorship_trailer`/`content.illusory_interruption_claim`'s near-identical
+  scan logic** unified onto one shared `kit.introduced_regex_predicate` — a real duplication that
+  could previously drift apart silently between the two checks now shares one implementation.
+- Three github-issue-filed bugs, ported forward from a stranded pre-restructure branch:
+  `canon.recur` false-STUCK on a retry that had actually resolved after a later, unrelated call
+  intervened; camelCase host dialects failing closed (denied) instead of being canonicalized;
+  `makoto uninstall` reporting false success without verifying the hook entries it claimed to
+  remove. Also closes a case-sensitivity gap in hook-invocation-token matching that could let
+  `uninstall` delete a hook entry the user wired themselves, never one of makoto's own.
+- Stale `skill-labV2` author/homepage/repository URLs in `plugin.json` and `pyproject.toml`
+  updated to this project's current home (`Clear-Sights/Makoto`) — a prior changelog entry
+  claimed this was already done; it was not, for these two files specifically.
+
+### Internal (no user-facing behavior change)
+- Design-history prose relocated from `makoto/checks/*.py` docstrings to linked ADRs
+  (`docs/adr/`), recovering source density without losing any documented rationale.
+- `scripts/publish_public.sh` gained a pre-`--delete` divergence guard and closed a
+  same-doc-exclusion-list drift bug that could publish a dangling internal-doc link.
+- Six internal-only design/audit docs removed from the public release tree.
+
 ## [2.2.0] — 2026-07-26
 
 ### Fixed
