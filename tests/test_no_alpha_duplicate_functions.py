@@ -11,7 +11,7 @@ the rest; the scan set is now the package, minus tests/ (test files legitimately
 
 Exemption list is EXPLICIT and justified, never a blanket suppression: an entry here means the
 duplication was checked and found necessary, not merely convenient. See
-docs/CANON-17-VALIDATION.md's neighbor for the reasoning template this follows.
+its neighbor test_canon_17_no_subsumption.py for the reasoning template this follows.
 """
 from __future__ import annotations
 

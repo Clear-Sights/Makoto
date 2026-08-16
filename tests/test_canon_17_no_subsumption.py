@@ -4,7 +4,7 @@ duplicates, zero subsumption pairs (no formula's literal-set is a superset of an
 
 A subsumption pair would mean one formula's firing condition is redundant given another's --
 this test exists so that fact stays checked on every future edit to THE_CANON_17, not re-derived
-by hand. See docs/CANON-17-VALIDATION.md for the full narrative.
+by hand.
 """
 from __future__ import annotations
 

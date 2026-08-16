@@ -1727,7 +1727,7 @@ def test_no_shadow_gate_every_gate_blocks():
     assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass",
                           "gate.liveness",     # liveness folded in from the collapsed close-check tier
-                          "gate.hollow_test",  # HOLLOWED-class detector (SPIRIT.md §4), same split as liveness
+                          "gate.hollow_test",  # HOLLOWED-class detector, same split as liveness
                           "gate.canon",        # ported agnostic Stop primitives canon.timeout/canon.recur
                           "gate.canon_fingerprints",            # SPEC-5 Task 9: BLOCK-tier canon fingerprints
                           "gate.canon_fingerprints_advisory",    # SPEC-5 Task 9: ADVISE-tier sibling

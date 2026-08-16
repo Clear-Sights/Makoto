@@ -1,4 +1,4 @@
-"""gate.hollow_test's pure AST analyzer: a HOLLOWED-class detector (SPIRIT.md §4) — a test that
+"""gate.hollow_test's pure AST analyzer: a HOLLOWED-class detector — a test that
 survives in name while its content is gutted. Four independently-firing sub-patterns, each
 zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.py):
 
@@ -26,7 +26,7 @@ zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.
                            same `_is_tautology` predicate already proven zero-FP for sub-pattern 2. A
                            bare, argument-less `@pytest.mark.skip(...)` / `@unittest.skip(...)` (no
                            condition at all) is explicitly NOT this pattern — that is an honest,
-                           transparently-labeled skip (SPIRIT.md §4 INCOMPLETE), not a disguised one.
+                           transparently-labeled skip (INCOMPLETE), not a disguised one.
 
 SPEC-5 Task 4 (owner-revised layout): the analyzer engine (formerly `stopchecks/hollow_test.py`)
 and its Stop-hook adapter (formerly `stopchecks/stopcheck_hollow_test.py`) are combined into ONE

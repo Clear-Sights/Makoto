@@ -20,7 +20,7 @@ REPO = Path(__file__).resolve().parent.parent
 # Living docs = those that make CURRENT claims about makoto's behavior or usage. Adding one is a
 # deliberate, reviewed act. Provenance/forward-looking trees (docs/archive, docs/certs,
 # docs/research) make no current claim and are NOT checked.
-LIVING_DOCS = ["README.md", "docs/SPIRIT.md", "makoto/docs/MAKOTO-CONVENTIONS.md", "makoto/docs/CITATIONS.md"]
+LIVING_DOCS = ["README.md", "makoto/docs/MAKOTO-CONVENTIONS.md", "makoto/docs/CITATIONS.md"]
 
 # A term that must not be presented as makoto's CURRENT substrate (it migrated to SQLite).
 SUBSTRATE_DENYLIST = ["duckdb"]
@@ -116,7 +116,7 @@ def test_assertions_have_teeth():
     assert _cli_invocation_valid(["pattern", "list"], top, sub)
     # 2) links
     assert not (REPO / "docs" / "does-not-exist-xyz.md").exists()
-    assert (REPO / "docs" / "SPIRIT.md").exists()
+    assert (REPO / "README.md").exists()
     # 3) substrate
     bad = "We use DuckDB as the substrate."
     assert any(t in bad.lower() for t in SUBSTRATE_DENYLIST) and not _ALLOW_RX.search(bad)
