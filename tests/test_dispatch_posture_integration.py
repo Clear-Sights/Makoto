@@ -93,3 +93,49 @@ def test_posttooluse_still_refreshes_and_records_without_capture(tmp_path):
         assert ledger_rows > 0, "record_update must still run on PostToolUse"
     finally:
         conn.close()
+
+
+def test_meta_block_finding_floors_at_ask_under_loose_and_silent(tmp_path):
+    """content.self_mute_guard (layer="meta") fires BLOCK on a self-mute attempt. Under LOOSE or
+    SILENT posture, an object-layer BLOCK would soften to ADVISE or vanish to ALLOW -- but a meta
+    finding must floor at ASK instead: a loose posture setting must not suppress detection of
+    tampering with the mechanism that enforces posture itself."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "posture_meta",
+        "cwd": str(tmp_path),
+        "tool_name": "Write",
+        "tool_input": {
+            "file_path": ".claude/settings.json",
+            "content": '{"MAKOTO_DISABLE": "1"}',
+        },
+    }
+    for mode in ("loose", "silent"):
+        rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_MODE": mode})
+        assert rc == 0
+        assert out, f"expected a rendered body under MAKOTO_MODE={mode}, got empty stdout"
+        body = json.loads(out)
+        assert body["hookSpecificOutput"]["permissionDecision"] == "ask", (
+            f"meta BLOCK must floor at ask under MAKOTO_MODE={mode}, got {body!r}"
+        )
+
+
+def test_object_layer_block_still_softens_under_loose(tmp_path):
+    """Control: an object-layer (non-meta) BLOCK still softens normally under LOOSE -- the meta
+    floor must not leak into ordinary checks' folding."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "posture_object",
+        "cwd": "/tmp",
+        "tool_input": {
+            "file_path": "constitution/integrity/checks/v.py",
+            "content": 'def check(x):\n    return x.startswith("ok")\n',
+        },
+    }
+    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_MODE": "loose"})
+    assert rc == 0
+    body = json.loads(out) if out else {}
+    decision = body.get("hookSpecificOutput", {}).get("permissionDecision")
+    assert decision != "deny", "object-layer BLOCK should have softened under LOOSE, not stayed deny"

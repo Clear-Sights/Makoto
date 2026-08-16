@@ -124,7 +124,7 @@ def is_oversight_clamped(permission_mode) -> bool:
     return permission_mode in _REDUCED_OVERSIGHT_MODES
 
 
-def apply(outcome, posture_value, *, permission_mode=None) -> str:
+def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> str:
     """Intent: Fold the configured posture over a raw check outcome into the final posture the host
     acts on — softening or hardening what a check flagged, never escalating a check that found none.
 
@@ -144,6 +144,13 @@ def apply(outcome, posture_value, *, permission_mode=None) -> str:
     `permission_mode` (D6, optional, additive): when `is_oversight_clamped(permission_mode)`,
     `posture_value` is IGNORED and the STRICT rule applies instead -- see the module-level
     comment above `_REDUCED_OVERSIGHT_MODES` for why softening in these two modes is unsafe.
+
+    `layer` (optional, additive, default "object"): a check whose only possible trigger is
+    tampering with Makoto's own audit/enforcement machinery declares ``layer="meta"``. A raw
+    BLOCK from a meta check floors at ASK under LOOSE/SILENT instead of softening further --
+    a loose posture setting must not be able to suppress detection of tampering with the very
+    mechanism that enforces posture. Placed after the D6 oversight clamp, which already returns
+    the raw outcome and still wins; object-layer (the default) folds exactly as before.
     """
     if outcome not in _OUTCOMES:
         return ALLOW
@@ -151,6 +158,8 @@ def apply(outcome, posture_value, *, permission_mode=None) -> str:
         return ALLOW
     if is_oversight_clamped(permission_mode):
         return outcome                      # forced STRICT: honor the raw outcome unchanged
+    if outcome == BLOCK and layer == "meta" and posture_value in (SILENT, LOOSE):
+        return ASK                          # meta BLOCK floors at ASK, never softer
     if posture_value == SILENT:
         return ALLOW
     if posture_value == LOOSE:
@@ -389,7 +398,7 @@ def recheck_certificate(certificate: VerdictCertificate) -> tuple[str, str]:
     not a per-check fault that can safely be ignored.
     """
     # Local so the later F4 wiring can import this module from dispatch without an import cycle.
-    from makoto.dispatch import _jit_hint, _worst_finding
+    from makoto.dispatch import _finding_layer, _jit_hint, _worst_finding
 
     worst = _worst_finding(list(certificate.findings))
     if worst is None:
@@ -405,6 +414,7 @@ def recheck_certificate(certificate: VerdictCertificate) -> tuple[str, str]:
             Decision(outcome, detail),
             certificate.mode,
             permission_mode=certificate.permission_mode,
+            layer=_finding_layer(outcome, finding, certificate.mode, certificate.permission_mode),
         )
         reconstructed = (str(folded), getattr(folded, "detail", ""))
 

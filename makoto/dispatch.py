@@ -333,6 +333,31 @@ def _blocking_gate_ids() -> frozenset:
     return frozenset(c.id for c in load_checks(edge="Stop") if c.may_block)
 
 
+@lru_cache(maxsize=1)
+def _meta_check_ids() -> frozenset:
+    """The ids of every check declaring `layer="meta"` -- a check whose only possible trigger is
+    tampering with Makoto's own audit/enforcement machinery. DERIVED from `Check.layer` via
+    `load_checks()` across every edge -- never hand-synced, matching `_blocking_gate_ids()`'s own
+    discipline, so a check tagged meta is picked up here automatically, not by memory."""
+    return frozenset(
+        c.id for edge in ("Pre", "Post", "Stop", "SubagentStop", "SessionStart")
+        for c in load_checks(edge=edge) if getattr(c, "layer", "object") == "meta"
+    )
+
+
+def _finding_layer(outcome, finding, mode, permission_mode) -> str:
+    """Returns "meta" only on the exact branch where verdict.apply's meta-BLOCK floor can bind
+    (a raw BLOCK, from a meta-tagged check, under LOOSE/SILENT posture, not oversight-clamped) --
+    so the default STRICT hot path never pays the `_meta_check_ids()` catalog-derivation cost."""
+    if outcome != verdict.BLOCK or mode not in ("loose", "silent"):
+        return "object"
+    if verdict.is_oversight_clamped(permission_mode):
+        return "object"
+    if finding.pattern_id in _meta_check_ids():
+        return "meta"
+    return "object"
+
+
 def _run_predicates(conn, payload: dict, history: list, event_id: int,
                     state_dir: Path, payload_raw: str) -> list[Finding]:
     """keyword-prefilter the catalog, invoke each candidate predicate, collect Findings.
@@ -481,7 +506,8 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             detail = f"{detail}\n{hint}"
     mode = verdict.posture()
     folded = verdict.apply(verdict.Decision(outcome, detail), mode,
-                           permission_mode=permission_mode)
+                           permission_mode=permission_mode,
+                           layer=_finding_layer(outcome, finding, mode, permission_mode))
     if _recheck_certificate_enabled():
         # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
         # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
