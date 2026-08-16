@@ -117,6 +117,19 @@ def test_entry_dispatches_to_makoto_matches_install_semantics():
     assert _entry_dispatches_to_makoto("not-a-dict") is False
 
 
+def test_invocation_regex_does_not_admit_a_shim_this_layout_never_installs():
+    """This layout reaches configchange as `-m makoto.configchange` (merged into
+    makoto/configchange.py) -- it has no `_dispatch_configchange_shim.sh`. Recognizing that
+    filename as makoto's own would be a standing licence to delete a file makoto never wrote,
+    the exact over-match MAKOTO_INVOCATION_RX exists to close."""
+    assert _entry_dispatches_to_makoto(
+        {"hooks": [{"type": "command",
+                     "command": "sh /some/path/_dispatch_configchange_shim.sh"}]}) is False
+    assert _entry_dispatches_to_makoto(
+        {"hooks": [{"type": "command",
+                     "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"}]}) is True
+
+
 def test_check_export_shape():
     assert CHECK.id == "gate.self_wired"
     assert CHECK.applies_at == "Stop"

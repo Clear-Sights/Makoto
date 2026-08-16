@@ -28,9 +28,17 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # makoto's own hook-command invocation tokens -- anchored to the forms it actually installs, and
 # ONLY those: `~/.claude/makoto_state/dispatch.sh` (settings.json wiring, two-segment path so a
 # bare `dispatch.sh` living anywhere else does not match), `${CLAUDE_PLUGIN_ROOT}/makoto/
-# _dispatch_shim.sh` and `_dispatch_configchange_shim.sh` (the plugin-manifest shim forms -- see
-# hooks/hooks.json), and the module forms `-m makoto.dispatch` / `-m makoto.configchange` (the
-# two hook entrypoints; `\b` so `makoto.dispatcher_v2` never matches).
+# _dispatch_shim.sh` (the ONE plugin-manifest shim form -- see hooks/hooks.json, which wires
+# every declared event to that single script), and the module forms `-m makoto.dispatch` /
+# `-m makoto.configchange` (the two hook entrypoints; `\b` so `makoto.dispatcher_v2` never
+# matches).
+#
+# Deliberately does NOT admit `_dispatch_configchange_shim.sh`: this layout has no such script
+# (configchange is reached as `-m makoto.configchange`, its adapter merged into
+# makoto/configchange.py). An ownership predicate that recognizes a filename nothing installs is
+# a standing licence to delete a file makoto did not write -- the exact over-match this regex
+# exists to close, so the alternative is dropped rather than kept "just in case". If a
+# configchange shim is ever installed, this regex is the one place that has to learn about it.
 #
 # This ONE regex is the single source for "is this command makoto's" -- exported for
 # `checks/selfMuteGuard` to import rather than maintain its own copy. Two regexes answering one
@@ -45,7 +53,7 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # case-sensitive replacement would silently un-recognize a form makoto had already installed.
 MAKOTO_INVOCATION_RX = re.compile(
     r"makoto_state[/\\]dispatch\.sh"
-    r"|_dispatch(?:_configchange)?_shim\.sh"
+    r"|_dispatch_shim\.sh"
     r"|-m\s+makoto\.(?:dispatch|configchange)\b",
     re.IGNORECASE)
 
