@@ -1,70 +1,14 @@
 """L1 claim/admission primitives (split from predicates/helpers.py; renamed per §3c).
 
-claims_done / claims_success gate a Stop payload's final message. Imports L0 only.
+whole_suite_pass_claim gates a Stop payload's final message for a whole-suite green claim.
+Imports L0 only.
 """
 from __future__ import annotations
 import re
 from makoto.vocab import (
-    _DONE_WORDS_RX, _NEGATION_RX, _SUCCESS_WORDS_RX,
+    _NEGATION_RX,
     _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
 )
-
-
-def claims_done(payload: dict) -> bool:
-    """True iff the Stop payload represents a real 'done' claim worth gating on.
-
-    PRODUCTION-PAYLOAD FIX (2026-05-29, verified vs 1759 real captured Stop events):
-    Claude Code's real Stop hook payload exposes the assistant's final message as
-    ``last_assistant_message`` and carries NO ``stop_reason`` key. The original spec
-    (mirroring install-helpers/predicates.sh) read ``response`` and required
-    ``stop_reason == 'end_turn'`` — both ABSENT in production, so this helper always
-    returned False and patterns 2.1/2.2/2.5 were DEAD in production while their unit
-    tests passed on manufactured payloads. See ADVERSARY-FINDINGS.md (repo history).
-
-    Gating contract (corrected):
-      1. stop_reason, IF PRESENT, must be 'end_turn' (skips tool_use / max_tokens
-         stops in payloads that carry the field). A Stop event with no stop_reason is
-         end-of-turn by definition, so its absence is NOT a rejection.
-      2. The assistant text (``last_assistant_message`` in prod; ``response`` retained
-         for the bash-port / synthetic-test payload shape) MUST be non-empty.
-      3. The text MUST contain a done-word (done|complete|completed|finished, case-insensitive).
-      4. The 50-char window BEFORE the first done-word MUST NOT contain a negation
-         token (not|never|no|n’t|n’’t) — captures ‘I am not done’, ‘haven’t finished’, etc.
-    """
-    stop_reason = payload.get("stop_reason")
-    if stop_reason is not None and stop_reason != "end_turn":
-        return False
-    response = payload.get("last_assistant_message") or payload.get("response", "")
-    if not response:
-        return False
-    m = _DONE_WORDS_RX.search(response)
-    if m is None:
-        return False
-    # 50-char negation window before the first done-word.
-    before = response[: m.start()]
-    window = before[-50:] if len(before) > 50 else before
-    if _NEGATION_RX.search(window):
-        return False
-    return True
-
-
-def claims_success(payload: dict) -> Optional[re.Match]:
-    """Like claims_done but with the WIDE lexicon. Returns the re.Match of the
-    first success word (negation-window guarded), else None."""
-    stop_reason = payload.get("stop_reason")
-    if stop_reason is not None and stop_reason != "end_turn":
-        return None
-    response = payload.get("last_assistant_message") or payload.get("response", "")
-    if not response:
-        return None
-    m = _SUCCESS_WORDS_RX.search(response)
-    if m is None:
-        return None
-    before = response[: m.start()]
-    window = before[-50:] if len(before) > 50 else before
-    if _NEGATION_RX.search(window):
-        return None
-    return m
 
 
 # ---- whole-suite pass-claim signal (Theme A relocation, 2026-06-09) ----

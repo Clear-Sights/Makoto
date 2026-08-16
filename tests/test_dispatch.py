@@ -8,30 +8,12 @@ from pathlib import Path
 import pytest
 
 
-def _setup_state(tmp_path):
-    """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.state.store import init_db
-    state_dir = tmp_path / "makoto_state"
-    citations = tmp_path / "CITATIONS.md"
-    citations.write_text("Smith 2020\n")
-    init_db(state_dir, citations)
-    return state_dir
-
-
-def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
-    env = os.environ.copy()
-    env["MAKOTO_STATE_DIR"] = str(state_dir)
-    if extra_env:
-        env.update(extra_env)
-    proc = subprocess.run(
-        [sys.executable, "-m", "makoto.dispatch"],
-        input=json.dumps(payload).encode("utf-8"),
-        capture_output=True,
-        env=env,
-        cwd=str(Path(__file__).parent.parent),
-    )
-    return proc.returncode, proc.stdout.decode("utf-8")
+# _setup_state / _run_dispatch now live in tests/conftest.py as the `state_dir`/`run_dispatch`
+# fixtures; re-imported here as plain functions (not fixture injection) because this module's
+# own tests still call them directly by name. Kept importable here for backward compat / historical
+# reasons — tests/test_dispatch_posture_integration.py and tests/test_check_law_confluence.py now
+# import the shared plain-function twins from tests.conftest directly, not from this module.
+from tests.conftest import _setup_state, _run_dispatch
 
 
 def _dispatch_facts(state_dir) -> list:
@@ -1727,7 +1709,7 @@ def test_no_shadow_gate_every_gate_blocks():
     assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass",
                           "gate.liveness",     # liveness folded in from the collapsed close-check tier
-                          "gate.hollow_test",  # HOLLOWED-class detector, same split as liveness
+                          "gate.hollow_test",  # HOLLOWED-class detector (SPIRIT.md §4), same split as liveness
                           "gate.canon",        # ported agnostic Stop primitives canon.timeout/canon.recur
                           "gate.canon_fingerprints",            # SPEC-5 Task 9: BLOCK-tier canon fingerprints
                           "gate.canon_fingerprints_advisory",    # SPEC-5 Task 9: ADVISE-tier sibling

@@ -52,13 +52,10 @@ def _within_governed_tree(fp: str, cwd: str, root: Optional[Path]) -> bool:
         return False
 
 
-# jscpd note (2026-07-09): flagged as a clone against fabricatedCommitSha.py. Verified: the matched
-# span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
-# history: list, pattern: Check, conn=None) -> Optional[Finding]` -- byte-identical across 9
-# check modules (grep '^def predicate(' checks/*.py) -- plus a coincidental preceding `return False`
-# from this file's own unrelated `_within_governed_tree` helper. A dispatcher-invoked entrypoint's
-# signature is a structural contract, not extractable logic; the two functions' bodies do unrelated
-# things (SHA-fabrication detection vs. citation-allowlist path scoping).
+# jscpd flags this as a clone against fabricatedCommitSha.py; the shared span is the fixed
+# dispatcher entrypoint signature (a structural contract, not extractable logic), and the two
+# bodies do unrelated things. Not to be "deduped" -- see
+# docs/adr/0042-phantom-citation-jscpd-clone-flag.md for the verification record.
 def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     """fire on first Author-Year string not present in canonical_citations."""

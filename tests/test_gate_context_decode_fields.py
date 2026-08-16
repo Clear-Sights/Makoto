@@ -16,15 +16,6 @@ from makoto.registry import Check
 from makoto.context import GateContext
 
 
-def _setup_state(tmp_path):
-    from makoto.state.store import init_db
-    state_dir = tmp_path / "makoto_state"
-    citations = tmp_path / "CITATIONS.md"
-    citations.write_text("Smith 2020\n")
-    init_db(state_dir, citations)
-    return state_dir
-
-
 # ---- GateContext itself: additive fields, safe defaults ---------------------------------------
 def test_gate_context_permission_agent_fields_default_none_and_not_subagent():
     ctx = GateContext(text="x", touched=frozenset(), empty=frozenset(), opens=[],
@@ -55,8 +46,7 @@ def _spy_stopcheck(sink: list):
     return Check(id="test.spy", applies_at="Stop", posture="BLOCK", run=_run)
 
 
-def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(tmp_path, monkeypatch):
-    state_dir = _setup_state(tmp_path)
+def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(state_dir, tmp_path, monkeypatch):
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
     monkeypatch.setattr(_context, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
@@ -75,8 +65,7 @@ def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(
     assert ctx.is_subagent is True
 
 
-def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(tmp_path, monkeypatch):
-    state_dir = _setup_state(tmp_path)
+def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(state_dir, tmp_path, monkeypatch):
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
     monkeypatch.setattr(_context, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])

@@ -16,6 +16,12 @@ FACTORY_SHAPES = {
     "claim_vs_history_predicate": "CLAIM_VS_HISTORY",
     "claim_vs_ledger_predicate": "CLAIM_VS_LEDGER",
     "live_query_finding": "LIVE_QUERY",
+    # "introduced_regex_predicate" is NOT listed here: it serves both PATTERN_MATCH and
+    # CLAIM_VS_HISTORY callers (illusoryAuthorshipTrailer.py / illusoryInterruptionClaim.py),
+    # so its shape isn't derivable from factory NAME alone — see _factory_shape's special case
+    # below, which derives it from whether the call site passes `grounded_in_history=` instead.
+    # That's still a literal AST check on the call's own keywords, not a runtime value or a
+    # trusted manifest, so the law keeps verifying the declared shape from source.
 }
 
 ONE_OFF = {
@@ -83,14 +89,25 @@ def _walk_calls(root: ast.AST, funcs, seen: set[str]) -> set[str]:
     return out
 
 
+def _introduced_regex_predicate_shape(node: ast.Call) -> str:
+    """`introduced_regex_predicate` alone serves both PATTERN_MATCH and CLAIM_VS_HISTORY callers
+    (see kit.py's own docstring) — its shape is derived from whether the call passes
+    `grounded_in_history=`, a literal keyword on THIS call node, not a runtime value or a name
+    lookup. Still a source-derived verdict, not a trusted declaration."""
+    return "CLAIM_VS_HISTORY" if any(kw.arg == "grounded_in_history" for kw in node.keywords) \
+        else "PATTERN_MATCH"
+
+
 def _factory_shape(tree: ast.Module) -> str | None:
-    shapes = {
-        FACTORY_SHAPES[name]
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        for name in [_call_name(node).rsplit(".", 1)[-1]]
-        if name in FACTORY_SHAPES
-    }
+    shapes = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node).rsplit(".", 1)[-1]
+        if name == "introduced_regex_predicate":
+            shapes.add(_introduced_regex_predicate_shape(node))
+        elif name in FACTORY_SHAPES:
+            shapes.add(FACTORY_SHAPES[name])
     assert len(shapes) <= 1, f"module mixes result-shape factories: {sorted(shapes)}"
     return next(iter(shapes), None)
 

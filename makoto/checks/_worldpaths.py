@@ -1,10 +1,8 @@
 """Cross-machine and cross-process world resolution for Stop gates.
 
 gate.completion verifies a production claim against the results ledger and a cwd-relative
-os.path.exists. That observation window has a measured blind spot (FP, 2026-07-16): a file
-produced on a REMOTE machine over ssh and landed locally via `git pull` IS on disk — but under
-a repo root, not under cwd, and a bare-name claim ("index.md") resolves to <cwd>/index.md and
-misses. The claim was true; the world just wasn't looked at where it lives.
+os.path.exists. That observation window alone misses a file that lives under a synced repo root
+rather than under cwd. See docs/adr/0050-synced-repo-world-resolution.md for the decision history.
 
 This module WIDENS THE OBSERVATION, never the verdict:
 

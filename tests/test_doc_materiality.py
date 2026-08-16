@@ -20,7 +20,15 @@ REPO = Path(__file__).resolve().parent.parent
 # Living docs = those that make CURRENT claims about makoto's behavior or usage. Adding one is a
 # deliberate, reviewed act. Provenance/forward-looking trees (docs/archive, docs/certs,
 # docs/research) make no current claim and are NOT checked.
-LIVING_DOCS = ["README.md", "makoto/docs/MAKOTO-CONVENTIONS.md", "makoto/docs/CITATIONS.md"]
+#
+# Declared, then filtered to what actually exists in THIS checkout: docs/SPIRIT.md is dev-only by
+# design (scripts/publish_public.sh's EXCLUDE_PATHS) -- present and checked at full rigor on dev,
+# absent (correctly) on a published public checkout. Filtering here, rather than hardcoding
+# presence, means this test suite runs the SAME source unmodified in both trees and never asserts
+# a doc must exist that a deliberate exclusion already removed -- the exclusion list is the one
+# source of truth for what should ship, not a second copy here.
+_LIVING_DOCS_DECLARED = ["README.md", "docs/SPIRIT.md", "makoto/docs/MAKOTO-CONVENTIONS.md", "makoto/docs/CITATIONS.md"]
+LIVING_DOCS = [d for d in _LIVING_DOCS_DECLARED if (REPO / d).exists()]
 
 # A term that must not be presented as makoto's CURRENT substrate (it migrated to SQLite).
 SUBSTRATE_DENYLIST = ["duckdb"]
@@ -114,7 +122,9 @@ def test_assertions_have_teeth():
     assert not _cli_invocation_valid(["pattern", "frobnicate"], top, sub)
     assert _cli_invocation_valid(["status"], top, sub)
     assert _cli_invocation_valid(["pattern", "list"], top, sub)
-    # 2) links
+    # 2) links -- README.md is the positive control (ships in every checkout, dev and public
+    # alike); docs/SPIRIT.md is NOT used here since it's dev-only by design (LIVING_DOCS above)
+    # and this plant must hold in both trees.
     assert not (REPO / "docs" / "does-not-exist-xyz.md").exists()
     assert (REPO / "README.md").exists()
     # 3) substrate

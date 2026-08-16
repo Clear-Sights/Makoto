@@ -21,13 +21,17 @@ fixture) is exempted the same way every other check's own documentation is: `mak
 <reason>`.
 
 Knight-Leveson: stdlib re only.
+
+Built on `kit.introduced_regex_predicate` — the shared scaffold this check and
+content.illusory_authorship_trailer both need (scan ANY tool's introduced text, not just a
+file-path-gated Write/Edit body), called here WITH `grounded_in_history` — this check's own
+history-grounding veto. See that factory's docstring for how `tests/test_check_law_tests.py`
+derives PATTERN_MATCH vs. CLAIM_VS_HISTORY from the presence of that keyword at this call site.
 """
 from __future__ import annotations
 import re
-from typing import Optional
-from makoto.vocab import Finding
 from makoto.registry import Check
-from makoto.kit import introduced_text, makoto_allowed
+from makoto.kit import introduced_regex_predicate
 from makoto.kit import decode_history_row
 
 # The claim, however it's phrased. Matches the harness's own literal bracketed marker AND
@@ -55,35 +59,11 @@ def _genuine_interruption_in_history(history: list) -> bool:
     return False
 
 
-def predicate(*, current_event: dict, history: list,
-              pattern: Check, conn=None) -> Optional[Finding]:
-    if current_event.get("hook_event_name") != "PreToolUse":
-        return None
-    tool_name = current_event.get("tool_name", "") or ""
-    tool_input = current_event.get("tool_input", {}) or {}
-    text = introduced_text(tool_name, tool_input)
-    if not text:
-        return None
-    if makoto_allowed(text):
-        return None  # universal exemption: AI documented this as legitimate (see CLAUDE.md)
-    m = _INTERRUPTION_CLAIM_RX.search(text)
-    if not m:
-        return None
-    if _genuine_interruption_in_history(history):
-        return None  # a real interruption IS on the record -- the claim is grounded, not illusory
-    line_no = text[: m.start()].count("\n") + 1
-    snippet = text[max(0, m.start() - 40): m.end() + 40].strip()
-    where = tool_input.get("file_path", "") or f"{tool_name or 'tool'} command"
-    return Finding(
-        pattern_id=pattern.id,
-        file=where,
-        line=line_no,
-        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
-        message=(f"row {pattern.id} ({pattern.description}): matched {m.group(0)!r} at line "
-                 f"{line_no} — no genuine interruption is recorded this session"),
-        retry_hint=pattern.retry_hint,
-        snippet=snippet,
-    )
+predicate = introduced_regex_predicate(
+    body_rx=_INTERRUPTION_CLAIM_RX,
+    grounded_in_history=_genuine_interruption_in_history,
+    veto_suffix=" — no genuine interruption is recorded this session",
+)
 
 
 from makoto.registry import Check as _Check

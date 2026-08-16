@@ -6,13 +6,10 @@ done, just deferred. Either complete or leave unchecked.
 Scaffold extracted to substrate.factories.regex_file_predicate (1.0.3 R1).
 Knight-Leveson: stdlib re only.
 """
-# jscpd note (2026-07-09): flagged as a clone against verifierPredicateWeakened.py. Verified: both
-# modules already reuse the ONE shared factory (substrate.factories.regex_file_predicate) -- the
-# matched span is just the minimal `regex_file_predicate(target_rx=re.compile(r"...")` call-site
-# syntax common to ANY two callers of that factory, plus the shared doc-convention lines. The two
-# target_rx/body_rx regexes differ and ARE each check's real, distinct content; collapsing the call
-# sites further would mean merging two unrelated file/body patterns into one, which would be wrong.
-# This pair is already at the dedup endpoint substrate.factories.regex_file_predicate exists for.
+# See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
+# against verifierPredicateWeakened.py was verified and dismissed (both already reuse the one
+# shared regex_file_predicate factory; the matched span is call-site syntax, not shared logic).
+# tests/test_no_alpha_duplicate_functions.py is the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from makoto.kit import regex_file_predicate

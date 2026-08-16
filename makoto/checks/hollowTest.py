@@ -1,4 +1,4 @@
-"""gate.hollow_test's pure AST analyzer: a HOLLOWED-class detector — a test that
+"""gate.hollow_test's pure AST analyzer: a HOLLOWED-class detector (SPIRIT.md §4) — a test that
 survives in name while its content is gutted. Four independently-firing sub-patterns, each
 zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.py):
 
@@ -26,13 +26,10 @@ zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.
                            same `_is_tautology` predicate already proven zero-FP for sub-pattern 2. A
                            bare, argument-less `@pytest.mark.skip(...)` / `@unittest.skip(...)` (no
                            condition at all) is explicitly NOT this pattern — that is an honest,
-                           transparently-labeled skip (INCOMPLETE), not a disguised one.
+                           transparently-labeled skip (SPIRIT.md §4 INCOMPLETE), not a disguised one.
 
-SPEC-5 Task 4 (owner-revised layout): the analyzer engine (formerly `stopchecks/hollow_test.py`)
-and its Stop-hook adapter (formerly `stopchecks/stopcheck_hollow_test.py`) are combined into ONE
-flat file here — the migration ticket left single-vs-paired-file layout to the executing session's
-call; a single file is chosen because the two halves are always read/changed together and a flat
-`checks/` package favors one file per detector, matching every other migrated check. The analyzer
+The analyzer engine and its Stop-hook adapter live in this ONE flat file (see
+docs/adr/0036-hollow-test-single-file-layout.md for the layout history). The analyzer
 itself is self-contained (zero imports beyond stdlib `ast`); the `makoto-allow` exemption and the
 GateContext plumbing live in the adapter half below — this discipline is unchanged from the split
 layout, only the file boundary moved.
@@ -93,9 +90,9 @@ def _iter_own_scope(stmts):
 
 
 # ---- the assertion recognizer (generous by design: an FN here only suppresses a fire) -----------
-# _callee_chain imported at module top from _stdlib_ast_helpers (2026-07-09: was a local duplicate
-# of both deadPureStatement.py's usage pattern and lib/factories.py::callee_chain; extracted rather
-# than left duplicated -- see tests/test_detector_engines_are_stdlib_isolated.py).
+# _callee_chain is imported at module top from _stdlib_ast_helpers, the stdlib-isolated shared
+# helper home (see tests/test_detector_engines_are_stdlib_isolated.py, and
+# docs/adr/0038-stdlib-ast-helper-extraction.md for the extraction history).
 def _is_assertion_call(node) -> bool:
     """Generous recognizer: any Call whose dotted callee has a component (case-insensitive)
     starting with `assert` (`self.assertTrue`, `assert_that(...)`, `mock.assert_called_with`), OR
@@ -411,8 +408,8 @@ def analyze_file(src: str, path: str) -> list:
 # Stop-hook adapter (formerly stopchecks/stopcheck_hollow_test.py)
 # =============================================================================================
 # _is_scratch/_read (imported at module top from _stdlib_ast_helpers) are shared verbatim with
-# deadPureStatement.py (2026-07-09: found alpha-equivalent by AST canonicalization; extracted
-# rather than left duplicated -- see tests/test_detector_engines_are_stdlib_isolated.py).
+# deadPureStatement.py -- see tests/test_detector_engines_are_stdlib_isolated.py, and
+# docs/adr/0038-stdlib-ast-helper-extraction.md for the extraction history.
 
 
 _KIND_MESSAGE = {
@@ -435,23 +432,22 @@ _KIND_MESSAGE = {
 def _allowed(lineno, lines) -> bool:
     """On-the-record override (makoto convention), via the ONE canonical marker predicate.
 
-    This was a bare `"makoto-allow" in line` substring test, which exempted a reasonless
-    `# makoto-allow` — while `makoto_allowed`/`_MAKOTO_ALLOW_RX` (§7.5b, the predicate every
-    factory-built content check uses) requires a colon and a non-empty reason, and while this
-    module's OWN finding text tells the author to write `# makoto-allow: <reason>`. The escape
-    hatch was strictly laxer than the rule makoto installs into the user's CLAUDE.md
-    ("an on-the-record, auditable rationale, never a disguise"), so an exemption marker
-    asserting an audit trail was accepted without one — the flag-decay bug in miniature, on
-    the security-relevant path. One concept, one predicate: the marker means the same thing
-    everywhere it is honored. (`makoto.vocab` is already on this engine's isolation
-    allowlist — see tests/test_detector_engines_are_stdlib_isolated.py.)"""
+    The marker is recognized by `makoto_allowed`/`_MAKOTO_ALLOW_RX` (§7.5b, the predicate every
+    factory-built content check uses), which requires a colon and a NON-EMPTY reason — matching
+    this module's own finding text ("annotate `# makoto-allow: <reason>`") and the rule makoto
+    installs into the user's CLAUDE.md ("an on-the-record, auditable rationale, never a
+    disguise"). One concept, one predicate: the marker means the same thing everywhere it is
+    honored, so an exemption asserting an audit trail can never be accepted without one.
+    (`makoto.vocab` is already on this engine's isolation allowlist — see
+    tests/test_detector_engines_are_stdlib_isolated.py.)
+    See docs/adr/0037-hollow-test-makoto-allow-predicate.md for the decision history."""
     return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
 
 
 def _run(ctx) -> list:
     out = []
     # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
-    # deadPureStatement._run via the stdlib-isolated helper home -- 2026-07-09 dedup round 2
+    # deadPureStatement._run via the stdlib-isolated helper home
     for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         lines = src.splitlines()
         for f in analyze_file(src, str(p)):

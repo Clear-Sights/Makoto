@@ -4,10 +4,10 @@ import os
 from typing import Optional
 from makoto.vocab import Finding
 from makoto.kit import live_query_finding
-# The 2026-07-09 dedup pass performed exactly the hoist this module's old note asked for: the
-# wiring predicate now lives in makoto.substrate.wiring (an L0 primitive module, firewall-
+# The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
-# instead of mirrored by hand.
+# rather than mirrored here. See docs/adr/0041-wiring-predicate-hoist.md for the decision
+# history.
 from makoto.substrate.wiring import (
     entry_dispatches_to_makoto as _entry_dispatches_to_makoto,
     event_wired as _event_wired,

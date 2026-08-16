@@ -5,10 +5,7 @@ never the verdict. A claim about a file/ref absent from the world must still blo
 """
 from __future__ import annotations
 import json
-import os
 import subprocess
-import sys
-from pathlib import Path
 
 from makoto.checks._worldpaths import (
     pushed_ref_matches_world,
@@ -166,35 +163,10 @@ def test_resolve_no_roots_returns_none():
 
 
 # ==== end-to-end dispatch: the actual issue #2 repro + controls ==============================
-def _setup_state(tmp_path):
-    from makoto.state.store import init_db
-    state_dir = tmp_path / "makoto_state"
-    citations = tmp_path / "CITATIONS.md"
-    citations.write_text("Smith 2020\n")
-    init_db(state_dir, citations)
-    return state_dir
-
-
-def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    env = os.environ.copy()
-    env["MAKOTO_STATE_DIR"] = str(state_dir)
-    if extra_env:
-        env.update(extra_env)
-    proc = subprocess.run(
-        [sys.executable, "-m", "makoto.dispatch"],
-        input=json.dumps(payload).encode("utf-8"),
-        capture_output=True,
-        env=env,
-        cwd=str(Path(__file__).parent.parent),
-    )
-    return proc.returncode, proc.stdout.decode("utf-8")
-
-
-def test_dispatch_completion_gate_discharges_via_synced_repo_after_remote_git_pull(tmp_path):
+def test_dispatch_completion_gate_discharges_via_synced_repo_after_remote_git_pull(state_dir, run_dispatch, tmp_path):
     """The issue #2 repro: index.md was produced on a REMOTE machine (ssh) and landed here via
     a local `git pull` -- it lives under a repo root, not under cwd. The claim is TRUE; the
     gate must not false-block it."""
-    state_dir = _setup_state(tmp_path)
     sid = "worldpaths_fp"
     cwd = tmp_path / "workspace"
     cwd.mkdir()
@@ -206,22 +178,21 @@ def test_dispatch_completion_gate_discharges_via_synced_repo_after_remote_git_pu
         "tool_input": {"command": f"git -C {repo} pull --ff-only"},
         "tool_response": {"stdout": "Already up to date.", "stderr": "", "exitCode": 0},
     }
-    rc, _ = _run_dispatch(state_dir, pull)
+    rc, _ = run_dispatch(state_dir, pull)
     assert rc == 0
 
     stop = {
         "hook_event_name": "Stop", "session_id": sid, "cwd": str(cwd),
         "last_assistant_message": "Done — updated index.md with the new page counts.",
     }
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out == "", f"file lives under the synced repo root; claim is true, must not block: {out}"
 
 
-def test_dispatch_completion_gate_still_blocks_without_a_synced_pull(tmp_path):
+def test_dispatch_completion_gate_still_blocks_without_a_synced_pull(state_dir, run_dispatch, tmp_path):
     """Control: SAME claim, SAME file layout, but no git-pull Bash event ever ran in this
     session -- the fix must not become a blanket allow. The gate still blocks by default."""
-    state_dir = _setup_state(tmp_path)
     sid = "worldpaths_control"
     cwd = tmp_path / "workspace2"
     cwd.mkdir()
@@ -231,17 +202,16 @@ def test_dispatch_completion_gate_still_blocks_without_a_synced_pull(tmp_path):
         "hook_event_name": "Stop", "session_id": sid, "cwd": str(cwd),
         "last_assistant_message": "Done — updated index.md with the new page counts.",
     }
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out, "no git-pull event ever synced this repo -- must still block"
     assert json.loads(out)["decision"] == "block"
 
 
-def test_dispatch_completion_gate_still_blocks_on_genuinely_absent_file(tmp_path):
+def test_dispatch_completion_gate_still_blocks_on_genuinely_absent_file(state_dir, run_dispatch, tmp_path):
     """A synced repo root IS present in history, but the claimed file exists nowhere in it --
     falsifiability must be preserved: the fix widens observation, it never rubber-stamps the
     verdict. Every alternate path still ends in a live existence check."""
-    state_dir = _setup_state(tmp_path)
     sid = "worldpaths_absent"
     cwd = tmp_path / "workspace3"
     cwd.mkdir()
@@ -253,23 +223,22 @@ def test_dispatch_completion_gate_still_blocks_on_genuinely_absent_file(tmp_path
         "tool_input": {"command": f"git -C {repo} pull --ff-only"},
         "tool_response": {"stdout": "Already up to date.", "stderr": "", "exitCode": 0},
     }
-    rc, _ = _run_dispatch(state_dir, pull)
+    rc, _ = run_dispatch(state_dir, pull)
     assert rc == 0
 
     stop = {
         "hook_event_name": "Stop", "session_id": sid, "cwd": str(cwd),
         "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
     }
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out, "the claimed file exists nowhere -- must still block"
     assert json.loads(out)["decision"] == "block"
 
 
-def test_dispatch_completion_gate_discharges_via_cd_and_pull_form(tmp_path):
+def test_dispatch_completion_gate_discharges_via_cd_and_pull_form(state_dir, run_dispatch, tmp_path):
     """Same FP repro, but the session used the `cd <dir> && git pull` shell form instead of
     `git -C <dir> pull` -- both forms must resolve identically."""
-    state_dir = _setup_state(tmp_path)
     sid = "worldpaths_cdform"
     cwd = tmp_path / "workspace4"
     cwd.mkdir()
@@ -281,13 +250,13 @@ def test_dispatch_completion_gate_discharges_via_cd_and_pull_form(tmp_path):
         "tool_input": {"command": f"cd {repo} && git pull --ff-only"},
         "tool_response": {"stdout": "Already up to date.", "stderr": "", "exitCode": 0},
     }
-    rc, _ = _run_dispatch(state_dir, pull)
+    rc, _ = run_dispatch(state_dir, pull)
     assert rc == 0
 
     stop = {
         "hook_event_name": "Stop", "session_id": sid, "cwd": str(cwd),
         "last_assistant_message": "Done — updated index.md with the new page counts.",
     }
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out == "", f"cd-form pull must resolve exactly like -C form: {out}"

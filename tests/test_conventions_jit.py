@@ -81,7 +81,7 @@ def test_allow_exempt_ids_match_predicate_sources():
             continue
         src = inspect.getsource(importlib.import_module(p.predicate_module))
         implements = ("regex_file_predicate" in src or "ast_introduced_predicate" in src
-                      or "makoto_allowed" in src)
+                      or "introduced_regex_predicate" in src or "makoto_allowed" in src)
         refuses = "does NOT exempt" in src
         if implements and not refuses:
             derived.add(p.id)

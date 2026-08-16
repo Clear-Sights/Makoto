@@ -42,12 +42,10 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     PostToolUse Bash call -- else None (a different tool, a Pre row, or nothing at all).
 
     Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
-    step, shared with `canonTimeoutRecur._decode_row`. A hand-rolled local copy of this logic
-    used to live here, justified as keeping "zero cross-module coupling" with a module that
-    ALREADY imports `bash_output_text` from the same kit two lines above -- that claim was
-    already false when it was written, and the drift it enabled was a real bug: this predicate
-    was blind to rows whose event type lives only on the WRAPPER column, rows its sibling gate
-    (canon.timeout/canon.recur) acts on, from the same table, for the same concept."""
+    step, shared with `canonTimeoutRecur._decode_row`. Sharing it is what keeps this predicate
+    and its sibling gate (canon.timeout/canon.recur) reading the SAME rows from the same table
+    for the same concept -- including rows whose event type lives only on the WRAPPER column.
+    See docs/adr/0039-identical-retry-shared-row-decoder.md for the decision history."""
     rows = list(history or ())
     if not rows:
         return None

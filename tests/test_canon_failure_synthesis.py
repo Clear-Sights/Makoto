@@ -18,10 +18,6 @@ adds: (1) pure calls_from_history unit tests pinning the narrowed synthesis rule
 proving gate.canon actually fires/blocks live on a mid-turn-abandoned call, and stays silent on the
 last-row-discharge shape."""
 import json
-import os
-import subprocess
-import sys
-from pathlib import Path
 
 from makoto.checks.canonTimeoutRecur import calls_from_history, timed_out_at_turn_end
 
@@ -80,69 +76,41 @@ def test_normal_fully_paired_call_is_unaffected():
 
 
 # ---- end-to-end, through the real dispatch (mirrors test_dispatch.py's _run_dispatch pattern) --
-def _setup_state(tmp_path):
-    """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.state.store import init_db
-    state_dir = tmp_path / "makoto_state"
-    citations = tmp_path / "CITATIONS.md"
-    citations.write_text("Smith 2020\n")
-    init_db(state_dir, citations)
-    return state_dir
-
-
-def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
-    env = os.environ.copy()
-    env["MAKOTO_STATE_DIR"] = str(state_dir)
-    if extra_env:
-        env.update(extra_env)
-    proc = subprocess.run(
-        [sys.executable, "-m", "makoto.dispatch"],
-        input=json.dumps(payload).encode("utf-8"),
-        capture_output=True,
-        env=env,
-        cwd=str(Path(__file__).parent.parent),
-    )
-    return proc.returncode, proc.stdout.decode("utf-8")
-
-
-def test_dispatch_last_row_dangling_pre_stays_silent_no_block(tmp_path):
+def test_dispatch_last_row_dangling_pre_stays_silent_no_block(state_dir, run_dispatch, tmp_path):
     """Same shape as test_dispatch.py::test_dispatch_fabricated_action_silent_when_command_ran, but
     exercised directly against gate.canon's own verdict: a single dangling PreToolUse (Bash) with
     no PostToolUse, then Stop with nothing else in between -> it IS the last tool-related row ->
     no failure synthesized -> canon.timeout does not fire, no block."""
-    state_dir = _setup_state(tmp_path)
     pre = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "midturn_last",
            "cwd": str(tmp_path),
            "tool_input": {"command": "python -m pytest tests/zzz_unrun.py -q"}}
-    _run_dispatch(state_dir, pre)
+    run_dispatch(state_dir, pre)
     stop = {"hook_event_name": "Stop", "session_id": "midturn_last", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out == "", "a dangling Pre that is the last tool row before Stop must not block"
 
 
-def test_dispatch_mid_turn_abandoned_pre_synthesizes_failure_and_canon_blocks(tmp_path):
+def test_dispatch_mid_turn_abandoned_pre_synthesizes_failure_and_canon_blocks(state_dir, run_dispatch, tmp_path):
     """Mid-turn abandonment fires canon.timeout live: a PreToolUse (Bash, cmd-a) never gets a
     PostToolUse, but the agent moves on to ANOTHER PreToolUse (Bash, cmd-b) -- itself also never
     resolved -- before Stop. cmd-a is no longer the last tool-related row, so it synthesizes a
     failure Call; that failure becomes the turn's last Call (cmd-b, being the new last row, is
     left un-synthesized) -> canon.timeout fires -> gate.canon blocks by default, exactly like
     test_dispatch.py::test_dispatch_canon_gate_blocks_by_default's PostToolUse-interrupted case."""
-    state_dir = _setup_state(tmp_path)
     sid = "midturn_abandon"
     pre_a = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": sid,
              "cwd": str(tmp_path), "tool_input": {"command": "cmd-a-never-resolved"}}
     pre_b = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": sid,
              "cwd": str(tmp_path), "tool_input": {"command": "cmd-b-also-never-resolved"}}
-    rc, out = _run_dispatch(state_dir, pre_a)
+    rc, out = run_dispatch(state_dir, pre_a)
     assert rc == 0 and out == ""
-    rc, out = _run_dispatch(state_dir, pre_b)
+    rc, out = run_dispatch(state_dir, pre_b)
     assert rc == 0 and out == ""
     stop = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out, "a mid-turn-abandoned dangling Pre must synthesize a failure and block via canon.timeout"
     decision = json.loads(out)
@@ -153,18 +121,17 @@ def test_dispatch_mid_turn_abandoned_pre_synthesizes_failure_and_canon_blocks(tm
         "the gate.canon fire must be audited"
 
 
-def test_dispatch_normal_paired_call_unaffected_no_block(tmp_path):
+def test_dispatch_normal_paired_call_unaffected_no_block(state_dir, run_dispatch, tmp_path):
     """A normal, fully-paired Pre+Post call (real success) is unaffected by the FD14-A synthesis
     rule -- still exactly one Call from the Post, no block."""
-    state_dir = _setup_state(tmp_path)
     sid = "midturn_paired_ok"
     post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid,
             "cwd": str(tmp_path), "tool_input": {"command": "echo hi"},
             "tool_response": {"stdout": "hi\n", "stderr": "", "exitCode": 0}}
-    rc, out = _run_dispatch(state_dir, post)
+    rc, out = run_dispatch(state_dir, post)
     assert rc == 0 and out == ""
     stop = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
+    rc, out = run_dispatch(state_dir, stop)
     assert rc == 0
     assert out == "", "a normal completed call must not be affected by the dangling-pre synthesis rule"

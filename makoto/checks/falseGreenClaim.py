@@ -5,9 +5,9 @@ from makoto.kit import is_failing_testrun
 from makoto.substrate.claims import whole_suite_pass_claim
 
 
-# The prose half (the whole-suite green-claim signal) RELOCATED to substrate.claims.whole_suite_pass_claim
-# (consolidation T2.2, 2026-06-09): truthiness-identical pure relocation; the second consumer is
-# gate.stale_pass, which additionally uses the returned Match's POSITION for its teeth window.
+# The prose half (the whole-suite green-claim signal) lives in substrate.claims.whole_suite_pass_claim,
+# shared with gate.stale_pass (which additionally uses the returned Match's POSITION for its teeth
+# window). See docs/adr/0032-green-claim-signal-relocation.md for the relocation history.
 def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
     """Fire iff the assistant claims UNIVERSAL test success ('tests pass', 'the suite is green',
     'CI is green') while the MOST RECENT recorded test-runner output shows a REAL failure — a

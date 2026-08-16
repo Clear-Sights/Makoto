@@ -12,8 +12,8 @@ to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently s
 (SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
 of silence.
 
-This module is the sole discovery path for every edge. See
-docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for the migration history."""
+This module is the sole discovery path for both edges; `load_precheck_catalog()` is the Pre-tier
+convenience wrapper. See docs/adr/0001-unified-check-discovery.md for the migration history."""
 from __future__ import annotations
 
 import importlib
@@ -39,25 +39,27 @@ class Check:
     loader only duck-types `.id` / `.applies_at` / `.posture`, so a module exporting its own
     richer dataclass is equally discoverable.
 
-    `may_block` is the Stop edge's structural blocking-eligibility signal, independent of posture.
-    See docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for why both signals exist.
+    `may_block`: a Stop-edge check is blocking-eligible only when BOTH `may_block is True` AND
+    `posture == BLOCK` -- two independent signals, not one. A Pre-tier CHECK leaves it False.
+    See docs/adr/0002-may-block-field.md for the migration history.
 
-    `keywords`/`retry_hint`/`description`/`predicate_module` are additive Pre-tier fields; Stop
-    checks retain their safe empty defaults. See
-    docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for their cutover history.
+    `keywords`/`retry_hint`/`description`/`predicate_module` are Pre-tier fields; Stop-tier checks
+    leave their safe empty defaults. See docs/adr/0003-pre-tier-check-fields.md for history.
 
     `eats` is the check's exact declared input signature. Stop checks name GateContext fields or
     derived properties; Pre checks use the flat predicate vocabulary current_event/history/
     pattern/conn. tests/test_check_law_eats.py derives the reachable reads and rejects either an
-    undeclared read or a dead declaration.
+    undeclared read or a dead declaration. See docs/adr/0020-check-eats-law.md for history.
 
     `tests` declares the check's result/evidence shape (one of `TESTS_SHAPES`). The sibling
     tests/test_check_law_tests.py rejects both an undeclared shape and a declaration whose
     module/factory does not use that shape's required evidence primitive. Genuine one-offs keep
-    the empty default only when their id and reason are registered explicitly in that law.
+    the empty default only when their id and reason are registered explicitly in that law. See
+    docs/adr/0021-check-tests-result-shape-law.md for history.
 
-    `layer` distinguishes checks of the assistant's work from checks of Makoto's own enforcement.
-    See docs/adr/0005-distinguish-meta-enforcement-tampering.md for the scope and posture-floor decision."""
+    `layer` is "object" or "meta" (default "object"); "meta" means the check can trigger only on
+    tampering with Makoto's own audit/enforcement machinery. A meta BLOCK cannot soften below ASK
+    under LOOSE/SILENT. See docs/adr/0004-check-layer-field.md for the decision history."""
     id: str
     applies_at: str
     posture: str
@@ -205,7 +207,9 @@ def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = Non
 
 
 def load_precheck_catalog(*, package_dir: Optional[Path] = None) -> list:
-    """Return live Pre-tier predicate checks; tests pin their BLOCK-only invariant.
-
-    See docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for the cutover."""
+    """Every live Pre-tier `CHECK` with a `predicate_module` set -- the keyword-prefiltered
+    detector catalog `dispatch._run_predicates` (and `install.py`/`__main__.py`'s catalog
+    inspection commands) consume. The BLOCK-only invariant is pinned by
+    `tests/test_pre_tier_block_invariant.py`; see docs/adr/0001-unified-check-discovery.md for
+    the migration history."""
     return [c for c in load_checks(edge="Pre", package_dir=package_dir) if c.predicate_module]

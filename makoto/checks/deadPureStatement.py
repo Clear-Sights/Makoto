@@ -393,11 +393,11 @@ def analyze_file(src: str, path: str) -> list:
         return []                                           # fail-open: skip unparseable files
     lines = src.splitlines()
     def _allowed(lineno):
-        # On-the-record override via the ONE canonical marker predicate (§7.5b). Was a bare
-        # `"makoto-allow" in line` substring test, which exempted a reasonless `# makoto-allow`
-        # that `makoto_allowed`/`_MAKOTO_ALLOW_RX` rejects — and that this check's own finding
-        # text already tells the author to write with a reason. An exemption marker asserts an
-        # audit trail; accepting one without a rationale accepts the assertion unmeasured.
+        # On-the-record override via the ONE canonical marker predicate (§7.5b): a reasonless
+        # `# makoto-allow` does NOT exempt, matching what this check's own finding text already
+        # tells the author to write. An exemption marker asserts an audit trail; accepting one
+        # without a rationale accepts the assertion unmeasured.
+        # See docs/adr/0026-liveness-allow-marker-strictness.md for the decision history.
         return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
     out = []
     for node in ast.walk(tree):

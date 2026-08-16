@@ -656,6 +656,73 @@ def claim_vs_history_predicate(
     return _predicate
 
 
+def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
+    """Shared scan step behind `introduced_regex_predicate`: scan ANY tool's INTRODUCED text (via
+    `introduced_text` — Write/Edit/MultiEdit content OR a Bash command, not just a file-path-gated
+    Write/Edit body the way `regex_file_predicate`'s `target_rx` requires) for `body_rx`. Returns
+    None (no finding) or a (match, text, tool_input, tool_name) tuple for the caller to finish
+    building a Finding from — see `introduced_regex_predicate`'s own docstring for how its callers
+    diverge (a `grounded_in_history` veto or not) after this scan step.
+    """
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    tool_name = current_event.get("tool_name", "") or ""
+    tool_input = current_event.get("tool_input", {}) or {}
+    text = introduced_text(tool_name, tool_input)
+    if not text:
+        return None
+    if makoto_allowed(text):
+        return None  # universal exemption: AI documented this as legitimate (see CLAUDE.md)
+    m = body_rx.search(text)
+    if not m:
+        return None
+    return m, text, tool_input, tool_name
+
+
+def _introduced_regex_finding(pattern: Check, m, text: str, tool_input: dict, tool_name: str,
+                               suffix: str = "") -> Finding:
+    line_no = text[: m.start()].count("\n") + 1
+    snippet = text[max(0, m.start() - 40): m.end() + 40].strip()
+    where = tool_input.get("file_path", "") or f"{tool_name or 'tool'} command"
+    return Finding(
+        pattern_id=pattern.id, file=where, line=line_no, level="error",
+        message=f"row {pattern.id} ({pattern.description}): matched {m.group(0)!r} at line {line_no}{suffix}",
+        retry_hint=pattern.retry_hint, snippet=snippet,
+    )
+
+
+def introduced_regex_predicate(
+    *, body_rx: re.Pattern, grounded_in_history=None, veto_suffix: str = "",
+) -> Callable[..., Optional[Finding]]:
+    """Build a Pre predicate over `_introduced_regex_scan` + `_introduced_regex_finding` — the
+    shared scaffold behind illusoryAuthorshipTrailer.py (PATTERN_MATCH: no `grounded_in_history`)
+    and illusoryInterruptionClaim.py (CLAIM_VS_HISTORY: `grounded_in_history` supplied — when it
+    returns True on `history`, a real instance of the claim IS on the record, so the finding is
+    suppressed rather than raised).
+
+    One factory, not two, because the shape distinction between these callers is genuinely just
+    "is there a veto after the match" — the same shape `_introduced_regex_scan`'s own docstring
+    already named as the real divergence point. `tests/test_check_law_tests.py`'s `_factory_shape`
+    derives PATTERN_MATCH vs. CLAIM_VS_HISTORY from whether the call site passes
+    `grounded_in_history=` — a literal AST check on the call's keywords, not a runtime value, so
+    the law still VERIFIES the declared shape from source rather than trusting a name or a
+    manifest (the failure mode the DSL/Rego/CEL angle of this session's prior-art investigation
+    found and rejected for exactly this reason).
+    """
+    def _predicate(*, current_event: dict, history: list,
+                   pattern: Check, conn=None) -> Optional[Finding]:
+        hit = _introduced_regex_scan(current_event, body_rx)
+        if hit is None:
+            return None
+        m, text, tool_input, tool_name = hit
+        if grounded_in_history is None:
+            return _introduced_regex_finding(pattern, m, text, tool_input, tool_name)
+        if grounded_in_history(history):
+            return None  # a real instance IS on the record -- the claim is grounded, not illusory
+        return _introduced_regex_finding(pattern, m, text, tool_input, tool_name, veto_suffix)
+    return _predicate
+
+
 def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Finding]]:
     """Build a Stop check whose live query result is itself the evidence."""
     input_name = query.__code__.co_varnames[0] if query.__code__.co_argcount else ""

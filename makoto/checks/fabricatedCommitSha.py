@@ -15,7 +15,7 @@ Detection (FP-SAFE BY DESIGN):
      the PRODUCTION field `last_assistant_message` (fallback `response` for the
      bash-port / synthetic-test payload shape), and treat a MISSING `stop_reason`
      as end-of-turn (Claude Code's real Stop payload carries no `stop_reason`;
-     see substrate.claims.claims_done and ADVERSARY-FINDINGS.md (repo history)). This is
+     see substrate.claims.whole_suite_pass_claim and ADVERSARY-FINDINGS.md (repo history)). This is
      the AI's OWN closing claim — never a USER-directed action, so this predicate
      structurally cannot gate the user.
   2. Find a SHA-shaped hex token (7–40 hex chars) bound to a POSITIVE
@@ -68,24 +68,13 @@ from makoto.vocab import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-iden
 _SHA_RX = r"(?<![0-9a-zA-Z])([0-9a-f]{7,40})(?![0-9a-zA-Z])"
 
 # ---------------------------------------------------------------------------
-# REVISION (content.fabricated_commit_sha, verity-1.22-revise): require a POSITIVE COMMIT-CLAIM, exclude
-# negated/referential forms.
-#
-# DEFECT (grumpy audit, reproduced): the original _CLAIM_RXS keyed on a SHA token
-# CO-OCCURRING with a commit/tag KEYWORD inside a short gap. That is mere
-# co-occurrence, not an assertion that a commit happened — so it FIRED on:
-#   - the disclaim case: "Regarding the commit a1b2c3d you mentioned: I have NOT
-#     committed anything this session."  (the AI explicitly denies committing)
-#   - a bare reference: "the commit a1b2c3d you found introduced the bug"
-#   - a deferral: "I haven't committed yet"
-# All three are FALSE POSITIVES: the AI made no fabricated commit assertion.
-#
-# Root-cause fix: detect a positive commit/tag-HAPPENED claim ("committed as
-# <sha>", "I committed <sha>", "<sha> was committed/landed/pushed", "tagged
-# <sha>", "commit <sha> is on main", etc.), then REJECT any match whose SHA sits
-# in a negated or referential window ("have NOT committed", "haven't committed",
-# "without committing", "the commit <sha> you mentioned", "asked about commit
-# <sha>"). Co-occurrence alone no longer fires.
+# A fire requires a POSITIVE commit/tag-HAPPENED CLAIM ("committed as <sha>", "I committed
+# <sha>", "<sha> was committed/landed/pushed", "tagged <sha>", "commit <sha> is on main"), and
+# REJECTS any match whose SHA sits in a negated or referential window ("have NOT committed",
+# "haven't committed", "without committing", "the commit <sha> you mentioned", "asked about
+# commit <sha>"). Co-occurrence of a SHA with a commit keyword never fires on its own — an
+# assertion is required. See docs/adr/0033-commit-sha-positive-claim-requirement.md for the
+# decision history.
 # ---------------------------------------------------------------------------
 
 # Positive commit/tag-completion verbs. "committed"/"tagged"/"landed"/"pushed"
@@ -254,16 +243,11 @@ _GLOBAL_DENIAL_RX = re.compile(
 )
 
 # A real commit/tag invocation in the session: `git commit` / `git tag`, in ANY
-# invocation form. WIDENED (content.fabricated_commit_sha revision, 2026-05-29) to close the documented
-# AI-FP: a truthful commit made through a git worktree / `git -C <dir>` / a cd'd
-# directory, then a truthful Stop SHA claim, must NOT fire. The original
-# `\bgit\s+(?:commit|tag)\b` required the subcommand to be IMMEDIATELY after
-# `git`, so it MISSED `git -C <worktree> commit`, `git -c k=v commit`,
-# `git --git-dir=.. --work-tree=.. commit`, and `git -C <wt> tag` (verified:
-# those forms are exactly how a worktree/-C commit is invoked). We now allow any
-# run of git GLOBAL OPTION tokens (each a `-x`/`--x` token plus an optional value
-# token that is not itself another option) between `git` and the `commit`/`tag`
-# subcommand. Non-commit subcommands stay un-matched: `git -C <wt> log`,
+# invocation form. This matters for FP-safety: a truthful commit made through a git
+# worktree / `git -C <dir>` / a cd'd directory, then a truthful Stop SHA claim, must NOT
+# fire. Any run of git GLOBAL OPTION tokens (each a `-x`/`--x` token plus an optional value
+# token that is not itself another option) is allowed between `git` and the `commit`/`tag`
+# subcommand. See docs/adr/0034-git-invocation-form-widening.md for the decision history. Non-commit subcommands stay un-matched: `git -C <wt> log`,
 # `git show`, `git rev-parse`, `git diff` all carry a non-commit/tag subcommand
 # word, so they do not match — the widening adds commit/tag FORMS only, never
 # new subcommands. (Quotes are stripped first so a --message body that mentions
@@ -280,7 +264,7 @@ def _stop_text(current_event: dict) -> str:
 
     Claude Code's real Stop payload exposes the assistant's final message as
     ``last_assistant_message`` and carries NO ``stop_reason`` key (verified vs
-    1759 captured Stop events; see substrate.claims.claims_done +
+    1759 captured Stop events; see substrate.claims.whole_suite_pass_claim +
     ADVERSARY-FINDINGS.md (repo history)). We therefore:
       - read ``last_assistant_message`` first, falling back to ``response`` (the
         bash-port / synthetic-test payload shape), and
@@ -356,14 +340,8 @@ def _real_commit_in_history(history: list) -> bool:
     return False
 
 
-# jscpd note (2026-07-09): flagged as a clone against phantomCitation.py. Verified: the matched
-# span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
-# history: list, pattern: Check, conn=None) -> Optional[Finding]` -- byte-identical across 9
-# check modules (grep '^def predicate(' checks/*.py: writeThrashRevert.py, verifierExitMasking.py,
-# unsourcedWebfetch.py, selfMuteGuard.py, illusoryAuthorshipTrailer.py, forbiddenLocation.py,
-# among others) -- plus a coincidental preceding `return False` from this file's own unrelated
-# `_real_commit_in_history` helper. A dispatcher-invoked entrypoint's signature is a structural
-# contract, not extractable logic; the two functions' bodies do unrelated things.
+# See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
+# against phantomCitation.py was verified and dismissed.
 def _claim_subject(current_event: dict) -> Optional[str]:
     if current_event.get("hook_event_name") != "Stop":
         return None

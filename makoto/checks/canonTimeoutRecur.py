@@ -22,9 +22,8 @@ boundary (design's method B). Two primitives are installed:
     a direct error state — a stuck retry loop with nothing changed between attempts. Verdict is
     judged per KEY at the END of each of that key's maximal consecutive runs, and the LAST
     judgment for each key wins — so a later success for the same key silences it even when other,
-    different calls happened in between (a bugfix: the original judged the instant a bad run
-    closed and never looked further ahead, so a retry loop that failed twice, had an unrelated
-    call intervene, then genuinely succeeded on a later attempt still read as permanently stuck).
+    different calls happened in between. See docs/adr/0022-recur-stuck-latest-run-wins.md for the
+    decision history.
 
 ADAPTATION NOTE (the substrate divergence from the ancestor, revised for FD14-A): the ancestor's
 `calls_from_history` turned every PreToolUse OR PostToolUse row into a Call. Live makoto's real
@@ -113,12 +112,9 @@ def exit_code(c: Call):
     read it (see its own docstring — the real substrate carries no exit_code on tool calls, and a
     non-zero exit on an idempotent call is not itself an error state).
 
-    BUGFIX (this ticket): was reading the wrong key `"exit_code"` — the real substrate's Bash
-    tool_response carries it camelCase as `"exitCode"` (confirmed live-correct elsewhere:
-    makoto/ledger.py:49 and makoto/checks.py:124 both already read `tool_response["exitCode"]`).
-    This terminal was consequently dead code no installed primitive could ever observe firing
-    correctly; no live primitive reads it (see docstring above), so the fix changes no gate
-    behavior — only makes the terminal itself correct."""
+    The key read is the real substrate's camelCase `"exitCode"`, matching every other reader of a
+    Bash tool_response in this repo. See docs/adr/0023-canon-exit-code-terminal-key.md for the
+    decision history."""
     return _result(c).get("exitCode")
 
 
@@ -171,16 +167,12 @@ def recur_stuck(calls: list) -> bool:
     [ERR, ERR, OK] does NOT fire — the later identical SUCCESS lands in the same run and flips
     run_all_err False before the run ends, silencing the loop.
 
-    BUGFIX (this ticket, live-observed): the original judged each run the instant it closed and
-    returned True immediately on the first bad one, permanently for the rest of the calls list —
-    so [ERR, ERR, <different call>, ERR, ERR, ..., <same key succeeds>] stayed stuck-True even
-    though the SAME call went on to genuinely resolve later, just not immediately back-to-back
-    with the failing run (a different, unrelated call sat in between, e.g. checking a PR's status
-    between retries against a flaky API). A key whose retries eventually succeed, however many
-    unrelated calls sit in between, is not a stuck loop by the time the turn ends — only a key
-    whose MOST RECENT run is itself still bad should fire. Every run is now judged as it closes,
-    per key, and the LAST judgment for each key wins; a fresh success (even a lone one, not
-    itself part of a run>=2) for a key overwrites an earlier bad verdict for that same key."""
+    A key whose retries eventually succeed, however many unrelated calls sit in between, is not a
+    stuck loop by the time the turn ends — only a key whose MOST RECENT run is itself still bad
+    fires. Every run is judged as it closes, per key, and the LAST judgment for each key wins; a
+    fresh success (even a lone one, not itself part of a run>=2) for a key overwrites an earlier
+    bad verdict for that same key. See docs/adr/0022-recur-stuck-latest-run-wins.md for the
+    decision history."""
     def _no_info_err(c) -> bool:
         return interrupted(c) or bool(self_error_code(c))
 
@@ -230,13 +222,9 @@ def _pairing_input(inp) -> str:
     """`_canon_input` with leading-dunder keys dropped — the identity used ONLY to pair a
     PostToolUse back to its own PreToolUse, never to judge a verdict.
 
-    A harness may add bookkeeping keys to `tool_input` BETWEEN a call's Pre and its Post
-    (observed live on the `Artifact` tool: a 3-key Pre, then a 6-key Post carrying
-    `__artifactPlanConsentAsk`, `__artifactPlanConsentDecisionCaps`, `__artifactPublishTarget`).
-    Pairing on the FULL canonical input therefore never matched those two rows, so every such
-    call left a dangling Pre and synthesized a phantom mid-turn-abandonment failure — for a call
-    that in fact succeeded. Two of those back-to-back read as an all-error run of length 2 and
-    false-fired `canon.recur` STUCK on a retry that had actually succeeded (#17).
+    A harness may add bookkeeping keys to `tool_input` BETWEEN a call's Pre and its Post, so
+    pairing on the FULL canonical input would leave a dangling Pre for a call that in fact
+    succeeded. See docs/adr/0024-dunder-insensitive-call-pairing.md for the decision history.
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
     cannot collapse two genuinely distinct calls. This RELAXES PAIRING ONLY: `recur_stuck`,
@@ -359,12 +347,9 @@ def _release_clause(cid: str) -> str:
     """The `release.operator` affordance sentence for ONE primitive, generated from its id.
 
     `canon_gate` offers the ackblock discharge to EVERY fired primitive — the loop calls
-    `find_ack_block(cid, ...)` for whatever fired, not just `timeout`. But the affordance was
-    spelled out only in `timeout`'s hand-written hint, so a fired `canon.recur` told the agent
-    to "change the input" and nothing else. When the finding was a false positive the agent had
-    no reachable discharge named anywhere, and every subsequent Stop re-fired the same block
-    until the rows aged out of the recency window — a mechanism that existed but was invisible
-    reads exactly like a mechanism that is missing.
+    `find_ack_block(cid, ...)` for whatever fired, not just `timeout` — so every hint must name
+    it: a mechanism that exists but is invisible reads exactly like a mechanism that is missing.
+    See docs/adr/0025-per-primitive-release-affordance.md for the decision history.
 
     Generated per-id rather than written per-entry so a primitive cannot be added to
     CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —

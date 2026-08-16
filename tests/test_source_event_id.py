@@ -10,37 +10,7 @@ provenance), `source_event_id` stays 0 and these go red — so a missed site can
 silently. Covers both finding-producing paths (predicate + gate).
 """
 import json
-import os
 import sqlite3
-import subprocess
-import sys
-from pathlib import Path
-
-
-def _setup_state(tmp_path):
-    """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.state.store import init_db
-    state_dir = tmp_path / "makoto_state"
-    citations = tmp_path / "CITATIONS.md"
-    citations.write_text("Smith 2020\n")
-    init_db(state_dir, citations)
-    return state_dir
-
-
-def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
-    env = os.environ.copy()
-    env["MAKOTO_STATE_DIR"] = str(state_dir)
-    if extra_env:
-        env.update(extra_env)
-    proc = subprocess.run(
-        [sys.executable, "-m", "makoto.dispatch"],
-        input=json.dumps(payload).encode("utf-8"),
-        capture_output=True,
-        env=env,
-        cwd=str(Path(__file__).parent.parent),
-    )
-    return proc.returncode, proc.stdout.decode("utf-8")
 
 
 def _only_event_id(state_dir) -> int:
@@ -62,9 +32,8 @@ def _recorded_findings(state_dir) -> list[dict]:
     return [f for r in rows for f in r.get("findings", [])]
 
 
-def test_predicate_finding_carries_source_event_id(tmp_path):
+def test_predicate_finding_carries_source_event_id(state_dir, run_dispatch):
     """A live predicate fire (content.verifier_predicate_weakened) records a finding stamped with its events.id."""
-    state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PreToolUse",
         "tool_name": "Write",
@@ -75,7 +44,7 @@ def test_predicate_finding_carries_source_event_id(tmp_path):
             "content": 'def check(x):\n    return x.startswith("ok")\n',
         },
     }
-    rc, out = _run_dispatch(state_dir, payload)
+    rc, out = run_dispatch(state_dir, payload)
     # SPEC-5 Task 8: a PreToolUse block renders wire.py's real Pre shape (deny), not a literal
     # "block" substring.
     assert rc == 0 and '"deny"' in out, f"content.verifier_predicate_weakened should fire; got rc={rc} out={out!r}"
@@ -89,19 +58,18 @@ def test_predicate_finding_carries_source_event_id(tmp_path):
     )
 
 
-def test_gate_finding_carries_source_event_id(tmp_path):
+def test_gate_finding_carries_source_event_id(state_dir, run_dispatch, tmp_path):
     """A gate fire (completion gate on an unbacked production claim) is recorded with its
     events.id too — the second finding-producing path is also stamped. Pinned in shadow
     (MAKOTO_DISABLE_GATES=1) so this asserts provenance on the AUDIT path independently of
     the live block behavior."""
-    state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "Stop",
         "session_id": "prov_gate",
         "cwd": str(tmp_path),  # the cited file definitely does not exist under here
         "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
     }
-    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_GATES": "1"})
+    rc, out = run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_GATES": "1"})
     assert rc == 0 and out == "", "shadow gate must audit without blocking"
     gate_findings = [f for f in _recorded_findings(state_dir)
                      if f["pattern_id"].startswith("gate.")]

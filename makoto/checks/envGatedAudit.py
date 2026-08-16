@@ -11,15 +11,11 @@ ONLY when someone opts in — a silently-disable-able integrity check, i.e. a HO
 audit survives in name while its guarantee is gutted). This is makoto's own CLAUDE.md convention
 ("Audit/verification code gated behind an env var (`if os.environ.get(...AUDIT...)`)").
 
-Why AST, not the old string matcher (cert 2026-06-02, warning-tier-elimination:43, which CUT the
-prior ``regex_file_predicate``): the old regex (1) fired on MENTIONS in comments/strings/docs
-(instance-vs-mention FP) — it even targeted ``.md``, firing on CLAUDE.md describing the shape;
-(2) required a literal ``AUDIT`` in the var NAME (its ``body_rx``), a flat FN on a BODY-only
-signal like ``if os.environ.get("MAKOTO_SHADOW"): run_integrity_check()``; (3) matched only
-``os.environ.get(`` — ``os.getenv()`` was a flat FN. The active-code AST gate
-(``substrate.factories.parse_introduced``) dissolves (1) — a comment / ``str`` Constant / docstring is
-never a real ``ast.If``; checking the gated BODY's code identifiers (not just the var name)
-dissolves (2); ``callee_chain`` matching both call forms + the subscript form dissolves (3).
+Detection is an ACTIVE-CODE AST gate (``substrate.factories.parse_introduced``), not a string
+matcher: a comment / ``str`` Constant / docstring is never a real ``ast.If``, so a mention cannot
+fire; the integrity signal is read from the env-var KEY *or* the gated body's code identifiers;
+and ``callee_chain`` matches both call forms plus the subscript form. See
+docs/adr/0031-env-gated-audit-ast-rewrite.md for the migration history.
 
 NAME-AGNOSTIC: the integrity signal comes from the env-var KEY *or* a body code identifier, so it
 is not tied to the literal substring ``AUDIT``. A bare feature flag

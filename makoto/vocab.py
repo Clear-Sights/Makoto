@@ -70,8 +70,6 @@ class Finding:
 
 # --- L0 lexicons (verbatim from core/lexicons.py) ------------------------------
 
-_DONE_WORDS_RX = re.compile(r"\b(done|complete|completed|finished)\b", re.IGNORECASE)
-
 # File extensions recognized by the location detector. Kept at L0 because both the detector
 # and shared path-suffix discharge logic must recognize precisely the same extension set.
 _PATH_EXT = (
@@ -193,14 +191,6 @@ _ASIDE_RX = re.compile(r"\bI\s+forgot\s+to\s+(?:mention|note|add|say|point\s+out
 _USER_CONCESSION_RX = re.compile(
     r"\b(?:you['’]re\s+right|as\s+you\s+said|you\s+caught|you\s+pointed\s+out|"
     r"you\s+were\s+right|good\s+catch)\b",
-    re.IGNORECASE,
-)
-
-# Wide success/completeness lexicon (fixes the success-synonym gap: done|complete|finished
-# missed "full/all/shipped/ideal/optimal/green/verified/merged/...").
-_SUCCESS_WORDS_RX = re.compile(
-    r"\b(done|complete|completed|finished|fully|full|all|every|everything|exhaustive|"
-    r"shipped|merged|deployed|verified|passing|green|ideal|optimal|ready)\b",
     re.IGNORECASE,
 )
 

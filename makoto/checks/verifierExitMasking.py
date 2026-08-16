@@ -4,12 +4,11 @@ Forcing a verifier's exit code to 0 — `pytest || true`, `go test ; true`, `set
 runner — manufactures a green that survives real failures. A core honesty cheat (CLAUDE.md
 commandment 1: no `|| true` / `; true` / `set +e` to hide failures).
 
-SCOPED to exit-code masking ONLY (2026-06-02 graduation). The `2>/dev/null` / `&>/dev/null` branch
-was REMOVED: stream redirection does NOT alter `$?` (`sys.exit(7) 2>/dev/null` still exits 7) — every
-runner in _LEAD_RUNNER_RX signals failure via a nonzero exit, so silencing stderr cannot turn a real
-failure into a green. The devnull branch detected honest stderr-noise suppression, not failure-masking
-(a category error), and was the predicate's only false-positive source on the real corpus (2 fires,
-both honest diagnostics). Removing it drives corpus-FP to 0 → graduated to BLOCKING.
+SCOPED to exit-code masking ONLY. Stream redirection (`2>/dev/null` / `&>/dev/null`) is deliberately
+OUT of scope: it does NOT alter `$?` (`sys.exit(7) 2>/dev/null` still exits 7) — every runner in
+_LEAD_RUNNER_RX signals failure via a nonzero exit, so silencing stderr cannot turn a real failure
+into a green. See docs/adr/0049-verifier-exit-masking-devnull-branch-removal.md for the decision
+history.
 
 FP-SAFE BY SHELL COMMAND POSITION: this check tokenizes the Bash command and only treats a runner,
 mask, or `set +e` as evidence when it is an executed command/operator, not prose in a comment,
@@ -26,13 +25,10 @@ runner, FP-safe). The bare `<tool> test/check` fallback (unknown tool, no launch
 
 Knight-Leveson: stdlib re only.
 """
-# jscpd note (2026-07-09): flagged as a clone against illusoryAuthorshipTrailer.py. Verified: the
-# matched span is only this docstring's closing "Knight-Leveson" line + the standard
-# `from __future__ import annotations` / `import re` / `from typing import Optional` /
-# `from makoto.vocab import Finding` + `from makoto.registry import Check` headers both Pre-hook predicate modules need --
-# it ends before any function body, so no logic is shared (this module's runner/exit-mask
-# detection is unrelated to illusoryAuthorshipTrailer's Claude-authorship-trailer regex). See
-# tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
+# See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
+# against illusoryAuthorshipTrailer.py was verified and dismissed (only shared span is the
+# standard predicate-module docstring/import header, no logic in common).
+# tests/test_no_alpha_duplicate_functions.py is the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from typing import Optional

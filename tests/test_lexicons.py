@@ -10,10 +10,10 @@ from pathlib import Path
 def test_lexicons_exports_all_regex_symbols():
     from makoto import vocab as lexicons
     for name in (
-        "_DONE_WORDS_RX", "_NEGATION_RX", "_MAKOTO_ALLOW_RX", "JWT_CALLEE_RX",
+        "_NEGATION_RX", "_MAKOTO_ALLOW_RX", "JWT_CALLEE_RX",
         "_TEST_RUNNER_RX", "_FAILURE_SUMMARY_RX", "_SUCCESS_SUMMARY_RX", "_FAILURE_MARKER_RX",
         "_ADMIT_CORE_RX", "_FORWARD_YET_RX", "_FORWARD_FUTURE_RX", "_ASIDE_RX",
-        "_USER_CONCESSION_RX", "_SUCCESS_WORDS_RX", "_UNIVERSAL_RX",
+        "_USER_CONCESSION_RX", "_UNIVERSAL_RX",
         "_ENUMERATION_RX", "_CITATION_RX",
     ):
         assert isinstance(getattr(lexicons, name), re.Pattern), name

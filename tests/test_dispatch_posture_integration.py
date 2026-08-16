@@ -12,7 +12,7 @@ fired finding through `makoto.verdict`'s posture fold + wire tables instead of t
 import json
 import sqlite3
 
-from tests.test_dispatch import _setup_state, _run_dispatch
+from tests.conftest import _setup_state, _run_dispatch
 
 
 def test_pretooluse_block_renders_new_wire_shape(tmp_path):
@@ -95,47 +95,87 @@ def test_posttooluse_still_refreshes_and_records_without_capture(tmp_path):
         conn.close()
 
 
-def test_meta_block_finding_floors_at_ask_under_loose_and_silent(tmp_path):
-    """content.self_mute_guard (layer="meta") fires BLOCK on a self-mute attempt. Under LOOSE or
-    SILENT posture, an object-layer BLOCK would soften to ADVISE or vanish to ALLOW -- but a meta
-    finding must floor at ASK instead: a loose posture setting must not suppress detection of
-    tampering with the mechanism that enforces posture itself."""
-    state_dir = _setup_state(tmp_path)
-    payload = {
-        "hook_event_name": "PreToolUse",
-        "session_id": "posture_meta",
-        "cwd": str(tmp_path),
-        "tool_name": "Write",
-        "tool_input": {
-            "file_path": ".claude/settings.json",
-            "content": '{"MAKOTO_DISABLE": "1"}',
-        },
-    }
+# --- meta-layer immunity (Check.layer wired into the fold, claude/port-layer-immunity) ----------
+# A layer="meta" check's ONLY possible trigger is tampering with Makoto's own audit/enforcement
+# machinery, so LOOSE/SILENT must not be able to soften its BLOCK below ASK -- the posture knob
+# is itself part of the machinery a meta check guards. Object-layer folds are byte-identical.
+
+import io
+
+from makoto import dispatch, verdict
+from makoto.vocab import Finding
+
+
+def _block_finding(pattern_id):
+    return Finding(pattern_id=pattern_id, file="settings.json", line=1, level="error",
+                   message=f"{pattern_id} fired", source_event_id=1)
+
+
+def _emit(finding, mode, monkeypatch, permission_mode=None):
+    monkeypatch.setenv("MAKOTO_MODE", mode)
+    stream = io.StringIO()
+    dispatch._emit_decision([finding], "PreToolUse", stream=stream,
+                            permission_mode=permission_mode)
+    return stream.getvalue()
+
+
+def test_apply_meta_block_floors_at_ask_under_loose_and_silent():
+    """The pure fold: a meta BLOCK never softens below ASK; every other (outcome, layer) cell of
+    the fold table is unchanged from the object-layer rules."""
+    assert verdict.apply(verdict.BLOCK, verdict.LOOSE, layer="meta") == verdict.ASK
+    assert verdict.apply(verdict.BLOCK, verdict.SILENT, layer="meta") == verdict.ASK
+    # STRICT / ASK postures already sit at or above the floor -- unchanged.
+    assert verdict.apply(verdict.BLOCK, verdict.STRICT, layer="meta") == verdict.BLOCK
+    assert verdict.apply(verdict.BLOCK, verdict.ASK_POSTURE, layer="meta") == verdict.ASK
+    # The contract is exactly "a meta BLOCK never softens below ASK" -- a meta ASK/ADVISE/ALLOW
+    # folds by the ordinary rules (SILENT still suppresses them).
+    assert verdict.apply(verdict.ASK, verdict.SILENT, layer="meta") == verdict.ALLOW
+    assert verdict.apply(verdict.ADVISE, verdict.LOOSE, layer="meta") == verdict.ADVISE
+    assert verdict.apply(verdict.ALLOW, verdict.SILENT, layer="meta") == verdict.ALLOW
+    # Object layer (and the default, i.e. every existing caller): byte-identical old behavior.
+    assert verdict.apply(verdict.BLOCK, verdict.LOOSE) == verdict.ADVISE
+    assert verdict.apply(verdict.BLOCK, verdict.SILENT) == verdict.ALLOW
+    assert verdict.apply(verdict.BLOCK, verdict.LOOSE, layer="object") == verdict.ADVISE
+    # D6 oversight clamp outranks the floor question entirely: raw BLOCK either way.
+    assert verdict.apply(verdict.BLOCK, verdict.LOOSE, layer="meta",
+                         permission_mode="bypassPermissions") == verdict.BLOCK
+
+
+def test_meta_check_ids_derived_not_hand_synced():
+    """_meta_check_ids is DERIVED from the catalog's layer tags -- exactly the two known-meta
+    checks today (same source of truth tests/test_meta_layer.py pins)."""
+    assert dispatch._meta_check_ids() == frozenset({"content.self_mute_guard",
+                                                    "gate.self_wired"})
+
+
+def test_meta_block_finding_floors_at_ask_on_the_wire(monkeypatch):
+    """RED under the pre-wiring code (LOOSE softened a self_mute_guard BLOCK to an allow+context
+    advisory; SILENT swallowed it entirely): a BLOCK-level finding from the meta-layer
+    content.self_mute_guard check renders the Pre 'ask' wire shape under BOTH softening
+    postures -- detection of tampering with Makoto's own kill-switches survives a permissive
+    MAKOTO_MODE."""
+    meta = _block_finding("content.self_mute_guard")
     for mode in ("loose", "silent"):
-        rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_MODE": mode})
-        assert rc == 0
-        assert out, f"expected a rendered body under MAKOTO_MODE={mode}, got empty stdout"
+        out = _emit(meta, mode, monkeypatch)
+        assert out, f"meta BLOCK must not be suppressed under {mode}"
         body = json.loads(out)
         assert body["hookSpecificOutput"]["permissionDecision"] == "ask", (
-            f"meta BLOCK must floor at ask under MAKOTO_MODE={mode}, got {body!r}"
-        )
+            f"meta BLOCK must floor at ASK under {mode}, got {body}")
 
 
-def test_object_layer_block_still_softens_under_loose(tmp_path):
-    """Control: an object-layer (non-meta) BLOCK still softens normally under LOOSE -- the meta
-    floor must not leak into ordinary checks' folding."""
-    state_dir = _setup_state(tmp_path)
-    payload = {
-        "hook_event_name": "PreToolUse",
-        "session_id": "posture_object",
-        "cwd": "/tmp",
-        "tool_input": {
-            "file_path": "constitution/integrity/checks/v.py",
-            "content": 'def check(x):\n    return x.startswith("ok")\n',
-        },
-    }
-    rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_MODE": "loose"})
-    assert rc == 0
-    body = json.loads(out) if out else {}
-    decision = body.get("hookSpecificOutput", {}).get("permissionDecision")
-    assert decision != "deny", "object-layer BLOCK should have softened under LOOSE, not stayed deny"
+def test_object_block_finding_still_folds_normally(monkeypatch):
+    """Control: an object-layer BLOCK finding keeps the exact old fold -- LOOSE softens it to an
+    allow+context advisory, SILENT writes nothing at all."""
+    obj = _block_finding("content.verifier_predicate_weakened")
+    loose = json.loads(_emit(obj, "loose", monkeypatch))
+    assert "additionalContext" in loose["hookSpecificOutput"], "LOOSE object BLOCK -> ADVISE"
+    assert loose["hookSpecificOutput"].get("permissionDecision") != "ask"
+    assert _emit(obj, "silent", monkeypatch) == "", "object BLOCK under SILENT stays suppressed"
+
+
+def test_meta_floor_recheck_certificate_agrees(monkeypatch):
+    """F4 consistency: with MAKOTO_RECHECK_CERTIFICATE=1 the certificate reconstruction folds
+    the meta floor identically (a mismatch would raise inside _emit_decision)."""
+    monkeypatch.setenv("MAKOTO_RECHECK_CERTIFICATE", "1")
+    out = _emit(_block_finding("content.self_mute_guard"), "loose", monkeypatch)
+    assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "ask"

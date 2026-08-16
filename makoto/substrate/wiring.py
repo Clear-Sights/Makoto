@@ -25,16 +25,18 @@ MAKOTO_CLAUDE_FLAG = "_makoto_managed"
 PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 
 
-# makoto's own hook-command invocation tokens -- anchored to the forms it actually installs, and
-# ONLY those: `~/.claude/makoto_state/dispatch.sh` (settings.json wiring, two-segment path so a
-# bare `dispatch.sh` living anywhere else does not match), `${CLAUDE_PLUGIN_ROOT}/makoto/
+# makoto's own hook-command invocation tokens -- anchored to the forms THIS TREE actually
+# installs, and ONLY those: `~/.claude/makoto_state/dispatch.sh` (settings.json wiring, written
+# by install.py's `_install_bash_scripts`/`_wire_claude_hooks`; two-segment path so a bare
+# `dispatch.sh` living anywhere else does not match), `${CLAUDE_PLUGIN_ROOT}/makoto/
 # _dispatch_shim.sh` (the ONE plugin-manifest shim form -- see hooks/hooks.json, which wires
 # every declared event to that single script), and the module forms `-m makoto.dispatch` /
-# `-m makoto.configchange` (the two hook entrypoints; `\b` so `makoto.dispatcher_v2` never
-# matches).
+# `-m makoto.configchange` (the two hook entrypoints, both of which have a live `__main__`;
+# `\b` so `makoto.dispatcher_v2` never matches).
 #
-# Deliberately does NOT admit `_dispatch_configchange_shim.sh`: this layout has no such script
-# (configchange is reached as `-m makoto.configchange`, its adapter merged into
+# Deliberately NOT a verbatim copy of the pattern this fix carried on the branch it came from:
+# that one also admitted `_dispatch_configchange_shim.sh`, a script this layout does not have
+# (configchange is reached as `-m makoto.configchange`, its adapter having been merged into
 # makoto/configchange.py). An ownership predicate that recognizes a filename nothing installs is
 # a standing licence to delete a file makoto did not write -- the exact over-match this regex
 # exists to close, so the alternative is dropped rather than kept "just in case". If a

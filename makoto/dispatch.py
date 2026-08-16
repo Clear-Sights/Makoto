@@ -154,9 +154,8 @@ def _note_host_dialect(state_dir: Path, session_id, notes: dict, host_event) -> 
 
 
 def _self_verify_chain(state_dir: Path) -> None:
-    """Verify the ledger chain on every dispatch, advisory-only and never raising.
-
-    See docs/adr/0001-advisory-first-ledger-self-verification.md for the rollout decision."""
+    """Re-derive the chain's tamper evidence at every dispatch, advisory-only. A clean or
+    absent/empty chain is silent. Never raises. See docs/adr/0005-chain-verification-rollout.md."""
     try:
         from makoto.state import ledger as _ledger
         broken_at = _ledger.verify_chain()
@@ -209,8 +208,12 @@ def _connect_with_retry(db_path: Path):
     return None
 
 
-# The events table is a bounded transient evidence buffer, not a durable log.
-# See docs/adr/0002-bound-the-transient-events-buffer.md for the retention rationale.
+# The events table is a TRANSIENT evidence buffer, not a durable log: the only production
+# reader is _select_recent, which never looks back past a 1-hour same-session window. Anything
+# older is dead weight. We keep a small multiple of that window and prune the rest on every
+# ingest, which hard-bounds the table to ~one working window's worth of rows regardless of how
+# many sessions accumulate — the DB cannot grow without limit. Durable cross-session state lives
+# in ledger/commitments; the fire (blocking-event) log lives in audit.jsonl. Neither is touched.
 _EVENT_RETENTION_HOURS_DEFAULT = 1.5   # just over the 1-hour _select_recent read window (must stay >= it)
 
 
@@ -275,51 +278,24 @@ def _keyword_hit(pattern, raw_payload: str) -> bool:
 
 
 def _disabled_pattern_ids() -> frozenset[str]:
-    """Parse disabled canonical pattern ids; legacy aliases are not supported.
-
-    See docs/adr/0008-retire-legacy-pattern-id-aliases.md for the epoch-reset decision."""
+    """Parse MAKOTO_DISABLE_PATTERNS=<id>,<id>,... as canonical family.name ids.
+    See docs/adr/0006-canonical-pattern-ids.md for the epoch-reset history."""
     raw = os.environ.get("MAKOTO_DISABLE_PATTERNS", "")
     return frozenset(p.strip() for p in raw.split(",") if p.strip())
 
 
 def _gates_enabled() -> bool:
-    """Return whether the corpus-validated Stop gates may block live.
-
-    See docs/adr/0003-enable-stop-gates-after-corpus-validation.md for the evidence and escape valve."""
+    """Whether Stop gates block live; MAKOTO_DISABLE_GATES=1 returns them to audited shadow.
+    See docs/adr/0007-stop-gates-live-rollout.md for rollout evidence."""
     return os.environ.get("MAKOTO_DISABLE_GATES", "").strip().lower() not in ("1", "true", "yes", "on")
 
 
 @lru_cache(maxsize=1)
 def _blocking_gate_ids() -> frozenset:
-    """Derive and memoize the structurally blocking-eligible Stop-check ids.
-
-    See docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for the loader migration."""
+    """Stop-check ids eligible to reach `_emit_decision`, derived from `Check.may_block`.
+    Lazy and memoized to avoid catalog imports outside Stop dispatch. See
+    docs/adr/0002-may-block-field.md for the structural-eligibility history."""
     return frozenset(c.id for c in load_checks(edge="Stop") if c.may_block)
-
-
-@lru_cache(maxsize=1)
-def _meta_check_ids() -> frozenset:
-    """The ids of every check declaring `layer="meta"` -- a check whose only possible trigger is
-    tampering with Makoto's own audit/enforcement machinery. DERIVED from `Check.layer` via
-    `load_checks()` across every edge -- never hand-synced, matching `_blocking_gate_ids()`'s own
-    discipline, so a check tagged meta is picked up here automatically, not by memory."""
-    return frozenset(
-        c.id for edge in ("Pre", "Post", "Stop", "SubagentStop", "SessionStart")
-        for c in load_checks(edge=edge) if getattr(c, "layer", "object") == "meta"
-    )
-
-
-def _finding_layer(outcome, finding, mode, permission_mode) -> str:
-    """Returns "meta" only on the exact branch where verdict.apply's meta-BLOCK floor can bind
-    (a raw BLOCK, from a meta-tagged check, under LOOSE/SILENT posture, not oversight-clamped) --
-    so the default STRICT hot path never pays the `_meta_check_ids()` catalog-derivation cost."""
-    if outcome != verdict.BLOCK or mode not in ("loose", "silent"):
-        return "object"
-    if verdict.is_oversight_clamped(permission_mode):
-        return "object"
-    if finding.pattern_id in _meta_check_ids():
-        return "meta"
-    return "object"
 
 
 def _run_predicates(conn, payload: dict, history: list, event_id: int,
@@ -332,8 +308,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     Predicate exceptions are captured to dispatch_errors.jsonl (audit.append_error)
     and skipped — they must never block agent work.
     """
-    # The registry is the sole catalog; tests pin the Pre tier's BLOCK-only invariant.
-    # See docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md.
+    # Source directly from the unified checks catalog. See docs/adr/0001-unified-check-discovery.md.
     patterns = load_precheck_catalog()
     disabled = _disabled_pattern_ids()
     candidates = [p for p in patterns
@@ -410,17 +385,12 @@ _OUTCOME_RANK = {verdict.BLOCK: 3, verdict.ASK: 2, verdict.ADVISE: 1, verdict.AL
 # serves both, keyed by the SAME edge string "Stop"/"SubagentStop" it also echoes as hook_name).
 _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post", "Stop": "Stop",
                 "SubagentStop": "SubagentStop"}
-# PostToolUse must have its own wire edge rather than falling back to Pre.
-# See docs/adr/0009-render-decisions-with-per-edge-wire-tables.md for the latent-fallback history.
+# PostToolUse has its own wire edge; see docs/adr/0010-posttooluse-wire-edge.md for why.
 
 
 def _recheck_certificate_enabled() -> bool:
-    """Opt-in (OFF by default, mirroring the MAKOTO_DISABLE_* switch parsing): when
-    MAKOTO_RECHECK_CERTIFICATE=1, `_emit_decision` re-verifies its own folded verdict via
-    `makoto.verdict.recheck_certificate` before writing it to the wire. A mismatch
-    RAISES (recheck.py's deliberate not-fail-open rule) — which is why this is opt-in: with the
-    flag unset, production hook behavior is provably unchanged (this predicate is the only new
-    code on the hot path, and it cannot raise)."""
+    """Whether MAKOTO_RECHECK_CERTIFICATE enables pre-wire verdict verification. A mismatch
+    raises. See docs/adr/0011-opt-in-verdict-recheck.md for why this remains opt-in."""
     return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
 
 
@@ -437,19 +407,42 @@ def _worst_finding(findings: list[Finding]) -> Optional[tuple[str, Finding]]:
     return best
 
 
+@lru_cache(maxsize=1)
+def _meta_check_ids() -> frozenset:
+    """The check ids tagged `layer=\"meta\"` in the catalog (see Check.layer's docstring in
+    makoto/registry.py) -- DERIVED from `load_checks()` across every edge, never a hand-synced
+    literal, same discipline as `_blocking_gate_ids()`. Lazy + memoized because the loader
+    imports every checks/*.py module: `_finding_layer` below only calls this on the one branch
+    where the answer can matter (a BLOCK under a softening posture), so the default STRICT hot
+    path never pays the import."""
+    return frozenset(c.id for c in load_checks() if c.layer == "meta")
+
+
+def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -> str:
+    """The `layer` to hand `verdict.apply` for the worst finding -- \"meta\" iff the finding came
+    from a meta-layer check AND the fold is on the one branch where the meta floor can bind (a
+    raw BLOCK under LOOSE/SILENT with no oversight clamp). Everywhere else it returns \"object\",
+    which is fold-equivalent to the true layer by `apply`'s own rule (the floor only acts on
+    exactly that branch) -- so the catalog import in `_meta_check_ids` is never paid on the
+    default-STRICT hot path. Shared verbatim by `verdict.recheck_certificate` so the F4
+    certificate reconstruction folds identically."""
+    if (outcome == verdict.BLOCK
+            and mode in (verdict.LOOSE, verdict.SILENT)
+            and not verdict.is_oversight_clamped(permission_mode)
+            and finding.pattern_id in _meta_check_ids()):
+        return "meta"
+    return "object"
+
+
 def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
                    permission_mode=None) -> None:
     """Fold the worst fired outcome through the configured MAKOTO_MODE posture (makoto.verdict) and
     render it via verdict.dispatch_posture's per-edge table, writing the body to stdout iff non-empty.
 
-    This is the real posture pipeline (SPEC-5 Task 8), replacing the old single ad-hoc
-    "decision":"block" shape that main() used identically for every edge. A BLOCK outcome carries
-    the finding's message plus its JIT hint (convention text / makoto-allow hatch / conventions
-    pointer — the same text `_build_decision` used to put in "retry_hint") as the Decision's
-    `.detail`, so verdict's per-edge wire renderer surfaces it in place of its constant reason text.
+    A BLOCK outcome carries the finding's message plus its JIT hint as the Decision detail.
     An ADVISE/ASK outcome at an edge whose table has no entry for it (e.g. ADVISE at Stop/
-    SubagentStop — everything but BLOCK renders `{}` there by the wire tables' own design) — and no
-    findings at all — both fall through to "write nothing", matching the old None-decision case.
+    SubagentStop) and no findings both produce no output. See
+    docs/adr/0012-posture-pipeline-migration.md for the migration history.
 
     `permission_mode` (D6, additive): threaded into `verdict.apply` so a session running
     bypassPermissions/dontAsk is clamped to STRICT regardless of the operator's configured
@@ -540,10 +533,8 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     """PostToolUse — accumulation: store the event (already done by _ingest_event
     upstream so history-walking predicates can see tool_results) and record
     the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
-    No predicate evaluation and no block — PostToolUse is for accumulation,
-    never decision. (SPEC-5 Task 8: citations.capture() removed here — see
-    makoto/citations.py; refresh_if_stale upstream and record_update below are
-    separate call sites and stay.)"""
+    No predicate evaluation and no block — PostToolUse is for accumulation, never decision.
+    See docs/adr/0013-posttooluse-accumulation.md for the migration history."""
     try:
         from makoto.state import ledger as _ledger
         from makoto.kit import bash_output_text, is_test_runner
@@ -553,11 +544,8 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
         delta_finding = None
-        # Task 3, the domain correction (test-delta redirect): compute the delta vs the
-        # PRIOR recorded testrun BEFORE record_update's upsert overwrites it -- the only
-        # point where "prior" is still readable. ADVISE-tier (Post has no fire_level
-        # invariant -- Pre's error-only rule doesn't apply here): a factual diff is always
-        # safe to surface, never a toothless hedge, so no discrimination problem exists.
+        # Compute test delta before record_update overwrites the prior run; surface it as ADVISE.
+        # See docs/adr/0019-test-delta-domain-correction.md for why.
         if payload.get("tool_name") == "Bash":
             cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
             if is_test_runner(cmd):
@@ -572,8 +560,8 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # Live writes both declare and advance plans through contractOrder's shared resolution.
-        # See docs/adr/0006-wire-live-plan-declaration-and-advancement.md for the stranded-plan history.
+        # Locating tools declare or advance the live plan through the shared Plan.resolve contract.
+        # See docs/adr/0014-live-plan-lifecycle.md for why.
         if payload.get("tool_name") in _LOCATING_TOOLS:
             from makoto.state import plan as _plan
             loc = _event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
@@ -590,8 +578,8 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         if nid is not None and nid in plan_obj.open_nodes():
                             plan_obj.mark_done(nid)
                             _plan.persist_plan(conn, sid, plan_obj)
-        # Harness task events are the ground truth for the plan-item store.
-        # See docs/adr/0006-wire-live-plan-declaration-and-advancement.md for the source decision.
+        # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
+        # See docs/adr/0015-plan-item-event-source.md for why.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
             from makoto.state import plan as _plan_items
             _plan_items.record_task_event(conn, sid, payload)
@@ -599,8 +587,7 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
             delta_finding = replace(delta_finding, source_event_id=event_id)
             _emit_decision([delta_finding], payload.get("hook_event_name", ""),
                            permission_mode=payload.get("permission_mode"))
-            # Audit the delta finding as well as rendering it.
-            # See docs/adr/0009-render-decisions-with-per-edge-wire-tables.md for the discovered gap.
+            # Persist the delta redirect finding; see docs/adr/0016-delta-finding-audit.md for why.
             _record_audit(state_dir, [delta_finding], payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
@@ -613,11 +600,8 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     completion claim. Gates evaluate on Stop AND SubagentStop (real last_assistant_message) —
     a SubagentStop payload carries the same shape (last_assistant_message, session_id, cwd,
     etc.) as a main-thread Stop, so a sub-agent's own completion claim is checked by the same
-    gates. The three Stop gates — completion, advance, and green_claim — block live under the
-    single _gates_enabled() switch (each validated FP-clean on the 1335-session corpus;
-    green_claim measured POWERED with real Bash output reconstructed in cert.replay_stop).
-    All gate fires are always recorded to the audit log, block or not, so any future
-    real-session FP can still be mined."""
+    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless.
+    See docs/adr/0007-stop-gates-live-rollout.md for rollout evidence."""
     hook_event = payload.get("hook_event_name", "")
     history = _select_recent(conn, payload.get("session_id", ""), event_id)
     findings = _run_predicates(conn, payload, history, event_id,
@@ -636,12 +620,8 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     _record_audit(state_dir, findings + gate_findings, payload)
 
 
-# The table: hook_event_name -> the event's pipeline. This is the whole routing — adding an
-# event is adding one row plus (at most) one handler above, never another branch in main()
-# (the same "a capability is a row, never a module" discipline as Detent's MOVES). The
-# lookup's default is _evaluate_and_gate, the wildcard law: an event with no specialist row
-# is held to the predicate catalog, so a newly wired event can never silently bypass
-# evaluation — exactly the fall-through main()'s old if/elif chain provided, now as data.
+# The table maps hook_event_name to its pipeline; unknown events use the evaluation pipeline.
+# See docs/adr/0017-table-driven-event-routing.md for the design history.
 HANDLERS: dict[str, Any] = {
     "SessionStart": _admit_plan,
     "PostToolUse": _accumulate,
@@ -673,13 +653,32 @@ def main() -> int:
         _dispatch_fact(state_dir, "non_object_payload",
                        f"payload was {type(payload).__name__}, not a JSON object", blocked=True)
         return 2
-    # Normalize known host dialects before routing or persistence.
-    # See docs/adr/0007-normalize-host-dialects-at-the-dispatch-boundary.md for the boundary decision.
+    # The host-dialect boundary (makoto.core.hostdialect): one hop from whatever spelling the
+    # host sent to the protocol every reader below assumes, applied here -- after the envelope
+    # has been proven evaluable (parseable, an object), before ANYTHING routes on or persists it
+    # -- so routing, gates, history, commitments and audit all see one canonical payload rather
+    # than each learning a second dialect. Cursor loads Claude-Code-compatible hook wiring but
+    # delivers camelCase (`preToolUse`): under the wildcard-law routing that ran the WRONG
+    # handler and persisted a row every history decoder was blind to (#19). The unevaluable-
+    # envelope refusals ABOVE are untouched: this normalizes a known event's capitalization, and
+    # `canonical_event` can only return a name already in HANDLERS, so a genuinely unknown event
+    # still takes exactly the wildcard path it took before.
     host_event = payload.get("hook_event_name")
     payload, dialect_notes = hostdialect.normalize_payload(payload, HANDLERS)
     if dialect_notes:
-        # Persist the normalized payload that was evaluated; preserve non-ASCII for keyword scans.
-        # See docs/adr/0007-normalize-host-dialects-at-the-dispatch-boundary.md for why.
+        # Persist WHAT WAS EVALUATED, not the host's spelling of it. The events table is the
+        # rolling substrate every history decoder reads, and those decoders key on the PAYLOAD's
+        # `hook_event_name`/`tool_name` -- ingesting the raw dialect envelope would leave
+        # `event.identical_retry`, `canon.recur`/`canon.timeout` and the claim-graph Bash
+        # evidence path reading zero matching rows for a Cursor session: admitted live, then
+        # invisible to every history-derived gate afterwards. Only rewritten when normalization
+        # actually changed something: a host already speaking the protocol still ingests its own
+        # bytes, byte-identical.
+        # ensure_ascii=False: the default escapes non-ASCII to \uXXXX, and this text is also what
+        # `_keyword_hit` prefilters the Pre catalog against as a raw substring scan -- an escaped
+        # row would make a non-ASCII keyword match on a protocol host and silently miss on a
+        # dialect host, the exact "a check that reads nothing" failure mode this boundary exists
+        # to prevent.
         payload_raw = json.dumps(payload, ensure_ascii=False)
         _note_host_dialect(state_dir, payload.get("session_id"), dialect_notes, host_event)
     db_path = state_dir / "makoto.record.db"

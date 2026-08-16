@@ -5,7 +5,7 @@ import sqlite3
 
 from makoto import dispatch
 from makoto import verdict as posture
-from tests.test_dispatch import _setup_state
+from tests.conftest import _setup_state
 
 
 def _verdict_shape(findings):

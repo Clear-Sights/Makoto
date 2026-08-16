@@ -145,12 +145,16 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
     `posture_value` is IGNORED and the STRICT rule applies instead -- see the module-level
     comment above `_REDUCED_OVERSIGHT_MODES` for why softening in these two modes is unsafe.
 
-    `layer` (optional, additive, default "object"): a check whose only possible trigger is
-    tampering with Makoto's own audit/enforcement machinery declares ``layer="meta"``. A raw
-    BLOCK from a meta check floors at ASK under LOOSE/SILENT instead of softening further --
-    a loose posture setting must not be able to suppress detection of tampering with the very
-    mechanism that enforces posture. Placed after the D6 oversight clamp, which already returns
-    the raw outcome and still wins; object-layer (the default) folds exactly as before.
+    `layer` (meta-layer immunity, additive; default "object" preserves every existing fold
+    byte-for-byte): the `Check.layer` axis from `makoto/registry.py`. A `layer="meta"`
+    check's ONLY possible trigger is tampering with Makoto's own audit/enforcement machinery,
+    so a permissive posture must not be able to suppress it -- the posture knob is part of the
+    very machinery a meta check guards. Rule: a meta BLOCK never softens below ASK. Concretely,
+    under LOOSE (BLOCK->ADVISE) and SILENT (BLOCK->ALLOW) a meta BLOCK is floored at ASK
+    instead; STRICT and ASK already yield >= ASK, and the oversight clamp above already returns
+    the raw BLOCK. Object-layer folds are untouched, and only a raw BLOCK is floored -- a meta
+    ASK/ADVISE folds by the ordinary rules (the docstring'd contract is exactly "a meta BLOCK
+    never softening below ASK", nothing broader).
     """
     if outcome not in _OUTCOMES:
         return ALLOW
@@ -158,8 +162,8 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
         return ALLOW
     if is_oversight_clamped(permission_mode):
         return outcome                      # forced STRICT: honor the raw outcome unchanged
-    if outcome == BLOCK and layer == "meta" and posture_value in (SILENT, LOOSE):
-        return ASK                          # meta BLOCK floors at ASK, never softer
+    if outcome == BLOCK and layer == "meta" and posture_value in (LOOSE, SILENT):
+        return ASK          # meta floor: tamper detection never softens below ASK
     if posture_value == SILENT:
         return ALLOW
     if posture_value == LOOSE:
@@ -414,7 +418,8 @@ def recheck_certificate(certificate: VerdictCertificate) -> tuple[str, str]:
             Decision(outcome, detail),
             certificate.mode,
             permission_mode=certificate.permission_mode,
-            layer=_finding_layer(outcome, finding, certificate.mode, certificate.permission_mode),
+            layer=_finding_layer(outcome, finding, certificate.mode,
+                                 certificate.permission_mode),
         )
         reconstructed = (str(folded), getattr(folded, "detail", ""))
 

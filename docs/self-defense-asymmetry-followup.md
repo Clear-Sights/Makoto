@@ -137,49 +137,14 @@ it would not close the Bash-tool gap described above.
 
 ## 2026-07-05 update — partial-strip detection added as mitigation, verdict stays OPEN
 
-**Verdict: still OPEN.** What follows is mitigation, not closure — see the "what would actually
-close this" list above, which is unchanged; direction (c) (an out-of-band integrity check) is
-still required to close this ticket.
-
-**What was added.** A DESIGN DECISION (the repo's designated one-shot decision-maker for
-oversight-config/claim-bearing changes, invoked because this touches `.claude/` self-defense
-posture) authorized Option 1 from that decision's own menu: implement a narrow self-check,
-recorded explicitly as mitigation, not closure. The result is `gate.self_wired`
-(`makoto/stopchecks/stopcheck_self_wired.py`, registered like every other Stop gate via the
-`stopcheck_*.py` auto-discovery in `makoto/stopchecks/__init__.py:load_stopchecks`). At each Stop
-event it reads `.claude/settings.json` (repo-root-relative, same convention as `gate.dropped`'s
-`fs_read` calls) and fires an **advisory-only** finding (`level="advisory"`, never `"error"` —
-`_dispatch.py`'s `_build_decision` only escalates `level=="error"` findings to a block, so this
-never blocks a turn) naming which of PreToolUse/PostToolUse/Stop is missing a makoto-dispatching
-entry.
-
-**Real coverage, stated precisely.** This check catches a *partial* strip — an edit that removes
-at least one of Makoto's three hook entries while leaving another intact — and records it to the
-audit log for a later session (or a later Stop event in the same session, if something re-wires
-Makoto's Stop hook in between) to see. It does not catch, and does not claim to catch, the
-canonical *full* strip of all three entries in one edit.
-
-**Corrected finding — no same-session grace period for a full strip.** The decision that
-authorized this check initially speculated that "Claude Code captures hook configuration at
-session start... the Stop-time check would fire once, in-session, even against the canonical full
-sed strip." **This speculation was checked against Claude Code's own documentation
-(code.claude.com/docs/en/settings.md, "When edits take effect") and found FALSE:** hooks
-configuration is file-watched and reloaded **live** during the session, not cached once at
-session start. This means a same-session `sed -i` (or equivalent) strip of all three of Makoto's
-hook entries takes effect essentially immediately, *including* the Stop entry that would have run
-`gate.self_wired` — so the removed Stop entry never runs again to report the removal. The check
-gets **zero** same-session grace period against the canonical full-strip attack described in §"Net
-effect" above; it was never live to observe it in the first place. Coverage is limited to: (a) a
-partial strip (at least one Makoto-dispatching entry survives to report the loss of another), or
-(b) a full strip discovered only if some later event re-wires Makoto's Stop hook before the next
-Stop fires (an unusual sequence, not the attacker's easiest path).
-
-**Closure still requires direction (c).** As stated above and unchanged by this update: closing
-this ticket for real requires the out-of-band integrity check — a hash/signature over the
-installed hook config, verified independently of the in-session tool-call stream, so that a full
-simultaneous strip is detectable by something that was never itself disabled by the strip. `gate.
-self_wired` is not that; it is an in-session, in-band advisory signal that is honest about its own
-blind spot (see the check's own module docstring, which states this limitation as its first line).
+**Superseded by the 2026-07-22 update below**, which restates and corrects this section's claims
+with a second wiring source added. Summary for history: `gate.self_wired` was added as an
+advisory-only (never-blocking) Stop check reading `.claude/settings.json`, catching a *partial*
+strip (at least one of Makoto's three hook entries survives to report the loss of another) but
+**not** a full simultaneous strip of all three — Claude Code reloads hook config live, not once
+at session start, so a removed Stop entry never runs again to report its own removal. Closing the
+ticket for real still required an out-of-band integrity check (direction (c) below); mitigation,
+not closure. Verdict stayed OPEN.
 
 ## 2026-07-05 followup — researched direction (c); one real candidate found, not built (rule-4)
 
@@ -195,27 +160,15 @@ builds unilaterally. So the ticket's status is unchanged (OPEN), but the reason 
 
 ### What was checked, and what was not found
 
-- **No built-in integrity check on `.claude/settings.json` content.** Checked
-  `code.claude.com/docs/en/settings.md` directly: no hashing, signing, checksum, or
-  cryptographic-attestation feature over settings files is documented anywhere. The only
-  loss-prevention feature is generic and unrelated to tamper detection: "Claude Code automatically
-  creates timestamped backups of configuration files and retains the five most recent backups to
-  prevent data loss" (`settings.md`). Backups protect against accidental loss; they do not alert
-  anyone to a strip, and nothing reads or diffs them automatically — recovering from one, if it
-  even applies to this JSON, is a manual, out-of-band action a human would have to think to take.
-- **No permission gate on editing `.claude/settings.json` itself.** Checked the same page: the
-  `permissions` object governs what *Claude's tool calls* may do, not who may edit settings files;
-  there is no settings-file-specific write-approval step documented.
-- **No hook event fires "outside" the dispatch mechanism entirely** in the sense of a periodic/
-  heartbeat timer independent of any trigger — every event in the reference
-  (`code.claude.com/docs/en/hooks.md`, "Hook lifecycle" table) is tied to *some* occurrence
-  (session start/end, a turn, a tool call, a subagent, a compaction, a config file changing, a
-  worktree, etc.), not a bare clock tick. `SessionEnd` ("when a session terminates") is the closest
-  thing to a session-boundary catch-all, but Makoto has no entry under any lifecycle event other
-  than PreToolUse/PostToolUse/Stop today (confirmed by re-reading `.claude/settings.json`: its
-  `SessionStart` array has only `session-start.sh` and `ventura`/`assay` `hook_bridge` entries — no
-  `makoto._dispatch` anywhere in it), and adding one is the same rule-4 problem as everything else
-  in this section.
+Condensed — fully superseded by "Corrected verdict" below, which supplies the actual answer
+(`ConfigChange` exists and is the real candidate). Summary: no built-in integrity check
+(hash/signing/checksum) exists over `.claude/settings.json` content — the only related feature is
+generic timestamped backups, unrelated to tamper detection; no permission gate covers editing the
+settings file itself; and no hook event fires as a bare periodic/heartbeat timer independent of
+some occurrence (session start/end, a turn, a tool call, a config file changing, etc.) — checked
+against `code.claude.com/docs/en/settings.md` and `.../hooks.md`'s "Hook lifecycle" table.
+`SessionEnd` was specifically evaluated as a session-boundary catch-all and rejected: Makoto has
+zero dispatch wiring under it, so it would fire with no gate to run.
 
 ### The one real candidate: `ConfigChange`
 
