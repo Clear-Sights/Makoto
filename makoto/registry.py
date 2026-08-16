@@ -91,16 +91,16 @@ class Check:
     tuning work (see each file's own "ACKNOWLEDGED FN" sections) for a case that isn't actually
     self-referential. Only `content.self_mute_guard` and `gate.self_wired` are unambiguously
     meta -- both can ONLY ever fire on Makoto's own settings.json/hook-wiring, nothing else.
-    `layer="meta"` has exactly ONE consumer today: `tests/test_meta_layer.py` asserts the two
-    known-meta check ids are tagged, catching drift if either is ever un-tagged or a new
-    Makoto-self-referential check ships untagged. It does NOT (yet) change enforcement/posture-
-    folding behavior -- selfMuteGuard's makoto-allow immunity is already hardcoded in its own
-    predicate (never calls the shared `makoto_allowed` path), and selfWiredCheck is Stop-tier
-    ADVISE (never BLOCK) and never reads `makoto-allow` at all, so neither needs the fold logic
-    touched to be correct. Wiring `layer` into `makoto.verdict.apply()`'s fold rules
-    (e.g. a meta BLOCK never softening below ASK under LOOSE/SILENT) is a separate, higher-
-    blast-radius change affecting all 32 checks' shared fold path -- deliberately NOT bundled
-    into this additive schema field."""
+    `layer="meta"` is wired into `makoto.verdict.apply()`'s fold rules: a raw BLOCK from a meta
+    check floors at ASK under LOOSE/SILENT posture instead of softening further -- a loose
+    posture setting must not be able to suppress detection of tampering with the mechanism that
+    enforces posture itself (`dispatch._meta_check_ids()`/`dispatch._finding_layer()`, threaded
+    through `dispatch._emit_decision` and `verdict.recheck_certificate`). `content.self_mute_guard`
+    is Pre-tier with `level="error"` (Pre-tier is invariantly BLOCK), so this floor is LIVE for it
+    today; `gate.self_wired` is Stop-tier ADVISE (never BLOCK), so the floor is present but
+    currently inert for it. `tests/test_meta_layer.py` still asserts the two known-meta check ids
+    are tagged, catching drift if either is ever un-tagged or a new Makoto-self-referential check
+    ships untagged."""
     id: str
     applies_at: str
     posture: str
