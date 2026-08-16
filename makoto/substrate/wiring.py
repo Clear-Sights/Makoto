@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 # The managed-entry marker `makoto install` writes into settings.json hook entries.
 MAKOTO_CLAUDE_FLAG = "_makoto_managed"
@@ -24,18 +25,56 @@ MAKOTO_CLAUDE_FLAG = "_makoto_managed"
 PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 
 
+# makoto's own hook-command invocation tokens -- anchored to the forms it actually installs, and
+# ONLY those: `~/.claude/makoto_state/dispatch.sh` (settings.json wiring, two-segment path so a
+# bare `dispatch.sh` living anywhere else does not match), `${CLAUDE_PLUGIN_ROOT}/makoto/
+# _dispatch_shim.sh` and `_dispatch_configchange_shim.sh` (the plugin-manifest shim forms -- see
+# hooks/hooks.json), and the module forms `-m makoto.dispatch` / `-m makoto.configchange` (the
+# two hook entrypoints; `\b` so `makoto.dispatcher_v2` never matches).
+#
+# This ONE regex is the single source for "is this command makoto's" -- exported for
+# `checks/selfMuteGuard` to import rather than maintain its own copy. Two regexes answering one
+# question is exactly the class of bug this module exists to prevent (see the module docstring):
+# a bare `makoto` substring test invented a looser answer that (a) via matching ANY makoto
+# subcommand -- `-m makoto.reference_integrity`, `-m makoto.status` -- let install/uninstall
+# absorb and delete a user's OWN makoto-CLI hooks, the exact "silently disarmed the user's own
+# integrity hook" failure this predicate exists to prevent, and (b) let a decoy hook merely
+# NAMING makoto satisfy `gate.self_wired`'s wired-check, suppressing the self-defense gate.
+# `re.IGNORECASE`: Windows/case-insensitive filesystems can produce either casing for a path
+# makoto itself wrote, and the substring test this replaces was case-insensitive too -- a
+# case-sensitive replacement would silently un-recognize a form makoto had already installed.
+MAKOTO_INVOCATION_RX = re.compile(
+    r"makoto_state[/\\]dispatch\.sh"
+    r"|_dispatch(?:_configchange)?_shim\.sh"
+    r"|-m\s+makoto\.(?:dispatch|configchange)\b",
+    re.IGNORECASE)
+
+
 def entry_dispatches_to_makoto(entry) -> bool:
     """True iff ONE hook entry functionally reaches makoto's dispatch -- the managed-flag entry
-    `makoto install` writes, OR a flag-less hand-wired/shim entry whose command names makoto
-    (`.../makoto_state/dispatch.sh`, `python -m makoto.dispatch`). Keying on the flag alone
-    lies on a shim-wired device (status: hooks_wired=false while firing, fixed v1.2.1;
-    install: a duplicate entry double-dispatching every event, the same bug on the write side)."""
+    `makoto install` writes, or a flag-less hand-wired/shim entry whose command is one of
+    makoto's own invocation forms (`MAKOTO_INVOCATION_RX`).
+
+    This is the SAME predicate used to decide ownership for absorption and removal
+    (`entry_owned_by_makoto` is an alias of this function) -- detecting a wiring and being
+    entitled to delete it are the same question once the invocation check is precise, and a
+    split predicate is exactly what would let the two drift (a decoy hook that merely NAMES
+    makoto satisfying detection while a real makoto CLI invocation fails the narrower one).
+    Keying on the flag alone lies on a shim-wired device (status: hooks_wired=false while
+    firing, fixed v1.2.1; install: a duplicate entry double-dispatching every event, the same
+    bug on the write side)."""
     if not isinstance(entry, dict):
         return False
     if entry.get(MAKOTO_CLAUDE_FLAG):
         return True
-    return any(isinstance(inner, dict) and "makoto" in str(inner.get("command", "")).lower()
+    return any(isinstance(inner, dict)
+               and MAKOTO_INVOCATION_RX.search(str(inner.get("command", "")))
                for inner in entry.get("hooks", []))
+
+
+# Removal and absorption need the SAME question detection answers -- see
+# `entry_dispatches_to_makoto`.
+entry_owned_by_makoto = entry_dispatches_to_makoto
 
 
 def event_wired(hooks, event: str) -> bool:

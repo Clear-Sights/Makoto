@@ -86,6 +86,24 @@ def test_manifest_hit_on_stripped_path_blocks(tmp_path):
     assert len(rows) == 1
     assert rows[0]["pattern_fires"] == ["gate.configchange_transition"]
     assert rows[0]["findings"][0]["level"] == "error"
+    # The blocking tier's own audit row must record that it BLOCKED. This was a hardcoded
+    # `exit_code=0` on the path that prints `{"decision": "block"}`, so every block fire read as
+    # a clean exit to anything mining the trail -- the ledger misreporting the one event it
+    # exists to record, while the sibling advisory row derived the same field honestly.
+    assert rows[0]["exit_code"] == 2
+
+
+def test_the_advisory_tier_still_records_a_clean_exit(tmp_path):
+    """PAIRED. `exit_code` must DISCRIMINATE the two tiers, not just be 2 everywhere -- an
+    advisory fire does not block and must not claim it did."""
+    state_dir = tmp_path / "makoto_state"
+    settings_path = _write_settings(tmp_path, pre=False, post=False, stop=False)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    rc, out = _run_json(state_dir, _payload(tmp_path, settings_path))
+    assert rc == 0 and out == b""
+    rows = _audit_rows(state_dir)
+    assert rows[0]["pattern_fires"] == ["gate.configchange_advisory"]
+    assert rows[0]["exit_code"] == 0
 
 
 def test_manifest_present_but_this_path_not_in_it_stays_advisory(tmp_path):

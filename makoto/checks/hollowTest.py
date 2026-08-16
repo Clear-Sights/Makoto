@@ -40,6 +40,7 @@ layout, only the file boundary moved.
 from __future__ import annotations
 import ast
 
+from makoto.vocab import _MAKOTO_ALLOW_RX
 from makoto.substrate._stdlib_ast_helpers import _callee_chain, iter_touched_python_sources
 from makoto.vocab import Finding
 
@@ -431,8 +432,20 @@ _KIND_MESSAGE = {
 }
 
 
-def _allowed(lineno, lines) -> bool:                          # on-the-record override (makoto convention)
-    return 1 <= lineno <= len(lines) and "makoto-allow" in lines[lineno - 1].lower()
+def _allowed(lineno, lines) -> bool:
+    """On-the-record override (makoto convention), via the ONE canonical marker predicate.
+
+    This was a bare `"makoto-allow" in line` substring test, which exempted a reasonless
+    `# makoto-allow` — while `makoto_allowed`/`_MAKOTO_ALLOW_RX` (§7.5b, the predicate every
+    factory-built content check uses) requires a colon and a non-empty reason, and while this
+    module's OWN finding text tells the author to write `# makoto-allow: <reason>`. The escape
+    hatch was strictly laxer than the rule makoto installs into the user's CLAUDE.md
+    ("an on-the-record, auditable rationale, never a disguise"), so an exemption marker
+    asserting an audit trail was accepted without one — the flag-decay bug in miniature, on
+    the security-relevant path. One concept, one predicate: the marker means the same thing
+    everywhere it is honored. (`makoto.vocab` is already on this engine's isolation
+    allowlist — see tests/test_detector_engines_are_stdlib_isolated.py.)"""
+    return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
 
 
 def _run(ctx) -> list:

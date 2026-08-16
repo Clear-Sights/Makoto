@@ -21,7 +21,7 @@ from typing import Optional
 
 from makoto.checks import detect_locations, detect_quantity, normalize_path, subject_binds
 from makoto.vocab import (
-    _BE_AUX_RX,  # L0 shared lexicon (dedup: was a byte-identical local copy)
+    _BE_AUX_RX, _OFFER_COND_RX, _FIRST_PERSON_RX,  # L0 shared lexicon (dedup: were byte-identical local copies)
     _NEG_FRAME_RX, _FENCE_SPAN_RX,
     _RETRACT_VERB_RX, _RETRACT_NEGPROMISE_RX, _RETRACT_POST_RX, _RETRACT_REASON_RX,
     _RETRACT_CLAUSE_BREAK_RX, _WRONG_SUBJECT_RX, _ACCIDENTAL_RX, _RETRACT_KEPT_RX,
@@ -60,15 +60,12 @@ _NEGATED_PROMISE_RX = re.compile(
 # A clause boundary OR a tree/diagram glyph OR a pipe between the verb and the path -> the verb
 # governs a different clause, or a different cell of a file-listing, not this path.
 _GOVERN_BREAK_RX = re.compile(r"[.;:\n—|│]|──|[├└┌┐┘]")
-# A conditional/hypothetical OFFER governing the promise -> not a firm commitment.
-_OFFER_COND_RX = re.compile(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
-                            re.IGNORECASE)
-# Makoto watches the AI's OWN promises: a commitment needs a FIRST-PERSON subject ("I'll add X",
-# "we need to write X") OR a clause-initial imperative ("Add X to Y"). A THIRD-PERSON or
-# adverbial subject — "the fold fork writing X" (a subagent's action), "before adding entries to
-# X" (an adverbial gerund), "it leans on a CLAUDE.md convention" — is NOT a promise the AI made.
-_FIRST_PERSON_RX = re.compile(
-    r"\b(?:i|we|i'?ll|we'?ll|i'?m|we'?re|i'?ve|we'?ve|i'?d|we'?d|let'?s|my|our)\b", re.IGNORECASE)
+# _OFFER_COND_RX / _FIRST_PERSON_RX: L0 shared lexicon (makoto.vocab, imported above) --
+# _OFFER_COND_RX carves out a conditional/hypothetical OFFER from being read as a firm
+# commitment; _FIRST_PERSON_RX requires a first-person subject or clause-initial imperative. A
+# THIRD-PERSON or adverbial subject — "the fold fork writing X" (a subagent's action), "before
+# adding entries to X" (an adverbial gerund) — is NOT a promise the AI made. (Dedup: was a
+# byte-identical local copy, mirrored again in state/plan.py.)
 # A box-drawing/tree glyph on the path's line -> a file-listing, not prose. Never a promise.
 _TREE_GLYPH_RX = re.compile(r"[│├└┌┐┘┤┬┴┼─╾╿]")
 # The verb is line-initial (optionally after a bullet/number) -> an imperative plan-item

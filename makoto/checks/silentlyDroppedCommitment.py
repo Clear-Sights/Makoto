@@ -118,7 +118,19 @@ def _drop_touched(path, touched_keys, empty_keys) -> bool:
 def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exists, fs_size, fs_read) -> bool:
     """At turn-end, is the forward claim satisfied on `path`? Content-deep where the kind
     needs it (symbol/count read the file via fs_read); artifact/line discharge on a non-empty
-    touch or a non-empty file. Mirrors completion_gate's content-deep discharge."""
+    touch or a non-empty file.
+
+    Follows completion_gate's content-deep discharge, with a DELIBERATE and bounded difference,
+    stated here because the docstring used to claim it "mirrors" the ledger's `_discharged` and
+    does not: `_discharged` applies the `_EMPTY_OK` conventional-empty carve-out globally, while
+    this applies `conventional` on the `named_artifact` and `line_range` branches only.
+    `named_symbol` and `count` ask a question emptiness cannot answer -- a claim to add 2 exports
+    to `pkg/__init__.py` is not discharged by that file being empty, however conventional its
+    emptiness is in general. So on a zero-byte conventional file with a count/symbol claim,
+    `gate.completion` discharges and `gate.dropped` fires, on identical ledger state. That is the
+    intended reading of two different questions, not an oversight -- but it IS a divergence, and
+    an unstated divergence behind a claim of mirroring is how the next reader "fixes" one of them
+    into agreement and silently deletes a gate."""
     content = fs_read(path) if (fs_read is not None and path) else None
     touched = _drop_touched(path, touched_keys, empty_keys)
     exists = bool(fs_exists and path and fs_exists(path))

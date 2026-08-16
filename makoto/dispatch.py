@@ -27,6 +27,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
+from makoto.core import hostdialect
 from makoto.vocab import Finding
 from makoto.state.store import _state_dir
 from makoto.state import citations
@@ -120,6 +121,36 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool) -
                            exc=_Unevaluable(f"{disposition}: {reason}"))
     except Exception:
         pass
+
+
+def _note_host_dialect(state_dir: Path, session_id, notes: dict, host_event) -> bool:
+    """Record ONCE PER SESSION that this host's envelopes are being translated. Returns whether
+    this call was the one that recorded it.
+
+    A dialect translation must be visible -- a rename nobody can see is indistinguishable from a
+    bug the next time one of these fields turns up missing. But it must not be visible once per
+    tool call: `_dispatch_fact` writes a guaranteed stderr line, and a foreign host translates
+    EVERY event, so a per-event fact would put a line on the user's terminal for the whole session
+    and grow the error ledger without adding information after the first row. Once per session is
+    the whole signal -- the dialect is a property of the host, not of the call.
+
+    Best-effort by construction: an unwritable marker degrades to re-noting (noisy but correct),
+    never to crashing the hot path or to suppressing the note."""
+    try:
+        marker_dir = state_dir / "host_dialect"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        key = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(session_id or "nosession"))[:96]
+        marker = marker_dir / f"{key}.json"
+        if marker.exists():
+            return False
+        marker.write_text(json.dumps({"notes": notes, "host_event": host_event}) + "\n",
+                          encoding="utf-8")
+    except Exception:
+        pass
+    _dispatch_fact(state_dir, "host_dialect",
+                   f"normalized host spellings {notes!r} (first seen as event {host_event!r}); "
+                   f"noted once for this session", blocked=False)
+    return True
 
 
 def _self_verify_chain(state_dir: Path) -> None:
@@ -671,6 +702,34 @@ def main() -> int:
         _dispatch_fact(state_dir, "non_object_payload",
                        f"payload was {type(payload).__name__}, not a JSON object", blocked=True)
         return 2
+    # The host-dialect boundary (makoto.core.hostdialect): one hop from whatever spelling the
+    # host sent to the protocol every reader below assumes, applied here -- after the envelope
+    # has been proven evaluable (parseable, an object), before ANYTHING routes on or persists it
+    # -- so routing, gates, history, commitments and audit all see one canonical payload rather
+    # than each learning a second dialect. Cursor loads Claude-Code-compatible hook wiring but
+    # delivers camelCase (`preToolUse`): under the wildcard-law routing that ran the WRONG
+    # handler and persisted a row every history decoder was blind to (#19). The unevaluable-
+    # envelope refusals ABOVE are untouched: this normalizes a known event's capitalization, and
+    # `canonical_event` can only return a name already in HANDLERS, so a genuinely unknown event
+    # still takes exactly the wildcard path it took before.
+    host_event = payload.get("hook_event_name")
+    payload, dialect_notes = hostdialect.normalize_payload(payload, HANDLERS)
+    if dialect_notes:
+        # Persist WHAT WAS EVALUATED, not the host's spelling of it. The events table is the
+        # rolling substrate every history decoder reads, and those decoders key on the PAYLOAD's
+        # `hook_event_name`/`tool_name` -- ingesting the raw dialect envelope would leave
+        # `event.identical_retry`, `canon.recur`/`canon.timeout` and the claim-graph Bash
+        # evidence path reading zero matching rows for a Cursor session: admitted live, then
+        # invisible to every history-derived gate afterwards. Only rewritten when normalization
+        # actually changed something: a host already speaking the protocol still ingests its own
+        # bytes, byte-identical.
+        # ensure_ascii=False: the default escapes non-ASCII to \uXXXX, and this text is also what
+        # `_keyword_hit` prefilters the Pre catalog against as a raw substring scan -- an escaped
+        # row would make a non-ASCII keyword match on a protocol host and silently miss on a
+        # dialect host, the exact "a check that reads nothing" failure mode this boundary exists
+        # to prevent.
+        payload_raw = json.dumps(payload, ensure_ascii=False)
+        _note_host_dialect(state_dir, payload.get("session_id"), dialect_notes, host_event)
     db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):
         _dispatch_fact(state_dir, "db_init_failed", "lazy DB init failed", blocked=False)
