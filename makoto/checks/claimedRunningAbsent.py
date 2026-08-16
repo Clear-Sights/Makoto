@@ -8,12 +8,22 @@ from makoto.core.lexicons import (
 )
 from makoto.substrate.claims import _code_spans
 from makoto.substrate.io import decode_history_row
-import makoto.substrate.claim_graph as _claim_graph
 
-# gate.claimed_running -- an ongoing liveness claim is certified only by a successful recorded
-# health observation for the same canonical endpoint/port. A clean launcher exit is a deed, not
-# proof that a process remains live; a check of another port is unrelated. A failed exact-target
-# check contradicts, and a later exact-target check supersedes only that predicate/target pair.
+# gate.claimed_running -- the assistant claims an ONGOING running/live/listening/serving state
+# for a process/service ("the server is running", "it's up and running", "now listening on port
+# 5173") but this session's OWN recorded Bash evidence contradicts it: either nothing
+# process-shaped ever ran, or the most recently recorded process-start/liveness-check call ended
+# in a direct error state. Same posture as gate.completion/gate.green_claim: a claim checked
+# against makoto's own captured record, never against the live world -- makoto cannot itself go
+# curl a port; it only re-reads what the agent's own tool calls already showed.
+#
+# AGNOSTIC in the same two senses this catalog already uses the word for gate.canon
+# (canonTimeoutRecur.py's module docstring):
+#   (1) the FAILURE verdict reads only protocol-level terminals -- `tool_response.interrupted`
+#       and a non-zero `exitCode` -- no test-runner regex, no language/framework token;
+#   (2) the command CLASSIFIER (_PROCESS_LIFECYCLE_CMD_RX) is a broad, open-world, multi-
+#       ecosystem net (like _TEST_RUNNER_RX) -- an unlisted launcher/healthcheck shape is a
+#       documented RECALL bound, never a false-block source.
 #
 # FP firewall: the claim itself only fires when a first-person process-lifecycle action verb
 # (_PROCESS_START_VERB_RX: "I started/launched/ran/...") co-occurs anywhere in the same message --
@@ -21,10 +31,29 @@ import makoto.substrate.claim_graph as _claim_graph
 # the assistant itself starting something, so this kills that FP class at a documented recall
 # cost (a bare later re-confirmation with no start narrated in the same turn fails open).
 #
-# SCOPE: health observations currently come from settled Bash probes recognized by the closed
-# command classifier. Cross-agent observations are consumable only through an explicit,
-# target-bound Agent/Task/Workflow delegation edge. Unnamed services remain NOT-EVALUABLE rather
-# than borrowing identity from an unrelated lifecycle command.
+# SCOPE (a named limitation, not a silent gap): evidence is Bash-only. A liveness confirmation
+# the agent established some other way (a screenshot, a Read of a browser devtools log) is
+# invisible here -- the same "open-world, textual-command" limitation is_test_runner documents
+# for itself. Backgrounded launches (`cmd &`) almost always exit 0 at the SHELL level regardless
+# of whether the backgrounded process itself later dies, so a clean exit is treated as fail-open
+# silence, never as positive proof of liveness -- only a DIRECT error/interrupted state on the
+# most recently recorded relevant call is treated as a contradiction.
+#
+# CROSS-AGENT EVIDENCE (2026-07-23): unlike every other gate, this one reads
+# `ctx.history_all_agents` -- every agent-thread's PostToolUse Bash rows pooled, not narrowed to
+# the calling thread by `_history_for_agent`. A subagent dispatched to start/verify a process is
+# real session evidence the main thread's own claim must see; the thread-boundary firewall exists
+# to stop a DANGLING (in-flight) PreToolUse from synthesizing a FAILURE across threads, a risk
+# that does not apply to a completed PostToolUse Bash call. Residual, accepted risk: an unrelated
+# subagent's unrelated process-lifecycle-shaped call failing could wrongly implicate this claim --
+# narrower than the false positive this closes (a real launch invisible only because a different
+# thread made it), not eliminated.
+#
+# NOT IN SCOPE (a documented limitation, not fixed here): both history views stay bounded by
+# `_select_recent`'s 1-hour rolling window -- a launch more than an hour before the claim reads as
+# "no evidence" (UNFULFILLED) even if the process is in fact still running. Same tradeoff class as
+# the Bash-only/backgrounded-exit limits above; widening the window is a dispatch-wide change,
+# out of this one gate's scope.
 
 
 def _running_claim(text: str):
@@ -64,14 +93,12 @@ def _bash_postuse_calls(history):
 
 
 def _latest_process_call_failed(history) -> Optional[bool]:
-    """Legacy diagnostic for the former flat-history rule.
-
-    None iff no process-lifecycle-shaped Bash call (_PROCESS_LIFECYCLE_CMD_RX) ever ran this
+    """None iff no process-lifecycle-shaped Bash call (_PROCESS_LIFECYCLE_CMD_RX) ever ran this
     session -- the claim has zero grounding. Else True/False for whether the MOST RECENT such
     call ended in a direct agnostic error state: `interrupted`, or a recorded non-zero exit code
     -- the same two protocol terminals gate.canon reads (canonTimeoutRecur.py), no exit-code
     SEMANTICS guess beyond "non-zero", no language token. Latest-wins, like
-    record.ledger.latest_testrun. The gate itself uses target-typed graph observations."""
+    record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt."""
     verdict = None
     for cmd, tr in _bash_postuse_calls(history):
         if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
@@ -82,34 +109,30 @@ def _latest_process_call_failed(history) -> Optional[bool]:
     return verdict
 
 
-def claimed_running_gate(text, *, history=(), graph=None, claim_ids=()) -> Optional[Finding]:
-    """Reject running claims without target-identical liveness support."""
-    if graph is None:
-        graph, claim_ids = _claim_graph.build_ephemeral_graph(text, history=history)
-    claims = [
-        graph.claims[claim_id] for claim_id in claim_ids
-        if claim_id in graph.claims and graph.claims[claim_id].predicate == "service.running"
-    ]
-    if not claims:
+def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
+    """Fire iff the assistant claims an ongoing running/live/listening/serving state
+    (`_running_claim`) and this session's own recorded evidence contradicts it: no process-
+    lifecycle Bash call ever ran (UNFULFILLED), or the most recently recorded one ended in a
+    direct error state (MISREPORTED). Silent when the most recent such call was clean --
+    fail-open: a clean exit is not proof of liveness (see module docstring's SCOPE note), but
+    only a POSITIVE contradiction bites, never mere absence-of-proof-of-liveness."""
+    if _running_claim(text) is None:
         return None
-    for claim in claims:
-        adjudication = graph.adjudicate(claim.node_id)
-        if adjudication.verdict is _claim_graph.Verdict.CERTIFIED:
-            continue
-        if adjudication.verdict is _claim_graph.Verdict.CONTRADICTED:
-            message = (
-                f"Claim states {claim.target_value} is running, but the latest exact-target "
-                "liveness observation failed."
-            )
-        else:
-            message = (
-                f"Claim states {claim.target_value} is running, but no target-identical liveness "
-                "observation supports it — a launcher exit or a different port/service cannot "
-                "certify ongoing liveness."
-            )
+    failed = _latest_process_call_failed(history)
+    if failed is None:
         return Finding(
             pattern_id="gate.claimed_running", file="", line=0, level="error",
-            message=message,
+            message=("Claim states a process/service is running, but no process-start or "
+                      "liveness-check command appears anywhere in this session's recorded "
+                      "history — the word must match the world."),
+            retry_hint=("Actually start or verify the process with a real Bash call and cite a "
+                        "clean result, or scope/retract the running claim."))
+    if failed:
+        return Finding(
+            pattern_id="gate.claimed_running", file="", line=0, level="error",
+            message=("Claim states a process/service is running, but the most recently recorded "
+                      "process-start/liveness-check call ended in a direct error state "
+                      "(interrupted, or a non-zero exit) — the word must match the world."),
             retry_hint=("Re-run the start/health-check to a real successful result and cite it, "
                         "or scope/retract the running claim."))
     return None
@@ -117,6 +140,5 @@ def claimed_running_gate(text, *, history=(), graph=None, claim_ids=()) -> Optio
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: claimed_running_gate(
-                   c.text, history=c.history_all_agents, graph=c.claim_graph,
-                   claim_ids=c.current_claim_ids))
+               eats=frozenset({"text", "history_all_agents"}),
+               run=lambda c: claimed_running_gate(c.text, history=c.history_all_agents))

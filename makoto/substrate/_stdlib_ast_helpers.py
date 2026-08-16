@@ -53,8 +53,8 @@ def _is_scratch(p, cwd) -> bool:
     return any(_under(rp, r) for r in _SCRATCH_ROOTS)        # outside cwd AND in a scratch root -> stray scratch
 
 
-def _read(ctx, p):
-    fn = getattr(ctx, "fs_read", None)
+def _read(fs_read, p):
+    fn = fs_read
     return fn(p) if callable(fn) else Path(p).read_text(encoding="utf-8")
 
 
@@ -76,23 +76,24 @@ def _callee_chain(call: ast.Call) -> str:
     return ".".join(reversed(parts))
 
 
-def iter_touched_python_sources(ctx):
+def iter_touched_python_sources(touched, cwd, fs_read):
     """Yield (touched_key, source_text) for every in-scope .py file the turn touched -- the
     iteration scaffold deadPureStatement._run and hollowTest._run previously duplicated line for
     line (2026-07-09 dedup; the two bodies differed only INSIDE the loop). Contract preserved
     exactly: a possibly-relative touched key is anchored to the event's OWN cwd, never the
-    dispatch process's ambient one (matches _dispatch.py's real fs_read/fs_exists join); stray
+    dispatch process's ambient one (matches _dispatch.py's real fs_read/fs_exists join). The
+    caller projects these three GateContext inputs explicitly so each check's signature remains
+    locally visible; stray
     scratch outside the working project is skipped; an OSError or fs_read miss (None) skips the
     file, never crashes the gate."""
-    cwd = getattr(ctx, "cwd", None)
-    for p in getattr(ctx, "touched", ()):
+    for p in touched:
         if not str(p).endswith(".py"):
             continue
         real_p = p if not cwd or os.path.isabs(str(p)) else os.path.join(cwd, p)
         if _is_scratch(real_p, cwd):
             continue
         try:
-            src = _read(ctx, real_p)
+            src = _read(fs_read, real_p)
         except OSError:
             continue
         if not isinstance(src, str):

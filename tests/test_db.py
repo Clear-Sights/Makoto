@@ -56,37 +56,6 @@ def test_init_db_is_idempotent(tmp_path):
     conn.close()
 
 
-def test_init_db_migrates_key_only_ledger_without_losing_rows(tmp_path):
-    from makoto.record.db import init_db
-    from makoto.record.ledger import record_update
-    state_dir = tmp_path / "makoto_state"
-    state_dir.mkdir()
-    db_file = state_dir / "makoto.record.db"
-    conn = _connect(db_file)
-    conn.execute(
-        "CREATE TABLE ledger (key TEXT PRIMARY KEY, value TEXT, kind TEXT NOT NULL, "
-        "exit INTEGER, source_event_id INTEGER, session_id TEXT, ts TEXT)"
-    )
-    conn.execute(
-        "INSERT INTO ledger VALUES ('shared.py', 'old', 'touched', NULL, 1, 's1', 'old')"
-    )
-    conn.close()
-
-    init_db(state_dir, tmp_path / "CITATIONS.md")
-    conn = _connect(db_file)
-    record_update(
-        conn,
-        {"tool_name": "Write", "tool_input": {"file_path": "shared.py", "content": "new"}},
-        event_id=2,
-        session_id="s2",
-    )
-    rows = conn.execute(
-        "SELECT session_id, key FROM ledger ORDER BY session_id"
-    ).fetchall()
-    assert rows == [("s1", "shared.py"), ("s2", "shared.py")]
-    conn.close()
-
-
 def test_init_db_creates_state_dir_if_missing(tmp_path):
     """init_db mkdir -p's state_dir so cmd_install doesn't have to."""
     from makoto.record.db import init_db

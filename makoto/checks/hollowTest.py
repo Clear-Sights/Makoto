@@ -439,7 +439,7 @@ def _run(ctx) -> list:
     out = []
     # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
     # deadPureStatement._run via the stdlib-isolated helper home -- 2026-07-09 dedup round 2
-    for p, src in iter_touched_python_sources(ctx):
+    for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         lines = src.splitlines()
         for f in analyze_file(src, str(p)):
             if _allowed(f["line"], lines):
@@ -460,4 +460,5 @@ def _run(ctx) -> list:
 # claim-vs-ledger predicate — mirrors gate.liveness's split exactly. `run` returns list[Finding] (a
 # closed test file can have many hollow tests); run_stop_checks normalizes a list like a single finding.
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=_run)
+CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
+               eats=frozenset({"touched", "cwd", "fs_read"}))

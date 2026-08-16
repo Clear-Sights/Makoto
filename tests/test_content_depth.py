@@ -5,7 +5,6 @@ discharged "I implemented X". makoto now records Write-emptiness in the ledger s
 is content-deep: an empty Write of a non-conventional file does not satisfy a production
 claim. Unknown/edited/conventional-empty cases fail open (never a false block).
 """
-import json
 import os
 import sqlite3
 
@@ -97,26 +96,16 @@ def test_run_stop_checks_flags_empty_write_production():
     c = _conn()
     L.record_update(c, {"tool_name": "Write", "tool_input": {"file_path": "auth.py", "content": ""}},
                     event_id=1, session_id="s")
-    history = [(1, "t", "PostToolUse", "/nonexistent-cwd-xyz", json.dumps({
-        "hook_event_name": "PostToolUse", "tool_name": "Write",
-        "tool_input": {"file_path": "auth.py", "content": ""},
-        "tool_response": {"ok": True},
-    }))]
     out = run_stop_checks(c, {"last_assistant_message": "I implemented `auth.py`.",
-                               "session_id": "s", "cwd": "/nonexistent-cwd-xyz"}, history)
+                               "session_id": "s", "cwd": "/nonexistent-cwd-xyz"})
     assert any(getattr(f, "pattern_id", "") == "gate.completion" for f in out)
 
 def test_run_stop_checks_silent_on_nonempty_write_production():
     c = _conn()
     L.record_update(c, {"tool_name": "Write", "tool_input": {"file_path": "auth.py", "content": "real\n"}},
                     event_id=1, session_id="s")
-    history = [(1, "t", "PostToolUse", "/nonexistent-cwd-xyz", json.dumps({
-        "hook_event_name": "PostToolUse", "tool_name": "Write",
-        "tool_input": {"file_path": "auth.py", "content": "real\n"},
-        "tool_response": {"ok": True},
-    }))]
     out = run_stop_checks(c, {"last_assistant_message": "I implemented `auth.py`.",
-                               "session_id": "s", "cwd": "/nonexistent-cwd-xyz"}, history)
+                               "session_id": "s", "cwd": "/nonexistent-cwd-xyz"})
     assert not any(getattr(f, "pattern_id", "") == "gate.completion" for f in out)
 
 

@@ -1,8 +1,11 @@
-"""makoto.checks.relativePathCitation -- flags a chat response that cites a relative file path.
+"""makoto.checks.relativePathCitation -- flags a chat response that cites a file path in a
+non-absolute (unclickable) form.
 
-Whether a host renders a relative path as a clickable jump target is host-dependent. The narrow
-observable fact owned here is only that the citation is relative; the retry asks for an absolute
-path because that is this assistant interface's explicit citation convention.
+Owner-reported pain: "the paths I keep complaining I cannot read -- when a link to read has a
+non-absolute path it's an unclickable link". Most terminal/IDE hosts only turn an ABSOLUTE path
+(or an explicit `file_path:line_number` citation, per this assistant's own house style) into a
+clickable jump target; a relative path ("checks/hollowTest.py:146") or a `~`-relative one
+("~/.claude/foo.py") renders as plain, unclickable text in many hosts.
 
 ADVISORY tier only (never blocks): this is a communication-quality signal, not an integrity
 violation -- the same "advisory over blocking" standing policy `selfWiredCheck.py`/
@@ -13,7 +16,7 @@ Detection is DELIBERATELY narrow and syntactic (never a judgment call about whet
   - A candidate token needs real path shape: either a directory separator ('/') plus a
     dotted-extension basename, or a bare `name.ext:NNN` line-citation (this assistant's own
     documented convention: "include the pattern file_path:line_number").
-  - Already-absolute ('/...') tokens are not flagged -- they are outside the relative-path claim.
+  - Already-absolute ('/...') tokens are not flagged -- they ARE clickable.
   - A token inside a fenced code block (```...```) is code being shown, not a citation being
     made, so it is excluded (same fence-parity discipline `session/commitments.py` uses).
   - A token immediately preceded by a URL scheme (http://, https://, ftp://) is excluded -- a URL
@@ -41,7 +44,7 @@ _DIR_QUALIFIED_RX = re.compile(
 )
 # A bare `name.ext:NNN` line-citation with no directory at all -- this assistant's own
 # documented "file_path:line_number" convention, minus the directory qualifier. Still a citation
-# (it names a specific line), but still has relative syntax.
+# (it names a specific line), still unclickable without an absolute root.
 _BARE_CITATION_RX = re.compile(
     rf"(?<![\w/.~-])([\w-]+\.{_EXT_RX}:\d+)(?![\w/])"
 )
@@ -72,7 +75,7 @@ def find_relative_citations(text: str) -> list:
         for m in rx.finditer(text):
             path = m.group(1)
             if path.startswith("/"):
-                continue                              # already absolute -> outside this detector
+                continue                              # already absolute -> clickable, not flagged
             if _in_fence(text, m.start()):
                 continue                              # code being shown, not a citation
             if _after_url_scheme(text, m.start()):
@@ -87,7 +90,7 @@ def find_relative_citations(text: str) -> list:
 
 def relative_path_gate(text: str) -> Optional[Finding]:
     """Fire iff `text` (the assistant's own turn) cites at least one non-absolute path-shaped
-    location. Names every distinct offender so a single response with several relative
+    location. Names every distinct offender so a single response with several unclickable
     citations gets one finding, not one per occurrence."""
     hits = find_relative_citations(text)
     if not hits:
@@ -100,7 +103,7 @@ def relative_path_gate(text: str) -> Optional[Finding]:
         line=0,
         level="advisory",
         message=(
-            f"cited path(s) are relative; clickability is host-dependent: {names}{more}. "
+            f"cited path(s) not absolute, so not clickable in most hosts: {names}{more}. "
             f"Prefer an absolute path (or this assistant's own file_path:line_number convention "
             f"rooted at an absolute file_path)."
         ),
@@ -110,4 +113,5 @@ def relative_path_gate(text: str) -> Optional[Finding]:
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.relative_path_citation", applies_at="Stop", posture="ADVISE",
+               eats=frozenset({"text"}),
                may_block=True, run=lambda c: relative_path_gate(c.text))

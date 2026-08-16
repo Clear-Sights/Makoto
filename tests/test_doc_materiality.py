@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from makoto.__main__ import build_parser
-from makoto.core.schema import load_prechecks
+from makoto.substrate._loader import load_precheck_catalog
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -99,7 +99,7 @@ def test_living_doc_no_stale_substrate(doc):
 
 @pytest.mark.parametrize("doc", LIVING_DOCS)
 def test_living_doc_no_dead_pattern_id(doc):
-    live = {p.id for p in load_prechecks()}
+    live = {p.id for p in load_precheck_catalog()}
     for m in _PATID_RX.finditer(_read(doc)):
         assert m.group(1) in live, (
             f"{doc}: cites pattern {m.group(1)} which is not in the live catalog"
@@ -124,6 +124,6 @@ def test_assertions_have_teeth():
     assert _ALLOW_RX.search(ok)
     # 4) dead pattern id -- "content.never_existed" is a planted violation;
     # "content.self_mute_guard" is a real live id (proving the check discriminates).
-    live = {p.id for p in load_prechecks()}
+    live = {p.id for p in load_precheck_catalog()}
     assert _PATID_RX.search("see pattern content.never_existed for details").group(1) not in live
     assert _PATID_RX.search("see pattern content.self_mute_guard for details").group(1) in live

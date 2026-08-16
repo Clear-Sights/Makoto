@@ -1,45 +1,39 @@
-"""gate.fabricated_action claim parsing and exact command-coreference behavior."""
+"""gate.fabricated_action — the assistant claims a completed TOOL action ("I ran `X`") in a turn where
+it made NO tool calls. FP-safe by design: a closed tool-verb lexicon (reasoning verbs excluded), a
+DISTINCTIVE object (backticked/path/url — bare words rejected), negation/future/quoted guards, and
+discharge on ANY tool activity this turn (presence-of-work, NOT command-text matching — so it is
+immune to command paraphrase and to invisible Workflow/Agent/Task tools). Signal half pinned too."""
 import json
 
 from makoto.checks.fabricatedToolAction import _action_signal, fabricated_action_gate
 
 
-def _tool_call(name="Bash", cmd="x", event="PostToolUse"):
-    return (1, "t", event, "/r", json.dumps({
-        "hook_event_name": event, "tool_name": name,
-        "tool_input": {"command": cmd},
-        "tool_response": {"stdout": "ok", "exitCode": 0}}))
+def _tool_call(name="Bash", cmd="x"):
+    # one PreToolUse event this turn, production events-table row shape (id, ts, event_type, cwd, payload)
+    return (1, "t", "PreToolUse", "/r", json.dumps({
+        "tool_name": name, "tool_input": {"command": cmd}, "tool_response": {"stdout": "ok"}}))
 
 
 def _stop():
     return (2, "t", "Stop", "/r", "{}")
 
 
-# --- discharge / gate behavior (predicate-and-target coreference) ---
+# --- discharge / gate behavior (presence-of-work) ---
 def test_fires_when_no_tool_calls_this_turn():
     f = fabricated_action_gate("I ran `pytest tests/ -q`.", history=[])
     assert f is not None and f.pattern_id == "gate.fabricated_action"
 
 
-def test_silent_when_exact_settled_command_happened_this_turn():
-    assert fabricated_action_gate(
-        "I ran `pytest tests/ -q`.", history=[_tool_call(cmd="pytest tests/ -q")],
-    ) is None
+def test_silent_when_a_tool_call_happened_this_turn():
+    # even a DIFFERENT command discharges — the claim is backed by real tool work, paraphrase aside
+    assert fabricated_action_gate("I ran `pytest tests/ -q`.",
+                                  history=[_tool_call(cmd="python -m pytest tests/ -q --tb=short")]) is None
 
 
-def test_unrelated_command_cannot_launder_claim():
-    finding = fabricated_action_gate(
-        "I ran `pytest tests/ -q`.",
-        history=[_tool_call(cmd="python -m pytest tests/ -q --tb=short")],
-    )
-    assert finding is not None
-
-
-def test_unrelated_workflow_cannot_launder_claim():
-    finding = fabricated_action_gate(
-        "I launched `wf_abc123`.", history=[_tool_call(name="Workflow", cmd="")],
-    )
-    assert finding is not None
+def test_silent_when_invisible_tool_ran_this_turn():
+    # a Workflow launch carries no Bash command but IS a PreToolUse event -> discharges (no false fire)
+    assert fabricated_action_gate("I launched `wf_abc123`.",
+                                  history=[_tool_call(name="Workflow", cmd="")]) is None
 
 
 def test_fires_when_tool_work_was_only_a_PRIOR_turn():

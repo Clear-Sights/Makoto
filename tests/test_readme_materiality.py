@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from makoto.core.schema import load_prechecks
+from makoto.substrate._loader import load_precheck_catalog
 from makoto.substrate._loader import load_checks
 
 README = (Path(__file__).resolve().parent.parent / "README.md").read_text()
@@ -17,7 +17,7 @@ README = (Path(__file__).resolve().parent.parent / "README.md").read_text()
 def _live_gates():
     # "end-of-turn gates" means the checks eligible to reach the Stop decision pipeline at all
     # (formerly: had a GATE export / discovered by load_stopchecks()) -- may_block=True, not
-    # every Stop-edge CHECK (staleEstablisher/catalogCompleteness are Stop-edge but were never
+    # every Stop-edge CHECK (staleEstablisher/undeclaredFalsifiable are Stop-edge but were never
     # counted among the README's stated gates).
     return [c for c in load_checks(edge="Stop") if c.may_block]
 
@@ -29,7 +29,7 @@ def _stated(pattern: str) -> int:
 
 
 def test_readme_precheck_count_matches_live():
-    live = len([p for p in load_prechecks() if p.predicate_module])
+    live = len([p for p in load_precheck_catalog() if p.predicate_module])
     assert _stated(r"\*\*(\d+) pre-checks\*\*") == live
 
 

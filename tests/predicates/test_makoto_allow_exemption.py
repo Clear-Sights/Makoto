@@ -17,7 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from makoto.core.schema import PreCheck, load_prechecks
+from makoto.core.schema import PreCheck
+from makoto.substrate._loader import load_precheck_catalog
 
 
 def _evt(file_path: str, content: str) -> dict:
@@ -28,7 +29,7 @@ def _run(pid: str, content: str, file_path: str, level: str, conn=None):
     import importlib
     # SPEC-5: resolve via the real catalog's predicate_module (flat makoto.checks, descriptive
     # names -- no longer derivable from the pattern id).
-    _mod_path = next(p.predicate_module for p in load_prechecks() if p.id == pid)
+    _mod_path = next(p.predicate_module for p in load_precheck_catalog() if p.id == pid)
     mod = importlib.import_module(_mod_path)
     pat = PreCheck(id=pid, fire_level=level, description="x", retry_hint="y")
     return mod.predicate(current_event=_evt(file_path, content), history=[], pattern=pat, conn=conn)

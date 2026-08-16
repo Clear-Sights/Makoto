@@ -128,34 +128,21 @@ def test_fires_when_the_latest_of_two_calls_is_the_failing_one():
 
 def test_unfulfilled_and_misreported_messages_are_distinct():
     # the two contradiction shapes are worth telling apart in the retry feedback
-    text = "I started the server. It is running now on port 3000."
-    no_evidence = claimed_running_gate(text, history=[])
-    misreported = claimed_running_gate(
-        text, history=[_post("curl -sf http://localhost:3000", exitCode=7)],
-    )
+    no_evidence = claimed_running_gate("I started the server. It is running now.", history=[])
+    misreported = claimed_running_gate("I started the server. It is running now.",
+                                        history=[_post("npm run dev &", interrupted=True)])
     assert no_evidence.message != misreported.message
 
 
-# --- only target-specific liveness observations certify an ongoing-state claim ---
-def test_clean_launcher_exit_is_not_liveness_proof():
+# --- silent: latest evidence is clean, or the claim itself never grounds ---
+def test_silent_when_latest_launch_exited_cleanly():
     hist = [_post("npm run dev &", exitCode=0)]
-    assert claimed_running_gate(
-        "I started the server. It is now running on port 3000.", history=hist,
-    ) is not None
+    assert claimed_running_gate("I started the server. It is now running on port 3000.", history=hist) is None
 
 
 def test_silent_when_an_earlier_failure_is_superseded_by_a_later_clean_call():
     hist = [_post("npm run dev &", interrupted=True), _post("curl -sf http://localhost:3000", exitCode=0)]
-    assert claimed_running_gate(
-        "I started the server. It is running now on port 3000.", history=hist,
-    ) is None
-
-
-def test_healthcheck_for_another_port_cannot_launder_running_claim():
-    hist = [_post("curl -sf http://localhost:9999", exitCode=0)]
-    assert claimed_running_gate(
-        "I started the server. It is running now on port 3000.", history=hist,
-    ) is not None
+    assert claimed_running_gate("I started the server. It is running now.", history=hist) is None
 
 
 def test_silent_when_no_running_claim_at_all():

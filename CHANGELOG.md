@@ -5,28 +5,6 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
-### Fixed
-- **Unevaluable hook input no longer returns a green exit code.** Missing, empty, malformed,
-  non-object, and unknown-event envelopes now return exit 2 with an explicit diagnostic through
-  both Python adapters and both shell shims. A complete envelope may still retain its documented
-  verdict behavior; the change is limited to claims Makoto cannot evaluate.
-- **Local source citations are now resolved, not syntax-checked.** CI runs
-  `python -m makoto.reference_integrity --root .` over local Markdown links plus JSON/TOML
-  manifest paths. Its negative test plants a missing relative source path in a throwaway copy and proves
-  the gate fails. The stale Spirit and self-wiring notes were replaced with current
-  links rather than references to deleted trees or sibling projects.
-- **A built wheel/sdist now ships the whole runtime, not just `makoto/*.py`.** `pyproject.toml`
-  declared `packages = ["makoto"]`, so every subpackage the dispatcher imports at fire time
-  (`makoto.core`, `.checks`, `.record`, `.session`, `.substrate`, `.verdict`) was dropped from the
-  distribution: a `pip install` of the built artifact produced a runtime that died on
-  `ModuleNotFoundError: No module named 'makoto.core'` at first invocation. Packages are now
-  discovered (`[tool.setuptools.packages.find] include = ["makoto*"]`), and the non-`.py` files the
-  runtime reads at fire time ship with them — `_dispatch_shim.sh` (executable bit preserved) plus
-  the packaged `docs/CITATIONS.md` and `docs/MAKOTO-CONVENTIONS.md`. The stale `config/*.toml`
-  package-data entry is dropped (`config/patterns.toml` was deleted 2026-07-08); `docs/*` is no
-  longer excluded, since `makoto/docs/` is runtime data rather than repo documentation. The
-  editable non-plugin install (`pip install -e`) and the plugin install path were never affected.
-
 ## [2.2.0] — 2026-07-26
 
 ### Fixed
@@ -94,8 +72,15 @@ All notable changes to makoto. Versions follow the live check inventory
   tested implementation code that never ran in the shipped plugin because
   `hooks/hooks.json` never wired either event -- graduated from dead code to wired,
   verified by a live-fire subprocess smoke test.
-- **The README's live block transcript is backed by a real artifact.** The smoke test
-  (`test_readme_references_exist`) fails CI on any README reference to a missing file.
+- **The README's "Live demo" section is now backed by real artifacts.** Its three
+  embedded SVG screenshots and the `docs/demo/render_demo.py` / `render_svg.py` scripts
+  it names were absent from the tree -- the landing page showed broken images. The demo
+  is rebuilt for real: three scenarios driven through the actual dispatchers (a
+  PreToolUse block, the full word->deed->record->receipt chain including the test-delta
+  redirect, a ConfigChange advisory), genuine logged output under `docs/demo/logs/`,
+  SVGs rendered from those logs, and the receipt scenario reproducing the README's
+  promised numbers exactly. A new smoke test (`test_readme_references_exist`) fails CI
+  on any README reference to a missing file.
 - **README**: the revoked legacy `makoto ack-block` phrase is no longer documented
   (`release.operator` is the only discharge, per the epoch reset below), and the
   citations-seed path reflects the package layout (`makoto/docs/CITATIONS.md`).
@@ -235,6 +220,10 @@ All notable changes to makoto. Versions follow the live check inventory
   Bash retry with no intervening state change is redirected before the redundant call even runs,
   gated on `checks/_failureClassifier.py`'s deterministic-vs-transient discrimination (never
   fires on a legitimate timeout/5xx/429 re-poll).
+- **A runnable demo** (`docs/demo/render_demo.py` + `render_svg.py`): 3 real scenarios driven
+  through the actual dispatchers (a genuine block, the full receipt story, a ConfigChange
+  advisory fire), rendered to committed SVG "screenshots" via a small stdlib-only text-to-SVG
+  renderer (no terminal-recorder dependency).
 
 ### Fixed
 - `event.forbidden_location` now carves out the harness's own plan directory

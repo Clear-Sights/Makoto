@@ -223,13 +223,13 @@ def test_anti_goodhart_canary_fire_and_inert():
 
 def test_catalog_row_exists_and_matches():
     """the live catalog must declare content.self_mute_guard with the predicate wired (no test/catalog drift)."""
-    from makoto.core.schema import load_prechecks
+    from makoto.substrate._loader import load_precheck_catalog
     # SPEC-5: this test moved from makoto/tests/ into makoto/tests/predicates/, one directory
-    # deeper -- use load_prechecks()'s own default path resolution rather than a hand-rolled
+    # deeper -- use load_precheck_catalog()'s own default path resolution rather than a hand-rolled
     # relative path that silently breaks on the next move.
-    cat = {p.id: p for p in load_prechecks()}
+    cat = {p.id: p for p in load_precheck_catalog()}
     assert "content.self_mute_guard" in cat, "patterns.toml missing row content.self_mute_guard"
     row = cat["content.self_mute_guard"]
     assert row.predicate_module == "makoto.checks.selfMuteGuard"
-    assert row.fire_level == "error"
+    assert row.posture.strip().upper() == "BLOCK"
     assert "settings.json" in row.keywords

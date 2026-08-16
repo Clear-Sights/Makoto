@@ -22,7 +22,8 @@ import re
 from typing import Optional
 
 from makoto.substrate.factories import scan_target_content
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 
 # The file makoto wires into: ~/.claude/settings.json (or settings.local.json).
 _SETTINGS_RX = re.compile(r"\.claude/settings(?:\.local)?\.json$")
@@ -62,7 +63,7 @@ def _removed_text(tool_input: dict) -> str:
     return old
 
 
-def predicate(*, current_event: dict, history: list, pattern: PreCheck,
+def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -100,7 +101,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
         pattern_id=pattern.id,
         file=fp,
         line=0,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=(f"row {pattern.id} ({pattern.description}): {reason}. makoto watches "
                  f"your tool calls — disabling it in-session is a self-bypass; disable "
                  f"out-of-band (your shell) or run `makoto uninstall`."),
@@ -113,4 +114,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
-CHECK = _Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=RETRY_HINT, description=DESCRIPTION, layer="meta")
+CHECK = _Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=RETRY_HINT, description=DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}))

@@ -121,11 +121,11 @@ def test_red_latest_of_two_calls_is_the_failing_one_fires(tmp_path):
 
 
 # ---- TN population: MUST every one stay silent ----------------------------------------------------
-def test_red_clean_launcher_exit_is_not_liveness_proof(tmp_path):
+def test_tn_silent_when_latest_launch_exited_cleanly(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0})]
     msgs = _claimed_running_messages(history, cwd, text=_CLAIM)
-    assert msgs, f"a launcher exit must not certify ongoing liveness: {msgs}"
+    assert not msgs, f"gate.claimed_running FALSE-POSITIVE: a clean latest launch must stay silent: {msgs}"
 
 
 def test_tn_silent_when_an_earlier_failure_is_superseded_by_a_later_clean_call(tmp_path):
@@ -136,9 +136,7 @@ def test_tn_silent_when_an_earlier_failure_is_superseded_by_a_later_clean_call(t
         _row(1, cwd, "Bash", {"command": "npm run dev &"}, {"interrupted": True}),
         _row(2, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 0}),
     ]
-    msgs = _claimed_running_messages(
-        history, cwd, text="I started the server. It is running now on port 3000.",
-    )
+    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running now.")
     assert not msgs, f"gate.claimed_running FALSE-POSITIVE: a later clean call must supersede an earlier failure: {msgs}"
 
 
@@ -180,14 +178,17 @@ def test_tn_silent_when_the_only_mention_is_inside_a_code_span(tmp_path):
     assert not msgs, f"gate.claimed_running FALSE-POSITIVE: quoted/backticked mention, not the agent's own prose claim: {msgs}"
 
 
-def test_red_subagent_launcher_without_delegation_or_healthcheck_cannot_certify(tmp_path):
-    """Cross-agent pooling alone is not authority: it needs exact target delegation and a
-    target-specific liveness observation."""
+def test_tn_silent_when_a_subagent_launched_it_cleanly(tmp_path):
+    """The cross-agent evidence fix (2026-07-23): a subagent dispatched to start the process is
+    real session evidence -- the main thread's agentless Stop must see it via
+    ctx.history_all_agents even though `_history_for_agent` would exclude this row from the
+    thread-scoped ctx.history every other gate reads. Before the fix this false-fired
+    UNFULFILLED on a true claim purely because a different thread made the launch call."""
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0},
                     agent_id="subagent-1")]
     msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running now.")
-    assert msgs, f"an unrelated/undelegated subagent launch must not certify the main claim: {msgs}"
+    assert not msgs, f"gate.claimed_running FALSE-POSITIVE: a subagent's clean launch is real session evidence: {msgs}"
 
 
 def test_red_subagent_launch_interrupted_still_fires(tmp_path):
@@ -201,10 +202,10 @@ def test_red_subagent_launch_interrupted_still_fires(tmp_path):
     assert msgs, f"gate.claimed_running MUST fire when the subagent's own launch was interrupted -- battery VOID: {msgs}"
 
 
-def test_clean_launcher_only_still_fires(tmp_path):
+def test_clean_successful_history_nothing_fires(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"stdout": "ready", "exitCode": 0})]
-    assert _claimed_running_messages(history, cwd, text=_CLAIM)
+    assert _claimed_running_messages(history, cwd, text=_CLAIM) == []
 
 
 def test_empty_history_no_claim_nothing_fires(tmp_path):

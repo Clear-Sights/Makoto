@@ -1,61 +1,21 @@
 """makoto.substrate._loader.load_checks — the flat checks/ package's own discovery mechanism
-(SPEC-5 Task 2). Supersedes nothing yet: `schema.load_prechecks`/`substrate._loader.load_stopchecks`
-keep working unchanged this task (Task 3/4 migrate their real callers later).
+(SPEC-5 Task 2). Now the SOLE discovery path for both edges (2026-08-16): `schema.load_prechecks`
+was retired once its real callers migrated to `load_checks`/`load_precheck_catalog`, and the old
+`substrate._loader.load_stopchecks` was retired earlier (2026-07-10, see `_loader.py`'s own
+docstring).
 
 Every scenario here scans an ISOLATED tmp_path directory via `load_checks(package_dir=...)`
 rather than the real `makoto/checks/` package, so this file stays correct forever regardless of
-how many real detector modules land into the real folder. The one
+how many real detector modules Tasks 3-9 land into the real folder (today: zero besides
+`undeclaredFalsifiable.py`, landed by this same task's Part B; eventually ~60). The one
 exception is the dead-package regression guard, which is about import identity, not catalog
 contents.
 """
 import importlib
-from pathlib import Path
 
 import pytest
 
 from makoto.substrate._loader import Check, load_checks
-
-
-REPO = Path(__file__).resolve().parent.parent
-
-
-def test_m2_retired_checks_are_absent_from_the_real_catalog_and_filesystem():
-    """A removed semantic claim must leave with its module, support, and catalog id.
-
-    Denominators are asserted first: a missing package/docs root or empty live loader is a failed
-    audit, never a vacuous absence pass.
-    """
-    checks_dir = REPO / "makoto" / "checks"
-    substrate_dir = REPO / "makoto" / "substrate"
-    docs_dir = REPO / "docs"
-    assert checks_dir.is_dir() and substrate_dir.is_dir() and docs_dir.is_dir()
-    present_check_files = {p.name for p in checks_dir.glob("*.py")}
-    live_ids = {c.id for c in load_checks()}
-    assert present_check_files and live_ids
-
-    retired_files = {
-        "illusoryAuthorshipTrailer.py",
-        "canonFingerprints.py",
-        "canonFingerprintsAdvisory.py",
-        "undeclaredFalsifiable.py",
-    }
-    retired_ids = {
-        "content.illusory_authorship_trailer",
-        "gate.canon_fingerprints",
-        "gate.canon_fingerprints_advisory",
-        "gate.undeclared_falsifiable",
-    }
-    violations = {
-        "check_files": sorted(retired_files & present_check_files),
-        "check_ids": sorted(retired_ids & live_ids),
-        "support_files": sorted(
-            p.name for p in [substrate_dir / "_canonAtoms.py"] if p.exists()
-        ),
-        "docs": sorted(
-            p.name for p in [docs_dir / "CANON-17-VALIDATION.md"] if p.exists()
-        ),
-    }
-    assert violations == {"check_files": [], "check_ids": [], "support_files": [], "docs": []}
 
 
 def _write(tmp_path, name, id_, applies_at, posture="advise"):
@@ -130,11 +90,60 @@ def test_collapsed_packages_are_still_gone():
             importlib.import_module(dead)
 
 
-def test_existing_prechecks_and_stopchecks_loaders_unaffected():
-    # Non-breaking guarantee: the new checks/ taxonomy is additive. The two existing loaders
-    # this task explicitly does not touch/supersede keep discovering their real catalogs.
-    from makoto.core.schema import load_prechecks
-    from makoto.substrate._loader import load_checks
+def test_load_checks_does_not_import_modules_irrelevant_to_the_requested_edge():
+    # Loader-level perf guard (measured regression: load_checks(edge=...) used to import EVERY
+    # check module in makoto/checks/ regardless of which edge was requested -- ~35 modules,
+    # ~600KB of code, on every single call). This scans the REAL package -- unlike the rest of
+    # this file -- because the point is specifically that a Pre-only real module never lands in
+    # `sys.modules` for a Stop-edge request, and vice versa. `contractOrder.py` (the one
+    # dual Pre+Stop surface via EXTRA_CHECKS) legitimately belongs on both sides, so it is
+    # excluded from the "must not appear" sets below.
+    import sys
 
-    assert load_prechecks(), "prechecks still discovered unchanged"
+    from makoto.substrate._loader import ALLOWED_EDGES, scan
+
+    def _reset_check_modules():
+        for mod in list(sys.modules):
+            if mod.startswith("makoto.checks.") and mod != "makoto.checks.contractOrder":
+                del sys.modules[mod]
+
+    # Ground truth for "which edge does each real module's own CHECK belong to" (stem -> CHECK,
+    # from an unfiltered scan() so this test never hardcodes the real catalog by hand). This
+    # only sees each module's PRIMARY CHECK, not EXTRA_CHECKS -- fine, since contractOrder.py
+    # (the sole EXTRA_CHECKS user) is excluded from both sides below anyway.
+    stems_by_edge = {edge: set() for edge in ALLOWED_EDGES}
+    for stem, chk in scan().items():
+        if chk is not None and stem != "contractOrder":
+            stems_by_edge[chk.applies_at].add(stem)
+
+    pre_only_stems = stems_by_edge["Pre"] - stems_by_edge["Stop"]
+    stop_only_stems = stems_by_edge["Stop"] - stems_by_edge["Pre"]
+    assert pre_only_stems and stop_only_stems  # sanity: real catalog has both kinds
+
+    _reset_check_modules()
+    assert load_checks(edge="Stop")
+    imported_stems = {m.rsplit(".", 1)[-1] for m in sys.modules if m.startswith("makoto.checks.")}
+    assert not (pre_only_stems & imported_stems), (
+        "load_checks(edge='Stop') imported Pre-only module(s): "
+        f"{pre_only_stems & imported_stems}")
+
+    _reset_check_modules()
+    assert load_checks(edge="Pre")
+    imported_stems = {m.rsplit(".", 1)[-1] for m in sys.modules if m.startswith("makoto.checks.")}
+    assert not (stop_only_stems & imported_stems), (
+        "load_checks(edge='Pre') imported Stop-only module(s): "
+        f"{stop_only_stems & imported_stems}")
+
+
+def test_existing_prechecks_and_stopchecks_loaders_unaffected():
+    # 2026-08-16: `schema.load_prechecks()` (the loader-adapter shim this comment used to say
+    # was "explicitly not touched/superseded") has now been retired -- the migration to a single
+    # discovery path completed. Both edges are discovered through the same `substrate._loader`
+    # entry points today; this test now pins that unified reality instead of the old split.
+    from makoto.substrate._loader import load_checks, load_precheck_catalog
+
+    live = load_precheck_catalog()
+    assert live, "prechecks still discovered unchanged"
+    assert all(c.predicate_module for c in live), "every Pre-tier catalog row has a predicate_module"
+    assert all(c.keywords for c in live), "every Pre-tier catalog row has >=1 keyword"
     assert load_checks(edge="Stop"), "stop checks still discovered unchanged"

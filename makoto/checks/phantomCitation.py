@@ -9,7 +9,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Optional
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 from makoto.substrate.factories import makoto_allowed, scan_target_content
 from makoto.session.citations import extract_citations
 
@@ -53,12 +54,12 @@ def _within_governed_tree(fp: str, cwd: str, root: Optional[Path]) -> bool:
 
 # jscpd note (2026-07-09): flagged as a clone against fabricatedCommitSha.py. Verified: the matched
 # span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
-# history: list, pattern: PreCheck, conn=None) -> Optional[Finding]` -- byte-identical across 9
+# history: list, pattern: Check, conn=None) -> Optional[Finding]` -- byte-identical across 9
 # check modules (grep '^def predicate(' checks/*.py) -- plus a coincidental preceding `return False`
 # from this file's own unrelated `_within_governed_tree` helper. A dispatcher-invoked entrypoint's
 # signature is a structural contract, not extractable logic; the two functions' bodies do unrelated
 # things (SHA-fabrication detection vs. citation-allowlist path scoping).
-def predicate(*, current_event: dict, history: list, pattern: PreCheck,
+def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     """fire on first Author-Year string not present in canonical_citations."""
     if current_event.get("hook_event_name") != "PreToolUse":
@@ -95,7 +96,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
         pattern_id=pattern.id,
         file=fp,
         line=line_no,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=f"row {pattern.id} ({pattern.description}): '{cite_str}' not in canonical CITATIONS.md set",
         retry_hint=pattern.retry_hint,
         snippet=snippet,
@@ -106,4 +107,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Add the citation as an Author-Year entry to the canonical CITATIONS.md this install wired (the `canonical_citations_path` config row — the packaged makoto/docs/CITATIONS.md by default)."
 DESCRIPTION = 'phantom citation — Author-Year not in the canonical CITATIONS.md set'
 
-CHECK = _Check(id='content.phantom_citation', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('et al', ' 19', ' 20'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='content.phantom_citation', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('et al', ' 19', ' 20'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))

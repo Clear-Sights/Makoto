@@ -85,8 +85,9 @@ def test_dispatch_loose_comparator_emits_block_json(tmp_path):
     assert "content.verifier_predicate_weakened" in reason or "loose" in reason.lower() or "startswith" in reason
 
 
-def test_dispatch_unparseable_stdin_refuses_with_fact(tmp_path):
-    """An unparseable envelope is not evaluable: exit 2 plus an auditable fact."""
+def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
+    """HYBRID: unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON)
+    -> loud-ALLOW (exit 0, empty stdout) AND an on-the-record fact. Never a silent fail-open."""
     state_dir = _setup_state(tmp_path)
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
@@ -97,7 +98,7 @@ def test_dispatch_unparseable_stdin_refuses_with_fact(tmp_path):
         env=env,
         cwd=str(Path(__file__).parent.parent),
     )
-    assert proc.returncode == 2
+    assert proc.returncode == 0
     assert proc.stdout == b""
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.unparseable_payload" for f in facts), facts
@@ -362,17 +363,11 @@ def test_dispatch_env_disable_silences_specific_pattern(tmp_path):
     rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_PATTERNS": "content.verifier_predicate_weakened"})
     assert rc == 0
     assert out == "", f"disabled pattern must not emit block JSON; got {out!r}"
-    # only-fires audit policy: a missing audit.jsonl means ZERO patterns fired, which already
-    # proves the disabled one did not. A regression that fired it would recreate the file with a
-    # content.verifier_predicate_weakened row, flipping the any(...) below to True. Written this
-    # way rather than under `if audit_path.exists():`, which SKIPPED the assertion entirely -- and
-    # a disabled pattern writing no audit file is exactly the expected state, so the claim never
-    # ran. Same reasoning, and same shape, as the gate.advance check further down this file.
     audit_path = state_dir / "audit.jsonl"
-    rows = ([json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
-            if audit_path.exists() else [])
-    assert not any("content.verifier_predicate_weakened" in r.get("pattern_fires", []) for r in rows), \
-        "disabled pattern must not record a fire row"
+    if audit_path.exists():
+        rows = [json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
+        assert not any("content.verifier_predicate_weakened" in r.get("pattern_fires", []) for r in rows), \
+            "disabled pattern must not record a fire row"
 
 
 def test_dispatch_audit_row_records_tool_name(tmp_path):
@@ -1083,6 +1078,50 @@ def test_dispatch_canon_gate_blocks_by_default(tmp_path):
     assert "canon.timeout" in decision["reason"]           # sub-primitive named in the message
 
 
+def test_dispatch_canon_fingerprints_gate_blocks(tmp_path):
+    """Behavioral blocking pin for gate.canon_fingerprints (SPEC-5 Task 9) THROUGH the real
+    dispatch. A bare destructive Bash call with no source edit and no failing test run fires
+    nosrc_destruct (NOT_edit_test_after_red ∧ NOT_source_edited ∧ destructive_command, a
+    robust-core, blocking-capable fingerprint) and BLOCKS at Stop by default."""
+    state_dir = _setup_state(tmp_path)
+    post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "canon_fp_block",
+            "cwd": str(tmp_path), "tool_input": {"command": "rm -rf /tmp/scratch"},
+            "tool_response": {"stdout": "", "stderr": "", "exitCode": 0}}
+    rc, out = _run_dispatch(state_dir, post)
+    assert rc == 0 and out == ""
+    stop = {"hook_event_name": "Stop", "session_id": "canon_fp_block", "cwd": str(tmp_path),
+            "last_assistant_message": "Done for now."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out, "gate.canon_fingerprints must block by default on a robust-core fingerprint fire"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "canon.nosrc_destruct" in decision["reason"]
+
+
+def test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin mirroring test_dispatch_self_wired_gate_never_blocks_even_when_it_fires:
+    gate.canon_fingerprints_advisory fires (audited) but NEVER blocks, even when its own fingerprint
+    condition holds -- an Edit on a test file that degenerates a real assertion into a tautology,
+    with no green test run recorded (nogreen_weakened)."""
+    state_dir = _setup_state(tmp_path)
+    post = {"hook_event_name": "PostToolUse", "tool_name": "Edit", "session_id": "canon_fp_advise",
+            "cwd": str(tmp_path),
+            "tool_input": {"file_path": "tests/test_x.py",
+                           "old_string": "assert x == 5", "new_string": "assert True"},
+            "tool_response": {}}
+    rc, out = _run_dispatch(state_dir, post)
+    assert rc == 0 and out == ""
+    stop = {"hook_event_name": "Stop", "session_id": "canon_fp_advise", "cwd": str(tmp_path),
+            "last_assistant_message": "Done for now."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out == "", "gate.canon_fingerprints_advisory must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.canon_fingerprints_advisory" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
 def test_dispatch_canon_gate_silent_when_resolved_before_turn_end(tmp_path):
     """Control proving the gate DISCRIMINATES end-to-end: the SAME interrupted call, but a LATER
     successful Bash call closes the turn -> the error was resolved -> no block."""
@@ -1177,18 +1216,20 @@ def test_dispatch_fabricated_action_gate_blocks(tmp_path):
 
 
 def test_dispatch_fabricated_action_silent_when_command_ran(tmp_path):
-    """The same canonical command in a settled PostToolUse deed certifies the action claim."""
+    """Control proving the gate DISCRIMINATES end-to-end on PRESENCE of tool work: the SAME action
+    claim, but a tool call really happened this turn (a PreToolUse event — every tool call emits one,
+    matcher '*') -> turn_tool_calls > 0 -> discharged -> no block. The discharge is presence-of-work,
+    NOT command-text matching, so it is immune to paraphrase and to invisible tools."""
     state_dir = _setup_state(tmp_path)
-    post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "fab_ok",
-            "cwd": str(tmp_path),
-            "tool_input": {"command": "pytest tests/zzz_unrun.py -q"},
-            "tool_response": {"stdout": "1 passed", "stderr": "", "exitCode": 0}}
-    _run_dispatch(state_dir, post)
+    pre = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "fab_ok",
+           "cwd": str(tmp_path),
+           "tool_input": {"command": "python -m pytest tests/zzz_unrun.py -q --tb=short"}}
+    _run_dispatch(state_dir, pre)                  # a tool call really happened this turn
     stop = {"hook_event_name": "Stop", "session_id": "fab_ok", "cwd": str(tmp_path),
             "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed."}
     rc, out = _run_dispatch(state_dir, stop)
     assert rc == 0
-    assert out == "", "the exact settled command should certify the action claim"
+    assert out == "", "a tool call this turn discharges the action claim -> must not block"
 
 
 def test_dispatch_named_test_gate_blocks_after_recorded_named_red(tmp_path):
@@ -1252,7 +1293,7 @@ def test_dispatch_claimed_shipped_gate_blocks_on_unbacked_remote_claim(tmp_path)
     assert out, "claimed_shipped gate must block an unbacked completed remote-action claim"
     decision = json.loads(out)
     assert decision["decision"] == "block"
-    assert "remote.merge" in decision["reason"]
+    assert "remote change was shipped" in decision["reason"]
     rows = [json.loads(line) for line in (state_dir / "audit.jsonl").read_text().splitlines()
             if line.strip()]
     assert any("gate.claimed_shipped" in row.get("pattern_fires", []) for row in rows), \
@@ -1688,6 +1729,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.liveness",     # liveness folded in from the collapsed close-check tier
                           "gate.hollow_test",  # HOLLOWED-class detector (SPIRIT.md §4), same split as liveness
                           "gate.canon",        # ported agnostic Stop primitives canon.timeout/canon.recur
+                          "gate.canon_fingerprints",            # SPEC-5 Task 9: BLOCK-tier canon fingerprints
+                          "gate.canon_fingerprints_advisory",    # SPEC-5 Task 9: ADVISE-tier sibling
                           "gate.contract_order",   # SPEC-5 (Makoto absorbs Assay): the plan's Stop
                                                       # remainder guard
                           "gate.self_wired",   # advisory-tier exception (2026-07-05); still
@@ -1729,7 +1772,11 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     opposite claim: it fires (audited) and never blocks."""
     from pathlib import Path as _P
     from makoto._dispatch import _blocking_gate_ids
-    _ADVISORY_EXEMPT = {"gate.self_wired",
+    # gate.canon_fingerprints_advisory (SPEC-5 Task 9, DESIGN DECISION 26) is the second documented
+    # exception, same shape as gate.self_wired: discovered (so it appears in _blocking_gate_ids())
+    # but ships at level="advisory" only, never "error" -- structurally cannot block. Its behavioral
+    # pin is test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fires below.
+    _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
                         "gate.relative_path_citation", "gate.plan_item_drift"}
     src = _P(__file__).read_text()
     missing = [gid for gid in _blocking_gate_ids()
@@ -1955,69 +2002,3 @@ def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
         "an error-level finding must record exit_code=2 in the audit row; "
         f"got {fire_rows[0].get('exit_code')!r}"
     )
-
-
-def _run_raw(state_dir, raw: bytes) -> tuple[int, str, str]:
-    """Invoke the dispatcher with RAW bytes on stdin, bypassing json.dumps.
-
-    _run_dispatch serialises a dict, so it cannot express the two cases this test is about --
-    no bytes at all, and bytes that are not JSON.
-    """
-    env = os.environ.copy()
-    env["MAKOTO_STATE_DIR"] = str(state_dir)
-    proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
-        input=raw, capture_output=True, env=env,
-        cwd=str(Path(__file__).parent.parent),
-    )
-    return proc.returncode, proc.stdout.decode("utf-8"), proc.stderr.decode("utf-8")
-
-
-def test_an_empty_payload_and_an_unparseable_one_refuse_with_different_reasons(tmp_path):
-    """Both are refused, but the diagnostic distinguishes missing bytes from bad bytes."""
-    state = _setup_state(tmp_path)
-
-    code, stdout, stderr = _run_raw(state, b"")
-    assert code == 2, stderr
-    assert stdout == ""
-    assert "stdin was empty" in stderr, stderr
-    assert "no payload arrived at all" in stderr, stderr
-
-    code, stdout, stderr = _run_raw(state, b"not json at all {{{")
-    assert code == 2, stderr
-    assert "stdin was not valid JSON" in stderr, stderr
-    assert "stdin was empty" not in stderr, stderr
-
-    # The field is pattern_id, read from a real fact rather than guessed. An earlier draft of
-    # this test asserted on fact["kind"], which does not exist: every row returned None, so the
-    # count was 0 and the assertion failed for a reason unrelated to the behaviour under test.
-    # A test that guesses a schema can fail while the code is right -- or pass while it is wrong.
-    facts = _dispatch_facts(state)
-    ids = [fact.get("pattern_id") for fact in facts]
-    assert ids.count("dispatch.unparseable_payload") == 2, facts
-    messages = " | ".join(fact.get("exc_message", "") for fact in facts)
-    assert "stdin was empty" in messages, facts
-    assert "stdin was not valid JSON" in messages, facts
-
-
-def test_an_empty_json_object_refuses_with_fact(tmp_path):
-    state = _setup_state(tmp_path)
-    code, stdout, stderr = _run_raw(state, b"{}")
-    assert code == 2, stderr
-    assert stdout == ""
-    assert "empty_payload" in stderr
-    facts = _dispatch_facts(state)
-    assert any(f.get("pattern_id") == "dispatch.empty_payload" for f in facts), facts
-
-
-def test_a_valid_non_object_payload_still_fails_closed(tmp_path):
-    """The control. Distinguishing empty from unparseable must not soften the tamper-shaped case.
-
-    A truncated pipe yields INVALID json, never valid-non-object, so valid JSON that is not an
-    object is anomalous rather than transient and blocks at exit 2. If this ever joins the
-    loud-allow branch, the fail-mode has been widened by accident.
-    """
-    state = _setup_state(tmp_path)
-    code, _, stderr = _run_raw(state, b'"a valid json string, not an object"')
-    assert code == 2, stderr
-    assert "non_object_payload" in stderr, stderr

@@ -26,7 +26,8 @@ from typing import Optional
 
 from makoto.substrate._failureClassifier import classify_failure
 from makoto.substrate.io import bash_output_text
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 
 
 def _canon_input(ti: dict) -> str:
@@ -71,7 +72,7 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     return ti, text
 
 
-def predicate(*, current_event: dict, history: list, pattern: PreCheck,
+def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -90,7 +91,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
         pattern_id=pattern.id,
         file="",
         line=0,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=("Identical retry of a Bash call that just failed deterministically -- retrying "
                  "the byte-identical command cannot change a deterministic error."),
         retry_hint=pattern.retry_hint,
@@ -101,4 +102,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'You retried the byte-identical failing Bash command with no intervening change, and the prior failure was deterministic (a syntax/import/permission/not-found error) -- retrying it unmodified cannot make progress. Change the command, fix the underlying cause, or take a different action.'
 DESCRIPTION = "byte-identical Bash retry immediately following that SAME call's deterministic failure -- no intervening state change"
 
-CHECK = _Check(id="event.identical_retry", applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Bash',), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id="event.identical_retry", applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Bash',), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))

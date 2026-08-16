@@ -15,7 +15,8 @@ from __future__ import annotations
 import json
 from typing import Optional
 from urllib.parse import urlparse
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 
 
 # Allowlisted hosts the agent legitimately knows from training data.
@@ -31,7 +32,7 @@ _TRUSTED_HOSTS = frozenset({
 })
 
 
-def predicate(*, current_event: dict, history: list, pattern: PreCheck,
+def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     """fire on WebFetch URL that wasn't seen in any prior session event."""
     if current_event.get("hook_event_name") != "PreToolUse":
@@ -62,7 +63,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
         pattern_id=pattern.id,
         file="",
         line=0,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=f"row {pattern.id} ({pattern.description}): URL never seen in this session",
         retry_hint=pattern.retry_hint,
         snippet=url[:200],
@@ -73,4 +74,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Run WebSearch first; only WebFetch URLs that prior search results actually returned. Fabricated URLs typically reflect plausible host+path patterns from training data, not real pages.'
 DESCRIPTION = 'WebFetch URL never seen in any prior tool_result this session'
 
-CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('http://', 'https://'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('http://', 'https://'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))

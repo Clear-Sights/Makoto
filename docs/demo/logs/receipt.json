@@ -1,0 +1,108 @@
+{
+ "scenario": "receipt",
+ "steps": [
+  {
+   "title": "WORD becomes deed: the write lands (kind=touched, chain row 1)",
+   "display_cmd": "PostToolUse Write src/auth.py",
+   "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "session_id": "demo-session-001",
+    "cwd": "/tmp/makoto-demo-j9f35qjc/receipt-proj",
+    "tool_input": {
+     "file_path": "/tmp/makoto-demo-j9f35qjc/receipt-proj/src/auth.py",
+     "content": "def login(user):\n    return None\n"
+    },
+    "tool_response": {
+     "filePath": "/tmp/makoto-demo-j9f35qjc/receipt-proj/src/auth.py"
+    }
+   },
+   "exit": 0,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "title": "a real test run FAILS (kind=testrun, chain row 2)",
+   "display_cmd": "PostToolUse Bash `python -m pytest tests/test_auth.py -q -rA`",
+   "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "session_id": "demo-session-001",
+    "cwd": "/tmp/makoto-demo-j9f35qjc/receipt-proj",
+    "tool_input": {
+     "command": "python -m pytest tests/test_auth.py -q -rA"
+    },
+    "tool_response": {
+     "stdout": "F                                                                    [100%]\nFAILED tests/test_auth.py::test_login - AssertionError: expected a session token\n=== 1 failed in 0.14s ===\n",
+     "stderr": "",
+     "exitCode": 1
+    }
+   },
+   "exit": 0,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "title": "the fix lands (kind=touched)",
+   "display_cmd": "PostToolUse Write src/auth.py",
+   "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "session_id": "demo-session-001",
+    "cwd": "/tmp/makoto-demo-j9f35qjc/receipt-proj",
+    "tool_input": {
+     "file_path": "/tmp/makoto-demo-j9f35qjc/receipt-proj/src/auth.py",
+     "content": "def login(user):\n    return session_token(user)\n"
+    },
+    "tool_response": {
+     "filePath": "/tmp/makoto-demo-j9f35qjc/receipt-proj/src/auth.py"
+    }
+   },
+   "exit": 0,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "title": "the rerun PASSES \u2014 the test-delta redirect fires and is ITSELF chain-appended (kind=audit)",
+   "display_cmd": "PostToolUse Bash `python -m pytest tests/test_auth.py -q -rA`",
+   "payload": {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "session_id": "demo-session-001",
+    "cwd": "/tmp/makoto-demo-j9f35qjc/receipt-proj",
+    "tool_input": {
+     "command": "python -m pytest tests/test_auth.py -q -rA"
+    },
+    "tool_response": {
+     "stdout": ".                                                                    [100%]\nPASSED tests/test_auth.py::test_login\n=== 1 passed in 0.06s ===\n",
+     "stderr": "",
+     "exitCode": 0
+    }
+   },
+   "exit": 0,
+   "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"makoto: Test delta vs the prior recorded run: 1 newly passing: test_login\"}}",
+   "stderr": ""
+  },
+  {
+   "title": "the closing claim is checked against the recorded ledger: clean, allowed",
+   "display_cmd": "Stop",
+   "payload": {
+    "hook_event_name": "Stop",
+    "session_id": "demo-session-001",
+    "cwd": "/tmp/makoto-demo-j9f35qjc/receipt-proj",
+    "last_assistant_message": "Fixed src/auth.py \u2014 test_login passes now. Done."
+   },
+   "exit": 0,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "title": "RECEIPT: every claim cites a verify_chain-checkable row",
+   "display_cmd": "python -m makoto receipt --session demo-session-001",
+   "payload": null,
+   "exit": 0,
+   "stdout": "{\n  \"session_id\": \"demo-session-001\",\n  \"chain_name\": \"chain\",\n  \"verified_through\": null,\n  \"claims\": [\n    {\n      \"claim_kind\": \"testrun\",\n      \"row_index\": 1,\n      \"row_hash\": \"0b292d91a914552ccf3d3e3b31656ad32235488d1af43415dad2a2b2425683d3\"\n    },\n    {\n      \"claim_kind\": \"testrun\",\n      \"row_index\": 3,\n      \"row_hash\": \"d8ecd377ce046050cb513c1be9c0f59fd77689425b54df69183a63413849a674\"\n    }\n  ],\n  \"claim_count\": 2,\n  \"trace_bound_count\": 2,\n  \"exemption_count\": 0\n}\n",
+   "stderr": ""
+  }
+ ]
+}

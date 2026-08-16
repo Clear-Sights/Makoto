@@ -9,7 +9,8 @@ from pathlib import Path
 
 import makoto.record.db as vdb
 import makoto._dispatch  # noqa: F401 — importing the L3 orchestrator installs the exemption sink
-from makoto.core.schema import PreCheck, load_prechecks
+from makoto.core.schema import PreCheck
+from makoto.substrate._loader import load_precheck_catalog
 from makoto.record import audit
 from makoto.substrate import factories
 
@@ -30,7 +31,7 @@ def _run(pid: str, evt: dict, conn):
     import importlib
     # SPEC-5: resolve via the real catalog's predicate_module (flat makoto.checks, descriptive
     # names -- no longer derivable from the pattern id).
-    _mod_path = next(p.predicate_module for p in load_prechecks() if p.id == pid)
+    _mod_path = next(p.predicate_module for p in load_precheck_catalog() if p.id == pid)
     mod = importlib.import_module(_mod_path)
     pat = PreCheck(id=pid, fire_level="error", description="x", retry_hint="y")
     return mod.predicate(current_event=evt, history=[], pattern=pat, conn=conn)
@@ -96,10 +97,10 @@ def test_disabled_pattern_suppression_is_recorded(tmp_path, monkeypatch):
     """MAKOTO_DISABLE_PATTERNS muting a pattern that keyword-hits the payload leaves a record —
     the silent-disable gap closed; parity with the already-audited MAKOTO_DISABLE_GATES."""
     from makoto._dispatch import _run_predicates
-    from makoto.core.schema import load_prechecks
+    from makoto.substrate._loader import load_precheck_catalog
     st = _state(tmp_path)
     conn = sqlite3.connect(str(st / "makoto.record.db"))
-    pat = next(p for p in load_prechecks() if p.predicate_module and p.keywords)
+    pat = next(p for p in load_precheck_catalog() if p.predicate_module and p.keywords)
     kw = pat.keywords[0]
     monkeypatch.setenv("MAKOTO_DISABLE_PATTERNS", pat.id)
     payload = {"hook_event_name": "PreToolUse", "session_id": "s2", "tool_name": "Bash",
@@ -161,10 +162,10 @@ def test_set_exemption_sink_is_restorable(tmp_path):
 def test_no_disable_env_means_no_suppression_work(tmp_path):
     """default case: MAKOTO_DISABLE_PATTERNS unset -> no disabled-pattern rows ever written."""
     from makoto._dispatch import _run_predicates
-    from makoto.core.schema import load_prechecks
+    from makoto.substrate._loader import load_precheck_catalog
     st = _state(tmp_path)
     conn = sqlite3.connect(str(st / "makoto.record.db"))
-    pat = next(p for p in load_prechecks() if p.predicate_module and p.keywords)
+    pat = next(p for p in load_precheck_catalog() if p.predicate_module and p.keywords)
     payload = {"hook_event_name": "PreToolUse", "session_id": "s3", "tool_name": "Bash",
                "tool_input": {"command": pat.keywords[0] + " something"}}
     _run_predicates(conn, payload, [], 1, st, json.dumps(payload))

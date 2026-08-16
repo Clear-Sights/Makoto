@@ -28,7 +28,8 @@ import os
 import re
 import importlib
 import pytest
-from makoto.core.schema import PreCheck, load_prechecks
+from makoto.core.schema import PreCheck
+from makoto.substrate._loader import load_precheck_catalog
 
 # A file_path that matches each content-scan check's target_rx (so the gate passes).
 _PATH = {
@@ -62,12 +63,7 @@ def _parse(path: str):
 
 
 def _params():
-    stem_to_id = {p.predicate_module.rsplit(".", 1)[-1]: p.id for p in load_prechecks()}
-    # The three exact regex members now share one predicate module. Corpus fixture stems remain
-    # the old check-specific labels, so recover their IDs from the table rather than pretending
-    # the central module is three differently named files.
-    from makoto.checks.agnosticRegex import SPECS
-    stem_to_id.update({spec.corpus_stem: spec.id for spec in SPECS})
+    stem_to_id = {p.predicate_module.rsplit(".", 1)[-1]: p.id for p in load_precheck_catalog()}
     out = []
     for p in sorted(glob.glob(os.path.join(_CDIR, "T[PN]_*.md"))):
         name = os.path.basename(p)
@@ -87,7 +83,7 @@ def _params():
 def test_content_scan_corpus(name, pid, expects_fire, reason, body):
     # checks live in the flat makoto.checks package under descriptive names, not a name
     # derivable from the check id -- resolve via the real catalog's predicate_module.
-    _mod_path = next(p.predicate_module for p in load_prechecks() if p.id == pid)
+    _mod_path = next(p.predicate_module for p in load_precheck_catalog() if p.id == pid)
     mod = importlib.import_module(_mod_path)
     pat = PreCheck(id=pid, fire_level="error", description="corpus", retry_hint="x")
     evt = {"hook_event_name": "PreToolUse", "tool_input": {"file_path": _PATH[pid], "content": body}}

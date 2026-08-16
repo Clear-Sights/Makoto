@@ -1,4 +1,4 @@
-"""Detection logic for the live `ConfigChange` hook adapter.
+"""Pure detection logic for a hypothetical `ConfigChange` hook adapter — NOT a live hook.
 
 Background (see `docs/self-defense-asymmetry-followup.md`, "2026-07-05 followup" section): Makoto's
 Stop-time `gate.self_wired` (`checks/selfWiredCheck.py`, migrated from `stopchecks/stopcheck_self_wired.py`
@@ -10,9 +10,19 @@ hook event (fired by Claude Code's file-watcher when a settings file changes, in
 PreToolUse/PostToolUse/Stop dispatch chain) is architecturally different: it observes the file-level
 edit itself, so a full simultaneous strip is exactly the kind of event it fires for.
 
-The packaged `hooks/hooks.json` entry reaches `makoto._dispatch_configchange`; this module remains
-pure so the adapter can keep filesystem and audit I/O at its boundary. Its end-to-end regression test
-replays the documented Claude Code fields, `source` and `file_path`, through that subprocess adapter.
+**This module does NOT close that gap.** It contains only the pure predicate a future `ConfigChange`
+hook adapter could call — no hook registration, no `.claude/settings.json` wiring, nothing that runs
+in a live session. Wiring a new hook entry, and deciding whether it should be advisory or blocking,
+is oversight-config territory (`CLAUDE.md` rule 4: hook wiring, enforcement tiers/defaults) requiring
+direct human/main authorization, not a dispatcher/worker-level build. See the followup doc's "Candidate
+for a future design decision" section for what that would still take.
+
+**Verified only against constructed payloads.** No real `ConfigChange` event has ever reached this
+code — it has not been wired into any hook, so there is no live event stream to test against. The
+function below is tested with hand-built payload shapes that match the event's documented schema
+(`config_source`, `config_path`); whether Claude Code's real payload matches that schema exactly, with
+no additional wrapping, is unverified beyond the documentation research already recorded in the
+followup doc.
 
 Detection logic reuse: rather than a third hand-duplicated copy of the "which of PreToolUse/
 PostToolUse/Stop lost its makoto-dispatching entry" predicate (`selfWiredCheck.py` already
@@ -30,7 +40,7 @@ from typing import Callable, Optional
 
 from makoto.checks.selfWiredCheck import _missing_makoto_events
 
-# The two `source` values (per Claude Code's documented ConfigChange schema — see the
+# The two `config_source` values (per Claude Code's documented ConfigChange schema — see the
 # followup doc's citations) that can carry Makoto's hook wiring at all. `user_settings` (global,
 # outside this repo), `policy_settings` (managed/enterprise, cannot be blocked per the docs and is
 # not where a repo-local hook is installed), and `skills` are structurally incapable of carrying
@@ -47,9 +57,9 @@ class ConfigChangeVerdict:
     boolean fact this predicate is willing to assert — a future hook adapter maps it to whatever
     enforcement tier a human/main authorizes, this module does not pick one.
     """
-    config_source: str                # verbatim source from the event, or None if absent
-    config_path: str                  # verbatim file path from the event, or "" if absent
-    applicable: bool                  # False iff source can't carry makoto's hook wiring at all
+    config_source: str                # verbatim from the event, or None if absent
+    config_path: str                  # verbatim from the event, or "" if absent
+    applicable: bool                  # False iff config_source can't carry makoto's hook wiring at all
     evaluated: bool                   # False iff applicable but the settings content could not be
                                        # obtained/parsed as a JSON object (fail-open, mirrors gate.self_wired)
     stripped: bool                    # True iff >=1 of PreToolUse/PostToolUse/Stop lost its
@@ -69,20 +79,18 @@ def configchange_verdict(event, *, settings_json: Optional[dict] = None,
                           fs_read: Optional[Callable[[str], Optional[str]]] = None) -> ConfigChangeVerdict:
     """Evaluate a `ConfigChange`-shaped `event` against Makoto's own hook wiring.
 
-    `event` carries Claude Code's documented ConfigChange fields, `source` and `file_path`
-    (dict-like or attribute-like; either works via `_get`). `config_source` and `config_path`
-    remain accepted as compatibility aliases for callers that predate the current schema. The
-    settings file's own content is
+    `event` carries the two documented ConfigChange fields, `config_source` and `config_path`
+    (dict-like or attribute-like; either works via `_get`). The settings file's own content is
     supplied by the caller in one of two ways (caller's choice, not fixed by this function):
       - `settings_json`: the already-parsed JSON object (preferred when the caller already has it,
         e.g. a test, or a future adapter that reads the file itself before calling this function), or
-      - `fs_read`: a `path -> Optional[str]` reader called with `event`'s `file_path`, mirroring the
+      - `fs_read`: a `path -> Optional[str]` reader called with `event`'s `config_path`, mirroring the
         `fs_read` convention `gate.self_wired` already uses for its own settings.json read.
     If both are omitted, or the content can't be read/parsed as a JSON object, the verdict fails open
     (`evaluated=False`, `fires=False`) — same fail-open philosophy as every other gate in this repo:
     an indeterminate read is not treated as evidence of a strip.
 
-    Not applicable (`applicable=False`) for any `source` other than `project_settings` or
+    Not applicable (`applicable=False`) for any `config_source` other than `project_settings` or
     `local_settings`, regardless of content — those are the only two sources capable of carrying
     `.claude/settings.json` / `.claude/settings.local.json`'s `hooks` object.
 
@@ -90,19 +98,14 @@ def configchange_verdict(event, *, settings_json: Optional[dict] = None,
     docstring): a settings file that simply never had Makoto's hooks wired produces the identical
     all-three-missing signal as a full strip would.
     """
-    config_source = _get(event, "source")
-    if config_source is None:
-        config_source = _get(event, "config_source")
-    config_path = _get(event, "file_path")
-    if config_path is None:
-        config_path = _get(event, "config_path")
-    config_path = config_path or ""
+    config_source = _get(event, "config_source")
+    config_path = _get(event, "config_path") or ""
 
     if config_source not in _APPLICABLE_SOURCES:
         return ConfigChangeVerdict(
             config_source=config_source, config_path=config_path,
             applicable=False, evaluated=False, stripped=False, missing_events=(), fires=False,
-            reason=(f"source={config_source!r} cannot carry makoto's hook wiring "
+            reason=(f"config_source={config_source!r} cannot carry makoto's hook wiring "
                     f"(only {_APPLICABLE_SOURCES!r} can); not evaluated"),
         )
 

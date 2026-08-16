@@ -52,10 +52,16 @@ EVENTS: dict[str, dict] = {
         "wired the event, so the branch was unreachable. Wired 2026-07-12 on direct owner "
         "instruction (rule-4 sign-off given in-session), closing the gap the matrix surfaced")},
 
-    "ConfigChange": {"status": "WIRED", "handler": "makoto/_dispatch_configchange.py",
-                     "moves": ("main", "configchange_verdict")},
-
     # ── HOLE — a Makoto-shaped handler exists (or is unit-tested) but isn't shipped-wired ──────
+    "ConfigChange": {"status": "HOLE", "reason": (
+        "built, owner-authorized (2026-07-08, per _dispatch_configchange.py's own docstring), "
+        "and unit-tested against constructed payloads (makoto.verdict.configchange_verdict) — "
+        "but wired only in an operator's own local, uncommitted .claude/settings.json for "
+        "self-hosted dogfooding, never in this repo's shipped hooks/hooks.json or "
+        ".claude-plugin manifest. A live-fire probe during that dogfooding session was recorded "
+        "as inconclusive, not confirmed-working (docs/self-defense-asymmetry-followup.md). "
+        "Unblock: ship the hooks.json entry once live delivery is actually confirmed, same "
+        "rule-4 sign-off as the others")},
     "PostToolUseFailure": {"status": "HOLE", "reason": (
         "the odd one of this section's four HOLEs: the other three mean 'code exists but is not "
         "shipped-wired'; this one means no design has ever been evaluated in this repo at all "

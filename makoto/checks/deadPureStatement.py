@@ -416,7 +416,7 @@ def _run(ctx) -> list:
     out = []
     # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
     # hollowTest._run via the stdlib-isolated helper home -- 2026-07-09 dedup round 2
-    for p, src in iter_touched_python_sources(ctx):
+    for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         for f in analyze_file(src, str(p)):
             out.append(Finding(
                 pattern_id="gate.liveness",
@@ -436,4 +436,5 @@ def _run(ctx) -> list:
 # scripts/falsify._BEHAVIORAL_TEETH. `run` returns list[Finding] (a closed unit can have many
 # illusory statements); run_stop_checks normalizes a list exactly like a single finding.
 from makoto.substrate._loader import Check as _Check
-CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=_run)
+CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
+               eats=frozenset({"touched", "cwd", "fs_read"}))

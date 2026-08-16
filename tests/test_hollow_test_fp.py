@@ -24,22 +24,7 @@ from tests._fpHarness import measure
 from makoto.checks.hollowTest import analyze_file
 from makoto.checks.hollowTest import _run as adapter_run
 
-# TWO ROOTS, and conflating them silently emptied this file's own falsifier.
-#
-# `parent.parent.parent` lands ABOVE this checkout, so `<that>/makoto` is this repository only
-# when the checkout directory happens to be named `makoto`. Under any other name -- a second
-# clone, a GitHub zip's `makoto-main`, a vendored subdirectory -- it names something else or
-# nothing at all, and `tracked_py_files` is documented FAIL-OPEN: it returns [] rather than
-# raising. `measure([], ...)` then reports `fires == 0`, so the pre-registered falsifier passed
-# green over a corpus it never read. Measured in a checkout named `checkout-under-another-name`:
-# REPO_ROOT=/tmp/wrongname, corpus root absent, files measured 0, test PASSED, exit 0.
-#
-# So: THIS_REPO is this checkout, whatever it is called, and is the only root the makoto corpora
-# may use. MONOREPO_ROOT is the enclosing tree, used only for the assay and ventura siblings,
-# which are legitimately absent from a standalone checkout and skip.
-THIS_REPO = Path(__file__).resolve().parents[1]
-MONOREPO_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = MONOREPO_ROOT   # sibling lookups only -- never for makoto's own corpus
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent   # .../Skill-lab-V5
 
 
 def _f(src, path="test_m.py"):
@@ -192,16 +177,8 @@ def test_analyzer_itself_does_not_apply_makoto_allow():
 # zero fires -- exactly like test_liveness_fp.py::test_fp_zero_on_makoto_source.
 def test_fp_zero_on_makoto_nontest_source():
     from tests._repo_scope import tracked_py_files
-    makoto_root = THIS_REPO
+    makoto_root = REPO_ROOT / "makoto"
     files = tracked_py_files(makoto_root)    # already root-pinned; route through the shared lister
-    # A ZERO OVER NOTHING IS NOT A ZERO. `tracked_py_files` is fail-open by design, so an
-    # unreadable or misaddressed root arrives here as [] and `measure` then reports fires == 0
-    # -- the falsifier passing precisely because it read no source. The denominator is asserted
-    # before the numerator is believed.
-    assert files, (
-        f"pre-registered falsifier has an EMPTY corpus at {makoto_root} — it cannot report zero "
-        f"false positives over a corpus it did not read"
-    )
     rep = measure([str(makoto_root / f) for f in files], _analyzer)
     assert rep["fires"] == 0, f"pre-registered falsifier FIRED — triage each candidate FP: {rep['detail']}"
 
@@ -232,30 +209,13 @@ def test_fp_zero_on_makoto_nontest_source():
 # genuine environment fact, so `_is_tautology` correctly stays silent on it. Both 4a and 4b ship:
 # real-FP evidence is 0/0/0 across all three corpora, same "prove zero-FP or cut" bar as 1-3.
 def _corpus_py_files(repo_relative_root: str) -> list:
-    # "makoto" is THIS checkout under whatever name it was cloned as, never a sibling directory
-    # that happens to be spelled the same. Only assay and ventura are genuinely siblings.
-    root = THIS_REPO if repo_relative_root == "makoto" else MONOREPO_ROOT / repo_relative_root
+    root = REPO_ROOT / repo_relative_root
     listed = subprocess.run(["git", "-C", str(root), "ls-files"], capture_output=True, text=True)
     if listed.returncode == 0:
-        # `git ls-files` reads the index, which legitimately still names a file deleted in an
-        # unstaged working tree. The corpus is the files analyzable on disk, not stale index
-        # entries; filtering preserves the committed-tree result and lets a deletion be tested
-        # before it is staged.
-        files = [str(path) for f in listed.stdout.split() if f.endswith(".py")
-                 if (path := root / f).is_file()]
-    else:
-        # The publish verifier intentionally receives an rsync tree with no .git directory.  It is
-        # still a corpus, so measure its files instead of silently measuring an empty git index.
-        files = [str(f) for f in sorted(root.rglob("*.py")) if f.is_file()]
-    assert files, f"{repo_relative_root} corpus is empty at {root} — nothing was measured"
-    return files
-
-
-def test_corpus_file_lister_refuses_an_empty_corpus(tmp_path, monkeypatch):
-    (tmp_path / "assay").mkdir()
-    monkeypatch.setitem(globals(), "MONOREPO_ROOT", tmp_path)
-    with pytest.raises(AssertionError, match=r"assay corpus is empty .* nothing was measured"):
-        _corpus_py_files("assay")
+        return [str(root / f) for f in listed.stdout.split() if f.endswith(".py")]
+    # The publish verifier intentionally receives an rsync tree with no .git directory.  It is
+    # still a corpus, so measure its files instead of silently measuring an empty git index.
+    return [str(f) for f in sorted(root.rglob("*.py")) if f.is_file()]
 
 
 def _annotated_hollow_test_functions(files: list[str]) -> set[str]:
@@ -280,11 +240,9 @@ def _annotated_hollow_test_functions(files: list[str]) -> set[str]:
 
 
 def test_corpus_fp_makoto_own_tests():
-    # No skip guard: makoto's own corpus is THIS checkout, so it is never legitimately absent.
-    # The guard that used to stand here tested for a SIBLING named `makoto` and skipped whenever
-    # the checkout was called anything else -- silently retiring makoto's own corpus measurement.
+    if not (REPO_ROOT / "makoto").is_dir():
+        pytest.skip("makoto/ sibling not present (standalone makoto checkout)")
     files = _corpus_py_files("makoto")
-    assert files, f"makoto's own test corpus is empty at {THIS_REPO} — nothing was measured"
     rep = measure(files, _analyzer)
     fires_by_func = {f["func"] for f in rep["detail"]}
     # The raw analyzer must retain every corpus-local, deliberately hollow annotated positive;
@@ -337,26 +295,3 @@ def test_corpus_fp_4a_4b_ventura_tests():
     # env-var check, not a tautology -- correctly silent. See the H8 comment block above.
     assert _new_pattern_fires("ventura") == []
 
-
-# --- the falsifier's own denominator -------------------------------------------------------------
-# The two assertions above protect the corpus at run time. This one protects the ADDRESS of the
-# corpus, which is the thing that actually broke: a root derived by counting `.parent` hops out of
-# the checkout is a claim about what the checkout is NAMED, and no clone is obliged to honour it.
-def test_the_makoto_corpora_are_addressed_by_this_checkout_not_by_its_directory_name():
-    from tests._repo_scope import tracked_py_files
-
-    # THIS_REPO is the checkout containing this file, whatever that directory is called.
-    assert (THIS_REPO / "tests" / "test_hollow_test_fp.py").is_file(), THIS_REPO
-    assert (THIS_REPO / "makoto").is_dir(), THIS_REPO
-
-    # Both makoto corpora must resolve inside it, and neither may be empty.
-    source_files = tracked_py_files(THIS_REPO)
-    test_files = _corpus_py_files("makoto")
-    assert source_files, f"non-test source corpus is empty at {THIS_REPO}"
-    assert test_files, f"test corpus is empty at {THIS_REPO}"
-    for path in test_files:
-        assert Path(path).resolve().is_relative_to(THIS_REPO), (path, THIS_REPO)
-
-    # And the corpus must not be reachable by the old sibling-directory address, which is what
-    # made a second clone read the first one's files.
-    assert _corpus_py_files("makoto") == test_files

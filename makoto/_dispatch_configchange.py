@@ -1,17 +1,42 @@
-"""ConfigChange hook adapter.
+"""ConfigChange hook ADAPTER — the real entry point a `.claude/settings.json` `ConfigChange` hook
+entry invokes via `python3 -m makoto._dispatch_configchange`.
 
-It accepts only a complete, readable ConfigChange envelope. A detected strip is advisory unless
-the installer manifest or a prior snapshot proves that Makoto had wired that exact path; those
-evidenced transitions block. The pure verdict lives in
-``makoto.verdict.configchange_verdict`` and the end-to-end contract is tested in
-``tests/test_dispatch_configchange.py`` and ``tests/test_dispatch_configchange_blocking.py``.
+**WIRED, 2026-07-08 (owner, identifying as Makoto's creator, gave direct, specifically-named
+authorization).** `.claude/settings.json` carries a live `ConfigChange` entry pointing at this
+module via `dispatch_configchange.sh`. See `docs/self-defense-asymmetry-followup.md`'s
+"2026-07-05 followup" sections for the design history; the pure predicate this module calls
+(`makoto.verdict.configchange_verdict.configchange_verdict`) is unit-tested against constructed payloads.
+
+**TWO TIERS, both owner-authorized (D5, docs/DEFERRED.md):**
+  1. **ADVISORY** (unconditional, per DESIGN DECISION 6/9's precedent): the underlying verdict
+     firing on a path that has NEVER been recorded as wired or previously-clean always logs a
+     stderr line + a best-effort audit-row append. Never blocks. This is the ambiguous
+     "never wired vs. just stripped" case `configchange_verdict` itself cannot resolve.
+  2. **BLOCKING** (2026-07-08, owner-authorized, FP-safety-scoped): fires ONLY when the strip is
+     a genuine, evidenced transition -- either (a) `config_path` is in the installer's own
+     manifest of paths it wired (`<state_dir>/configchange_manifest.json`, written by
+     `install.cmd_install`), or (b) a PRIOR evaluation of this exact `config_path` observed
+     makoto's hooks present (`<state_dir>/configchange_snapshots.json`). A path with neither --
+     no manifest entry, no prior "had hooks" observation -- can NEVER block, no matter how many
+     times it evaluates as stripped; this is the whole FP-safety property (a project that never
+     had makoto's hooks must never be blocked from editing its own settings). On block: the
+     documented top-level `{"decision": "block", "reason": ...}` shape on stdout, exit 0 (JSON is
+     only processed on exit 0, confirmed against Claude Code's own hooks reference, 2026-07-08).
+     Never for `policy_settings` -- already excluded upstream, `configchange_verdict`'s own
+     `_APPLICABLE_SOURCES` never includes it, so `verdict.fires` is already False there.
+
+**Verified only against constructed payloads** for the underlying predicate logic (see
+`configchange_verdict.py`); a live-fire probe in this session (a scratch, empty
+`~/.claude/settings.json` edited mid-session) produced no observed advisory fire -- most likely
+because Claude Code snapshots a session's hook set at session start, before this session's own
+mid-session wiring landed. Recorded honestly as inconclusive, not claimed as verified-working;
+only a hook wired from a session's own start could actually confirm live delivery.
 """
 from __future__ import annotations
 import json
 import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from makoto.record.audit import AuditRow, append_row
@@ -183,8 +208,8 @@ def _should_block(verdict) -> tuple:
 
 
 def main() -> int:
-    """Orchestrate a complete ConfigChange envelope. Input that cannot be evaluated fails closed
-    with exit 2; a readable, complete envelope still has the two verdict tiers below. Two tiers on a
+    """Orchestrator, fail-open at every step: a malformed payload, an unreadable settings file,
+    or any unexpected fault all resolve to "say nothing, do nothing, exit 0". Two tiers on a
     firing verdict (see module docstring): BLOCK on an evidenced manifest-hit or had->lost
     transition; otherwise ADVISORY (log + audit row, never blocks)."""
     try:
@@ -192,46 +217,15 @@ def main() -> int:
         try:
             payload = json.loads(raw)
         except Exception:
-            reason = "stdin was empty" if not raw.strip() else "stdin was not valid JSON"
-            print(f"makoto._dispatch_configchange: {reason}; NOT_EVALUABLE",
+            print("makoto._dispatch_configchange: stdin was not valid JSON; loud-allow",
                   file=sys.stderr)
-            return 2
+            return 0
         if not isinstance(payload, dict):
             print(f"makoto._dispatch_configchange: payload was {type(payload).__name__}, "
-                  f"not a JSON object; NOT_EVALUABLE", file=sys.stderr)
-            return 2
-        if not payload:
-            print("makoto._dispatch_configchange: payload was an empty JSON object; NOT_EVALUABLE",
-                  file=sys.stderr)
-            return 2
-        if payload.get("hook_event_name") != "ConfigChange":
-            print("makoto._dispatch_configchange: hook_event_name must be 'ConfigChange'; "
-                  "NOT_EVALUABLE", file=sys.stderr)
-            return 2
-        config_path = payload.get("config_path", payload.get("file_path"))
-        source = payload.get("config_source", payload.get("source"))
-        if not isinstance(config_path, str) or not config_path.strip():
-            print("makoto._dispatch_configchange: config_path/file_path is required; "
-                  "NOT_EVALUABLE", file=sys.stderr)
-            return 2
-        if not isinstance(source, str) or not source.strip():
-            print("makoto._dispatch_configchange: config_source/source is required; "
-                  "NOT_EVALUABLE", file=sys.stderr)
-            return 2
+                  f"not a JSON object; loud-allow", file=sys.stderr)
+            return 0
 
         fs_read = _make_fs_read(payload)
-        config_text = fs_read(config_path)
-        if config_text is None:
-            print("makoto._dispatch_configchange: configuration content is unavailable; "
-                  "NOT_EVALUABLE", file=sys.stderr)
-            return 2
-        try:
-            if not isinstance(json.loads(config_text), dict):
-                raise ValueError("configuration JSON was not an object")
-        except Exception:
-            print("makoto._dispatch_configchange: configuration content is not a JSON object; "
-                  "NOT_EVALUABLE", file=sys.stderr)
-            return 2
         verdict = configchange_verdict(payload, fs_read=fs_read)
 
         try:

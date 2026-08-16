@@ -87,21 +87,21 @@ def _write_settings(tmp_path, **wiring):
     return str(claude_dir / "settings.json")
 
 
-# --- malformed entrypoint input is refused ---------------------------------------------------------
+# --- basic fail-open shapes -----------------------------------------------------------------------
 
-def test_unparseable_stdin_exits_2_empty_stdout_no_audit_row(tmp_path):
+def test_unparseable_stdin_exits_0_empty_stdout_no_audit_row(tmp_path):
     state_dir = tmp_path / "makoto_state"
     rc, out = _run(state_dir, b"not json{{{")
-    assert rc == 2
+    assert rc == 0
     assert out == b""
     assert _audit_rows(state_dir) == []
 
 
-def test_non_dict_json_payload_exits_2_empty_stdout_no_audit_row(tmp_path):
+def test_non_dict_json_payload_exits_0_empty_stdout_no_audit_row(tmp_path):
     state_dir = tmp_path / "makoto_state"
     for raw in (b'["a", "list"]', b'"a bare string"', b"null", b"42"):
         rc, out = _run(state_dir, raw)
-        assert rc == 2, raw
+        assert rc == 0, raw
         assert out == b"", raw
     assert _audit_rows(state_dir) == []
 
@@ -122,32 +122,6 @@ def test_clean_fully_wired_project_settings_event_no_fire(tmp_path):
     assert rc == 0
     assert out == b""
     assert _audit_rows(state_dir) == []
-
-
-def test_documented_configchange_shape_reaches_adapter_end_to_end(tmp_path):
-    """Replay Claude Code's documented ``source``/``file_path`` payload through the adapter.
-
-    This deliberately avoids the legacy internal field names.  The regression it guards was
-    invisible while every end-to-end fixture reconstructed the adapter's old internal shape.
-    """
-    state_dir = tmp_path / "makoto_state"
-    settings_path = _write_settings(tmp_path, pre=True, post=True, stop=False)
-    payload = {
-        "hook_event_name": "ConfigChange",
-        "session_id": "cc_documented_shape",
-        "cwd": str(tmp_path),
-        "source": "project_settings",
-        "file_path": settings_path,
-    }
-    rc, out = _run_json(state_dir, payload)
-    assert rc == 0
-    assert out == b""
-    rows = _audit_rows(state_dir)
-    assert len(rows) == 1
-    assert rows[0]["pattern_fires"] == ["gate.configchange_advisory"]
-    assert rows[0]["session_id"] == "cc_documented_shape"
-    assert rows[0]["findings"][0]["file"] == settings_path
-    assert "Stop" in rows[0]["findings"][0]["message"]
 
 
 # --- full simultaneous strip: fires, but STILL empty stdout / exit 0 -------------------------------
@@ -227,9 +201,9 @@ def test_non_applicable_config_sources_never_fire_even_when_stripped(tmp_path):
         assert _audit_rows(state_dir) == [], source
 
 
-# --- unavailable or malformed configuration input is refused ---------------------------------------
+# --- content unavailable / malformed behind config_path: fail open, no audit row -------------------
 
-def test_missing_config_path_file_refuses_no_audit_row(tmp_path):
+def test_missing_config_path_file_fails_open_no_audit_row(tmp_path):
     state_dir = tmp_path / "makoto_state"
     payload = {
         "hook_event_name": "ConfigChange",
@@ -239,12 +213,12 @@ def test_missing_config_path_file_refuses_no_audit_row(tmp_path):
         "config_path": str(tmp_path / "does_not_exist" / "settings.json"),
     }
     rc, out = _run_json(state_dir, payload)
-    assert rc == 2
+    assert rc == 0
     assert out == b""
     assert _audit_rows(state_dir) == []
 
 
-def test_malformed_json_content_refuses_no_audit_row(tmp_path):
+def test_malformed_json_content_fails_open_no_audit_row(tmp_path):
     state_dir = tmp_path / "makoto_state"
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir(parents=True)
@@ -258,12 +232,12 @@ def test_malformed_json_content_refuses_no_audit_row(tmp_path):
         "config_path": str(bad),
     }
     rc, out = _run_json(state_dir, payload)
-    assert rc == 2
+    assert rc == 0
     assert out == b""
     assert _audit_rows(state_dir) == []
 
 
-def test_non_dict_json_content_refuses_no_audit_row(tmp_path):
+def test_non_dict_json_content_fails_open_no_audit_row(tmp_path):
     state_dir = tmp_path / "makoto_state"
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir(parents=True)
@@ -277,17 +251,17 @@ def test_non_dict_json_content_refuses_no_audit_row(tmp_path):
         "config_path": str(bad),
     }
     rc, out = _run_json(state_dir, payload)
-    assert rc == 2
+    assert rc == 0
     assert out == b""
     assert _audit_rows(state_dir) == []
 
 
-def test_missing_config_source_and_config_path_keys_refuses_no_audit_row(tmp_path):
-    """An adapter cannot evaluate an event with no source or configuration path."""
+def test_missing_config_source_and_config_path_keys_fails_open_no_audit_row(tmp_path):
+    """config_source absent -> not applicable in configchange_verdict -> never fires."""
     state_dir = tmp_path / "makoto_state"
     payload = {"hook_event_name": "ConfigChange", "session_id": "cc_no_keys", "cwd": str(tmp_path)}
     rc, out = _run_json(state_dir, payload)
-    assert rc == 2
+    assert rc == 0
     assert out == b""
     assert _audit_rows(state_dir) == []
 
@@ -316,15 +290,21 @@ def test_relative_config_path_resolves_against_payload_cwd(tmp_path):
 
 # --- THE single most important test: advisory-never-blocking invariant across a wide input battery -
 
-def test_advisory_never_blocks_across_complete_payload_battery(tmp_path):
-    """Complete, readable envelopes remain advisory unless transition evidence exists; malformed
-    envelopes are a separate refusal contract tested above."""
+def test_advisory_never_blocks_across_varied_payload_battery(tmp_path):
+    """Run ~10 varied constructed payloads (clean, stripped, malformed, non-applicable, missing
+    keys, wrong types, adversarial garbage) through the adapter and assert stdout is EMPTY and exit
+    code is 0 for every single one -- NONE of these paths have a manifest entry or a prior
+    snapshot, so all correctly stay advisory-only (see `test_dispatch_configchange_blocking.py`
+    for the fixtures that DO carry blocking evidence)."""
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
     clean_settings = claude_dir / "clean_settings.json"
     clean_settings.write_text(json.dumps(_settings()))
     stripped_settings = claude_dir / "stripped_settings.json"
     stripped_settings.write_text(json.dumps(_settings(pre=False, post=False, stop=False)))
+    malformed_settings = claude_dir / "malformed_settings.json"
+    malformed_settings.write_text("{not valid json at all")
+
     raw_battery: list[bytes] = [
         b"",                                  # empty stdin
         b"   ",                               # whitespace-only stdin
@@ -336,13 +316,15 @@ def test_advisory_never_blocks_across_complete_payload_battery(tmp_path):
         b'{"config_source": "project_settings"}',                       # missing config_path
         b'{"config_path": "/nowhere"}',                                 # missing config_source
         b'{"config_source": 42, "config_path": null}',                  # wrong types
-        b'{"hook_event_name": "ConfigChange", "config_source": "project_settings", "config_path": "/nowhere/at/all/settings.json"}',
+        b'{"config_source": "project_settings", "config_path": "/nowhere/at/all/settings.json"}',
     ]
     json_battery: list[dict] = [
         {"hook_event_name": "ConfigChange", "cwd": str(tmp_path),
          "config_source": "project_settings", "config_path": str(clean_settings)},
         {"hook_event_name": "ConfigChange", "cwd": str(tmp_path),
          "config_source": "project_settings", "config_path": str(stripped_settings)},
+        {"hook_event_name": "ConfigChange", "cwd": str(tmp_path),
+         "config_source": "project_settings", "config_path": str(malformed_settings)},
         {"hook_event_name": "ConfigChange", "cwd": str(tmp_path),
          "config_source": "user_settings", "config_path": str(stripped_settings)},
         {"hook_event_name": "ConfigChange", "cwd": str(tmp_path),
@@ -351,12 +333,16 @@ def test_advisory_never_blocks_across_complete_payload_battery(tmp_path):
          "config_source": "skills", "config_path": str(stripped_settings)},
         {"hook_event_name": "ConfigChange", "cwd": str(tmp_path),
          "config_source": "bogus_unknown_source", "config_path": str(stripped_settings)},
+        {"hook_event_name": "ConfigChange"},   # no cwd, no config_source, no config_path at all
+        {},                                    # totally empty object
+        {"decision": "block", "config_source": "project_settings",
+         "config_path": str(stripped_settings), "cwd": str(tmp_path)},   # adversarial: pre-baked block key
     ]
 
     state_dir = tmp_path / "battery_state"
     for i, raw in enumerate(raw_battery):
         rc, out = _run(state_dir / f"raw_{i}", raw)
-        assert rc == 2, (i, raw)
+        assert rc == 0, (i, raw)
         assert out == b"", (i, raw, out)
 
     for i, payload in enumerate(json_battery):

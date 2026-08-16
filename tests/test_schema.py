@@ -1,12 +1,21 @@
-"""tests for PreCheck + Finding dataclasses + load_prechecks.
+"""tests for PreCheck + Finding dataclasses, and the relocated TOML-pattern-fixture parser.
 
 1.0.3 collapse: dropped forensic-catalog field tests (intent / motivation /
 evidence) — those fields moved out of the runtime dataclass into TOML row
-comments. load_prechecks silently ignores them when present.
+comments. load_toml_patterns silently ignores them when present.
+
+2026-08-16: `schema.load_prechecks()` (the TOML/loader-adapter shim) was retired once
+`_dispatch.py`'s hot path (and every other caller) migrated to
+`substrate._loader.load_precheck_catalog()`. The default-path (live catalog) tests that used to
+live here now live in `tests/test_pre_tier_block_invariant.py` and the various
+`substrate._loader`-facing tests; the explicit-`path` TOML-parsing tests below now exercise the
+relocated `tests/_toml_pattern_fixture.load_toml_patterns`, which was never anything but a
+test-fixture helper in the first place.
 """
 from dataclasses import fields
 import pytest
-from makoto.core.schema import PreCheck, Finding, load_prechecks
+from makoto.core.schema import PreCheck, Finding
+from tests._toml_pattern_fixture import load_toml_patterns
 
 
 def test_pattern_dataclass_fields():
@@ -45,8 +54,8 @@ def test_pattern_dataclass_has_exactly_6_runtime_fields():
                            "retry_hint", "predicate_module", "keywords"}
 
 
-def test_load_prechecks_parses_toml(tmp_path):
-    """load_prechecks reads a TOML file into a list[PreCheck]."""
+def test_load_toml_patterns_parses_toml(tmp_path):
+    """load_toml_patterns reads a TOML file into a list[PreCheck]."""
     toml_path = tmp_path / "patterns.toml"
     toml_path.write_text("""
 [[pattern]]
@@ -55,20 +64,20 @@ fire_level = "error"
 description = "loosened verifier"
 keywords = ["startswith("]
 """, encoding="utf-8")
-    patterns = load_prechecks(toml_path)
+    patterns = load_toml_patterns(toml_path)
     assert len(patterns) == 1
     assert patterns[0].id == "content.verifier_predicate_weakened"
     assert patterns[0].fire_level == "error"
 
 
-def test_load_prechecks_empty_file(tmp_path):
+def test_load_toml_patterns_empty_file(tmp_path):
     """empty TOML returns empty list, no crash."""
     toml_path = tmp_path / "patterns.toml"
     toml_path.write_text("", encoding="utf-8")
-    assert load_prechecks(toml_path) == []
+    assert load_toml_patterns(toml_path) == []
 
 
-def test_load_prechecks_ignores_unknown_toml_keys(tmp_path):
+def test_load_toml_patterns_ignores_unknown_toml_keys(tmp_path):
     """TOML rows with extra keys (legacy intent/motivation/evidence) load cleanly."""
     toml_path = tmp_path / "patterns.toml"
     toml_path.write_text("""
@@ -82,64 +91,19 @@ motivation = "ADR-058"
 evidence = ["TP_1_x.md"]
 some_future_field = "ignored"
 """, encoding="utf-8")
-    patterns = load_prechecks(toml_path)
+    patterns = load_toml_patterns(toml_path)
     assert len(patterns) == 1
     assert patterns[0].id == "1.x"
     # Unknown keys silently dropped — no AttributeError
     assert not hasattr(patterns[0], "intent")
 
 
-def test_load_prechecks_default_path_resolves_to_package_data():
-    """load_prechecks() with no arg loads makoto/data/patterns.toml automatically."""
-    patterns = load_prechecks()
-    assert len(patterns) >= 8
-    ids = {p.id for p in patterns}
-    assert "content.verifier_predicate_weakened" in ids and "content.self_mute_guard" in ids
-
-
-def test_all_active_patterns_have_keywords_and_predicate_module():
-    """every pattern has keywords + predicate_module (no disabled tier remains to skip)."""
-    patterns = load_prechecks()
-    for p in patterns:
-        assert p.predicate_module, f"pattern {p.id} missing predicate_module"
-        # SPEC-5: prechecks migrated into flat makoto.checks with descriptive names (no longer
-        # derivable from the pattern id) -- assert the real invariant that survives the move: a
-        # live predicate_module actually rooted under the checks catalog.
-        assert p.predicate_module.startswith("makoto.checks."), \
-            f"pattern {p.id} has non-catalog predicate_module: {p.predicate_module}"
-        assert p.keywords, f"pattern {p.id} missing keywords"
-
-
-def test_every_pattern_blocks_no_warning_tier():
-    """Warning-tier-elimination invariant: EVERY live catalog pattern is fire_level='error'.
-    makoto has no non-blocking resting state — a pattern blocks or it is cut."""
-    patterns = load_prechecks()
-    assert patterns, "catalog must be non-empty"
-    assert all(p.fire_level == "error" for p in patterns), \
-        {p.id: p.fire_level for p in patterns if p.fire_level != "error"}
-
-
-def test_load_prechecks_default_rejects_non_block_posture(monkeypatch):
-    """The loader-backed path enforces its own BLOCK law, independently of TOML validation."""
-    from makoto.substrate import _loader
-    fake = _loader.Check(
-        id="content.only_bad_posture",
-        applies_at="Pre",
-        posture="ADVISE",
-        predicate_module="makoto.checks.only_bad_posture",
-    )
-    monkeypatch.setattr(_loader, "discover", lambda: [fake])
-    with pytest.raises(ValueError, match="every Pre-tier check must be posture=BLOCK") as excinfo:
-        load_prechecks()
-    assert "content.only_bad_posture='ADVISE'" in str(excinfo.value)
-
-
-def test_load_prechecks_rejects_non_error_fire_level(tmp_path):
-    """load_prechecks REJECTS any warning/disabled/shadow row — the tier cannot silently return."""
+def test_load_toml_patterns_rejects_non_error_fire_level(tmp_path):
+    """load_toml_patterns REJECTS any warning/disabled/shadow row — the tier cannot silently return."""
     for bad in ("warning", "disabled", "shadow", "info"):
         toml = tmp_path / f"p_{bad}.toml"
         toml.write_text(
             f'[[pattern]]\nid = "9.9"\nfire_level = "{bad}"\ndescription = "x"\n',
             encoding="utf-8")
         with pytest.raises(ValueError, match="no non-blocking tier"):
-            load_prechecks(toml)
+            load_toml_patterns(toml)

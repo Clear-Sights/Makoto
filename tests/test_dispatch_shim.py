@@ -57,8 +57,8 @@ def test_decoy_package_in_cwd_cannot_shadow_the_plugin(tmp_path, bare_python_dir
     assert "No module named" not in proc.stderr, proc.stderr
 
 
-def test_unusable_plugin_root_refuses_loudly(tmp_path):
+def test_unusable_plugin_root_fails_open_loudly(tmp_path):
     proc = _run_shim(cwd=tmp_path, state_dir=tmp_path / "state", env_overrides={})
-    assert proc.returncode == 2, proc.stderr
-    assert proc.stdout == ""
-    assert "NOT_EVALUABLE" in proc.stderr
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout == "{}"
+    assert "failing open" in proc.stderr

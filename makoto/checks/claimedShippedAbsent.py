@@ -13,7 +13,6 @@ from makoto.substrate.claims import _code_spans
 from makoto.substrate.io import decode_history_row
 from makoto.substrate._shared import _PUSH_BRANCH_RX
 from makoto.core._shell import _command_pushes_git
-import makoto.substrate.claim_graph as _claim_graph
 
 
 class PushTipStatus(Enum):
@@ -71,11 +70,11 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
 # mutations. It owns "I pushed/merged/published/deployed/shipped/released X" and present-result
 # claims such as "it's live now"; gate.completion continues to own local file-production claims.
 #
-# EVIDENCE is graph-bound, never existential over a flat history bag. A merge deed must name the
-# same owner/repository/PR number and record ``merged: true``. A push claim is decided by comparing
-# local HEAD with ``git ls-remote`` for the same repository, remote, and ref; a successful-looking
-# push transcript is not a proxy for the remote world. Publish/deploy/release language without a
-# provider-specific target observation remains NOT-EVALUABLE.
+# EVIDENCE is existential across the session's recorded PostToolUse history for merge/publish-like
+# claims. A push claim is different: it is decided by comparing `git rev-parse HEAD` with
+# `git ls-remote origin <branch>`, so a successful-looking push transcript is never accepted as a
+# proxy. Like gate.run_promised, the non-push evidence deliberately does not attempt semantic
+# coreference between "it"/"#42" and a command's owner/repo/ref fields.
 #
 # CLOSED NON-BASH SET: GitHub's merge_pull_request and push_files are actual shipping actions.
 # create_pull_request is intentionally excluded: opening a PR establishes review intent but does
@@ -132,10 +131,7 @@ def _response_succeeded(response) -> bool:
 
 
 def _successful_remote_mutation(history) -> bool:
-    """Legacy diagnostic for whether a flat history contains any remote mutation.
-
-    The blocking gate does not use this broad boolean; graph resolvers require exact identity.
-    """
+    """True iff pooled history contains a completed, successful remote mutation."""
     for row in history or ():
         ev = decode_history_row(row)
         if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
@@ -157,45 +153,41 @@ def _successful_remote_mutation(history) -> bool:
     return False
 
 
-def claimed_shipped_gate(text, *, history=(), cwd=None, graph=None,
-                         claim_ids=()) -> Optional[Finding]:
-    """Reject a shipping claim without an exact repository/ref/PR support path."""
-    if graph is None:
-        graph, claim_ids = _claim_graph.build_ephemeral_graph(
-            text, history=history, cwd=cwd, observe_push=True, run=subprocess.run,
-        )
-    claims = [
-        graph.claims[claim_id] for claim_id in claim_ids
-        if claim_id in graph.claims and graph.claims[claim_id].predicate.startswith("remote.")
-    ]
-    if not claims:
+def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
+    """Fire an unbacked shipping claim; pushes use the remote tip, not a tool signature.
+
+    A remote observation precondition failure is NOT_EVALUABLE and returns no pass/fail finding.
+    """
+    claim = _shipped_claim(text)
+    if claim is None:
         return None
-    for claim in claims:
-        adjudication = graph.adjudicate(claim.node_id)
-        if adjudication.verdict is _claim_graph.Verdict.CERTIFIED:
-            continue
-        if adjudication.verdict is _claim_graph.Verdict.CONTRADICTED:
-            message = (
-                f"Claim states {claim.predicate} for {claim.target_value}, but an exact-target "
-                "world observation records the opposite state."
-            )
-        else:
-            message = (
-                f"Claim states {claim.predicate} for {claim.target_value}, but no successful deed "
-                "or world observation names that same repository/ref/PR identity — a mutation "
-                "of another target cannot certify it."
-            )
+    push_claim = "pushed" in claim.group(0).lower()
+    if push_claim:
+        tip = pushed_tip_matches_remote(text, cwd)
+        if tip.status is PushTipStatus.MATCH:
+            return None
+        if tip.status is PushTipStatus.NOT_EVALUABLE:
+            return None
         return Finding(
             pattern_id="gate.claimed_shipped", file="", line=0, level="error",
-            message=message,
-            retry_hint=("Actually push/merge the exact named target and obtain its observation, "
-                        "or retract/rescope the shipping claim."),
+            message=(f"Push claim (\"{claim.group(0).strip()}\") is false: local HEAD is "
+                     f"{tip.local_sha}, but origin has {tip.remote_sha}."),
+            retry_hint="Push the local HEAD, or retract/rescope the push claim.",
         )
-    return None
+    if _successful_remote_mutation(history):
+        return None
+    return Finding(
+        pattern_id="gate.claimed_shipped", file="", line=0, level="error",
+        message=(f"Claim states a remote change was shipped "
+                 f"(\"{claim.group(0).strip()}\") but neither recorded mutation evidence nor "
+                 "a matching local remote-tracking ref backs it — the word must match the world."),
+        retry_hint=("Actually push/merge it so the world records the mutation, or "
+                    "retract/rescope the shipping claim."),
+    )
 
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BLOCK", may_block=True,
+               eats=frozenset({"text", "history_all_agents", "cwd"}),
                run=lambda c: claimed_shipped_gate(
-                   c.text, history=c.history_all_agents, cwd=c.cwd, graph=c.claim_graph,
-                   claim_ids=c.current_claim_ids))
+                   c.text, history=c.history_all_agents, cwd=c.cwd))

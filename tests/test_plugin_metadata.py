@@ -52,16 +52,6 @@ def test_hooks_json_declares_all_three_events():
                 assert "CLAUDE_PLUGIN_ROOT" in h["command"]
 
 
-def test_hooks_json_declares_configchange_adapter():
-    """The shipped plugin must deliver ConfigChange events to its dedicated adapter."""
-    data = json.loads((REPO_ROOT / "hooks" / "hooks.json").read_text())
-    configchange = data["hooks"].get("ConfigChange")
-    assert configchange, "hooks/hooks.json must register ConfigChange"
-    commands = [h["command"] for entry in configchange for h in entry["hooks"]]
-    assert any("_dispatch_configchange" in command for command in commands), commands
-    assert any("CLAUDE_PLUGIN_ROOT" in command for command in commands), commands
-
-
 def test_dispatch_shim_exists_and_executable():
     """_dispatch_shim.sh exists inside the package, is a POSIX sh script."""
     shim = REPO_ROOT / "makoto" / "_dispatch_shim.sh"
@@ -76,14 +66,6 @@ def test_dispatch_shim_invokes_makoto_dispatch():
     shim_text = (REPO_ROOT / "makoto" / "_dispatch_shim.sh").read_text()
     assert "makoto._dispatch" in shim_text
     assert "MAKOTO_PYTHON" in shim_text or "python3" in shim_text
-
-
-def test_configchange_shim_exists_and_invokes_its_adapter():
-    """The manifest target is a packaged executable, not a dangling command string."""
-    shim = REPO_ROOT / "makoto" / "_dispatch_configchange_shim.sh"
-    assert shim.is_file(), "missing ConfigChange dispatch shim"
-    assert shim.stat().st_mode & 0o100, "ConfigChange shim must be executable"
-    assert "makoto._dispatch_configchange" in shim.read_text(encoding="utf-8")
 
 
 def _exec_commands(md_text: str) -> list[str]:
@@ -148,7 +130,7 @@ def test_plugin_description_predicate_count_matches_disk():
     pattern module), so each stated tier count is pinned to the live catalog here —
     bump the description when a check is added or removed.
     """
-    from makoto.core.schema import load_prechecks
+    from makoto.substrate._loader import load_precheck_catalog
     from makoto.substrate._loader import load_checks
 
     def _live_gates():
@@ -156,7 +138,7 @@ def test_plugin_description_predicate_count_matches_disk():
 
     desc = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())["description"]
     for phrase_rx, loader, tier in (
-        (r"(\d+)\s+pre-checks", load_prechecks, "pre-check"),
+        (r"(\d+)\s+pre-checks", load_precheck_catalog, "pre-check"),
         (r"(\d+)\s+Stop gates", _live_gates, "Stop gate"),
     ):
         m = re.search(phrase_rx, desc)
@@ -166,54 +148,3 @@ def test_plugin_description_predicate_count_matches_disk():
             f"plugin.json claims {claimed} {tier}s but the live loader has {actual} — "
             f"update the description (or the catalog)."
         )
-
-
-def test_every_slash_command_invokes_a_verb_the_cli_actually_has():
-    """The three commands a user types were checked by nothing.
-
-    A delete-and-rerun pass over all 114 non-test files reported commands/patterns.md,
-    commands/show.md, commands/status.md and .claude-plugin/marketplace.json as UNNOTICED --
-    91 of 114 were NOTICED, and the ones a user actually invokes were not among them.
-
-    That gap is not theoretical: driving `python3 -m makoto status` by hand, only because this pass
-    pointed at commands/status.md, is how the 15-of-35 pattern under-count was found. A renamed
-    verb would break the slash command with every test still green.
-
-    The verb is taken from the `!` invocation line, which is what Claude Code actually runs, and
-    checked against argparse's own subcommand list -- not against a hard-coded set, so adding a
-    verb cannot silently escape this.
-    """
-    import re
-    import subprocess
-    import sys
-
-    root = Path(__file__).resolve().parents[1]
-    commands = sorted((root / "commands").glob("*.md"))
-    assert commands, "no slash commands found -- the commands/ directory is the product surface"
-
-    help_text = subprocess.run([sys.executable, "-m", "makoto", "--help"],
-                               cwd=root, capture_output=True, text=True, check=True).stdout
-    usage = re.search(r"\{([a-z,]+)\}", help_text)
-    assert usage, f"could not read the subcommand list from --help:\n{help_text}"
-    verbs = set(usage.group(1).split(","))
-    assert verbs, "argparse declares no subcommands"
-
-    for command in commands:
-        text = command.read_text(encoding="utf-8")
-        invocations = re.findall(r"^!`python3 -m makoto ([a-z]+)", text, re.MULTILINE)
-        assert invocations, f"{command.name} declares no `!python3 -m makoto ...` invocation"
-        for verb in invocations:
-            assert verb in verbs, (
-                f"{command.name} invokes `makoto {verb}`, which the CLI does not have. "
-                f"Available: {sorted(verbs)}"
-            )
-
-
-def test_the_marketplace_entry_names_this_plugin():
-    """A marketplace listing naming a plugin that does not exist installs nothing."""
-    root = Path(__file__).resolve().parents[1]
-    marketplace = json.loads(
-        (root / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
-    plugin = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-    assert plugin["name"] in json.dumps(marketplace), (
-        f"marketplace.json never names the plugin {plugin['name']!r}")

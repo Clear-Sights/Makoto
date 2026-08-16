@@ -9,8 +9,15 @@ import ast
 import re
 import textwrap
 from typing import Callable, Optional
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
 from makoto.core.lexicons import _MAKOTO_ALLOW_RX, _MAKOTO_ALLOW_REASON_RX, JWT_CALLEE_RX
+
+# `pattern:` arguments below are typed `Check` (substrate._loader.Check) only in a docstring/
+# comment sense, never a real import: this L1 module's own layering firewall
+# (tests/lib/test_factories.py) bars it from importing _loader (an L2+ module) even for a type
+# hint. `from __future__ import annotations` (top of file) means annotations are never evaluated
+# at runtime, so the bare `Check` name in each signature below resolves to nothing at runtime and
+# is safe -- it exists purely for readers, not as a real dependency edge.
 
 
 def makoto_allowed(content: str) -> bool:
@@ -81,7 +88,7 @@ def _gated_content(*, current_event: dict, target_rx: re.Pattern,
     return fp, content
 
 
-def _exempt_or_finding(*, current_event: dict, conn, pattern: PreCheck, fp: str, line_no: int,
+def _exempt_or_finding(*, current_event: dict, conn, pattern: Check, fp: str, line_no: int,
                        snippet: str, content: str, message: str) -> Optional[Finding]:
     """Shared tail of both content-scan factories below (found duplicated by jscpd, 2026-07-09,
     lines 174-181/242-249 and 201-208/262-272 of the pre-extraction file): DETECT-THEN-EXEMPT --
@@ -92,7 +99,12 @@ def _exempt_or_finding(*, current_event: dict, conn, pattern: PreCheck, fp: str,
                           snippet=snippet)
         return None  # AI documented this instance as legitimate (see CLAUDE.md) — recorded
     return Finding(
-        pattern_id=pattern.id, file=fp, line=line_no, level=pattern.fire_level,
+        # Pre-tier checks are invariantly posture=BLOCK (enforced by
+        # tests/test_pre_tier_block_invariant.py, no longer by a `.fire_level` field on the
+        # pattern object -- `Check` has no `fire_level`, only `posture`), and Finding.level's
+        # vocabulary ("error"/"advisory") is a separate axis from posture's ("BLOCK"/"ADVISE"/
+        # ...), so this is a literal, not a `pattern.posture` passthrough.
+        pattern_id=pattern.id, file=fp, line=line_no, level="error",
         message=message, retry_hint=pattern.retry_hint, snippet=snippet,
     )
 
@@ -126,8 +138,8 @@ def scan_target_content(tool_input: dict) -> str:
 def introduced_text(tool_name: str, tool_input: dict) -> str:
     """The text a PreToolUse call would introduce, across every tool that can carry it: a
     Bash `command` verbatim, or the Write/Edit/MultiEdit new content (`scan_target_content`).
-    Shared by every "would this call INTRODUCE a flagged string" predicate (currently
-    content.illusory_interruption_claim) — factored out (2026-07-19) after
+    Shared by every "would this call INTRODUCE a flagged string" predicate (content.illusory_authorship_trailer,
+    content.illusory_interruption_claim, ...) — factored out (2026-07-19) after
     test_no_alpha_duplicate_functions caught two checks carrying a byte-identical local copy."""
     if not isinstance(tool_input, dict):
         return ""
@@ -241,7 +253,7 @@ def ast_introduced_predicate(
     suffix = f" with no {exempt_label}" if exempt_label else ""
 
     def _predicate(*, current_event: dict, history: list,
-                   pattern: PreCheck, conn=None) -> Optional[Finding]:
+                   pattern: Check, conn=None) -> Optional[Finding]:
         gated = _gated_content(current_event=current_event, target_rx=target_rx, exempt_rx=exempt_rx)
         if gated is None:
             return None
@@ -296,7 +308,7 @@ def regex_file_predicate(
     suffix = f" with no {exempt_label}" if exempt_label else ""
 
     def _predicate(*, current_event: dict, history: list,
-                   pattern: PreCheck, conn=None) -> Optional[Finding]:
+                   pattern: Check, conn=None) -> Optional[Finding]:
         gated = _gated_content(current_event=current_event, target_rx=target_rx, exempt_rx=exempt_rx)
         if gated is None:
             return None

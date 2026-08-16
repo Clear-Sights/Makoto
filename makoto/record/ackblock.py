@@ -1,8 +1,12 @@
-"""Transcript-derived ``release.operator`` discharge for unresolved ``gate.canon`` findings.
-
-An unresolved terminal error remains the last call in immutable session history, so it re-fires
-at later Stops even when the operator has reviewed and accepted it. The discharge is an
-operator-attributable ``release.operator`` record, never model prose or detector narrowing.
+"""ackblock: Task 2 slice 5 -- the discharge mechanism for session-level canon fingerprints
+(DESIGN DECISION 2026-07-07, recorded verbatim in the plan). A SESSION-LEVEL fingerprint
+(gate.canon_fingerprints) matches over the whole recorded call stream; once its atoms go true
+they stay true forever (recorded history is immutable), so without a real discharge path it
+becomes a PERMANENT block for the rest of the session after any one matching action -- even a
+fully owner-sanctioned one. Rejected discharges: narrowing the detector (voids the 0-FP
+certificate + teaches a gaming recipe), and operator self-disable (normalizes the one action
+Makoto must never normalize). The decided discharge: an OPERATOR-ATTRIBUTABLE
+`release.operator` record, never prose, never atom-narrowing.
 
 D8a (docs/DEFERRED.md, DESIGN DECISION 2026-07-08, rename-only, owner-authorized 2026-07-08):
 this mechanism is the `release.operator` tier of Makoto's `release` family (`release.green` --
@@ -22,9 +26,9 @@ A transcript entry is a valid ack iff it:
      user-role entries; a tool call cannot write a top-level `toolUseResult`-free user turn);
   3. is not synthetic/system-injected -- no `<system-reminder`/hook-output/task-notification
      marker, and not the harness's own "[Request interrupted by user]" synthetic text;
-  4. is timestamped AFTER the canon finding's first-fired ts in THIS session (derived from the
+  4. is timestamped AFTER the fingerprint's first-fired ts in THIS session (derived from the
      chain's own unified audit trail -- slice 3b -- never from prose);
-  5. contains the literal token `makoto release.operator <canon-id>` plus a nonempty
+  5. contains the literal token `makoto release.operator <fingerprint-id>` plus a nonempty
      reason naming that exact id.
 No agent tool call, subagent output, or file write can forge such an entry -- the transcript is
 host-written, never model-written. A found ack is chain-appended (kind="release.operator")
@@ -87,13 +91,16 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
     return text
 
 
-def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon",
+def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
                     session_id: Optional[str] = None,
                     root: Optional[Path] = None) -> Optional[str]:
     """The earliest chain-recorded ts at which `gate_pattern_id` fired NAMING fingerprint_id,
     read from the unified audit trail (slice 3b -- every dispatch audit row is chain-appended).
     None if it has never fired in this chain. Chronological order is the chain's own append
-    order, so the first match IS the earliest."""
+    order, so the first match IS the earliest. `gate_pattern_id` generalizes this beyond
+    gate.canon_fingerprints (Task 0b: gate.canon's canon.timeout has the SAME no-discharge shape
+    when the last error is a genuinely unresolvable, operator-surfaced block -- one mechanism,
+    two gates, per SPEC-C's "one mercy model")."""
     needle = f"canon.{fingerprint_id}:"
     for row in ledger.read(root=root):
         if row.get("kind") != "audit":
@@ -109,7 +116,7 @@ def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon",
 
 
 def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
-                   gate_pattern_id: str = "gate.canon",
+                   gate_pattern_id: str = "gate.canon_fingerprints",
                    session_id: Optional[str] = None,
                    root: Optional[Path] = None) -> Optional[dict]:
     """Scan the host-written transcript at `transcript_path` for a qualifying release.operator turn for
@@ -148,7 +155,7 @@ def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
         m = _ACK_RX.search(text)
         if not m:
             continue
-        # group(2) can still capture a bare leftover separator (e.g. id-only "timeout:"
+        # group(2) can still capture a bare leftover separator (e.g. id-only "notestedit_destruct:"
         # backtracks to reason=":") when nothing real follows -- strip stray leading punctuation
         # before the truthiness check, rather than trust the regex to have consumed it.
         acked_id = m.group(1).strip()

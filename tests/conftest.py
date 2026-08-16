@@ -12,7 +12,7 @@ Provides:
 from __future__ import annotations
 import pytest
 
-from makoto.core.schema import PreCheck, load_prechecks
+from makoto.substrate._loader import load_precheck_catalog
 
 
 @pytest.fixture
@@ -43,18 +43,19 @@ def stop_evt():
 
 @pytest.fixture
 def loaded_pattern():
-    """load a PreCheck from the live checks/ catalog by id; raises if id is unknown.
+    """load a Check from the live checks/ catalog by id; raises if id is unknown.
 
     Use this instead of hand-constructing PreCheck dataclasses in tests, so test
     fixtures stay in sync with the live catalog (description / retry_hint /
-    fire_level / keywords drift between test and prod is caught automatically).
+    posture / keywords drift between test and prod is caught automatically).
 
-    SPEC-C item 2 (Pre-tier cutover): load_prechecks()'s default path is loader-backed now, not
-    a literal data/patterns.toml read -- this fixture follows that, not the file.
+    2026-08-16: sourced from `substrate._loader.load_precheck_catalog()` (`schema.load_prechecks()`
+    -- the TOML/loader-adapter shim -- was retired once its callers finished migrating). Returns
+    `Check` instances now, not `PreCheck`; the return annotation is documentation, not enforced.
     """
-    catalog = {p.id: p for p in load_prechecks()}
+    catalog = {c.id: c for c in load_precheck_catalog()}
 
-    def _by_id(pid: str) -> PreCheck:
+    def _by_id(pid: str):
         if pid not in catalog:
             raise KeyError(f"unknown pattern id {pid!r} (available: {sorted(catalog)})")
         return catalog[pid]

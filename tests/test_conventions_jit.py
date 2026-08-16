@@ -17,7 +17,8 @@ from pathlib import Path
 
 from makoto import _dispatch
 from makoto._dispatch import _jit_hint, _worst_finding, _ALLOW_EXEMPT_IDS
-from makoto.core.schema import Finding, load_prechecks
+from makoto.core.schema import Finding
+from makoto.substrate._loader import load_precheck_catalog
 
 REPO = Path(_dispatch.__file__).resolve().parent
 
@@ -75,7 +76,7 @@ def test_allow_exempt_ids_match_predicate_sources():
     both of which check makoto_allowed centrally) or calls makoto_allowed directly. Source-derived
     so the JIT hint can never claim an escape hatch the code does not honor — or hide one it does."""
     derived = set()
-    for p in load_prechecks():
+    for p in load_precheck_catalog():
         if not p.predicate_module:
             continue
         src = inspect.getsource(importlib.import_module(p.predicate_module))
@@ -91,5 +92,5 @@ def test_allow_exempt_ids_match_predicate_sources():
 # --- (4) the full doc names every active pattern (catalog-bound) --------------
 def test_conventions_doc_names_every_active_pattern():
     doc = (REPO / "docs" / "MAKOTO-CONVENTIONS.md").read_text(encoding="utf-8")
-    missing = [p.id for p in load_prechecks() if p.predicate_module and f"`{p.id}`" not in doc]
+    missing = [p.id for p in load_precheck_catalog() if p.predicate_module and f"`{p.id}`" not in doc]
     assert not missing, f"conventions doc missing active pattern ids: {missing}"

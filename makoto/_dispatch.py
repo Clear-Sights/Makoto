@@ -27,14 +27,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from makoto.core.schema import load_prechecks, PreCheck, Finding
+from makoto.core.schema import Finding
 from makoto.record.state import _state_dir
 from makoto.session import citations
 from makoto.record import audit
 from makoto.verdict import posture, wire
 from makoto.record.audit import AuditRow
 from makoto.substrate import factories
-from makoto.substrate._loader import load_checks
+from makoto.substrate._loader import load_checks, load_precheck_catalog
 from makoto.substrate._shared import GateContext
 
 
@@ -95,7 +95,9 @@ _PARSE_FAILED = object()  # sentinel: stdin was not valid JSON at all (distinct 
 
 
 def _parse_payload(raw: str) -> object:
-    """Parse stdin JSON, returning the distinct sentinel on invalid JSON."""
+    """Parse stdin JSON. Return the parsed value, or the _PARSE_FAILED sentinel if `raw` was not
+    valid JSON — distinct from a valid JSON `null` (which returns None). main()'s HYBRID fail-mode
+    treats an unparseable pipe (loud-allow) and a non-object payload (block) differently."""
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -284,7 +286,7 @@ def _history_for_agent(history, stop_payload: dict) -> list:
     return scoped
 
 
-def _keyword_hit(pattern: PreCheck, raw_payload: str) -> bool:
+def _keyword_hit(pattern, raw_payload: str) -> bool:
     """True iff any of pattern.keywords is a substring of raw_payload."""
     if not pattern.keywords:
         return False
@@ -329,7 +331,7 @@ def _blocking_gate_ids() -> frozenset:
     used to export a `GATE` -- every one of them reaches this pipeline regardless of its own
     `.level`/posture (the actual BLOCK-vs-ADVISE split happens inside `_emit_decision`/
     `_worst_finding`, keyed on each Finding's own `.level`, unchanged by this migration).
-    `staleEstablisher`/`catalogCompleteness` stay `may_block=False` ON PURPOSE: their
+    `staleEstablisher`/`undeclaredFalsifiable` stay `may_block=False` ON PURPOSE: their
     pattern_id must never enter this set at all, a STRUCTURAL exclusion independent of whatever
     `.level` their own `run()` might ever compute -- the former GATE-export-presence mechanism
     provided the exact same guarantee; this preserves it under the unified loader rather than
@@ -352,7 +354,11 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     Predicate exceptions are captured to dispatch_errors.jsonl (audit.append_error)
     and skipped — they must never block agent work.
     """
-    patterns = load_prechecks()
+    # 2026-08-16: sourced directly from the checks/ catalog via substrate._loader --
+    # schema.load_prechecks() (the TOML/adapter shim) is retired. See
+    # tests/test_pre_tier_block_invariant.py for the BLOCK-only invariant this used to enforce
+    # at load time.
+    patterns = load_precheck_catalog()
     disabled = _disabled_pattern_ids()
     candidates = [p for p in patterns
                   if p.predicate_module and p.id not in disabled
@@ -394,7 +400,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     return findings
 
 
-def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None) -> list:
+def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
     """Source + evaluate the completion / advance / green_claim gates for a Stop event.
 
     Reads the REAL `last_assistant_message` field; records any newly-stated located
@@ -505,24 +511,10 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None
                 pass
             return None
 
-        # Build the semantic substrate once.  Claim nodes (including exact Stop event/span
-        # provenance) are persisted before any resolver creates support/contradiction edges.
-        # The broad history view is safe here because cross-agent consumption is enforced by an
-        # explicit target-bound delegation edge inside the graph, never by pooling alone.
-        stop_graph = None
-        try:
-            from makoto.record import claim_graph as _claim_graph
-            stop_graph = _claim_graph.build_stop_graph(
-                conn, payload, history_all_agents, event_id=event_id, root=root,
-                fs_exists=fs_exists, fs_size=fs_size,
-            )
-        except Exception:
-            stop_graph = None
-
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
         # edge (2026-07-10: unified via checks._loader.load_checks, retiring the former
         # load_stopchecks()-only loop -- this ALSO now naturally includes staleEstablisher and
-        # catalogCompleteness, formerly special-cased direct-call/never-invoked carve-outs below
+        # undeclaredFalsifiable, formerly special-cased direct-call/never-invoked carve-outs below
         # this comment, since neither exported a GATE and load_stopchecks() never discovered them;
         # `may_block=False` on both keeps their pattern_id structurally out of
         # `_blocking_gate_ids()` regardless of this unification, exactly as before). Each gate
@@ -546,13 +538,8 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None
             agent_type=payload.get("agent_type"),
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
-            state_root=root,   # gate.canon's release.operator discharge
+            state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
-            claim_graph=(stop_graph.graph if stop_graph is not None else None),
-            current_claim_ids=(stop_graph.current_claim_ids if stop_graph is not None else ()),
-            prior_promise_claim_ids=(
-                stop_graph.prior_promise_claim_ids if stop_graph is not None else ()
-            ),
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
@@ -584,7 +571,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None, event_id=None
 # against the ledger, where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
     "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_body_hollowed",
-    "content.illusory_interruption_claim"})
+    "content.illusory_authorship_trailer", "content.illusory_interruption_claim"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
                "(any comment style) — an on-the-record, auditable rationale, never a disguise.")
@@ -611,6 +598,16 @@ _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post", "Stop": "Stop",
 # caller of _emit_decision -- previously latent (the .get(..., "Pre") fallback silently rendered
 # the WRONG edge's wire shape, with hookEventName="PreToolUse" on a PostToolUse response, had
 # anything ever called _emit_decision from the PostToolUse branch before now).
+
+
+def _recheck_certificate_enabled() -> bool:
+    """Opt-in (OFF by default, mirroring the MAKOTO_DISABLE_* switch parsing): when
+    MAKOTO_RECHECK_CERTIFICATE=1, `_emit_decision` re-verifies its own folded verdict via
+    `makoto.verdict.recheck.recheck_certificate` before writing it to the wire. A mismatch
+    RAISES (recheck.py's deliberate not-fail-open rule) — which is why this is opt-in: with the
+    flag unset, production hook behavior is provably unchanged (this predicate is the only new
+    code on the hot path, and it cannot raise)."""
+    return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _worst_finding(findings: list[Finding]) -> Optional[tuple[str, Finding]]:
@@ -653,8 +650,23 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         hint = _jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
-    folded = posture.apply(posture.Decision(outcome, detail), posture.posture(),
+    mode = posture.posture()
+    folded = posture.apply(posture.Decision(outcome, detail), mode,
                            permission_mode=permission_mode)
+    if _recheck_certificate_enabled():
+        # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
+        # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
+        # a fold mismatch never reaches stdout. recheck_certificate raises on mismatch by
+        # design (see makoto/verdict/recheck.py); that raise is unreachable unless
+        # MAKOTO_RECHECK_CERTIFICATE is explicitly set.
+        from makoto.verdict.recheck import VerdictCertificate, recheck_certificate
+        recheck_certificate(VerdictCertificate(
+            findings=tuple(findings),
+            mode=mode,
+            permission_mode=permission_mode,
+            claimed_outcome=str(folded),
+            claimed_detail=getattr(folded, "detail", ""),
+        ))
     body = wire.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
     if body:
         (stream or sys.stdout).write(json.dumps(body))
@@ -745,16 +757,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # Every settled PostToolUse becomes a deed node (and, where applicable, a typed
-        # observation) in the same append-only chain.  SQLite remains only its rebuildable view.
-        try:
-            from makoto.record import claim_graph as _claim_graph
-            _claim_graph.record_deed(
-                conn, payload, event_id=event_id, session_id=sid, cwd=cwd, root=state_dir,
-            )
-        except Exception as exc:
-            print(f"makoto._dispatch: claim graph deed update failed (non-fatal): {exc}",
-                  file=sys.stderr)
         # SPEC-5 live plan wiring (2026-07-23), two halves of the same gap: DECLARE and ADVANCE.
         # Before this, the ONLY way to populate a plan was a `.claude/makoto-plan.jsonl` already
         # sitting on disk BEFORE SessionStart fired -- nothing let Claude declare a plan
@@ -825,9 +827,7 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
         # Stop-edge CHECK findings get the same central provenance stamp: the Stop/SubagentStop
         # event they were evaluated against.
         gate_findings = [replace(f, source_event_id=event_id)
-                         for f in run_stop_checks(
-                             conn, payload, history, root=state_dir, event_id=event_id
-                         )]
+                         for f in run_stop_checks(conn, payload, history, root=state_dir)]
     blocking = list(findings)
     if _gates_enabled():
         blocking += [gf for gf in gate_findings
@@ -852,11 +852,10 @@ HANDLERS: dict[str, Any] = {
 
 
 def main() -> int:
-    """Orchestrate a complete hook envelope.
-
-    An absent, malformed, empty, non-object, or unknown-event envelope is not evaluable and fails
-    closed with exit 2.  Infrastructure failures after a valid envelope remain loud-allow so a
-    transient database problem cannot silently turn into a denial.
+    """orchestrator — HYBRID fail-mode (never silent, never blind-open): a tamper-shaped payload
+    fails CLOSED (block, exit 2 + reason); transient infra (unparseable pipe, DB init/lock failure,
+    unexpected body fault) fails LOUD-ALLOW (exit 0 + stderr); every can't-evaluate writes an
+    on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md.
     Routing is HANDLERS, the row table above — main() knows the common prologue (parse, verify,
     ingest) and nothing about any event."""
     payload_raw = sys.stdin.read()
@@ -864,24 +863,15 @@ def main() -> int:
     _self_verify_chain(state_dir)
     payload = _parse_payload(payload_raw)
     if payload is _PARSE_FAILED:
-        reason = ("stdin was empty -- no payload arrived at all"
-                  if not payload_raw.strip() else "stdin was not valid JSON")
-        _dispatch_fact(state_dir, "unparseable_payload", reason, blocked=True)
-        return 2
+        # unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON) ->
+        # loud-allow; never block agent work on a pipe glitch.
+        _dispatch_fact(state_dir, "unparseable_payload", "stdin was not valid JSON", blocked=False)
+        return 0
     if not isinstance(payload, dict):
         # valid JSON but not an object: a truncated pipe yields INVALID json, never valid-non-dict,
         # and Claude Code's envelope is always an object -> anomalous/tamper-shaped -> fail CLOSED.
         _dispatch_fact(state_dir, "non_object_payload",
                        f"payload was {type(payload).__name__}, not a JSON object", blocked=True)
-        return 2
-    if not payload:
-        _dispatch_fact(state_dir, "empty_payload", "payload was an empty JSON object", blocked=True)
-        return 2
-    event = payload.get("hook_event_name")
-    if event not in HANDLERS:
-        _dispatch_fact(state_dir, "unknown_event",
-                       f"hook_event_name was {event!r}; expected one of {', '.join(HANDLERS)}",
-                       blocked=True)
         return 2
     db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):

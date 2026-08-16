@@ -120,4 +120,5 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None) -> Option
 # guarantee still rests on posture=="ADVISE", same as always.
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", may_block=True,
+               eats=frozenset({"fs_read"}),
                run=lambda c: self_wired_gate(c.fs_read), layer="meta")

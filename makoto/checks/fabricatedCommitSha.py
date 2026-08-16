@@ -53,7 +53,8 @@ Knight-Leveson: stdlib re + json only; no network/LLM in the hot path.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 from makoto.substrate.io import iter_tool_events, raw_payload_str
 from makoto.core.lexicons import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
 
@@ -357,13 +358,13 @@ def _real_commit_in_history(history: list) -> bool:
 
 # jscpd note (2026-07-09): flagged as a clone against phantomCitation.py. Verified: the matched
 # span is the fixed dispatcher entrypoint signature `predicate(*, current_event: dict,
-# history: list, pattern: PreCheck, conn=None) -> Optional[Finding]` -- byte-identical across 9
+# history: list, pattern: Check, conn=None) -> Optional[Finding]` -- byte-identical across 9
 # check modules (grep '^def predicate(' checks/*.py: writeThrashRevert.py, verifierExitMasking.py,
-# unsourcedWebfetch.py, selfMuteGuard.py, forbiddenLocation.py,
+# unsourcedWebfetch.py, selfMuteGuard.py, illusoryAuthorshipTrailer.py, forbiddenLocation.py,
 # among others) -- plus a coincidental preceding `return False` from this file's own unrelated
 # `_real_commit_in_history` helper. A dispatcher-invoked entrypoint's signature is a structural
 # contract, not extractable logic; the two functions' bodies do unrelated things.
-def predicate(*, current_event: dict, history: list, pattern: PreCheck,
+def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     """fire on a Stop claim that presents a SHA as commit proof with no commit ran."""
     if current_event.get("hook_event_name") != "Stop":
@@ -401,7 +402,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
         pattern_id=pattern.id,
         file="",
         line=0,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=(f"row {pattern.id} ({pattern.description}): commit SHA "
                  f"{sha!r} presented as proof, but no `git commit`/`git tag` "
                  f"tool_use ran this session — fabricated evidence"),
@@ -414,4 +415,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Cite a real `git commit`/`git tag` run (or the SHA echoed in its tool output) before claiming a commit/tag landed. A SHA presented as proof with no commit/tag tool_use behind it this session is fabricated evidence (CLAUDE.md commandment 1, tool-call-diff canary).'
 DESCRIPTION = 'fabricated commit SHA/tag presented as proof of a commit (no git commit/tag ran)'
 
-CHECK = _Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))

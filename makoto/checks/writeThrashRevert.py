@@ -24,7 +24,8 @@ from typing import Optional
 
 from makoto.substrate.byte_identity import ByteIdentity
 from makoto.substrate.io import decode_history_row
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 
 
 def _prior_whole_file_writes(history, path: str) -> list:
@@ -34,8 +35,9 @@ def _prior_whole_file_writes(history, path: str) -> list:
     (id, ts, event_type, cwd, raw_payload_json) tuples _select_recent returns OR dicts with a
     'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped.
 
-    Row-decode step shared via substrate.io.decode_history_row. Only this function's own
-    Write/content filter stays local."""
+    Row-decode step shared via substrate.io.decode_history_row (2026-07-09 dedup: this function and
+    substrate._canonAtoms._decode_row each re-derived the same tuple/dict-payload sniff + json.loads
+    by hand -- found duplicated by jscpd). Only this function's own Write/content filter stays local."""
     out: list = []
     for row in history or ():
         ev = decode_history_row(row)
@@ -49,7 +51,7 @@ def _prior_whole_file_writes(history, path: str) -> list:
 
 
 def predicate(*, current_event: dict, history: list,
-              pattern: PreCheck, conn=None) -> Optional[Finding]:
+              pattern: Check, conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     # Whole-file Write ONLY. A current Edit/MultiEdit/NotebookEdit carries only a fragment, not a
@@ -72,7 +74,7 @@ def predicate(*, current_event: dict, history: list,
                 pattern_id=pattern.id,
                 file=path,
                 line=0,
-                level=pattern.fire_level,
+                level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
                 message=(
                     f"row {pattern.id} ({pattern.description}): this Write reverts {path!r} back "
                     f"to a byte-identical copy of an earlier whole-file content after it was "
@@ -88,4 +90,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = 'Decide which content is correct and write it once; do not revert to an earlier whole-file version after changing it.'
 DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 
-CHECK = _Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))

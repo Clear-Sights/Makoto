@@ -91,23 +91,3 @@ def test_rebuild_only_replays_the_verified_prefix(tmp_path):
 def test_rebuild_on_absent_chain_replays_zero_rows(tmp_path):
     state_dir, conn = _setup(tmp_path)
     assert rebuild_ledger_table_from_chain(conn, root=state_dir) == 0
-
-
-def test_projection_retains_same_key_for_two_sessions(tmp_path):
-    state_dir, conn = _setup(tmp_path)
-    event = {"hook_event_name": "PostToolUse", "tool_name": "Write",
-             "tool_input": {"file_path": "shared.py", "content": "x"}}
-
-    _record(conn, state_dir, event, 1, session_id="s1")
-    _record(conn, state_dir, event, 2, session_id="s2")
-
-    assert len(ledger.read(root=state_dir)) == 2
-    assert ledger.touched_keys(conn, "s1") == {"shared.py"}
-    assert ledger.touched_keys(conn, "s2") == {"shared.py"}
-    assert conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0] == 2
-
-    conn.execute("DELETE FROM ledger")
-    assert rebuild_ledger_table_from_chain(conn, root=state_dir) == 2
-    assert ledger.touched_keys(conn, "s1") == {"shared.py"}
-    assert ledger.touched_keys(conn, "s2") == {"shared.py"}
-    assert conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0] == 2

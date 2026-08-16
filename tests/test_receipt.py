@@ -1,103 +1,72 @@
-"""Claim-rooted receipt tests.
+"""Tests for makoto.record.receipt -- the pure read-time receipt view (Task 2 slice 4).
 
-Only persisted claim nodes are assertions.  Test runs, deeds, verdicts, and other evidence rows
-remain evidence; they never become claims merely because a receipt can cite them.
+DESIGN DECISION 2026-07-07: claim kinds = verdict/certified-fact/testrun only; a receipt is
+computed fresh every call, nothing persisted; every claim cites its own row_index/row_hash.
 """
 from __future__ import annotations
 
-import json
-import sqlite3
-
-from makoto.record import claim_graph, ledger
+from makoto.record import ledger
 from makoto.record.receipt import emit_receipt
 
 
-def _persist_action_claim(root, *, session_id="s1", event_id=2):
-    conn = sqlite3.connect(":memory:", isolation_level=None)
-    history = [(event_id - 1, "t", "PostToolUse", "/repo", json.dumps({
-        "hook_event_name": "PostToolUse",
-        "tool_name": "Bash",
-        "tool_input": {"command": "scripts/deploy.sh"},
-        "tool_response": {"exitCode": 0},
-    }))]
-    stop = {
-        "hook_event_name": "Stop",
-        "session_id": session_id,
-        "cwd": "/repo",
-        "last_assistant_message": "I ran `scripts/deploy.sh`.",
-    }
-    built = claim_graph.build_stop_graph(
-        conn, stop, history, event_id=event_id, root=root,
-    )
-    conn.close()
-    return built
-
-
 def test_absent_chain_is_a_vacuous_all_zero_receipt(tmp_path):
-    receipt = emit_receipt(root=tmp_path)
-    assert receipt["verified_through"] is None
-    assert receipt["claims"] == []
-    assert receipt["claim_count"] == 0
-    assert receipt["trace_bound_count"] == 0
-    assert receipt["exemption_count"] == 0
+    r = emit_receipt(root=tmp_path)
+    assert r["verified_through"] is None
+    assert r["claims"] == []
+    assert r["claim_count"] == 0
+    assert r["trace_bound_count"] == 0
+    assert r["exemption_count"] == 0
 
 
-def test_evidence_kinds_are_never_misnamed_as_claims(tmp_path):
-    for kind in ("testrun", "audit", "touched", "certified-fact", "verdict", "deed"):
-        ledger.append({"kind": kind, "key": kind, "session_id": "s1"}, root=tmp_path)
-    assert emit_receipt(session_id="s1", root=tmp_path)["claims"] == []
+def test_only_claim_kinds_are_counted_as_claims(tmp_path):
+    ledger.append({"kind": "testrun", "key": "a"}, root=tmp_path)
+    ledger.append({"kind": "audit", "key": "b"}, root=tmp_path)          # NOT a claim kind
+    ledger.append({"kind": "touched", "key": "c"}, root=tmp_path)        # NOT a claim kind
+    ledger.append({"kind": "certified-fact", "key": "d"}, root=tmp_path)
+    r = emit_receipt(root=tmp_path)
+    assert r["claim_count"] == 2
+    assert {c["claim_kind"] for c in r["claims"]} == {"testrun", "certified-fact"}
 
 
-def test_receipt_roots_at_claim_and_cites_real_graph_rows(tmp_path):
-    built = _persist_action_claim(tmp_path)
-    receipt = emit_receipt(session_id="s1", root=tmp_path)
-    assert receipt["claim_count"] == 1
-    claim = receipt["claims"][0]
-    assert claim["claim_id"] == built.current_claim_ids[0]
-    assert claim["claim_text"] == "I ran `scripts/deploy.sh`"
-    assert claim["predicate"] == "action.run"
-    assert claim["verdict"] == "CERTIFIED"
-    assert claim["trace_bound"] is True
-    assert claim["support_path"]
-
-    rows = ledger.read(root=tmp_path)
-    for citation in claim["cited_chain_rows"]:
-        row = rows[citation["row_index"]]
-        assert citation["row_hash"] == row["row_hash"]
-        assert citation["id"] in {row.get("node_id"), row.get("edge_id")}
+def test_every_claim_cites_a_real_row_index_and_hash(tmp_path):
+    stored = ledger.append({"kind": "verdict", "key": "a"}, root=tmp_path)
+    r = emit_receipt(root=tmp_path)
+    assert r["claims"] == [{"claim_kind": "verdict", "row_index": 0,
+                            "row_hash": stored["row_hash"]}]
 
 
-def test_session_id_scopes_actual_claim_nodes(tmp_path):
-    _persist_action_claim(tmp_path, session_id="s1", event_id=2)
-    _persist_action_claim(tmp_path, session_id="s2", event_id=4)
-    receipt = emit_receipt(session_id="s1", root=tmp_path)
-    assert receipt["claim_count"] == 1
-    assert receipt["claims"][0]["source_event_id"] == 2
+def test_session_id_scopes_claims_to_one_session(tmp_path):
+    ledger.append({"kind": "testrun", "key": "a", "session_id": "s1"}, root=tmp_path)
+    ledger.append({"kind": "testrun", "key": "b", "session_id": "s2"}, root=tmp_path)
+    r = emit_receipt(session_id="s1", root=tmp_path)
+    assert r["claim_count"] == 1
+    assert r["claims"][0]["row_index"] == 0
 
 
-def test_tampered_cited_path_keeps_claim_visible_but_demotes_verdict(tmp_path):
-    _persist_action_claim(tmp_path)
+def test_tampered_chain_excludes_claims_after_the_break_from_trace_bound(tmp_path):
+    """PLANT the fault: two claims, tamper the FIRST row. verify_chain names index 0 as broken,
+    so trace_bound_count must be 0 even though claim_count still lists both (undisguised, not
+    hidden -- the receipt's own contract is 'cite it, never hide it')."""
+    import json
+    ledger.append({"kind": "testrun", "key": "a"}, root=tmp_path)
+    ledger.append({"kind": "verdict", "key": "b"}, root=tmp_path)
     chain_file = tmp_path / "chain.jsonl"
     lines = chain_file.read_text().splitlines()
     row0 = json.loads(lines[0])
-    row0["canonical_value"] = "TAMPERED"
+    row0["key"] = "TAMPERED"
     lines[0] = json.dumps(row0, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     chain_file.write_text("\n".join(lines) + "\n")
 
-    receipt = emit_receipt(session_id="s1", root=tmp_path)
-    assert receipt["verified_through"] == 0
-    assert receipt["claim_count"] == 1
-    assert receipt["trace_bound_count"] == 0
-    assert receipt["claims"][0]["verdict"] == "NOT-EVALUABLE"
-    assert receipt["claims"][0]["trace_bound"] is False
+    r = emit_receipt(root=tmp_path)
+    assert r["verified_through"] == 0
+    assert r["claim_count"] == 2               # still cited, undisguised
+    assert r["trace_bound_count"] == 0         # but nothing after (or at) the break is trusted
 
 
 def test_exemption_count_reflects_chained_exemption_rows(tmp_path):
     from makoto.record import audit
-    audit.append_exemption(
-        tmp_path, pattern_id="content.timing_unsafe_compare", kind="makoto-allow",
-        file="h.py", line=4, reason="r", snippet="s",
-    )
-    receipt = emit_receipt(root=tmp_path)
-    assert receipt["exemption_count"] == 1
-    assert receipt["claim_count"] == 0
+    audit.append_exemption(tmp_path, pattern_id="content.timing_unsafe_compare", kind="makoto-allow", file="h.py",
+                           line=4, reason="r", snippet="s")
+    r = emit_receipt(root=tmp_path)
+    assert r["exemption_count"] == 1
+    assert r["claim_count"] == 0               # an exemption is not itself a claim

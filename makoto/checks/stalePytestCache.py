@@ -68,4 +68,5 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK", may_block=True,
+               eats=frozenset({"text", "cwd"}),
                run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))

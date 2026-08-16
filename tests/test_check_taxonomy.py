@@ -5,12 +5,12 @@ is now the gate.liveness Stop CHECK; the empty post tier (PostToolUse, never pop
 deleted."""
 import importlib
 import pytest
-from makoto.core.schema import load_prechecks            # schema.py exposes the Pre-Check loader
+from makoto.substrate._loader import load_precheck_catalog            # schema.py exposes the Pre-Check loader
 from makoto.substrate._loader import load_checks
 
 
 def test_two_categories_load():
-    assert load_prechecks(), "prechecks discovered"
+    assert load_precheck_catalog(), "prechecks discovered"
     assert load_checks(edge="Stop"), "stop checks discovered"
 
 

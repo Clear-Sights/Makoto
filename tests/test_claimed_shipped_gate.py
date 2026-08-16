@@ -166,30 +166,14 @@ def test_gate_fires_on_bare_unbacked_claim():
     assert finding.level == "error"
 
 
-def test_successful_push_transcript_alone_is_not_remote_world_evidence():
+def test_gate_silent_when_claim_has_successful_bash_evidence():
     history = [_bash("git push origin main", exitCode=0)]
-    assert claimed_shipped_gate("I've pushed it to main.", history=history) is not None
+    assert claimed_shipped_gate("I've pushed it to main.", history=history) is None
 
 
-def test_gate_silent_when_claim_has_exact_successful_merge_evidence():
-    history = [_event(
-        "merge_pull_request",
-        {"owner": "Clear-Sights", "repo": "makoto", "pullNumber": 42},
-        {"merged": True},
-    )]
-    assert claimed_shipped_gate(
-        "I merged Clear-Sights/makoto PR #42.", history=history,
-    ) is None
-
-
-def test_merge_of_another_repository_and_pr_cannot_launder_claim():
-    history = [_event(
-        "merge_pull_request", {"owner": "other", "repo": "other", "pullNumber": 7},
-        {"merged": True},
-    )]
-    assert claimed_shipped_gate(
-        "I merged Clear-Sights/makoto PR #999.", history=history,
-    ) is not None
+def test_gate_silent_when_claim_has_successful_non_bash_evidence():
+    history = [_event("merge_pull_request", {}, {"merged": True})]
+    assert claimed_shipped_gate("I merged the PR.", history=history) is None
 
 
 def test_gate_fires_when_only_failed_mutation_exists():
@@ -210,7 +194,7 @@ def test_tuple_history_shape_is_supported():
         "tool_response": {"exitCode": 0},
     })
     row = (1, "t", "PostToolUse", "/repo", payload)
-    assert claimed_shipped_gate("Pushed it to main.", history=[row]) is not None
+    assert claimed_shipped_gate("Pushed it to main.", history=[row]) is None
 
 
 def test_push_tip_match_upholds_claim(monkeypatch, tmp_path):
@@ -221,9 +205,6 @@ def test_push_tip_match_upholds_claim(monkeypatch, tmp_path):
     monkeypatch.setattr("makoto.checks.claimedShippedAbsent.subprocess.run", run)
     result = pushed_tip_matches_remote("I've pushed it to main.", tmp_path)
     assert result.status is PushTipStatus.MATCH
-    assert claimed_shipped_gate(
-        "I've pushed it to main.", history=[], cwd=tmp_path,
-    ) is None
 
 
 def test_push_tip_mismatch_refutes_claim_with_both_shas(monkeypatch, tmp_path):

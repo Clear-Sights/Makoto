@@ -26,10 +26,18 @@ runner, FP-safe). The bare `<tool> test/check` fallback (unknown tool, no launch
 
 Knight-Leveson: stdlib re only.
 """
+# jscpd note (2026-07-09): flagged as a clone against illusoryAuthorshipTrailer.py. Verified: the
+# matched span is only this docstring's closing "Knight-Leveson" line + the standard
+# `from __future__ import annotations` / `import re` / `from typing import Optional` /
+# `from makoto.core.schema import Finding` + `from makoto.substrate._loader import Check` headers both Pre-hook predicate modules need --
+# it ends before any function body, so no logic is shared (this module's runner/exit-mask
+# detection is unrelated to illusoryAuthorshipTrailer's Claude-authorship-trailer regex). See
+# tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 from makoto.core._shell import _shell_segments
 
 # Anchored at the (post-wrapper) START of a statement: the runner is INVOKED, not an argument.
@@ -69,7 +77,7 @@ def _is_runner_command(c: str) -> bool:
     return bool(_LEAD_RUNNER_RX.match(" ".join(toks[i:])))
 
 
-def predicate(*, current_event: dict, history: list, pattern: PreCheck,
+def predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -95,7 +103,7 @@ def predicate(*, current_event: dict, history: list, pattern: PreCheck,
 
     if reason:
         return Finding(
-            pattern_id=pattern.id, file="", line=0, level=pattern.fire_level,
+            pattern_id=pattern.id, file="", line=0, level="error",  # Pre-tier invariantly BLOCK
             message=f"row {pattern.id} ({pattern.description}): {reason} — a hidden failure reads as success",
             retry_hint=pattern.retry_hint, snippet=raw[:120],
         )
@@ -106,4 +114,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / set +e. Run the test/build/lint and fix what fails -- a hidden failure that reads as success is a cheat."
 DESCRIPTION = 'verifier exit-code masking (|| true / ; true / set +e on a test/build/lint runner)'
 
-CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|| true', '; true', '|| :', 'set +e'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|| true', '; true', '|| :', 'set +e'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern"}))

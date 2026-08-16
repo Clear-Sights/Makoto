@@ -4,13 +4,17 @@ from typing import Optional
 
 from makoto.core.schema import Finding
 from makoto.substrate.claims import _code_spans
-import makoto.substrate.claim_graph as _claim_graph
+from makoto.substrate._shared import turn_tool_calls
 
-# gate.fabricated_action — a concrete completed tool-action claim is certified only by a distinct,
-# settled PostToolUse deed whose canonical command/executable target is identical. Read activity,
-# a different command, and unsettled PreToolUse intent remain NOT-EVALUABLE and therefore block.
-# The claim-side precision firewall remains closed: tool verbs only, distinctive object required,
-# and negated/future/quoted/prior-turn frames excluded.
+# gate.fabricated_action — the assistant claims a completed TOOL action ("I ran `X`", "I executed
+# scripts/deploy.sh") in a turn where it made NO tool calls at all. FP-safety is the whole design:
+# a CLOSED tool-verb lexicon (reasoning verbs verified/checked/confirmed EXCLUDED — cognitive, not tool,
+# claims), a DISTINCTIVE object (backticked command / path / URL — bare words like "tests" rejected),
+# negation/future/quoted guards, and discharge on ANY tool activity this turn (turn_tool_calls > 0).
+# The discharge is presence-of-work, NOT command-text matching: a real action is narrated in cleaned-up
+# backticks (rel paths, simplified regex) and "invisible" tools (Workflow/Agent/Task) leave no Bash
+# command — but every tool call DOES emit a PreToolUse event, so presence is the faithful, paraphrase-
+# proof signal. Whether the spend was proportionate is a TEMPERANCE question, not this verity gate.
 
 # closed lexicon of TOOL-shaped past-tense actions (NOT reasoning verbs)
 _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed|launched)"
@@ -18,8 +22,9 @@ _ACTION_RX = re.compile(rf"\bI\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
 _NEG = re.compile(r"\b(?:not|never|without)\b|n't", re.I)
 _FUTURE = re.compile(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
 # PRIOR-TURN frame: the claim is a truthful RECAP of work done in an earlier turn/session, not an
-# assertion that the action happened in the current turn. This frame stays scoped to the claim's
-# own clause and fails open for explicit recaps.
+# assertion that the action happened THIS (tool-less) turn. turn_tool_calls only counts THIS turn's
+# calls (post-final-Stop), so a recap of last turn's real run reads as fabricated; this frame, scoped
+# to the claim's own clause, fails open. GATE-LOCAL (turn_tool_calls in _shared.py is untouched).
 _PRIOR_TURN = re.compile(
     r"\b(?:earlier|previously|already|before|last\s+turn|previous\s+turn|prior\s+turn|"
     r"this\s+session|in\s+the\s+last\s+turn|in\s+the\s+previous\s+turn|a\s+moment\s+ago)\b", re.I)
@@ -48,7 +53,8 @@ def _action_signal(text: str):
             continue                                  # negated / future -> not a completed action
         # PRIOR-TURN recap: the claim is scoped to an earlier turn/session ("Earlier this session I
         # ran X", "I ran X previously"). Scan the claim's own sentence (the frame can lead or trail
-        # the verb). The sentence is delimited cheaply on the surrounding terminators.
+        # the verb). turn_tool_calls only sees THIS turn, so such a truthful recap reads as fabricated
+        # -> fail open. The sentence is delimited cheaply on the surrounding terminators.
         s0 = max((text.rfind(p, 0, m.start()) for p in (". ", "! ", "? ", "\n")), default=-1) + 1
         e1 = min((p for p in (text.find(". ", m.end()), text.find("\n", m.end())) if p != -1),
                  default=len(text))
@@ -61,33 +67,26 @@ def _action_signal(text: str):
     return None
 
 
-def fabricated_action_gate(text, *, history=(), graph=None, claim_ids=()) -> Optional[Finding]:
-    """Reject a concrete action claim without an exact settled-deed support path."""
-    if graph is None:
-        graph, claim_ids = _claim_graph.build_ephemeral_graph(text, history=history)
-    claims = [
-        graph.claims[claim_id] for claim_id in claim_ids
-        if claim_id in graph.claims and graph.claims[claim_id].predicate.startswith("action.")
-    ]
-    if not claims:
+def fabricated_action_gate(text, *, history=()) -> Optional[Finding]:
+    """Fire iff the assistant claims a completed tool action with a distinctive object
+    (`_action_signal`) in a turn where it made ZERO tool calls (`turn_tool_calls(history) == 0`).
+    Discharge: ANY tool activity this turn -> silent (real work backs the claim). Presence-of-work,
+    not command-text matching: a real action is narrated in cleaned-up backticks and invisible tools
+    (Workflow/Agent/Task) carry no Bash command, but every tool call emits a PreToolUse event — so
+    presence is paraphrase-proof and invisible-tool-proof. Silent on no-claim or any tool work."""
+    obj = _action_signal(text)
+    if obj is None:
         return None
-    unsupported = next((
-        claim for claim in claims
-        if graph.adjudicate(claim.node_id).verdict is not _claim_graph.Verdict.CERTIFIED
-    ), None)
-    if unsupported is None:
-        return None
+    if turn_tool_calls(history) > 0:
+        return None                                   # real tool work this turn -> claim is backed
     return Finding(
         pattern_id="gate.fabricated_action", file="", line=0, level="error",
-        message=(f"Claim {unsupported.span_text!r} states a completed tool action, but no "
-                 "settled deed with the "
-                 "same canonical command/action target supports it — unrelated tool activity "
-                 "cannot certify this claim."),
+        message=(f"Claim states a completed tool action ('{obj}'), but this turn made no tool calls "
+                 f"at all — actually run it (any tool counts) and cite the result, or remove the claim."),
         retry_hint="Actually run the command/tool, or drop the claim that you did it.")
 
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: fabricated_action_gate(
-                   c.text, history=c.history, graph=c.claim_graph,
-                   claim_ids=c.current_claim_ids))
+               eats=frozenset({"text", "history"}),
+               run=lambda c: fabricated_action_gate(c.text, history=c.history))

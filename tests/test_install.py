@@ -168,7 +168,7 @@ def test_validate_predicate_modules_aborts_on_missing_callable(monkeypatch, caps
                 keywords=["x"]),
     ]
     import makoto.install as install_mod
-    monkeypatch.setattr(install_mod, "load_prechecks", lambda *a, **kw: fake_patterns)
+    monkeypatch.setattr(install_mod, "load_precheck_catalog", lambda *a, **kw: fake_patterns)
     with pytest.raises(SystemExit) as excinfo:
         install_mod._validate_predicate_modules()
     assert excinfo.value.code == 1
@@ -185,7 +185,7 @@ def test_validate_predicate_modules_aborts_on_import_error(monkeypatch, capsys):
                  predicate_module="makoto.checks.module_that_does_not_exist_makhard",
                  keywords=["x"]),
     ]
-    monkeypatch.setattr(install_mod, "load_prechecks", lambda *a, **kw: fake_patterns)
+    monkeypatch.setattr(install_mod, "load_precheck_catalog", lambda *a, **kw: fake_patterns)
     with pytest.raises(SystemExit) as excinfo:
         install_mod._validate_predicate_modules()
     assert excinfo.value.code == 1
@@ -206,7 +206,7 @@ def test_validate_predicate_modules_aborts_on_empty_keywords(monkeypatch, capsys
         PreCheck(id="keywords.empty", fire_level="error", description="d",
                  predicate_module=module_name, keywords=[]),
     ]
-    monkeypatch.setattr(install_mod, "load_prechecks", lambda *a, **kw: fake_patterns)
+    monkeypatch.setattr(install_mod, "load_precheck_catalog", lambda *a, **kw: fake_patterns)
     with pytest.raises(SystemExit) as excinfo:
         install_mod._validate_predicate_modules()
     assert excinfo.value.code == 1

@@ -32,9 +32,9 @@ def _state(tmp_path: Path) -> Path:
 
 
 def test_catalog_loads_nonempty():
-    from makoto.core.schema import load_prechecks
+    from makoto.substrate._loader import load_precheck_catalog
     from makoto.substrate._loader import load_checks
-    assert load_prechecks(), "Pre-tier catalog discovered"
+    assert load_precheck_catalog(), "Pre-tier catalog discovered"
     assert load_checks(edge="Stop"), "Stop-tier catalog discovered"
 
 

@@ -41,4 +41,5 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="ADVISE",
+               eats=frozenset({"open_plan_items"}),
                may_block=True, run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))

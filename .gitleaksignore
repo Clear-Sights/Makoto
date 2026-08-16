@@ -30,6 +30,12 @@
 a7263f55edfb0495f959bf38a0d6ca700904d4e6:tests/test_precheck_secret_committed.py:aws-access-token:35
 a7263f55edfb0495f959bf38a0d6ca700904d4e6:tests/test_precheck_secret_committed.py:generic-api-key:30
 a7263f55edfb0495f959bf38a0d6ca700904d4e6:tests/test_precheck_secret_committed.py:generic-api-key:53
+b3b6b05fd94199b723334b7f0e2a8ef05677c40a:tests/test_canon_fingerprints.py:generic-api-key:94
+b3b6b05fd94199b723334b7f0e2a8ef05677c40a:tests/test_canon_fingerprints.py:stripe-access-token:61
+6e9ebe68c6ec30757bd64d5a3c9d8e29d0a04e0f:tests/test_canon_fingerprints.py:generic-api-key:94
+6e9ebe68c6ec30757bd64d5a3c9d8e29d0a04e0f:tests/test_canon_fingerprints.py:stripe-access-token:61
+5fcb2c937acf78ed209c41ac4f85567345762662:tests/test_canon_fingerprints.py:generic-api-key:94
+5fcb2c937acf78ed209c41ac4f85567345762662:tests/test_canon_fingerprints.py:stripe-access-token:61
 #
 # 2) Real-but-adjudicated: two HF tokens in old history (a workflow fallback literal and
 #    the token quoted inside DEFERRED.md's own leak-report entry). On-the-record user

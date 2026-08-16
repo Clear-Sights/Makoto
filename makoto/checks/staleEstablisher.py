@@ -17,7 +17,7 @@ tier", see `checks/_shared.py`) -- exactly the tier this check must never enter.
 Finding to the audited-but-never-blocking list (its `pattern_id` never enters
 `_blocking_gate_ids()`, so it is STRUCTURALLY incapable of blocking, not just labeled advisory).
 This module still exports a `CHECK` (posture=ADVISE) purely for `checks._loader`'s /
-`checks.catalogCompleteness`'s completeness discovery -- it is NOT a `GATE` and is never
+`checks.undeclaredFalsifiable`'s completeness discovery -- it is NOT a `GATE` and is never
 scanned by `load_stopchecks()`'s blocking-id derivation, so it carries none of that
 mechanism's L2-import firewall either.
 
@@ -75,5 +75,6 @@ CHECK = Check(
     id="gate.stale_establisher",
     applies_at="Stop",
     posture=ADVISE,
+    eats=frozenset({"plan"}),
     run=lambda ctx: check(ctx.plan),
 )

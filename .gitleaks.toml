@@ -15,21 +15,22 @@
 #      entries all went stale at once)."
 #
 # Regenerating a list after every publish is a downstream guard for an upstream fact:
-# two paths in this repo's reachable history hold strings that are supposed to look like secrets.
-# Allowlisting those paths states that fact once, and no SHA appears in it.
+# two files in this repo exist to hold strings that are supposed to look like secrets.
+# Allowlisting those two paths states that fact once, and no SHA appears in it.
 #
-# THE COST, stated plainly: a real credential committed at either path would not be scanned.
-# Both files are now retired from the working tree and existed only as detector fixtures; every
-# other path in both repos stays fully scanned. If either path is reintroduced for a non-fixture
-# role, delete its entry here.
+# THE COST, stated plainly: a real credential pasted into either of these two files
+# would not be scanned. That is accepted because neither file has any purpose other
+# than carrying fixtures for makoto's own secret-detection checks, and because every
+# other path in both repos stays fully scanned. If either file ever grows a
+# non-fixture role, delete its entry here.
 
 [extend]
 useDefault = true
 
 [[allowlists]]
-description = """Historical fixture paths whose entire content was deliberately secret-shaped: \
-the false-positive/true-positive battery for atom_secret_committed, and the retired \
-canon-fingerprint corpus. The flagged literals are keyboard runs -- AKIA1234567890ABCDEF, \
+description = """Fixture files whose entire content is deliberately secret-shaped: the \
+false-positive/true-positive battery for atom_secret_committed, and the canon-fingerprint \
+corpus. The flagged literals are keyboard runs -- AKIA1234567890ABCDEF, \
 sk_live_abcdefghijklmnop -- carried as the TP half of paired cases that prove the \
 detector still fires. Not credentials."""
 paths = [

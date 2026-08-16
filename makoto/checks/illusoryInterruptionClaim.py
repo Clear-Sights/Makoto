@@ -1,5 +1,5 @@
 """content.illusory_interruption_claim predicate — a fabricated "interrupted by user" excuse
-(誠: material-not-illusory).
+(誠: material-not-illusory; same genre as content.illusory_authorship_trailer).
 
 Fires PreToolUse when a tool call would INTRODUCE a claim that the USER interrupted this
 session — either in a git commit (Bash `command`) or in written file content (Write / Edit /
@@ -25,7 +25,8 @@ Knight-Leveson: stdlib re only.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding, PreCheck
+from makoto.core.schema import Finding
+from makoto.substrate._loader import Check
 from makoto.substrate.factories import introduced_text, makoto_allowed
 from makoto.substrate.io import decode_history_row
 
@@ -55,7 +56,7 @@ def _genuine_interruption_in_history(history: list) -> bool:
 
 
 def predicate(*, current_event: dict, history: list,
-              pattern: PreCheck, conn=None) -> Optional[Finding]:
+              pattern: Check, conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     tool_name = current_event.get("tool_name", "") or ""
@@ -77,7 +78,7 @@ def predicate(*, current_event: dict, history: list,
         pattern_id=pattern.id,
         file=where,
         line=line_no,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=(f"row {pattern.id} ({pattern.description}): matched {m.group(0)!r} at line "
                  f"{line_no} — no genuine interruption is recorded this session"),
         retry_hint=pattern.retry_hint,
@@ -89,4 +90,4 @@ from makoto.substrate._loader import Check as _Check
 RETRY_HINT = "Do not write or commit a claim that \"the user interrupted\" this session unless this session's own recorded history actually carries a real harness-set interruption. That marker is host-synthesized, never model-written -- citing it with nothing behind it is a fabricated excuse (same cheat class as content.fabricated_commit_sha). If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
 DESCRIPTION = 'illusory "interrupted by user" claim (no genuine interruption recorded this session) in a commit or written content'
 
-CHECK = _Check(id='content.illusory_interruption_claim', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('interrupted', 'Interrupted', 'INTERRUPTED'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = _Check(id='content.illusory_interruption_claim', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('interrupted', 'Interrupted', 'INTERRUPTED'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))

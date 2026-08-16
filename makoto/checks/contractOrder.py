@@ -101,7 +101,7 @@ def predicate(*, current_event: dict, history: list, pattern, conn=None) -> Opti
         pattern_id=pattern.id,
         file=loc,
         line=0,
-        level=pattern.fire_level,
+        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
         message=(
             f"contract gap: {gap['nid']!r} cannot run before the establisher(s) of its "
             f"passthrough are DONE -- unmet {gap['unmet']}; finish them first."
@@ -133,7 +133,7 @@ def _stop_finding(plan: Optional[Plan]) -> Optional[Finding]:
 RETRY_HINT = 'Finish the node(s) that establish this passthrough (the unmet ids named in the message) before advancing this one -- deps are gaps in the declared plan, read by passthrough name, never a declared edge.'
 DESCRIPTION = 'declared-plan contract gap -- a Write/Edit/MultiEdit/NotebookEdit advances a plan node whose passthrough-establisher is not yet DONE'
 
-CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=predicate, predicate_module=__name__, keywords=('file_path', 'notebook_path'), retry_hint=RETRY_HINT, description=DESCRIPTION)
+CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=predicate, predicate_module=__name__, keywords=('file_path', 'notebook_path'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))
 
 # This module's Stop-side surface shares the SAME id as its Pre-side CHECK above but fires at a
 # different edge -- checks._loader.discover()'s EXTRA_CHECKS convention (the sole dual-surface
@@ -142,5 +142,6 @@ CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=p
 # discoverable via the now-retired GATE/load_stopchecks() mechanism.
 EXTRA_CHECKS = [
     Check(id="gate.contract_order", applies_at="Stop", posture="BLOCK", may_block=True,
+          eats=frozenset({"plan"}),
           run=lambda ctx: _stop_finding(ctx.plan)),
 ]

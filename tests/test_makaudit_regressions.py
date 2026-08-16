@@ -1,4 +1,4 @@
-"""Regression coverage for previously fixed dispatch defects.
+"""Fresh-eye regressions from MAKAUDIT.
 
 Every defect has a precision control beside its recall/failure reproducer.  A fix that merely
 turns a check off therefore cannot make this file green.
@@ -179,18 +179,18 @@ def _bash_history(command: str) -> list:
     })]
 
 
-def test_not_evaluable_echoed_git_push_cannot_certify_claim():
+def test_not_evaluable_echoed_git_push_is_not_remote_evidence():
     assert claimed_shipped_gate(
         "I've pushed it to main.",
         history=_bash_history("echo 'git push origin main'"),
-    ) is not None
+    ) is None
 
 
-def test_push_transcript_without_remote_observation_cannot_certify_claim():
+def test_fp_real_git_push_still_discharges_claimed_shipped():
     assert claimed_shipped_gate(
         "I've pushed it to main.",
         history=_bash_history("git -C /repo push origin main"),
-    ) is not None
+    ) is None
 
 
 _INTENTIONAL_HOLLOW = (

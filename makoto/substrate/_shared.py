@@ -54,7 +54,7 @@ class GateContext:
     session_id: Optional[str] = None        # raw hook payload's `session_id` (Task 2 slice 5).
     transcript_path: Optional[str] = None   # raw `transcript_path` (CONFIRMED real, top-level on
     #   every hook event -- Claude Code hooks reference, fetched 2026-07-07: "Path to conversation
-    #   JSONL file"). Read by gate.canon's release.operator discharge (makoto.record.ackblock).
+    #   JSONL file"). Read by canonFingerprints.py's release.operator discharge (makoto.record.ackblock).
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the release.operator discharge can read/append the chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
@@ -71,10 +71,6 @@ class GateContext:
     #   across threads -- a risk that does not apply to a completed PostToolUse Bash call. Every
     #   other gate should keep reading `history`; widen a gate onto this field only with the same
     #   completed-evidence reasoning these claim gates document.
-    claim_graph: Optional[object] = None     # common persisted ClaimGraph assembled once by the
-    #   dispatcher; gates query typed claim/evidence paths instead of reparsing flat event bags.
-    current_claim_ids: Sequence = ()         # claims extracted from this exact Stop event.
-    prior_promise_claim_ids: Sequence = ()   # future claims from the immediately prior Stop.
 
     @property
     def roots(self):
@@ -134,6 +130,9 @@ def _safe_size(fs_size, location):
         return fs_size(location)
     except Exception:
         return None
+DISCHARGE_EATS = frozenset({"touched", "fs_exists", "empty", "fs_size"})
+"""GateContext fields forwarded by `_discharge_kwargs`; pinned by the SIGNATURE law test."""
+
 def _discharge_kwargs(c) -> dict:
     """The four GateContext fields a `_discharged()`-style gate needs, forwarded as kwargs from a
     GateContext `c`. Single-sources the "these are the discharge-relevant fields" convention so a

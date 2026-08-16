@@ -22,8 +22,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from makoto.core.schema import load_prechecks
-from makoto.substrate._loader import load_checks
+from makoto.substrate._loader import load_precheck_catalog
 # Hoisted 2026-07-09 to makoto.substrate.wiring (shared with checks/selfWiredCheck.py, which the
 # gate-side layering firewall bars from importing this lifecycle module directly).
 from makoto.substrate.wiring import (
@@ -38,13 +37,13 @@ def _validate_predicate_modules() -> None:
     Fails loud (exit 1) on import error, missing predicate, or empty keywords.
     Skips rows with empty predicate_module (transitional state).
 
-    SPEC-C item 2 (Pre-tier cutover): sources the live catalog via load_prechecks()'s DEFAULT
+    SPEC-C item 2 (Pre-tier cutover): sources the live catalog via load_precheck_catalog()'s DEFAULT
     (loader-backed) path, not an explicit read of data/patterns.toml -- that file is no longer
     the runtime source of truth, so gating this validation on its presence would make the gate
     silently vacuous the moment the file is removed (item 2 step 3).
     """
     import importlib
-    for p in load_prechecks():
+    for p in load_precheck_catalog():
         if not p.predicate_module:
             continue
         try:
@@ -226,13 +225,8 @@ def _hooks_wired(data: dict) -> bool:
 def cmd_status() -> int:
     """report patterns_count, hooks_wired, state_dir."""
     state_dir = Path.home() / ".claude" / "makoto_state"
-    # The count a user reads must be the catalog the tool actually has. This was
-    # len(load_prechecks()) -- the Pre edge ALONE (15 of 35 distinct ids at the time) -- so `status`
-    # reported a catalog 20 smaller than `pattern list` showed from that install. Two commands
-    # in one CLI answering the same question with different numbers, and the user-facing one
-    # under-reporting. Sourced from load_checks(), deduplicated by id because gate.contract_order
-    # registers on both its Pre and Stop edges and is one pattern, not two.
-    patterns_count = len({check.id for check in load_checks()})
+    # SPEC-C item 2 (Pre-tier cutover): the live catalog count, not a literal patterns.toml read.
+    patterns_count = len(load_precheck_catalog())
     settings = Path.home() / ".claude" / "settings.json"
     hooks_wired = False
     if settings.exists():

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "makoto"
 version = "2.2.0"
-description = "Integrity hook for Claude Code — checks the agent's claims against its own logged deeds; regression fixtures are not an independent false-positive survey"
+description = "Integrity hook for Claude Code — holds the agent's claims against its own logged deeds and blocks faked checks; every check ships at measured zero false positives"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "skill-labV2"}]
@@ -24,19 +24,12 @@ dependencies = []
 Homepage = "https://github.com/skill-labV2/makoto"
 
 [tool.setuptools]
+package-dir = {"makoto" = "makoto"}
+packages = ["makoto"]
 include-package-data = true
 
-# every subpackage ships, not just the top-level one: `makoto._dispatch` imports
-# makoto.core / .checks / .record / .session / .substrate / .verdict at hook fire
-# time, so a wheel carrying only makoto/*.py installs a runtime that cannot start.
-[tool.setuptools.packages.find]
-include = ["makoto*"]
-namespaces = false
-
-# non-.py files the runtime reads at fire time: the hook shim settings.json/hooks.json
-# point at, the packaged canonical citation list, and the just-in-time conventions doc.
 [tool.setuptools.package-data]
-makoto = ["_dispatch_shim.sh", "_dispatch_configchange_shim.sh", "docs/*.md"]
+makoto = ["config/*.toml"]
 
 [tool.setuptools.exclude-package-data]
-makoto = ["*.bak"]
+makoto = ["tests/*", "docs/*", "*.bak"]

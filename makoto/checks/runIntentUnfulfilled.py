@@ -5,12 +5,12 @@ from makoto.core.schema import Finding
 from makoto.core.lexicons import _RUN_INTENT_CLAIM_RX, _RUN_INTENT_IDIOM_VETO_RX, _NEGATION_RX
 from makoto.substrate.claims import _code_spans
 from makoto.substrate.io import decode_history_row
-import makoto.substrate.claim_graph as _claim_graph
 
-# gate.run_promised -- the immediately prior Stop's first-person run promise is checked one turn
-# later against the persisted graph. A deed discharges it only when it occurred after the promise
-# and corefers with the promise's action class and canonical target. ``printf unrelated`` therefore
-# cannot discharge a deploy release; a failed exact command still proves that it was attempted.
+# gate.run_promised -- the forward-looking sibling of gate.claimed_running: the immediately PRIOR
+# turn's own message promised a first-person run-intent action ("I'll run the tests", "I'm going
+# to restart the server", "let me deploy this") but this session's own recorded history shows NO
+# Bash call at all in the turn that followed -- the word must match the world, checked one turn
+# later.
 #
 # GRACE PERIOD BY CONSTRUCTION: this gate never reads the CURRENT Stop's own last_assistant_message
 # -- only `history` is consulted, and `history` never contains the row for the Stop currently being
@@ -20,9 +20,16 @@ import makoto.substrate.claim_graph as _claim_graph
 # literal, structural form of "discharged by the next message" -- not a timestamp or counter kept
 # anywhere, just which rows have and haven't been ingested yet.
 #
-# PERSISTENCE: the first Stop persists the promise claim before adjudication. Settled PostToolUse
-# events persist deeds. The next Stop selects only the immediately prior promise for enforcement,
-# while the receipt retains all claims and their verdicts.
+# STATELESS BY DESIGN: no new persistence. Every hook event this session fires -- Stop included,
+# `last_assistant_message` and all -- is already durably logged by `_dispatch.py::_ingest_event`
+# BEFORE any handler runs, so a prior turn's own claim is directly re-derivable from `ctx.history`
+# at the next Stop. This deliberately does NOT extend `Plan`/`PlanNode` (SPEC-5, see
+# `makoto/session/plan.py`): a Plan node's discharge evidence is a LOCATED file write
+# (`contractOrder.py`'s `_event_location`/`Plan.resolve`, keyed by `where`), but a run-intent
+# promise's only evidence is "a Bash call happened" -- there is no `where` to resolve against.
+# Same enforcement SHAPE Plan/gate.contract_order established (declare a forward commitment ->
+# must discharge -> Stop blocks if not), a structurally different mechanism because the discharge
+# evidence itself is structurally different.
 #
 # CLOSED LEXICON (core/lexicons.py's `_RUN_INTENT_CLAIM_RX`): a first-person FORWARD auxiliary
 # ("I'm going to" / "I'll" / "let me" / "I plan to") bound to a closed process-lifecycle verb set
@@ -34,8 +41,11 @@ import makoto.substrate.claim_graph as _claim_graph
 # seeking), "run through X" (walkthrough), "run the/some numbers" (mental math) are none of them
 # execution intent.
 #
-# UNKNOWN TARGETS: pronouns or aliases that cannot be normalized without guessing stay visible as
-# NOT-EVALUABLE. They never acquire a support edge from mere temporal proximity.
+# DISCHARGE EVIDENCE: ANY Bash call in the turn following the promise, full stop -- not a match
+# against the promised text's specific content. Reliably mapping "the tests" or "this" to a
+# specific expected command is an open text-understanding problem outside this gate's scope (and a
+# wrong guess there is itself a zero-FP violation risk); "did the assistant run ANYTHING at all
+# after promising to run something" is the bound that stays provably safe.
 #
 # SCOPE (documented, not fixed here): only the immediately PRIOR turn's promise is ever checked --
 # a promise from two-or-more turns back that was already checked (and silently passed, or whose
@@ -84,11 +94,7 @@ def _last_stop_index(history) -> Optional[int]:
 
 
 def _bash_call_after(history, idx: int) -> bool:
-    """Legacy diagnostic: whether any PostToolUse Bash follows ``idx``.
-
-    The blocking gate intentionally does not use this broad boolean; graph adjudication requires
-    action-and-target coreference.
-    """
+    """True iff a PostToolUse Bash call appears anywhere after position `idx` in `history`."""
     for row in list(history or ())[idx + 1:]:
         ev = decode_history_row(row)
         if (isinstance(ev, dict) and ev.get("hook_event_name") == "PostToolUse"
@@ -97,46 +103,33 @@ def _bash_call_after(history, idx: int) -> bool:
     return False
 
 
-def run_promised_gate(*, history=(), graph=None, claim_ids=()) -> Optional[Finding]:
-    """Reject the prior turn's promise unless a later target-coreferent deed supports it."""
+def run_promised_gate(*, history=()) -> Optional[Finding]:
+    """Fire iff the immediately PRIOR turn's own message made a run-intent promise
+    (`_run_intent_claim`) and no Bash call appears anywhere in `history` since -- the one-turn
+    grace period is structural (see module docstring), not computed here. Silent whenever no prior
+    Stop/SubagentStop exists yet, the prior message made no such promise, or ANY Bash call
+    discharged it."""
     history = list(history or ())
     idx = _last_stop_index(history)
     if idx is None:
         return None
-    if graph is None:
-        graph = _claim_graph.ClaimGraph(session_id="ephemeral")
-        _claim_graph.ingest_history(graph, history)
-        _claim_graph.link_claims(graph, history=history)
-        event_id = _claim_graph.history_event_id(history[idx], idx)
-        claim_ids = [
-            claim.node_id for claim in graph.claims.values()
-            if str(claim.source_event_id) == str(event_id)
-            and claim.predicate.startswith("promise.")
-        ]
-    claims = [
-        graph.claims[claim_id] for claim_id in claim_ids
-        if claim_id in graph.claims and graph.claims[claim_id].predicate.startswith("promise.")
-    ]
-    if not claims:
+    prior = decode_history_row(history[idx])
+    prior_text = (prior or {}).get("last_assistant_message") or ""
+    claim = _run_intent_claim(prior_text)
+    if claim is None:
         return None
-    unsupported = next((
-        claim for claim in claims
-        if graph.adjudicate(claim.node_id).verdict is not _claim_graph.Verdict.CERTIFIED
-    ), None)
-    if unsupported is None:
+    if _bash_call_after(history, idx):
         return None
     return Finding(
         pattern_id="gate.run_promised", file="", line=0, level="error",
-        message=(f"Last turn's claim {unsupported.span_text!r} promised "
-                 f"{unsupported.predicate} on '{unsupported.target_value}', but no later "
-                 "settled deed corefers with both "
-                 "that action and target — unrelated Bash activity cannot discharge it."),
-        retry_hint=("Actually run the promised target with a real tool call, or retract/rescope the promise "
+        message=(f"Last turn promised to run something (\"{claim.group(0).strip()}\") but no "
+                  "Bash call appears anywhere in this session's recorded history since -- the "
+                  "word must match the world."),
+        retry_hint=("Actually run it with a real Bash call, or retract/rescope the promise "
                      "before ending the turn."))
 
 
 from makoto.substrate._loader import Check as _Check
 CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="BLOCK", may_block=True,
-               run=lambda c: run_promised_gate(
-                   history=c.history, graph=c.claim_graph,
-                   claim_ids=c.prior_promise_claim_ids))
+               eats=frozenset({"history"}),
+               run=lambda c: run_promised_gate(history=c.history))

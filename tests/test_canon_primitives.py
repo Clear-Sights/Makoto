@@ -244,8 +244,8 @@ def test_fired_primitives_silent_on_clean_history():
     assert list(fired_primitives([row])) == []
 
 
-# ---- canon.timeout's release.operator discharge for a genuinely unresolvable,
-# operator-surfaced block -- text alone cannot discharge a purely
+# ---- Task 0b part (b): canon.timeout's release.operator discharge (the SAME mechanism gate.canon_fingerprints
+# uses) for a genuinely unresolvable, operator-surfaced block -- text alone cannot discharge a purely
 # structural detector (calls[-1]), so without this it would re-fire at every subsequent Stop forever.
 def _write_transcript(tmp_path, entries):
     import json as _json

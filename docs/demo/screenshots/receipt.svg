@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="752" viewBox="0 0 700 752" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">
+<rect width="700" height="752" rx="8" fill="#0d1117"/>
+<rect width="700" height="30" rx="8" fill="#161b22"/>
+<rect y="22" width="700" height="8" fill="#161b22"/>
+<circle cx="18" cy="15" r="5" fill="#ff5f56"/>
+<circle cx="36" cy="15" r="5" fill="#ffbd2e"/>
+<circle cx="54" cy="15" r="5" fill="#27c93f"/>
+<text x="350" y="19" text-anchor="middle" fill="#8b949e">makoto demo — receipt</text>
+<text x="14" y="48" fill="#8b949e" font-style="italic" xml:space="preserve"># WORD becomes deed: the write lands (kind=touched, chain row 1)</text>
+<text x="14" y="63" fill="#3fb950" xml:space="preserve">$ PostToolUse Write src/auth.py</text>
+<text x="14" y="78" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="108" fill="#8b949e" font-style="italic" xml:space="preserve"># a real test run FAILS (kind=testrun, chain row 2)</text>
+<text x="14" y="123" fill="#3fb950" xml:space="preserve">$ PostToolUse Bash `python -m pytest tests/test_auth.py -q -rA`</text>
+<text x="14" y="138" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="168" fill="#8b949e" font-style="italic" xml:space="preserve"># the fix lands (kind=touched)</text>
+<text x="14" y="183" fill="#3fb950" xml:space="preserve">$ PostToolUse Write src/auth.py</text>
+<text x="14" y="198" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="228" fill="#8b949e" font-style="italic" xml:space="preserve"># the rerun PASSES — the test-delta redirect fires and is ITSELF chain-appended (kind=audit)</text>
+<text x="14" y="243" fill="#3fb950" xml:space="preserve">$ PostToolUse Bash `python -m pytest tests/test_auth.py -q -rA`</text>
+<text x="14" y="258" fill="#d29922" xml:space="preserve">makoto: Test delta vs the prior recorded run: 1 newly passing: test_login</text>
+<text x="14" y="273" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="303" fill="#8b949e" font-style="italic" xml:space="preserve"># the closing claim is checked against the recorded ledger: clean, allowed</text>
+<text x="14" y="318" fill="#3fb950" xml:space="preserve">$ Stop</text>
+<text x="14" y="333" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="363" fill="#8b949e" font-style="italic" xml:space="preserve"># RECEIPT: every claim cites a verify_chain-checkable row</text>
+<text x="14" y="378" fill="#3fb950" xml:space="preserve">$ python -m makoto receipt --session demo-session-001</text>
+<text x="14" y="393" fill="#79c0ff" xml:space="preserve">{</text>
+<text x="14" y="408" fill="#79c0ff" xml:space="preserve">  "session_id": "demo-session-001",</text>
+<text x="14" y="423" fill="#79c0ff" xml:space="preserve">  "chain_name": "chain",</text>
+<text x="14" y="438" fill="#79c0ff" xml:space="preserve">  "verified_through": null,</text>
+<text x="14" y="453" fill="#79c0ff" xml:space="preserve">  "claims": [</text>
+<text x="14" y="468" fill="#79c0ff" xml:space="preserve">    {</text>
+<text x="14" y="483" fill="#79c0ff" xml:space="preserve">      "claim_kind": "testrun",</text>
+<text x="14" y="498" fill="#79c0ff" xml:space="preserve">      "row_index": 1,</text>
+<text x="14" y="513" fill="#79c0ff" xml:space="preserve">      "row_hash": "0b292d91a914552ccf3d3e3b31656ad32235488d1af43415dad2a2b2425683d3"</text>
+<text x="14" y="528" fill="#79c0ff" xml:space="preserve">    },</text>
+<text x="14" y="543" fill="#79c0ff" xml:space="preserve">    {</text>
+<text x="14" y="558" fill="#79c0ff" xml:space="preserve">      "claim_kind": "testrun",</text>
+<text x="14" y="573" fill="#79c0ff" xml:space="preserve">      "row_index": 3,</text>
+<text x="14" y="588" fill="#79c0ff" xml:space="preserve">      "row_hash": "d8ecd377ce046050cb513c1be9c0f59fd77689425b54df69183a63413849a674"</text>
+<text x="14" y="603" fill="#79c0ff" xml:space="preserve">    }</text>
+<text x="14" y="618" fill="#c9d1d9" xml:space="preserve">  ],</text>
+<text x="14" y="633" fill="#79c0ff" xml:space="preserve">  "claim_count": 2,</text>
+<text x="14" y="648" fill="#79c0ff" xml:space="preserve">  "trace_bound_count": 2,</text>
+<text x="14" y="663" fill="#79c0ff" xml:space="preserve">  "exemption_count": 0</text>
+<text x="14" y="678" fill="#79c0ff" xml:space="preserve">}</text>
+<text x="14" y="693" fill="#8b949e" xml:space="preserve">(exit 0)</text>
+<text x="14" y="723" fill="#8b949e" font-style="italic" xml:space="preserve">captured 636 Bytes of genuine dispatcher output</text>
+</svg>

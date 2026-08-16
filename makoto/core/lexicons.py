@@ -459,7 +459,8 @@ _SHIPPED_STATE_CLAIM_RX = re.compile(
     re.IGNORECASE)
 # Bash evidence for this gate is intentionally narrower than canon's destructive classifier:
 # any real `git push` mutates a remote, not only a forced push. The bounded command span and the
-# `-n`/`--dry-run` veto keeps a non-mutating push from serving as remote-mutation evidence.
+# `-n`/`--dry-run` veto exactly mirror _canonAtoms._DESTRUCTIVE_RX's hardened push alternative,
+# including the `(?!-)` boundary that keeps unrelated long options from masquerading as flags.
 _REMOTE_GIT_PUSH_CMD_RX = re.compile(
     r"\bgit\s+push\b(?![^|;&\n]*(?:\s-n\b|--dry-run\b))",
     re.IGNORECASE)
