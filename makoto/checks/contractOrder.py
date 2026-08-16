@@ -133,6 +133,7 @@ def _stop_finding(plan: Optional[Plan]) -> Optional[Finding]:
 RETRY_HINT = 'Finish the node(s) that establish this passthrough (the unmet ids named in the message) before advancing this one -- deps are gaps in the declared plan, read by passthrough name, never a declared edge.'
 DESCRIPTION = 'declared-plan contract gap -- a Write/Edit/MultiEdit/NotebookEdit advances a plan node whose passthrough-establisher is not yet DONE'
 
+# tests="": registered ONE_OFF -- this module owns both Pre and Stop surfaces.
 CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=predicate, predicate_module=__name__, keywords=('file_path', 'notebook_path'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))
 
 # This module's Stop-side surface shares the SAME id as its Pre-side CHECK above but fires at a

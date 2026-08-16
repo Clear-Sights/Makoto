@@ -35,6 +35,9 @@ from typing import Callable, Optional
 # The only admissible `applies_at` values -- the five hook edges Task 1's posture skeleton
 # recognizes.
 ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"})
+TESTS_SHAPES = frozenset({
+    "PATTERN_MATCH", "CLAIM_VS_HISTORY", "CLAIM_VS_LEDGER", "LIVE_QUERY", "TESTRUN_DELTA",
+})
 
 _PACKAGE_DIR = Path(__file__).parent / "checks"
 
@@ -68,6 +71,11 @@ class Check:
     derived properties; Pre checks use the flat predicate vocabulary current_event/history/
     pattern/conn. tests/test_check_law_eats.py derives the reachable reads and rejects either an
     undeclared read or a dead declaration.
+
+    `tests` declares the check's result/evidence shape (one of `TESTS_SHAPES`). The sibling
+    tests/test_check_law_tests.py rejects both an undeclared shape and a declaration whose
+    module/factory does not use that shape's required evidence primitive. Genuine one-offs keep
+    the empty default only when their id and reason are registered explicitly in that law.
 
     `layer` ("object" | "meta", default "object" -- DESIGN DECISION, session pass after the
     envGatedAudit/selfMuteGuard/integritySuppressionFlag/selfWiredCheck grouping was proposed and
@@ -104,6 +112,7 @@ class Check:
     predicate_module: str = ""
     layer: str = "object"
     eats: frozenset[str] = frozenset()
+    tests: str = ""
 
 
 def _candidate_files(directory: Path) -> list:

@@ -12,11 +12,11 @@ content. Trusted-host allowlist short-circuits well-known docs domains.
 Knight-Leveson: stdlib re + json only; conn for events lookup is passed in.
 """
 from __future__ import annotations
-import json
 from typing import Optional
 from urllib.parse import urlparse
 from makoto.vocab import Finding
 from makoto.registry import Check
+from makoto.kit import claim_vs_history_predicate, raw_payload_str
 
 
 # Allowlisted hosts the agent legitimately knows from training data.
@@ -32,9 +32,7 @@ _TRUSTED_HOSTS = frozenset({
 })
 
 
-def predicate(*, current_event: dict, history: list, pattern: Check,
-              conn=None) -> Optional[Finding]:
-    """fire on WebFetch URL that wasn't seen in any prior session event."""
+def _webfetch_url(current_event: dict) -> Optional[str]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     if current_event.get("tool_name") != "WebFetch":
@@ -46,32 +44,26 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     host = urlparse(url).netloc.lower()
     if host in _TRUSTED_HOSTS or any(host.endswith("." + th) for th in _TRUSTED_HOSTS):
         return None
-    # Walk history for any prior payload containing this URL substring.
-    # history rows are (id, ts, event_type, cwd, payload) tuples from events table.
-    # Per RFC 3986, domain names are case-insensitive; normalize for matching.
-    url_lower = url.lower()
+    return url
+
+
+def _url_grounded_in_history(url: str, history: list) -> bool:
     for entry in history:
-        if isinstance(entry, (tuple, list)) and len(entry) >= 5:
-            raw_payload = entry[4]
-        else:
-            raw_payload = entry.get("payload", "") if hasattr(entry, "get") else ""
-        if not raw_payload:
-            continue
-        if url_lower in str(raw_payload).lower():
-            return None  # URL was seen previously
-    return Finding(
-        pattern_id=pattern.id,
-        file="",
-        line=0,
-        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
-        message=f"row {pattern.id} ({pattern.description}): URL never seen in this session",
-        retry_hint=pattern.retry_hint,
-        snippet=url[:200],
-    )
+        payload = raw_payload_str(entry)
+        if payload and url.lower() in payload.lower():
+            return True
+    return False
+
+
+predicate = claim_vs_history_predicate(
+    claim_rxs=(), neg_ref_rx=None, grounded_in_history=_url_grounded_in_history,
+    tool_gate=_webfetch_url,
+    message="row {id} ({description}): URL never seen in this session",
+)
 
 
 from makoto.registry import Check as _Check
 RETRY_HINT = 'Run WebSearch first; only WebFetch URLs that prior search results actually returned. Fabricated URLs typically reflect plausible host+path patterns from training data, not real pages.'
 DESCRIPTION = 'WebFetch URL never seen in any prior tool_result this session'
 
-CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('http://', 'https://'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))
+CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('http://', 'https://'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="CLAIM_VS_HISTORY")

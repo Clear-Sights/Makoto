@@ -113,5 +113,6 @@ def relative_path_gate(text: str) -> Optional[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.relative_path_citation", applies_at="Stop", posture="ADVISE",
+               tests="PATTERN_MATCH",
                eats=frozenset({"text"}),
                may_block=True, run=lambda c: relative_path_gate(c.text))

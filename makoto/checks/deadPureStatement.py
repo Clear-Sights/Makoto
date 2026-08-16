@@ -437,4 +437,4 @@ def _run(ctx) -> list:
 # illusory statements); run_stop_checks normalizes a list exactly like a single finding.
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
-               eats=frozenset({"touched", "cwd", "fs_read"}))
+               eats=frozenset({"touched", "cwd", "fs_read"}), tests="PATTERN_MATCH")

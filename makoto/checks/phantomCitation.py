@@ -107,4 +107,4 @@ from makoto.registry import Check as _Check
 RETRY_HINT = "Add the citation as an Author-Year entry to the canonical CITATIONS.md this install wired (the `canonical_citations_path` config row — the packaged makoto/docs/CITATIONS.md by default)."
 DESCRIPTION = 'phantom citation — Author-Year not in the canonical CITATIONS.md set'
 
-CHECK = _Check(id='content.phantom_citation', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('et al', ' 19', ' 20'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))
+CHECK = _Check(id='content.phantom_citation', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('et al', ' 19', ' 20'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="PATTERN_MATCH")

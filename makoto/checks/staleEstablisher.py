@@ -31,6 +31,7 @@ import os
 from typing import Optional
 
 from makoto.registry import Check
+from makoto.kit import live_query_finding
 from makoto.substrate._planNode import DONE, Plan
 from makoto.verdict import ADVISE
 from makoto.vocab import Finding
@@ -71,10 +72,13 @@ def check(plan: Optional[Plan]) -> Optional[Finding]:
     return None
 
 
+run = live_query_finding(query=lambda plan: check(plan), posture_label="gate.stale_establisher")
+
 CHECK = Check(
     id="gate.stale_establisher",
     applies_at="Stop",
     posture=ADVISE,
     eats=frozenset({"plan"}),
-    run=lambda ctx: check(ctx.plan),
+    run=run,
+    tests="LIVE_QUERY",
 )

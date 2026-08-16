@@ -146,6 +146,13 @@ def derived_reads() -> dict[tuple[str, str], frozenset[str]]:
                 root_funcs = funcs
                 if edge != "Pre" and isinstance(root, ast.Name) and root.id in funcs:
                     root = funcs[root.id]
+                elif edge != "Pre" and isinstance(root, ast.Name):
+                    factory_run = getattr(module, root.id, None)
+                    if callable(factory_run):
+                        run_tree = ast.parse(textwrap.dedent(inspect.getsource(factory_run)))
+                        run_funcs = _functions(run_tree)
+                        root = next(iter(run_funcs.values()))
+                        root_funcs = {}
             assert root is not None, f"{path}: {check_id} has no analyzable entry point"
             context_names = None
             if edge != "Pre" and isinstance(root, (ast.Lambda, ast.FunctionDef, ast.AsyncFunctionDef)):

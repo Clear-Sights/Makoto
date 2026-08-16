@@ -179,5 +179,6 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="TESTRUN_DELTA",
                eats=frozenset({"text", "history"}),
                run=lambda c: named_test_gate(c.text, history=c.history))

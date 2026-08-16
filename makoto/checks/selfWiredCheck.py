@@ -3,6 +3,7 @@ import json
 import os
 from typing import Optional
 from makoto.vocab import Finding
+from makoto.kit import live_query_finding
 # The 2026-07-09 dedup pass performed exactly the hoist this module's old note asked for: the
 # wiring predicate now lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
@@ -119,6 +120,9 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None) -> Option
 # were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
 # guarantee still rests on posture=="ADVISE", same as always.
 from makoto.registry import Check as _Check
+run = live_query_finding(
+    query=lambda fs_read: self_wired_gate(fs_read), posture_label="gate.self_wired"
+)
 CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", may_block=True,
                eats=frozenset({"fs_read"}),
-               run=lambda c: self_wired_gate(c.fs_read), layer="meta")
+               run=run, layer="meta", tests="LIVE_QUERY")

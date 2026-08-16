@@ -400,6 +400,7 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_HISTORY",
                eats=frozenset({"history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_gate(c.history, transcript_path=c.transcript_path,
                                          session_id=c.session_id, state_root=c.state_root))

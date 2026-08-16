@@ -88,5 +88,6 @@ def fabricated_action_gate(text, *, history=()) -> Optional[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_HISTORY",
                eats=frozenset({"text", "history"}),
                run=lambda c: fabricated_action_gate(c.text, history=c.history))

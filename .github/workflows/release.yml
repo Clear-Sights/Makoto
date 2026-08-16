@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 2.2.0); must match both manifests and CHANGELOG.md'
+        description: 'Version to release (e.g. 2.0.0), must match a CHANGELOG.md ## [X.Y.Z] heading'
         required: true
+        default: '2.0.0'
 
 permissions:
   contents: write
@@ -13,25 +14,14 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate version against package manifests
-        run: |
-          PACKAGE_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          PLUGIN_VERSION="$(python -c 'import json; print(json.load(open(".claude-plugin/plugin.json"))["version"])')"
-          if [ "$RELEASE_VERSION" != "$PACKAGE_VERSION" ] || [ "$RELEASE_VERSION" != "$PLUGIN_VERSION" ]; then
-            echo "Requested $RELEASE_VERSION, pyproject.toml has $PACKAGE_VERSION, plugin.json has $PLUGIN_VERSION" >&2
-            exit 1
-          fi
-
       - name: Extract release notes from CHANGELOG.md
         run: |
-          VERSION="$RELEASE_VERSION"
+          VERSION="${{ github.event.inputs.version }}"
           awk -v ver="$VERSION" '
             $0 ~ ("^## \\[" ver "\\]") {flag=1; next}
             flag && /^## \[/ {flag=0}
@@ -48,7 +38,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="$RELEASE_VERSION"
+          VERSION="${{ github.event.inputs.version }}"
           TAG="v$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

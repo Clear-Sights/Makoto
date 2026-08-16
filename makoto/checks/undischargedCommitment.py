@@ -7,7 +7,7 @@ from makoto.vocab import (
     _NEGATION_RX, _UNIVERSAL_DONE_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _ENUM_BEFORE_HEAD_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.kit import DISCHARGE_EATS, _discharge_kwargs, _discharged, _path_components
+from makoto.kit import DISCHARGE_EATS, _discharged, _path_components, claim_vs_ledger_predicate
 
 
 # A version/variant rename suffix on a basename stem: parser_v2, config_old, handler-final, foo_copy.
@@ -115,7 +115,35 @@ def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys
     return None
 
 
+def _open_advance_claims(text, opens):
+    return opens or () if _advance_signal(text) else ()
+
+
+def _advance_discharged(claim, _c, *, touched_keys, fs_exists, empty_keys, fs_size) -> bool:
+    return _discharged(
+        claim["location"], touched_keys, fs_exists,
+        empty_keys=empty_keys, fs_size=fs_size,
+    ) or _adv_relocated_discharge(claim["location"], touched_keys)
+
+
+def _advance_finding(claim, _c):
+    loc_n = normalize_path(claim["location"])
+    return Finding(
+        pattern_id="gate.advance", file=loc_n, line=0, level="error",
+        message=(f"Advancing past an open commitment to {loc_n} with no recorded result — "
+                 "discharge it, or retract it with a checked reason."),
+        retry_hint="Touch the location, or retract the commitment with a valid reason (R/U).",
+    )
+
+
+run = claim_vs_ledger_predicate(
+    extract_claims=_open_advance_claims,
+    veto=_advance_discharged,
+    message=_advance_finding,
+)
+
+
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.advance", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=DISCHARGE_EATS | frozenset({"text", "opens"}),
-               run=lambda c: advance_gate(c.text, c.opens, **_discharge_kwargs(c)))
+               run=run, tests="CLAIM_VS_LEDGER")

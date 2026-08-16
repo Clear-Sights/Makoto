@@ -28,4 +28,4 @@ from makoto.registry import Check as _Check
 RETRY_HINT = "Open T-items use '[ ]'; completed use '[x]'. The literal text 'DEFERRED' on a completed checkbox is theater. Either complete the task or leave the box unchecked."
 DESCRIPTION = 'DEFERRED checkbox theater on open T-item'
 
-CHECK = _Check(id='content.deferred_checkbox_theater', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('DEFERRED', 'deferred'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))
+CHECK = _Check(id='content.deferred_checkbox_theater', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('DEFERRED', 'deferred'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="PATTERN_MATCH")

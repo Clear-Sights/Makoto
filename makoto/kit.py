@@ -588,6 +588,70 @@ def regex_file_predicate(
     return _predicate
 
 
+def claim_vs_history_predicate(
+    *, claim_rxs, neg_ref_rx, grounded_in_history, tool_gate, message,
+) -> Callable[..., Optional[Finding]]:
+    """Build a claim-vs-recorded-history Pre predicate.
+
+    ``claim_rxs`` is normally a tuple of compiled regexes.  A callable extractor is also
+    accepted for checks whose established claim grammar needs clause-aware negation handling.
+    An empty tuple means the subject returned by ``tool_gate`` is itself the claim.
+    """
+    def _predicate(*, current_event: dict, history: list,
+                   pattern: Check, conn=None) -> Optional[Finding]:
+        subject = tool_gate(current_event)
+        if subject is None:
+            return None
+        if callable(claim_rxs):
+            claims = claim_rxs(subject)
+        elif not claim_rxs:
+            claims = (subject,)
+        else:
+            claims = []
+            for rx in claim_rxs:
+                for match in rx.finditer(subject):
+                    if neg_ref_rx and neg_ref_rx.search(
+                        subject[max(0, match.start() - 80):match.end() + 40]
+                    ):
+                        continue
+                    claims.append(match.group(1) if match.groups() else match.group(0))
+        for claimed in claims:
+            if grounded_in_history(claimed, history):
+                continue
+            rendered = message(claimed, subject, pattern) if callable(message) else message.format(
+                claimed=claimed, id=pattern.id, description=pattern.description
+            )
+            return Finding(
+                pattern_id=pattern.id, file="", line=0, level="error", message=rendered,
+                retry_hint=pattern.retry_hint, snippet=str(claimed if not subject else subject)[:200],
+            )
+        return None
+    return _predicate
+
+
+def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Finding]]:
+    """Build a Stop check whose live query result is itself the evidence."""
+    input_name = query.__code__.co_varnames[0] if query.__code__.co_argcount else ""
+    if input_name == "plan":
+        def _check(c):
+            result = query(c.plan)
+            if result is None or isinstance(result, Finding):
+                return result
+            return Finding(pattern_id=posture_label, file="", line=0, level="advisory",
+                           message=f"{posture_label}: {result}")
+    elif input_name == "fs_read":
+        def _check(c):
+            result = query(c.fs_read)
+            if result is None or isinstance(result, Finding):
+                return result
+            return Finding(pattern_id=posture_label, file="", line=0, level="advisory",
+                           message=f"{posture_label}: {result}")
+    else:
+        raise TypeError("live query parameter must be named 'plan' or 'fs_read'")
+    _check.__module__ = query.__module__
+    return _check
+
+
 # ---- transient-vs-deterministic failure classification (formerly substrate/_failureClassifier.py)
 # The ship-bar the design review named for D1 (identical-retry interdiction, docs/DEFERRED.md).
 # Two design consultations converged on this exact requirement: a BLOCK-tier check denying a
@@ -777,6 +841,30 @@ def _discharged(location: str, touched_keys, fs_exists, *, empty_keys=None, fs_s
             return False                             # exists but empty -> no production discharge
         return True
     return False
+
+
+def claim_vs_ledger_predicate(
+    *, extract_claims, veto=_discharged, message,
+) -> Callable[..., Optional[Finding]]:
+    """Build a Stop check comparing extracted claims with the discharge ledger."""
+    def _run(c):
+        claims = extract_claims(c.text, c.opens)
+        for claim in claims:
+            if veto(
+                claim, c,
+                touched_keys=c.touched, fs_exists=c.fs_exists,
+                empty_keys=c.empty, fs_size=c.fs_size,
+            ):
+                continue
+            result = message(claim, c) if callable(message) else message.format(claim=claim)
+            if isinstance(result, Finding):
+                return result
+            return Finding(
+                pattern_id="", file="", line=0, level="error", message=result,
+            )
+        return None
+    _run.__module__ = extract_claims.__module__
+    return _run
 
 
 def resolve_in_worktree(loc, cwd):

@@ -8,7 +8,7 @@ version = "2.2.0"
 description = "Integrity hook for Claude Code — holds the agent's claims against its own logged deeds and blocks faked checks; every check ships at measured zero false positives"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{name = "Clear-Sights"}]
+authors = [{name = "skill-labV2"}]
 license = {text = "Apache-2.0"}
 keywords = ["claude-code", "guardrails", "integrity", "hooks"]
 classifiers = [
@@ -21,7 +21,7 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/Clear-Sights/Makoto"
+Homepage = "https://github.com/skill-labV2/makoto"
 
 [tool.setuptools]
 package-dir = {"makoto" = "makoto"}

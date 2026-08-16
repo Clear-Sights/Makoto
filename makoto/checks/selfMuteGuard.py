@@ -111,6 +111,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
 
 
 from makoto.registry import Check as _Check
+# tests="": registered ONE_OFF -- hardcoded self-mute immunity must not use universal routing.
 RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 

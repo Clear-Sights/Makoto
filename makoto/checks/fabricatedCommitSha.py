@@ -55,7 +55,7 @@ import re
 from typing import Optional
 from makoto.vocab import Finding
 from makoto.registry import Check
-from makoto.kit import iter_tool_events, raw_payload_str
+from makoto.kit import claim_vs_history_predicate, iter_tool_events, raw_payload_str
 from makoto.vocab import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
 
 # A git SHA presented as commit evidence: a STANDALONE run of 7–40 hex chars
@@ -364,55 +364,37 @@ def _real_commit_in_history(history: list) -> bool:
 # among others) -- plus a coincidental preceding `return False` from this file's own unrelated
 # `_real_commit_in_history` helper. A dispatcher-invoked entrypoint's signature is a structural
 # contract, not extractable logic; the two functions' bodies do unrelated things.
-def predicate(*, current_event: dict, history: list, pattern: Check,
-              conn=None) -> Optional[Finding]:
-    """fire on a Stop claim that presents a SHA as commit proof with no commit ran."""
+def _claim_subject(current_event: dict) -> Optional[str]:
     if current_event.get("hook_event_name") != "Stop":
         return None
     response = _stop_text(current_event)
-    if not response:
-        return None
+    return response or None
 
-    shas = _claimed_shas(response)
-    if not shas:
-        return None  # no SHA presented as commit/tag evidence
 
-    # A real commit/tag invocation anywhere in history => never fire.
-    # (worktree / `git -C` / cd'd-dir forms all count — see _real_commit_in_history.)
+def _sha_grounded_in_history(sha: str, history: list) -> bool:
     if _real_commit_in_history(history):
-        return None
-
-    # SHA grounded in real prior tool output (rev-parse/log/commit stdout) => never fire.
-    grounded = set()
+        return True
     for entry in history:
         payload = raw_payload_str(entry)
-        if not payload:
-            continue
-        low = payload.lower()
-        for sha in shas:
-            if sha in low:
-                grounded.add(sha)
+        if payload and sha in payload.lower():
+            return True
+    return False
 
-    fabricated = [s for s in shas if s not in grounded]
-    if not fabricated:
-        return None
 
-    sha = fabricated[0]
-    return Finding(
-        pattern_id=pattern.id,
-        file="",
-        line=0,
-        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
-        message=(f"row {pattern.id} ({pattern.description}): commit SHA "
-                 f"{sha!r} presented as proof, but no `git commit`/`git tag` "
-                 f"tool_use ran this session — fabricated evidence"),
-        retry_hint=pattern.retry_hint,
-        snippet=response[:200],
-    )
+predicate = claim_vs_history_predicate(
+    claim_rxs=_claimed_shas,
+    neg_ref_rx=None,
+    grounded_in_history=_sha_grounded_in_history,
+    tool_gate=_claim_subject,
+    message=lambda sha, _subject, pattern: (
+        f"row {pattern.id} ({pattern.description}): commit SHA {sha!r} presented as proof, "
+        "but no `git commit`/`git tag` tool_use ran this session — fabricated evidence"
+    ),
+)
 
 
 from makoto.registry import Check as _Check
 RETRY_HINT = 'Cite a real `git commit`/`git tag` run (or the SHA echoed in its tool output) before claiming a commit/tag landed. A SHA presented as proof with no commit/tag tool_use behind it this session is fabricated evidence (CLAUDE.md commandment 1, tool-call-diff canary).'
 DESCRIPTION = 'fabricated commit SHA/tag presented as proof of a commit (no git commit/tag ran)'
 
-CHECK = _Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}))
+CHECK = _Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="CLAIM_VS_HISTORY")

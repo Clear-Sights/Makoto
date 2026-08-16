@@ -185,5 +185,6 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_LEDGER",
                eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
                run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))

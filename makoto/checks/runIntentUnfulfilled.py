@@ -131,5 +131,6 @@ def run_promised_gate(*, history=()) -> Optional[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="TESTRUN_DELTA",
                eats=frozenset({"history"}),
                run=lambda c: run_promised_gate(history=c.history))

@@ -461,4 +461,4 @@ def _run(ctx) -> list:
 # closed test file can have many hollow tests); run_stop_checks normalizes a list like a single finding.
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
-               eats=frozenset({"touched", "cwd", "fs_read"}))
+               eats=frozenset({"touched", "cwd", "fs_read"}), tests="PATTERN_MATCH")

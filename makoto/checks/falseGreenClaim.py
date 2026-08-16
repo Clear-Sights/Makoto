@@ -38,6 +38,7 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
 
 
 from makoto.registry import Check as _Check
+# tests="": registered ONE_OFF -- claim-vs-history and test-run-delta genuinely straddle here.
 CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "testrun_output"}),
                run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output))

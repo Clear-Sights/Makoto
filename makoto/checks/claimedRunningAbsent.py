@@ -140,5 +140,6 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_HISTORY",
                eats=frozenset({"text", "history_all_agents"}),
                run=lambda c: claimed_running_gate(c.text, history=c.history_all_agents))

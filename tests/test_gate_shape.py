@@ -101,7 +101,7 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim",
                           "gate.claimed_running", "gate.run_promised", "gate.claimed_shipped"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
-                        "layer", "eats"}   # "object" | "meta" -- see Check's own docstring; only
+                        "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
                                    # content.self_mute_guard / gate.self_wired are "meta" today
 EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output",
                            "cwd", "fs_exists", "fs_size", "fs_read", "history",
@@ -113,7 +113,7 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output"
                            # own field doc)
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
     "claimedProduceAbsent.py": 2,
-    "undischargedCommitment.py": 4,
+    "undischargedCommitment.py": 7,
     "falseGreenClaim.py": 1,
     "silentlyDroppedCommitment.py": 6,
     "fabricatedToolAction.py": 3,

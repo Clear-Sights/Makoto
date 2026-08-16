@@ -73,6 +73,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_HISTORY",
                eats=frozenset({"text", "history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_fingerprint_block_gate(
                    c.text, c.history, transcript_path=c.transcript_path,

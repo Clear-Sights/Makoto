@@ -74,6 +74,7 @@ def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
     )
 
 
+# tests="": registered ONE_OFF -- this audits registry/loader completeness itself.
 CHECK = Check(
     id="gate.undeclared_falsifiable",
     applies_at="Stop",

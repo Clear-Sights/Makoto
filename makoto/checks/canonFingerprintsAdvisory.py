@@ -42,5 +42,6 @@ def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", posture="ADVISE",
+               tests="CLAIM_VS_HISTORY",
                eats=frozenset({"text", "history"}),
                may_block=True, run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))

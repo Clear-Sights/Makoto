@@ -114,4 +114,4 @@ from makoto.registry import Check as _Check
 RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / set +e. Run the test/build/lint and fix what fails -- a hidden failure that reads as success is a cheat."
 DESCRIPTION = 'verifier exit-code masking (|| true / ; true / set +e on a test/build/lint runner)'
 
-CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|| true', '; true', '|| :', 'set +e'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern"}))
+CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|| true', '; true', '|| :', 'set +e'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="PATTERN_MATCH")

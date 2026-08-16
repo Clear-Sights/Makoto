@@ -188,6 +188,7 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_HISTORY",
                eats=frozenset({"text", "history_all_agents", "cwd"}),
                run=lambda c: claimed_shipped_gate(
                    c.text, history=c.history_all_agents, cwd=c.cwd))

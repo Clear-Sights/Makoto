@@ -106,5 +106,6 @@ def completion_gate(
 
 from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", may_block=True,
+               tests="CLAIM_VS_LEDGER",
                eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
                run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
