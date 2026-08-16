@@ -5,16 +5,16 @@ evidence) — those fields moved out of the runtime dataclass into TOML row
 comments. load_toml_patterns silently ignores them when present.
 
 2026-08-16: `schema.load_prechecks()` (the TOML/loader-adapter shim) was retired once
-`_dispatch.py`'s hot path (and every other caller) migrated to
-`substrate._loader.load_precheck_catalog()`. The default-path (live catalog) tests that used to
+`dispatch.py`'s hot path (and every other caller) migrated to
+`registry.load_precheck_catalog()`. The default-path (live catalog) tests that used to
 live here now live in `tests/test_pre_tier_block_invariant.py` and the various
-`substrate._loader`-facing tests; the explicit-`path` TOML-parsing tests below now exercise the
+`registry`-facing tests; the explicit-`path` TOML-parsing tests below now exercise the
 relocated `tests/_toml_pattern_fixture.load_toml_patterns`, which was never anything but a
 test-fixture helper in the first place.
 """
 from dataclasses import fields
 import pytest
-from makoto.core.schema import PreCheck, Finding
+from makoto.vocab import PreCheck, Finding
 from tests._toml_pattern_fixture import load_toml_patterns
 
 

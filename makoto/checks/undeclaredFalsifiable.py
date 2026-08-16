@@ -26,9 +26,9 @@ from pathlib import Path
 from typing import Optional
 
 from makoto.substrate._declared import DECLARED_IDS
-from makoto.substrate._loader import Check, scan
-from makoto.verdict.posture import ADVISE
-from makoto.core.schema import Finding
+from makoto.registry import Check, scan
+from makoto.verdict import ADVISE
+from makoto.vocab import Finding
 
 
 def orphan_modules(*, package_dir: Optional[Path] = None) -> list:

@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from makoto.substrate._loader import load_precheck_catalog
-from makoto.substrate._loader import load_checks
+from makoto.registry import load_precheck_catalog
+from makoto.registry import load_checks
 
 README = (Path(__file__).resolve().parent.parent / "README.md").read_text()
 

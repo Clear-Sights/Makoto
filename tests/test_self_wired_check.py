@@ -20,7 +20,7 @@ from makoto.substrate.wiring import event_wired, read_plugin_manifest_hooks
 
 def _settings(pre=True, post=True, stop=True):
     def _entry(wired):
-        hooks = [{"type": "command", "command": "python3 -m makoto._dispatch"}] if wired \
+        hooks = [{"type": "command", "command": "python3 -m makoto.dispatch"}] if wired \
             else [{"type": "command", "command": "python3 -m ventura.adapters.hook_bridge"}]
         return {"matcher": "*", "hooks": hooks}
 
@@ -111,7 +111,7 @@ def test_all_three_missing_predicate_reports_all_three():
 def test_entry_dispatches_to_makoto_matches_install_semantics():
     assert _entry_dispatches_to_makoto({"_makoto_managed": True}) is True
     assert _entry_dispatches_to_makoto(
-        {"hooks": [{"type": "command", "command": "python3 -m makoto._dispatch"}]}) is True
+        {"hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}) is True
     assert _entry_dispatches_to_makoto(
         {"hooks": [{"type": "command", "command": "python3 -m ventura.adapters.hook_bridge"}]}) is False
     assert _entry_dispatches_to_makoto("not-a-dict") is False
@@ -229,7 +229,7 @@ def test_plugin_manifest_path_is_root_relative_hooks_hooks_json():
 
 def test_missing_makoto_events_direct_two_source():
     settings_hooks = {"PreToolUse": [{"matcher": "*", "hooks": [
-        {"type": "command", "command": "python3 -m makoto._dispatch"}]}]}   # only PreToolUse wired
+        {"type": "command", "command": "python3 -m makoto.dispatch"}]}]}   # only PreToolUse wired
     plugin_hooks_json = _plugin_manifest(pre=False, post=True, stop=False)   # only PostToolUse wired
     missing = _missing_makoto_events(settings_hooks, plugin_root="/fake/plugin/root",
                                       plugin_fs_read=_reader(plugin_hooks_json))
@@ -237,7 +237,7 @@ def test_missing_makoto_events_direct_two_source():
 
 
 def test_event_wired_helper_matches_entry_dispatches_semantics():
-    hooks = {"Stop": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto._dispatch"}]}]}
+    hooks = {"Stop": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}]}
     assert event_wired(hooks, "Stop") is True
     assert event_wired(hooks, "PreToolUse") is False
     assert event_wired("not-a-dict", "Stop") is False

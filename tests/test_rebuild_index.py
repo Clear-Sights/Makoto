@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import sqlite3
 
-from makoto.record import ledger
-from makoto.record.db import init_db
+from makoto.state import ledger
+from makoto.state.store import init_db
 from tests.rebuild_index import rebuild_ledger_table_from_chain
 
 

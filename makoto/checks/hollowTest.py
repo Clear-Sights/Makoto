@@ -41,7 +41,7 @@ from __future__ import annotations
 import ast
 
 from makoto.substrate._stdlib_ast_helpers import _callee_chain, iter_touched_python_sources
-from makoto.core.schema import Finding
+from makoto.vocab import Finding
 
 _NESTED_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 _BROAD_EXC_NAMES = ("Exception", "BaseException")
@@ -459,6 +459,6 @@ def _run(ctx) -> list:
 # A Stop gate (fires on the Stop hook, like every gate). Its `fn` is the AST analyzer rather than a
 # claim-vs-ledger predicate — mirrors gate.liveness's split exactly. `run` returns list[Finding] (a
 # closed test file can have many hollow tests); run_stop_checks normalizes a list like a single finding.
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
                eats=frozenset({"touched", "cwd", "fs_read"}))

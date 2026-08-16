@@ -1,4 +1,4 @@
-"""Tests for `makoto.verdict.configchange_verdict` — a pure predicate, not a live hook (see module
+"""Tests for `makoto.configchange` — a pure predicate, not a live hook (see module
 docstring for why: this is detection logic for a hypothetical future `ConfigChange` hook adapter
 that has NOT been wired into `.claude/settings.json`, per CLAUDE.md rule 4 this repo's dispatchers
 may not do that unilaterally). Every test below constructs a fake ConfigChange-shaped payload; none
@@ -8,12 +8,12 @@ against yet.
 from __future__ import annotations
 import json
 
-from makoto.verdict.configchange_verdict import ConfigChangeVerdict, configchange_verdict
+from makoto.configchange import ConfigChangeVerdict, configchange_verdict
 
 
 def _settings(pre=True, post=True, stop=True):
     def _entry(wired):
-        hooks = [{"type": "command", "command": "python3 -m makoto._dispatch"}] if wired \
+        hooks = [{"type": "command", "command": "python3 -m makoto.dispatch"}] if wired \
             else [{"type": "command", "command": "python3 -m ventura.adapters.hook_bridge"}]
         return {"matcher": "*", "hooks": hooks}
 

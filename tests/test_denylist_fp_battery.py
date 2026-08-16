@@ -20,7 +20,7 @@ from makoto.substrate._canonAtoms import (
     atom_test_run_green,
     atom_tool_timeout,
 )
-from makoto.substrate.io import is_failing_testrun
+from makoto.kit import is_failing_testrun
 
 
 def _call(name, tool_input, result=None):

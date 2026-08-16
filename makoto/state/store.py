@@ -2,7 +2,7 @@
 
 Idempotent: safe to call on a fresh DB or one already initialized. cmd_install
 invokes init_db() once per install; the dispatcher (Phase 5.3+) never runs DDL
-beyond the lazy-init bootstrap in _dispatch._ensure_db_initialized.
+beyond the lazy-init bootstrap in dispatch._ensure_db_initialized.
 
 Knight-Leveson: stdlib `sqlite3` only. No LLM, no HTTP.
 
@@ -132,7 +132,7 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
         # config seed rows (single source of truth for citations path + mtime).
         # Seed the mtime to the "-1" ALWAYS-STALE sentinel — NOT the file's current mtime.
         # init_db only CREATES the (empty) canonical_citations table; the first
-        # refresh_if_stale (run by _dispatch before any predicate) is what POPULATES it from
+        # refresh_if_stale (run by dispatch before any predicate) is what POPULATES it from
         # CITATIONS.md. Seeding the real mtime made refresh see "not stale" and skip that
         # initial rebuild, leaving canonical EMPTY so content.phantom_citation (error-level) false-fired on
         # every Author-Year citation as phantom. -1 guarantees the first refresh rebuilds; it
@@ -147,3 +147,23 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
         )
     finally:
         conn.close()
+
+
+# =============================================================================================
+# shared state-directory resolution (merged from record/state.py -- Stage 2 seam 1).
+# Reads $MAKOTO_STATE_DIR env var; defaults to $HOME/.claude/makoto_state/.
+# Importable by dispatch.py, citations refresh, and tests without circular imports
+# (Knight-Leveson: stdlib only).
+# =============================================================================================
+import os
+
+
+def _state_dir() -> Path:
+    """resolve the canonical state directory.
+
+    $MAKOTO_STATE_DIR overrides; default $HOME/.claude/makoto_state/.
+    """
+    env = os.environ.get("MAKOTO_STATE_DIR")
+    if env:
+        return Path(env)
+    return Path.home() / ".claude" / "makoto_state"

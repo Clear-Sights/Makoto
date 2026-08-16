@@ -5,7 +5,7 @@
 # ModuleNotFoundError exit 1 (observed live as a 100% hook-failure rate on the marketplace
 # install; repro pinned by tests/test_dispatch_shim.py). Running from the plugin root makes the
 # plugin's own package the first candidate. Failure direction when the plugin root itself is
-# unusable matches _dispatch's own HYBRID fail-open: guaranteed-loud stderr, empty envelope,
+# unusable matches dispatch's own HYBRID fail-open: guaranteed-loud stderr, empty envelope,
 # exit 0 — a broken install must never wedge the harness.
 # NB: a bare `cd ""` succeeds in sh, so the empty/unset case needs its own test.
 # MAKOTO_PYTHON env var picks the python interpreter; defaults to python3.
@@ -15,4 +15,4 @@ if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || ! cd "$CLAUDE_PLUGIN_ROOT" 2>/dev/null; t
   exit 0
 fi
 PYTHON_BIN="${MAKOTO_PYTHON:-python3}"
-exec "$PYTHON_BIN" -m makoto._dispatch
+exec "$PYTHON_BIN" -m makoto.dispatch

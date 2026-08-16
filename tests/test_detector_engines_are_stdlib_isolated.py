@@ -18,8 +18,8 @@ from pathlib import Path
 _CHECKS_DIR = Path(__file__).resolve().parent.parent / "makoto" / "checks"
 _SUBSTRATE_DIR = Path(__file__).resolve().parent.parent / "makoto" / "substrate"
 _ALLOWED_STDLIB = {"ast", "os", "tempfile", "pathlib", "__future__"}
-_ALLOWED_MAKOTO = {"makoto.substrate._shared", "makoto.substrate._stdlib_ast_helpers", "makoto.core.schema",
-                   "makoto.substrate._loader"}
+_ALLOWED_MAKOTO = {"makoto.context", "makoto.substrate._stdlib_ast_helpers", "makoto.vocab",
+                   "makoto.registry"}
 
 
 def _imported_modules(path: Path) -> set:

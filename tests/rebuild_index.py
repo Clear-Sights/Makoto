@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from makoto.record import ledger as _ledger
+from makoto.state import ledger as _ledger
 _LEDGER_KINDS = frozenset({"touched", "testrun", "value"})
 
 

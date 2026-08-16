@@ -62,9 +62,9 @@ def test_dispatch_shim_exists_and_executable():
 
 
 def test_dispatch_shim_invokes_makoto_dispatch():
-    """shim execs `python -m makoto._dispatch`."""
+    """shim execs `python -m makoto.dispatch`."""
     shim_text = (REPO_ROOT / "makoto" / "_dispatch_shim.sh").read_text()
-    assert "makoto._dispatch" in shim_text
+    assert "makoto.dispatch" in shim_text
     assert "MAKOTO_PYTHON" in shim_text or "python3" in shim_text
 
 
@@ -130,8 +130,8 @@ def test_plugin_description_predicate_count_matches_disk():
     pattern module), so each stated tier count is pinned to the live catalog here —
     bump the description when a check is added or removed.
     """
-    from makoto.substrate._loader import load_precheck_catalog
-    from makoto.substrate._loader import load_checks
+    from makoto.registry import load_precheck_catalog
+    from makoto.registry import load_checks
 
     def _live_gates():
         return [c for c in load_checks(edge="Stop") if c.may_block]

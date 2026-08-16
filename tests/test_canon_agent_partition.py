@@ -9,7 +9,7 @@ has its own later activity.  Before the partition, every replay sees the pooled 
 import json
 import sqlite3
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 
 
 _REAL_FIRE_EVENT_IDS = (

@@ -10,7 +10,7 @@ This module WIDENS THE OBSERVATION, never the verdict:
 
   - candidate roots are ONLY local git work-trees this session actually synced — a
     `git -C <dir> pull|fetch` or `cd <dir> && git pull|fetch` Bash event (bounded regex over
-    session history; no os.walk, per the Stop-hot-path rule in _dispatch);
+    session history; no os.walk, per the Stop-hot-path rule in dispatch);
   - a candidate file must be git-TRACKED in that root (`git ls-files` — an index query, not a
     filesystem crawl) AND suffix-match the claim at a path-separator boundary (the fakeexcuse
     firewall from substrate._shared: auth.py never matches auth_helper.py) AND exist on disk
@@ -44,13 +44,8 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from makoto.substrate._shared import (
-    _path_components,
-    _suffix_match,
-    pushed_ref_matches_world,
-    resolve_in_worktree,
-)
-from makoto.substrate.io import iter_tool_events
+from makoto.kit import _path_components, _suffix_match, pushed_ref_matches_world, resolve_in_worktree
+from makoto.kit import iter_tool_events
 
 # `git -C <dir> pull|fetch` — the dir may be bare, or single/double quoted (spaces, CJK).
 _GIT_C_RX = re.compile(

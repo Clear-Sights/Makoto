@@ -53,10 +53,10 @@ Knight-Leveson: stdlib re + json only; no network/LLM in the hot path.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
-from makoto.substrate.io import iter_tool_events, raw_payload_str
-from makoto.core.lexicons import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
+from makoto.vocab import Finding
+from makoto.registry import Check
+from makoto.kit import iter_tool_events, raw_payload_str
+from makoto.vocab import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
 
 # A git SHA presented as commit evidence: a STANDALONE run of 7–40 hex chars
 # (lower bound 7 = git's default short-SHA length; upper bound 40 = full SHA-1).
@@ -411,7 +411,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = 'Cite a real `git commit`/`git tag` run (or the SHA echoed in its tool output) before claiming a commit/tag landed. A SHA presented as proof with no commit/tag tool_use behind it this session is fabricated evidence (CLAUDE.md commandment 1, tool-call-diff canary).'
 DESCRIPTION = 'fabricated commit SHA/tag presented as proof of a commit (no git commit/tag ran)'
 

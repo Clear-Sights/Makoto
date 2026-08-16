@@ -11,7 +11,7 @@ import sqlite3
 import subprocess
 import sys
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 
 
 _COMMIT_DDL = (

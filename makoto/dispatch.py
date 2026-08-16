@@ -4,8 +4,8 @@ Pipeline:
   stdin -> parse JSON -> ensure DB exists (lazy init) -> connect (with retry)
   -> refresh citations -> INSERT event (lastrowid) -> SELECT recent slice
   -> keyword prefilter -> iterate candidate predicates -> fold worst outcome
-  through the configured posture (makoto.verdict.posture) -> render via the per-edge
-  wire table (makoto.verdict.wire) -> stdout JSON iff non-empty -> append audit row
+  through the configured posture (makoto.verdict's posture fold) -> render via the per-edge
+  wire table (makoto.verdict's wire tables) -> stdout JSON iff non-empty -> append audit row
   -> exit 0.
 
 main() is the thin orchestrator. Each stage is a small helper:
@@ -27,15 +27,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from makoto.core.schema import Finding
-from makoto.record.state import _state_dir
-from makoto.session import citations
-from makoto.record import audit
-from makoto.verdict import posture, wire
-from makoto.record.audit import AuditRow
-from makoto.substrate import factories
-from makoto.substrate._loader import load_checks, load_precheck_catalog
-from makoto.substrate._shared import GateContext
+from makoto.vocab import Finding
+from makoto.state.store import _state_dir
+from makoto.state import citations
+from makoto.state import audit
+from makoto import verdict
+from makoto.state.audit import AuditRow
+from makoto import kit as factories
+from makoto.registry import load_checks, load_precheck_catalog
+from makoto.context import GateContext, _history_for_agent, run_stop_checks
 
 
 _EVENT_MAP = {
@@ -78,7 +78,7 @@ def _record_exemption_sink(*, current_event: dict, conn, pattern_id: str, kind: 
         pass  # observability must never break the gate path
 
 
-# Inject the recorder at import: `python -m makoto._dispatch` imports this module before main(), so the
+# Inject the recorder at import: `python -m makoto.dispatch` imports this module before main(), so the
 # live hot path always records suppressed matches; a bare unit import of a precheck does not, keeping
 # pure detector calls side-effect-free (the pre-existing exempt-returns-None contract is untouched).
 factories.set_exemption_sink(_record_exemption_sink)
@@ -114,7 +114,7 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool) -
     is the loud floor; the audit-file write is best-effort (the fact-writer must never itself crash
     the hook)."""
     disposition = "BLOCK" if blocked else "loud-allow"
-    print(f"makoto._dispatch: {disposition} [{stage}] {reason}", file=sys.stderr)
+    print(f"makoto.dispatch: {disposition} [{stage}] {reason}", file=sys.stderr)
     try:
         audit.append_error(state_dir, event_id=None, pattern_id=f"dispatch.{stage}",
                            exc=_Unevaluable(f"{disposition}: {reason}"))
@@ -131,7 +131,7 @@ def _self_verify_chain(state_dir: Path) -> None:
     separately-certified change. A clean or absent/empty chain is vacuously silent (verify_chain's
     own contract). NEVER RAISES: a verification fault must not crash the hot path it protects."""
     try:
-        from makoto.record import ledger as _ledger
+        from makoto.state import ledger as _ledger
         broken_at = _ledger.verify_chain()
     except Exception as exc:
         _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}", blocked=False)
@@ -145,13 +145,13 @@ def _ensure_db_initialized(state_dir: Path, db_path: Path) -> bool:
     """create makoto.record.db on first call if absent. Return False on init failure (fail-open)."""
     if db_path.exists():
         return True
-    from makoto.record import db as _db_module
+    from makoto.state import store as _db_module
     citations_path = Path(__file__).parent / "docs" / "CITATIONS.md"
     try:
         _db_module.init_db(state_dir, citations_path)
         return True
     except Exception as exc:
-        print(f"makoto._dispatch: lazy init failed: {exc}", file=sys.stderr)
+        print(f"makoto.dispatch: lazy init failed: {exc}", file=sys.stderr)
         return False
 
 
@@ -159,7 +159,7 @@ def _connect_with_retry(db_path: Path):
     """open a write connection to makoto.record.db; retry on lock contention, then fail open.
 
     SQLite in WAL mode allows concurrent readers and a single writer. When two
-    `python -m makoto._dispatch` processes write concurrently, the loser raises
+    `python -m makoto.dispatch` processes write concurrently, the loser raises
     sqlite3.OperationalError ("database is locked") once busy_timeout elapses. We
     connect in autocommit mode (so citations.refresh_if_stale's explicit BEGIN/COMMIT is
     honored), retry briefly on a lock, then return None and let the caller fail open.
@@ -178,7 +178,7 @@ def _connect_with_retry(db_path: Path):
                 raise  # not a lock error — propagate
             if attempt < _LOCK_RETRY_ATTEMPTS - 1:
                 time.sleep(_LOCK_RETRY_BACKOFF_S * (attempt + 1))
-    print(f"makoto._dispatch: db locked, failing open ({last_exc})", file=sys.stderr)
+    print(f"makoto.dispatch: db locked, failing open ({last_exc})", file=sys.stderr)
     return None
 
 
@@ -242,48 +242,6 @@ def _select_recent(conn, session_id: str, event_id: int) -> list:
         [session_id, event_id]
     ).fetchall()
 
-
-def _history_for_agent(history, stop_payload: dict) -> list:
-    """Return only history positively attributable to the thread ending in ``stop_payload``.
-
-    Claude Code gives subagent hooks a non-empty top-level ``agent_id`` while the ordinary main
-    loop is structurally a plain ``Stop`` with no ``agent_id`` key.  Preserve that distinction:
-    exact-id subagents see exact-id rows, and a structurally plain main Stop sees only rows that
-    are likewise structurally agentless.  An empty/malformed id, a SubagentStop with no id, or an
-    undecodable row is ambiguous and contributes no history rather than entering a shared None
-    bucket.  This intentionally fails open for an unidentifiable thread: pooling would let another
-    agent's dangling PreToolUse synthesize failures and false-block every later Stop in a session.
-    """
-    if not isinstance(stop_payload, dict):
-        return []
-    if "agent_id" in stop_payload:
-        agent_id = stop_payload.get("agent_id")
-        if not isinstance(agent_id, str) or not agent_id.strip():
-            return []
-
-        def belongs(payload):
-            return payload.get("agent_id") == agent_id
-    elif stop_payload.get("hook_event_name") == "Stop":
-        def belongs(payload):
-            return "agent_id" not in payload
-    else:
-        return []
-
-    scoped = []
-    for row in history or ():
-        if isinstance(row, (tuple, list)) and len(row) > 4:
-            raw = row[4]
-        elif hasattr(row, "get"):
-            raw = row.get("payload")
-        else:
-            continue
-        try:
-            payload = raw if isinstance(raw, dict) else json.loads(raw)
-        except Exception:
-            continue
-        if isinstance(payload, dict) and belongs(payload):
-            scoped.append(row)
-    return scoped
 
 
 def _keyword_hit(pattern, raw_payload: str) -> bool:
@@ -354,7 +312,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     Predicate exceptions are captured to dispatch_errors.jsonl (audit.append_error)
     and skipped — they must never block agent work.
     """
-    # 2026-08-16: sourced directly from the checks/ catalog via substrate._loader --
+    # 2026-08-16: sourced directly from the checks/ catalog via registry --
     # schema.load_prechecks() (the TOML/adapter shim) is retired. See
     # tests/test_pre_tier_block_invariant.py for the BLOCK-only invariant this used to enforce
     # at load time.
@@ -400,166 +358,6 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     return findings
 
 
-def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
-    """Source + evaluate the completion / advance / green_claim gates for a Stop event.
-
-    Reads the REAL `last_assistant_message` field; records any newly-stated located
-    commitment (enter — records, never blocks); reads open commitments + the ledger's
-    touched keys; re-derives the live filesystem. Returns a list of gate Findings
-    (possibly empty). Fail-open at every step — a gate must never crash the hook or
-    block on uncertainty. The caller decides whether these findings BLOCK (only when
-    gates are explicitly enabled) or are audit-only (shadow mode for corpus FP mining).
-    """
-    try:
-        # Thread-boundary firewall: no Stop gate may linearize another agent's events into this
-        # agent's call stream. In particular, canon FD14-A must never synthesize a failure from a
-        # dangling PreToolUse owned by a sibling subagent. Preserved BEFORE narrowing as
-        # history_all_agents (below) -- gate.claimed_running's Bash-launch evidence deliberately
-        # pools every thread, a completed PostToolUse row carrying none of the dangling-PreToolUse
-        # risk this firewall exists to stop (see GateContext.history_all_agents).
-        history_all_agents = history
-        history = _history_for_agent(history, payload)
-        text = payload.get("last_assistant_message") or ""
-        if not text:
-            return []
-        sid = payload.get("session_id", "")
-        cwd = payload.get("cwd") or os.getcwd()
-        from makoto.session import commitments as _C
-        from makoto.record import ledger as _ledger
-        from makoto.checks import normalize_path
-        from makoto.verdict.retraction import surfaced_retraction_locations
-        commit = _C.source_commitment(text)
-        if commit:
-            try:
-                _C.record_commitment(conn, sid, commit, created_event_id=None)
-            except Exception:
-                pass
-        # Reconcile: clear any open commitment the assistant EXPLICITLY + reason-bound retracts
-        # (status='retracted') so the advance gate does not false-fire on a legitimately-dropped
-        # promise. Firewall: NORMALIZED-EQUALITY membership only (retracting cache.py never
-        # clears auth.py). Fail-open — a detector error must not crash the hook or mass-clear.
-        retracted = set()
-        try:
-            retracted = surfaced_retraction_locations(text)
-            if retracted:
-                for c in _C.open_commitments(conn, sid):
-                    if normalize_path(c["location"]) in retracted:
-                        _C.set_status(conn, c["commitment_key"], "retracted",
-                                      retract_param="surfaced-reason")
-        except Exception:
-            pass
-        opens = _C.open_commitments(conn, sid)
-        touched = _ledger.touched_keys(conn, sid)
-        empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
-        from makoto.session import plan as _plan
-        try:
-            plan = _plan.load_plan(conn, sid)                # SPEC-5: the declared contract Plan
-        except Exception:
-            plan = None                                      # fail-open per-store, like every other read above
-        from makoto.session import planItems as _plan_items
-        try:
-            _plan_items.sync_plan_items(conn, sid, text)     # source/discharge label-shaped commitments
-            open_plan_items = _plan_items.open_plan_items(conn, sid)
-        except Exception:
-            open_plan_items = []                             # fail-open per-store, like every other read above
-
-        # cwd-first, and on a miss resolve against git work-trees this session synced
-        # (checks/_worldpaths.py) — a file produced remotely over ssh and landed here via
-        # `git pull` is on disk under a repo root, not under cwd, and a bare-name claim
-        # ("index.md") false-blocked gate.completion (issue #2). Observation widens; the
-        # verdict doesn't: every alternate path still ends in a live os.path.exists.
-        _wp = {"roots": None, "cache": {}}
-
-        def _world_path(p):
-            if p in _wp["cache"]:
-                return _wp["cache"][p]
-            full = os.path.join(cwd, p)
-            try:
-                if not os.path.exists(full):
-                    if _wp["roots"] is None:
-                        from makoto.checks._worldpaths import synced_repo_roots
-                        _wp["roots"] = synced_repo_roots(history, cwd)
-                    if _wp["roots"]:
-                        from makoto.checks._worldpaths import resolve_in_synced_repos
-                        alt = resolve_in_synced_repos(p, _wp["roots"])
-                        if alt:
-                            full = alt
-            except Exception:
-                pass                                     # resolution failure -> original verdict
-            _wp["cache"][p] = full
-            return full
-
-        def fs_exists(p):
-            try:
-                return os.path.exists(_world_path(p))
-            except Exception:
-                return False
-
-        def fs_size(p):
-            try:
-                full = _world_path(p)
-                return os.path.getsize(full) if os.path.isfile(full) else None
-            except Exception:
-                return None
-
-        def fs_read(p):
-            try:
-                full = _world_path(p)
-                if os.path.isfile(full):
-                    return open(full, encoding="utf-8", errors="replace").read()
-            except Exception:
-                pass
-            return None
-
-        # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
-        # edge (2026-07-10: unified via checks._loader.load_checks, retiring the former
-        # load_stopchecks()-only loop -- this ALSO now naturally includes staleEstablisher and
-        # undeclaredFalsifiable, formerly special-cased direct-call/never-invoked carve-outs below
-        # this comment, since neither exported a GATE and load_stopchecks() never discovered them;
-        # `may_block=False` on both keeps their pattern_id structurally out of
-        # `_blocking_gate_ids()` regardless of this unification, exactly as before). Each gate
-        # module owns its own adapter (GateContext -> the gate's heterogeneous signature), so this
-        # loop never names a gate. gate.dropped resolves against the agent's OWN ledger
-        # (touched_keys) + cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an unbounded
-        # os.walk (a Stop-hot-path landmine). meaning_gate / hidden_retraction were CUT (io-purge
-        # B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history is the
-        # recovery path.
-        ctx = GateContext(
-            text=text, touched=touched, empty=empty, opens=opens,
-            testrun_output=_ledger.latest_testrun(conn, sid),
-            cwd=cwd, fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
-            history=history,   # faithful events-table rows (A1.3) — fabrication gates walk this
-            history_all_agents=history_all_agents,   # unnarrowed twin — see GateContext's own doc
-            # Additive decode-layer extension (observability-only, no gate reads these yet):
-            # permission_mode/agent_id/agent_type are confirmed-real top-level hook payload
-            # fields (Claude Code hooks reference) that _dispatch.py never extracted before.
-            permission_mode=payload.get("permission_mode"),
-            agent_id=payload.get("agent_id"),
-            agent_type=payload.get("agent_type"),
-            plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
-            session_id=sid, transcript_path=payload.get("transcript_path"),
-            state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
-            open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
-        )
-        out = []
-        for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):
-            try:
-                finding = check.run(ctx)
-            except Exception:
-                continue   # fail-open PER CHECK: one check's fault must not suppress the others
-            # CHECK.run -> Optional[Finding] | list[Finding]: most gates yield one finding, but
-            # gate.liveness yields a list (a closed unit can have many illusory statements).
-            # Normalize: a list/tuple is extended, a single finding appended, None ignored.
-            if finding is None:
-                continue
-            if isinstance(finding, (list, tuple)):
-                out.extend(finding)
-            else:
-                out.append(finding)
-        return out
-    except Exception:
-        return []   # fail-open: gates never crash the hook
-
 
 # JIT conventions delivery: the installed CLAUDE.md block carries only the 3-line law; each
 # check's convention + the `makoto-allow` escape hatch arrive HERE, at the moment they bind.
@@ -587,10 +385,10 @@ def _jit_hint(finding: Finding) -> str:
     return "\n".join(parts)
 
 
-_OUTCOME_FOR_LEVEL = {"error": posture.BLOCK, "advisory": posture.ADVISE}
-_OUTCOME_RANK = {posture.BLOCK: 3, posture.ASK: 2, posture.ADVISE: 1, posture.ALLOW: 0}
-# The live Claude Code hook-event name -> the edge name wire.dispatch_posture expects. Only
-# PreToolUse renames (to "Pre"); Stop/SubagentStop pass through unchanged (wire.py's Stop table
+_OUTCOME_FOR_LEVEL = {"error": verdict.BLOCK, "advisory": verdict.ADVISE}
+_OUTCOME_RANK = {verdict.BLOCK: 3, verdict.ASK: 2, verdict.ADVISE: 1, verdict.ALLOW: 0}
+# The live Claude Code hook-event name -> the edge name verdict.dispatch_posture expects. Only
+# PreToolUse renames (to "Pre"); Stop/SubagentStop pass through unchanged (verdict's Stop wire table
 # serves both, keyed by the SAME edge string "Stop"/"SubagentStop" it also echoes as hook_name).
 _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post", "Stop": "Stop",
                 "SubagentStop": "SubagentStop"}
@@ -603,7 +401,7 @@ _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post", "Stop": "Stop",
 def _recheck_certificate_enabled() -> bool:
     """Opt-in (OFF by default, mirroring the MAKOTO_DISABLE_* switch parsing): when
     MAKOTO_RECHECK_CERTIFICATE=1, `_emit_decision` re-verifies its own folded verdict via
-    `makoto.verdict.recheck.recheck_certificate` before writing it to the wire. A mismatch
+    `makoto.verdict.recheck_certificate` before writing it to the wire. A mismatch
     RAISES (recheck.py's deliberate not-fail-open rule) — which is why this is opt-in: with the
     flag unset, production hook behavior is provably unchanged (this predicate is the only new
     code on the hot path, and it cannot raise)."""
@@ -617,7 +415,7 @@ def _worst_finding(findings: list[Finding]) -> Optional[tuple[str, Finding]]:
     posture-vocabulary's own fail-open rule for an unrecognized outcome."""
     best = None
     for f in findings:
-        outcome = _OUTCOME_FOR_LEVEL.get(f.level, posture.ALLOW)
+        outcome = _OUTCOME_FOR_LEVEL.get(f.level, verdict.ALLOW)
         if best is None or _OUTCOME_RANK[outcome] > _OUTCOME_RANK[best[0]]:
             best = (outcome, f)
     return best
@@ -625,41 +423,41 @@ def _worst_finding(findings: list[Finding]) -> Optional[tuple[str, Finding]]:
 
 def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
                    permission_mode=None) -> None:
-    """Fold the worst fired outcome through the configured MAKOTO_MODE posture (posture.py) and
-    render it via wire.dispatch_posture's per-edge table, writing the body to stdout iff non-empty.
+    """Fold the worst fired outcome through the configured MAKOTO_MODE posture (makoto.verdict) and
+    render it via verdict.dispatch_posture's per-edge table, writing the body to stdout iff non-empty.
 
     This is the real posture pipeline (SPEC-5 Task 8), replacing the old single ad-hoc
     "decision":"block" shape that main() used identically for every edge. A BLOCK outcome carries
     the finding's message plus its JIT hint (convention text / makoto-allow hatch / conventions
     pointer — the same text `_build_decision` used to put in "retry_hint") as the Decision's
-    `.detail`, so wire.py's per-edge renderer surfaces it in place of its constant reason text.
+    `.detail`, so verdict's per-edge wire renderer surfaces it in place of its constant reason text.
     An ADVISE/ASK outcome at an edge whose table has no entry for it (e.g. ADVISE at Stop/
-    SubagentStop — everything but BLOCK renders `{}` there by wire.py's own design) — and no
+    SubagentStop — everything but BLOCK renders `{}` there by the wire tables' own design) — and no
     findings at all — both fall through to "write nothing", matching the old None-decision case.
 
-    `permission_mode` (D6, additive): threaded into `posture.apply` so a session running
+    `permission_mode` (D6, additive): threaded into `verdict.apply` so a session running
     bypassPermissions/dontAsk is clamped to STRICT regardless of the operator's configured
-    MAKOTO_MODE — see `posture.is_oversight_clamped`'s own docstring for why.
+    MAKOTO_MODE — see `verdict.is_oversight_clamped`'s own docstring for why.
     """
     worst = _worst_finding(findings)
     if worst is None:
         return
     outcome, finding = worst
     detail = finding.message
-    if outcome == posture.BLOCK:
+    if outcome == verdict.BLOCK:
         hint = _jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
-    mode = posture.posture()
-    folded = posture.apply(posture.Decision(outcome, detail), mode,
+    mode = verdict.posture()
+    folded = verdict.apply(verdict.Decision(outcome, detail), mode,
                            permission_mode=permission_mode)
     if _recheck_certificate_enabled():
         # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
         # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
         # a fold mismatch never reaches stdout. recheck_certificate raises on mismatch by
-        # design (see makoto/verdict/recheck.py); that raise is unreachable unless
+        # design (see makoto.verdict's recheck section); that raise is unreachable unless
         # MAKOTO_RECHECK_CERTIFICATE is explicitly set.
-        from makoto.verdict.recheck import VerdictCertificate, recheck_certificate
+        from makoto.verdict import VerdictCertificate, recheck_certificate
         recheck_certificate(VerdictCertificate(
             findings=tuple(findings),
             mode=mode,
@@ -667,7 +465,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             claimed_outcome=str(folded),
             claimed_detail=getattr(folded, "detail", ""),
         ))
-    body = wire.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
+    body = verdict.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
     if body:
         (stream or sys.stdout).write(json.dumps(body))
 
@@ -685,8 +483,8 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
     # D6: record the clamp -- never override softening SILENTLY. None (the common case) when
     # this event's permission_mode isn't one of the two reduced-oversight modes.
     oversight_clamp = None
-    if posture.is_oversight_clamped(permission_mode):
-        oversight_clamp = {"active": True, "configured_mode": posture.posture(),
+    if verdict.is_oversight_clamped(permission_mode):
+        oversight_clamp = {"active": True, "configured_mode": verdict.posture(),
                            "permission_mode": permission_mode}
     row = AuditRow(
         ts=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -709,7 +507,7 @@ def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
     artifact. SessionStart never blocks — it is an admission step, not a gate — so this always
     completes silently regardless of whether a plan was actually declared."""
     try:
-        from makoto.session import plan as _plan
+        from makoto.state import plan as _plan
         _plan.declare_from_session_artifact(
             payload.get("cwd") or os.getcwd(),
             payload.get("session_id", ""),
@@ -717,7 +515,7 @@ def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
             source=payload.get("source", ""),
         )
     except Exception as exc:
-        print(f"makoto._dispatch: plan declare failed (non-fatal): {exc}",
+        print(f"makoto.dispatch: plan declare failed (non-fatal): {exc}",
               file=sys.stderr)
 
 
@@ -730,11 +528,11 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     makoto/citations.py; refresh_if_stale upstream and record_update below are
     separate call sites and stay.)"""
     try:
-        from makoto.record import ledger as _ledger
-        from makoto.substrate.io import bash_output_text, is_test_runner
-        from makoto.substrate._testDelta import compute_delta
+        from makoto.state import ledger as _ledger
+        from makoto.kit import bash_output_text, is_test_runner
+        from makoto.kit import compute_delta
         from makoto.checks.contractOrder import _LOCATING_TOOLS, _event_location
-        from makoto.substrate._shared import _path_components
+        from makoto.kit import _path_components
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
         delta_finding = None
@@ -767,10 +565,10 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         # SAME resolution contractOrder.py's Pre-gap-guard already uses (`_event_location`/
         # `Plan.resolve`), imported rather than duplicated -- this orchestrator carries no
         # L2-import firewall (contractOrder.py's own docstring scopes that firewall to discovered
-        # Stop GATE modules, which _dispatch.py is not). A no-op when the tool isn't a locating
+        # Stop GATE modules, which dispatch.py is not). A no-op when the tool isn't a locating
         # one, nothing resolves, or (advance side) no plan is declared.
         if payload.get("tool_name") in _LOCATING_TOOLS:
-            from makoto.session import plan as _plan
+            from makoto.state import plan as _plan
             loc = _event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
             if loc is not None:
                 if _path_components(loc)[-2:] == [".claude", "makoto-plan.jsonl"]:
@@ -791,7 +589,7 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         # transition discharges it, and planItemDrift.py's ADVISORY Stop reminder then
         # surfaces anything still open. Same fail-open umbrella as the ledger write.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
-            from makoto.session import planItems as _plan_items
+            from makoto.state import plan as _plan_items
             _plan_items.record_task_event(conn, sid, payload)
         if delta_finding is not None:
             delta_finding = replace(delta_finding, source_event_id=event_id)
@@ -803,7 +601,7 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
             # fired on the wire correctly; it just never left a record of having fired.
             _record_audit(state_dir, [delta_finding], payload)
     except Exception as exc:
-        print(f"makoto._dispatch: ledger update failed (non-fatal): {exc}",
+        print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)
 
 

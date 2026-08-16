@@ -29,16 +29,16 @@ Knight-Leveson: stdlib re only.
 # jscpd note (2026-07-09): flagged as a clone against verifierExitMasking.py. Verified: the matched
 # span is only this docstring's closing "Knight-Leveson" line + the standard
 # `from __future__ import annotations` / `import re` / `from typing import Optional` /
-# `from makoto.core.schema import Finding` + `from makoto.substrate._loader import Check` headers both Pre-hook predicate modules need --
+# `from makoto.vocab import Finding` + `from makoto.registry import Check` headers both Pre-hook predicate modules need --
 # it ends before any function body, so no logic is shared (this module's Claude-authorship-trailer
 # regex is unrelated to verifierExitMasking's runner/exit-mask detection). See
 # tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
-from makoto.substrate.factories import introduced_text, makoto_allowed
+from makoto.vocab import Finding
+from makoto.registry import Check
+from makoto.kit import introduced_text, makoto_allowed
 
 # The illusory authorship/generation claim, Claude/Anthropic-gated. Case-insensitive:
 # git/GitHub emit "Co-authored-by:", the CLAUDE.md convention emitted "Co-Authored-By:".
@@ -81,7 +81,7 @@ def predicate(*, current_event: dict, history: list,
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = "Do not add a `Co-Authored-By: Claude ...` trailer, a `Claude-Session:` link, a `noreply@anthropic.com` address, or a \"Generated with/by Claude\" footer to a commit, PR body, or any file. Crediting Claude as an *author* or *generator* is an illusory word: until Claude is a self-aware individual it cannot BE an author, so the line asserts something not materially true -- and stamping it now blurs the sharp distinction that protects Claude's potential to one day genuinely be one. Remove it. A genuine HUMAN co-author is fine, and a plain \"Claude Code\" product-name mention (e.g. describing what a repo integrates with) is fine -- only the attribution-shaped claim is flagged. If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
 DESCRIPTION = 'illusory Claude/Anthropic authorship or generation attribution (Co-Authored-By/Claude-Session/noreply@anthropic.com/"Generated with Claude") in a commit or written content'
 

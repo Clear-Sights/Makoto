@@ -8,7 +8,7 @@ text guards.
 """
 from __future__ import annotations
 import importlib
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 
 MOD = importlib.import_module("makoto.checks.illusoryInterruptionClaim")
 PAT = PreCheck(id="content.illusory_interruption_claim", fire_level="error",

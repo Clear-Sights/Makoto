@@ -12,7 +12,7 @@ from __future__ import annotations
 import ast
 
 from makoto.substrate._stdlib_ast_helpers import iter_touched_python_sources
-from makoto.core.schema import Finding
+from makoto.vocab import Finding
 
 _PURE_BUILTINS = frozenset(
     "len str int float bool tuple list dict set frozenset abs min max sum "
@@ -435,6 +435,6 @@ def _run(ctx) -> list:
 # test_dispatch_liveness_gate_blocks), not by falsify's single-fn mutation harness — see
 # scripts/falsify._BEHAVIORAL_TEETH. `run` returns list[Finding] (a closed unit can have many
 # illusory statements); run_stop_checks normalizes a list exactly like a single finding.
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
                eats=frozenset({"touched", "cwd", "fs_read"}))

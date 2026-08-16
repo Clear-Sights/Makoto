@@ -231,7 +231,7 @@ def test_first_firing_blocks_even_with_a_ready_ack_in_the_transcript(tmp_path):
 def test_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
     """PLANT the fault (first Stop fires and gets recorded), THEN a real ack turn -> the SECOND
     Stop's evaluation must be silent, and must chain-append a release.operator row."""
-    from makoto.record import ledger
+    from makoto.state import ledger
     first = canon_fingerprint_block_gate("", [_DESTRUCTIVE_ROW], session_id="s1", state_root=tmp_path)
     target_msg = next(f.message for f in first if f.message.startswith("canon.notestedit_destruct:"))
     ledger.append({"kind": "audit", "session_id": "s1", "ts": "2026-07-07T00:00:00Z",
@@ -258,7 +258,7 @@ def test_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
 def test_a_forged_synthetic_ack_never_silences_the_gate(tmp_path):
     """A `<system-reminder>`-wrapped or interrupted-request-shaped turn containing the exact ack
     token must NOT discharge -- only a genuine host-written user turn can."""
-    from makoto.record import ledger
+    from makoto.state import ledger
     first = canon_fingerprint_block_gate("", [_DESTRUCTIVE_ROW], session_id="s1", state_root=tmp_path)
     target_msg = next(f.message for f in first if f.message.startswith("canon.notestedit_destruct:"))
     ledger.append({"kind": "audit", "session_id": "s1", "ts": "2026-07-07T00:00:00Z",

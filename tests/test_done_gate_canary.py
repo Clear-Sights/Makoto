@@ -8,7 +8,7 @@ the cited file against payload['cwd'] (not the process cwd).
 """
 import sqlite3
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 
 
 def _conn():

@@ -1,4 +1,4 @@
-"""makoto.substrate._loader — the flat checks/ package's own discovery mechanism (SPEC-5 Task 2).
+"""makoto.registry — the flat checks/ package's own discovery mechanism (SPEC-5 Task 2).
 
 A check module is any `.py` file directly under `makoto/checks/` whose name does NOT start
 with `_` (package plumbing -- `__init__.py`, `_loader.py`, `_primitives.py`, `_declared.py`,
@@ -6,14 +6,14 @@ and any future underscore-prefixed helper -- is never a detector module and is s
 scan). A live check module exposes a module-level `CHECK` object with three duck-typed
 attributes: `.id` (str), `.applies_at` (one of Pre/Post/Stop/SubagentStop/SessionStart), and
 `.posture` (this check's own native outcome tier before the operator's configured MAKOTO_MODE
-posture folds over it -- see `makoto.verdict.posture`'s OUTCOME vocabulary). A candidate file that fails
+posture folds over it -- see `makoto.verdict`'s OUTCOME vocabulary). A candidate file that fails
 to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently skipped
 (fail-open, matching every other loader/gate in this codebase) -- `checks.undeclaredFalsifiable`
 (SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
 of silence.
 
 This module is now the SOLE discovery path for both edges (2026-08-16): `schema.load_prechecks`
-has been retired, and `_dispatch.py`'s Pre-tier predicate loop, Stop-finding loop, and
+has been retired, and `dispatch.py`'s Pre-tier predicate loop, Stop-finding loop, and
 `_blocking_gate_ids()` all call `load_checks(edge=...)` directly -- no second catalog, no
 schema.py-owned TOML/adapter layer left in the hot path. Stop-edge discovery has run entirely
 through this module since 2026-07-10 (the former `load_stopchecks()`/`GATE`-export mechanism,
@@ -36,7 +36,7 @@ from typing import Callable, Optional
 # recognizes.
 ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"})
 
-_PACKAGE_DIR = Path(__file__).parent.parent / "checks"
+_PACKAGE_DIR = Path(__file__).parent / "checks"
 
 
 @dataclass(frozen=True)
@@ -89,7 +89,7 @@ class Check:
     folding behavior -- selfMuteGuard's makoto-allow immunity is already hardcoded in its own
     predicate (never calls the shared `makoto_allowed` path), and selfWiredCheck is Stop-tier
     ADVISE (never BLOCK) and never reads `makoto-allow` at all, so neither needs the fold logic
-    touched to be correct. Wiring `layer` into `makoto.verdict.posture.apply()`'s fold rules
+    touched to be correct. Wiring `layer` into `makoto.verdict.apply()`'s fold rules
     (e.g. a meta BLOCK never softening below ASK under LOOSE/SILENT) is a separate, higher-
     blast-radius change affecting all 32 checks' shared fold path -- deliberately NOT bundled
     into this additive schema field."""
@@ -240,7 +240,7 @@ def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = Non
 
 def load_precheck_catalog(*, package_dir: Optional[Path] = None) -> list:
     """Every live Pre-tier `CHECK` with a `predicate_module` set -- the keyword-prefiltered
-    detector catalog `_dispatch._run_predicates` (and `install.py`/`__main__.py`'s catalog
+    detector catalog `dispatch._run_predicates` (and `install.py`/`__main__.py`'s catalog
     inspection commands) consume. Replaces `schema.load_prechecks()`'s old default-path
     behavior (retired 2026-08-16): the invariant it used to enforce at load time (every
     Pre-tier check must be `posture == BLOCK` -- makoto has no non-blocking Pre tier) is no

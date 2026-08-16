@@ -10,13 +10,14 @@ subagent", surfaced here as the derived `GateContext.is_subagent` convenience.
 """
 import sqlite3
 
-import makoto._dispatch as _dispatch
-from makoto.substrate._loader import Check
-from makoto.substrate._shared import GateContext
+import makoto.dispatch as dispatch
+import makoto.context as _context
+from makoto.registry import Check
+from makoto.context import GateContext
 
 
 def _setup_state(tmp_path):
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -58,13 +59,13 @@ def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(
     state_dir = _setup_state(tmp_path)
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
-    monkeypatch.setattr(_dispatch, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
+    monkeypatch.setattr(_context, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
     payload = {
         "hook_event_name": "Stop", "session_id": "s1", "cwd": str(tmp_path),
         "last_assistant_message": "done.",
         "permission_mode": "acceptEdits", "agent_id": "sub-1", "agent_type": "security-reviewer",
     }
-    _dispatch.run_stop_checks(conn, payload, history=())
+    dispatch.run_stop_checks(conn, payload, history=())
     conn.close()
     assert len(captured) == 1
     ctx = captured[0]
@@ -78,12 +79,12 @@ def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(tmp_path, mo
     state_dir = _setup_state(tmp_path)
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     captured: list = []
-    monkeypatch.setattr(_dispatch, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
+    monkeypatch.setattr(_context, "load_checks", lambda edge=None: [_spy_stopcheck(captured)])
     payload = {
         "hook_event_name": "Stop", "session_id": "s2", "cwd": str(tmp_path),
         "last_assistant_message": "done.",
     }
-    _dispatch.run_stop_checks(conn, payload, history=())
+    dispatch.run_stop_checks(conn, payload, history=())
     conn.close()
     assert len(captured) == 1
     ctx = captured[0]

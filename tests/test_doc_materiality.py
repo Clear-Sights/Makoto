@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from makoto.__main__ import build_parser
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.registry import load_precheck_catalog
 
 REPO = Path(__file__).resolve().parent.parent
 

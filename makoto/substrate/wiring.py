@@ -6,7 +6,7 @@ checks/selfWiredCheck.py (the self-defense gate that detects partial stripping).
 2026-07-09 from the byte-for-byte duplicate both files carried: selfWiredCheck's own module
 note asked for exactly this ("a future refactor that hoists both to a shared L0 module would
 let this duplication go away") -- the gate-side layering firewall
-(tests/test_gate_shape.py, ALLOWED_IMPORT_ROOTS) forbids a gate importing install.py's
+(tests/test_import_direction.py, the pipeline-order firewall) forbids a gate importing install.py's
 lifecycle machinery, but an L0 primitive module is precisely what the firewall allowlists.
 Stdlib-only, no makoto-internal imports: safe for anything to depend on.
 """
@@ -27,7 +27,7 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 def entry_dispatches_to_makoto(entry) -> bool:
     """True iff ONE hook entry functionally reaches makoto's dispatch -- the managed-flag entry
     `makoto install` writes, OR a flag-less hand-wired/shim entry whose command names makoto
-    (`.../makoto_state/dispatch.sh`, `python -m makoto._dispatch`). Keying on the flag alone
+    (`.../makoto_state/dispatch.sh`, `python -m makoto.dispatch`). Keying on the flag alone
     lies on a shim-wired device (status: hooks_wired=false while firing, fixed v1.2.1;
     install: a duplicate entry double-dispatching every event, the same bug on the write side)."""
     if not isinstance(entry, dict):

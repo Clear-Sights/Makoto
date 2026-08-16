@@ -95,17 +95,17 @@ def test_hooks_json_wired_events_point_at_the_real_dispatcher():
     wired = {name for name, e in EVENTS.items() if e["status"] == "WIRED"}
     for name in wired:
         commands = [h["command"] for matcher in hooks[name] for h in matcher["hooks"]]
-        assert any("_dispatch_shim.sh" in c or "makoto._dispatch" in c for c in commands), \
+        assert any("_dispatch_shim.sh" in c or "makoto.dispatch" in c for c in commands), \
             f"{name}: no command routes to makoto's dispatcher: {commands}"
 
 
 def test_wired_moves_appear_in_dispatch_source():
-    names = _referenced_names((REPO / "makoto" / "_dispatch.py").read_text())
+    names = _referenced_names((REPO / "makoto" / "dispatch.py").read_text())
     for name, entry in EVENTS.items():
         if entry["status"] != "WIRED":
             continue
         for move_name in entry["moves"]:
-            assert move_name in names, f"{name}: {move_name!r} not referenced in _dispatch.py"
+            assert move_name in names, f"{name}: {move_name!r} not referenced in dispatch.py"
 
 
 # HOLE entries that assert specific code still exists — each maps to (file, anchor names) so a
@@ -114,7 +114,7 @@ def test_wired_moves_appear_in_dispatch_source():
 # has no code to anchor against. (SessionStart/SubagentStop graduated HOLE→WIRED 2026-07-12 —
 # their anchors now live in the WIRED moves check above.)
 _HOLE_CODE_ANCHORS = {
-    "ConfigChange": ("makoto/_dispatch_configchange.py", ("configchange_verdict",)),
+    "ConfigChange": ("makoto/configchange.py", ("configchange_verdict",)),
 }
 
 

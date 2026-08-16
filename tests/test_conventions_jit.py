@@ -15,12 +15,12 @@ import importlib
 import inspect
 from pathlib import Path
 
-from makoto import _dispatch
-from makoto._dispatch import _jit_hint, _worst_finding, _ALLOW_EXEMPT_IDS
-from makoto.core.schema import Finding
-from makoto.substrate._loader import load_precheck_catalog
+from makoto import dispatch
+from makoto.dispatch import _jit_hint, _worst_finding, _ALLOW_EXEMPT_IDS
+from makoto.vocab import Finding
+from makoto.registry import load_precheck_catalog
 
-REPO = Path(_dispatch.__file__).resolve().parent
+REPO = Path(dispatch.__file__).resolve().parent
 
 _HATCH = "makoto-allow: <reason>"
 _POINTER = "MAKOTO-CONVENTIONS.md"

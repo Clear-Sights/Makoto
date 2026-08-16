@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from makoto.core.schema import Finding
-from makoto.core.lexicons import _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
+from makoto.vocab import Finding
+from makoto.vocab import _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
 from makoto.substrate.claims import whole_suite_pass_claim
 from makoto.substrate.pytest_cache import stale_failing_node
 
@@ -66,7 +66,7 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "cwd"}),
                run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))

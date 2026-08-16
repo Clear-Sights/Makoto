@@ -54,7 +54,7 @@ def test_wire_claude_hooks_absorbs_hand_wired_entry(tmp_path):
             {"matcher": "*", "hooks": [{"type": "command", "command": "other-tool --check"}]},
         ],
         "PostToolUse": [{"matcher": "*", "hooks": [
-            {"type": "command", "command": "python -m makoto._dispatch"}]}],
+            {"type": "command", "command": "python -m makoto.dispatch"}]}],
         "Stop": [{"matcher": "*", "hooks": [{"type": "command", "command": shim}]}],
     }}), encoding="utf-8")
     _wire_claude_hooks(settings_path)
@@ -161,7 +161,7 @@ def test_validate_predicate_modules_aborts_on_missing_callable(monkeypatch, caps
     import sys, types
     broken_mod = types.ModuleType("makoto.prechecks.precheck_broken")
     monkeypatch.setitem(sys.modules, "makoto.prechecks.precheck_broken", broken_mod)
-    from makoto.core.schema import PreCheck
+    from makoto.vocab import PreCheck
     fake_patterns = [
         PreCheck(id="x", fire_level="error", description="d",
                 predicate_module="makoto.prechecks.precheck_broken",
@@ -178,7 +178,7 @@ def test_validate_predicate_modules_aborts_on_missing_callable(monkeypatch, caps
 
 def test_validate_predicate_modules_aborts_on_import_error(monkeypatch, capsys):
     """An unimportable predicate module is its own install failure, not a later callable failure."""
-    from makoto.core.schema import PreCheck
+    from makoto.vocab import PreCheck
     import makoto.install as install_mod
     fake_patterns = [
         PreCheck(id="import.broken", fire_level="error", description="d",
@@ -196,7 +196,7 @@ def test_validate_predicate_modules_aborts_on_empty_keywords(monkeypatch, capsys
     """A callable predicate with no keywords reaches the prefilter-specific exit."""
     import sys
     import types
-    from makoto.core.schema import PreCheck
+    from makoto.vocab import PreCheck
     import makoto.install as install_mod
     module_name = "makoto.checks.makhard_callable_without_keywords"
     valid_mod = types.ModuleType(module_name)

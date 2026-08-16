@@ -9,14 +9,14 @@ from datetime import datetime, timedelta, timezone
 import json
 import sqlite3
 
-from makoto._dispatch import _select_recent
+from makoto.dispatch import _select_recent
 from makoto.checks.canonTimeoutRecur import canon_gate
 from makoto.checks.claimedShippedAbsent import claimed_shipped_gate
 from makoto.checks.falseGreenClaim import green_claim_gate
 from makoto.checks.hollowTest import _run as hollow_test_gate
 from makoto.checks.hollowTest import analyze_file as analyze_hollow_tests
 from makoto.checks.namedTestTeeth import named_test_gate
-from makoto.record import ledger
+from makoto.state import ledger
 
 
 def _event_payload(*, command: str, response: dict) -> str:

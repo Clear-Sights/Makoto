@@ -14,16 +14,16 @@ import sys
 from pathlib import Path
 
 
-def _dispatch(payload: dict, state_dir: Path):
+def dispatch(payload: dict, state_dir: Path):
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
-    proc = subprocess.run([sys.executable, "-m", "makoto._dispatch"],
+    proc = subprocess.run([sys.executable, "-m", "makoto.dispatch"],
                           input=json.dumps(payload).encode(), capture_output=True, env=env)
     return proc.returncode, proc.stdout.decode()
 
 
 def _state(tmp_path: Path) -> Path:
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state = tmp_path / "state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -32,8 +32,8 @@ def _state(tmp_path: Path) -> Path:
 
 
 def test_catalog_loads_nonempty():
-    from makoto.substrate._loader import load_precheck_catalog
-    from makoto.substrate._loader import load_checks
+    from makoto.registry import load_precheck_catalog
+    from makoto.registry import load_checks
     assert load_precheck_catalog(), "Pre-tier catalog discovered"
     assert load_checks(edge="Stop"), "Stop-tier catalog discovered"
 
@@ -55,7 +55,7 @@ def test_env_gated_audit_is_denied_on_the_wire(tmp_path):
     # forbiddenLocation moved to Ward, 2026-07-13 (github.com/Clear-Sights/Ward) -- content.env_gated_audit
     # is the still-live substitute exercising the same PreToolUse-Write-deny wire shape.
     state = _state(tmp_path)
-    rc, out = _dispatch({"hook_event_name": "PreToolUse", "session_id": "smoke-block",
+    rc, out = dispatch({"hook_event_name": "PreToolUse", "session_id": "smoke-block",
                          "cwd": str(tmp_path), "tool_name": "Write",
                          "tool_input": {"file_path": str(tmp_path / "app.py"),
                                        "content": "if os.environ.get('ENABLE_AUDIT_TRAIL'):\n"
@@ -69,7 +69,7 @@ def test_env_gated_audit_is_denied_on_the_wire(tmp_path):
 
 def test_benign_write_passes_silently(tmp_path):
     state = _state(tmp_path)
-    rc, out = _dispatch({"hook_event_name": "PreToolUse", "session_id": "smoke-clean",
+    rc, out = dispatch({"hook_event_name": "PreToolUse", "session_id": "smoke-clean",
                          "cwd": str(tmp_path), "tool_name": "Write",
                          "tool_input": {"file_path": str(tmp_path / "ok.py"), "content": "x = 1\n"},
                          "tool_use_id": "t2"}, state)
@@ -78,7 +78,7 @@ def test_benign_write_passes_silently(tmp_path):
 
 def test_clean_stop_passes_silently(tmp_path):
     state = _state(tmp_path)
-    rc, out = _dispatch({"hook_event_name": "Stop", "session_id": "smoke-stop",
+    rc, out = dispatch({"hook_event_name": "Stop", "session_id": "smoke-stop",
                          "cwd": str(tmp_path),
                          "last_assistant_message": "Read through the module as asked."}, state)
     assert rc == 0 and out == ""

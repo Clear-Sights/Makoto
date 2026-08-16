@@ -9,7 +9,7 @@ Env-aware behavior (1.0.4):
 
 cmd_install handles BOTH state-dir setup and settings.json wiring — useful
 when /plugin install is unavailable. Plugin-capable environments can just
-run `/plugin install <path>`; lazy init in _dispatch covers state-dir
+run `/plugin install <path>`; lazy init in dispatch covers state-dir
 bootstrap automatically, so `cmd_install` is the only makoto command they
 ever need to run (and only once, for the settings.json fallback path).
 
@@ -22,7 +22,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.registry import load_precheck_catalog
 # Hoisted 2026-07-09 to makoto.substrate.wiring (shared with checks/selfWiredCheck.py, which the
 # gate-side layering firewall bars from importing this lifecycle module directly).
 from makoto.substrate.wiring import (
@@ -116,7 +116,7 @@ def _conventions_block_body() -> str:
     """the 3-line law installed into CLAUDE.md: the monotonicity invariant, the makoto-allow
     convention, a pointer to the full conventions. The flagged-shapes catalog + examples are
     deliberately NOT installed — each check delivers its convention just-in-time when it fires
-    (_dispatch._jit_hint), so guidance lands at the moment it binds and costs zero adherence
+    (dispatch._jit_hint), so guidance lands at the moment it binds and costs zero adherence
     budget when it doesn't."""
     conv = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
     return (
@@ -156,7 +156,7 @@ def _uninstall_claude_conventions(claude_md_path: Path) -> None:
 
 def _record_configchange_manifest(settings_path: Path, *, state_dir: Path) -> None:
     """D5 (docs/DEFERRED.md, owner-authorized blocking flip, 2026-07-08): record that the
-    installer wired Makoto's hooks into `settings_path`, so `_dispatch_configchange.py`'s
+    installer wired Makoto's hooks into `settings_path`, so `configchange.py`'s
     blocking tier can treat a LATER full-strip of this exact path as a genuine strip (not the
     ambiguous "never wired" case `configchange_verdict` cannot distinguish on its own) -- ground
     truth from the one place that actually knows what it wired, complementary to (not a
@@ -180,7 +180,7 @@ def cmd_install() -> int:
     state_dir = Path.home() / ".claude" / "makoto_state"
     state_dir.mkdir(parents=True, exist_ok=True)
     _install_bash_scripts(state_dir)
-    from makoto.record import db
+    from makoto.state import store as db
     citations_path = Path(__file__).parent / "docs" / "CITATIONS.md"
     db.init_db(state_dir, citations_path)
     settings = Path.home() / ".claude" / "settings.json"
@@ -214,7 +214,7 @@ def _hooks_wired(data: dict) -> bool:
 
     Recognizes BOTH forms: the managed-flag entry cmd_install writes (`_makoto_managed`), AND a
     flag-less entry whose command points at makoto's dispatch (a hand-wired / shim install:
-    `…/makoto_state/dispatch.sh`, `python -m makoto._dispatch`). The flag exists for idempotent
+    `…/makoto_state/dispatch.sh`, `python -m makoto.dispatch`). The flag exists for idempotent
     UNINSTALL; reporting WIRING must use the functional truth — does a hook reach makoto — or status
     lies (hooks_wired=false) on a device where makoto is in fact firing."""
     hooks = data.get("hooks", {})

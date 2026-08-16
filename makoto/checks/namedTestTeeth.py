@@ -2,9 +2,9 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from makoto.core.schema import Finding
-from makoto.core.lexicons import _ANSI_SGR_RX, _TEETH_FRAME_RX
-from makoto.substrate.io import iter_tool_events
+from makoto.vocab import Finding
+from makoto.vocab import _ANSI_SGR_RX, _TEETH_FRAME_RX
+from makoto.kit import iter_tool_events
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -177,7 +177,7 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "history"}),
                run=lambda c: named_test_gate(c.text, history=c.history))

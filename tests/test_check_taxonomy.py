@@ -5,8 +5,8 @@ is now the gate.liveness Stop CHECK; the empty post tier (PostToolUse, never pop
 deleted."""
 import importlib
 import pytest
-from makoto.substrate._loader import load_precheck_catalog            # schema.py exposes the Pre-Check loader
-from makoto.substrate._loader import load_checks
+from makoto.registry import load_precheck_catalog            # schema.py exposes the Pre-Check loader
+from makoto.registry import load_checks
 
 
 def test_two_categories_load():
@@ -25,7 +25,7 @@ def test_collapsed_packages_are_gone():
 def test_liveness_run_adapter_emits_findings(tmp_path):
     # The Stop adapter reads each touched .py file and emits a real Finding per illusory statement.
     from makoto.checks.deadPureStatement import _run
-    from makoto.core.schema import Finding
+    from makoto.vocab import Finding
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
 
@@ -78,7 +78,7 @@ def test_liveness_gate_is_discovered_as_a_stop_check():
 
 def test_run_stop_checks_includes_liveness_findings(tmp_path, monkeypatch):
     # The Stop dispatch (run_stop_checks) flows the liveness gate's list-findings into its output.
-    import makoto._dispatch as D
+    import makoto.dispatch as D
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
     monkeypatch.chdir(tmp_path)
@@ -98,8 +98,8 @@ def test_run_stop_checks_includes_liveness_findings(tmp_path, monkeypatch):
 
     # Stub the ledger/commitment reads so the only substrate is the touched file.
     monkeypatch.setattr(D, "GateContext", D.GateContext)
-    import makoto.record.ledger as L
-    import makoto.session.commitments as C
+    import makoto.state.ledger as L
+    import makoto.state.commitments as C
     monkeypatch.setattr(L, "touched_keys", lambda conn, sid: frozenset({"m.py"}))
     monkeypatch.setattr(L, "empty_write_keys", lambda conn, sid: frozenset())
     monkeypatch.setattr(L, "latest_testrun", lambda conn, sid: "")

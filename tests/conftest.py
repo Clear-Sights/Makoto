@@ -12,7 +12,7 @@ Provides:
 from __future__ import annotations
 import pytest
 
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.registry import load_precheck_catalog
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def loaded_pattern():
     fixtures stay in sync with the live catalog (description / retry_hint /
     posture / keywords drift between test and prod is caught automatically).
 
-    2026-08-16: sourced from `substrate._loader.load_precheck_catalog()` (`schema.load_prechecks()`
+    2026-08-16: sourced from `registry.load_precheck_catalog()` (`schema.load_prechecks()`
     -- the TOML/loader-adapter shim -- was retired once its callers finished migrating). Returns
     `Check` instances now, not `PreCheck`; the return annotation is documentation, not enforced.
     """

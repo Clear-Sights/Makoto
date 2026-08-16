@@ -21,7 +21,7 @@ per-pattern adversarial teeth. The teeth test proves a neutered predicate would 
 """
 from __future__ import annotations
 
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 from makoto.checks.envGatedAudit import predicate as p_1_2
 from makoto.checks.verifierBodyHollowed import predicate as p_1_27
 # certVerifyDisabled/jwtSignatureDisabled/certNoneMode/timingUnsafeCompare/jwtNoneAlg/

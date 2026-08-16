@@ -15,7 +15,7 @@ def _connect(db_file):
 
 def test_init_db_creates_all_tables_and_wal(tmp_path):
     """init_db creates every table + sets WAL; ledger + commitments are net-new."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations_path = tmp_path / "CITATIONS.md"
     citations_path.write_text("Knight-Leveson 1986\n")
@@ -39,7 +39,7 @@ def test_init_db_creates_all_tables_and_wal(tmp_path):
 
 def test_init_db_is_idempotent(tmp_path):
     """second init_db on same state_dir preserves rows (CREATE TABLE IF NOT EXISTS)."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations_path = tmp_path / "CITATIONS.md"
     citations_path.write_text("Knight-Leveson 1986\n")
@@ -58,7 +58,7 @@ def test_init_db_is_idempotent(tmp_path):
 
 def test_init_db_creates_state_dir_if_missing(tmp_path):
     """init_db mkdir -p's state_dir so cmd_install doesn't have to."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "nonexistent" / "makoto_state"
     citations_path = tmp_path / "CITATIONS.md"
     citations_path.write_text("x")
@@ -69,7 +69,7 @@ def test_init_db_creates_state_dir_if_missing(tmp_path):
 
 def test_init_db_events_insert_autoincrement_id(tmp_path):
     """post-init, INSERT INTO events gives lastrowid == 1 (the dispatcher's idiom)."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations_path = tmp_path / "CITATIONS.md"
     citations_path.write_text("x")
@@ -85,7 +85,7 @@ def test_init_db_events_insert_autoincrement_id(tmp_path):
 
 def test_init_db_config_seeds_mtime_sentinel_when_path_missing(tmp_path):
     """missing citations_path -> mtime sentinel '-1'; refresh_citations treats as cache-miss."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     missing = tmp_path / "does_not_exist.md"
     init_db(state_dir, missing)
@@ -97,7 +97,7 @@ def test_init_db_config_seeds_mtime_sentinel_when_path_missing(tmp_path):
 
 def test_init_db_config_upserts_path_on_reinvoke(tmp_path):
     """re-running with a different citations_path REPLACES the seed row, no duplicates."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     p1 = tmp_path / "first.md"
     p1.write_text("x")

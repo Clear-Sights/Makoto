@@ -4,14 +4,14 @@ from enum import Enum
 import subprocess
 from typing import Optional
 
-from makoto.core.schema import Finding
-from makoto.core.lexicons import (
+from makoto.vocab import Finding
+from makoto.vocab import (
     _SHIPPED_ACTION_CLAIM_RX, _SHIPPED_STATE_CLAIM_RX,
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.substrate.io import decode_history_row
-from makoto.substrate._shared import _PUSH_BRANCH_RX
+from makoto.kit import decode_history_row
+from makoto.kit import _PUSH_BRANCH_RX
 from makoto.core._shell import _command_pushes_git
 
 
@@ -186,7 +186,7 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "history_all_agents", "cwd"}),
                run=lambda c: claimed_shipped_gate(

@@ -1,13 +1,13 @@
 from __future__ import annotations
 from typing import Optional
 
-from makoto.core.schema import Finding
-from makoto.core.lexicons import (
+from makoto.vocab import Finding
+from makoto.vocab import (
     _RUNNING_CLAIM_RX, _PROCESS_START_VERB_RX, _PROCESS_LIFECYCLE_CMD_RX,
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.substrate.io import decode_history_row
+from makoto.kit import decode_history_row
 
 # gate.claimed_running -- the assistant claims an ONGOING running/live/listening/serving state
 # for a process/service ("the server is running", "it's up and running", "now listening on port
@@ -138,7 +138,7 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "history_all_agents"}),
                run=lambda c: claimed_running_gate(c.text, history=c.history_all_agents))

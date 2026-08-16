@@ -83,7 +83,7 @@ def _chain_then_append(state_root: Path, filename: str, structural_kind: str,
     append-only law). A chain-append fault must never block the older, more foundational file
     log -- caught and swallowed; the jsonl file gets its row either way."""
     try:
-        from makoto.record import ledger as _ledger
+        from makoto.state import ledger as _ledger
         payload = chain_payload if chain_payload is not None else obj
         chained = _ledger.append({"kind": structural_kind, **payload}, root=state_root)
         obj["prev_hash"] = chained.get("prev_hash", "")
@@ -125,7 +125,7 @@ def append_error(state_root: Path, event_id: int | None,
 
     Spec §5.7 + v5 fix #9. SEPARATE from audit.jsonl; AuditRow shape preserved.
     Schema: {ts, event_id, pattern_id, exc_type, exc_message}. Called by
-    _dispatch._run_predicates when a predicate import or call raises (fail-open).
+    dispatch._run_predicates when a predicate import or call raises (fail-open).
     """
     _append_jsonl(state_root, "dispatch_errors.jsonl", {
         "ts": datetime.now(timezone.utc).isoformat(),

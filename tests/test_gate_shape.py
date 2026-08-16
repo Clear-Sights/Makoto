@@ -1,6 +1,7 @@
 """The Stop-gate catalog's SHAPE is itself a word makoto emits about its own design — so it must be
 MATERIAL, not illusory. This test pins the design (the gate-related file subset, function counts,
-exports, the Check schema, the shared/named-gate split, the layering firewall, the house style)
+exports, the Check schema, the shared/named-gate split, the house style; the layering firewall
+now lives in tests/test_import_direction.py — the pipeline file order IS the firewall)
 AND proves each shape predicate has TEETH: a `test_TEETH_*` feeds it a planted violation and asserts
 it goes red. The single source for "the design" is the EXPECTED_* declarations below — change the
 package <=> change these <=> the test moves with it (a re-checkable artifact, not a comment).
@@ -16,7 +17,7 @@ surface as a plain `CHECK` (or, for `contractOrder.py`'s dual Pre+Stop surface, 
 entry) discovered by the SAME unified `checks._loader.load_checks(edge="Stop")` every Pre-tier
 check already used, with a new `Check.may_block` field marking exactly the checks that used to
 export a `GATE` -- the structural "reaches the decision pipeline at all" signal, independent of
-`.posture`/`.level` (see `_loader.py`'s `Check.may_block` docstring and `_dispatch.py`'s
+`.posture`/`.level` (see `_loader.py`'s `Check.may_block` docstring and `dispatch.py`'s
 `_blocking_gate_ids()`). This test's GATES_DIR and every design declaration below point at
 `checks/`. Because `checks/` also holds every precheck, `forbiddenLocation`, and the completeness
 check itself, the file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness
@@ -29,8 +30,8 @@ import dataclasses
 import importlib
 from pathlib import Path
 
-from makoto.substrate._loader import Check, load_checks
-from makoto.substrate._shared import GateContext
+from makoto.registry import Check, load_checks
+from makoto.context import GateContext
 
 
 def _live_gates() -> list:
@@ -143,52 +144,16 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "runIntentUnfulfilled.py": 4,
     "claimedShippedAbsent.py": 5,
 }
-# a gate module may import ONLY L0/L1 primitives + the intra-package `_shared`/`_loader`/
-# `_canonAtoms` — never a sibling NAMED gate (checks.<other-gate-stem>) nor a sibling L2 detector
-# (commitments / retraction / ledger). `makoto.checks` (bare) is the package's own re-exported L0
-# primitives module.
-ALLOWED_IMPORT_ROOTS = {
-    "makoto.checks", "makoto.substrate._shared", "makoto.substrate._loader", "makoto.substrate._canonAtoms",
-    "makoto.substrate._planNode", "makoto.substrate._stdlib_ast_helpers",
-    "makoto.core.schema", "makoto.substrate.io", "makoto.substrate.claims", "makoto.substrate.pytest_cache",
-    "makoto.core.lexicons",
-    "makoto.core._shell",
-    "makoto.record.ackblock",   # Task 2 slice 5: canonFingerprints.py's release.operator discharge lookup --
-    #   named explicitly (never bare "makoto") so the firewall stays a curated allowlist, not a
-    #   hole into makoto's whole namespace.
-    "makoto.substrate.wiring",  # 2026-07-09 dedup: the hook-wiring predicate selfWiredCheck.py and
-    #   install.py used to duplicate by hand, hoisted to one stdlib-only L0 home (the refactor
-    #   selfWiredCheck's own module note asked for). Named explicitly, same rule as above.
-}
-GATE_MODULE_PATHS = {f"makoto.checks.{stem}" for stem in GATE_MODULE_STEMS}
+# Stage 2 seam 7: the gate-side import firewall (the former ALLOWED_IMPORT_ROOTS curated
+# allowlist + sibling-gate scan) now lives in tests/test_import_direction.py — "the layer
+# firewall becomes the file order": every makoto.* import must point strictly earlier in the
+# pipeline-ordered layout, named gates may never import a sibling gate, and their reach into
+# state/ stays narrowed to the ledger/citations read surfaces.
 
 
 # ---- pure shape predicates (each is fed a planted violation by a test_TEETH_* below) ---------
-def imported_makoto_modules(src: str) -> set:
-    """Every `from makoto... import` / `import makoto...` module path referenced in src (AST)."""
-    out: set = set()
-    for node in ast.walk(ast.parse(src)):
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("makoto"):
-            out.add(node.module)
-        elif isinstance(node, ast.Import):
-            for a in node.names:
-                if a.name.startswith("makoto"):
-                    out.add(a.name)
-    return out
-
-
-def sibling_gate_imports(src: str) -> set:
-    """The NAMED sibling gate modules src imports — the L2->L2 firewall violations (empty = clean).
-    Importing the shared `_shared`/`_loader` helpers is fine; importing another named gate is not."""
-    return imported_makoto_modules(src) & GATE_MODULE_PATHS
-
-
 def _def_count(src: str) -> int:
     return sum(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) for n in ast.parse(src).body)
-
-
-def _gate_source_files() -> list:
-    return sorted(GATES_DIR / f"{stem}.py" for stem in GATE_MODULE_STEMS) + [GATES_DIR.parent / "substrate" / "_shared.py"]
 
 
 def _leads_with_future_import(src: str) -> bool:
@@ -271,14 +236,6 @@ def test_module_function_counts_match_the_design():
         assert _def_count((GATES_DIR / name).read_text()) == n, f"{name}: expected {n} top-level defs"
 
 
-def test_no_gate_module_imports_a_sibling_or_cross_l2():
-    for f in _gate_source_files():
-        src = f.read_text()
-        assert sibling_gate_imports(src) == set(), f"{f.name} imports a sibling gate (L2->L2)"
-        for m in imported_makoto_modules(src):
-            assert m in ALLOWED_IMPORT_ROOTS, f"{f.name} imports disallowed module {m}"
-
-
 def test_each_gate_module_follows_the_house_style():
     for stem in GATE_MODULE_STEMS:
         f = GATES_DIR / f"{stem}.py"
@@ -289,18 +246,9 @@ def test_each_gate_module_follows_the_house_style():
 
 
 # ---- teeth: every shape predicate must go RED on a planted violation --------------------------
-def test_TEETH_sibling_import_detector_discriminates():
-    planted = "from makoto.checks.undischargedCommitment import advance_gate\nx = 1\n"
-    assert sibling_gate_imports(planted) == {"makoto.checks.undischargedCommitment"}   # caught
-    clean = "from makoto.substrate._shared import _discharged\n"
-    assert sibling_gate_imports(clean) == set()                            # no false positive
-
-
-def test_TEETH_import_allowlist_catches_a_cross_l2_import():
-    planted = "from makoto.session.commitments import open_commitments\n"          # a sibling L2 — forbidden
-    mods = imported_makoto_modules(planted)
-    assert mods == {"makoto.session.commitments"}
-    assert not (mods <= ALLOWED_IMPORT_ROOTS)              # the real allowlist assertion would FAIL here
+# (the import-firewall predicates + their TEETH moved to tests/test_import_direction.py, seam 7;
+#  both planted edges — a sibling named gate and gate->state.commitments — are still asserted
+#  RED there, in test_TEETH_direction_checker_rejects_planted_backward_edges.)
 
 
 def test_TEETH_no_shadow_field_check_catches_a_planted_blocking_field():

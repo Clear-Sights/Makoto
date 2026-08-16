@@ -1,6 +1,6 @@
 """Test-only TOML-pattern-file parser, relocated here 2026-08-16 from
-`makoto/core/schema.py`'s `_load_prechecks_from_toml` when `schema.load_prechecks()` (and its
-explicit-`path` TOML branch) was retired as part of finishing the `substrate._loader` migration.
+`makoto/vocab.py`'s `_load_prechecks_from_toml` when `schema.load_prechecks()` (and its
+explicit-`path` TOML branch) was retired as part of finishing the `registry` migration.
 
 This was never exercised by any live, non-test caller -- the production default path had already
 moved to the checks/ catalog; only tests handed this function a synthetic fixture TOML to
@@ -11,7 +11,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 
 _PATTERN_FIELDS = frozenset({
     "id", "fire_level", "description",

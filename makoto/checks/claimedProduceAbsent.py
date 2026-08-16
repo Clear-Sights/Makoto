@@ -3,16 +3,11 @@ import os
 import re
 from typing import Optional
 from makoto.checks import detect_locations, normalize_path
-from makoto.core.schema import Finding
-from makoto.core.lexicons import (
+from makoto.vocab import Finding
+from makoto.vocab import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
-from makoto.substrate._shared import (
-    _BIND_BEFORE,
-    DISCHARGE_EATS, _discharge_kwargs,
-    _discharged,
-    resolve_in_worktree,
-)
+from makoto.kit import _BIND_BEFORE, DISCHARGE_EATS, _discharge_kwargs, _discharged, resolve_in_worktree
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -109,7 +104,7 @@ def completion_gate(
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
                run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))

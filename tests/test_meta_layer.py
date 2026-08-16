@@ -1,6 +1,6 @@
 """tests for Check.layer -- catches drift on the two known-meta checks (see _loader.Check's
 own docstring for why only these two, not all four originally proposed, are tagged "meta")."""
-from makoto.substrate._loader import load_checks
+from makoto.registry import load_checks
 
 _KNOWN_META_IDS = {"content.self_mute_guard", "gate.self_wired"}
 

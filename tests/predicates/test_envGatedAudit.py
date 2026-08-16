@@ -22,7 +22,7 @@ the near-misses pin (1) is dissolved by the active-code AST gate AND a bare feat
 """
 from __future__ import annotations
 from makoto.checks.envGatedAudit import predicate
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 
 _PAT = PreCheck(id="content.env_gated_audit", fire_level="error",
                description="env-gated audit/verification code", retry_hint="x")
@@ -102,14 +102,14 @@ def test_neg_perf_toggle_no_integrity_token():
 
 def test_neg_env_read_not_gating_an_if():
     """An env read in an ASSIGNMENT (not an `if` test) is config, not a gated check -> silent.
-    Mirrors makoto's own reads (install.py / state.py / _dispatch.py) — none must fire."""
+    Mirrors makoto's own reads (install.py / state.py / dispatch.py) — none must fire."""
     assert not _fires("state.py", "audit_dir = os.environ.get('AUDIT_DIR', '/tmp')\n")
 
 
 def test_neg_makoto_disable_read_is_not_an_audit_gate():
     """makoto's own `if os.environ.get('MAKOTO_DISABLE_GATES'): ...` — the KEY names no integrity
     concept and the body names none -> silent (this is content.self_mute_guard's bypass domain, not content.env_gated_audit's)."""
-    assert not _fires("_dispatch.py", "if os.environ.get('MAKOTO_DISABLE_GATES'):\n    return None\n")
+    assert not _fires("dispatch.py", "if os.environ.get('MAKOTO_DISABLE_GATES'):\n    return None\n")
 
 
 def test_neg_string_comparison_value_does_not_self_trigger():

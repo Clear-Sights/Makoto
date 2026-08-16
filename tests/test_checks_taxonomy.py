@@ -1,7 +1,7 @@
-"""makoto.substrate._loader.load_checks — the flat checks/ package's own discovery mechanism
+"""makoto.registry.load_checks — the flat checks/ package's own discovery mechanism
 (SPEC-5 Task 2). Now the SOLE discovery path for both edges (2026-08-16): `schema.load_prechecks`
 was retired once its real callers migrated to `load_checks`/`load_precheck_catalog`, and the old
-`substrate._loader.load_stopchecks` was retired earlier (2026-07-10, see `_loader.py`'s own
+`registry.load_stopchecks` was retired earlier (2026-07-10, see `_loader.py`'s own
 docstring).
 
 Every scenario here scans an ISOLATED tmp_path directory via `load_checks(package_dir=...)`
@@ -15,12 +15,12 @@ import importlib
 
 import pytest
 
-from makoto.substrate._loader import Check, load_checks
+from makoto.registry import Check, load_checks
 
 
 def _write(tmp_path, name, id_, applies_at, posture="advise"):
     (tmp_path / name).write_text(
-        "from makoto.substrate._loader import Check\n"
+        "from makoto.registry import Check\n"
         f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture={posture!r})\n"
     )
 
@@ -100,7 +100,7 @@ def test_load_checks_does_not_import_modules_irrelevant_to_the_requested_edge():
     # excluded from the "must not appear" sets below.
     import sys
 
-    from makoto.substrate._loader import ALLOWED_EDGES, scan
+    from makoto.registry import ALLOWED_EDGES, scan
 
     def _reset_check_modules():
         for mod in list(sys.modules):
@@ -138,9 +138,9 @@ def test_load_checks_does_not_import_modules_irrelevant_to_the_requested_edge():
 def test_existing_prechecks_and_stopchecks_loaders_unaffected():
     # 2026-08-16: `schema.load_prechecks()` (the loader-adapter shim this comment used to say
     # was "explicitly not touched/superseded") has now been retired -- the migration to a single
-    # discovery path completed. Both edges are discovered through the same `substrate._loader`
+    # discovery path completed. Both edges are discovered through the same `registry`
     # entry points today; this test now pins that unified reality instead of the old split.
-    from makoto.substrate._loader import load_checks, load_precheck_catalog
+    from makoto.registry import load_checks, load_precheck_catalog
 
     live = load_precheck_catalog()
     assert live, "prechecks still discovered unchanged"

@@ -11,10 +11,10 @@ import sqlite3
 
 import pytest
 
-from makoto.record.db import init_db
-from makoto.session.citations import refresh_if_stale
+from makoto.state.store import init_db
+from makoto.state.citations import refresh_if_stale
 from makoto.checks.phantomCitation import predicate, _governed_root
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.registry import load_precheck_catalog
 
 _PAT = {p.id: p for p in load_precheck_catalog()}["content.phantom_citation"]
 _PHANTOM = "See (Russo et al. 2018) for the method."   # a real paper, NOT in makoto's allowlist

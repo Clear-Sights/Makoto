@@ -1,10 +1,10 @@
 """Subprocess end-to-end for makoto/_dispatch_shim.sh — the shim itself, which the live-fire
-smoke tests bypass (they invoke `python -m makoto._dispatch` directly). It pins the two
+smoke tests bypass (they invoke `python -m makoto.dispatch` directly). It pins the two
 properties only the shim owns: (1) package resolution is pinned to the plugin root — a decoy
 makoto/ package in the invoking cwd must not shadow it (under the former form it did:
 ModuleNotFoundError exit 1 on every hook, a 100% failure rate on the marketplace install), and
 (2) an unusable CLAUDE_PLUGIN_ROOT fails OPEN with a loud stderr line and an empty envelope,
-matching _dispatch's own HYBRID fail-mode. Runs against a bare venv interpreter so a dev
+matching dispatch's own HYBRID fail-mode. Runs against a bare venv interpreter so a dev
 editable install cannot mask a resolution failure — with the dev interpreter these checks could
 never return FALSE."""
 from __future__ import annotations

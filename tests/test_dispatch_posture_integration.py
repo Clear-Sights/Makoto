@@ -1,5 +1,5 @@
-"""SPEC-5 Task 8 integration pins: the posture cutover (`_dispatch._emit_decision` now folds a
-fired finding through `makoto.verdict.posture`/`makoto.verdict.wire` instead of the old single ad-hoc
+"""SPEC-5 Task 8 integration pins: the posture cutover (`dispatch._emit_decision` now folds a
+fired finding through `makoto.verdict`'s posture fold + wire tables instead of the old single ad-hoc
 "decision":"block" shape). Three behavioral claims, one test each:
 
   1. a BLOCK precheck (PreToolUse) denies via the NEW nested Pre shape.

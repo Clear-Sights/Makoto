@@ -1,6 +1,6 @@
 import sqlite3
 
-from makoto.session.planItems import (
+from makoto.state.plan import (
     record_task_event,
     source_plan_item_promise, source_plan_item_completions,
     record_plan_item, open_plan_items, set_plan_item_status, sync_plan_items,

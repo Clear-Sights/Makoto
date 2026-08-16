@@ -81,7 +81,7 @@ def iter_touched_python_sources(touched, cwd, fs_read):
     iteration scaffold deadPureStatement._run and hollowTest._run previously duplicated line for
     line (2026-07-09 dedup; the two bodies differed only INSIDE the loop). Contract preserved
     exactly: a possibly-relative touched key is anchored to the event's OWN cwd, never the
-    dispatch process's ambient one (matches _dispatch.py's real fs_read/fs_exists join). The
+    dispatch process's ambient one (matches dispatch.py's real fs_read/fs_exists join). The
     caller projects these three GateContext inputs explicitly so each check's signature remains
     locally visible; stray
     scratch outside the working project is skipped; an OSError or fs_read miss (None) skips the

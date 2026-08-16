@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from makoto._dispatch import _jit_hint
-from makoto.core.schema import Finding
-from makoto.verdict import posture
-from makoto.verdict.recheck import VerdictCertificate, recheck_certificate
+from makoto.dispatch import _jit_hint
+from makoto.vocab import Finding
+from makoto import verdict as posture
+from makoto.verdict import VerdictCertificate, recheck_certificate
 
 
 def _blocking_finding() -> Finding:

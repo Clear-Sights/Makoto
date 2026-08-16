@@ -1,6 +1,6 @@
-"""End-to-end subprocess tests for `makoto/_dispatch_configchange.py` (the ConfigChange hook
+"""End-to-end subprocess tests for `makoto/configchange.py` (the ConfigChange hook
 adapter). Mirrors `test_dispatch.py`'s subprocess-invocation convention: spawn
-`python -m makoto._dispatch_configchange` with `MAKOTO_STATE_DIR` pointed at a tmp dir and stdin
+`python -m makoto.configchange` with `MAKOTO_STATE_DIR` pointed at a tmp dir and stdin
 fed a JSON payload, then assert on `(returncode, stdout)` and on `audit.jsonl`'s contents.
 
 Like `test_configchange_verdict.py`, every payload here is CONSTRUCTED against hand-built payload
@@ -32,12 +32,12 @@ _PKG_PARENT = str(Path(_makoto_under_test.__file__).resolve().parent.parent)
 
 
 def _run(state_dir, raw_stdin: bytes) -> tuple[int, bytes]:
-    """invoke `python -m makoto._dispatch_configchange` with raw bytes on stdin;
+    """invoke `python -m makoto.configchange` with raw bytes on stdin;
     return (exit_code, stdout_bytes)."""
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch_configchange"],
+        [sys.executable, "-m", "makoto.configchange"],
         input=raw_stdin,
         capture_output=True,
         env=env,
@@ -52,7 +52,7 @@ def _run_json(state_dir, payload, extra_env: dict | None = None) -> tuple[int, b
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch_configchange"],
+        [sys.executable, "-m", "makoto.configchange"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
@@ -70,7 +70,7 @@ def _audit_rows(state_dir) -> list:
 
 def _settings(pre=True, post=True, stop=True):
     def _entry(wired):
-        cmd = "python3 -m makoto._dispatch" if wired else "python3 -m ventura.adapters.hook_bridge"
+        cmd = "python3 -m makoto.dispatch" if wired else "python3 -m ventura.adapters.hook_bridge"
         return {"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}
 
     return {"hooks": {

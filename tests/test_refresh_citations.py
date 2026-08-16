@@ -20,7 +20,7 @@ def _conn_with_config(tmp_path, citations_path_str, mtime_str="-1"):
 
 def test_refresh_if_stale_noop_when_path_missing(tmp_path):
     """canonical_citations_path doesn't exist -> no rebuild, no error."""
-    from makoto.session.citations import refresh_if_stale
+    from makoto.state.citations import refresh_if_stale
     conn = _conn_with_config(tmp_path, str(tmp_path / "no-such-file.md"))
     refresh_if_stale(conn)
     n = conn.execute("SELECT COUNT(*) FROM canonical_citations").fetchone()[0]
@@ -30,7 +30,7 @@ def test_refresh_if_stale_noop_when_path_missing(tmp_path):
 
 def test_refresh_if_stale_rebuilds_on_mtime_change(tmp_path):
     """on-disk mtime > stored mtime -> DELETE + INSERTs."""
-    from makoto.session.citations import refresh_if_stale
+    from makoto.state.citations import refresh_if_stale
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Per Smith 2020 and Jones et al. 2021, results hold.\n")
     conn = _conn_with_config(tmp_path, str(cit), mtime_str="-1")  # sentinel: always stale
@@ -46,7 +46,7 @@ def test_refresh_if_stale_rebuilds_on_mtime_change(tmp_path):
 
 def test_refresh_if_stale_noop_when_mtime_matches(tmp_path):
     """stored mtime == on-disk mtime -> no rebuild (fast path)."""
-    from makoto.session.citations import refresh_if_stale
+    from makoto.state.citations import refresh_if_stale
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Smith 2020\n")
     conn = _conn_with_config(tmp_path, str(cit), mtime_str=str(cit.stat().st_mtime_ns))
@@ -62,7 +62,7 @@ def test_refresh_if_stale_rebuilds_when_mtime_row_missing(tmp_path):
     """canonical_citations_mtime config row absent (mrow=None) -> treated as always-stale,
     rebuild proceeds. The `(mrow and mrow[0])` guard must short-circuit on mrow=None; an OR
     there would subscript None and raise TypeError, never reaching the rebuild."""
-    from makoto.session.citations import refresh_if_stale
+    from makoto.state.citations import refresh_if_stale
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Per Smith 2020, results hold.\n")
     conn = sqlite3.connect(str(tmp_path / "test.db"), isolation_level=None)
@@ -78,7 +78,7 @@ def test_refresh_if_stale_rebuilds_when_mtime_row_missing(tmp_path):
 
 def test_refresh_if_stale_reraises_rebuild_failure_after_rollback(tmp_path, monkeypatch):
     """Rollback is not a discharge: the exact rebuild failure must still escape."""
-    from makoto.session import citations
+    from makoto.state import citations
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Smith 2020\n")
     conn = _conn_with_config(tmp_path, str(cit), mtime_str="-1")
@@ -102,8 +102,8 @@ def test_init_db_then_refresh_populates_canonical(tmp_path):
     file's CURRENT mtime, so refresh saw 'not stale' and never did the initial rebuild —
     leaving canonical EMPTY, which makes content.phantom_citation (error-level) false-fire on EVERY
     Author-Year citation as phantom. The fix seeds the '-1' always-stale sentinel."""
-    from makoto.record.db import init_db
-    from makoto.session import citations
+    from makoto.state.store import init_db
+    from makoto.state import citations
     state_dir = tmp_path / "makoto_state"
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Smith 2020\nJones 2019\n")

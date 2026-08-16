@@ -17,8 +17,8 @@ reliability canaries / anti-Goodhart), mirroring test_gate_dropped_live_battery.
     each primitive actually reads) is PRESENT on every RED fixture and ABSENT on every TN/clean
     fixture -- the missing half a corpus-only measurement can never supply for itself.
 
-All three populations route through `makoto._dispatch.run_stop_checks` -- the SAME function
-`makoto._dispatch.main()` calls for a real Stop event -- with hand-built events-table row tuples
+All three populations route through `makoto.dispatch.run_stop_checks` -- the SAME function
+`makoto.dispatch.main()` calls for a real Stop event -- with hand-built events-table row tuples
 `(id, ts, event_type, cwd, raw_payload_json)` matching the exact shape `_select_recent` returns
 (not a weaker reimplementation), so a discharge/wiring regression the pure-function unit tests
 (test_canon_primitives.py) would miss reddens here too.
@@ -26,7 +26,7 @@ All three populations route through `makoto._dispatch.run_stop_checks` -- the SA
 import json
 import sqlite3
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 from makoto.checks.canonTimeoutRecur import calls_from_history, recur_stuck, timed_out_at_turn_end
 
 _COMMIT_DDL = (

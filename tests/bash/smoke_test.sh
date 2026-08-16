@@ -1,5 +1,5 @@
 #!/bin/sh
-# Phase 5.4 smoke test — drives makoto._dispatch end-to-end.
+# Phase 5.4 smoke test — drives makoto.dispatch end-to-end.
 # Spec §6 success criterion: lazy state init + dispatch event + audit row written.
 set -e
 
@@ -10,12 +10,12 @@ echo "Scratch: $SCRATCH"
 echo "Python: $PYTHON_BIN"
 
 # Drive a synthetic PreToolUse event through the dispatcher.
-# Lazy init in _dispatch.py should create makoto.db on first call.
+# Lazy init in dispatch.py should create makoto.db on first call.
 EVENT='{"hook_event_name":"PreToolUse","session_id":"smoke","cwd":"/tmp","tool_input":{"file_path":"/tmp/x.txt","content":"hello"}}'
 
 cd "$REPO_ROOT"
 export MAKOTO_STATE_DIR="$SCRATCH/makoto_state"
-printf '%s' "$EVENT" | "$PYTHON_BIN" -m makoto._dispatch
+printf '%s' "$EVENT" | "$PYTHON_BIN" -m makoto.dispatch
 
 # Verify lazy init worked
 test -f "$SCRATCH/makoto_state/makoto.db" || { echo "FAIL: lazy init didn't create makoto.db"; rm -rf "$SCRATCH"; exit 1; }

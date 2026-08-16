@@ -1,9 +1,9 @@
 """CI guard: every LIVE-dispatched finding carries its provenance (source_event_id).
 
 This is the completeness oracle for Task 6. Provenance is stamped CENTRALLY at the
-dispatch boundary (`_dispatch._run_predicates` for predicate findings, `main()` for
+dispatch boundary (`dispatch._run_predicates` for predicate findings, `main()` for
 gate findings) via `dataclasses.replace(finding, source_event_id=event_id)`. These two
-tests drive the real `python -m makoto._dispatch` end-to-end and assert the recorded
+tests drive the real `python -m makoto.dispatch` end-to-end and assert the recorded
 finding's `source_event_id` equals the actual `events.id` it came from — non-zero AND
 correct. If the central stamp is ever removed or bypassed (a finding emitted without
 provenance), `source_event_id` stays 0 and these go red — so a missed site can't ship
@@ -19,7 +19,7 @@ from pathlib import Path
 
 def _setup_state(tmp_path):
     """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -28,13 +28,13 @@ def _setup_state(tmp_path):
 
 
 def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto._dispatch` with payload on stdin; return (exit, stdout)."""
+    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,

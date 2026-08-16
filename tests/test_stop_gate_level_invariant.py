@@ -1,9 +1,9 @@
 """B1 — "every signal blocks or doesn't exist" extended to Stop gates, at RUNTIME.
 
-Historically, `makoto/core/schema.py`'s now-retired `load_prechecks()` enforced this invariant
+Historically, `makoto/vocab.py`'s now-retired `load_prechecks()` enforced this invariant
 for prechecks at LOAD TIME (`_ALLOWED_FIRE_LEVELS == {"error"}`, raising on any other
 fire_level). That enforcement now lives in `tests/test_pre_tier_block_invariant.py` instead (see
-`substrate._loader.load_precheck_catalog()`'s own docstring). Stop gates have no equivalent
+`registry.load_precheck_catalog()`'s own docstring). Stop gates have no equivalent
 load-time enforcement — Check carries no
 `fire_level`/`blocking` field at all (only `may_block`, the structural discovery-eligibility
 signal; by design that is NOT the same as "blocks" — the level lives on the `Finding` each gate's
@@ -19,7 +19,7 @@ This test fires EVERY live gate discovered by `_live_gates()` through its real `
 entry point — the exact call `run_stop_checks` makes — with a scenario proven (via each gate's own
 existing sentinel tests / test_dispatch.py's behavioral pins, cited per-branch below) to make it
 emit at least one Finding, then asserts the emitted level is "error" (the only blocking level,
-makoto.core.schema._ALLOWED_FIRE_LEVELS) UNLESS the gate id is in the explicit, named allowlist below.
+makoto.vocab._ALLOWED_FIRE_LEVELS) UNLESS the gate id is in the explicit, named allowlist below.
 A future gate that ships a silent advisory tier without updating the allowlist reddens here.
 """
 from __future__ import annotations
@@ -27,8 +27,8 @@ from __future__ import annotations
 import json
 import os
 
-from makoto.substrate._loader import load_checks
-from makoto.substrate._shared import GateContext
+from makoto.registry import load_checks
+from makoto.context import GateContext
 
 
 def _live_gates() -> list:
@@ -160,8 +160,8 @@ def _scenario_contract_order(tmp_path):
 def _scenario_self_wired(tmp_path):
     # fires: tests/test_self_wired_check.py (partial strip: Stop entry missing)
     wired = json.dumps({"hooks": {
-        "PreToolUse": [{"hooks": [{"command": "python3 -m makoto._dispatch"}]}],
-        "PostToolUse": [{"hooks": [{"command": "python3 -m makoto._dispatch"}]}],
+        "PreToolUse": [{"hooks": [{"command": "python3 -m makoto.dispatch"}]}],
+        "PostToolUse": [{"hooks": [{"command": "python3 -m makoto.dispatch"}]}],
     }})
     return _ctx(fs_read=lambda p: wired if p == ".claude/settings.json" else None)
 
@@ -246,7 +246,7 @@ def test_every_gate_scenario_actually_fires(tmp_path):
 
 def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
     """The runtime invariant: every live Stop gate's emitted Finding.level is "error" (the sole
-    blocking level, makoto.core.schema._ALLOWED_FIRE_LEVELS) UNLESS its id is in _ADVISORY_ALLOWLIST.
+    blocking level, makoto.vocab._ALLOWED_FIRE_LEVELS) UNLESS its id is in _ADVISORY_ALLOWLIST.
     A future gate that silently ships a second advisory-tier exception reddens THIS test, not just
     a shape/dataclass pin."""
     violations = []

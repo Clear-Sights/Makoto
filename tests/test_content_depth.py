@@ -8,10 +8,10 @@ claim. Unknown/edited/conventional-empty cases fail open (never a false block).
 import os
 import sqlite3
 
-from makoto.substrate._shared import _discharged
+from makoto.kit import _discharged
 from makoto.checks.claimedProduceAbsent import completion_gate
-from makoto._dispatch import run_stop_checks
-from makoto.record import ledger as L
+from makoto.dispatch import run_stop_checks
+from makoto.state import ledger as L
 def _conn():
     c = sqlite3.connect(":memory:", isolation_level=None)
     c.execute("CREATE TABLE ledger (key TEXT PRIMARY KEY, value TEXT, kind TEXT NOT NULL, "
@@ -110,11 +110,11 @@ def test_run_stop_checks_silent_on_nonempty_write_production():
 
 
 # --- run_stop_checks resolves the filesystem against payload['cwd'], not the process cwd ---
-# These pin the cwd-sourcing + fs closures (_dispatch.py). They deliberately use NO
+# These pin the cwd-sourcing + fs closures (dispatch.py). They deliberately use NO
 # ledger signal so discharge falls through to the live filesystem under the recorded cwd.
 
 def test_run_stop_checks_resolves_existing_file_against_payload_cwd(tmp_path):
-    # _dispatch.py `payload.get("cwd") or os.getcwd()` + `return os.path.exists(...)`:
+    # dispatch.py `payload.get("cwd") or os.getcwd()` + `return os.path.exists(...)`:
     # a production claim for a non-empty file that exists under payload["cwd"] is discharged ->
     # gate SILENT. The L559 `and` mutant (resolves against os.getcwd()) and the L586 `return
     # None` mutant both fail to find the file there and falsely fire. The unique filename cannot
@@ -127,7 +127,7 @@ def test_run_stop_checks_resolves_existing_file_against_payload_cwd(tmp_path):
 
 
 def test_run_stop_checks_fires_on_empty_file_under_payload_cwd(tmp_path):
-    # _dispatch.py `getsize(full) if isfile(full) else None`: a production claim for a file that
+    # dispatch.py `getsize(full) if isfile(full) else None`: a production claim for a file that
     # EXISTS but is empty (size 0) under payload["cwd"] is NOT discharged -> gate FIRES. The
     # `return None` mutant erases the size signal, fails open to discharged, and wrongly stays
     # silent on an empty-production claim (the §7.1 content-depth break this whole module guards).
@@ -139,8 +139,8 @@ def test_run_stop_checks_fires_on_empty_file_under_payload_cwd(tmp_path):
 
 
 def test_run_stop_checks_empty_text_returns_empty_list_not_none():
-    # _dispatch.py `if not text: return []`: an empty last_assistant_message must return an EMPTY
-    # LIST, not None. The _dispatch call site iterates the result directly in a list
+    # dispatch.py `if not text: return []`: an empty last_assistant_message must return an EMPTY
+    # LIST, not None. The dispatch call site iterates the result directly in a list
     # comprehension (`[... for f in run_stop_checks(...)]`), so the `return None` mutant would
     # raise TypeError and crash the hook on any text-less Stop event. A normal-path early return,
     # not an except branch — it has to be pinned, not documented.

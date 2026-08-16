@@ -4,7 +4,7 @@
 Fires PreToolUse when a tool call would INTRODUCE a claim that the USER interrupted this
 session — either in a git commit (Bash `command`) or in written file content (Write / Edit /
 MultiEdit introduced text) — matching Claude Code's own synthetic marker text
-(`"[Request interrupted by user]"`, `makoto/record/ackblock.py`'s `_SYNTHETIC_MARKERS`) or a
+(`"[Request interrupted by user]"`, `makoto/state/ledger.py`'s `_SYNTHETIC_MARKERS`) or a
 paraphrase of it ("interrupted by the user", "user interrupted"). That marker is HARNESS-
 SYNTHESIZED, host-written, never model-written (see ackblock.py's own spoof-proof-attribution
 note) — so an agent citing it as an excuse for incomplete/abandoned work, when no such
@@ -25,10 +25,10 @@ Knight-Leveson: stdlib re only.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
-from makoto.substrate.factories import introduced_text, makoto_allowed
-from makoto.substrate.io import decode_history_row
+from makoto.vocab import Finding
+from makoto.registry import Check
+from makoto.kit import introduced_text, makoto_allowed
+from makoto.kit import decode_history_row
 
 # The claim, however it's phrased. Matches the harness's own literal bracketed marker AND
 # looser prose paraphrases -- both are the same claim ("the user is why this stopped").
@@ -86,7 +86,7 @@ def predicate(*, current_event: dict, history: list,
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = "Do not write or commit a claim that \"the user interrupted\" this session unless this session's own recorded history actually carries a real harness-set interruption. That marker is host-synthesized, never model-written -- citing it with nothing behind it is a fabricated excuse (same cheat class as content.fabricated_commit_sha). If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
 DESCRIPTION = 'illusory "interrupted by user" claim (no genuine interruption recorded this session) in a commit or written content'
 

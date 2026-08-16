@@ -1,11 +1,11 @@
 """tests for `makoto receipt [--session <id>]` -- read-only chain-receipt inspection (never
 fires). Uses MAKOTO_STATE_DIR (not monkeypatch.setattr on state._state_dir): ledger.py binds
-`_chain_state_dir` at IMPORT time (`from makoto.record.state import _state_dir as _chain_state_dir`),
+`_chain_state_dir` at IMPORT time (`from makoto.state.store import _state_dir as _chain_state_dir`),
 so only the env var is re-read live on every call -- a function-object monkeypatch (the pattern
 test_show_cli.py uses for `_cmd_show`'s own fresh per-call import) would not be seen here."""
 import json
 
-from makoto.record import ledger
+from makoto.state import ledger
 from makoto import __main__ as cli
 def test_receipt_cli_absent_chain_is_vacuous(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))

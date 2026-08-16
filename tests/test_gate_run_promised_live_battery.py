@@ -25,8 +25,8 @@ SAME thread's own next action. The driving Stop event's own last_assistant_messa
 just an inert placeholder here, present only because run_stop_checks bails out entirely (for
 every gate, not just this one) when it is empty.
 
-All RED/TN cases route through `makoto._dispatch.run_stop_checks` -- the SAME function
-`makoto._dispatch.main()` calls for a real Stop event -- with hand-built events-table row tuples
+All RED/TN cases route through `makoto.dispatch.run_stop_checks` -- the SAME function
+`makoto.dispatch.main()` calls for a real Stop event -- with hand-built events-table row tuples
 `(id, ts, event_type, cwd, raw_payload_json)` matching the exact shape `_select_recent` returns
 (not a weaker reimplementation), so a discharge/wiring regression the pure-function unit tests
 (test_run_intent_gate.py) would miss reddens here too -- in particular, the cross-agent cases
@@ -36,9 +36,9 @@ below exercise `_history_for_agent`'s real narrowing, which calling `run_promise
 import json
 import sqlite3
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 from makoto.checks.runIntentUnfulfilled import _last_stop_index, _bash_call_after, _run_intent_claim
-from makoto.substrate.io import decode_history_row
+from makoto.kit import decode_history_row
 
 _COMMIT_DDL = (
     "CREATE TABLE commitments (commitment_key TEXT PRIMARY KEY, session_id TEXT, "

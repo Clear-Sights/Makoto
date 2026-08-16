@@ -17,7 +17,7 @@ from __future__ import annotations
 
 EVENTS: dict[str, dict] = {
     # ── WIRED — hooks/hooks.json wires exactly this set; each names its HANDLERS-table row ────
-    # (_dispatch.py routing is the HANDLERS row table: adding an event is adding one row plus
+    # (dispatch.py routing is the HANDLERS row table: adding an event is adding one row plus
     # at most one handler, never another branch in main().)
     "PreToolUse": {"status": "WIRED", "moves": (
         "_evaluate_and_gate", "_run_predicates", "_emit_decision")},
@@ -54,8 +54,8 @@ EVENTS: dict[str, dict] = {
 
     # ── HOLE — a Makoto-shaped handler exists (or is unit-tested) but isn't shipped-wired ──────
     "ConfigChange": {"status": "HOLE", "reason": (
-        "built, owner-authorized (2026-07-08, per _dispatch_configchange.py's own docstring), "
-        "and unit-tested against constructed payloads (makoto.verdict.configchange_verdict) — "
+        "built, owner-authorized (2026-07-08, per configchange.py's own docstring), "
+        "and unit-tested against constructed payloads (makoto.configchange) — "
         "but wired only in an operator's own local, uncommitted .claude/settings.json for "
         "self-hosted dogfooding, never in this repo's shipped hooks/hooks.json or "
         ".claude-plugin manifest. A live-fire probe during that dogfooding session was recorded "

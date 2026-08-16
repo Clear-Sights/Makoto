@@ -1,6 +1,6 @@
 """CLI entry — makoto status / install / uninstall / pattern.
 
-Hook dispatch (PreToolUse, Stop) is handled by _dispatch.py via the plugin
+Hook dispatch (PreToolUse, Stop) is handled by dispatch.py via the plugin
 shim or settings.json wiring. This module exposes the install lifecycle, a
 status report, and catalog inspection.
 
@@ -22,7 +22,7 @@ import json
 import sys
 from pathlib import Path
 
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.registry import load_precheck_catalog
 
 
 def _cmd_pattern_list() -> int:
@@ -76,7 +76,7 @@ def _cmd_receipt(session_id: str | None) -> int:
     """print the current receipt (Task 2 slice 4) as JSON -- a pure read-time view over the
     chain, never a persisted row. Fail-soft: no chain yet -> a vacuous all-zero receipt, exit 0
     (matching `_cmd_show`'s "no DB yet" discipline; this is inspection, never a gate)."""
-    from makoto.record.receipt import emit_receipt
+    from makoto.state.ledger import emit_receipt
     print(json.dumps(emit_receipt(session_id=session_id), indent=2))
     return 0
 
@@ -88,8 +88,8 @@ def _cmd_show(key: str) -> int:
     never blocks. Fail-soft: no DB yet -> a friendly note, exit 0.
     """
     import sqlite3
-    from makoto.record.state import _state_dir
-    from makoto.record import ledger
+    from makoto.state.store import _state_dir
+    from makoto.state import ledger
     db_path = _state_dir() / "makoto.record.db"
     if not db_path.exists():
         print("makoto show: no makoto.record.db yet (run `makoto install`)", file=sys.stderr)

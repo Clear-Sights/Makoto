@@ -29,15 +29,15 @@ Knight-Leveson: stdlib re only.
 # jscpd note (2026-07-09): flagged as a clone against illusoryAuthorshipTrailer.py. Verified: the
 # matched span is only this docstring's closing "Knight-Leveson" line + the standard
 # `from __future__ import annotations` / `import re` / `from typing import Optional` /
-# `from makoto.core.schema import Finding` + `from makoto.substrate._loader import Check` headers both Pre-hook predicate modules need --
+# `from makoto.vocab import Finding` + `from makoto.registry import Check` headers both Pre-hook predicate modules need --
 # it ends before any function body, so no logic is shared (this module's runner/exit-mask
 # detection is unrelated to illusoryAuthorshipTrailer's Claude-authorship-trailer regex). See
 # tests/test_no_alpha_duplicate_functions.py for the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
+from makoto.vocab import Finding
+from makoto.registry import Check
 from makoto.core._shell import _shell_segments
 
 # Anchored at the (post-wrapper) START of a statement: the runner is INVOKED, not an argument.
@@ -110,7 +110,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     return None
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / set +e. Run the test/build/lint and fix what fails -- a hidden failure that reads as success is a cheat."
 DESCRIPTION = 'verifier exit-code masking (|| true / ; true / set +e on a test/build/lint runner)'
 

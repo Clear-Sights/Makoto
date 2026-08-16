@@ -1,7 +1,5 @@
 """lib/claims.py (L1) — the renamed claim/admission primitives. Pins new names, old-names-gone,
-behaviour, L1 purity."""
-import ast
-from pathlib import Path
+behaviour. (claims.py's import purity is enforced by tests/test_import_direction.py, seam 7.)"""
 
 
 def test_claims_exports_renamed_symbols():
@@ -23,14 +21,6 @@ def test_claims_behaviour_preserved():
     assert claims_done({"last_assistant_message": "All done."}) is True
     assert claims_done({"last_assistant_message": "I am not done."}) is False
     assert claims_success({"last_assistant_message": "I shipped it."}) is not None
-
-
-def test_claims_is_L1_imports_only_L0():
-    src = Path(__file__).resolve().parents[2] / "makoto" / "substrate" / "claims.py"
-    tree = ast.parse(src.read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("makoto"):
-            assert node.module == "makoto.core.lexicons", f"L1 claims may import only L0 lexicons: {node.module}"
 
 
 # --- behavioral cases redistributed verbatim from the dissolved tests/predicates/test_helpers.py (idealization: name<->content) ---

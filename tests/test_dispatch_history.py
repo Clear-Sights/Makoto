@@ -2,7 +2,8 @@
 so the fabrication gates can walk it. Drop the `history=` thread -> this reddens."""
 import sqlite3
 
-import makoto._dispatch as D
+import makoto.dispatch as D
+import makoto.context as CTX
 
 
 def _conn():
@@ -23,7 +24,7 @@ def test_run_stop_checks_threads_history_into_context(monkeypatch):
         captured.update(kw)
         return real(**kw)
 
-    monkeypatch.setattr(D, "GateContext", spy)
+    monkeypatch.setattr(CTX, "GateContext", spy)
     hist = [(1, "t", "live.posttooluse", "/repo",
              '{"tool_name":"Bash","tool_input":{"command":"ls"},"tool_response":{"stdout":"x"}}')]
     D.run_stop_checks(_conn(), {"hook_event_name": "Stop", "last_assistant_message": "hi",

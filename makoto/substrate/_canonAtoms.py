@@ -36,9 +36,9 @@ from __future__ import annotations
 import re
 from typing import Dict, Iterable, List, Tuple
 
-from makoto.core.lexicons import _SUCCESS_SUMMARY_RX
+from makoto.vocab import _SUCCESS_SUMMARY_RX
 from makoto.substrate.claims import whole_suite_pass_claim
-from makoto.substrate.io import bash_output_text, decode_history_row, is_failing_testrun
+from makoto.kit import bash_output_text, decode_history_row, is_failing_testrun
 from makoto.core._shell import (
     _effective_argv,
     _git_subcommand,

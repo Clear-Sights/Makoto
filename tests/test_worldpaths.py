@@ -167,7 +167,7 @@ def test_resolve_no_roots_returns_none():
 
 # ==== end-to-end dispatch: the actual issue #2 repro + controls ==============================
 def _setup_state(tmp_path):
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -181,7 +181,7 @@ def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tu
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,

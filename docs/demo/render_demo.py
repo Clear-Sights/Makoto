@@ -1,6 +1,6 @@
 """docs/demo/render_demo.py — drive 3 REAL scenarios through the actual dispatchers.
 
-Each scenario runs the real `python -m makoto._dispatch` / `python -m makoto._dispatch_configchange`
+Each scenario runs the real `python -m makoto.dispatch` / `python -m makoto.configchange`
 / `python -m makoto receipt` against a fresh, throwaway MAKOTO_STATE_DIR and captures the genuine
 stdout/stderr/exit of every step into `docs/demo/logs/<scenario>.json`. Nothing here is mocked or
 hand-written: the EVENTS are scripted (it is a synthetic session), the DISPATCHERS and their output
@@ -54,7 +54,7 @@ def scenario_block(tmp: Path) -> None:
     state = tmp / "block-state"
     proj = tmp / "block-proj"
     proj.mkdir(parents=True)
-    steps = [_run(["makoto._dispatch"], {
+    steps = [_run(["makoto.dispatch"], {
         "hook_event_name": "PreToolUse",
         "tool_name": "Write",
         "session_id": "demo-block-001",
@@ -76,7 +76,7 @@ def scenario_receipt(tmp: Path) -> None:
     sid = "demo-session-001"
 
     def post_write(content: str, title: str) -> dict:
-        return _run(["makoto._dispatch"], {
+        return _run(["makoto.dispatch"], {
             "hook_event_name": "PostToolUse", "tool_name": "Write", "session_id": sid,
             "cwd": str(proj),
             "tool_input": {"file_path": str(proj / "src/auth.py"), "content": content},
@@ -84,7 +84,7 @@ def scenario_receipt(tmp: Path) -> None:
         }, state, "PostToolUse Write src/auth.py", title)
 
     def post_pytest(stdout: str, exit_code: int, title: str) -> dict:
-        return _run(["makoto._dispatch"], {
+        return _run(["makoto.dispatch"], {
             "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid,
             "cwd": str(proj),
             "tool_input": {"command": "python -m pytest tests/test_auth.py -q -rA"},
@@ -106,7 +106,7 @@ def scenario_receipt(tmp: Path) -> None:
             "PASSED tests/test_auth.py::test_login\n"
             "=== 1 passed in 0.06s ===\n", 0,
             "the rerun PASSES — the test-delta redirect fires and is ITSELF chain-appended (kind=audit)"),
-        _run(["makoto._dispatch"], {
+        _run(["makoto.dispatch"], {
             "hook_event_name": "Stop", "session_id": sid, "cwd": str(proj),
             "last_assistant_message": "Fixed src/auth.py — test_login passes now. Done.",
         }, state, "Stop", "the closing claim is checked against the recorded ledger: clean, allowed"),
@@ -125,7 +125,7 @@ def scenario_configchange(tmp: Path) -> None:
     settings = proj / ".claude" / "settings.json"
     settings.write_text(json.dumps(
         {"hooks": {"PreToolUse": [], "PostToolUse": [], "Stop": []}}, indent=1))
-    steps = [_run(["makoto._dispatch_configchange"], {
+    steps = [_run(["makoto.configchange"], {
         "hook_event_name": "ConfigChange",
         "session_id": "demo-configchange-001",
         "cwd": str(proj),

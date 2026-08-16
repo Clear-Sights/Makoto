@@ -7,12 +7,12 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-import makoto.record.db as vdb
-import makoto._dispatch  # noqa: F401 — importing the L3 orchestrator installs the exemption sink
-from makoto.core.schema import PreCheck
-from makoto.substrate._loader import load_precheck_catalog
-from makoto.record import audit
-from makoto.substrate import factories
+import makoto.state.store as vdb
+import makoto.dispatch  # noqa: F401 — importing the L3 orchestrator installs the exemption sink
+from makoto.vocab import PreCheck
+from makoto.registry import load_precheck_catalog
+from makoto.state import audit
+from makoto import kit as factories
 
 
 def _state(tmp: Path) -> Path:
@@ -96,8 +96,8 @@ def test_regex_factory_path_also_records(tmp_path):
 def test_disabled_pattern_suppression_is_recorded(tmp_path, monkeypatch):
     """MAKOTO_DISABLE_PATTERNS muting a pattern that keyword-hits the payload leaves a record —
     the silent-disable gap closed; parity with the already-audited MAKOTO_DISABLE_GATES."""
-    from makoto._dispatch import _run_predicates
-    from makoto.substrate._loader import load_precheck_catalog
+    from makoto.dispatch import _run_predicates
+    from makoto.registry import load_precheck_catalog
     st = _state(tmp_path)
     conn = sqlite3.connect(str(st / "makoto.record.db"))
     pat = next(p for p in load_precheck_catalog() if p.predicate_module and p.keywords)
@@ -134,7 +134,7 @@ def test_append_exemption_also_chain_appends_with_renamed_kind(tmp_path):
     'exemption'; the original suppression-mechanism kind ('makoto-allow'/'disabled-pattern') is
     renamed to exemption_kind in the chain payload only, so it never collides with the chain's
     own kind field -- the exemptions.jsonl line itself is untouched (still keyed 'kind')."""
-    from makoto.record import ledger as _ledger
+    from makoto.state import ledger as _ledger
     st = _state(tmp_path)
     audit.append_exemption(st, pattern_id="content.timing_unsafe_compare", kind="makoto-allow", file="h.py", line=4,
                            reason="constant-time compare not needed here", snippet="a == b")
@@ -161,8 +161,8 @@ def test_set_exemption_sink_is_restorable(tmp_path):
 
 def test_no_disable_env_means_no_suppression_work(tmp_path):
     """default case: MAKOTO_DISABLE_PATTERNS unset -> no disabled-pattern rows ever written."""
-    from makoto._dispatch import _run_predicates
-    from makoto.substrate._loader import load_precheck_catalog
+    from makoto.dispatch import _run_predicates
+    from makoto.registry import load_precheck_catalog
     st = _state(tmp_path)
     conn = sqlite3.connect(str(st / "makoto.record.db"))
     pat = next(p for p in load_precheck_catalog() if p.predicate_module and p.keywords)

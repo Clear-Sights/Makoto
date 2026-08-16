@@ -11,7 +11,7 @@ matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts)
 import re
 
 from makoto.checks import normalize_path
-from makoto.substrate.io import bash_output_text, is_test_runner
+from makoto.kit import bash_output_text, is_test_runner
 
 _PATH_IN_CMD_RX = re.compile(r"[\w.\-]+/[\w.\-]+\.\w+|`?([\w.\-]+\.\w+)`?")
 
@@ -152,7 +152,7 @@ def view_for(conn, session) -> "LedgerView":
     """Build the unified ledger read-surface for one session.
 
     `session` is either a bare session_id string, or an event/hook-payload dict carrying one
-    under `"session_id"` (the same two shapes `_dispatch.py` already juggles: a raw payload at
+    under `"session_id"` (the same two shapes `dispatch.py` already juggles: a raw payload at
     the hook boundary, a bare `sid` once unpacked) — so a check can pass through whichever it
     already has in hand. A dict with no `session_id` key resolves to `""` (matches every
     existing ledger read function's fail-open-to-empty behavior for an unknown session), never
@@ -183,7 +183,7 @@ def latest_testrun(conn, session_id: str) -> str:
 # The chained, tamper-evident surface (owner decision 2026-07-07: verification lives IN the
 # ledger — the gates' verdicts depend on these rows, so the store and its verifier share one
 # home). Ported by shape from Assay's kernel/ledger.py + identity (the substrate the SPEC-5
-# merge dropped), re-homed onto makoto.record.state._state_dir(). Append-only JSONL with
+# merge dropped), re-homed onto makoto.state.store._state_dir(). Append-only JSONL with
 # prev_hash/row_hash links; verify_chain names the exact broken row; an exclusive fcntl.flock
 # across tail-read+append means concurrent hook invocations can never fork the chain.
 # Relationship to the sqlite surface above: sqlite stays the latest-wins QUERY INDEX; this is
@@ -195,7 +195,7 @@ import json as _json
 from pathlib import Path
 from typing import Optional
 
-from makoto.record.state import _state_dir as _chain_state_dir
+from makoto.state.store import _state_dir as _chain_state_dir
 
 _DEFAULT_STREAM = "chain"
 OPEN = "open"
@@ -335,3 +335,262 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
         expected_prev = row.get("row_hash", "")
         idx += 1
     return None
+
+
+# =============================================================================================
+# ackblock (merged from record/ackblock.py -- Stage 2 seam 1)
+_ACKBLOCK_DOC = """ackblock: Task 2 slice 5 -- the discharge mechanism for session-level canon fingerprints
+(DESIGN DECISION 2026-07-07, recorded verbatim in the plan). A SESSION-LEVEL fingerprint
+(gate.canon_fingerprints) matches over the whole recorded call stream; once its atoms go true
+they stay true forever (recorded history is immutable), so without a real discharge path it
+becomes a PERMANENT block for the rest of the session after any one matching action -- even a
+fully owner-sanctioned one. Rejected discharges: narrowing the detector (voids the 0-FP
+certificate + teaches a gaming recipe), and operator self-disable (normalizes the one action
+Makoto must never normalize). The decided discharge: an OPERATOR-ATTRIBUTABLE
+`release.operator` record, never prose, never atom-narrowing.
+
+D8a (docs/DEFERRED.md, DESIGN DECISION 2026-07-08, rename-only, owner-authorized 2026-07-08):
+this mechanism is the `release.operator` tier of Makoto's `release` family (`release.green` --
+world-verified, agent-earnable -- is a distinct, not-yet-built future item; this module
+implements ONLY the host-transcript-attributed tier). Epoch reset (2026-07-10, owner
+decision): the phrase a human types and the chain `kind` are EXACTLY `release.operator` -- the
+former accept-the-original-forever guarantee (and the alias-table discipline it mirrored) was
+retired outright; state predating the reset is archived (zip) or wiped by the operator, so no
+record remains whose meaning depends on the old forms.
+
+SPOOF-PROOF ATTRIBUTION (the load-bearing part): the ack is NEVER trusted from ledger/chain
+content -- at CHECK TIME Makoto re-derives it from the HOST-WRITTEN transcript file every time.
+A transcript entry is a valid ack iff it:
+  1. has top-level role "user" (`entry["message"]["role"] == "user"`, real transcript shape --
+     confirmed against this session's own transcript JSONL, 2026-07-07);
+  2. carries NO `toolUseResult` field (excludes tool-result turns -- the only agent-producible
+     user-role entries; a tool call cannot write a top-level `toolUseResult`-free user turn);
+  3. is not synthetic/system-injected -- no `<system-reminder`/hook-output/task-notification
+     marker, and not the harness's own "[Request interrupted by user]" synthetic text;
+  4. is timestamped AFTER the fingerprint's first-fired ts in THIS session (derived from the
+     chain's own unified audit trail -- slice 3b -- never from prose);
+  5. contains the literal token `makoto release.operator <fingerprint-id>` plus a nonempty
+     reason naming that exact id.
+No agent tool call, subagent output, or file write can forge such an entry -- the transcript is
+host-written, never model-written. A found ack is chain-appended (kind="release.operator")
+for the receipt/audit trail, but the DISCHARGE
+decision itself is re-derived from the transcript on every evaluation, never read back from that
+row (`record_ack_block_if_new` only avoids duplicate chain rows across repeated Stops -- see its
+own docstring).
+"""
+import json
+_ACK_RX = re.compile(
+    r"makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
+# [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon
+# itself (id becomes "name:", never matching the real fingerprint id) -- found live by
+# test_genuine_ack_after_first_fired_discharges/test_ack_rejected_when_reason_is_empty, which
+# also caught the mirror bug (an id-only ack with nothing after the colon matching "" -> ":" as
+# a non-empty-looking "reason" via backtracking). Excluding ':' from the id group closes both.
+# Epoch reset (2026-07-10, owner decision): `release.operator` is the ONLY discharge phrase.
+# The former dual-phrase acceptance existed to keep pre-rename records/habits working; the owner
+# retired that guarantee outright -- state predating the reset is archived (zip) or wiped, so
+# there is no history left whose meaning depends on the old phrase."""
+_SYNTHETIC_MARKERS = (
+    "<system-reminder", "<user-prompt-submit-hook", "<task-notification",
+    "<local-command-caveat", "[request interrupted by user]",
+)
+
+
+def _entry_text(entry: dict) -> str:
+    msg = entry.get("message")
+    content = msg.get("content") if isinstance(msg, dict) else None
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            str(item.get("text", "")) for item in content
+            if isinstance(item, dict) and item.get("type") == "text"
+        )
+    return ""
+
+
+def _is_genuine_user_turn(entry: dict) -> Optional[str]:
+    """Return the entry's text iff it is a genuine, host-written, non-synthetic user turn (ack
+    contract points 1-3) -- else None. A tool result or a synthetic/system-injected turn can
+    never qualify, no matter what text it happens to contain."""
+    msg = entry.get("message")
+    if not isinstance(msg, dict) or msg.get("role") != "user":
+        return None
+    if "toolUseResult" in entry:
+        return None
+    text = _entry_text(entry)
+    low = text.lower()
+    if any(marker in low for marker in _SYNTHETIC_MARKERS):
+        return None
+    return text
+
+
+def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
+                    session_id: Optional[str] = None,
+                    root: Optional[Path] = None) -> Optional[str]:
+    """The earliest chain-recorded ts at which `gate_pattern_id` fired NAMING fingerprint_id,
+    read from the unified audit trail (slice 3b -- every dispatch audit row is chain-appended).
+    None if it has never fired in this chain. Chronological order is the chain's own append
+    order, so the first match IS the earliest. `gate_pattern_id` generalizes this beyond
+    gate.canon_fingerprints (Task 0b: gate.canon's canon.timeout has the SAME no-discharge shape
+    when the last error is a genuinely unresolvable, operator-surfaced block -- one mechanism,
+    two gates, per SPEC-C's "one mercy model")."""
+    needle = f"canon.{fingerprint_id}:"
+    for row in read(root=root):
+        if row.get("kind") != "audit":
+            continue
+        if session_id is not None and row.get("session_id") != session_id:
+            continue
+        if gate_pattern_id not in (row.get("pattern_fires") or []):
+            continue
+        for finding in row.get("findings") or ():
+            if needle in (finding.get("message") or ""):
+                return row.get("ts")
+    return None
+
+
+def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
+                   gate_pattern_id: str = "gate.canon_fingerprints",
+                   session_id: Optional[str] = None,
+                   root: Optional[Path] = None) -> Optional[dict]:
+    """Scan the host-written transcript at `transcript_path` for a qualifying release.operator turn for
+    `fingerprint_id` (fired under `gate_pattern_id`). Returns {"fingerprint_id", "reason", "ts"}
+    for the FIRST qualifying turn found, or None. Never raises: an absent/unreadable transcript
+    or an unfired fingerprint (no first-fired ts to compare against) both read as "no ack" --
+    fail-closed on the BLOCK side, which is the safe direction (a discharge must be earned, never
+    assumed)."""
+    if not transcript_path:
+        return None
+    since_ts = _first_fired_ts(fingerprint_id, gate_pattern_id=gate_pattern_id,
+                               session_id=session_id, root=root)
+    if since_ts is None:
+        return None
+    p = Path(transcript_path)
+    if not p.exists():
+        return None
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        text = _is_genuine_user_turn(entry)
+        if text is None:
+            continue
+        ts = entry.get("timestamp", "")
+        if not ts or ts <= since_ts:
+            continue
+        m = _ACK_RX.search(text)
+        if not m:
+            continue
+        # group(2) can still capture a bare leftover separator (e.g. id-only "notestedit_destruct:"
+        # backtracks to reason=":") when nothing real follows -- strip stray leading punctuation
+        # before the truthiness check, rather than trust the regex to have consumed it.
+        acked_id = m.group(1).strip()
+        reason = m.group(2).strip().lstrip(":- ").strip()
+        if acked_id != fingerprint_id or not reason:
+            continue
+        return {"fingerprint_id": fingerprint_id, "reason": reason, "ts": ts}
+    return None
+
+
+# Epoch reset (2026-07-10): exactly one chain kind means "an operator-attributed release".
+_RELEASE_OPERATOR_KINDS = frozenset({"release.operator"})
+
+
+def record_ack_block_if_new(ack: dict, *, session_id: Optional[str] = None,
+                            root: Optional[Path] = None) -> bool:
+    """Chain-append a `release.operator` row for `ack` (kind="release.operator") UNLESS this
+    exact (fingerprint_id, session_id) pair is already recorded -- avoids flooding the chain with a duplicate row on every
+    subsequent Stop for the rest of the session (the ack is re-derived from the transcript every
+    time regardless; this is purely the audit/receipt trail, never the discharge decision
+    itself). Returns True iff a new row was appended. Never raises: a chain fault must not block
+    the Stop-gate evaluation it accompanies."""
+    try:
+        for row in read(root=root):
+            if (row.get("kind") in _RELEASE_OPERATOR_KINDS
+                    and row.get("fingerprint_id") == ack["fingerprint_id"]
+                    and row.get("session_id") == session_id):
+                return False
+        append({
+            "kind": "release.operator",
+            "fingerprint_id": ack["fingerprint_id"],
+            "reason": ack["reason"],
+            "acked_at": ack["ts"],
+            "session_id": session_id,
+        }, root=root)
+        return True
+    except Exception:
+        return False
+
+
+# =============================================================================================
+# receipt (merged from record/receipt.py -- Stage 2 seam 1)
+_RECEIPT_DOC = """The receipt emitter (Task 2 slice 4) -- Makoto blocks the illusory word but, until now,
+issued no tender for the kept one; the README promises "trustworthy tender... without
+re-deriving it" and nothing emitted it. This closes that gap.
+
+DESIGN DECISION 2026-07-07 (curated brief: claim kinds, shape, persistence):
+  1. Only `verdict`/`certified-fact`/`testrun` chain rows count as CLAIMS -- kinds that assert
+     something about the world (the ancestor canon/mint.py's "spendable if backed by a real
+     deed" test). `audit`/`touched`/`release.operator`/`fetch`/`exemption` are records of deeds and
+     machinery, not claims, and folding them in would blur exactly the distinction the receipt
+     exists to expose.
+  2. One dict per call: {ts, session_id, chain_name, verified_through, claims, claim_count,
+     trace_bound_count, exemption_count} -- a list of citations plus PARALLEL counts, never
+     combined into one score (HOURGLASS: a measure you optimize for stops measuring). Every
+     claim cites its own row_index/row_hash, independently re-checkable against `verify_chain`.
+  3. A PURE READ-TIME VIEW -- nothing persisted. A 4th file to keep in sync, or a chain row that
+     could only attest to a chain it is itself inside, both cut against this project's own "one
+     stream, everything else a view" goal (SPEC-C item 1).
+
+`trace_bound` = at or before `verified_through`'s cut (or every row, if the whole chain is
+intact) -- a claim AFTER the first broken link can no longer be trusted to be what it claims to
+be, so it is excluded from trace_bound_count (though still listed in `claims`, undisguised).
+"""
+_CLAIM_KINDS = frozenset({"verdict", "certified-fact", "testrun"})
+_EXEMPTION_KIND = "exemption"
+
+
+def _session_matches(row: dict, session_id: Optional[str]) -> bool:
+    return session_id is None or row.get("session_id") == session_id
+
+
+def _trace_bound(row_index: int, verified_through: Optional[int]) -> bool:
+    return verified_through is None or row_index < verified_through
+
+
+def emit_receipt(*, session_id: Optional[str] = None, name: str = "chain",
+                 root: Optional[Path] = None) -> dict:
+    """Compute one receipt over the chain at `root` (env-var default when None), optionally
+    scoped to one `session_id`. Never raises: reads `ledger.read`/`verify_chain`, both of which
+    are themselves never-raise (absent/empty chain -> a vacuous, all-zero receipt)."""
+    rows = read(name=name, root=root)
+    verified_through = verify_chain(name=name, root=root)
+
+    claims = [
+        {"claim_kind": row.get("kind"), "row_index": idx, "row_hash": row.get("row_hash", "")}
+        for idx, row in enumerate(rows)
+        if row.get("kind") in _CLAIM_KINDS and _session_matches(row, session_id)
+    ]
+    trace_bound_count = sum(1 for c in claims if _trace_bound(c["row_index"], verified_through))
+    exemption_count = sum(
+        1 for idx, row in enumerate(rows)
+        if row.get("kind") == _EXEMPTION_KIND and _session_matches(row, session_id)
+        and _trace_bound(idx, verified_through)
+    )
+    return {
+        "session_id": session_id,
+        "chain_name": name,
+        "verified_through": verified_through,
+        "claims": claims,
+        "claim_count": len(claims),
+        "trace_bound_count": trace_bound_count,
+        "exemption_count": exemption_count,
+    }

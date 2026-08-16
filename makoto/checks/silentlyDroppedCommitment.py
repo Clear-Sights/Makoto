@@ -3,9 +3,9 @@ import os
 import re
 from typing import Optional
 from makoto.checks import normalize_path
-from makoto.core.lexicons import _EMPTY_OK
-from makoto.core.schema import Finding
-from makoto.substrate._shared import _path_components, _suffix_match
+from makoto.vocab import _EMPTY_OK
+from makoto.vocab import Finding
+from makoto.kit import _path_components, _suffix_match
 
 
 _DROP_FORWARD = r"(?:I['’]?ll|I\s+will|I['’]?m\s+going\s+to|I\s+am\s+going\s+to|let\s+me|let['’]s|let\s+us|going\s+to|i\s+plan\s+to|next\s+i\s+will|we['’]?ll|we\s+will|i\s+need\s+to|i\s+should|i\s+want\s+to)"
@@ -183,7 +183,7 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
     return None
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
                run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))

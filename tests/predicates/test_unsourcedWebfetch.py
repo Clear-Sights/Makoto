@@ -1,7 +1,7 @@
 """tests for content.unsourced_webfetch — WebFetch URL not in prior tool_result."""
 import json
 from makoto.checks.unsourcedWebfetch import predicate
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 
 
 _PAT = PreCheck(

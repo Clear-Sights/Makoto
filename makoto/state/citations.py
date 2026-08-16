@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from makoto.core.lexicons import _CITATION_RX, _CITATION_AUTHOR_STOPWORDS
+from makoto.vocab import _CITATION_RX, _CITATION_AUTHOR_STOPWORDS
 
 
 # --- extract: text -> [(cite, line, snippet)] for pattern-1.6 validation -----------
@@ -64,7 +64,7 @@ def extract_citations(text: str) -> list[tuple[str, int, str]]:
 def refresh_if_stale(conn) -> None:
     """if docs/CITATIONS.md mtime exceeds stored mtime, rebuild canonical_citations.
 
-    Spec §5.2. Called by _dispatch.py after the sqlite connect, before any predicate
+    Spec §5.2. Called by dispatch.py after the sqlite connect, before any predicate
     runs. Single source of truth: both the path AND the stored mtime live in the
     `config` table (v5 fix #16). Atomic rebuild via BEGIN/DELETE/INSERTs/COMMIT
     (honored because the connection opens in autocommit mode, isolation_level=None).

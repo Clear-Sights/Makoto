@@ -18,8 +18,8 @@ disk), so a discharge/wiring regression that the pure-function unit tests miss r
 """
 import sqlite3
 
-from makoto.record import ledger as _L
-from makoto._dispatch import run_stop_checks
+from makoto.state import ledger as _L
+from makoto.dispatch import run_stop_checks
 
 _COMMIT_DDL = (
     "CREATE TABLE commitments (commitment_key TEXT PRIMARY KEY, session_id TEXT, "

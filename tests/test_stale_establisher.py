@@ -1,7 +1,7 @@
 """makoto.checks.staleEstablisher -- the opt-in ADVISORY (never blocking) ground-truth
 staleness detector (SPEC-5). Falsifying tests for the check() logic itself, and a structural
 proof that it can never block: its CHECK export stays `may_block=False` (2026-07-10, retiring
-`load_stopchecks()`/`GATE`), so its pattern_id can never enter _dispatch._blocking_gate_ids()
+`load_stopchecks()`/`GATE`), so its pattern_id can never enter dispatch._blocking_gate_ids()
 regardless of what `.level` its own Finding carries.
 """
 from __future__ import annotations
@@ -54,10 +54,10 @@ def test_check_clean_when_establisher_still_open():
 
 def test_never_discovered_as_a_blocking_stop_gate():
     """Structural proof of the never-BLOCK guarantee: staleEstablisher's CHECK stays
-    may_block=False, so it never enters _dispatch._blocking_gate_ids() (load_checks(edge="Stop")-
+    may_block=False, so it never enters dispatch._blocking_gate_ids() (load_checks(edge="Stop")-
     derived, filtered on may_block) regardless of what `.level` its own Finding carries."""
     assert staleEstablisher.CHECK.may_block is False
-    from makoto.substrate._loader import load_checks
+    from makoto.registry import load_checks
     live_ids = {c.id for c in load_checks(edge="Stop") if c.may_block}
     assert "gate.stale_establisher" not in live_ids
 
@@ -65,5 +65,5 @@ def test_never_discovered_as_a_blocking_stop_gate():
 def test_check_export_is_advisory_and_stop_scoped():
     assert staleEstablisher.CHECK.id == "gate.stale_establisher"
     assert staleEstablisher.CHECK.applies_at == "Stop"
-    from makoto.verdict.posture import ADVISE
+    from makoto.verdict import ADVISE
     assert staleEstablisher.CHECK.posture == ADVISE

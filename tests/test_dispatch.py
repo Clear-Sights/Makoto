@@ -1,4 +1,4 @@
-"""end-to-end dispatcher tests for makoto/_dispatch.py (SQLite(WAL) backend)."""
+"""end-to-end dispatcher tests for makoto/dispatch.py (SQLite(WAL) backend)."""
 import json
 import os
 import subprocess
@@ -10,7 +10,7 @@ import pytest
 
 def _setup_state(tmp_path):
     """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -19,13 +19,13 @@ def _setup_state(tmp_path):
 
 
 def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto._dispatch` with payload on stdin; return (exit, stdout)."""
+    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
@@ -92,7 +92,7 @@ def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=b"not json{{{",
         capture_output=True,
         env=env,
@@ -128,7 +128,7 @@ def test_dispatch_clean_appended_chain_self_verify_silent_no_fact(tmp_path, monk
     is a tamper detector, not a mere-presence trip."""
     state_dir = _setup_state(tmp_path)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
-    from makoto.record import ledger as _ledger
+    from makoto.state import ledger as _ledger
     _ledger.append({"kind": "verdict", "key": "a"})
     _ledger.append({"kind": "verdict", "key": "b"})
     payload = {
@@ -148,7 +148,7 @@ def test_dispatch_tampered_chain_self_verify_advisory_fact_never_blocks(tmp_path
     clean-chain case; only the audit trail differs."""
     state_dir = _setup_state(tmp_path)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
-    from makoto.record import ledger as _ledger
+    from makoto.state import ledger as _ledger
     _ledger.append({"kind": "verdict", "key": "a"})
     _ledger.append({"kind": "verdict", "key": "b"})
     chain_file = _chain_path(state_dir)
@@ -178,7 +178,7 @@ def test_dispatch_non_object_payload_blocks_exit_2_with_fact(tmp_path):
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     for raw in (b'["not","an","object"]', b'"a bare string"', b'null'):
         proc = subprocess.run(
-            [sys.executable, "-m", "makoto._dispatch"],
+            [sys.executable, "-m", "makoto.dispatch"],
             input=raw, capture_output=True, env=env,
             cwd=str(Path(__file__).parent.parent),
         )
@@ -191,14 +191,14 @@ def test_dispatch_non_object_payload_blocks_exit_2_with_fact(tmp_path):
 def test_dispatch_db_init_failure_loud_allows_with_fact(tmp_path, monkeypatch):
     """HYBRID infra: lazy DB init failure -> loud-ALLOW (exit 0) + fact (never crash, never silent)."""
     import io
-    from makoto import _dispatch
+    from makoto import dispatch
     state_dir = tmp_path / "makoto_state"
     state_dir.mkdir(parents=True)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
-    monkeypatch.setattr(_dispatch, "_ensure_db_initialized", lambda *a, **k: False)
+    monkeypatch.setattr(dispatch, "_ensure_db_initialized", lambda *a, **k: False)
     payload = {"hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/tmp", "tool_input": {}}
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    assert _dispatch.main() == 0
+    assert dispatch.main() == 0
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.db_init_failed" for f in facts), facts
 
@@ -206,13 +206,13 @@ def test_dispatch_db_init_failure_loud_allows_with_fact(tmp_path, monkeypatch):
 def test_dispatch_db_lock_loud_allows_with_fact(tmp_path, monkeypatch):
     """HYBRID infra: write-lock not acquired -> loud-ALLOW (exit 0) + fact."""
     import io
-    from makoto import _dispatch
+    from makoto import dispatch
     state_dir = _setup_state(tmp_path)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
-    monkeypatch.setattr(_dispatch, "_connect_with_retry", lambda *a, **k: None)
+    monkeypatch.setattr(dispatch, "_connect_with_retry", lambda *a, **k: None)
     payload = {"hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/tmp", "tool_input": {}}
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    assert _dispatch.main() == 0
+    assert dispatch.main() == 0
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.db_locked" for f in facts), facts
 
@@ -221,21 +221,21 @@ def test_dispatch_body_exception_loud_allows_with_fact(tmp_path, monkeypatch):
     """HYBRID infra: an unexpected body fault -> loud-ALLOW (exit 0, never crash to non-zero) + fact
     (Exception, not BaseException, so Ctrl-C still propagates)."""
     import io
-    from makoto import _dispatch
+    from makoto import dispatch
     state_dir = _setup_state(tmp_path)
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(state_dir))
     def boom(*a, **k):
         raise RuntimeError("ingest blew up")
-    monkeypatch.setattr(_dispatch, "_ingest_event", boom)
+    monkeypatch.setattr(dispatch, "_ingest_event", boom)
     payload = {"hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/tmp", "tool_input": {}}
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    assert _dispatch.main() == 0
+    assert dispatch.main() == 0
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.exception" for f in facts), facts
 
 
 def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
-    """if makoto.record.db is absent, _dispatch.main() creates it on first call."""
+    """if makoto.record.db is absent, dispatch.main() creates it on first call."""
     state_dir = tmp_path / "makoto_state"
     # DO NOT call init_db here — the dispatcher must create it lazily.
     state_dir.mkdir(parents=True)
@@ -248,7 +248,7 @@ def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
@@ -269,7 +269,7 @@ def test_connect_with_retry_fails_open_on_lock(monkeypatch):
     rather than racing two processes for a lock.
     """
     import sqlite3
-    from makoto import _dispatch
+    from makoto import dispatch
     calls = {"n": 0}
 
     def _locked(*a, **kw):
@@ -277,21 +277,21 @@ def test_connect_with_retry_fails_open_on_lock(monkeypatch):
         raise sqlite3.OperationalError("database is locked")
 
     monkeypatch.setattr(sqlite3, "connect", _locked)
-    assert _dispatch._connect_with_retry(Path("/tmp/whatever.db")) is None
-    assert calls["n"] == _dispatch._LOCK_RETRY_ATTEMPTS  # retried the full budget, then gave up
+    assert dispatch._connect_with_retry(Path("/tmp/whatever.db")) is None
+    assert calls["n"] == dispatch._LOCK_RETRY_ATTEMPTS  # retried the full budget, then gave up
 
 
 def test_connect_with_retry_reraises_non_lock_errors(monkeypatch):
     """A non-lock OperationalError is a real bug, not contention — it must propagate,
     never be silently swallowed as fail-open (that would mask corruption)."""
     import sqlite3
-    from makoto import _dispatch
+    from makoto import dispatch
     def _boom(*a, **kw):
         raise sqlite3.OperationalError("no such table: events")
 
     monkeypatch.setattr(sqlite3, "connect", _boom)
     with pytest.raises(sqlite3.OperationalError):
-        _dispatch._connect_with_retry(Path("/tmp/whatever.db"))
+        dispatch._connect_with_retry(Path("/tmp/whatever.db"))
 
 
 def test_dispatch_skips_audit_row_when_no_findings(tmp_path):
@@ -396,7 +396,7 @@ def test_dispatch_audit_row_records_tool_name(tmp_path):
 def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
     """PostToolUse Write -> a `touched` ledger row (the update recorder, wired live)."""
     import sqlite3
-    from makoto.record import ledger
+    from makoto.state import ledger
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PostToolUse",
@@ -420,7 +420,7 @@ def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
 def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
     """PostToolUse Bash -> a `value` ledger row keyed by the path token in the command."""
     import sqlite3
-    from makoto.record import ledger
+    from makoto.state import ledger
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PostToolUse",
@@ -1380,7 +1380,7 @@ def test_dispatch_named_test_gate_blocks_through_subagent_stop(tmp_path):
     (test_dispatch_named_test_gate_blocks_after_recorded_named_red above) must block IDENTICALLY
     when it arrives as a SubagentStop event — a sub-agent's own completion claim is checked by the
     same gates a main-thread Stop claim is checked by. Breaking the `hook_event in ("Stop",
-    "SubagentStop")` branch in _dispatch.main() reddens this while leaving the Stop-path sibling
+    "SubagentStop")` branch in dispatch.main() reddens this while leaving the Stop-path sibling
     test green, proving the SubagentStop route specifically."""
     state_dir = _setup_state(tmp_path)
     post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "nt_sub",
@@ -1614,8 +1614,8 @@ def test_dispatch_self_wired_gate_never_blocks_through_subagent_stop(tmp_path):
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
     (claude_dir / "settings.json").write_text(json.dumps({"hooks": {
-        "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto._dispatch"}]}],
-        "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto._dispatch"}]}],
+        "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
         # Stop entry deliberately absent -> a partial strip -> gate.self_wired fires, advisory only.
     }}))
     subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "sw_sub", "cwd": str(tmp_path),
@@ -1663,8 +1663,8 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
     (claude_dir / "settings.json").write_text(json.dumps({"hooks": {
-        "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto._dispatch"}]}],
-        "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto._dispatch"}]}],
+        "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
         # Stop entry deliberately absent -> a partial strip -> gate.self_wired fires, advisory only.
     }}))
     stop = {"hook_event_name": "Stop", "session_id": "sw", "cwd": str(tmp_path),
@@ -1720,8 +1720,8 @@ def test_no_shadow_gate_every_gate_blocks():
     was CUT 2026-06-02 — it could not block FP-safely. A future shadow gate (discoverable but
     routed around _blocking_gate_ids(), or wired into run_stop_checks without may_block) turns
     this red."""
-    from makoto.substrate._loader import load_checks
-    from makoto._dispatch import _blocking_gate_ids
+    from makoto.registry import load_checks
+    from makoto.dispatch import _blocking_gate_ids
     live = [c for c in load_checks(edge="Stop") if c.may_block]
     discovered = {c.id for c in live}
     assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
@@ -1771,7 +1771,7 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     test_dispatch_self_wired_gate_never_blocks_even_when_it_fires (this file), which proves the
     opposite claim: it fires (audited) and never blocks."""
     from pathlib import Path as _P
-    from makoto._dispatch import _blocking_gate_ids
+    from makoto.dispatch import _blocking_gate_ids
     # gate.canon_fingerprints_advisory (SPEC-5 Task 9, DESIGN DECISION 26) is the second documented
     # exception, same shape as gate.self_wired: discovered (so it appears in _blocking_gate_ids())
     # but ships at level="advisory" only, never "error" -- structurally cannot block. Its behavioral
@@ -1787,7 +1787,7 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
 
 
 # ---------------------------------------------------------------------------
-# Line-level pinning tests (mutation-audit gap closure for _dispatch.py).
+# Line-level pinning tests (mutation-audit gap closure for dispatch.py).
 # Each test below reddens a specific surviving single-token mutant; the
 # (lineno, kind) it closes is named in the docstring.
 # ---------------------------------------------------------------------------
@@ -1817,7 +1817,7 @@ def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
@@ -1851,7 +1851,7 @@ def test_dispatch_lazy_init_failure_fails_open_not_crash(tmp_path):
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
@@ -1873,18 +1873,18 @@ def test_connect_with_retry_sleeps_backoff_between_attempts(monkeypatch):
     mutation changes the observed sleep count, so pinning it to ATTEMPTS-1 reddens both.
     """
     import sqlite3
-    from makoto import _dispatch
+    from makoto import dispatch
     sleeps = {"n": 0}
 
     def _locked(*a, **kw):
         raise sqlite3.OperationalError("database is locked")
 
     monkeypatch.setattr(sqlite3, "connect", _locked)
-    monkeypatch.setattr(_dispatch.time, "sleep", lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1))
-    assert _dispatch._connect_with_retry(Path("/tmp/whatever.db")) is None
-    assert sleeps["n"] == _dispatch._LOCK_RETRY_ATTEMPTS - 1, (
+    monkeypatch.setattr(dispatch.time, "sleep", lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1))
+    assert dispatch._connect_with_retry(Path("/tmp/whatever.db")) is None
+    assert sleeps["n"] == dispatch._LOCK_RETRY_ATTEMPTS - 1, (
         "backoff must sleep between every attempt except the last "
-        f"(expected {_dispatch._LOCK_RETRY_ATTEMPTS - 1}, got {sleeps['n']})"
+        f"(expected {dispatch._LOCK_RETRY_ATTEMPTS - 1}, got {sleeps['n']})"
     )
 
 
@@ -1895,8 +1895,8 @@ def test_keyword_hit_empty_keywords_returns_false():
     `return False` to `return None`/`return True` makes an empty-keyword pattern (synthetic,
     a defensive branch) claim a hit on any payload. Direct unit on the helper.
     """
-    from makoto._dispatch import _keyword_hit
-    from makoto.core.schema import PreCheck
+    from makoto.dispatch import _keyword_hit
+    from makoto.vocab import PreCheck
     pattern = PreCheck(id="x", description="d", fire_level="error",
                       predicate_module="m", keywords=[], retry_hint="")
     assert _keyword_hit(pattern, "any payload at all") is False
@@ -1910,8 +1910,8 @@ def test_keyword_hit_all_keywords_present_returns_true():
     all keywords are present -> the hit is lost. Asserting True on an all-present payload reddens
     the swap (a partial-present payload would not, since `not in` is True for the missing kw).
     """
-    from makoto._dispatch import _keyword_hit
-    from makoto.core.schema import PreCheck
+    from makoto.dispatch import _keyword_hit
+    from makoto.vocab import PreCheck
     pattern = PreCheck(id="y", description="d", fire_level="error",
                       predicate_module="m", keywords=["foo", "bar"], retry_hint="")
     assert _keyword_hit(pattern, "xx foo yy bar zz") is True

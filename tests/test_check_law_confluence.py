@@ -3,20 +3,20 @@
 import random
 import sqlite3
 
-from makoto import _dispatch
-from makoto.verdict import posture
+from makoto import dispatch
+from makoto import verdict as posture
 from tests.test_dispatch import _setup_state
 
 
 def _verdict_shape(findings):
-    worst = _dispatch._worst_finding(findings)
+    worst = dispatch._worst_finding(findings)
     if worst is None:
         return None
 
     outcome, finding = worst
     detail = finding.message
     if outcome == posture.BLOCK:
-        hint = _dispatch._jit_hint(finding)
+        hint = dispatch._jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
 
@@ -42,7 +42,7 @@ def test_stop_check_order_is_confluent_for_frozen_dispatch_fixture(tmp_path):
     try:
         # Reuse the stable Stop fixture from test_dispatch_posture_integration. Evaluate its
         # independent checks once, freezing both their inputs and results before any permutation.
-        declared_order = _dispatch.run_stop_checks(conn, payload, root=state_dir)
+        declared_order = dispatch.run_stop_checks(conn, payload, root=state_dir)
     finally:
         conn.close()
 

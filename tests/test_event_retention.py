@@ -1,4 +1,4 @@
-"""tests for the events-table rolling-window retention (makoto._dispatch).
+"""tests for the events-table rolling-window retention (makoto.dispatch).
 
 The events table is a transient evidence buffer; the only production reader (_select_recent)
 never looks back past a 1-hour same-session window, so anything older is dead weight. These tests
@@ -7,13 +7,13 @@ window is env-tunable but never disables (an unbounded table is the failure mode
 """
 import sqlite3
 
-from makoto._dispatch import (
+from makoto.dispatch import (
     _event_retention_hours,
     _prune_old_events,
     _ingest_event,
     _select_recent,
 )
-from makoto.record.db import init_db
+from makoto.state.store import init_db
 
 
 def _db(tmp_path):

@@ -1,10 +1,10 @@
-"""Tests for makoto.substrate._failureClassifier -- D1's transient-vs-deterministic gold set.
+"""Tests for makoto.kit -- D1's transient-vs-deterministic gold set.
 Matches Task 1's own rigor bar: every marker class gets a real, named fixture, and the
 fail-toward-uncertain contract is tested directly (never a guess on ambiguous input).
 """
 from __future__ import annotations
 
-from makoto.substrate._failureClassifier import classify_failure
+from makoto.kit import classify_failure
 
 # ---- deterministic gold (classify_failure must return True) ------------------------------------
 DETERMINISTIC_GOLD = {

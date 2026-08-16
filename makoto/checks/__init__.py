@@ -13,10 +13,10 @@ pre-existing L0 path/quantity/location primitives that used to live at the top-l
 `makoto/checks.py` module, before that name was claimed by this package (see that module's own
 docstring for the relocation note). Re-exported here so every existing
 `from makoto.checks import normalize_path`-shaped call site across the codebase — `ledger.py`,
-`_dispatch.py`, `retraction.py`, `commitments.py`, several `stopchecks/*.py` modules, and their
+`dispatch.py`, `retraction.py`, `commitments.py`, several `stopchecks/*.py` modules, and their
 tests — is byte-for-byte unaffected by this package's introduction.
 """
-from makoto.substrate._primitives import (
+from makoto.kit import (
     normalize_path,
     location_match,
     quantity_match,

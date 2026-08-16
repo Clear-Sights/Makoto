@@ -28,8 +28,8 @@ import os
 import re
 import importlib
 import pytest
-from makoto.core.schema import PreCheck
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.vocab import PreCheck
+from makoto.registry import load_precheck_catalog
 
 # A file_path that matches each content-scan check's target_rx (so the gate passes).
 _PATH = {

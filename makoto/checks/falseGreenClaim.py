@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
-from makoto.core.schema import Finding
-from makoto.substrate.io import is_failing_testrun
+from makoto.vocab import Finding
+from makoto.kit import is_failing_testrun
 from makoto.substrate.claims import whole_suite_pass_claim
 
 
@@ -37,7 +37,7 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "testrun_output"}),
                run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output))

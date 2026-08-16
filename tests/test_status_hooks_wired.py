@@ -17,7 +17,7 @@ def test_flagless_dispatch_shim_entry_is_wired():
 
 def test_module_dispatch_command_is_wired():
     data = {"hooks": {"Stop": [{"hooks": [
-        {"type": "command", "command": "python -m makoto._dispatch"}]}]}}
+        {"type": "command", "command": "python -m makoto.dispatch"}]}]}}
     assert install._hooks_wired(data)
 
 

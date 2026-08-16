@@ -35,7 +35,7 @@ from typing import Callable, Optional
 from makoto.checks.verifierPredicateWeakened import predicate as _verifier_weakened_predicate
 from makoto.checks.identicalRetryInterdiction import predicate as _identical_retry_predicate
 from makoto.checks.namedTestTeeth import named_test_gate
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 
 
 @dataclass(frozen=True)

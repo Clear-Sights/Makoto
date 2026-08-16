@@ -10,8 +10,8 @@ import sqlite3
 
 from makoto.substrate.claims import whole_suite_pass_claim
 from makoto.checks.falseGreenClaim import green_claim_gate
-from makoto._dispatch import run_stop_checks
-from makoto.record import ledger as L
+from makoto.dispatch import run_stop_checks
+from makoto.state import ledger as L
 # === whole_suite_pass_claim: the whole-suite green claim ==============================
 
 def test_signal_tp_whole_suite_claims():

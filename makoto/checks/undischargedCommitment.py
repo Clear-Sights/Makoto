@@ -2,12 +2,12 @@ from __future__ import annotations
 import re
 from typing import Optional
 from makoto.checks import normalize_path
-from makoto.core.schema import Finding
-from makoto.core.lexicons import (
+from makoto.vocab import Finding
+from makoto.vocab import (
     _NEGATION_RX, _UNIVERSAL_DONE_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _ENUM_BEFORE_HEAD_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.substrate._shared import DISCHARGE_EATS, _discharge_kwargs, _discharged, _path_components
+from makoto.kit import DISCHARGE_EATS, _discharge_kwargs, _discharged, _path_components
 
 
 # A version/variant rename suffix on a basename stem: parser_v2, config_old, handler-final, foo_copy.
@@ -115,7 +115,7 @@ def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys
     return None
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.advance", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=DISCHARGE_EATS | frozenset({"text", "opens"}),
                run=lambda c: advance_gate(c.text, c.opens, **_discharge_kwargs(c)))

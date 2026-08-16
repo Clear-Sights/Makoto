@@ -7,7 +7,7 @@ together rather than replaying only the pure function.
 import json
 import sqlite3
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 from makoto.checks.claimedShippedAbsent import _successful_remote_mutation
 
 _COMMIT_DDL = (

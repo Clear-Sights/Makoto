@@ -2,10 +2,10 @@ from __future__ import annotations
 import json
 import os
 from typing import Optional
-from makoto.core.schema import Finding
+from makoto.vocab import Finding
 # The 2026-07-09 dedup pass performed exactly the hoist this module's old note asked for: the
 # wiring predicate now lives in makoto.substrate.wiring (an L0 primitive module, firewall-
-# allowlisted in tests/test_gate_shape.py's ALLOWED_IMPORT_ROOTS), shared with install.py
+# allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
 # instead of mirrored by hand.
 from makoto.substrate.wiring import (
     entry_dispatches_to_makoto as _entry_dispatches_to_makoto,
@@ -62,7 +62,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None) -> Option
 
     ADVISORY tier only (`level="advisory"`, never `"error"`): per this repo's "advisory over
     blocking" standing policy and the explicit condition this check shipped under, it must never
-    block a turn — `_emit_decision` in _dispatch.py maps level=="advisory" to posture.ADVISE, and
+    block a turn — `_emit_decision` in dispatch.py maps level=="advisory" to posture.ADVISE, and
     wire.py's Stop/SubagentStop table has no ADVISE entry (only BLOCK renders there), so an
     advisory finding is recorded to the audit log (a forensic trail) and never surfaces as a
     block. Fail-open on anything short of a parseable settings.json JSON object — missing file,
@@ -118,7 +118,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None) -> Option
 # `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
 # were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
 # guarantee still rests on posture=="ADVISE", same as always.
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", may_block=True,
                eats=frozenset({"fs_read"}),
                run=lambda c: self_wired_gate(c.fs_read), layer="meta")

@@ -1,9 +1,9 @@
 """D5 (docs/DEFERRED.md, owner-authorized 2026-07-08): the BLOCKING tier of
-`makoto/_dispatch_configchange.py` -- fires ONLY on evidenced strips (a manifest-hit, or an
+`makoto/configchange.py` -- fires ONLY on evidenced strips (a manifest-hit, or an
 observed had->lost transition), never on a bare "stripped" reading with no prior evidence (the
-"never wired" case stays advisory forever -- see `test_dispatch_configchange.py`).
+"never wired" case stays advisory forever -- see `testconfigchange.py`).
 
-Same subprocess-invocation convention as that file: spawn `python -m makoto._dispatch_configchange`
+Same subprocess-invocation convention as that file: spawn `python -m makoto.configchange`
 with `MAKOTO_STATE_DIR` pointed at a tmp dir, stdin fed a JSON payload, assert on
 `(returncode, stdout)` and `audit.jsonl`.
 """
@@ -23,7 +23,7 @@ def _run_json(state_dir, payload) -> tuple[int, bytes]:
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch_configchange"],
+        [sys.executable, "-m", "makoto.configchange"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
@@ -41,7 +41,7 @@ def _audit_rows(state_dir) -> list:
 
 def _settings(pre=True, post=True, stop=True):
     def _entry(wired):
-        cmd = "python3 -m makoto._dispatch" if wired else "python3 -m ventura.adapters.hook_bridge"
+        cmd = "python3 -m makoto.dispatch" if wired else "python3 -m ventura.adapters.hook_bridge"
         return {"matcher": "*", "hooks": [{"type": "command", "command": cmd}]}
 
     return {"hooks": {

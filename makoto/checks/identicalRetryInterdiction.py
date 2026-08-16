@@ -24,10 +24,10 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from makoto.substrate._failureClassifier import classify_failure
-from makoto.substrate.io import bash_output_text
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
+from makoto.kit import classify_failure
+from makoto.kit import bash_output_text
+from makoto.vocab import Finding
+from makoto.registry import Check
 
 
 def _canon_input(ti: dict) -> str:
@@ -40,7 +40,7 @@ def _canon_input(ti: dict) -> str:
 def _decode_row(row) -> Optional[dict]:
     """One history row -> its decoded hook payload dict, or None. Accepts both the live
     events-table tuple shape (id, ts, event_type, cwd, raw_payload_json) and a dict with a
-    'payload' key (corpus/replay callers) -- the same row union makoto.substrate.io.iter_tool_events
+    'payload' key (corpus/replay callers) -- the same row union makoto.kit.iter_tool_events
     decodes, kept local (not imported) so this predicate has no cross-module coupling at all."""
     if isinstance(row, (tuple, list)) and len(row) > 4:
         raw = row[4]
@@ -98,7 +98,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = 'You retried the byte-identical failing Bash command with no intervening change, and the prior failure was deterministic (a syntax/import/permission/not-found error) -- retrying it unmodified cannot make progress. Change the command, fix the underlying cause, or take a different action.'
 DESCRIPTION = "byte-identical Bash retry immediately following that SAME call's deterministic failure -- no intervening state change"
 

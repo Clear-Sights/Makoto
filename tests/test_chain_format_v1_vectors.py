@@ -10,7 +10,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from makoto.record import ledger
+from makoto.state import ledger
 _VECTORS_DIR = Path(__file__).resolve().parent / "vectors" / "chain_v1"
 
 

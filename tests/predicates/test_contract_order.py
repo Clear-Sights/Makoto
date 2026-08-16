@@ -8,11 +8,11 @@ import sqlite3
 
 import pytest
 
-from makoto.record import db
-from makoto.session import plan as plan_store
+from makoto.state import store as db
+from makoto.state import plan as plan_store
 from makoto.checks import contractOrder
 from makoto.substrate._planNode import Plan
-from makoto.core.schema import PreCheck
+from makoto.vocab import PreCheck
 
 
 @pytest.fixture

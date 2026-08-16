@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from makoto.core.schema import PreCheck
-from makoto.substrate._loader import load_precheck_catalog
+from makoto.vocab import PreCheck
+from makoto.registry import load_precheck_catalog
 
 
 def _evt(file_path: str, content: str) -> dict:
@@ -48,7 +48,7 @@ def citation_conn():
     tmp = Path(tempfile.mkdtemp())
     cit = tmp / "CITATIONS.md"
     cit.write_text("Smith 2020\n")
-    import makoto.record.db as vdb
+    import makoto.state.store as vdb
     vdb.init_db(tmp / "st", cit)
     conn = sqlite3.connect(str(tmp / "st" / "makoto.record.db"))
     yield conn
@@ -70,7 +70,7 @@ def test_1_6_violation_fires_but_makoto_allow_exempts(citation_conn):
 
 
 def test_makoto_allow_requires_structured_reason():
-    from makoto.substrate.factories import makoto_allowed
+    from makoto.kit import makoto_allowed
     # structured `makoto-allow: <reason>` exempts (case-insensitive, any comment style)
     assert makoto_allowed("x = 1  # MAKOTO-ALLOW: ok")
     assert makoto_allowed("Makoto-Allow: somewhere")

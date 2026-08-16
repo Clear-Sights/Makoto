@@ -32,7 +32,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from makoto.core.schema import Finding
+from makoto.vocab import Finding
 
 # A plausible file EXTENSION: short, lowercase, alphanumeric, not purely numeric -- the same
 # firewall session/commitments.py::_is_file_shaped uses to separate a real filename from a
@@ -111,7 +111,7 @@ def relative_path_gate(text: str) -> Optional[Finding]:
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.relative_path_citation", applies_at="Stop", posture="ADVISE",
                eats=frozenset({"text"}),
                may_block=True, run=lambda c: relative_path_gate(c.text))

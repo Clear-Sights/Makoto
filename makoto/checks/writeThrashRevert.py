@@ -17,15 +17,15 @@ NotebookEdit is SILENT, and a PRIOR Edit/MultiEdit/NotebookEdit is not counted a
 Copy-by-shape from the makoto-dev ancestor (rule 5 / FD11), re-homed onto live Makoto: it carries
 its OWN whole-file-Write history walker so a PreToolUse precheck does not import the Stop-gate
 engine. The ONLY content read is through ByteIdentity (==/len/hash only), so this body CANNOT read
-content MEANING — only content IDENTITY. Stdlib only; imports only makoto.core.schema + makoto.substrate."""
+content MEANING — only content IDENTITY. Stdlib only; imports only makoto.vocab + makoto.substrate."""
 from __future__ import annotations
 
 from typing import Optional
 
 from makoto.substrate.byte_identity import ByteIdentity
-from makoto.substrate.io import decode_history_row
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
+from makoto.kit import decode_history_row
+from makoto.vocab import Finding
+from makoto.registry import Check
 
 
 def _prior_whole_file_writes(history, path: str) -> list:
@@ -86,7 +86,7 @@ def predicate(*, current_event: dict, history: list,
             )
     return None
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = 'Decide which content is correct and write it once; do not revert to an earlier whole-file version after changing it.'
 DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 

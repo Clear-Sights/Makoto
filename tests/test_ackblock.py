@@ -1,4 +1,4 @@
-"""Unit tests for makoto.record.ackblock -- the transcript-re-derived discharge mechanism for
+"""Unit tests for makoto.state.ledger -- the transcript-re-derived discharge mechanism for
 session-level canon fingerprints (Task 2 slice 5, DESIGN DECISION Option A). Every positive case
 here proves a GENUINE host-written turn discharges; every negative case proves a specific one of
 the five contract points (role/toolUseResult/synthetic-marker/timing/token+reason) is what's
@@ -7,8 +7,8 @@ actually gating the result -- never a vaguer "it just didn't match".
 from __future__ import annotations
 import json
 
-from makoto.record import ledger
-from makoto.record.ackblock import find_ack_block, record_ack_block_if_new, _first_fired_ts
+from makoto.state import ledger
+from makoto.state.ledger import find_ack_block, record_ack_block_if_new, _first_fired_ts
 
 
 def _write_transcript(tmp_path, entries):

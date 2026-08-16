@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import List
 
 from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
-from makoto.core.schema import Finding
+from makoto.vocab import Finding
 
 
 def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session_id=None,
@@ -31,7 +31,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     history has no other legitimate discharge (narrowing the detector voids its 0-FP
     certificate; self-disabling normalizes the one action Makoto must never normalize), so once
     fired it would otherwise re-fire at every subsequent Stop for the rest of the session.
-    `makoto.record.ackblock.find_ack_block` re-derives the discharge from the HOST-WRITTEN transcript
+    `makoto.state.ledger.find_ack_block` re-derives the discharge from the HOST-WRITTEN transcript
     every time (never trusted from chain content) -- a found ack is chain-appended for the
     audit/receipt trail via `record_ack_block_if_new`, but the discharge decision itself is
     always freshly re-derived, never read back from that row. Silent (empty list) when no
@@ -43,7 +43,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
             continue
         ack = None
         try:
-            import makoto.record.ackblock as _ackblock
+            import makoto.state.ledger as _ackblock
             ack = _ackblock.find_ack_block(name, transcript_path=transcript_path,
                                            session_id=session_id, root=state_root)
         except Exception:
@@ -71,7 +71,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     return out
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"text", "history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_fingerprint_block_gate(

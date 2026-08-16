@@ -10,10 +10,10 @@ filesystem-blind design (an `os.path.exists` call). DETECTIVE tier: a fired verd
 ADVISORY, never a deny -- escalating this to a blocking tier is a product decision left to the
 caller, not made here.
 
-WIRING (deliberately NOT via `substrate._loader.load_stopchecks`'s GATE discovery): every id that
+WIRING (deliberately NOT via `registry.load_stopchecks`'s GATE discovery): every id that
 mechanism discovers auto-BLOCKS by construction ("discovered<=>live<=>blocking -- no shadow
 tier", see `checks/_shared.py`) -- exactly the tier this check must never enter. Instead,
-`makoto/_dispatch.py`'s `run_stop_checks` calls `check(ctx.plan)` directly and appends its
+`makoto/dispatch.py`'s `run_stop_checks` calls `check(ctx.plan)` directly and appends its
 Finding to the audited-but-never-blocking list (its `pattern_id` never enters
 `_blocking_gate_ids()`, so it is STRUCTURALLY incapable of blocking, not just labeled advisory).
 This module still exports a `CHECK` (posture=ADVISE) purely for `checks._loader`'s /
@@ -30,10 +30,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from makoto.substrate._loader import Check
+from makoto.registry import Check
 from makoto.substrate._planNode import DONE, Plan
-from makoto.verdict.posture import ADVISE
-from makoto.core.schema import Finding
+from makoto.verdict import ADVISE
+from makoto.vocab import Finding
 
 
 def check(plan: Optional[Plan]) -> Optional[Finding]:

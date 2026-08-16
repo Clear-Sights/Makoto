@@ -22,8 +22,8 @@ in-repo, hand-authored:
     RED history above and is the non-firing value on every TN/clean one -- the explicit pure-
     function proof a dispatch-level message-count check alone can't localize.
 
-All RED/TN cases route through `makoto._dispatch.run_stop_checks` -- the SAME function
-`makoto._dispatch.main()` calls for a real Stop event -- with hand-built events-table row tuples
+All RED/TN cases route through `makoto.dispatch.run_stop_checks` -- the SAME function
+`makoto.dispatch.main()` calls for a real Stop event -- with hand-built events-table row tuples
 `(id, ts, event_type, cwd, raw_payload_json)` matching the exact shape `_select_recent` returns
 (not a weaker reimplementation), so a discharge/wiring regression the pure-function unit tests
 (test_claimed_running_gate.py) would miss reddens here too.
@@ -31,7 +31,7 @@ All RED/TN cases route through `makoto._dispatch.run_stop_checks` -- the SAME fu
 import json
 import sqlite3
 
-from makoto._dispatch import run_stop_checks
+from makoto.dispatch import run_stop_checks
 from makoto.checks.claimedRunningAbsent import _latest_process_call_failed
 
 _COMMIT_DDL = (

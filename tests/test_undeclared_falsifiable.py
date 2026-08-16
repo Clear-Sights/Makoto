@@ -22,7 +22,7 @@ from makoto.checks.undeclaredFalsifiable import (
 
 def _good(tmp_path, name, id_, applies_at="Stop"):
     (tmp_path / name).write_text(
-        "from makoto.substrate._loader import Check\n"
+        "from makoto.registry import Check\n"
         f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture='advise')\n"
     )
 
@@ -46,7 +46,7 @@ def test_module_with_a_malformed_check_is_an_orphan_module(tmp_path):
     # A CHECK object present but with a mismatched/invalid shape (no valid id) never resolves
     # via load_checks() -- unregistered in the loader's eyes despite the file existing.
     (tmp_path / "mismatched.py").write_text(
-        "from makoto.substrate._loader import Check\n"
+        "from makoto.registry import Check\n"
         "CHECK = Check(id='', applies_at='Stop', posture='advise')\n"
     )
     assert orphan_modules(package_dir=tmp_path) == ["mismatched"]
@@ -92,7 +92,7 @@ def test_gate_reports_both_orphan_kinds_together(tmp_path):
 def test_gate_is_advisory_never_blocking():
     # Never "error" -- per this repo's advisory-over-blocking standing policy, same tier as
     # gate.self_wired.
-    from makoto.verdict.posture import ADVISE
+    from makoto.verdict import ADVISE
     assert CHECK.posture == ADVISE
 
 
@@ -106,7 +106,7 @@ def test_real_catalog_has_zero_drift_at_rest():
 
 
 def test_check_is_discovered_by_load_checks():
-    from makoto.substrate._loader import load_checks
+    from makoto.registry import load_checks
     ids = {c.id for c in load_checks(edge="Stop")}
     assert "gate.undeclared_falsifiable" in ids
 

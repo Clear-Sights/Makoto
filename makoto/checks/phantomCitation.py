@@ -9,10 +9,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Optional
-from makoto.core.schema import Finding
-from makoto.substrate._loader import Check
-from makoto.substrate.factories import makoto_allowed, scan_target_content
-from makoto.session.citations import extract_citations
+from makoto.vocab import Finding
+from makoto.registry import Check
+from makoto.kit import makoto_allowed, scan_target_content
+from makoto.state.citations import extract_citations
 
 
 _TARGET_RX = re.compile(r"\.md$")
@@ -103,7 +103,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = "Add the citation as an Author-Year entry to the canonical CITATIONS.md this install wired (the `canonical_citations_path` config row — the packaged makoto/docs/CITATIONS.md by default)."
 DESCRIPTION = 'phantom citation — Author-Year not in the canonical CITATIONS.md set'
 

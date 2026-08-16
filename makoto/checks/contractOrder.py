@@ -9,19 +9,19 @@ the plan BY PASSTHROUGH-NAME (`Plan.order_violation`/`Plan.unmet_deps`), never a
 TWO firing surfaces from ONE module, mirroring Assay's single `ContractOrder` class's two
 guards:
   * the PRE gap guard (`predicate`, wired via the loader-backed catalog -- `schema.load_prechecks`
-    -> `_dispatch._run_predicates` -- BLOCK): a Write/Edit/MultiEdit/NotebookEdit call advancing a plan node whose passthrough-
+    -> `dispatch._run_predicates` -- BLOCK): a Write/Edit/MultiEdit/NotebookEdit call advancing a plan node whose passthrough-
     establisher is not yet DONE is the partial-order contradiction.
   * the STOP remainder guard (this module's `EXTRA_CHECKS` Stop surface, discovered by
-    `substrate._loader.load_checks(edge="Stop")`, blocking-eligible via `may_block=True`;
+    `registry.load_checks(edge="Stop")`, blocking-eligible via `may_block=True`;
     context shape: `substrate/_shared.py`): the turn ending with the plan's `remainder()` non-empty.
 
 LAYERING FIREWALL: as a discovered Stop GATE this module is subject to the same L2-import
-firewall every gate module is (`tests/test_gate_shape.py`'s `ALLOWED_IMPORT_ROOTS`) -- it never
-imports `makoto.session.plan` (a sibling L2 store) directly. The PRE predicate instead reads the
+firewall every gate module is (`tests/test_import_direction.py`'s pipeline-order firewall) -- it never
+imports `makoto.state.plan` (a sibling L2 store) directly. The PRE predicate instead reads the
 `plans` table INLINE via its own `conn` argument (`_load_plan` below) -- a small, deliberate
 duplicate of `plan.load_plan`'s SQL, this repo's own boundary law ("shapes are copied, never
 imported") applied at this finer grain -- while the STOP side reads the already-loaded
-`ctx.plan` that `_dispatch.run_stop_checks` populates once per event.
+`ctx.plan` that `dispatch.run_stop_checks` populates once per event.
 """
 from __future__ import annotations
 
@@ -29,9 +29,9 @@ import json
 from typing import Optional
 
 from makoto.checks import normalize_path
-from makoto.substrate._loader import Check
+from makoto.registry import Check
 from makoto.substrate._planNode import Plan
-from makoto.core.schema import Finding
+from makoto.vocab import Finding
 
 _LOCATING_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 _LOCATION_KEYS = ("file_path", "notebook_path")
@@ -39,7 +39,7 @@ _LOCATION_KEYS = ("file_path", "notebook_path")
 
 def _load_plan(conn, session_id: str) -> Optional[Plan]:
     """A small, deliberate duplicate of `plan.load_plan`'s SQL -- see module docstring
-    (contractOrder is a discovered Stop GATE, so it may not import the sibling L2 `makoto.session.plan`
+    (contractOrder is a discovered Stop GATE, so it may not import the sibling L2 `makoto.state.plan`
     store directly)."""
     if conn is None:
         return None

@@ -13,7 +13,7 @@ Knight-Leveson: stdlib re only.
 # This pair is already at the dedup endpoint substrate.factories.regex_file_predicate exists for.
 from __future__ import annotations
 import re
-from makoto.substrate.factories import regex_file_predicate
+from makoto.kit import regex_file_predicate
 
 
 predicate = regex_file_predicate(
@@ -22,7 +22,7 @@ predicate = regex_file_predicate(
 )
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 RETRY_HINT = "Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
 DESCRIPTION = 'verifier predicate weakened — loose-comparator shape'
 

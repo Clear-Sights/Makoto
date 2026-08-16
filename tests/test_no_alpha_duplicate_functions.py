@@ -24,15 +24,15 @@ _ROOT = Path(__file__).resolve().parent.parent / "makoto"
 
 # (file, function) pairs allowed to be alpha-equivalent, with the reason on record.
 _EXEMPT_PAIRS = {
-    frozenset({("substrate/_stdlib_ast_helpers.py", "_callee_chain"), ("substrate/factories.py", "callee_chain")}):
+    frozenset({("substrate/_stdlib_ast_helpers.py", "_callee_chain"), ("kit.py", "callee_chain")}):
         "deliberate: _stdlib_ast_helpers.py must stay stdlib-only so deadPureStatement.py/"
         "hollowTest.py keep their import-graph isolation (enforced by "
         "test_detector_engines_are_stdlib_isolated.py) -- importing substrate.factories here would break "
         "the property the duplication exists to protect.",
-    frozenset({("checks/contractOrder.py", "_load_plan"), ("session/plan.py", "load_plan")}):
+    frozenset({("checks/contractOrder.py", "_load_plan"), ("state/plan.py", "load_plan")}):
         "deliberate: contractOrder is a discovered Stop gate, and the gate-side layering firewall "
-        "(tests/test_gate_shape.py, ALLOWED_IMPORT_ROOTS -- an ENFORCED check, verified 2026-07-09, "
-        "not a docstring claim) bars it from importing makoto.session.plan, the L2 store. Its PRE "
+        "(tests/test_import_direction.py, the pipeline-order firewall -- an ENFORCED check, "
+        "not a docstring claim) bars it from importing makoto.state.plan, the L2 store. Its PRE "
         "predicate therefore reads the plans table inline via its own conn -- 12 lines of SQL "
         "duplicated on purpose, per the repo's own boundary law ('shapes are copied, never "
         "imported'). Merging would require widening the firewall, an owner-level design change.",
@@ -71,10 +71,10 @@ def _signature(fn_node: ast.FunctionDef) -> tuple:
 
 def _scan() -> dict:
     groups = defaultdict(list)
-    scan = [py for d in ("checks", "substrate", "record", "verdict", "session", "core",
+    scan = [py for d in ("checks", "substrate", "state", "verdict", "core",
                          "stopchecks", "tools")
             for py in sorted((_ROOT / d).glob("*.py")) if (_ROOT / d).is_dir()]
-    scan += sorted(_ROOT.glob("*.py"))  # root entry-point modules (_dispatch.py, install.py, ...)
+    scan += sorted(_ROOT.glob("*.py"))  # root entry-point modules (dispatch.py, install.py, ...)
     for py in scan:
         try:
             tree = ast.parse(py.read_text())

@@ -1,4 +1,4 @@
-"""run_stop_checks is the L3 orchestrator's, living in _dispatch (spec §3b row 4 / §6 — Task 10).
+"""run_stop_checks is the L3 orchestrator's, living in dispatch (spec §3b row 4 / §6 — Task 10).
 
 Pins the move + the no-shim dissolution of engine.py: importing makoto.engine must fail."""
 import importlib
@@ -6,7 +6,7 @@ import sqlite3
 
 
 def test_run_stop_checks_lives_in_dispatch():
-    from makoto._dispatch import run_stop_checks
+    from makoto.dispatch import run_stop_checks
     c = sqlite3.connect(":memory:", isolation_level=None)
     c.execute("CREATE TABLE commitments (commitment_key TEXT PRIMARY KEY, session_id TEXT, "
               "location TEXT, qty_min REAL, qty_max REAL, status TEXT NOT NULL DEFAULT 'open', "

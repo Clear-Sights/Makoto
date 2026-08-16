@@ -1,4 +1,4 @@
-"""makoto.session.plan -- sqlite persistence for a declared contract Plan (SPEC-5). Falsifying tests
+"""makoto.state.plan -- sqlite persistence for a declared contract Plan (SPEC-5). Falsifying tests
 for declare_plan's falsifiability gate + latest-wins semantics, load_plan's fail-open reads,
 and declare_from_session_artifact's SessionStart admission (STARTUP-only, fail-open on a bad
 artifact, fail-closed on a non-falsifiable one).
@@ -9,8 +9,8 @@ import sqlite3
 
 import pytest
 
-from makoto.record import db
-from makoto.session import plan as plan_store
+from makoto.state import store as db
+from makoto.state import plan as plan_store
 from makoto.substrate._planNode import DONE, Plan
 
 

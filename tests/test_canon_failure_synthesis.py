@@ -82,7 +82,7 @@ def test_normal_fully_paired_call_is_unaffected():
 # ---- end-to-end, through the real dispatch (mirrors test_dispatch.py's _run_dispatch pattern) --
 def _setup_state(tmp_path):
     """create a makoto.record.db with the 3 tables + minimal config; return state_dir."""
-    from makoto.record.db import init_db
+    from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations = tmp_path / "CITATIONS.md"
     citations.write_text("Smith 2020\n")
@@ -91,13 +91,13 @@ def _setup_state(tmp_path):
 
 
 def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto._dispatch` with payload on stdin; return (exit, stdout)."""
+    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run(
-        [sys.executable, "-m", "makoto._dispatch"],
+        [sys.executable, "-m", "makoto.dispatch"],
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,

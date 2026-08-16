@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import Optional
 
-from makoto.core.schema import Finding
-from makoto.core.lexicons import _RUN_INTENT_CLAIM_RX, _RUN_INTENT_IDIOM_VETO_RX, _NEGATION_RX
+from makoto.vocab import Finding
+from makoto.vocab import _RUN_INTENT_CLAIM_RX, _RUN_INTENT_IDIOM_VETO_RX, _NEGATION_RX
 from makoto.substrate.claims import _code_spans
-from makoto.substrate.io import decode_history_row
+from makoto.kit import decode_history_row
 
 # gate.run_promised -- the forward-looking sibling of gate.claimed_running: the immediately PRIOR
 # turn's own message promised a first-person run-intent action ("I'll run the tests", "I'm going
@@ -14,24 +14,24 @@ from makoto.substrate.io import decode_history_row
 #
 # GRACE PERIOD BY CONSTRUCTION: this gate never reads the CURRENT Stop's own last_assistant_message
 # -- only `history` is consulted, and `history` never contains the row for the Stop currently being
-# evaluated (`_dispatch.py::_select_recent`'s `id < event_id`). A promise made THIS turn is
+# evaluated (`dispatch.py::_select_recent`'s `id < event_id`). A promise made THIS turn is
 # therefore structurally exempt from blocking THIS Stop; it can only ever be checked starting at
 # the NEXT Stop, once the intervening turn's tool calls are themselves in history. This is the
 # literal, structural form of "discharged by the next message" -- not a timestamp or counter kept
 # anywhere, just which rows have and haven't been ingested yet.
 #
 # STATELESS BY DESIGN: no new persistence. Every hook event this session fires -- Stop included,
-# `last_assistant_message` and all -- is already durably logged by `_dispatch.py::_ingest_event`
+# `last_assistant_message` and all -- is already durably logged by `dispatch.py::_ingest_event`
 # BEFORE any handler runs, so a prior turn's own claim is directly re-derivable from `ctx.history`
 # at the next Stop. This deliberately does NOT extend `Plan`/`PlanNode` (SPEC-5, see
-# `makoto/session/plan.py`): a Plan node's discharge evidence is a LOCATED file write
+# `makoto/state/plan.py`): a Plan node's discharge evidence is a LOCATED file write
 # (`contractOrder.py`'s `_event_location`/`Plan.resolve`, keyed by `where`), but a run-intent
 # promise's only evidence is "a Bash call happened" -- there is no `where` to resolve against.
 # Same enforcement SHAPE Plan/gate.contract_order established (declare a forward commitment ->
 # must discharge -> Stop blocks if not), a structurally different mechanism because the discharge
 # evidence itself is structurally different.
 #
-# CLOSED LEXICON (core/lexicons.py's `_RUN_INTENT_CLAIM_RX`): a first-person FORWARD auxiliary
+# CLOSED LEXICON (vocab.py's `_RUN_INTENT_CLAIM_RX`): a first-person FORWARD auxiliary
 # ("I'm going to" / "I'll" / "let me" / "I plan to") bound to a closed process-lifecycle verb set
 # mirroring gate.claimed_running's own `_PROCESS_START_VERB_RX` vocabulary (run/launch/deploy/...),
 # base/infinitive form. Closed subject AND closed verb by construction: "it's going to rain today"
@@ -83,7 +83,7 @@ def _run_intent_claim(text: str):
 def _last_stop_index(history) -> Optional[int]:
     """The index (in `history`, session order) of the most recent Stop/SubagentStop-event row, or
     None if neither appears anywhere in the window. `history` is already `ORDER BY id`
-    (_select_recent) -- treated as one equivalence class the same way `_dispatch.py` itself
+    (_select_recent) -- treated as one equivalence class the same way `dispatch.py` itself
     documents them ("Gates evaluate on Stop AND SubagentStop")."""
     idx = None
     for i, row in enumerate(history or ()):
@@ -129,7 +129,7 @@ def run_promised_gate(*, history=()) -> Optional[Finding]:
                      "before ending the turn."))
 
 
-from makoto.substrate._loader import Check as _Check
+from makoto.registry import Check as _Check
 CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="BLOCK", may_block=True,
                eats=frozenset({"history"}),
                run=lambda c: run_promised_gate(history=c.history))

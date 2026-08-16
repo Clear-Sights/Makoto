@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from makoto.substrate._loader import ALLOWED_EDGES, Check, load_checks
-from makoto.substrate._shared import DISCHARGE_EATS, GateContext, _discharge_kwargs
+from makoto.registry import ALLOWED_EDGES, Check, load_checks
+from makoto.context import GateContext
+from makoto.kit import DISCHARGE_EATS, _discharge_kwargs
 
 
 STOP_CONTEXT_FIELDS = frozenset(
@@ -100,7 +101,7 @@ def _literal(call: ast.Call, name: str) -> str:
 def _imports_discharge_kwargs(tree: ast.Module) -> bool:
     return any(
         isinstance(node, ast.ImportFrom)
-        and node.module == "makoto.substrate._shared"
+        and node.module == "makoto.kit"
         and any(alias.name == "_discharge_kwargs" and alias.asname in (None, "_discharge_kwargs")
                 for alias in node.names)
         for node in tree.body
