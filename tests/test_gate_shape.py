@@ -134,7 +134,11 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
                                                             # 35->30, 2026-07-09: _callee_chain/_scratch_roots/
                                                             # _under/_is_scratch/_read extracted to
                                                             # _stdlib_ast_helpers.py
-    "canonTimeoutRecur.py": 15,                            # engine + adapter merged (canon_gate lives here)
+    "canonTimeoutRecur.py": 17,                            # engine + adapter merged (canon_gate lives here);
+                                                            # 15->17, 2026-08-16 (#17 port): _pairing_input
+                                                            # (dunder-insensitive Pre<->Post pairing identity)
+                                                            # + _release_clause (per-primitive release.operator
+                                                            # affordance, generated from the id)
     "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
     "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
     "contractOrder.py": 5,

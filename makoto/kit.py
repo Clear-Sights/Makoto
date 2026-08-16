@@ -209,6 +209,33 @@ def decode_history_row(row):
     return decoded if isinstance(decoded, dict) else None
 
 
+def decode_history_event(row):
+    """Like `decode_history_row`, but also backfills `hook_event_name` from the row's own
+    WRAPPER event-type column (tuple index 2, or dict key `event_type`) when the payload itself
+    doesn't carry one -- the canonical merge of `decode_history_row` + the wrapper-etype
+    fallback.
+
+    Two checks (`canonTimeoutRecur._decode_row`, `identicalRetryInterdiction`) used to re-derive
+    this fallback independently, each a byte-similar copy of the row-union handling above. One
+    drifted: it read only the payload's own field, so a row whose event type lived solely on the
+    wrapper decoded to a payload with no `hook_event_name` -- and `event.identical_retry`
+    requires an exact `== "PostToolUse"` match, so it went silently blind to rows
+    `canon.timeout`/`canon.recur` acted on, from the same table, for the same concept. One
+    primitive now serves both -- see `decode_history_row`'s own docstring on why a shared decode
+    step exists at all."""
+    wrapper_etype = None
+    if isinstance(row, (tuple, list)) and len(row) > 2:
+        wrapper_etype = row[2]
+    elif hasattr(row, "get"):
+        wrapper_etype = row.get("event_type")
+    ev = decode_history_row(row)
+    if ev is None:
+        return None
+    if not ev.get("hook_event_name") and wrapper_etype:
+        ev = {**ev, "hook_event_name": wrapper_etype}
+    return ev
+
+
 def bash_output_text(tool_response) -> str:
     """extract captured stdout+stderr from a Bash tool_response.
 
@@ -896,15 +923,26 @@ def resolve_in_worktree(loc, cwd):
         return None
 
 
+def extract_pushed_branch(text):
+    """The branch name from a "pushed ... to/branch X" claim in `text`, trailing
+    quote/punctuation stripped -- or None if no such claim is present.
+
+    Was two byte-identical regex-plus-rstrip pairs (`pushed_ref_matches_world` here and
+    `checks/claimedShippedAbsent.pushed_tip_matches_remote`), each with its own postprocessing
+    call site. One extraction step; each caller keeps its own downstream use (this module
+    validates against local/remote refs, claimedShippedAbsent compares tips) -- the same
+    shared-decode/caller-owned-interpretation split `decode_history_event` uses."""
+    match = _PUSH_BRANCH_RX.search(text or "")
+    return match.group(1).rstrip("`'\",:;.") if match else None
+
+
 def pushed_ref_matches_world(text, cwd):
     """True iff local and origin remote-tracking refs back a pushed-branch claim."""
     if not text or not cwd:
         return False
     try:
-        match = _PUSH_BRANCH_RX.search(text)
-        if match:
-            branch = match.group(1).rstrip("`'\",:;.")
-        else:
+        branch = extract_pushed_branch(text)
+        if branch is None:
             branch_result = subprocess.run(
                 ["git", "-C", cwd, "symbolic-ref", "--quiet", "--short", "HEAD"],
                 capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,

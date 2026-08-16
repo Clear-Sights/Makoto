@@ -275,6 +275,17 @@ _PRODUCE_VERB_RX = re.compile(
 # A passive/copular auxiliary right before the verb ⇒ "was written / is wired" — a
 # description of state or of another subject's action, NOT a first-person production claim.
 _BE_AUX_RX = re.compile(r"(?:\b(?:was|were|is|are|been|being|be|am)\s*$)|(?:['’](?:s|re)\s*$)", re.IGNORECASE)
+# A conditional/hypothetical OFFER governing a promise -> not a firm commitment. Byte-identical
+# in `state/commitments.py` and `state/plan.py`; plan.py's own comment already said it "mirrors
+# commitments.py's hardened guards" without the dedup actually happening -- the same class of
+# drift risk `_BE_AUX_RX` above was already hoisted for.
+_OFFER_COND_RX = re.compile(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
+                            re.IGNORECASE)
+# Makoto watches the AI's OWN promises: a commitment needs a FIRST-PERSON subject ("I'll add X",
+# "we need to write X") OR a clause-initial imperative ("Add X to Y"). A THIRD-PERSON or
+# adverbial subject is NOT a promise the AI made. Byte-identical in both files, same reason.
+_FIRST_PERSON_RX = re.compile(
+    r"\b(?:i|we|i'?ll|we'?ll|i'?m|we'?re|i'?ve|we'?ve|i'?d|we'?d|let'?s|my|our)\b", re.IGNORECASE)
 # A clause boundary between the verb and the path ⇒ the verb governs a different clause.
 _CLAUSE_BREAK_RX = re.compile(r"[.;:\n—]")
 # A double- or single-quoted string span — used to blank quoted argument bodies before scanning a shell

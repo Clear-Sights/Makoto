@@ -209,11 +209,10 @@ _NEGATED_RX = re.compile(
     r"not planning to|no longer|skip(?:ping)?|never\s?mind|dropping|drop(?:ped)?|"
     r"not\s+(?:doing|finishing|completing|going\s+to))\b",
     re.IGNORECASE)
-_OFFER_COND_RX = re.compile(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
-                            re.IGNORECASE)
-_FIRST_PERSON_RX = re.compile(
-    r"\b(?:i|we|i'?ll|we'?ll|i'?m|we'?re|i'?ve|we'?ve|i'?d|we'?d|let'?s|my|our)\b",
-    re.IGNORECASE)
+# _OFFER_COND_RX / _FIRST_PERSON_RX: L0 shared lexicon (makoto.vocab -- dedup: was a
+# byte-identical local copy of the exact regexes commitments.py hoisted; this file's own comment
+# already said it "mirrors commitments.py's hardened guards" without the dedup happening).
+from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 _BIND_BEFORE = 60
 _BIND_AFTER = 40
 

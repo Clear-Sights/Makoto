@@ -82,6 +82,7 @@ import json
 from typing import Iterable, List
 
 from makoto.vocab import Finding
+from makoto.kit import decode_history_event
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
 # "result": tool_response} — tool_input/tool_response are kept as full DICTS (not the flattened
@@ -225,32 +226,40 @@ def _canon_input(inp) -> str:
         return repr(inp)
 
 
+def _pairing_input(inp) -> str:
+    """`_canon_input` with leading-dunder keys dropped — the identity used ONLY to pair a
+    PostToolUse back to its own PreToolUse, never to judge a verdict.
+
+    A harness may add bookkeeping keys to `tool_input` BETWEEN a call's Pre and its Post
+    (observed live on the `Artifact` tool: a 3-key Pre, then a 6-key Post carrying
+    `__artifactPlanConsentAsk`, `__artifactPlanConsentDecisionCaps`, `__artifactPublishTarget`).
+    Pairing on the FULL canonical input therefore never matched those two rows, so every such
+    call left a dangling Pre and synthesized a phantom mid-turn-abandonment failure — for a call
+    that in fact succeeded. Two of those back-to-back read as an all-error run of length 2 and
+    false-fired `canon.recur` STUCK on a retry that had actually succeeded (#17).
+
+    A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
+    cannot collapse two genuinely distinct calls. This RELAXES PAIRING ONLY: `recur_stuck`,
+    `identical_retry` and every other primitive keep keying on the full `_canon_input`, so the
+    verdict's identity test is untouched and no true positive is widened away."""
+    if isinstance(inp, dict):
+        return _canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
+    return _canon_input(inp)
+
+
 # ---- the history -> Call adapter (protocol-field decode; fail-open per row) -------------------
 def _decode_row(row):
     """Decode ONE history row into (etype, name, input_dict, result_dict), or None to skip.
-    Accepts BOTH live events-table tuples (id, ts, event_type, cwd, raw_payload_json) and dict
-    rows with a 'payload' key (corpus/replay-style callers) — the same row union
-    makoto.kit.iter_tool_events decodes. A malformed row is skipped (fail-open). Keeps both
-    PreToolUse and PostToolUse rows (unlike the pre-FD14-A cut which dropped Pre at decode time)
-    so `calls_from_history` can pair them and detect a dangling Pre."""
-    wrapper_etype = None
-    if isinstance(row, (tuple, list)) and len(row) > 4:
-        raw = row[4]
-        wrapper_etype = row[2] if len(row) > 2 else None
-    elif hasattr(row, "get"):
-        raw = row.get("payload")
-        wrapper_etype = row.get("event_type")
-    else:
-        raw = None
-    if not raw:
+
+    Raw decode + wrapper-event-type fallback is `kit.decode_history_event` -- the canonical
+    step, shared with `identicalRetryInterdiction._most_recent_completed_bash_call`. This
+    function keeps only what's specific to canon's OWN adapter shape: the tuple conversion, and
+    keeping both PreToolUse and PostToolUse rows (unlike the pre-FD14-A cut which dropped Pre at
+    decode time) so `calls_from_history` can pair them and detect a dangling Pre."""
+    ev = decode_history_event(row)
+    if ev is None:
         return None
-    try:
-        ev = raw if isinstance(raw, dict) else json.loads(raw)
-    except Exception:
-        return None
-    if not isinstance(ev, dict):
-        return None
-    etype = ev.get("hook_event_name") or wrapper_etype
+    etype = ev.get("hook_event_name")
     name = ev.get("tool_name", "") or ""
     if etype not in ("PreToolUse", "PostToolUse") or not name:
         return None
@@ -265,9 +274,12 @@ def _decode_row(row):
 def calls_from_history(history) -> list:
     """Decode GateContext.history rows into agnostic Call dicts carrying the protocol fields the
     terminals read. A completed call contributes a PreToolUse AND a PostToolUse row; each Post is
-    PAIRED to the nearest preceding still-unpaired identical (tool name + canonicalized input)
-    Pre, and only the Post becomes a Call (the Pre is dropped) — so `recur_stuck`'s consecutive-run
+    PAIRED to the nearest preceding still-unpaired identical (tool name + `_pairing_input`) Pre,
+    and only the Post becomes a Call (the Pre is dropped) — so `recur_stuck`'s consecutive-run
     judgment is not corrupted by spurious result-less Calls (module docstring ADAPTATION NOTE).
+    Pairing uses `_pairing_input` (dunder-insensitive), NOT the full `_canon_input` the verdicts
+    key on: a harness may inject bookkeeping keys between a call's Pre and its Post, and pairing
+    on those synthesized a phantom failure for a call that succeeded. See `_pairing_input`.
 
     FD14-A, narrowed to MID-TURN ABANDONMENT ONLY (see module docstring): a leftover unpaired
     PreToolUse (a dangling Pre) synthesizes a FAILURE Call — result `{"interrupted": True, ...}` —
@@ -283,12 +295,12 @@ def calls_from_history(history) -> list:
     for j, (etype, name, ti, _tr) in enumerate(decoded):
         if etype != "PostToolUse":
             continue
-        key = (name, _canon_input(ti))
+        key = (name, _pairing_input(ti))
         for i in range(j - 1, -1, -1):
             if i in paired_pre:
                 continue
             et2, n2, ti2, _ = decoded[i]
-            if et2 == "PreToolUse" and (n2, _canon_input(ti2)) == key:
+            if et2 == "PreToolUse" and (n2, _pairing_input(ti2)) == key:
                 paired_pre.add(i)
                 break
 
@@ -329,10 +341,8 @@ CANON_SEQ_PRIMITIVES: dict = {
         # gate.canon_fingerprints uses (makoto.state.ledger), not a third prose-only path.
         "A call errored (timeout / interrupted / error code) and the turn closed without "
         "resolving it. Re-run it (or the equivalent action) to a real successful result before "
-        "closing, OR if the error is a genuinely unresolvable, already-reviewed block, say "
-        "exactly `makoto release.operator timeout: <reason>` in a real (non-tool, non-quoted) reply -- "
-        "text alone cannot discharge this any other way; the detector reads only whether the "
-        "LAST call in the turn succeeded.",
+        "closing. Text alone cannot discharge this any other way; the detector reads only "
+        "whether the LAST call in the turn succeeded.",
     ),
     "recur": (
         recur_stuck,
@@ -345,14 +355,35 @@ CANON_SEQ_PRIMITIVES: dict = {
 }
 
 
+def _release_clause(cid: str) -> str:
+    """The `release.operator` affordance sentence for ONE primitive, generated from its id.
+
+    `canon_gate` offers the ackblock discharge to EVERY fired primitive — the loop calls
+    `find_ack_block(cid, ...)` for whatever fired, not just `timeout`. But the affordance was
+    spelled out only in `timeout`'s hand-written hint, so a fired `canon.recur` told the agent
+    to "change the input" and nothing else. When the finding was a false positive the agent had
+    no reachable discharge named anywhere, and every subsequent Stop re-fired the same block
+    until the rows aged out of the recency window — a mechanism that existed but was invisible
+    reads exactly like a mechanism that is missing.
+
+    Generated per-id rather than written per-entry so a primitive cannot be added to
+    CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —
+    the affordance is structural, not prose that the next author must remember to copy."""
+    return (f" If this finding is a genuinely unresolvable, already-reviewed block — or a "
+            f"misfire you have verified — say exactly `makoto release.operator {cid}: <reason>` "
+            f"in a real (non-tool, non-quoted) reply; that is the only discharge other than "
+            f"changing what the detector actually reads.")
+
+
 def fired_primitives(history) -> Iterable:
     """Yield (canon_id, stop_text, retry_hint) for every installed primitive that fires on the
     session's call stream. Pure: no makoto import, no I/O beyond decoding the passed-in history
-    rows."""
+    rows. Every yielded hint carries its own `release.operator` clause (`_release_clause`) —
+    `canon_gate` offers that discharge to every primitive, so every hint must name it."""
     calls = calls_from_history(history)
     for cid, (seq_pred, stop_text, retry_hint) in CANON_SEQ_PRIMITIVES.items():
         if seq_pred(calls):
-            yield (cid, stop_text, retry_hint)
+            yield (cid, stop_text, retry_hint + _release_clause(cid))
 
 
 # =============================================================================================

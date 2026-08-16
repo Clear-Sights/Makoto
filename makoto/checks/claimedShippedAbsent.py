@@ -11,7 +11,7 @@ from makoto.vocab import (
 )
 from makoto.substrate.claims import _code_spans
 from makoto.kit import decode_history_row
-from makoto.kit import _PUSH_BRANCH_RX
+from makoto.kit import extract_pushed_branch
 from makoto.core._shell import _command_pushes_git
 
 
@@ -39,10 +39,11 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
     """
     if not text or not cwd:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="missing claim text or cwd")
-    match = _PUSH_BRANCH_RX.search(text)
-    if not match:
+    # Pushed-branch extraction: kit.extract_pushed_branch (dedup: was a byte-identical
+    # regex-search + rstrip pair with kit.pushed_ref_matches_world's own call site).
+    branch = extract_pushed_branch(text)
+    if branch is None:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="push claim names no branch")
-    branch = match.group(1).rstrip("`'\",:;.")
     if not branch:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="empty branch")
     try:

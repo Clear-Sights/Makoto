@@ -11,6 +11,7 @@ imports beyond stdlib `ast`.
 from __future__ import annotations
 import ast
 
+from makoto.vocab import _MAKOTO_ALLOW_RX
 from makoto.substrate._stdlib_ast_helpers import iter_touched_python_sources
 from makoto.vocab import Finding
 
@@ -391,8 +392,13 @@ def analyze_file(src: str, path: str) -> list:
     except SyntaxError:
         return []                                           # fail-open: skip unparseable files
     lines = src.splitlines()
-    def _allowed(lineno):                                   # on-the-record override (makoto convention)
-        return 1 <= lineno <= len(lines) and "makoto-allow" in lines[lineno - 1].lower()
+    def _allowed(lineno):
+        # On-the-record override via the ONE canonical marker predicate (§7.5b). Was a bare
+        # `"makoto-allow" in line` substring test, which exempted a reasonless `# makoto-allow`
+        # that `makoto_allowed`/`_MAKOTO_ALLOW_RX` rejects — and that this check's own finding
+        # text already tells the author to write with a reason. An exemption marker asserts an
+        # audit trail; accepting one without a rationale accepts the assertion unmeasured.
+        return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
     out = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):

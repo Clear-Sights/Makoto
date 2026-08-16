@@ -192,19 +192,25 @@ def _make_fs_read(payload: dict):
     return fs_read
 
 
-def _record_advisory_fire(payload: dict, verdict) -> None:
-    """Loud stderr note (mirrors `dispatch._dispatch_fact`'s style) + a best-effort AuditRow
-    append. Wrapped so an observability failure can never break the hook — same fail-open
-    philosophy as `dispatch._record_exemption_sink`."""
-    print(f"makoto.configchange: ADVISORY {verdict.reason}", file=sys.stderr)
+def _record_fire(payload: dict, verdict, *, pattern_id: str, level: str, message: str) -> None:
+    """Shared AuditRow-construction shape for both the advisory and blocking tiers -- was two
+    12-line byte-identical bodies differing only in pattern_id/level/message. `exit_code` and
+    `retry_hint_emitted` are DERIVED here from the finding, the same rule
+    `dispatch._record_audit` uses (error-level finding -> exit 2), rather than passed in as
+    literals by each caller. The block tier used to hardcode `exit_code=0` on the very path that
+    PRINTS `{"decision": "block"}`, so every block fire read as a clean exit to anything mining
+    the audit trail: the ledger misreporting the one event it exists to record. Two callers
+    independently supplying a value that is actually a function of `level` is exactly the shape
+    that let it rot; deriving it once, here, makes that drift structurally impossible rather
+    than merely fixed for today."""
     try:
         state_dir = _state_dir()
         finding = {
-            "pattern_id": "gate.configchange_advisory",
+            "pattern_id": pattern_id,
             "file": verdict.config_path,
             "line": 0,
-            "level": "advisory",
-            "message": verdict.reason,
+            "level": level,
+            "message": message,
             "retry_hint": "",
             "snippet": "",
             "source_event_id": 0,
@@ -215,8 +221,8 @@ def _record_advisory_fire(payload: dict, verdict) -> None:
             hook_kind="ConfigChange",
             session_id=payload.get("session_id", ""),
             project_root=payload.get("cwd") or os.getcwd(),
-            pattern_fires=["gate.configchange_advisory"],
-            exit_code=0,
+            pattern_fires=[pattern_id],
+            exit_code=2 if finding["level"] == "error" else 0,
             retry_hint_emitted=bool(finding["retry_hint"]),
             findings=[finding],
             tool_name="",  # ConfigChange is not tool-scoped
@@ -226,36 +232,20 @@ def _record_advisory_fire(payload: dict, verdict) -> None:
         pass  # observability must never break the hook
 
 
+def _record_advisory_fire(payload: dict, verdict) -> None:
+    """Loud stderr note (mirrors `dispatch._dispatch_fact`'s style) + a best-effort AuditRow
+    append. Wrapped so an observability failure can never break the hook — same fail-open
+    philosophy as `dispatch._record_exemption_sink`."""
+    print(f"makoto.configchange: ADVISORY {verdict.reason}", file=sys.stderr)
+    _record_fire(payload, verdict, pattern_id="gate.configchange_advisory",
+                 level="advisory", message=verdict.reason)
+
+
 def _record_block_fire(payload: dict, verdict, reason: str) -> None:
     """Same shape as `_record_advisory_fire`, level="error" -- the blocking tier's own audit
     trail, distinct pattern_id so audit-mining can tell the two tiers apart."""
-    try:
-        state_dir = _state_dir()
-        finding = {
-            "pattern_id": "gate.configchange_transition",
-            "file": verdict.config_path,
-            "line": 0,
-            "level": "error",
-            "message": reason,
-            "retry_hint": "",
-            "snippet": "",
-            "source_event_id": 0,
-        }
-        row = AuditRow(
-            ts=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            event="live.config_change",
-            hook_kind="ConfigChange",
-            session_id=payload.get("session_id", ""),
-            project_root=payload.get("cwd") or os.getcwd(),
-            pattern_fires=["gate.configchange_transition"],
-            exit_code=0,
-            retry_hint_emitted=False,
-            findings=[finding],
-            tool_name="",
-        )
-        append_row(state_dir, row)
-    except Exception:
-        pass  # observability must never break the hook
+    _record_fire(payload, verdict, pattern_id="gate.configchange_transition",
+                 level="error", message=reason)
 
 
 # ---- D5 blocking tier (owner-authorized, 2026-07-08): manifest + transition detection ----------

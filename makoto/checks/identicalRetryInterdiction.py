@@ -25,7 +25,7 @@ import json
 from typing import Optional
 
 from makoto.kit import classify_failure
-from makoto.kit import bash_output_text
+from makoto.kit import bash_output_text, decode_history_event
 from makoto.vocab import Finding
 from makoto.registry import Check
 
@@ -37,33 +37,21 @@ def _canon_input(ti: dict) -> str:
         return repr(ti)
 
 
-def _decode_row(row) -> Optional[dict]:
-    """One history row -> its decoded hook payload dict, or None. Accepts both the live
-    events-table tuple shape (id, ts, event_type, cwd, raw_payload_json) and a dict with a
-    'payload' key (corpus/replay callers) -- the same row union makoto.kit.iter_tool_events
-    decodes, kept local (not imported) so this predicate has no cross-module coupling at all."""
-    if isinstance(row, (tuple, list)) and len(row) > 4:
-        raw = row[4]
-    elif hasattr(row, "get"):
-        raw = row.get("payload")
-    else:
-        return None
-    if not raw:
-        return None
-    try:
-        ev = raw if isinstance(raw, dict) else json.loads(raw)
-    except Exception:
-        return None
-    return ev if isinstance(ev, dict) else None
-
-
 def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     """(tool_input, result_text) of the SINGLE MOST RECENT history row, iff that row is a
-    PostToolUse Bash call -- else None (a different tool, a Pre row, or nothing at all)."""
+    PostToolUse Bash call -- else None (a different tool, a Pre row, or nothing at all).
+
+    Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
+    step, shared with `canonTimeoutRecur._decode_row`. A hand-rolled local copy of this logic
+    used to live here, justified as keeping "zero cross-module coupling" with a module that
+    ALREADY imports `bash_output_text` from the same kit two lines above -- that claim was
+    already false when it was written, and the drift it enabled was a real bug: this predicate
+    was blind to rows whose event type lives only on the WRAPPER column, rows its sibling gate
+    (canon.timeout/canon.recur) acts on, from the same table, for the same concept."""
     rows = list(history or ())
     if not rows:
         return None
-    ev = _decode_row(rows[-1])
+    ev = decode_history_event(rows[-1])
     if ev is None or ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
         return None
     ti = ev.get("tool_input", {}) or {}
