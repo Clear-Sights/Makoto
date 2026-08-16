@@ -12,17 +12,8 @@ to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently s
 (SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
 of silence.
 
-This module is now the SOLE discovery path for both edges (2026-08-16): `schema.load_prechecks`
-has been retired, and `dispatch.py`'s Pre-tier predicate loop, Stop-finding loop, and
-`_blocking_gate_ids()` all call `load_checks(edge=...)` directly -- no second catalog, no
-schema.py-owned TOML/adapter layer left in the hot path. Stop-edge discovery has run entirely
-through this module since 2026-07-10 (the former `load_stopchecks()`/`GATE`-export mechanism,
-itself relocated here 2026-07-09 from the deleted `stopchecks/__init__.py` compat shim, was
-retired entirely then; every check that used to export a `GATE` now expresses the same Stop-edge
-surface as a plain `CHECK` (or an `EXTRA_CHECKS` entry for `contractOrder.py`'s dual Pre+Stop
-surface), with `may_block=True` where `GATE`'s presence used to imply blocking-eligibility -- see
-`Check.may_block`'s own docstring). `load_precheck_catalog()` (below) is the Pre-tier convenience
-wrapper that replaces `schema.load_prechecks()`'s old default-path behavior."""
+This module is the sole discovery path for every edge. See
+docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for the migration history."""
 from __future__ import annotations
 
 import importlib
@@ -48,24 +39,12 @@ class Check:
     loader only duck-types `.id` / `.applies_at` / `.posture`, so a module exporting its own
     richer dataclass is equally discoverable.
 
-    `may_block` (added when `load_stopchecks()`/`GATE` was retired -- DESIGN DECISION): a Stop-edge
-    check is blocking-eligible only when BOTH `may_block is True` AND `posture == BLOCK` --
-    two independent signals, not one. Before this field existed, blocking-eligibility was
-    `posture == BLOCK` alone; `may_block` restores the second, structural layer the old
-    `GATE`-export-presence mechanism used to provide (a check with no `GATE` export could
-    never enter `_blocking_gate_ids()`, regardless of its posture -- see
-    `staleEstablisher.py`/`undeclaredFalsifiable.py`, which stay `may_block=False` on purpose:
-    their pattern_id must never enter the blocking-eligible set even if `posture` were ever
-    mistagged). A Pre-tier CHECK never sets this; it reads back False and is irrelevant there
-    (`_blocking_gate_ids()` only ever consults Stop-edge checks).
+    `may_block` is the Stop edge's structural blocking-eligibility signal, independent of posture.
+    See docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for why both signals exist.
 
-    `keywords`/`retry_hint`/`description`/`predicate_module` (SPEC-C item 2, Pre-tier cutover,
-    backported from public 2026-07-10): additive fields consumed only by `schema.load_prechecks()`'s
-    loader-backed default path and by the Pre-tier predicates themselves (which read
-    `pattern.retry_hint`/`pattern.description` directly to build their Finding). A Stop-tier CHECK
-    never sets them and reads them back as their safe empty defaults. `predicate_module` is
-    conventionally set to the module's own `__name__` at CHECK-construction time
-    (self-referential, never a hand-typed/stale dotted string).
+    `keywords`/`retry_hint`/`description`/`predicate_module` are additive Pre-tier fields; Stop
+    checks retain their safe empty defaults. See
+    docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for their cutover history.
 
     `eats` is the check's exact declared input signature. Stop checks name GateContext fields or
     derived properties; Pre checks use the flat predicate vocabulary current_event/history/
@@ -77,30 +56,8 @@ class Check:
     module/factory does not use that shape's required evidence primitive. Genuine one-offs keep
     the empty default only when their id and reason are registered explicitly in that law.
 
-    `layer` ("object" | "meta", default "object" -- DESIGN DECISION, session pass after the
-    envGatedAudit/selfMuteGuard/integritySuppressionFlag/selfWiredCheck grouping was proposed and
-    then narrowed on re-examination): "meta" marks a check whose ONLY possible trigger is
-    tampering with Makoto's own audit/enforcement machinery -- as opposed to "object", which
-    watches claims/artifacts about the assistant's OWN WORK. This is a real, distinct axis (is
-    the assistant lying about its work vs. is the assistant disabling the thing that would catch
-    the lie), but it is NOT a blanket tag for "checks that mention integrity/audit concepts" --
-    envGatedAudit.py and integritySuppressionFlag.py are GENERAL-PURPOSE detectors (any env-gated
-    audit code, any integrity-named suppression flag in a .toml, regardless of whether it has
-    anything to do with Makoto itself) and were deliberately left "object" rather than "meta":
-    tagging them meta and stripping their `makoto-allow` escape hatch would regress real FP-
-    tuning work (see each file's own "ACKNOWLEDGED FN" sections) for a case that isn't actually
-    self-referential. Only `content.self_mute_guard` and `gate.self_wired` are unambiguously
-    meta -- both can ONLY ever fire on Makoto's own settings.json/hook-wiring, nothing else.
-    `layer="meta"` is wired into `makoto.verdict.apply()`'s fold rules: a raw BLOCK from a meta
-    check floors at ASK under LOOSE/SILENT posture instead of softening further -- a loose
-    posture setting must not be able to suppress detection of tampering with the mechanism that
-    enforces posture itself (`dispatch._meta_check_ids()`/`dispatch._finding_layer()`, threaded
-    through `dispatch._emit_decision` and `verdict.recheck_certificate`). `content.self_mute_guard`
-    is Pre-tier with `level="error"` (Pre-tier is invariantly BLOCK), so this floor is LIVE for it
-    today; `gate.self_wired` is Stop-tier ADVISE (never BLOCK), so the floor is present but
-    currently inert for it. `tests/test_meta_layer.py` still asserts the two known-meta check ids
-    are tagged, catching drift if either is ever un-tagged or a new Makoto-self-referential check
-    ships untagged."""
+    `layer` distinguishes checks of the assistant's work from checks of Makoto's own enforcement.
+    See docs/adr/0005-distinguish-meta-enforcement-tampering.md for the scope and posture-floor decision."""
     id: str
     applies_at: str
     posture: str
@@ -248,11 +205,7 @@ def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = Non
 
 
 def load_precheck_catalog(*, package_dir: Optional[Path] = None) -> list:
-    """Every live Pre-tier `CHECK` with a `predicate_module` set -- the keyword-prefiltered
-    detector catalog `dispatch._run_predicates` (and `install.py`/`__main__.py`'s catalog
-    inspection commands) consume. Replaces `schema.load_prechecks()`'s old default-path
-    behavior (retired 2026-08-16): the invariant it used to enforce at load time (every
-    Pre-tier check must be `posture == BLOCK` -- makoto has no non-blocking Pre tier) is no
-    longer re-checked here on every hot-path call; it is pinned instead by
-    `tests/test_pre_tier_block_invariant.py`, which asserts it against this exact catalog."""
+    """Return live Pre-tier predicate checks; tests pin their BLOCK-only invariant.
+
+    See docs/adr/0004-unify-check-discovery-with-structural-block-eligibility.md for the cutover."""
     return [c for c in load_checks(edge="Pre", package_dir=package_dir) if c.predicate_module]
