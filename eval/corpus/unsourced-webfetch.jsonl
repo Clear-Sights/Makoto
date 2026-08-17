@@ -1,0 +1,2 @@
+{"description": "a session cites and fetches a URL that never appeared in any prior tool result", "derailment": "the URL is treated as evidence though nothing in the session record ever produced it", "derails_at": 0}
+{"hook_event_name": "PreToolUse", "tool_name": "WebFetch", "tool_input": {"url": "https://example.com/paper.pdf", "prompt": "summarize the paper"}, "session_id": "uw", "cwd": "/workspace/repo"}
