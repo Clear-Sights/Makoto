@@ -43,24 +43,45 @@ silent "warning" tier for those (see [Fire level](#fire-level)) — the four doc
 - `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
 - `gate.contract_order` a result-producing call issued while a declared Plan's dependency for that step is still undischarged (its Stop-time sibling gate guards the remainder at turn end)
 
-**End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger:
-- `gate.completion` — "done / created `X`" but the artifact isn't on disk
-- `gate.advance` — advancing a phase whose precondition isn't recorded as met
-- `gate.green_claim` — "suite green" against a recorded test failure
-- `gate.dropped` — a forward promise carrying identifying info ("I'll add `def X` to `Y`", "3 tests in `Z`") left undischarged at turn-end — said-but-not-done, checked against the agent's own touched-keys
-- `gate.fabricated_action` — "I ran `X` / executed `Y`" in a turn with no tool call at all (presence-of-work, not command-text match)
-- `gate.named_test` — "`test_foo` passes" against a recorded `FAILED` of that exact named test (coreference-pinned; the green_claim delta)
-- `gate.stale_pass` — "all tests pass" against pytest's own `lastfailed` record still naming a live failing test (the runner's ledger, existence-filtered for staleness)
-- `gate.claimed_running` — "the server is running" / "it's up and listening on port 5173" but this session's own recorded Bash evidence contradicts it: no process-start or liveness-check command ran at all this session, or the most recently recorded one ended in a direct error state (`interrupted`, or a non-zero exit code). Agnostic in the `gate.canon` sense — the failure verdict reads only those two protocol terminals, never a test-runner regex or a language/framework token; the command classifier is a broad, open-world, multi-ecosystem net (like `is_test_runner`'s), so an unlisted launcher/healthcheck shape is a documented recall bound, never a false-block source.
-- `gate.run_promised` — the forward-looking sibling of `gate.claimed_running`: the immediately prior turn's own message promised a first-person run-intent action ("I'll run the tests", "I'm going to restart the server", "let me deploy this") but no Bash call appears anywhere in this session's recorded history since — the word must match the world, checked one turn later. Closed first-person-auxiliary + closed process-lifecycle-verb lexicon (mirroring `gate.claimed_running`'s own verb set), so "it's going to rain today" cannot match on either the subject or the verb axis. Stateless: the one-turn grace period falls out of `history` structurally never containing the row for the Stop currently being evaluated, so a promise made THIS turn can only ever be checked starting at the NEXT one — no new persistence, no `Plan`/`PlanNode` extension (a run-intent promise's only evidence is "a Bash call happened", not a located file write).
-- `gate.claimed_shipped` — a completed-action sibling to `gate.claimed_running`/`gate.run_promised`, but scoped to REMOTE mutations instead of local process liveness: "I merged the PR", "pushed it to main", "it's live now" with no successful remote-mutating tool call anywhere in this session's recorded history. Evidence is a non-dry-run `git push` over Bash, or a successful call from a closed non-Bash tool set (`merge_pull_request` — requiring `merged: true`, not just an error-free response — and `push_files`, plus their `mcp__github__`-qualified forms); `create_pull_request` is deliberately excluded, since opening a PR establishes intent but does not substantiate "merged" or "live". Reads `history_all_agents` so a subagent's own real push/merge grounds a main-thread claim. Immediate check, no grace period — this claims something already done. `gate.completion` keeps sole ownership of local file-production claims; this gate never duplicates it.
-- `gate.liveness` — fires on the code itself, not a claim: a statement with no live effect inside a closed function (dead/illusory work the present-closure model can prove inert). It walks the turn's touched `.py` ASTs, so it yields a finding per illusory statement rather than one per turn.
-- `gate.self_wired` — **advisory only, never blocks** (see [Fire level](#fire-level)): partial-strip detection of makoto's own `.claude/settings.json` hook wiring — fires if `PreToolUse`/`PostToolUse`/`Stop` is missing a makoto-dispatching entry while at least one other still has one. It has a documented blind spot: a single edit that strips all three simultaneously disables this check in the same instant it would have fired (Claude Code reloads hook config live, not once at session start), so it provides zero coverage against that full-strip case — see `docs/self-defense-asymmetry-followup.md`.
-- `gate.hollow_test` — fires on the code itself, not a claim: a HOLLOWED test (SPIRIT.md §4) — one that survives in name while its content is gutted, so it can never actually fail. Four sub-patterns: no assertion of any kind in the test body; an asserted tautology (`assert True`, or comparing an expression to itself); a broad, no-op `try`/`except` that silently swallows the only call-under-test's failure; and a test-shaped function that can never fire independently — either nested inside another function (pytest's collector never discovers it) or gated behind a `skipif`/`skipIf` condition that is provably always true.
-- `gate.canon` — **blocking** (`level="error"`, unlike the advisory exceptions below): two language-agnostic Stop primitives over the turn's own call stream, reading only closed protocol fields (tool_name/tool_input identity, `tool_response.interrupted`/`.error`) — no test-runner regex, no language token. `canon.timeout` fires when the turn's LAST tool call ended in a direct error state (interrupted, or a self-emitted error code) and closed without resurfacing or resolving it — an error resolved by a later successful call stays silent. `canon.recur` fires when the SAME tool call (identical name + byte-identical input) was re-issued back-to-back and every call in that consecutive run ended in the same direct error state — a stuck retry loop with nothing changed between attempts; judged per (tool, input) key, so a later success for that same key silences it even with other, different calls in between. Certified via held-out adversarial RED fixtures (planted cases that must fire) plus a near-vacuous corpus-FP check — the honest corpus almost never carries the triggering precondition (`interrupted`/`self_error_code`) at all, so a clean corpus replay alone is inconclusive, not a certification (see `ANCESTRY.md` §2 Part B for the corrected framing).
-- `gate.canon_fingerprints` — **blocking**: 4 of 17 ported session-level "canon" fingerprints (SPEC-5 Task 9, from `REF-lever-graded-primitives/signalminer/grade_planted.py`'s 27-fingerprint `THE_CANON`) that are robust-core, blocking-capable by construction — 0-FP on both the planted-clean and real-Claude-gold negative sets per the gold-oracle certification (`nogreen_checkdisabled`, `nosrc_destruct`, `nosrc_green_timeout`, `notestedit_destruct`).
-- `gate.canon_fingerprints_advisory` — **advisory only, never blocks**: the other 13 of the same 17 fingerprints — each either rests on a soft/claim atom (`claimed_pass_no_run`, `tool_timeout`, `assertion_weakened`) the gold-oracle finding doesn't certify as robust, or is one of that finding's explicitly-named worst-disqualified fingerprints. Recorded to the audit log per SPEC-5's total-retention rule, never emitted as a block decision.
-- `gate.contract_order` — **blocking**: the Stop-time remainder guard over a declared Plan (SPEC-5, ported by shape from Assay's `ContractOrder` pattern) — fires when the turn ends with the plan's dependency remainder still non-empty. Its PreToolUse sibling guard is a pre-check, not a Stop gate; see `makoto/checks/contractOrder.py`.
+**End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
+The table below is the summary; the long-form description of every gate is in
+[docs/CATALOG.md](docs/CATALOG.md) (relocated from this section, word for word).
+
+The **certification** column uses three values, each naming its own denominator:
+
+- **established** — certified at zero false positives on the named negative sets: the shipped
+  corpus for the ordinary blocking gates (the warning-tier-elimination invariant below — a
+  pattern either blocks at proven zero corpus-FP, or it is cut), and additionally the
+  planted-clean and real-Claude-gold negative sets for `gate.canon_fingerprints` (gold-oracle
+  certification). Zero-FP on those sets is the claim; the live-session false-positive rate
+  accumulates from field use and is not covered by it.
+- **replayed** — a corpus replay ran but is inconclusive by the gate's own admission (the honest
+  corpus almost never carries the triggering precondition), so certification rests instead on
+  held-out adversarial RED fixtures plus that near-vacuous corpus-FP check.
+- **advisory** — uncertifiable by design or not yet corpus-measured; recorded to the audit log,
+  never emitted as a block decision.
+
+| Check id | One-line trigger | Fire | Certification |
+|---|---|---|---|
+| `gate.completion` | "done / created `X`" but the artifact isn't on disk | blocking | established |
+| `gate.advance` | advancing a phase whose precondition isn't recorded as met | blocking | established |
+| `gate.green_claim` | "suite green" against a recorded test failure | blocking | established |
+| `gate.dropped` | an identifying forward promise left undischarged at turn-end | blocking | established |
+| `gate.fabricated_action` | "I ran `X`" in a turn with no tool call at all | blocking | established |
+| `gate.named_test` | "`test_foo` passes" against a recorded `FAILED` of that named test | blocking | established |
+| `gate.stale_pass` | "all tests pass" against pytest's own live `lastfailed` record | blocking | established |
+| `gate.claimed_running` | "it's running/up" contradicted by this session's own Bash record | blocking | established |
+| `gate.run_promised` | last turn promised a run ("I'll run the tests") and no Bash call followed | blocking | established |
+| `gate.claimed_shipped` | "merged/pushed/live" with no successful remote-mutating call on record | blocking | established |
+| `gate.liveness` | a statement with no live effect inside a closed function | blocking | established |
+| `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |
+| `gate.canon` | last call ended in an unresolved direct error, or a byte-identical stuck retry loop | blocking | replayed |
+| `gate.canon_fingerprints` | 4 of 17 ported canon fingerprints, robust-core by gold-oracle certification | blocking | established |
+| `gate.contract_order` | turn ends with a declared Plan's dependency remainder non-empty | blocking | established |
+| `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | advisory | advisory |
+| `gate.canon_fingerprints_advisory` | the other 13 canon fingerprints (soft/claim atoms or gold-disqualified) | advisory | advisory |
+| `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |
+| `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
 
 Inspect the live catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 
@@ -93,8 +114,11 @@ if os.environ.get("ENABLE_AUDIT_TRAIL"):  # makoto-allow: app feature, gates use
     write_audit_trail()
 ```
 
-**See `docs/SPIRIT.md`** (this repo's own internal design doc — not part of the public release) — 誠 (makoto), the constitution every pattern derives from:
-a word is real the way water is wet, a constitutive property, not an after-the-fact audit.
+The constitution every pattern derives from is 誠 (makoto): a word is real the way water is wet —
+a constitutive property, not an after-the-fact audit. (An internal design document elaborating
+this is not shipped in this repository, so it is deliberately not cited here; every normative
+statement a pattern rests on appears self-contained in this README, [docs/CATALOG.md](docs/CATALOG.md),
+or the pattern's own `makoto pattern show` output.)
 
 
 ## Install (plugin)
@@ -131,7 +155,8 @@ untouched beyond hook wiring (above); set it yourself if you want the earlier la
 
 If you previously ran the old `python -m makoto install` (0.3.0 or earlier), your
 `~/.claude/settings.json` has makoto-managed hook entries. Running the plugin alongside would cause
-double-dispatch. Migrate cleanly:
+double-dispatch. How to tell if you're affected: `grep makoto ~/.claude/settings.json` — any hit
+means the old entries are present. Migrate cleanly:
 
 ```bash
 python -m makoto uninstall                   # removes old settings.json entries
@@ -213,7 +238,9 @@ Every live pattern blocks (`fire_level = "error"` → exit 2). makoto deliberate
 non-blocking tier**: a `warning`/`disabled` resting state — witnessing a violation and letting the
 tool through — is itself an illusory word, the exact weakening shape makoto exists to catch. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
-blocks at proven zero corpus-FP, or it is cut). This still governs all 15 pre-checks (`_ALLOWED_FIRE_LEVELS
+blocks at proven zero corpus-FP, or it is cut — zero false positives on the shipped corpus and gold
+negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
+from field use and is not part of that measurement). This still governs all 15 pre-checks (`_ALLOWED_FIRE_LEVELS
 = {"error"}`, enforced at load) and 15 of the 19 end-of-turn gates.
 
 **Four narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05),
