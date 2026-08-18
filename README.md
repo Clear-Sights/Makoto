@@ -138,6 +138,19 @@ python -m makoto uninstall                   # removes old settings.json entries
 /plugin install https://github.com/Clear-Sights/Makoto  # installs the plugin
 ```
 
+## Siblings
+
+Makoto is one of three engines that split one taxonomy — act, sequence, statement — and share
+nothing else. Each installs alone; none inherits or implies the others' coverage. All three
+install from the [Tribunal](https://github.com/Clear-Sights/Tribunal) marketplace:
+`claude plugin marketplace add Clear-Sights/Tribunal`.
+
+| Engine | Judges | One line |
+|---|---|---|
+| [**Ward**](https://github.com/Clear-Sights/Ward) | the pending **act** | nothing outright bad happens |
+| [**Gyroscope**](https://github.com/Clear-Sights/Gyroscope) | the **sequence** | a session neither capsizes nor gets lost |
+| **Makoto** (this repo) | the **statement** | words aren't empty |
+
 ## Non-plugin install (power users)
 
 ```bash
