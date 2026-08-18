@@ -38,7 +38,7 @@ from typing import Dict, Iterable, List, Tuple
 
 from makoto.vocab import _SUCCESS_SUMMARY_RX
 from makoto.substrate.claims import whole_suite_pass_claim
-from makoto.kit import bash_output_text, decode_history_row, is_failing_testrun
+from makoto.kit import bash_output_text, decode_history_event, is_failing_testrun
 from makoto.core._shell import (
     _effective_argv,
     _git_subcommand,
@@ -51,25 +51,34 @@ Call = dict  # {"name": tool_name, "input": tool_input dict, "result": tool_resp
 _EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 
 
-# ---- history -> Call decode (PostToolUse rows only) -----------------------------------------------
+# ---- history -> Call decode (settled tool-terminal rows only) ------------------------------------
 # Unlike canonTimeoutRecur's timeout/recur primitives, these atoms only care about COMPLETED
-# actions, and a real PostToolUse payload already carries both tool_input AND tool_response for
-# the same call -- so no Pre/Post pairing or dangling-Pre synthesis is needed here.
+# actions. PostToolUse carries tool_input/tool_response; PostToolUseFailure carries tool_input and
+# top-level error/is_interrupt. Neither needs Pre/Post pairing or dangling-Pre synthesis here.
 def _decode_row(row):
-    # Row-decode step shared via substrate.io.decode_history_row (2026-07-09 dedup: this function
+    # Row-decode step shared via kit.decode_history_event (2026-07-09 dedup: this function
     # and checks.writeThrashRevert._prior_whole_file_writes each re-derived the same tuple/dict-
-    # payload sniff + json.loads by hand -- found duplicated by jscpd). Only this function's own
-    # hook_event_name filter + Call-dict shaping stays local.
-    ev = decode_history_row(row)
-    if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+    # payload sniff + json.loads by hand -- found duplicated by jscpd). The shared helper owns the
+    # event-wrapper fallback; only the terminal filter and Call-dict shaping stay local.
+    ev = decode_history_event(row)
+    if not isinstance(ev, dict):
+        return None
+    event_type = ev.get("hook_event_name")
+    if event_type not in ("PostToolUse", "PostToolUseFailure"):
         return None
     name = ev.get("tool_name", "") or ""
     if not name:
         return None
     ti = ev.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
-    tr = ev.get("tool_response")
-    tr = tr if isinstance(tr, dict) else {}
+    if event_type == "PostToolUseFailure":
+        tr = {
+            "error": ev.get("error") or "tool call failed",
+            "interrupted": bool(ev.get("is_interrupt")),
+        }
+    else:
+        tr = ev.get("tool_response")
+        tr = tr if isinstance(tr, dict) else {}
     return {"name": name, "input": ti, "result": tr}
 
 

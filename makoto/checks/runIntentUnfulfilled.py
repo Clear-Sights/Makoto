@@ -94,10 +94,13 @@ def _last_stop_index(history) -> Optional[int]:
 
 
 def _bash_call_after(history, idx: int) -> bool:
-    """True iff a PostToolUse Bash call appears anywhere after position `idx` in `history`."""
+    """True iff a settled Bash terminal appears anywhere after position `idx` in `history`.
+    Success is irrelevant: this gate asks whether the promised run happened, not whether it won."""
     for row in list(history or ())[idx + 1:]:
         ev = decode_history_row(row)
-        if (isinstance(ev, dict) and ev.get("hook_event_name") == "PostToolUse"
+        # INCLUDE failed terminals: ran-and-failed still discharges a promise merely to run.
+        if (isinstance(ev, dict)
+                and ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure")
                 and ev.get("tool_name") == "Bash"):
             return True
     return False

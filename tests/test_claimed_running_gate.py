@@ -6,9 +6,14 @@ fires when a first-person process-start verb ("I started/launched/ran ...") co-o
 the same message -- generic explanatory prose about a tool's default behavior essentially never
 also narrates the assistant itself starting something -- plus the usual quoted/negated/
 forward-framed clause guards (mirroring substrate.claims.whole_suite_pass_claim's shape). Agnostic
-in the gate.canon sense: the failure verdict reads only two protocol terminals (`interrupted`, a
-non-zero `exitCode`), never a test-runner regex or a language/framework token."""
-from makoto.checks.claimedRunningAbsent import claimed_running_gate, _running_claim
+in the gate.canon sense: the failure verdict reads only protocol terminals (`interrupted`, a
+non-zero `exitCode`, or PostToolUseFailure's top-level `error`), never a test-runner regex or a
+language/framework token."""
+from makoto.checks.claimedRunningAbsent import (
+    _latest_process_call_failed,
+    _running_claim,
+    claimed_running_gate,
+)
 
 
 def _post(cmd="npm run dev", **response):
@@ -21,6 +26,12 @@ def _post(cmd="npm run dev", **response):
 def _pre(cmd="npm run dev", **response):
     return {"payload": {"hook_event_name": "PreToolUse", "tool_name": "Bash",
                          "tool_input": {"command": cmd}, "tool_response": response}}
+
+
+def _failure(cmd="npm run dev", *, error="Connection error", is_interrupt=False):
+    return {"payload": {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+                         "tool_input": {"command": cmd}, "error": error,
+                         "is_interrupt": is_interrupt}}
 
 
 # --- TP: _running_claim recognizes the claim shape ---
@@ -118,6 +129,20 @@ def test_fires_when_latest_healthcheck_exited_nonzero():
     hist = [_post("curl -sf http://localhost:3000", exitCode=7)]
     f = claimed_running_gate("I started it earlier; it is still running.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
+
+
+def test_failed_process_start_terminal_is_misreported_not_unsubstantiated():
+    hist = [_failure("npm run dev", error="Connection error", is_interrupt=False)]
+    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    assert f is not None and f.pattern_id == "gate.claimed_running"
+    assert "most recently recorded" in f.message
+
+
+def test_successful_post_with_benign_error_key_is_not_a_failure_terminal():
+    hist = [_post("npm run dev", stdout="listening", exitCode=0, error=None)]
+    assert _latest_process_call_failed(hist) is False
+    assert claimed_running_gate(
+        "I started the server. It is now running.", history=hist) is None
 
 
 def test_fires_when_the_latest_of_two_calls_is_the_failing_one():

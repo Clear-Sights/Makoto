@@ -55,6 +55,7 @@ def _events(state_dir):
 def test_canonical_event_folds_camelcase_to_known_name():
     assert hostdialect.canonical_event("preToolUse", HANDLERS) == "PreToolUse"
     assert hostdialect.canonical_event("postToolUse", HANDLERS) == "PostToolUse"
+    assert hostdialect.canonical_event("postToolUseFailure", HANDLERS) == "PostToolUseFailure"
     assert hostdialect.canonical_event("stop", HANDLERS) == "Stop"
 
 

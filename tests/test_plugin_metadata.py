@@ -33,17 +33,18 @@ def test_plugin_json_has_required_fields():
     assert "license" in data
 
 
-def test_hooks_json_declares_all_three_events():
-    """hooks.json registers PreToolUse + PostToolUse + Stop pointing at _dispatch_shim.sh.
+def test_hooks_json_declares_pre_both_post_terminals_and_stop():
+    """hooks.json registers PreToolUse + both Post terminals + Stop at _dispatch_shim.sh.
 
     PostToolUse added 1.0.5 to enable history-walking predicates (content.unsourced_webfetch, 2.5)
-    and citation capture (capture.py).
+    and citation capture (capture.py). PostToolUseFailure retains ran-and-failed calls with their
+    real top-level error/is_interrupt terminal instead of leaving a dangling PreToolUse.
     """
     p = REPO_ROOT / "hooks" / "hooks.json"
     assert p.is_file(), "missing hooks/hooks.json"
     data = json.loads(p.read_text())
     hooks = data["hooks"]
-    for evt in ("PreToolUse", "PostToolUse", "Stop"):
+    for evt in ("PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop"):
         assert evt in hooks, f"missing {evt} in hooks.json"
         for entry in hooks[evt]:
             for h in entry["hooks"]:

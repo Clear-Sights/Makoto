@@ -7,7 +7,7 @@ from makoto.vocab import (
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.kit import decode_history_row
+from makoto.kit import decode_history_event
 
 # gate.claimed_running -- the assistant claims an ONGOING running/live/listening/serving state
 # for a process/service ("the server is running", "it's up and running", "now listening on port
@@ -19,8 +19,9 @@ from makoto.kit import decode_history_row
 #
 # AGNOSTIC in the same two senses this catalog already uses the word for gate.canon
 # (canonTimeoutRecur.py's module docstring):
-#   (1) the FAILURE verdict reads only protocol-level terminals -- `tool_response.interrupted`
-#       and a non-zero `exitCode` -- no test-runner regex, no language/framework token;
+#   (1) the FAILURE verdict reads only protocol-level terminals -- `tool_response.interrupted`,
+#       a non-zero `exitCode`, and PostToolUseFailure's top-level `error` -- no test-runner regex,
+#       no language/framework token;
 #   (2) the command CLASSIFIER (_PROCESS_LIFECYCLE_CMD_RX) is a broad, open-world, multi-
 #       ecosystem net (like _TEST_RUNNER_RX) -- an unlisted launcher/healthcheck shape is a
 #       documented RECALL bound, never a false-block source.
@@ -40,14 +41,15 @@ from makoto.kit import decode_history_row
 # most recently recorded relevant call is treated as a contradiction.
 #
 # CROSS-AGENT EVIDENCE (2026-07-23): unlike every other gate, this one reads
-# `ctx.history_all_agents` -- every agent-thread's PostToolUse Bash rows pooled, not narrowed to
-# the calling thread by `_history_for_agent`. A subagent dispatched to start/verify a process is
+# `ctx.history_all_agents` -- every agent-thread's settled PostToolUse/PostToolUseFailure Bash
+# rows pooled, not narrowed to the calling thread by `_history_for_agent`. A subagent dispatched
+# to start/verify a process is
 # real session evidence the main thread's own claim must see; the thread-boundary firewall exists
 # to stop a DANGLING (in-flight) PreToolUse from synthesizing a FAILURE across threads, a risk
-# that does not apply to a completed PostToolUse Bash call. Residual, accepted risk: an unrelated
-# subagent's unrelated process-lifecycle-shaped call failing could wrongly implicate this claim --
-# narrower than the false positive this closes (a real launch invisible only because a different
-# thread made it), not eliminated.
+# that does not apply to a settled PostToolUse/PostToolUseFailure Bash terminal. Residual,
+# accepted risk: an unrelated subagent's unrelated process-lifecycle-shaped call failing could
+# wrongly implicate this claim -- narrower than the false positive this closes (a real launch
+# invisible only because a different thread made it), not eliminated.
 #
 # NOT IN SCOPE (a documented limitation, not fixed here): both history views stay bounded by
 # `_select_recent`'s 1-hour rolling window -- a launch more than an hour before the claim reads as
@@ -78,34 +80,47 @@ def _running_claim(text: str):
 
 
 def _bash_postuse_calls(history):
-    """Yield (command, tool_response_dict) for every PostToolUse Bash call in `history`, in
-    session order. Reuses the one canonical row-decode step (substrate.io.decode_history_row);
-    fail-open per row -- a malformed row is skipped, never raised."""
+    """Yield (command, result_dict, is_failure_terminal) for every settled Bash terminal in
+    `history`, in session order. A PostToolUseFailure's top-level error/is_interrupt fields become
+    the same small result shape read below, while the boolean preserves where that error came
+    from. Reuses the canonical row/event decode; malformed rows fail open."""
     for row in history or ():
-        ev = decode_history_row(row)
-        if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+        ev = decode_history_event(row)
+        if not isinstance(ev, dict):
+            continue
+        event_type = ev.get("hook_event_name")
+        # INCLUDE failed terminals: this gate distinguishes "no evidence" from "ran and failed".
+        if event_type not in ("PostToolUse", "PostToolUseFailure"):
             continue
         if ev.get("tool_name") != "Bash":
             continue
-        cmd = str((ev.get("tool_input") or {}).get("command", "") or "")
+        tool_input = ev.get("tool_input")
+        cmd = str(tool_input.get("command", "") or "") if isinstance(tool_input, dict) else ""
+        if event_type == "PostToolUseFailure":
+            yield cmd, {
+                "interrupted": bool(ev.get("is_interrupt")),
+                "error": ev.get("error"),
+            }, True
+            continue
         tr = ev.get("tool_response")
-        yield cmd, (tr if isinstance(tr, dict) else {})
+        yield cmd, (tr if isinstance(tr, dict) else {}), False
 
 
 def _latest_process_call_failed(history) -> Optional[bool]:
     """None iff no process-lifecycle-shaped Bash call (_PROCESS_LIFECYCLE_CMD_RX) ever ran this
     session -- the claim has zero grounding. Else True/False for whether the MOST RECENT such
-    call ended in a direct agnostic error state: `interrupted`, or a recorded non-zero exit code
-    -- the same two protocol terminals gate.canon reads (canonTimeoutRecur.py), no exit-code
-    SEMANTICS guess beyond "non-zero", no language token. Latest-wins, like
+    call ended in a direct agnostic error state: `interrupted`, a recorded non-zero exit code, or
+    a PostToolUseFailure top-level `error` terminal -- protocol fields only, with no exit-code
+    SEMANTICS guess beyond "non-zero" and no language token. Latest-wins, like
     record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt."""
     verdict = None
-    for cmd, tr in _bash_postuse_calls(history):
+    for cmd, tr, is_failure_terminal in _bash_postuse_calls(history):
         if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
             continue
+        direct_error = is_failure_terminal and "error" in tr
         interrupted = tr.get("interrupted") is True
         exit_code = tr.get("exitCode", tr.get("exit"))
-        verdict = bool(interrupted or (exit_code is not None and exit_code != 0))
+        verdict = bool(direct_error or interrupted or (exit_code is not None and exit_code != 0))
     return verdict
 
 
@@ -132,7 +147,8 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
             pattern_id="gate.claimed_running", file="", line=0, level="error",
             message=("Claim states a process/service is running, but the most recently recorded "
                       "process-start/liveness-check call ended in a direct error state "
-                      "(interrupted, or a non-zero exit) — the word must match the world."),
+                      "(interrupted, a non-zero exit, or a failed-tool error terminal) — the "
+                      "word must match the world."),
             retry_hint=("Re-run the start/health-check to a real successful result and cite it, "
                         "or scope/retract the running claim."))
     return None

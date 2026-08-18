@@ -35,6 +35,17 @@ EVENTS: dict[str, dict] = {
         "replace a plan mid-session at all), and the TaskCreate/TaskUpdate plan-item sync always "
         "run; the test-delta finding is the one ADVISE-tier exception, surfaced via "
         "_emit_decision")},
+    "PostToolUseFailure": {"status": "WIRED", "moves": (
+        "_accumulate", "_ledger.record_update", "compute_delta",
+        "_plan_items.record_task_event", "_event_location", "_plan.persist_plan",
+        "_plan.declare_from_live_write"), "reason": (
+        "was a HOLE because we had not evaluated the event at all. We learned from a live MCP "
+        "failure that Claude Code delivers a call that ran and failed here, with top-level "
+        "`error`/`is_interrupt`, instead of delivering PostToolUse. Leaving it unwired erased "
+        "the real terminal and made history decoders invent a dangling-Pre failure with fixed "
+        "text. Wired 2026-08-18 through the same accumulation-only handler as PostToolUse so "
+        "the original failure terminal is retained for later claim checks; it never makes a "
+        "blocking decision on the Post edge")},
     "Stop": {"status": "WIRED", "moves": (
         "_evaluate_and_gate", "run_stop_checks", "_blocking_gate_ids", "_emit_decision")},
     "SessionStart": {"status": "WIRED", "moves": (
@@ -62,15 +73,6 @@ EVENTS: dict[str, dict] = {
         "as inconclusive, not confirmed-working (docs/self-defense-asymmetry-followup.md). "
         "Unblock: ship the hooks.json entry once live delivery is actually confirmed, same "
         "rule-4 sign-off as the others")},
-    "PostToolUseFailure": {"status": "HOLE", "reason": (
-        "the odd one of this section's four HOLEs: the other three mean 'code exists but is not "
-        "shipped-wired'; this one means no design has ever been evaluated in this repo at all "
-        "(no doc, no code path) — flagged explicitly so it isn't mistaken for the built-but-"
-        "unwired flavor. It is a plausible in-domain candidate: a tool call that itself errored "
-        "right before a completion claim is exactly the kind of contradiction Makoto's "
-        "claim-checking domain should care about. Unblock: an owner-authorized design pass — "
-        "same rule-4 posture as ConfigChange before it was built")},
-
     # ── OUT — declared outside Makoto's writ, each with its reason ─────────────────────────────
     "UserPromptSubmit": {"status": "OUT", "reason": (
         "carries ORACLE-authored content (the human's own words); Makoto verifies the "

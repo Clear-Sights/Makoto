@@ -39,7 +39,8 @@ def _canon_input(ti: dict) -> str:
 
 def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     """(tool_input, result_text) of the SINGLE MOST RECENT history row, iff that row is a
-    PostToolUse Bash call -- else None (a different tool, a Pre row, or nothing at all).
+    settled PostToolUse/PostToolUseFailure Bash call -- else None (a different tool, a Pre row,
+    or nothing at all). Failed terminals classify their real top-level error text.
 
     Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
     step, shared with `canonTimeoutRecur._decode_row`. Sharing it is what keeps this predicate
@@ -50,9 +51,15 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     if not rows:
         return None
     ev = decode_history_event(rows[-1])
-    if ev is None or ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
+    if ev is None or ev.get("tool_name") != "Bash":
+        return None
+    event_type = ev.get("hook_event_name")
+    # INCLUDE failed terminals: this check reasons about the immediately prior failed attempt.
+    if event_type not in ("PostToolUse", "PostToolUseFailure"):
         return None
     ti = ev.get("tool_input", {}) or {}
+    if event_type == "PostToolUseFailure":
+        return ti, str(ev.get("error") or "tool call failed")
     tr = ev.get("tool_response", {}) or {}
     text = bash_output_text(tr) if isinstance(tr, dict) else str(tr)
     return ti, text

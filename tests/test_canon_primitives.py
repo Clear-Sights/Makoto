@@ -8,6 +8,7 @@ import json
 
 from makoto.checks.canonTimeoutRecur import (
     CANON_SEQ_PRIMITIVES,
+    _decode_row as _decode_canon_row,
     calls_from_history,
     canon_gate,
     exit_code,
@@ -125,6 +126,14 @@ def test_recur_fires_when_a_run_of_three_all_err_ends_at_list_end():
     assert recur_stuck(calls) is True
 
 
+def test_recur_gives_two_transient_failures_a_budget_but_fires_on_the_third():
+    ti = {"command": "poll-service"}
+    calls = [_call(input=ti, result={"error": "Connection error"}) for _ in range(2)]
+    assert recur_stuck(calls) is False
+    calls.append(_call(input=ti, result={"error": "Connection error"}))
+    assert recur_stuck(calls) is True
+
+
 def test_recur_input_identity_is_key_order_independent():
     calls = [_call(input={"a": 1, "b": 2}, result={"interrupted": True}),
              _call(input={"b": 2, "a": 1}, result={"interrupted": True})]
@@ -164,6 +173,21 @@ def test_recur_still_fires_when_the_same_key_fails_again_after_an_unrelated_call
     assert recur_stuck(calls) is True
 
 
+def test_recur_transient_count_resets_when_that_key_succeeds():
+    ti = {"owner": "x", "repo": "y", "pullNumber": 8}
+    other = _call(name="get_check_runs", input={"pullNumber": 8}, result={"stdout": "ok"})
+    calls = [
+        *[_call(name="merge_pull_request", input=ti, result={"error": "503"})
+          for _ in range(3)],
+        other,
+        _call(name="merge_pull_request", input=ti, result={"merged": True}),
+        other,
+        _call(name="merge_pull_request", input=ti, result={"error": "503"}),
+        _call(name="merge_pull_request", input=ti, result={"error": "503"}),
+    ]
+    assert recur_stuck(calls) is False
+
+
 def test_recur_one_key_resolved_another_key_still_stuck():
     """A resolved key must not mask a DIFFERENT key's genuinely still-stuck loop."""
     ti_a = {"command": "a"}
@@ -185,10 +209,61 @@ def _tuple_row(idx, event_type, tool_name, tool_input, tool_response, cwd="/repo
     return (idx, "t", event_type, cwd, payload)
 
 
+def _failure_tuple_row(idx, tool_name, tool_input, error, *, is_interrupt=False, cwd="/repo"):
+    payload = json.dumps({"hook_event_name": "PostToolUseFailure", "tool_name": tool_name,
+                          "tool_input": tool_input, "error": error,
+                          "is_interrupt": is_interrupt})
+    return (idx, "t", "PostToolUseFailure", cwd, payload)
+
+
 def test_calls_from_history_decodes_posttooluse_tuple_rows():
     row = _tuple_row(1, "PostToolUse", "Bash", {"command": "x"}, {"interrupted": True})
     assert calls_from_history([row]) == [
         {"name": "Bash", "input": {"command": "x"}, "result": {"interrupted": True}}]
+
+
+def test_decode_row_normalizes_posttoolusefailure_with_real_error_text():
+    row = _failure_tuple_row(1, "mcp__svc__poll", {"query": "x"}, "Connection error",
+                             is_interrupt=True)
+    assert _decode_canon_row(row) == (
+        "PostToolUse", "mcp__svc__poll", {"query": "x"},
+        {"error": "Connection error", "interrupted": True})
+
+
+def test_issue_28_transient_eeo_failure_rows_do_not_fire_recur():
+    same = {"query": "status"}
+    changed = {"query": "status, please retry"}
+    history = [
+        _tuple_row(1, "PreToolUse", "mcp__svc__poll", same, {}),
+        _failure_tuple_row(2, "mcp__svc__poll", same, "Connection error"),
+        _tuple_row(3, "PreToolUse", "mcp__svc__poll", same, {}),
+        _failure_tuple_row(4, "mcp__svc__poll", same, "Connection error"),
+        _tuple_row(5, "PreToolUse", "mcp__svc__poll", changed, {}),
+        _tuple_row(6, "PostToolUse", "mcp__svc__poll", changed, {"content": "ok"}),
+    ]
+    calls = calls_from_history(history)
+    assert [c["result"].get("error") for c in calls] == [
+        "Connection error", "Connection error", None]
+    assert recur_stuck(calls) is False
+
+
+def test_issue_28_validationerror_eeo_failure_rows_still_fire_recur():
+    same = {"query": "status"}
+    changed = {"query": "status, please retry"}
+    history = [
+        _tuple_row(1, "PreToolUse", "mcp__svc__poll", same, {}),
+        _failure_tuple_row(2, "mcp__svc__poll", same,
+                           "ValidationError: invalid tool input"),
+        _tuple_row(3, "PreToolUse", "mcp__svc__poll", same, {}),
+        _failure_tuple_row(4, "mcp__svc__poll", same,
+                           "ValidationError: invalid tool input"),
+        _tuple_row(5, "PreToolUse", "mcp__svc__poll", changed, {}),
+        _tuple_row(6, "PostToolUse", "mcp__svc__poll", changed, {"content": "ok"}),
+    ]
+    calls = calls_from_history(history)
+    assert [c["result"].get("error") for c in calls[:2]] == [
+        "ValidationError: invalid tool input", "ValidationError: invalid tool input"]
+    assert recur_stuck(calls) is True
 
 
 def test_calls_from_history_skips_pretooluse_rows():
