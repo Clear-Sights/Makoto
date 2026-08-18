@@ -236,6 +236,24 @@ def decode_history_event(row):
     return ev
 
 
+def failure_terminal_result(ev) -> dict:
+    """Normalize a PostToolUseFailure event to the shared result-dict shape.
+
+    The shape is always ``{"error": <non-empty str>, "interrupted": <bool>}``.  A terminal
+    whose optional error detail is absent gets the deliberately generic ``"tool call failed"``
+    fallback: the event type is itself evidence that the call failed, but generic wording stays
+    unclassified by :func:`classify_failure` and therefore cannot invent a deterministic retry
+    block.  Keeping this normalization here prevents history decoders from drifting on whether a
+    missing error means failure, success, or uncertainty.
+    """
+    event = ev if isinstance(ev, dict) else {}
+    error = event.get("error")
+    return {
+        "error": str(error) if error else "tool call failed",
+        "interrupted": bool(event.get("is_interrupt")),
+    }
+
+
 def bash_output_text(tool_response) -> str:
     """extract captured stdout+stderr from a Bash tool_response.
 

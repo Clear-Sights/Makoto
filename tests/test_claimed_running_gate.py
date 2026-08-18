@@ -138,6 +138,13 @@ def test_failed_process_start_terminal_is_misreported_not_unsubstantiated():
     assert "most recently recorded" in f.message
 
 
+def test_failure_terminal_without_error_text_is_still_failure_evidence():
+    hist = [_failure("npm run dev", error=None, is_interrupt=False)]
+    assert _latest_process_call_failed(hist) is True
+    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    assert f is not None and "most recently recorded" in f.message
+
+
 def test_successful_post_with_benign_error_key_is_not_a_failure_terminal():
     hist = [_post("npm run dev", stdout="listening", exitCode=0, error=None)]
     assert _latest_process_call_failed(hist) is False

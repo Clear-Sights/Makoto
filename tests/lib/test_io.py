@@ -4,7 +4,8 @@ import purity is enforced by tests/test_import_direction.py, seam 7.)"""
 
 def test_io_exports_renamed_symbols():
     from makoto import kit as mio
-    for name in ("raw_payload_str", "bash_output_text", "is_failing_testrun", "is_test_runner"):
+    for name in ("raw_payload_str", "bash_output_text", "is_failing_testrun", "is_test_runner",
+                 "failure_terminal_result"):
         assert callable(getattr(mio, name)), name
 
 
@@ -21,6 +22,17 @@ def test_io_behaviour_preserved():
     assert is_failing_testrun("=== 681 passed, 3 xfailed ===") is False
     assert is_test_runner("python -m pytest tests/ -q") is True
     assert is_test_runner("cat tests/old_failure.log") is False
+
+
+def test_failure_terminal_result_has_one_stable_shape_and_safe_fallback():
+    from makoto.kit import classify_failure, failure_terminal_result
+
+    assert failure_terminal_result({"error": "Connection error", "is_interrupt": True}) == {
+        "error": "Connection error", "interrupted": True,
+    }
+    missing_detail = failure_terminal_result({"is_interrupt": False})
+    assert missing_detail == {"error": "tool call failed", "interrupted": False}
+    assert classify_failure(missing_detail["error"]) is None
 
 
 # --- behavioral cases redistributed verbatim from the dissolved tests/predicates/test_helpers.py (idealization: name<->content) ---

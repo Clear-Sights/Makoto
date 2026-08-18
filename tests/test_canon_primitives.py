@@ -230,6 +230,24 @@ def test_decode_row_normalizes_posttoolusefailure_with_real_error_text():
         {"error": "Connection error", "interrupted": True})
 
 
+def test_timeout_at_turn_end_silent_on_last_transient_failure_terminal():
+    row = _failure_tuple_row(1, "mcp__svc__poll", {"query": "status"},
+                             "Connection error")
+    assert timed_out_at_turn_end(calls_from_history([row])) is False
+
+
+def test_timeout_at_turn_end_fires_on_last_validation_error_failure_terminal():
+    row = _failure_tuple_row(1, "mcp__svc__poll", {"query": "status"},
+                             "ValidationError: invalid tool input")
+    assert timed_out_at_turn_end(calls_from_history([row])) is True
+
+
+def test_timeout_at_turn_end_interrupted_failure_still_fires_with_transient_error_text():
+    row = _failure_tuple_row(1, "mcp__svc__poll", {"query": "status"},
+                             "Connection error", is_interrupt=True)
+    assert timed_out_at_turn_end(calls_from_history([row])) is True
+
+
 def test_issue_28_transient_eeo_failure_rows_do_not_fire_recur():
     same = {"query": "status"}
     changed = {"query": "status, please retry"}

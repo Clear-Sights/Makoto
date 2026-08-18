@@ -18,7 +18,9 @@ Two primitives are installed:
 
   * canon.timeout — `timed_out_at_turn_end`: the turn closed with the LAST decoded call in a
     direct error state (interrupted or a self-emitted error code) — NOT "any call errored
-    somewhere", because a resolved-then-fixed error must stay silent.
+    somewhere", because a resolved-then-fixed error must stay silent. One confidently transient,
+    non-interrupted failure is also silent; an explicit harness interruption and deterministic or
+    uncertain errors retain the one-call bar.
   * canon.recur   — `recur_stuck`: the SAME tool call (identical tool_name + byte-identical
     tool_input) re-issued in a CONSECUTIVE run of length >=2 where EVERY call in that run is in
     a direct error state — a stuck retry loop with nothing changed between attempts. A run of
@@ -85,7 +87,7 @@ import json
 from typing import Iterable, List
 
 from makoto.vocab import Finding
-from makoto.kit import classify_failure, decode_history_event
+from makoto.kit import classify_failure, decode_history_event, failure_terminal_result
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
 # "result": tool_response} — tool_input/tool_response are kept as full DICTS (not the flattened
@@ -233,8 +235,17 @@ def timed_out_at_turn_end(calls: list) -> bool:
     Sequence-level, NOT per-call EXISTS: the signal is "left unresolved AT TURN-END", not "an
     error occurred somewhere in the turn". A call that errored but was RESOLVED before the turn
     closed — a later call succeeded, e.g. a flaky command re-run that finally passed — is not a
-    silent unresolved error, so it stays silent."""
-    return bool(calls) and timed_out(calls[-1])
+    silent unresolved error, so it stays silent. Likewise, one non-interrupted failure whose error
+    text is confidently transient is a recoverable blip, not an unresolved-error turn end. An
+    explicit harness interruption still fires even when its accompanying text sounds transient;
+    deterministic and uncertain errors retain the ordinary one-call bar."""
+    if not calls:
+        return False
+    last = calls[-1]
+    if interrupted(last):
+        return True
+    error = self_error_code(last)
+    return bool(error) and classify_failure(str(error)) is not False
 
 
 def _canon_input(inp) -> str:
@@ -284,10 +295,7 @@ def _decode_row(row):
     ti = ev.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
     if etype == "PostToolUseFailure":
-        return ("PostToolUse", name, ti, {
-            "error": ev.get("error") or "tool call failed",
-            "interrupted": bool(ev.get("is_interrupt")),
-        })
+        return ("PostToolUse", name, ti, failure_terminal_result(ev))
     if etype == "PostToolUse":
         tr = ev.get("tool_response")
         return ("PostToolUse", name, ti, tr if isinstance(tr, dict) else {})
@@ -356,7 +364,8 @@ CANON_SEQ_PRIMITIVES: dict = {
     "timeout": (
         timed_out_at_turn_end,
         "A tool call ended in a direct error state — interrupted or a self-emitted error code — "
-        "and the turn closed without resurfacing or resolving it.",
+        "and the turn closed without resurfacing or resolving it; confidently transient, "
+        "non-interrupted failures receive one retry opportunity.",
         # Task 0b part (a): the OLD hint said "...or state explicitly why the error is acceptable"
         # -- a discharge the detector cannot honor. timed_out_at_turn_end reads ONLY calls[-1]
         # (purely structural); prose can never change it. The two REAL discharges: a later

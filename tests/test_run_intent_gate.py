@@ -7,6 +7,8 @@ never containing the row for the Stop currently being evaluated, so a promise ma
 only ever be checked starting at the NEXT one. FP-safe by design: closed first-person-auxiliary +
 closed process-lifecycle-verb lexicon (mirroring gate.claimed_running's own verb set), plus the
 usual quoted/negated/question/idiom clause guards."""
+import json
+
 from makoto.checks.runIntentUnfulfilled import (
     run_promised_gate, _run_intent_claim, _last_stop_index, _bash_call_after,
 )
@@ -38,6 +40,11 @@ def _failure(cmd="pytest -q", *, error="Connection error", is_interrupt=False):
     return {"payload": {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
                          "tool_input": {"command": cmd}, "error": error,
                          "is_interrupt": is_interrupt}}
+
+
+def _wrapper_typed(event_type, **payload):
+    """A production events-table row whose event type lives only on the wrapper column."""
+    return (1, "ts", event_type, "/repo", json.dumps(payload))
 
 
 # --- TP: _run_intent_claim recognizes the claim shape (every aux x every verb family) ---
@@ -209,6 +216,12 @@ def test_last_stop_index_counts_subagent_stop_too():
     assert _last_stop_index(hist) == 0
 
 
+def test_last_stop_index_sees_a_wrapper_typed_stop_row():
+    hist = [_wrapper_typed(
+        "Stop", session_id="s1", last_assistant_message="I'll run the tests now.")]
+    assert _last_stop_index(hist) == 0
+
+
 def test_last_stop_index_empty_history():
     assert _last_stop_index([]) is None
 
@@ -225,6 +238,13 @@ def test_bash_call_after_true_when_bash_follows():
 
 def test_bash_call_after_true_when_failed_bash_terminal_follows():
     hist = [_stop("I'll run the tests now."), _failure("pytest -q")]
+    assert _bash_call_after(hist, 0) is True
+
+
+def test_bash_call_after_sees_a_wrapper_typed_terminal_row():
+    hist = [_stop("I'll run the tests now."), _wrapper_typed(
+        "PostToolUse", tool_name="Bash", tool_input={"command": "pytest -q"},
+        tool_response={"stdout": "1 passed", "exitCode": 0})]
     assert _bash_call_after(hist, 0) is True
 
 
@@ -274,6 +294,16 @@ def test_silent_when_prior_stop_made_no_promise():
 
 def test_silent_when_a_bash_call_discharges_it():
     hist = [_stop("I'll run the tests now."), _post("pytest -q", exitCode=0)]
+    assert run_promised_gate(history=hist) is None
+
+
+def test_silent_when_wrapper_typed_bash_call_discharges_it():
+    """ADR 0039 shape: wrapper-only event types must not make the gate false-fire."""
+    hist = [_wrapper_typed(
+                "Stop", session_id="s1", last_assistant_message="I'll run the tests now."),
+            _wrapper_typed(
+                "PostToolUse", tool_name="Bash", tool_input={"command": "pytest -q"},
+                tool_response={"stdout": "1 passed", "exitCode": 0})]
     assert run_promised_gate(history=hist) is None
 
 

@@ -4,7 +4,7 @@ from typing import Optional
 from makoto.vocab import Finding
 from makoto.vocab import _RUN_INTENT_CLAIM_RX, _RUN_INTENT_IDIOM_VETO_RX, _NEGATION_RX
 from makoto.substrate.claims import _code_spans
-from makoto.kit import decode_history_row
+from makoto.kit import decode_history_event, decode_history_row
 
 # gate.run_promised -- the forward-looking sibling of gate.claimed_running: the immediately PRIOR
 # turn's own message promised a first-person run-intent action ("I'll run the tests", "I'm going
@@ -87,7 +87,7 @@ def _last_stop_index(history) -> Optional[int]:
     documents them ("Gates evaluate on Stop AND SubagentStop")."""
     idx = None
     for i, row in enumerate(history or ()):
-        ev = decode_history_row(row)
+        ev = decode_history_event(row)
         if isinstance(ev, dict) and ev.get("hook_event_name") in ("Stop", "SubagentStop"):
             idx = i
     return idx
@@ -97,7 +97,7 @@ def _bash_call_after(history, idx: int) -> bool:
     """True iff a settled Bash terminal appears anywhere after position `idx` in `history`.
     Success is irrelevant: this gate asks whether the promised run happened, not whether it won."""
     for row in list(history or ())[idx + 1:]:
-        ev = decode_history_row(row)
+        ev = decode_history_event(row)
         # INCLUDE failed terminals: ran-and-failed still discharges a promise merely to run.
         if (isinstance(ev, dict)
                 and ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure")

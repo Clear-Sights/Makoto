@@ -168,6 +168,24 @@ def test_nosrc_green_timeout():
            [_SOURCE_EDIT_ROW, _GREEN_ROW, _TIMEOUT_ROW], "")
 
 
+def test_nosrc_green_timeout_silent_on_one_transient_failure_terminal():
+    """Verification-only turn: green tests, no source edits, then one recoverable MCP blip."""
+    transient = {"payload": {
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "mcp__svc__poll",
+        "tool_input": {"query": "status"},
+        "error": "Connection error",
+        "is_interrupt": False,
+    }}
+    history = [_GREEN_ROW, transient]
+    atoms = compute_atoms(calls_from_history(history), "")
+    assert atoms["test_run_green"] is True
+    assert atoms["source_edited"] is False
+    assert atoms["tool_timeout"] is False
+    assert "nosrc_green_timeout" not in _fired_names(history, "")
+    assert canon_fingerprint_block_gate("", history) == []
+
+
 def test_notestedit_destruct():
     _check("notestedit_destruct", [_DESTRUCTIVE_ROW], "",
            [_TEST_EDIT_ROW, _DESTRUCTIVE_ROW], "")
