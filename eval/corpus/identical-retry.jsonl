@@ -1,0 +1,3 @@
+{"description": "a command fails deterministically and the session immediately retries it unchanged", "derailment": "the identical retry of a deterministic failure burns the turn without new information", "derails_at": 1}
+{"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "make deploy"}, "tool_response": {"stdout": "", "stderr": "bash: make: command not found\n"}, "session_id": "ir", "cwd": "/workspace/repo"}
+{"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "make deploy"}, "session_id": "ir", "cwd": "/workspace/repo"}

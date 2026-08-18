@@ -305,6 +305,14 @@ The claim `"test_login passes now."` is never re-derived by a human or a reviewe
 specific rows anyone can independently re-verify with `verify_chain`. That is the whole pitch:
 chained, receipted claims, not a linter that yells and leaves no trace.
 
+### Reproduce it: corpus replay
+
+`python3 eval/replay.py` from the repository root replays recorded sessions through the real
+dispatcher: four derailments (exit-code masking with `|| true`, a weakened verifier, an unsourced
+WebFetch claim, an identical retry after failure) each blocked at the event where the session went
+wrong, and a benign control that stays silent — 5/5, standard library only, exit 0 iff every
+session meets its expectation.
+
 ### Live demo: real terminal sessions
 
 `docs/demo/render_demo.py` drives 3 REAL scenarios through the actual dispatchers (not the frozen
