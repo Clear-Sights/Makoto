@@ -13,9 +13,10 @@ event the same way content.fabricated_commit_sha catches a hallucinated SHA: a c
 as evidence, with no real event behind it.
 
 Grounded, not over-broad: if this session's OWN history actually carries a genuine
-`tool_response.interrupted == true` row, the claim is TRUE and never fires — this check
-widens nothing about what counts as a real interruption; it only catches the claim being
-made with NO real interruption anywhere in the record. A bare description of the marker
+`tool_response.interrupted == true` row or a PostToolUseFailure `is_interrupt == true` terminal,
+the claim is TRUE and never fires — this check widens nothing about what counts as a real
+interruption; it only catches the claim being made with NO real interruption anywhere in the
+record. A bare description of the marker
 itself (this module's own docstring, ackblock.py's `_SYNTHETIC_MARKERS` tuple, a test
 fixture) is exempted the same way every other check's own documentation is: `makoto-allow:
 <reason>`.
@@ -32,7 +33,7 @@ from __future__ import annotations
 import re
 from makoto.registry import Check
 from makoto.kit import introduced_regex_predicate
-from makoto.kit import decode_history_row
+from makoto.kit import decode_history_event
 
 # The claim, however it's phrased. Matches the harness's own literal bracketed marker AND
 # looser prose paraphrases -- both are the same claim ("the user is why this stopped").
@@ -46,13 +47,17 @@ _INTERRUPTION_CLAIM_RX = re.compile(
 
 def _genuine_interruption_in_history(history: list) -> bool:
     """True iff any prior tool event in `history` actually carries a HARNESS-set
-    `tool_response.interrupted == true` — the real, non-model-writable signal
-    (substrate.io's own documented tool_response shape: stdout/stderr/interrupted/...).
-    Fail-open per row: an undecodable row is skipped, never treated as grounding."""
+    `tool_response.interrupted == true` or PostToolUseFailure `is_interrupt == true` — real,
+    non-model-writable signals. Fail-open per row: an undecodable row is skipped, never treated
+    as grounding."""
     for row in history or ():
-        ev = decode_history_row(row)
+        ev = decode_history_event(row)
         if not isinstance(ev, dict):
             continue
+        # INCLUDE the failed-terminal spelling: an interrupted failure grounds the same fact.
+        if (ev.get("hook_event_name") == "PostToolUseFailure"
+                and ev.get("is_interrupt") is True):
+            return True
         resp = ev.get("tool_response")
         if isinstance(resp, dict) and resp.get("interrupted") is True:
             return True

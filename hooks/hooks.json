@@ -22,6 +22,17 @@
         ]
       }
     ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "*",

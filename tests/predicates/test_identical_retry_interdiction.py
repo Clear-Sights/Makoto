@@ -18,6 +18,12 @@ def _post_row(command: str, stdout: str) -> dict:
                         "tool_response": {"stdout": stdout, "stderr": "", "exitCode": 1}}}
 
 
+def _failure_row(command: str, error: str, *, is_interrupt=False) -> dict:
+    return {"payload": {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+                        "tool_input": {"command": command}, "error": error,
+                        "is_interrupt": is_interrupt}}
+
+
 def _pre_event(command: str) -> dict:
     return {"hook_event_name": "PreToolUse", "tool_name": "Bash",
             "tool_input": {"command": command}}
@@ -38,6 +44,19 @@ def test_silent_on_identical_retry_after_transient_failure():
     finding = predicate(current_event=_pre_event("curl https://api.example.com/status"),
                         history=history, pattern=PATTERN)
     assert finding is None
+
+
+def test_failure_terminal_blocks_identical_retry_only_when_deterministic():
+    command = "python3 -c 'def f(: pass'"
+    history = [_failure_row(command, "SyntaxError: invalid syntax")]
+    finding = predicate(current_event=_pre_event(command), history=history, pattern=PATTERN)
+    assert finding is not None and finding.pattern_id == "event.identical_retry"
+
+
+def test_transient_failure_terminal_never_blocks_identical_retry():
+    command = "curl https://api.example.com/status"
+    history = [_failure_row(command, "Connection error")]
+    assert predicate(current_event=_pre_event(command), history=history, pattern=PATTERN) is None
 
 
 def test_silent_on_identical_retry_after_ambiguous_failure():

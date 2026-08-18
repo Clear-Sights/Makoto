@@ -10,20 +10,24 @@ firewall (tests/test_import_direction.py, the pipeline-order firewall) is satisf
 half; the adapter half below (`canon_gate`/`GATE`/`CHECK`) is what actually imports
 `makoto.vocab`/`makoto.context`.
 
-A primitive here reads ONLY the closed agnostic terminal set: {tool_name, tool_input identity,
-interrupted, self_error_code}. No language- or test-runner-specific regex appears — that is the
-boundary (design's method B). Two primitives are installed:
+A primitive here reads the closed agnostic terminal set: {tool_name, tool_input identity,
+interrupted, self_error_code}. No language- or test-runner-specific regex appears. `canon.recur`
+also uses `kit.classify_failure` over the host-emitted error text only to budget confidently
+transient failures; its markers are generic failure vocabulary, never runner or language tokens.
+Two primitives are installed:
 
   * canon.timeout — `timed_out_at_turn_end`: the turn closed with the LAST decoded call in a
     direct error state (interrupted or a self-emitted error code) — NOT "any call errored
     somewhere", because a resolved-then-fixed error must stay silent.
   * canon.recur   — `recur_stuck`: the SAME tool call (identical tool_name + byte-identical
     tool_input) re-issued in a CONSECUTIVE run of length >=2 where EVERY call in that run is in
-    a direct error state — a stuck retry loop with nothing changed between attempts. Verdict is
-    judged per KEY at the END of each of that key's maximal consecutive runs, and the LAST
-    judgment for each key wins — so a later success for the same key silences it even when other,
-    different calls happened in between. See docs/adr/0022-recur-stuck-latest-run-wins.md for the
-    decision history.
+    a direct error state — a stuck retry loop with nothing changed between attempts. A run of
+    confidently transient failures gets one extra re-poll: it becomes stuck only after that key
+    has accumulated three transient failures across the stream, reset by that key's success;
+    deterministic and uncertain failures keep the two-call bar. Verdict is judged per KEY at the
+    END of each maximal consecutive run, and the LAST judgment for each key wins — so a later
+    success for the same key silences it even when other, different calls happened in between.
+    See docs/adr/0022-recur-stuck-latest-run-wins.md for the decision history.
 
 ADAPTATION NOTE (the substrate divergence from the ancestor, revised for FD14-A): the ancestor's
 `calls_from_history` turned every PreToolUse OR PostToolUse row into a Call. Live makoto's real
@@ -81,7 +85,7 @@ import json
 from typing import Iterable, List
 
 from makoto.vocab import Finding
-from makoto.kit import decode_history_event
+from makoto.kit import classify_failure, decode_history_event
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
 # "result": tool_response} — tool_input/tool_response are kept as full DICTS (not the flattened
@@ -157,7 +161,10 @@ def recur_stuck(calls: list) -> bool:
     """RECUR / non-refire: a STUCK RETRY LOOP. Fires iff, for at least one (tool_name,
     tool_input) key, that key's MOST RECENT maximal consecutive run (no intervening *different*
     call) in the call stream has length >= 2 and every call in it is in a direct error state
-    (`timed_out`).
+    (`timed_out`). A run made entirely of confidently transient failures needs the same
+    consecutive run length plus at least three transient failures for that key across the stream;
+    a success for that key resets its transient count. Deterministic and uncertain errors keep
+    the ordinary two-call threshold.
 
     Deliberately conservative: silent if any retry changed the input (real progress), if any
     different action intervened (loop broken) with nothing further from that same key, or if any
@@ -171,30 +178,51 @@ def recur_stuck(calls: list) -> bool:
     stuck loop by the time the turn ends — only a key whose MOST RECENT run is itself still bad
     fires. Every run is judged as it closes, per key, and the LAST judgment for each key wins; a
     fresh success (even a lone one, not itself part of a run>=2) for a key overwrites an earlier
-    bad verdict for that same key. See docs/adr/0022-recur-stuck-latest-run-wins.md for the
-    decision history."""
+    bad verdict for that same key and resets its transient budget. See
+    docs/adr/0022-recur-stuck-latest-run-wins.md for the decision history."""
     def _no_info_err(c) -> bool:
         return interrupted(c) or bool(self_error_code(c))
 
+    def _transient_err(c) -> bool:
+        error = self_error_code(c)
+        return _no_info_err(c) and error is not None and classify_failure(str(error)) is False
+
+    def _run_is_bad(key, length, all_err, all_transient) -> bool:
+        if length < 2 or not all_err:
+            return False
+        return not all_transient or transient_failures.get(key, 0) >= 3
+
     last_bad: dict = {}     # key -> whether that key's most-recently-closed run was stuck-bad
+    transient_failures: dict = {}  # key -> transient failures since that key's latest success
     run_key = None          # (name, canonical_input) of the current consecutive identical run
     run_all_err = False     # every call in the current run so far was in a no-info error state
+    run_all_transient = False  # every call in the current run is a confidently transient error
     run_len = 0
     for c in calls or ():
         key = (c.get("name", ""), _canon_input(c.get("input")))
+        call_err = _no_info_err(c)
+        call_transient = _transient_err(c)
+        if not call_err:
+            transient_failures[key] = 0
+        elif call_transient:
+            transient_failures[key] = transient_failures.get(key, 0) + 1
         if key == run_key:
             run_len += 1
-            run_all_err = run_all_err and _no_info_err(c)
+            run_all_err = run_all_err and call_err
+            run_all_transient = run_all_transient and call_transient
         else:
             # the previous run just ENDED — judge it now that it's complete
             if run_key is not None:
-                last_bad[run_key] = run_len >= 2 and run_all_err
+                last_bad[run_key] = _run_is_bad(
+                    run_key, run_len, run_all_err, run_all_transient)
             run_key = key
             run_len = 1
-            run_all_err = _no_info_err(c)
+            run_all_err = call_err
+            run_all_transient = call_transient
     # judge the final run at end-of-list
     if run_key is not None:
-        last_bad[run_key] = run_len >= 2 and run_all_err
+        last_bad[run_key] = _run_is_bad(
+            run_key, run_len, run_all_err, run_all_transient)
     return any(last_bad.values())
 
 
@@ -242,17 +270,24 @@ def _decode_row(row):
     Raw decode + wrapper-event-type fallback is `kit.decode_history_event` -- the canonical
     step, shared with `identicalRetryInterdiction._most_recent_completed_bash_call`. This
     function keeps only what's specific to canon's OWN adapter shape: the tuple conversion, and
-    keeping both PreToolUse and PostToolUse rows (unlike the pre-FD14-A cut which dropped Pre at
-    decode time) so `calls_from_history` can pair them and detect a dangling Pre."""
+    keeping PreToolUse plus both settled terminal events (unlike the pre-FD14-A cut which dropped
+    Pre at decode time) so `calls_from_history` can pair them and detect a dangling Pre.
+    PostToolUseFailure is normalized to PostToolUse with its real top-level error/is_interrupt
+    fields, so the existing pairing path treats it as the failed call's terminal."""
     ev = decode_history_event(row)
     if ev is None:
         return None
     etype = ev.get("hook_event_name")
     name = ev.get("tool_name", "") or ""
-    if etype not in ("PreToolUse", "PostToolUse") or not name:
+    if etype not in ("PreToolUse", "PostToolUse", "PostToolUseFailure") or not name:
         return None
     ti = ev.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
+    if etype == "PostToolUseFailure":
+        return ("PostToolUse", name, ti, {
+            "error": ev.get("error") or "tool call failed",
+            "interrupted": bool(ev.get("is_interrupt")),
+        })
     if etype == "PostToolUse":
         tr = ev.get("tool_response")
         return ("PostToolUse", name, ti, tr if isinstance(tr, dict) else {})
@@ -261,10 +296,11 @@ def _decode_row(row):
 
 def calls_from_history(history) -> list:
     """Decode GateContext.history rows into agnostic Call dicts carrying the protocol fields the
-    terminals read. A completed call contributes a PreToolUse AND a PostToolUse row; each Post is
-    PAIRED to the nearest preceding still-unpaired identical (tool name + `_pairing_input`) Pre,
-    and only the Post becomes a Call (the Pre is dropped) — so `recur_stuck`'s consecutive-run
-    judgment is not corrupted by spurious result-less Calls (module docstring ADAPTATION NOTE).
+    terminals read. A completed call contributes a PreToolUse and either a PostToolUse or
+    PostToolUseFailure row; each terminal is normalized to Post and PAIRED to the nearest
+    preceding still-unpaired identical (tool name + `_pairing_input`) Pre, and only the terminal
+    becomes a Call (the Pre is dropped) — so `recur_stuck`'s consecutive-run judgment is not
+    corrupted by spurious result-less Calls (module docstring ADAPTATION NOTE).
     Pairing uses `_pairing_input` (dunder-insensitive), NOT the full `_canon_input` the verdicts
     key on: a harness may inject bookkeeping keys between a call's Pre and its Post, and pairing
     on those synthesized a phantom failure for a call that succeeded. See `_pairing_input`.

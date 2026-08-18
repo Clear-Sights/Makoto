@@ -32,8 +32,8 @@ ONE_OFF = {
 }
 
 HISTORY_PRIMITIVES = frozenset({
-    "iter_tool_events", "raw_payload_str", "decode_history_row", "turn_tool_calls",
-    "calls_from_history",
+    "iter_tool_events", "raw_payload_str", "decode_history_row", "decode_history_event",
+    "turn_tool_calls", "calls_from_history",
 })
 LEDGER_PRIMITIVES = frozenset({"_discharged", "_discharge_kwargs", "_drop_discharged"})
 TESTRUN_PRIMITIVES = frozenset({

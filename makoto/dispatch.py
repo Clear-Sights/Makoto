@@ -40,9 +40,10 @@ from makoto.context import GateContext, _history_for_agent, run_stop_checks
 
 
 _EVENT_MAP = {
-    "PreToolUse":   "live.pre_tool_use",
-    "Stop":         "live.stop",
-    "SubagentStop": "live.subagent_stop",
+    "PreToolUse":          "live.pre_tool_use",
+    "PostToolUseFailure":  "live.post_tool_use_failure",
+    "Stop":                "live.stop",
+    "SubagentStop":        "live.subagent_stop",
 }
 
 
@@ -380,12 +381,15 @@ def _jit_hint(finding: Finding) -> str:
 
 _OUTCOME_FOR_LEVEL = {"error": verdict.BLOCK, "advisory": verdict.ADVISE}
 _OUTCOME_RANK = {verdict.BLOCK: 3, verdict.ASK: 2, verdict.ADVISE: 1, verdict.ALLOW: 0}
-# The live Claude Code hook-event name -> the edge name verdict.dispatch_posture expects. Only
-# PreToolUse renames (to "Pre"); Stop/SubagentStop pass through unchanged (verdict's Stop wire table
-# serves both, keyed by the SAME edge string "Stop"/"SubagentStop" it also echoes as hook_name).
-_HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post", "Stop": "Stop",
+# The live Claude Code hook-event name -> the edge name verdict.dispatch_posture expects.
+# PreToolUse renames to Pre; both settled tool terminals share Post; Stop/SubagentStop pass
+# through unchanged (verdict's Stop wire table serves both, keyed by the SAME edge string
+# "Stop"/"SubagentStop" it also echoes as hook_name).
+_HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post",
+                "PostToolUseFailure": "Post", "Stop": "Stop",
                 "SubagentStop": "SubagentStop"}
-# PostToolUse has its own wire edge; see docs/adr/0010-posttooluse-wire-edge.md for why.
+# Both settled tool terminals use the Post wire edge; see
+# docs/adr/0010-posttooluse-wire-edge.md for why Post has its own edge.
 
 
 def _recheck_certificate_enabled() -> bool:
@@ -530,10 +534,10 @@ def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
 
 
 def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
-    """PostToolUse — accumulation: store the event (already done by _ingest_event
-    upstream so history-walking predicates can see tool_results) and record
-    the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
-    No predicate evaluation and no block — PostToolUse is for accumulation, never decision.
+    """PostToolUse / PostToolUseFailure — accumulation: store the event (already done by
+    _ingest_event upstream so history-walking predicates can see successful and failed settled
+    calls) and record the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
+    No predicate evaluation and no block — settled tool events accumulate, never decide.
     See docs/adr/0013-posttooluse-accumulation.md for the migration history."""
     try:
         from makoto.state import ledger as _ledger
@@ -625,6 +629,7 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
 HANDLERS: dict[str, Any] = {
     "SessionStart": _admit_plan,
     "PostToolUse": _accumulate,
+    "PostToolUseFailure": _accumulate,
     "PreToolUse": _evaluate_and_gate,
     "Stop": _evaluate_and_gate,
     "SubagentStop": _evaluate_and_gate,

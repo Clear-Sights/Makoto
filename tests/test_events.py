@@ -99,6 +99,14 @@ def test_hooks_json_wired_events_point_at_the_real_dispatcher():
             f"{name}: no command routes to makoto's dispatcher: {commands}"
 
 
+def test_posttoolusefailure_uses_the_post_accumulation_route():
+    from makoto.dispatch import HANDLERS, _EVENT_MAP, _HOOK_TO_EDGE, _accumulate
+
+    assert HANDLERS["PostToolUseFailure"] is _accumulate
+    assert _HOOK_TO_EDGE["PostToolUseFailure"] == "Post"
+    assert _EVENT_MAP["PostToolUseFailure"] == "live.post_tool_use_failure"
+
+
 def test_wired_moves_appear_in_dispatch_source():
     names = _referenced_names((REPO / "makoto" / "dispatch.py").read_text())
     for name, entry in EVENTS.items():
@@ -110,9 +118,9 @@ def test_wired_moves_appear_in_dispatch_source():
 
 # HOLE entries that assert specific code still exists — each maps to (file, anchor names) so a
 # deleted branch turns this matrix into a silent lie without this check. Only entries making a
-# checkable code claim are listed; a HOLE that's purely "never designed" (PostToolUseFailure)
-# has no code to anchor against. (SessionStart/SubagentStop graduated HOLE→WIRED 2026-07-12 —
-# their anchors now live in the WIRED moves check above.)
+# checkable code claim are listed. (SessionStart/SubagentStop graduated HOLE→WIRED 2026-07-12,
+# and PostToolUseFailure graduated HOLE→WIRED 2026-08-18 — their anchors now live in the WIRED
+# moves check above.)
 _HOLE_CODE_ANCHORS = {
     "ConfigChange": ("makoto/configchange.py", ("configchange_verdict",)),
 }

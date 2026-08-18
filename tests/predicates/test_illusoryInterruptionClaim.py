@@ -39,6 +39,12 @@ def _real_interruption_row():
     return {"payload": json.dumps(payload)}
 
 
+def _real_failure_interruption_row():
+    return {"payload": {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+                         "tool_input": {"command": "long_running_cmd"},
+                         "error": "Connection aborted", "is_interrupt": True}}
+
+
 # --- TP: fires with no genuine interruption on record -----------------------
 def test_fires_on_bracketed_harness_marker_in_written_content():
     f = _fire(_write(f"Stopped here: {_CLAIM}\n"))
@@ -68,6 +74,12 @@ def test_fires_on_edit_new_string():
 # --- TN: a REAL interruption on record grounds the claim ---------------------
 def test_silent_when_a_genuine_interruption_is_in_history():
     f = _fire(_write(f"Stopped here: {_CLAIM}\n"), history=[_real_interruption_row()])
+    assert f is None
+
+
+def test_silent_when_failure_terminal_records_a_genuine_interruption():
+    f = _fire(_write(f"Stopped here: {_CLAIM}\n"),
+              history=[_real_failure_interruption_row()])
     assert f is None
 
 

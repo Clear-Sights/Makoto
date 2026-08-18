@@ -775,7 +775,12 @@ _DETERMINISTIC_MARKERS = (
 # byte-identical input. Presence of either class wins its own side; presence of BOTH is ambiguous
 # (fails to None, never guessed).
 _TRANSIENT_MARKERS = (
-    re.compile(r"\bconnection refused\b", re.IGNORECASE),
+    re.compile(r"\bconnection (?:refused|error|reset|closed|aborted)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:ECONNRESET|ECONNREFUSED|ECONNABORTED|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|EPIPE)\b",
+        re.IGNORECASE),
+    re.compile(r"\bnetwork (?:error|is unreachable)\b", re.IGNORECASE),
+    re.compile(r"\bfetch failed\b", re.IGNORECASE),
     re.compile(r"\btimed? ?out\b", re.IGNORECASE),
     re.compile(r"Temporary failure in name resolution"),
     re.compile(r"\b(?:502|503|504)\b"),

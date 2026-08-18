@@ -34,6 +34,12 @@ def _pre(cmd="pytest -q"):
                          "tool_input": {"command": cmd}, "tool_response": {}}}
 
 
+def _failure(cmd="pytest -q", *, error="Connection error", is_interrupt=False):
+    return {"payload": {"hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+                         "tool_input": {"command": cmd}, "error": error,
+                         "is_interrupt": is_interrupt}}
+
+
 # --- TP: _run_intent_claim recognizes the claim shape (every aux x every verb family) ---
 def test_tp_going_to_run():
     assert _run_intent_claim("I'm going to run the tests now.") is not None
@@ -217,6 +223,11 @@ def test_bash_call_after_true_when_bash_follows():
     assert _bash_call_after(hist, 0) is True
 
 
+def test_bash_call_after_true_when_failed_bash_terminal_follows():
+    hist = [_stop("I'll run the tests now."), _failure("pytest -q")]
+    assert _bash_call_after(hist, 0) is True
+
+
 def test_bash_call_after_false_when_nothing_follows():
     hist = [_stop("I'll run the tests now.")]
     assert _bash_call_after(hist, 0) is False
@@ -270,6 +281,11 @@ def test_silent_when_the_discharging_bash_call_failed():
     # discharge is "did anything run", not "did it succeed" -- a failed Bash call still proves the
     # word matched the world (something ran); a bad RESULT is a different gate's concern
     hist = [_stop("I'll run the tests now."), _post("pytest -q", exitCode=1)]
+    assert run_promised_gate(history=hist) is None
+
+
+def test_silent_when_the_discharging_bash_call_has_failure_terminal():
+    hist = [_stop("I'll run the tests now."), _failure("pytest -q")]
     assert run_promised_gate(history=hist) is None
 
 

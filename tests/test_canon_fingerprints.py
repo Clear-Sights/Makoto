@@ -6,7 +6,13 @@ own fixed Finding.level.
 """
 from __future__ import annotations
 
-from makoto.substrate._canonAtoms import BLOCK_IDS, THE_CANON_17, calls_from_history, compute_atoms
+from makoto.substrate._canonAtoms import (
+    BLOCK_IDS,
+    THE_CANON_17,
+    _decode_row as _decode_canon_atom_row,
+    calls_from_history,
+    compute_atoms,
+)
 from makoto.checks.canonFingerprints import canon_fingerprint_block_gate
 from makoto.checks.canonFingerprintsAdvisory import canon_fingerprint_advisory_gate
 
@@ -49,6 +55,17 @@ def test_worst_disqualified_fingerprints_are_not_blocking():
     worst = {"nogreen_secret_testedit", "red_no_green", "claim_secret", "claim_revert"}
     assert worst <= set(THE_CANON_17)
     assert worst.isdisjoint(BLOCK_IDS)
+
+
+def test_canon_atom_decoder_reads_posttoolusefailure_terminal():
+    row = {"payload": {"hook_event_name": "PostToolUseFailure",
+                       "tool_name": "mcp__svc__poll", "tool_input": {"query": "x"},
+                       "error": "Connection error", "is_interrupt": True}}
+    assert _decode_canon_atom_row(row) == {
+        "name": "mcp__svc__poll",
+        "input": {"query": "x"},
+        "result": {"error": "Connection error", "interrupted": True},
+    }
 
 
 # ---- both-polarity battery: one RED + one silent case per fingerprint -----------------------------

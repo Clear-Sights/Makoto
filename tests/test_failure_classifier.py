@@ -20,6 +20,20 @@ DETERMINISTIC_GOLD = {
 # ---- transient gold (classify_failure must return False) ---------------------------------------
 TRANSIENT_GOLD = {
     "connection_refused": "curl: (7) Failed to connect to host: Connection refused",
+    "connection_error": "MCP transport failed: Connection error",
+    "connection_reset": "socket closed: Connection reset",
+    "connection_closed": "upstream Connection closed",
+    "connection_aborted": "request ended: Connection aborted",
+    "econnreset": "Error: read ECONNRESET",
+    "econnrefused": "connect ECONNREFUSED 127.0.0.1:3000",
+    "econnaborted": "socket error ECONNABORTED",
+    "eai_again": "getaddrinfo EAI_AGAIN api.example.com",
+    "ehostunreach": "connect EHOSTUNREACH",
+    "enetunreach": "connect ENETUNREACH",
+    "epipe": "write EPIPE",
+    "network_error": "Network error while contacting the MCP server",
+    "network_unreachable": "Network is unreachable",
+    "fetch_failed": "TypeError: fetch failed",
     "timeout": "requests.exceptions.ConnectTimeout: Connection timed out",
     "dns_failure": "Temporary failure in name resolution",
     "http_503": "HTTP/1.1 503 Service Unavailable",
@@ -35,6 +49,7 @@ AMBIGUOUS_GOLD = {
     "unrelated_success_text": "3 passed in 0.4s",
     "both_classes_present": "Permission denied -- retry after the rate limit resets",
     "generic_nonzero_exit_no_marker": "exit status 1",
+    "transient_code_inside_word": "prefixECONNRESETsuffix",
 }
 
 
