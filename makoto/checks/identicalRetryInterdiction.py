@@ -25,7 +25,7 @@ import json
 from typing import Optional
 
 from makoto.kit import classify_failure
-from makoto.kit import bash_output_text, decode_history_event
+from makoto.kit import bash_output_text, decode_history_event, failure_terminal_result
 from makoto.vocab import Finding
 from makoto.registry import Check
 
@@ -59,7 +59,7 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
         return None
     ti = ev.get("tool_input", {}) or {}
     if event_type == "PostToolUseFailure":
-        return ti, str(ev.get("error") or "tool call failed")
+        return ti, failure_terminal_result(ev)["error"]
     tr = ev.get("tool_response", {}) or {}
     text = bash_output_text(tr) if isinstance(tr, dict) else str(tr)
     return ti, text

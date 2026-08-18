@@ -399,6 +399,41 @@ def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
     assert row is not None and row["kind"] == "touched", f"expected touched row; got {row!r}"
 
 
+def test_dispatch_failed_write_stays_in_history_without_recording_a_touch(tmp_path):
+    """PostToolUseFailure is failure evidence, not a successful filesystem update.
+
+    The terminal must remain in ``events`` for history decoders, but must not create the
+    success-shaped ``touched`` row that completion/dropped/advance gates treat as discharge.
+    """
+    import sqlite3
+    from makoto.state import ledger
+
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "Write",
+        "session_id": "failed_ledger_write",
+        "cwd": str(tmp_path),
+        "tool_input": {"file_path": "src/never-created.py", "content": "x"},
+        "error": "permission denied",
+        "is_interrupt": False,
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert rc == 0 and out == ""
+
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        assert ledger.read_key(conn, "src/never-created.py") is None
+        event_type, raw = conn.execute(
+            "SELECT event_type, payload FROM events WHERE session_id = ?",
+            ["failed_ledger_write"],
+        ).fetchone()
+    finally:
+        conn.close()
+    assert event_type == "PostToolUseFailure"
+    assert json.loads(raw)["error"] == "permission denied"
+
+
 def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
     """PostToolUse Bash -> a `value` ledger row keyed by the path token in the command."""
     import sqlite3
@@ -421,6 +456,56 @@ def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
         conn.close()
     assert row is not None and row["kind"] == "value", f"expected value row; got {row!r}"
     assert "120 tests/auth_test.py" in (row["value"] or "")
+
+
+def test_dispatch_failed_terminal_does_not_clobber_prior_failing_testrun(tmp_path):
+    """A failed hook terminal has no runner output and cannot supersede a real red result."""
+    import sqlite3
+    from makoto.kit import is_failing_testrun
+    from makoto.state import ledger
+
+    state_dir = _setup_state(tmp_path)
+    sid = "failed_testrun_terminal"
+    command = "python -m pytest tests/ -q"
+    red = {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "session_id": sid,
+        "cwd": str(tmp_path),
+        "tool_input": {"command": command},
+        "tool_response": {
+            "stdout": "=== 2 failed, 9 passed in 3.0s ===",
+            "stderr": "",
+            "exitCode": 1,
+        },
+    }
+    failed_terminal = {
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "Bash",
+        "session_id": sid,
+        "cwd": str(tmp_path),
+        "tool_input": {"command": command},
+        "error": "Connection error",
+        "is_interrupt": False,
+    }
+    assert _run_dispatch(state_dir, red) == (0, "")
+    assert _run_dispatch(state_dir, failed_terminal) == (0, "")
+
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        latest = ledger.latest_testrun(conn, sid)
+        source_event_id = conn.execute(
+            "SELECT source_event_id FROM ledger WHERE session_id = ? AND kind = 'testrun'",
+            [sid],
+        ).fetchone()[0]
+        event_types = [row[0] for row in conn.execute(
+            "SELECT event_type FROM events WHERE session_id = ? ORDER BY id", [sid]
+        )]
+    finally:
+        conn.close()
+    assert is_failing_testrun(latest) is True
+    assert source_event_id == 1
+    assert event_types == ["PostToolUse", "PostToolUseFailure"]
 
 
 def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
@@ -683,6 +768,59 @@ def test_dispatch_contract_order_gate_silent_after_locating_write_advances_the_p
     rc, out = _run_dispatch(state_dir, stop)
     assert rc == 0
     assert out == "", f"contract_order must stay silent once the only declared node is advanced: {out}"
+
+
+def test_dispatch_failed_locating_write_leaves_plan_node_open(tmp_path):
+    """A failed Write at a node's ``where`` is not plan progress; the Stop remainder stays."""
+    import sqlite3
+    from makoto.state import plan as plan_store
+
+    state_dir = _setup_state(tmp_path)
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "makoto-plan.jsonl").write_text(
+        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
+    )
+    session = "contract_order_failed_advance"
+    start = {
+        "hook_event_name": "SessionStart",
+        "session_id": session,
+        "cwd": str(tmp_path),
+        "source": "startup",
+    }
+    assert _run_dispatch(state_dir, start) == (0, "")
+    failed_write = {
+        "hook_event_name": "PostToolUseFailure",
+        "session_id": session,
+        "cwd": str(tmp_path),
+        "tool_name": "Write",
+        "tool_input": {"file_path": "auth.py", "content": "def login(): ...\n"},
+        "error": "permission denied",
+        "is_interrupt": False,
+    }
+    assert _run_dispatch(state_dir, failed_write) == (0, "")
+
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        stored = plan_store.load_plan(conn, session)
+    finally:
+        conn.close()
+    assert stored is not None
+    assert stored.open_nodes() == {"n1"}
+
+    stop = {
+        "hook_event_name": "Stop",
+        "session_id": session,
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Done for now.",
+    }
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0 and out
+    rows = [json.loads(line) for line in (state_dir / "audit.jsonl").read_text().splitlines()]
+    contract_fires = [row for row in rows if "gate.contract_order" in row.get("pattern_fires", [])]
+    assert contract_fires
+    assert any("n1" in finding["message"] for finding in contract_fires[-1]["findings"]
+               if finding["pattern_id"] == "gate.contract_order")
 
 
 def test_dispatch_contract_order_gate_still_blocks_on_the_untouched_sibling_node(tmp_path):

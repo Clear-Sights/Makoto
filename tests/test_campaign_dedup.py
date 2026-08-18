@@ -45,6 +45,21 @@ def test_identical_retry_sees_a_wrapper_only_row_like_its_sibling():
     assert _most_recent_completed_bash_call([row]) is not None
 
 
+def test_failure_terminal_result_is_one_shared_normalizer():
+    from makoto.kit import failure_terminal_result
+    from makoto.checks import canonTimeoutRecur, claimedRunningAbsent
+    from makoto.checks import identicalRetryInterdiction
+    from makoto.substrate import _canonAtoms
+
+    for module in (
+        canonTimeoutRecur,
+        claimedRunningAbsent,
+        identicalRetryInterdiction,
+        _canonAtoms,
+    ):
+        assert module.failure_terminal_result is failure_terminal_result
+
+
 # ---- dd5c436: shared lexicon + pushed-branch extraction ---------------------------------------
 def test_offer_and_first_person_regexes_are_the_one_vocab_object():
     from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX

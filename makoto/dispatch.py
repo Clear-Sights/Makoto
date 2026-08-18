@@ -534,11 +534,19 @@ def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
 
 
 def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
-    """PostToolUse / PostToolUseFailure — accumulation: store the event (already done by
-    _ingest_event upstream so history-walking predicates can see successful and failed settled
-    calls) and record the `update` ledger row (Write/Edit touch, Bash result; latest-wins).
-    No predicate evaluation and no block — settled tool events accumulate, never decide.
+    """Settled-tool accumulation, with failure evidence kept out of success-shaped state.
+
+    Both PostToolUse terminals have already been stored by ``_ingest_event`` before this handler
+    runs, so history-walking decoders can see successes and failures alike.  Only a successful
+    PostToolUse may mutate the update ledger, advance a plan, record a task event, or emit a test
+    delta.  PostToolUseFailure is evidence that the operation did *not* land; retaining it in
+    history while returning here prevents a failed Write/Bash from discharging gates or
+    latest-wins clobbering an earlier real result.
+
+    No predicate evaluation and no block — settled tool events accumulate evidence, never decide.
     See docs/adr/0013-posttooluse-accumulation.md for the migration history."""
+    if payload.get("hook_event_name") == "PostToolUseFailure":
+        return
     try:
         from makoto.state import ledger as _ledger
         from makoto.kit import bash_output_text, is_test_runner

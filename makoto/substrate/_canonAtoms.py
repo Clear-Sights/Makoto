@@ -38,7 +38,13 @@ from typing import Dict, Iterable, List, Tuple
 
 from makoto.vocab import _SUCCESS_SUMMARY_RX
 from makoto.substrate.claims import whole_suite_pass_claim
-from makoto.kit import bash_output_text, decode_history_event, is_failing_testrun
+from makoto.kit import (
+    bash_output_text,
+    classify_failure,
+    decode_history_event,
+    failure_terminal_result,
+    is_failing_testrun,
+)
 from makoto.core._shell import (
     _effective_argv,
     _git_subcommand,
@@ -72,10 +78,7 @@ def _decode_row(row):
     ti = ev.get("tool_input")
     ti = ti if isinstance(ti, dict) else {}
     if event_type == "PostToolUseFailure":
-        tr = {
-            "error": ev.get("error") or "tool call failed",
-            "interrupted": bool(ev.get("is_interrupt")),
-        }
+        tr = failure_terminal_result(ev)
     else:
         tr = ev.get("tool_response")
         tr = tr if isinstance(tr, dict) else {}
@@ -299,8 +302,22 @@ def _existing(calls: Iterable[Call], pred) -> bool:
 
 
 def atom_tool_timeout(calls, text) -> bool:
-    return _existing(calls, lambda c: c["result"].get("interrupted") is True
-                     or bool(c["result"].get("error") or c["result"].get("error_code")))
+    """A harness interruption or non-transient direct error occurred.
+
+    One confidently transient, non-interrupted failure terminal is deliberately excluded: it is
+    evidence that the call failed, but not enough evidence that the turn timed out. Explicit
+    harness aborts still count even when their accompanying error text looks transient, while
+    deterministic and uncertain errors retain the ordinary one-call bar. This matches
+    canon.timeout's transient budget without hiding interrupted calls from the fingerprint atoms.
+    """
+    def _is_timeout(c):
+        result = c["result"]
+        if result.get("interrupted") is True:
+            return True
+        error = result.get("error") or result.get("error_code")
+        return bool(error) and classify_failure(str(error)) is not False
+
+    return _existing(calls, _is_timeout)
 
 
 def atom_test_run_red(calls, text) -> bool:

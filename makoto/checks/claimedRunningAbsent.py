@@ -7,7 +7,7 @@ from makoto.vocab import (
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.kit import decode_history_event
+from makoto.kit import decode_history_event, failure_terminal_result
 
 # gate.claimed_running -- the assistant claims an ONGOING running/live/listening/serving state
 # for a process/service ("the server is running", "it's up and running", "now listening on port
@@ -97,10 +97,7 @@ def _bash_postuse_calls(history):
         tool_input = ev.get("tool_input")
         cmd = str(tool_input.get("command", "") or "") if isinstance(tool_input, dict) else ""
         if event_type == "PostToolUseFailure":
-            yield cmd, {
-                "interrupted": bool(ev.get("is_interrupt")),
-                "error": ev.get("error"),
-            }, True
+            yield cmd, failure_terminal_result(ev), True
             continue
         tr = ev.get("tool_response")
         yield cmd, (tr if isinstance(tr, dict) else {}), False
@@ -110,14 +107,16 @@ def _latest_process_call_failed(history) -> Optional[bool]:
     """None iff no process-lifecycle-shaped Bash call (_PROCESS_LIFECYCLE_CMD_RX) ever ran this
     session -- the claim has zero grounding. Else True/False for whether the MOST RECENT such
     call ended in a direct agnostic error state: `interrupted`, a recorded non-zero exit code, or
-    a PostToolUseFailure top-level `error` terminal -- protocol fields only, with no exit-code
-    SEMANTICS guess beyond "non-zero" and no language token. Latest-wins, like
+    a PostToolUseFailure terminal -- protocol fields only, with no exit-code SEMANTICS guess
+    beyond "non-zero" and no language token. The failure event type itself is sufficient evidence;
+    its optional error text need not be present, and `failure_terminal_result` supplies generic
+    text only so every decoder receives one stable shape. Latest-wins, like
     record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt."""
     verdict = None
     for cmd, tr, is_failure_terminal in _bash_postuse_calls(history):
         if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
             continue
-        direct_error = is_failure_terminal and "error" in tr
+        direct_error = is_failure_terminal
         interrupted = tr.get("interrupted") is True
         exit_code = tr.get("exitCode", tr.get("exit"))
         verdict = bool(direct_error or interrupted or (exit_code is not None and exit_code != 0))
