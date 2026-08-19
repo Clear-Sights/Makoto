@@ -36,25 +36,35 @@ _TRUSTED_HOSTS = frozenset({
 })
 
 
-# The characters that can CONTINUE a url. A match followed by one of these is a proper prefix of a
-# longer url the user actually typed, not that url -- which is the whole substring hole.
+# What may TRAIL a url and still leave it the url the user typed.
 #
-# Sentence punctuation is deliberately NOT in this set, and that asymmetry is the point: people end
-# sentences with urls, and `See https://vendor.example/a.` must keep exempting
-# `https://vendor.example/a`. Treating the trailing period as part of the url would turn this fix
-# into a false DENY on the single most ordinary way a human supplies a url -- the exact failure
-# this check was rewritten to stop committing. Same linkifier convention every chat client uses.
-_URL_CONTINUES = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_~/%&=+@#$*"
-)
+# The first attempt at this listed the characters that CONTINUE a url and rejected a match followed
+# by one of them. That set is impossible to get right, and getting it wrong is not symmetric: it
+# omitted `?`, so `https://vendor.example/api` was waved through when the user had typed
+# `https://vendor.example/api?token=secret`; it omitted `.`, so `.../api` was waved through against
+# `.../api.json`; and it omitted every non-ASCII letter, so `.../api` was waved through against
+# `.../apié`. Three different resources the user never named, each exempted by the one channel this
+# check treats as ground truth.
+#
+# The rule that is actually right is the one every linkifier uses, and it looks at the TOKEN rather
+# than the next character: a url runs to the next whitespace, and only trailing punctuation may be
+# shaved off the end. So whatever follows the match, up to the next space, must be punctuation and
+# nothing else. `See https://vendor.example/a.` still exempts `https://vendor.example/a` -- people
+# end sentences with urls, and denying that would reinstate the exact false deny this exemption was
+# written to stop -- while `.../api?token=secret`, `.../api.json` and `.../apié` no longer do.
+# It also handles a url inside a markdown link, `[docs](https://vendor.example/a)`, where the tail
+# is `)`.
+_TRAILING_PUNCT = ".,;:!?)>]}\"'`"
 
 
 def _ends_url(turn: str, url: str) -> bool:
-    """True iff `url` occurs in `turn` as a complete url rather than as a prefix of a longer one."""
+    """True iff `url` occurs in `turn` as a COMPLETE url rather than as a prefix of a longer one."""
     start = turn.find(url)
     while start != -1:
-        end = start + len(url)
-        if end >= len(turn) or turn[end] not in _URL_CONTINUES:
+        tail = turn[start + len(url):]
+        # Everything from the end of the match to the next whitespace: the rest of this token.
+        rest = "" if (not tail or tail[0].isspace()) else tail.split(None, 1)[0]
+        if not rest or all(c in _TRAILING_PUNCT for c in rest):
             return True
         start = turn.find(url, start + 1)
     return False

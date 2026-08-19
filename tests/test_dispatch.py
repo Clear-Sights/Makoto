@@ -2185,17 +2185,25 @@ def test_a_failing_error_logger_does_not_abandon_the_remaining_checks(tmp_path, 
     assert [f.pattern_id for f in findings] == ["x.deny"], "the DENY was lost"
 
 
-def test_a_half_written_decision_is_never_followed_by_a_second_object(tmp_path):
-    """`_stdout_written` was set AFTER the write, so a write that failed part-way left the flag
-    False with bytes already on stdout -- and `main`'s `finally` then appended a whole SECOND JSON
-    object onto the fragment. Observed shape: `{"hookSpecif{"systemMessage": ...`, which no host
-    can parse, so a real DENY became an unreadable response instead of a truncated one.
+def test_a_failed_decision_write_is_reported_rather_than_silently_dropped(tmp_path):
+    """Two of these fixes collided here, and this test records how the collision was settled.
+
+    The wire claim was moved BEFORE the write so a half-written decision could not be followed by
+    a whole second JSON object. Then a review pass showed the same claim silenced the notice when
+    the write failed having emitted NOTHING -- the DENY reached nobody, the notice reached nobody,
+    and an unchecked call looked like a clean pass.
+
+    The two cannot both be satisfied, because a raised `write` does not say how many bytes landed.
+    So the trade is made deliberately: when the decision write FAILS, the notice is emitted. A
+    fragment on stdout is unparseable whether or not something follows it, so the notice cannot
+    turn a good response into a bad one -- while suppressing it loses the only signal that says a
+    check did not decide anything. The claim still does its original job on the path that matters:
+    a decision that was written SUCCESSFULLY is never followed by a notice.
     """
     from makoto import dispatch as D
     from makoto.vocab import Finding
 
     class HalfDeadStream:
-        """Accepts the first 12 characters, then dies -- a pipe closed mid-write."""
         def __init__(self):
             self.written = ""
 
@@ -2203,28 +2211,48 @@ def test_a_half_written_decision_is_never_followed_by_a_second_object(tmp_path):
             self.written += s[:12]
             raise BrokenPipeError("pipe closed mid-write")
 
-    stream = HalfDeadStream()
-    saved_written, saved_notices = D._stdout_written, list(D._notices)
-    D._stdout_written = False
-    D._notices[:] = ["[db_locked] write lock not acquired"]
+    saved = (D._stdout_written, list(D._notices), D._decision_write_failed)
+    finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
+                      message="denied", snippet="")
+
+    # 1. a SUCCESSFUL decision still shuts the notice emitter up.
+    class GoodStream:
+        def __init__(self):
+            self.written = ""
+
+        def write(self, s):
+            self.written += s
+            return len(s)
+
     try:
-        finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
-                          message="denied", snippet="")
-        with pytest.raises(BrokenPipeError):
-            D._emit_decision([finding], "PreToolUse", stream=stream)
-        assert D._stdout_written is True, (
-            "a partial write still consumed the wire; leaving the claim unset lets the notice "
-            "emitter append a second object onto the fragment")
+        D._stdout_written, D._decision_write_failed = False, False
+        D._notices[:] = ["[db_locked] write lock not acquired"]
+        D._emit_decision([finding], "PreToolUse", stream=GoodStream())
         buf = io.StringIO()
-        real_stdout, sys.stdout = sys.stdout, buf
+        real, sys.stdout = sys.stdout, buf
         try:
             D._emit_notices()
         finally:
-            sys.stdout = real_stdout
-        assert buf.getvalue() == "", f"a second object was appended: {buf.getvalue()!r}"
-    finally:
-        D._stdout_written, D._notices[:] = saved_written, saved_notices
+            sys.stdout = real
+        assert buf.getvalue() == "", "a notice was appended behind a delivered decision"
 
+        # 2. a FAILED decision write is reported instead.
+        D._stdout_written, D._decision_write_failed = False, False
+        D._notices[:] = ["[db_locked] write lock not acquired"]
+        stream = HalfDeadStream()
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=stream)
+        assert D._stdout_written is True
+        assert D._decision_write_failed is True
+        buf = io.StringIO()
+        real, sys.stdout = sys.stdout, buf
+        try:
+            D._emit_notices()
+        finally:
+            sys.stdout = real
+        assert "systemMessage" in buf.getvalue(), "the undelivered decision was never reported"
+    finally:
+        D._stdout_written, D._notices[:], D._decision_write_failed = saved[0], saved[1], saved[2]
 
 def test_a_prologue_fault_is_a_loud_allow_not_a_crash(tmp_path, monkeypatch, capsys):
     """`_dispatch` wraps only the HANDLER, so its whole prologue ran with no catch, and `main`'s
@@ -2240,3 +2268,52 @@ def test_a_prologue_fault_is_a_loud_allow_not_a_crash(tmp_path, monkeypatch, cap
     err = capsys.readouterr()
     assert "prologue_exception" in err.err
     assert "carriage exploded" in err.err
+
+
+def test_a_decision_that_never_reached_the_wire_still_reports_the_fault(tmp_path):
+    """Found by an independent review pass, against the previous fix.
+
+    Claiming the wire before the write closed the fragment-plus-second-object corruption, but it
+    also claimed the wire when the write raised having emitted NOTHING -- EPIPE on the first byte,
+    a closed fd. Then the DENY reached nobody AND the notice was suppressed, so a call that was
+    never decided looked exactly like a clean pass. The claim must not silence the report when
+    there is nothing on the wire to protect.
+    """
+    from makoto import dispatch as D
+    from makoto.vocab import Finding
+
+    class RejectsOutright:
+        def write(self, s):
+            raise BrokenPipeError("rejected before any byte was written")
+
+    saved = (D._stdout_written, list(D._notices), D._decision_write_failed)
+    D._stdout_written, D._decision_write_failed = False, False
+    D._notices[:] = ["[db_locked] write lock not acquired"]
+    try:
+        finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
+                          message="denied", snippet="")
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=RejectsOutright())
+        buf = io.StringIO()
+        real, sys.stdout = sys.stdout, buf
+        try:
+            D._emit_notices()
+        finally:
+            sys.stdout = real
+        assert buf.getvalue(), "the call was never decided and nobody was told"
+        assert "systemMessage" in buf.getvalue()
+    finally:
+        D._stdout_written, D._notices[:], D._decision_write_failed = saved[0], saved[1], saved[2]
+
+
+def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch, capsys):
+    """`_notices` and `_stdout_written` are module globals. A second `main()` in one interpreter
+    re-reported the first call's faults under the wrong event and grew the list without bound."""
+    from makoto import dispatch as D
+    monkeypatch.setattr(D.wire, "read_stdin",
+                        lambda: (_ for _ in ()).throw(RuntimeError("carriage exploded")))
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
+    D.main()
+    capsys.readouterr()
+    D.main()
+    assert len(D._notices) == 1, f"notices accumulated across calls: {D._notices!r}"

@@ -194,3 +194,40 @@ def test_a_bom_prefixed_transcript_still_yields_its_first_turn(tmp_path, check):
     p.write_bytes(b"\xef\xbb\xbf" + json.dumps(_user_turn(f"fetch {URL}")).encode("utf-8") + b"\n")
     assert predicate(current_event=_event(transcript_path=str(p)),
                      history=[], pattern=check) is None
+
+
+@pytest.mark.parametrize("typed,why", [
+    ("https://obscure-vendor.example/api/v3/reference?token=secret", "query string"),
+    ("https://obscure-vendor.example/api/v3/reference.json", "file extension"),
+    ("https://obscure-vendor.example/api/v3/reference\u00e9", "non-ascii continuation"),
+])
+def test_a_longer_url_sharing_our_prefix_is_not_an_exemption(tmp_path, check, typed, why):
+    """Found by an independent review pass, after the first fix.
+
+    The first attempt listed the characters that CONTINUE a url and rejected a match followed by
+    one. That set is impossible to enumerate and each omission is a silent false ALLOW: `?`, `.`
+    and every non-ascii letter were missing, so three different resources the user never named
+    were each waved through by the one channel this check treats as ground truth.
+    """
+    t = _transcript(tmp_path, [_user_turn(f"please fetch {typed}")])
+    finding = predicate(current_event=_event(url=URL, transcript_path=t), history=[], pattern=check)
+    assert finding is not None, f"{why}: a different resource was exempted as user-supplied"
+
+
+def test_a_url_inside_a_markdown_link_is_still_the_users_url(tmp_path, check):
+    """The boundary rule must read the whole token, not the next character: a markdown link puts
+    a `)` after the url, and people paste links that way."""
+    t = _transcript(tmp_path, [_user_turn(f"see [the docs]({URL}) for this")])
+    assert predicate(current_event=_event(transcript_path=t), history=[], pattern=check) is None
+
+
+def test_a_bom_on_every_chunk_boundary_still_yields_every_turn(tmp_path, check):
+    """`utf-8-sig` strips a BOM only at BYTE ZERO. A transcript assembled from separately-written
+    chunks -- a resumed or merged session -- carries one at the head of each chunk, and every
+    record after the first was silently unparseable."""
+    p = tmp_path / "chunked.jsonl"
+    bom = b"\xef\xbb\xbf"
+    p.write_bytes(bom + json.dumps(_user_turn("hello")).encode("utf-8") + b"\n"
+                  + bom + json.dumps(_user_turn(f"fetch {URL}")).encode("utf-8") + b"\n")
+    assert predicate(current_event=_event(transcript_path=str(p)),
+                     history=[], pattern=check) is None

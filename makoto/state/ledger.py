@@ -474,7 +474,14 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
     # into a hard deny resting on a false fact -- the one thing a gate must never do. Correctness
     # first: if the unbounded read has to go, it needs a form that splits on the same set.
     for line in raw.splitlines()[:limit]:
-        line = line.strip()
+        # `strip("\ufeff")` as well as whitespace. "utf-8-sig" removes a BOM only at BYTE ZERO, so
+        # a transcript that is the concatenation of separately-written chunks -- which is how a
+        # resumed or merged session is produced -- keeps a U+FEFF glued to the front of every
+        # chunk after the first. `json.loads` rejects each of those records, and every user turn
+        # in them disappears; the loss lands in `_user_supplied` as "the user never typed it",
+        # which is a hard deny resting on a false fact. Stripping per record costs nothing and
+        # makes the reader indifferent to where the chunk boundaries fell.
+        line = line.strip().strip("\ufeff").strip()
         if not line:
             continue
         try:

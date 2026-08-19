@@ -213,6 +213,9 @@ _NOTICE_STAGES = frozenset({"unparseable_payload", "db_init_failed", "db_locked"
                             "prologue_exception"})
 _notices: list = []
 _stdout_written = False
+# Set when the decision write itself raised. Distinct from `_stdout_written`, which only says the
+# wire was CLAIMED -- see `_emit_decision`.
+_decision_write_failed = False
 
 
 def _emit_notices() -> None:
@@ -223,7 +226,10 @@ def _emit_notices() -> None:
     last-word emitter, and `_stdout_written` is the interlock that keeps it from ever appending a
     second object onto a real decision and corrupting the response.
     """
-    if _stdout_written or not _notices:
+    # `_decision_write_failed` is the exception to the claim: the wire was claimed, but the
+    # decision never landed on it, so there is nothing for a notice to corrupt and everything for
+    # it to explain.
+    if not _notices or (_stdout_written and not _decision_write_failed):
         return
     try:
         detail = "; ".join(_notices[:3])
@@ -610,7 +616,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         ))
     body = verdict.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
     if body:
-        global _stdout_written
+        global _stdout_written, _decision_write_failed
         # Claim the wire BEFORE the write, not after. The claim is about having BEGUN to write,
         # not about having finished: a write that fails part-way -- a broken pipe, a full disk,
         # an encoder refusing a byte mid-buffer -- left the flag False with bytes already on
@@ -621,7 +627,18 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         # silently mis-reading two.
         # Set even for an injected `stream`: a caller that redirected the wire still owns it.
         _stdout_written = True
-        (stream or sys.stdout).write(json.dumps(body))
+        try:
+            (stream or sys.stdout).write(json.dumps(body))
+        except Exception:
+            # A stream that rejects the write OUTRIGHT -- EPIPE on the first byte, a closed fd --
+            # leaves stdout empty, and the claim above would then suppress the notice as well:
+            # the DENY reaches nobody, no notice reaches anybody, and the hook looks like a clean
+            # pass. That is the loud-allow this plugin promises, gone silent. Recording the
+            # failure lets `_emit_notices` speak in exactly that case. A half-written fragment is
+            # already unparseable, so a notice behind it cannot turn a good response into a bad
+            # one -- it can only add the one signal that says a check did not decide anything.
+            _decision_write_failed = True
+            raise
 
 
 def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> None:
@@ -791,6 +808,16 @@ def main() -> int:
     notice must not be lost, so the flush is a `finally` rather than a line before each return --
     the same reason `_dispatch`'s own conn.close() is one.
     """
+    # Reset FIRST. These are module globals, and a second `main()` in one interpreter inherited
+    # the first call's buffered notices and its spent wire claim: the notices were re-reported
+    # under the wrong event and grew without bound, while `_stdout_written` left over from a
+    # previous decision suppressed this call's notice entirely. Production forks a process per
+    # event and never noticed; every in-process caller -- the tests, and any host that batches --
+    # did.
+    global _stdout_written, _decision_write_failed
+    _notices.clear()
+    _stdout_written = False
+    _decision_write_failed = False
     try:
         return _dispatch()
     except Exception as exc:
