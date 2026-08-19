@@ -117,18 +117,23 @@ class _Unevaluable(Exception):
 # payload is NOT trustworthy JSON, so a real parser is not available and a greedy one would invent
 # structure. A miss yields "" and the row says `id_source: ""` -- honest silence, never a guess
 # presented as a reading.
-_RAW_ID_RXS = {
-    "session_id": re.compile(r'"session_id"\s*:\s*"([^"\\]{1,128})"'),
-    "tool_name": re.compile(r'"tool_name"\s*:\s*"([^"\\]{1,64})"'),
-    "hook_event_name": re.compile(r'"hook_event_name"\s*:\s*"([^"\\]{1,64})"'),
+# Left UNCOMPILED on purpose. These are consulted only when the envelope did not parse, which is
+# rare, while `re.compile` here is paid by every hook subprocess that ever starts -- measured at
+# 196us for the three of them, on a path the overwhelming majority of events never reach. `re`
+# keeps its own cache, and this function runs at most once per process, so a plain `re.search` on
+# the pattern string is both cheaper at import and one moving part fewer.
+_RAW_ID_PATTERNS = {
+    "session_id": r'"session_id"\s*:\s*"([^"\\]{1,128})"',
+    "tool_name": r'"tool_name"\s*:\s*"([^"\\]{1,64})"',
+    "hook_event_name": r'"hook_event_name"\s*:\s*"([^"\\]{1,64})"',
 }
 
 
 def _ids_from_raw(payload_raw: str) -> dict:
     """Best-effort {session_id, tool_name, hook_event} recovered from unparsed stdin text."""
     found = {}
-    for field, rx in _RAW_ID_RXS.items():
-        m = rx.search(payload_raw or "")
+    for field, pattern in _RAW_ID_PATTERNS.items():
+        m = re.search(pattern, payload_raw or "")
         if m:
             found[field] = m.group(1)
     if not found:

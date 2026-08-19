@@ -379,6 +379,7 @@ row (`record_ack_block_if_new` only avoids duplicate chain rows across repeated 
 own docstring).
 """
 import json
+from itertools import islice
 _ACK_RX = re.compile(
     r"makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
 # [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon
@@ -445,15 +446,17 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
     """
     if not transcript_path:
         return []
-    p = Path(transcript_path)
+    texts = []
     try:
-        if not p.exists():
-            return []
-        raw = p.read_text(encoding="utf-8", errors="replace")
+        # Stream, bounded by `limit`. Reading the whole file and then slicing applied the bound
+        # AFTER paying for every byte of an unbounded transcript -- on a hot path, for a scan that
+        # only ever looks at the first `limit` lines. A missing file raises OSError here, which is
+        # the same "no user turns" answer the exists() check gave, one stat cheaper.
+        with Path(transcript_path).open("r", encoding="utf-8", errors="replace") as handle:
+            lines = list(islice(handle, limit))
     except OSError:
         return []
-    texts = []
-    for line in raw.splitlines()[:limit]:
+    for line in lines:
         line = line.strip()
         if not line:
             continue
