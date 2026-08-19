@@ -449,7 +449,14 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
     try:
         if not p.exists():
             return []
-        raw = p.read_text(encoding="utf-8", errors="replace")
+        # "utf-8-sig", not "utf-8": a transcript written by a host that prefixes a UTF-8 BOM
+        # decoded with a leading U+FEFF glued onto the FIRST record, so that record alone failed
+        # to parse and every user turn in it vanished. The first record is where a session's
+        # opening message lives -- routinely the turn carrying the URL the user typed -- and its
+        # loss lands in `_user_supplied` as "the user never typed it", i.e. the same deny resting
+        # on a false fact that the `splitlines` note below is about. "utf-8-sig" strips the BOM
+        # when present and is byte-for-byte the same decode when it is not.
+        raw = p.read_text(encoding="utf-8-sig", errors="replace")
     except OSError:
         return []
     texts = []

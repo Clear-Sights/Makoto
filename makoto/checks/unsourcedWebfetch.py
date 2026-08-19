@@ -36,6 +36,30 @@ _TRUSTED_HOSTS = frozenset({
 })
 
 
+# The characters that can CONTINUE a url. A match followed by one of these is a proper prefix of a
+# longer url the user actually typed, not that url -- which is the whole substring hole.
+#
+# Sentence punctuation is deliberately NOT in this set, and that asymmetry is the point: people end
+# sentences with urls, and `See https://vendor.example/a.` must keep exempting
+# `https://vendor.example/a`. Treating the trailing period as part of the url would turn this fix
+# into a false DENY on the single most ordinary way a human supplies a url -- the exact failure
+# this check was rewritten to stop committing. Same linkifier convention every chat client uses.
+_URL_CONTINUES = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_~/%&=+@#$*"
+)
+
+
+def _ends_url(turn: str, url: str) -> bool:
+    """True iff `url` occurs in `turn` as a complete url rather than as a prefix of a longer one."""
+    start = turn.find(url)
+    while start != -1:
+        end = start + len(url)
+        if end >= len(turn) or turn[end] not in _URL_CONTINUES:
+            return True
+        start = turn.find(url, start + 1)
+    return False
+
+
 def _user_supplied(url: str, current_event: dict) -> bool:
     """True iff `url` appears VERBATIM in a genuine user turn of this session's transcript.
 
@@ -52,10 +76,15 @@ def _user_supplied(url: str, current_event: dict) -> bool:
     can improve on that. So the exemption is not a softening of the check, it is the check finally
     matching its own stated subject.
 
-    Verbatim, and only verbatim. Substring containment in the user's own words is the whole test --
-    no normalization, no host-only match, no prefix match. A host-only match would exempt every
-    path under any domain the user ever mentioned, which is the fabrication this check exists to
-    catch, one directory deeper.
+    Verbatim, and only verbatim -- as a WHOLE URL, not as a substring. No normalization, no
+    host-only match, no prefix match. A host-only match would exempt every path under any domain
+    the user ever mentioned, which is the fabrication this check exists to catch, one directory
+    deeper -- and plain `in` quietly granted exactly that, one character at a time. If the user
+    typed `https://vendor.example/api/v3/reference-internal-only`, then
+    `https://vendor.example/api/v3/reference` is a substring of it, so the agent could invent that
+    shorter url -- a DIFFERENT resource, which the user never named -- and be waved through by the
+    oracle. Every proper prefix of anything the user ever pasted was pre-approved. `_ends_url`
+    closes it by requiring the match to END where the user's url ended.
 
     Spoof-resistant by construction, because the turns come from `ledger.user_turn_texts`, which
     admits only host-written, non-synthetic, non-tool-result user entries. The agent cannot write
@@ -69,7 +98,7 @@ def _user_supplied(url: str, current_event: dict) -> bool:
         # Absence of evidence, never evidence of absence: an unreadable transcript leaves the
         # check exactly as strict as it was before this exemption existed.
         return False
-    return any(url in turn for turn in turns)
+    return any(_ends_url(turn, url) for turn in turns)
 
 
 def _webfetch_url(current_event: dict) -> Optional[str]:

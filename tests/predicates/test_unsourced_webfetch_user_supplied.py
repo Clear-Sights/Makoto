@@ -144,3 +144,53 @@ def test_transcript_line_bound_is_still_applied(tmp_path):
         json.dumps({"message": {"role": "user", "content": [{"type": "text", "text": f"turn {i}"}]}})
         for i in range(50)), encoding="utf-8")
     assert len(user_turn_texts(str(path), limit=10)) == 10
+
+
+# --- regressions found by an independent high-effort review pass ------------------------------
+
+def test_a_proper_prefix_of_a_typed_url_is_not_the_typed_url(tmp_path, check):
+    """The oracle exempted every PREFIX of anything the user ever pasted.
+
+    `in` is substring containment, and the docstring it implemented says "no prefix match". So a
+    user who typed `.../reference-internal-only` silently pre-approved `.../reference` -- a
+    DIFFERENT resource they never named -- and the agent could invent it and be waved through by
+    the one channel this check treats as ground truth.
+    """
+    typed = URL + "-internal-only"
+    t = _transcript(tmp_path, [_user_turn(f"please fetch {typed}")])
+    finding = predicate(current_event=_event(url=URL, transcript_path=t), history=[], pattern=check)
+    assert finding is not None and finding.pattern_id == "content.unsourced_webfetch"
+
+
+def test_the_url_the_user_actually_typed_is_still_exempt(tmp_path, check):
+    """The other half: tightening the boundary must not start denying the exact typed url."""
+    typed = URL + "-internal-only"
+    t = _transcript(tmp_path, [_user_turn(f"please fetch {typed}")])
+    assert predicate(current_event=_event(url=typed, transcript_path=t),
+                     history=[], pattern=check) is None
+
+
+@pytest.mark.parametrize("wrapper", ["fetch {}.", "see ({})", "{}", "read {}, then stop",
+                                     "<{}>", '"{}"', "{}; thanks"])
+def test_ordinary_sentence_punctuation_does_not_revoke_the_exemption(tmp_path, check, wrapper):
+    """The failure mode the boundary check could EASILY introduce, pinned so it cannot.
+
+    People end sentences with urls. If a trailing `.` or `)` counted as part of the url, this fix
+    would deny the single most ordinary way a human supplies one -- reintroducing the exact false
+    deny the exemption was written to stop.
+    """
+    t = _transcript(tmp_path, [_user_turn(wrapper.format(URL))])
+    assert predicate(current_event=_event(transcript_path=t), history=[], pattern=check) is None
+
+
+def test_a_bom_prefixed_transcript_still_yields_its_first_turn(tmp_path, check):
+    """A UTF-8 BOM glued U+FEFF onto the FIRST record, so that record alone failed to parse.
+
+    The first record is where a session's opening message lives -- routinely the very turn
+    carrying the url -- and losing it lands as "the user never typed it", i.e. a hard deny resting
+    on a false fact.
+    """
+    p = tmp_path / "bom.jsonl"
+    p.write_bytes(b"\xef\xbb\xbf" + json.dumps(_user_turn(f"fetch {URL}")).encode("utf-8") + b"\n")
+    assert predicate(current_event=_event(transcript_path=str(p)),
+                     history=[], pattern=check) is None

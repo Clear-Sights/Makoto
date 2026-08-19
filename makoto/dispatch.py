@@ -171,7 +171,17 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool,
     would inflate exactly the count this work exists to drive to zero, and would tell a reader that
     checks were skipped when they ran."""
     disposition = disposition or ("BLOCK" if blocked else "loud-allow")
-    print(f"makoto.dispatch: {disposition} [{stage}] {reason}", file=sys.stderr)
+    try:
+        print(f"makoto.dispatch: {disposition} [{stage}] {reason}", file=sys.stderr)
+    except Exception:
+        # The stderr line is the LOUD FLOOR, and a floor that can raise is not a floor. stderr can
+        # be closed, full, a broken pipe, or -- the failure mode this very module exists to fight
+        # -- pinned to an encoder that refuses a character inside `reason`. Any of those escaped
+        # this function, and from the prologue callers escaped `main()` outright: the REPORT of a
+        # fault became a second, unreported fault, and took the hook's exit code with it. Losing
+        # the line is bad; losing the notice and the audit row behind it is worse, so both durable
+        # records below run either way.
+        pass
     if not blocked and stage in _NOTICE_STAGES:
         _notices.append(f"[{stage}] {reason}")
     try:
@@ -199,7 +209,8 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool,
 #
 # Only faults that mean A CHECK DID NOT RUN produce a notice. A REPAIRED payload evaluated normally
 # and says nothing; a chain-tamper advisory has its own audit row and is not about this call.
-_NOTICE_STAGES = frozenset({"unparseable_payload", "db_init_failed", "db_locked", "exception"})
+_NOTICE_STAGES = frozenset({"unparseable_payload", "db_init_failed", "db_locked", "exception",
+                            "prologue_exception"})
 _notices: list = []
 _stdout_written = False
 
@@ -454,8 +465,18 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
                 # from — single source of the id, one place to keep correct.
                 findings.append(replace(finding, source_event_id=event_id))
         except Exception as exc:
-            audit.append_error(state_dir, event_id, pattern.id, exc,
-                               **_ids_from_payload(payload))
+            # Guarded, and the guard is load-bearing. This is the ERROR path of one predicate, and
+            # an `append_error` that raised here escaped `_run_predicates` ENTIRELY: every pattern
+            # after this one was abandoned unevaluated, and the unwind landed in `_dispatch`'s
+            # catch-all, which records a loud-allow and returns 0. A later predicate that would
+            # have DENIED simply never ran -- so a failure in the error LOGGER silently turned a
+            # deny into an allow. Observability must never decide a verdict; when the ledger
+            # cannot be written, the remaining checks still finish.
+            try:
+                audit.append_error(state_dir, event_id, pattern.id, exc,
+                                   **_ids_from_payload(payload))
+            except Exception:
+                pass
             continue
     return findings
 
@@ -590,10 +611,17 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     body = verdict.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
     if body:
         global _stdout_written
-        (stream or sys.stdout).write(json.dumps(body))
-        # Claim the wire so `_emit_notices` cannot append a second object behind a real decision.
+        # Claim the wire BEFORE the write, not after. The claim is about having BEGUN to write,
+        # not about having finished: a write that fails part-way -- a broken pipe, a full disk,
+        # an encoder refusing a byte mid-buffer -- left the flag False with bytes already on
+        # stdout, and `main`'s `finally` then appended a whole second JSON object onto the
+        # fragment. Observed shape: `{"hookSpecif{"systemMessage": ...`, which no host can parse,
+        # so a real DENY became an unreadable response. Claiming first degrades the same failure
+        # to a truncated single object, which a host rejects as one bad message instead of
+        # silently mis-reading two.
         # Set even for an injected `stream`: a caller that redirected the wire still owns it.
         _stdout_written = True
+        (stream or sys.stdout).write(json.dumps(body))
 
 
 def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> None:
@@ -765,6 +793,26 @@ def main() -> int:
     """
     try:
         return _dispatch()
+    except Exception as exc:
+        # `_dispatch` wraps only the HANDLER in a catch-all, so its whole prologue -- the stdin
+        # read, the state-dir resolve, the parse, the chain self-verify -- ran with no catch at
+        # all, and a `finally` does not absorb, it re-raises. A fault in any of those left the
+        # hook with a traceback and a non-zero exit instead of the loud-allow that IS this
+        # plugin's declared fail direction for carriage faults. Same disposition as every other
+        # carriage fault: recorded, loud, allowed. `_state_dir()` is resolved again here rather
+        # than reused, because the fault may well be the one that stopped it resolving the first
+        # time -- and if even that fails, the bare stderr line is still the floor.
+        try:
+            _dispatch_fact(_state_dir(), "prologue_exception", f"{type(exc).__name__}: {exc}",
+                           blocked=False)
+        except Exception:
+            _notices.append(f"[prologue_exception] {type(exc).__name__}: {exc}")
+            try:
+                print(f"makoto.dispatch: loud-allow [prologue_exception] "
+                      f"{type(exc).__name__}: {exc}", file=sys.stderr)
+            except Exception:
+                pass
+        return 0
     finally:
         _emit_notices()
 

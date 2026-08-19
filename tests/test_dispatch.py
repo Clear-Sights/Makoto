@@ -1,3 +1,4 @@
+import io
 """end-to-end dispatcher tests for makoto/dispatch.py (SQLite(WAL) backend)."""
 import json
 import os
@@ -2136,3 +2137,106 @@ def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
         "an error-level finding must record exit_code=2 in the audit row; "
         f"got {fire_rows[0].get('exit_code')!r}"
     )
+
+
+# --- regressions found by an independent high-effort review pass ------------------------------
+
+def test_a_failing_error_logger_does_not_abandon_the_remaining_checks(tmp_path, monkeypatch):
+    """Observability must never decide a verdict, and here it did -- in the worst direction.
+
+    `audit.append_error` on a predicate's ERROR path was unguarded, so an append that raised
+    escaped `_run_predicates` entirely: every pattern after the raising one went unevaluated, and
+    the unwind landed in `_dispatch`'s catch-all, which records a loud-allow and returns 0. A
+    later predicate that would have DENIED simply never ran. A failure in the error LOGGER turned
+    a deny into an allow.
+    """
+    import types
+    from makoto import dispatch as D
+    from makoto.state import audit as A
+    from makoto.vocab import Finding
+
+    ran = []
+    boom = types.ModuleType("mk_boom")
+    def _boom(**_kw):
+        ran.append("boom")
+        raise RuntimeError("predicate exploded")
+    boom.predicate = _boom
+    denier = types.ModuleType("mk_denier")
+    def _deny(**_kw):
+        ran.append("denier")
+        return Finding(pattern_id="x.deny", file="f.py", line=1, level="error",
+                       message="would have DENIED", snippet="")
+    denier.predicate = _deny
+    monkeypatch.setitem(sys.modules, "mk_boom", boom)
+    monkeypatch.setitem(sys.modules, "mk_denier", denier)
+
+    class P:
+        def __init__(self, i, m):
+            self.id, self.predicate_module = i, m
+    monkeypatch.setattr(D, "load_precheck_catalog",
+                        lambda: [P("x.boom", "mk_boom"), P("x.deny", "mk_denier")])
+    monkeypatch.setattr(D, "_keyword_hit", lambda p, raw: True)
+    monkeypatch.setattr(D, "_disabled_pattern_ids", lambda: set())
+    monkeypatch.setattr(A, "append_error",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("ledger disk full")))
+
+    findings = D._run_predicates(None, {"session_id": "s"}, [], 1, tmp_path, "raw")
+    assert ran == ["boom", "denier"], f"the later check never ran: {ran}"
+    assert [f.pattern_id for f in findings] == ["x.deny"], "the DENY was lost"
+
+
+def test_a_half_written_decision_is_never_followed_by_a_second_object(tmp_path):
+    """`_stdout_written` was set AFTER the write, so a write that failed part-way left the flag
+    False with bytes already on stdout -- and `main`'s `finally` then appended a whole SECOND JSON
+    object onto the fragment. Observed shape: `{"hookSpecif{"systemMessage": ...`, which no host
+    can parse, so a real DENY became an unreadable response instead of a truncated one.
+    """
+    from makoto import dispatch as D
+    from makoto.vocab import Finding
+
+    class HalfDeadStream:
+        """Accepts the first 12 characters, then dies -- a pipe closed mid-write."""
+        def __init__(self):
+            self.written = ""
+
+        def write(self, s):
+            self.written += s[:12]
+            raise BrokenPipeError("pipe closed mid-write")
+
+    stream = HalfDeadStream()
+    saved_written, saved_notices = D._stdout_written, list(D._notices)
+    D._stdout_written = False
+    D._notices[:] = ["[db_locked] write lock not acquired"]
+    try:
+        finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
+                          message="denied", snippet="")
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=stream)
+        assert D._stdout_written is True, (
+            "a partial write still consumed the wire; leaving the claim unset lets the notice "
+            "emitter append a second object onto the fragment")
+        buf = io.StringIO()
+        real_stdout, sys.stdout = sys.stdout, buf
+        try:
+            D._emit_notices()
+        finally:
+            sys.stdout = real_stdout
+        assert buf.getvalue() == "", f"a second object was appended: {buf.getvalue()!r}"
+    finally:
+        D._stdout_written, D._notices[:] = saved_written, saved_notices
+
+
+def test_a_prologue_fault_is_a_loud_allow_not_a_crash(tmp_path, monkeypatch, capsys):
+    """`_dispatch` wraps only the HANDLER, so its whole prologue ran with no catch, and `main`'s
+    `finally` does not absorb -- it re-raises. A fault in the stdin read, the state-dir resolve,
+    the parse or the chain self-verify left the hook with a traceback and a non-zero exit instead
+    of the loud-allow that IS this plugin's declared fail direction for carriage faults.
+    """
+    from makoto import dispatch as D
+    monkeypatch.setattr(D.wire, "read_stdin",
+                        lambda: (_ for _ in ()).throw(RuntimeError("carriage exploded")))
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
+    assert D.main() == 0
+    err = capsys.readouterr()
+    assert "prologue_exception" in err.err
+    assert "carriage exploded" in err.err

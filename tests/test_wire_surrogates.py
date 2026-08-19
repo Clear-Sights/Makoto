@@ -190,3 +190,26 @@ def test_repair_count_is_bytes_not_malformed_runs():
     assert n == 1
     _text, n = wire._decode_counting("legit � char".encode("utf-8"))
     assert n == 0, "a genuine U+FFFD is not damage"
+
+
+def test_two_damaged_keys_do_not_collapse_into_one_losing_a_value():
+    """Scrubbing is not injective on keys: every surrogate becomes the same U+FFFD.
+
+    Found by an independent review pass. `wire.scrub({"\\ud800": 1, "\\ud801": 2})` returned
+    `({'\\ufffd': 2}, 2)` -- a repair count of 2 sitting next to a dict that had silently lost a
+    field. This module's one promise is that repair is ON THE RECORD; deleting a field without a
+    word is the opposite of that, and the field could have been `tool_input`.
+    """
+    from makoto.core import wire
+    value, n = wire.scrub({"\ud800": 1, "\ud801": 2})
+    assert n == 2
+    assert sorted(value.values()) == [1, 2], f"a value was discarded: {value!r}"
+    assert not any("\ud800" <= c <= "\udfff" for k in value for c in k)
+
+
+def test_a_repaired_key_does_not_evict_a_clean_key_of_the_same_name():
+    """The ordering case: the clean key keeps its own name, whichever side of the dict it is on."""
+    from makoto.core import wire
+    value, _n = wire.scrub({"\ud800": 1, "\ufffd": 2})
+    assert sorted(value.values()) == [1, 2]
+    assert value["\ufffd"] == 2

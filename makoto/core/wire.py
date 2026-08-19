@@ -85,6 +85,21 @@ def scrub(value: Any) -> tuple[Any, int]:
             if isinstance(k, str):
                 k, n = scrub_text(k)
                 total += n
+                if n and (k in out or k in value):
+                    # Scrubbing is NOT injective on keys: every surrogate becomes the same U+FFFD,
+                    # so two genuinely different damaged keys collapse onto one name and the plain
+                    # assignment below dropped the earlier one's VALUE on the floor without a word.
+                    # `wire.scrub({"\ud800": 1, "\ud801": 2})` returned `({'\ufffd': 2}, 2)` -- a
+                    # count of 2 repairs next to a dict that had lost a field. This module's one
+                    # promise is that repair is on the record; silently deleting a field is the
+                    # opposite of that, and the field could be `tool_input`. The suffix keeps both
+                    # values reachable and keeps the collision visible in the persisted row.
+                    # Tested against `value` as well as `out` so a CLEAN key later in the dict
+                    # keeps its own name rather than being overwritten by a repaired one.
+                    suffix = 2
+                    while f"{k}~{suffix}" in out or f"{k}~{suffix}" in value:
+                        suffix += 1
+                    k = f"{k}~{suffix}"
             v, n = scrub(v)
             total += n
             out[k] = v
