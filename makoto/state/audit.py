@@ -120,20 +120,58 @@ def read_rows(state_root: Path, since: str | None = None) -> Iterator[dict]:
 
 
 def append_error(state_root: Path, event_id: int | None,
-                 pattern_id: str | None, exc: BaseException) -> None:
-    """append one JSON line to <state_root>/dispatch_errors.jsonl on predicate failure.
+                 pattern_id: str | None, exc: BaseException,
+                 *, session_id: str = "", tool_name: str = "",
+                 hook_event: str = "", id_source: str = "") -> None:
+    """append one JSON line to <state_root>/dispatch_errors.jsonl on predicate or dispatch failure.
 
     Spec §5.7 + v5 fix #9. SEPARATE from audit.jsonl; AuditRow shape preserved.
-    Schema: {ts, event_id, pattern_id, exc_type, exc_message}. Called by
-    dispatch._run_predicates when a predicate import or call raises (fail-open).
+    Schema: {ts, plugin, event_id, pattern_id, exc_type, exc_message, session_id, tool_name,
+    hook_event, id_source}.
+
+    THE ATTRIBUTION FIELDS ARE THE POINT, not decoration. audit.jsonl has carried `session_id` and
+    `tool_name` since 1.0.2; this log carried neither, so a crash row could name the exception but
+    not the session or the call it happened on. That gap is not a missing nicety -- it is why
+    "did this failure affect the session I am looking at?" was unanswerable after the fact for the
+    one class of row where the answer matters most, since every row here is a check that DID NOT
+    RUN. A fire is attributable and a miss was not; the log was informative in exactly the wrong
+    direction.
+
+    `id_source` records HOW the ids were obtained, because on the unparseable-payload path they
+    cannot come from a parsed envelope: "payload" means read from the parsed object, "raw-scan"
+    means recovered by scanning the raw stdin text, "" means none were available. A recovered id
+    that does not say it was recovered is worse than no id, so the provenance ships with the value.
+
+    `plugin` is constant here and deliberately so: Ward, Gyroscope and Makoto all register
+    PreToolUse `*` and all three can emit a deny, so a row that does not name its author is
+    unattributable the moment more than one of them is installed -- which is the shipped
+    Courthouse configuration.
+
+    Additive: every field is keyword-only with a default, and readers use dict.get, so pre-upgrade
+    rows keep parsing identically.
     """
     _append_jsonl(state_root, "dispatch_errors.jsonl", {
         "ts": datetime.now(timezone.utc).isoformat(),
+        "plugin": "makoto",
         "event_id": event_id,
         "pattern_id": pattern_id,
         "exc_type": type(exc).__name__,
         "exc_message": str(exc),
+        "session_id": session_id,
+        "tool_name": tool_name,
+        "hook_event": hook_event,
+        "id_source": id_source,
     })
+
+
+def read_errors(state_root: Path, since: str | None = None) -> Iterator[dict]:
+    """stream the dispatch-error log; one dict per valid JSON row. See _read_jsonl for the contract.
+
+    The reader that keeps this log from being write-only. `dispatch` uses it at Stop to answer
+    "were any checks skipped this session?" -- absence of a finding is only good news if nothing
+    was silently unable to produce one.
+    """
+    yield from _read_jsonl(state_root, "dispatch_errors.jsonl", since)
 
 
 def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,

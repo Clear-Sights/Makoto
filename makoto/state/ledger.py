@@ -425,6 +425,50 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
     return text
 
 
+def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> list:
+    """Every genuine, host-written, non-synthetic user turn in the transcript, oldest first.
+
+    The ORACLE channel, exposed for readers other than the ack scanner. `find_ack_block` has always
+    needed "what did the human actually type, as opposed to what could the agent have produced" --
+    contract points 1-3 of the ack rules, enforced by `_is_genuine_user_turn`. That question is not
+    specific to acks: any check that wants to distinguish a fact the human supplied from a fact the
+    agent supplied needs exactly this list, and needs it to have the same spoof-resistance.
+
+    Sharing the primitive rather than re-deriving it is the point. A second, looser reader of the
+    transcript would be a second definition of "the user said so", and the looser one would win any
+    disagreement -- which is how an agent-writable channel becomes an oracle by accident.
+
+    Never raises: an absent, unreadable or malformed transcript reads as "no user turns". Callers
+    must treat that as absence of evidence, never as evidence of absence.
+
+    `limit` bounds the scan; a transcript is unbounded in principle and this runs on a hot path.
+    """
+    if not transcript_path:
+        return []
+    p = Path(transcript_path)
+    try:
+        if not p.exists():
+            return []
+        raw = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    texts = []
+    for line in raw.splitlines()[:limit]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        text = _is_genuine_user_turn(entry)
+        if text:
+            texts.append(text)
+    return texts
+
+
 def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
                     session_id: Optional[str] = None,
                     root: Optional[Path] = None) -> Optional[str]:

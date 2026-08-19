@@ -7,7 +7,11 @@ pattern from training data.
 
 Predicate walks session history (events table, populated by 1.0.5 PostToolUse
 infra) and checks whether the URL appears anywhere in prior tool_response
-content. Trusted-host allowlist short-circuits well-known docs domains.
+content. Two short-circuits come first: a trusted-host allowlist for well-known
+docs domains, and -- the one that keeps the condition honest -- a URL the USER
+typed verbatim in a genuine transcript turn. "Not in a prior tool_result" is a
+proxy for "fabricated", and it is a proxy that misfires on the single most
+clearly-grounded case there is; see `_user_supplied` for the measured misfire.
 
 Knight-Leveson: stdlib re + json only; conn for events lookup is passed in.
 """
@@ -32,6 +36,42 @@ _TRUSTED_HOSTS = frozenset({
 })
 
 
+def _user_supplied(url: str, current_event: dict) -> bool:
+    """True iff `url` appears VERBATIM in a genuine user turn of this session's transcript.
+
+    THE TRIGGER-NARROWING THAT MAKES THIS CHECK MEAN WHAT IT SAYS. The mined defect is a
+    FABRICATED url -- one the agent invented from a plausible host+path pattern in training data.
+    The implemented condition was "never seen in a prior tool_result", and those are not the same
+    set. A url the human typed into chat has never been in a tool_result either, so the check fired
+    on it: measured live, on a url the user supplied directly, denied as never-seen. That is not a
+    near-miss of the target, it is a different target -- and it fires precisely when the agent is
+    doing the most obviously correct thing available to it, which is the worst possible time for a
+    gate to be wrong, because the user watched them supply the url.
+
+    A url the user typed is grounded BY DEFINITION: its provenance is the oracle, and no tool call
+    can improve on that. So the exemption is not a softening of the check, it is the check finally
+    matching its own stated subject.
+
+    Verbatim, and only verbatim. Substring containment in the user's own words is the whole test --
+    no normalization, no host-only match, no prefix match. A host-only match would exempt every
+    path under any domain the user ever mentioned, which is the fabrication this check exists to
+    catch, one directory deeper.
+
+    Spoof-resistant by construction, because the turns come from `ledger.user_turn_texts`, which
+    admits only host-written, non-synthetic, non-tool-result user entries. The agent cannot write
+    itself a permission slip: a tool result carrying the url is not a user turn, and that
+    distinction is enforced where the transcript is read, not here.
+    """
+    try:
+        from makoto.state.ledger import user_turn_texts
+        turns = user_turn_texts(current_event.get("transcript_path"))
+    except Exception:
+        # Absence of evidence, never evidence of absence: an unreadable transcript leaves the
+        # check exactly as strict as it was before this exemption existed.
+        return False
+    return any(url in turn for turn in turns)
+
+
 def _webfetch_url(current_event: dict) -> Optional[str]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -43,6 +83,9 @@ def _webfetch_url(current_event: dict) -> Optional[str]:
     # Trusted-host short-circuit
     host = urlparse(url).netloc.lower()
     if host in _TRUSTED_HOSTS or any(host.endswith("." + th) for th in _TRUSTED_HOSTS):
+        return None
+    # Oracle short-circuit: the user typed this url themselves. See `_user_supplied`.
+    if _user_supplied(url, current_event):
         return None
     return url
 
@@ -58,12 +101,13 @@ def _url_grounded_in_history(url: str, history: list) -> bool:
 predicate = claim_vs_history_predicate(
     claim_rxs=(), neg_ref_rx=None, grounded_in_history=_url_grounded_in_history,
     tool_gate=_webfetch_url,
-    message="row {id} ({description}): URL never seen in this session",
+    message=("row {id} ({description}): this URL was never returned by a prior tool call in "
+             "this session, and the user never typed it"),
 )
 
 
 from makoto.registry import Check as _Check
-RETRY_HINT = 'Run WebSearch first; only WebFetch URLs that prior search results actually returned. Fabricated URLs typically reflect plausible host+path patterns from training data, not real pages.'
-DESCRIPTION = 'WebFetch URL never seen in any prior tool_result this session'
+RETRY_HINT = 'Run WebSearch first; only WebFetch URLs that prior search results actually returned, or that the user gave you verbatim. Fabricated URLs typically reflect plausible host+path patterns from training data, not real pages.'
+DESCRIPTION = 'WebFetch URL neither returned by a prior tool_result nor supplied verbatim by the user'
 
 CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('http://', 'https://'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="CLAIM_VS_HISTORY")
