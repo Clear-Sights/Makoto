@@ -1,0 +1,8 @@
+version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "makoto"
+version = "2.3.0"
+source = { editable = "." }

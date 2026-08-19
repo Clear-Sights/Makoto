@@ -208,8 +208,16 @@ def test_two_damaged_keys_do_not_collapse_into_one_losing_a_value():
 
 
 def test_a_repaired_key_does_not_evict_a_clean_key_of_the_same_name():
-    """The ordering case: the clean key keeps its own name, whichever side of the dict it is on."""
+    """The ordering case: the clean key keeps its own name, whichever side of the dict it is on.
+
+    BOTH orderings, because the docstring promised both and only one was run. Which key `scrub`
+    reaches first decides which one gets the renamed slot, so a one-sided test leaves the more
+    dangerous half -- the clean key encountered SECOND, after the repaired one already took the
+    name -- unexercised. Both pass today; the point is that a regression in either direction now
+    has something to trip over.
+    """
     from makoto.core import wire
-    value, _n = wire.scrub({"\ud800": 1, "\ufffd": 2})
-    assert sorted(value.values()) == [1, 2]
-    assert value["\ufffd"] == 2
+    for payload in ({"\ud800": 1, "\ufffd": 2}, {"\ufffd": 2, "\ud800": 1}):
+        value, _n = wire.scrub(payload)
+        assert sorted(value.values()) == [1, 2], f"a value was discarded: {value!r}"
+        assert value["\ufffd"] == 2, f"the clean key lost its name: {value!r}"

@@ -2203,19 +2203,35 @@ def test_a_failed_decision_write_is_reported_rather_than_silently_dropped(tmp_pa
     from makoto import dispatch as D
     from makoto.vocab import Finding
 
+    # ONE stream for the decision AND the notice, because in production there is only one: the
+    # earlier version handed `_emit_decision` a private object and then pointed `sys.stdout` at a
+    # fresh buffer, so it asserted a notice was PRODUCED while never showing what the wire ends up
+    # holding. That is the only question this trade turns on.
     class HalfDeadStream:
+        """First write keeps 12 characters and raises; later writes land. A disk that filled and
+        was freed, an EINTR -- the case where the notice actually reaches the wire behind the
+        fragment, which is the case the trade has to be judged on."""
+
         def __init__(self):
             self.written = ""
+            self.calls = 0
 
         def write(self, s):
-            self.written += s[:12]
-            raise BrokenPipeError("pipe closed mid-write")
+            self.calls += 1
+            if self.calls == 1:
+                self.written += s[:12]
+                raise BrokenPipeError("pipe closed mid-write")
+            self.written += s
+            return len(s)
+
+    class DeadStream:
+        def write(self, s):
+            raise BrokenPipeError("pipe closed for good")
 
     saved = (D._stdout_written, list(D._notices), D._decision_write_failed)
     finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
                       message="denied", snippet="")
 
-    # 1. a SUCCESSFUL decision still shuts the notice emitter up.
     class GoodStream:
         def __init__(self):
             self.written = ""
@@ -2225,18 +2241,21 @@ def test_a_failed_decision_write_is_reported_rather_than_silently_dropped(tmp_pa
             return len(s)
 
     try:
+        # 1. a SUCCESSFUL decision still shuts the notice emitter up, on the SAME stream.
         D._stdout_written, D._decision_write_failed = False, False
         D._notices[:] = ["[db_locked] write lock not acquired"]
-        D._emit_decision([finding], "PreToolUse", stream=GoodStream())
-        buf = io.StringIO()
-        real, sys.stdout = sys.stdout, buf
+        good = GoodStream()
+        D._emit_decision([finding], "PreToolUse", stream=good)
+        delivered = good.written
+        real, sys.stdout = sys.stdout, good
         try:
             D._emit_notices()
         finally:
             sys.stdout = real
-        assert buf.getvalue() == "", "a notice was appended behind a delivered decision"
+        assert good.written == delivered, "a notice was appended behind a delivered decision"
+        assert json.loads(good.written)["hookSpecificOutput"], "the decision is not intact JSON"
 
-        # 2. a FAILED decision write is reported instead.
+        # 2. a FAILED decision write is reported instead -- and this is what the wire then holds.
         D._stdout_written, D._decision_write_failed = False, False
         D._notices[:] = ["[db_locked] write lock not acquired"]
         stream = HalfDeadStream()
@@ -2244,15 +2263,37 @@ def test_a_failed_decision_write_is_reported_rather_than_silently_dropped(tmp_pa
             D._emit_decision([finding], "PreToolUse", stream=stream)
         assert D._stdout_written is True
         assert D._decision_write_failed is True
-        buf = io.StringIO()
-        real, sys.stdout = sys.stdout, buf
+        fragment = stream.written
+        assert fragment == '{"hookSpecif', f"unexpected fragment: {fragment!r}"
+        real, sys.stdout = sys.stdout, stream
         try:
             D._emit_notices()
         finally:
             sys.stdout = real
-        assert "systemMessage" in buf.getvalue(), "the undelivered decision was never reported"
+        assert "systemMessage" in stream.written, "the undelivered decision was never reported"
+        # The trade, asserted rather than asserted-around: the wire now carries the fragment with
+        # the notice behind it, and that is NOT parseable. It was not parseable before the notice
+        # either -- a 12-character fragment never is -- so the notice destroys nothing and is the
+        # only thing on the wire that explains why no decision arrived. Written down as a test so
+        # the cost is visible to whoever revisits this, instead of living in a comment.
+        with pytest.raises(ValueError):
+            json.loads(stream.written)
+        assert stream.written.startswith(fragment)
+
+        # 3. a stream that is dead for good: the notice cannot land, and must not raise either.
+        D._stdout_written, D._decision_write_failed = False, False
+        D._notices[:] = ["[db_locked] write lock not acquired"]
+        dead = DeadStream()
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=dead)
+        real, sys.stdout = sys.stdout, dead
+        try:
+            D._emit_notices()          # must swallow: reporting never outranks returning
+        finally:
+            sys.stdout = real
     finally:
         D._stdout_written, D._notices[:], D._decision_write_failed = saved[0], saved[1], saved[2]
+
 
 def test_a_prologue_fault_is_a_loud_allow_not_a_crash(tmp_path, monkeypatch, capsys):
     """`_dispatch` wraps only the HANDLER, so its whole prologue ran with no catch, and `main`'s
@@ -2283,8 +2324,21 @@ def test_a_decision_that_never_reached_the_wire_still_reports_the_fault(tmp_path
     from makoto.vocab import Finding
 
     class RejectsOutright:
+        """Rejects the first write having emitted NOTHING, then accepts. One object, used for the
+        decision AND the notice, because pointing `sys.stdout` at a fresh buffer for the second
+        call proved only that a notice was ATTEMPTED -- on a stream that was still dead it could
+        not have landed, and the test's name promises it reaches the wire."""
+
+        def __init__(self):
+            self.written = ""
+            self.calls = 0
+
         def write(self, s):
-            raise BrokenPipeError("rejected before any byte was written")
+            self.calls += 1
+            if self.calls == 1:
+                raise BrokenPipeError("rejected before any byte was written")
+            self.written += s
+            return len(s)
 
     saved = (D._stdout_written, list(D._notices), D._decision_write_failed)
     D._stdout_written, D._decision_write_failed = False, False
@@ -2292,16 +2346,21 @@ def test_a_decision_that_never_reached_the_wire_still_reports_the_fault(tmp_path
     try:
         finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
                           message="denied", snippet="")
+        stream = RejectsOutright()
         with pytest.raises(BrokenPipeError):
-            D._emit_decision([finding], "PreToolUse", stream=RejectsOutright())
-        buf = io.StringIO()
-        real, sys.stdout = sys.stdout, buf
+            D._emit_decision([finding], "PreToolUse", stream=stream)
+        assert stream.written == "", "the decision was supposed to reach nobody"
+        real, sys.stdout = sys.stdout, stream
         try:
             D._emit_notices()
         finally:
             sys.stdout = real
-        assert buf.getvalue(), "the call was never decided and nobody was told"
-        assert "systemMessage" in buf.getvalue()
+        assert stream.written, "the call was never decided and nobody was told"
+        assert "systemMessage" in stream.written
+        # Zero bytes of decision landed, so unlike the half-written case there is no fragment in
+        # front of the notice: the wire carries ONE valid object, and it is the one that says the
+        # call went undecided.
+        assert json.loads(stream.written)["systemMessage"]
     finally:
         D._stdout_written, D._notices[:], D._decision_write_failed = saved[0], saved[1], saved[2]
 
