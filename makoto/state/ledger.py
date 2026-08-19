@@ -379,7 +379,6 @@ row (`record_ack_block_if_new` only avoids duplicate chain rows across repeated 
 own docstring).
 """
 import json
-from itertools import islice
 _ACK_RX = re.compile(
     r"makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
 # [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon
@@ -446,17 +445,28 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
     """
     if not transcript_path:
         return []
-    texts = []
+    p = Path(transcript_path)
     try:
-        # Stream, bounded by `limit`. Reading the whole file and then slicing applied the bound
-        # AFTER paying for every byte of an unbounded transcript -- on a hot path, for a scan that
-        # only ever looks at the first `limit` lines. A missing file raises OSError here, which is
-        # the same "no user turns" answer the exists() check gave, one stat cheaper.
-        with Path(transcript_path).open("r", encoding="utf-8", errors="replace") as handle:
-            lines = list(islice(handle, limit))
+        if not p.exists():
+            return []
+        raw = p.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
-    for line in lines:
+    texts = []
+    # `splitlines()`, NOT iteration over the file handle, and the difference is a live false deny.
+    #
+    # This was briefly rewritten to `islice` over an open handle, to apply the `limit` bound before
+    # paying for every byte rather than after. That bound is a real concern and the rewrite was
+    # wrong anyway: file iteration splits ONLY on \n, while `splitlines()` also splits on \v, \f,
+    # \x1c-\x1e, \x85, U+2028 and U+2029. A transcript carrying any of those collapsed into one
+    # unparseable line and this function returned [] -- measured, all five separators tested.
+    #
+    # [] here does not read as "no evidence". It flows into `_user_supplied`, which reports that the
+    # user never typed the URL, and `content.unsourced_webfetch` DENIES with exactly that as its
+    # stated reason. So the optimization turned an ordinary WebFetch of a URL the user had typed
+    # into a hard deny resting on a false fact -- the one thing a gate must never do. Correctness
+    # first: if the unbounded read has to go, it needs a form that splits on the same set.
+    for line in raw.splitlines()[:limit]:
         line = line.strip()
         if not line:
             continue

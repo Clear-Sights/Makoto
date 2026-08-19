@@ -102,3 +102,45 @@ def test_prior_tool_result_grounding_still_works(check):
     history = [(1, "2026-08-19T10:00:00Z", "PostToolUse", "/tmp",
                 json.dumps({"tool_response": {"results": URL}}))]
     assert predicate(current_event=_event(), history=history, pattern=check) is None
+
+def test_transcript_separators_splitlines_handles_are_all_seen(tmp_path):
+    """A REGRESSION, caused by an optimization and caught by an independent review pass.
+
+    `user_turn_texts` was briefly rewritten to iterate an open file handle under `islice`, to apply
+    its line bound before reading the whole transcript rather than after. File iteration splits only
+    on `\n`; `str.splitlines()` also splits on `\v`, `\f`, `\x1c`-`\x1e`, `\x85`, U+2028 and U+2029.
+    A transcript carrying any of those collapsed into ONE unparseable line and the function returned
+    [] -- no user turns at all, not merely a missed one.
+
+    That empty list is not inert. `_user_supplied` reads it as "the user never typed this URL" and
+    `content.unsourced_webfetch` DENIES, stating exactly that as its reason. So the optimization
+    turned an ordinary WebFetch of a URL the user HAD typed into a hard deny resting on a false
+    fact. This test pins every separator `splitlines()` recognises, so the bound can only ever be
+    reintroduced by a form that splits on the same set.
+    """
+    from makoto.state.ledger import user_turn_texts
+
+    def record(text):
+        return json.dumps({"message": {"role": "user",
+                                       "content": [{"type": "text", "text": text}]}})
+
+    for separator in ("\n", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"):
+        path = tmp_path / f"transcript-{ord(separator)}.jsonl"
+        path.write_text(record("first turn") + separator + record("fetch https://vendor.example/api"),
+                        encoding="utf-8")
+        turns = user_turn_texts(str(path))
+        assert len(turns) == 2, (
+            f"separator U+{ord(separator):04X} lost a user turn: {turns!r} -- a WebFetch of a URL "
+            f"the user typed would be denied for 'the user never typed it'")
+        assert any("https://vendor.example/api" in t for t in turns)
+
+
+def test_transcript_line_bound_is_still_applied(tmp_path):
+    """The bound the reverted optimization existed to enforce must still hold."""
+    from makoto.state.ledger import user_turn_texts
+
+    path = tmp_path / "long.jsonl"
+    path.write_text("\n".join(
+        json.dumps({"message": {"role": "user", "content": [{"type": "text", "text": f"turn {i}"}]}})
+        for i in range(50)), encoding="utf-8")
+    assert len(user_turn_texts(str(path), limit=10)) == 10
