@@ -288,11 +288,37 @@ without leaking whole-file contents. It's plain JSONL — query it with `jq` or 
 | `retry_hint_emitted` | Boolean — at least one fired pattern had a non-empty `retry_hint` |
 | `findings` | Per-finding `{pattern_id, level, file, line, snippet}` |
 
+### The error log
+
+`$MAKOTO_STATE_DIR/dispatch_errors.jsonl` is the other half, and it is the half that matters when
+something goes wrong: one row per predicate that raised and per dispatch-stage can't-evaluate. Every
+row carries `plugin`, `session_id`, `tool_name`, `hook_event` and `id_source`.
+
+Those fields were missing. `audit.jsonl` has carried the session and tool since 1.0.2 and this log
+carried neither — so a *fire* was attributable and a *miss* was not, and every row here is a check
+that did not run. When 30 fail-opens landed in one day, "did they affect this session?" could not
+be answered from the record. `id_source` says how the ids were obtained (`payload`, or `raw-scan`
+when the envelope did not parse and they had to be recovered from the raw text); a recovered id
+that does not admit it was recovered is worse than no id.
+
+Row dispositions are `loud-allow` (a check did not run), `BLOCK`, `REPAIRED` (the envelope carried
+bytes that had to be fixed, and evaluation then continued normally), and `NOTE`.
+
+### A fail-open is never silent
+
+Hook stderr on exit 0 reaches the debug log only — not the transcript, not the user, not the model.
+So "loud-allow + a stderr line" was loud to nobody, and a skipped check looked exactly like a clean
+pass from every seat. Every fail-open now also emits a `systemMessage` saying the call was
+**allowed without being checked**. The direction is unchanged; only the visibility is. See
+[Courthouse docs/FAIL-DIRECTION.md](https://github.com/Clear-Sights/Courthouse/blob/main/docs/FAIL-DIRECTION.md)
+for the bench-wide policy.
+
 ### Failure mode
 
 Audit writes are best-effort. If the append fails (disk full, permission denied), dispatch prints one
 stderr line and continues with its original exit code. The audit subsystem cannot cause makoto to
 mis-block or mis-allow a tool call — a fundamental separation-of-concerns invariant.
+
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
 Separate from the 15 pre-checks and 19 end-of-turn checks above: an optional `ConfigChange` hook

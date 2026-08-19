@@ -19,6 +19,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import re
 import sys
 import time
 from dataclasses import asdict, replace
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import Optional
 
 from makoto.core import hostdialect
+from makoto.core import wire
 from makoto.vocab import Finding
 from makoto.state.store import _state_dir
 from makoto.state import citations
@@ -110,16 +112,109 @@ class _Unevaluable(Exception):
     """A dispatch-stage can't-evaluate condition, recorded as an on-the-record fact (never silent)."""
 
 
-def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool) -> None:
+# Recovering the ids from raw stdin when the envelope did not parse. Deliberately a flat scan of
+# the top-level shape Claude Code actually emits and nothing cleverer: this runs precisely when the
+# payload is NOT trustworthy JSON, so a real parser is not available and a greedy one would invent
+# structure. A miss yields "" and the row says `id_source: ""` -- honest silence, never a guess
+# presented as a reading.
+_RAW_ID_RXS = {
+    "session_id": re.compile(r'"session_id"\s*:\s*"([^"\\]{1,128})"'),
+    "tool_name": re.compile(r'"tool_name"\s*:\s*"([^"\\]{1,64})"'),
+    "hook_event_name": re.compile(r'"hook_event_name"\s*:\s*"([^"\\]{1,64})"'),
+}
+
+
+def _ids_from_raw(payload_raw: str) -> dict:
+    """Best-effort {session_id, tool_name, hook_event} recovered from unparsed stdin text."""
+    found = {}
+    for field, rx in _RAW_ID_RXS.items():
+        m = rx.search(payload_raw or "")
+        if m:
+            found[field] = m.group(1)
+    if not found:
+        return {}
+    return {"session_id": found.get("session_id", ""),
+            "tool_name": found.get("tool_name", ""),
+            "hook_event": found.get("hook_event_name", ""),
+            "id_source": "raw-scan"}
+
+
+def _ids_from_payload(payload) -> dict:
+    """{session_id, tool_name, hook_event} read from a parsed envelope, or {} if there isn't one."""
+    if not isinstance(payload, dict):
+        return {}
+    return {"session_id": str(payload.get("session_id") or ""),
+            "tool_name": str(payload.get("tool_name") or ""),
+            "hook_event": str(payload.get("hook_event_name") or ""),
+            "id_source": "payload"}
+
+
+def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool,
+                   ids: dict | None = None, disposition: str | None = None) -> None:
     """HYBRID fail-mode: record an on-the-record can't-evaluate fact + a guaranteed-loud stderr line.
     NEVER silent. `blocked` marks a tamper-block vs a loud-allow in the recorded fact. The stderr line
     is the loud floor; the audit-file write is best-effort (the fact-writer must never itself crash
-    the hook)."""
-    disposition = "BLOCK" if blocked else "loud-allow"
+    the hook).
+
+    `ids` carries the session/tool attribution (see `audit.append_error`). Every caller supplies it
+    -- from the parsed payload where there is one, from `_ids_from_raw` where there isn't. A
+    can't-evaluate fact that cannot be tied to a session is a fact nobody can act on: the row exists
+    to answer "was THIS session affected", and unattributed rows answer that with a shrug.
+
+    `disposition` overrides the recorded label for the one case that is neither of the two original
+    fates: a payload that was REPAIRED and then evaluated normally. Filing that under "loud-allow"
+    would inflate exactly the count this work exists to drive to zero, and would tell a reader that
+    checks were skipped when they ran."""
+    disposition = disposition or ("BLOCK" if blocked else "loud-allow")
     print(f"makoto.dispatch: {disposition} [{stage}] {reason}", file=sys.stderr)
+    if not blocked and stage in _NOTICE_STAGES:
+        _notices.append(f"[{stage}] {reason}")
     try:
         audit.append_error(state_dir, event_id=None, pattern_id=f"dispatch.{stage}",
-                           exc=_Unevaluable(f"{disposition}: {reason}"))
+                           exc=_Unevaluable(f"{disposition}: {reason}"), **(ids or {}))
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------------------------
+# THE LOUD IN "LOUD-ALLOW". A fail-open that nobody can see is a silent one.
+#
+# `_dispatch_fact`'s stderr line was the entire "loud" half of the contract, and stderr from a hook
+# that exits 0 goes to the DEBUG LOG ONLY -- never the transcript, never the user, never the model.
+# So a can't-evaluate looked identical, from every seat, to a clean pass: the pending call
+# proceeded, no output appeared, and the one party who could have retried or reported it was the
+# only party not told. Measured: 30 loud-allows in one day, on one machine, noticed by nobody until
+# somebody went looking through the state directory for an unrelated reason.
+#
+# `systemMessage` is a universal hook-output field that IS surfaced to the user, on every event
+# that can carry output. Using it keeps the fail direction exactly where it was -- open, never
+# blocking, a broken gate must not wedge the session -- while removing the "silently".
+# Gyroscope's own shim reached the same conclusion for the same reason; this is that precedent
+# applied one layer in, to the faults that happen after carriage succeeds.
+#
+# Only faults that mean A CHECK DID NOT RUN produce a notice. A REPAIRED payload evaluated normally
+# and says nothing; a chain-tamper advisory has its own audit row and is not about this call.
+_NOTICE_STAGES = frozenset({"unparseable_payload", "db_init_failed", "db_locked", "exception"})
+_notices: list = []
+_stdout_written = False
+
+
+def _emit_notices() -> None:
+    """Write the buffered can't-evaluate notices to stdout, iff no decision already claimed it.
+
+    The wire carries exactly ONE JSON object. A decision always outranks a notice -- a deny the
+    agent must obey matters more than a report about a check that did not run -- so this is a
+    last-word emitter, and `_stdout_written` is the interlock that keeps it from ever appending a
+    second object onto a real decision and corrupting the response.
+    """
+    if _stdout_written or not _notices:
+        return
+    try:
+        detail = "; ".join(_notices[:3])
+        sys.stdout.write(json.dumps({"systemMessage": (
+            f"makoto: {len(_notices)} check-evaluation fault(s) on this call -- {detail}. "
+            f"The call was ALLOWED WITHOUT BEING CHECKED (fail-open). "
+            f"See dispatch_errors.jsonl in the makoto state dir.")}))
     except Exception:
         pass
 
@@ -150,22 +245,29 @@ def _note_host_dialect(state_dir: Path, session_id, notes: dict, host_event) -> 
         pass
     _dispatch_fact(state_dir, "host_dialect",
                    f"normalized host spellings {notes!r} (first seen as event {host_event!r}); "
-                   f"noted once for this session", blocked=False)
+                   f"noted once for this session", blocked=False, disposition="NOTE",
+                   ids={"session_id": str(session_id or ""), "hook_event": str(host_event or ""),
+                        "id_source": "payload"})
     return True
 
 
-def _self_verify_chain(state_dir: Path) -> None:
+def _self_verify_chain(state_dir: Path, ids: dict | None = None) -> None:
     """Re-derive the chain's tamper evidence at every dispatch, advisory-only. A clean or
-    absent/empty chain is silent. Never raises. See docs/adr/0005-chain-verification-rollout.md."""
+    absent/empty chain is silent. Never raises. See docs/adr/0005-chain-verification-rollout.md.
+
+    `ids` is the caller's session/tool attribution, threaded through for the same reason every
+    other fact carries it: a tamper report nobody can tie to a session is a report nobody can
+    act on."""
     try:
         from makoto.state import ledger as _ledger
         broken_at = _ledger.verify_chain()
     except Exception as exc:
-        _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}", blocked=False)
+        _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}",
+                       blocked=False, ids=ids)
         return
     if broken_at is not None:
         _dispatch_fact(state_dir, "chain_tamper",
-                       f"chain integrity broken at row index {broken_at}", blocked=False)
+                       f"chain integrity broken at row index {broken_at}", blocked=False, ids=ids)
 
 
 def _ensure_db_initialized(state_dir: Path, db_path: Path) -> bool:
@@ -347,7 +449,8 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
                 # from — single source of the id, one place to keep correct.
                 findings.append(replace(finding, source_event_id=event_id))
         except Exception as exc:
-            audit.append_error(state_dir, event_id, pattern.id, exc)
+            audit.append_error(state_dir, event_id, pattern.id, exc,
+                               **_ids_from_payload(payload))
             continue
     return findings
 
@@ -481,7 +584,11 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         ))
     body = verdict.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
     if body:
+        global _stdout_written
         (stream or sys.stdout).write(json.dumps(body))
+        # Claim the wire so `_emit_notices` cannot append a second object behind a real decision.
+        # Set even for an injected `stream`: a caller that redirected the wire still owns it.
+        _stdout_written = True
 
 
 def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> None:
@@ -645,27 +752,67 @@ HANDLERS: dict[str, Any] = {
 
 
 def main() -> int:
+    """Run the dispatch and then GUARANTEE the can't-evaluate notices reach the wire.
+
+    Every early `return 0` in `_dispatch` is a fail-open, and a fail-open is exactly the path whose
+    notice must not be lost, so the flush is a `finally` rather than a line before each return --
+    the same reason `_dispatch`'s own conn.close() is one.
+    """
+    try:
+        return _dispatch()
+    finally:
+        _emit_notices()
+
+
+def _dispatch() -> int:
     """orchestrator — HYBRID fail-mode (never silent, never blind-open): a tamper-shaped payload
     fails CLOSED (block, exit 2 + reason); transient infra (unparseable pipe, DB init/lock failure,
     unexpected body fault) fails LOUD-ALLOW (exit 0 + stderr); every can't-evaluate writes an
     on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md.
     Routing is HANDLERS, the row table above — main() knows the common prologue (parse, verify,
     ingest) and nothing about any event."""
-    payload_raw = sys.stdin.read()
+    # The byte boundary comes FIRST, before anything reads a character. `makoto.core.wire` pins the
+    # decode to errors="replace" instead of inheriting the ambient locale's surrogateescape handler,
+    # so a host byte that is not valid UTF-8 can no longer enter as a lone surrogate and detonate
+    # later, inside sqlite3, as the loud-allow that skipped every check for that call. See
+    # makoto/core/wire.py for the measured failure this closes.
+    wire.harden_stderr()
+    payload_raw, undecodable = wire.read_stdin()
     state_dir = _state_dir()
-    _self_verify_chain(state_dir)
     payload = _parse_payload(payload_raw)
+    # Chain self-verification is advisory and session-scoped, but its two facts are rows in the
+    # same log as everything else, so it runs AFTER the parse in order to be tagged with the ids
+    # like every other row. Nothing it does depends on the payload; only its attribution does.
+    _self_verify_chain(state_dir, ids=_ids_from_payload(payload) or _ids_from_raw(payload_raw))
     if payload is _PARSE_FAILED:
         # unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON) ->
         # loud-allow; never block agent work on a pipe glitch.
-        _dispatch_fact(state_dir, "unparseable_payload", "stdin was not valid JSON", blocked=False)
+        _dispatch_fact(state_dir, "unparseable_payload", "stdin was not valid JSON", blocked=False,
+                       ids=_ids_from_raw(payload_raw))
         return 0
     if not isinstance(payload, dict):
         # valid JSON but not an object: a truncated pipe yields INVALID json, never valid-non-dict,
         # and Claude Code's envelope is always an object -> anomalous/tamper-shaped -> fail CLOSED.
         _dispatch_fact(state_dir, "non_object_payload",
-                       f"payload was {type(payload).__name__}, not a JSON object", blocked=True)
+                       f"payload was {type(payload).__name__}, not a JSON object", blocked=True,
+                       ids=_ids_from_raw(payload_raw))
         return 2
+    # The OTHER surrogate door: a payload whose bytes were valid UTF-8 but whose JSON text carried
+    # an unpaired `\uD8xx` escape, which json.loads faithfully materializes as a real lone
+    # surrogate. wire.read_stdin cannot see that one -- the escape is plain ASCII in the raw text --
+    # so the parsed object is scrubbed here, and payload_raw is re-derived from the scrubbed object
+    # so the text that gets persisted and keyword-scanned is the text that was actually evaluated.
+    payload, escaped = wire.scrub(payload)
+    if escaped:
+        payload_raw = json.dumps(payload, ensure_ascii=False)
+    if undecodable or escaped:
+        # Recorded, not silent, and NOT a loud-allow: the payload was repaired and evaluation
+        # continues normally. Distinguishing "repaired and checked" from "gave up and allowed" is
+        # the whole difference between this row and the crash row it replaces.
+        _dispatch_fact(state_dir, "unencodable_input",
+                       f"replaced {undecodable} undecodable byte(s) and {escaped} unpaired "
+                       f"surrogate escape(s); evaluation continued on the repaired payload",
+                       blocked=False, disposition="REPAIRED", ids=_ids_from_payload(payload))
     # The host-dialect boundary (makoto.core.hostdialect): one hop from whatever spelling the
     # host sent to the protocol every reader below assumes, applied here -- after the envelope
     # has been proven evaluable (parseable, an object), before ANYTHING routes on or persists it
@@ -678,6 +825,21 @@ def main() -> int:
     # still takes exactly the wildcard path it took before.
     host_event = payload.get("hook_event_name")
     payload, dialect_notes = hostdialect.normalize_payload(payload, HANDLERS)
+    # A THIRD surrogate door, and the reason this scrub is here rather than only above.
+    # `hostdialect._tool_result` runs `json.loads` on Cursor's `tool_output`, which arrives as a
+    # JSON *string*. An unpaired `\ud800` escape inside that inner document is plain ASCII in the
+    # outer payload -- invisible to `wire.read_stdin`, and invisible to the `wire.scrub` above,
+    # because at that point it is still an unparsed string. Normalization is what materializes it,
+    # so normalization is what has to be followed by a scrub. Verified by reproducing the ORIGINAL
+    # UnicodeEncodeError on a camelCase envelope after the boundary fix was already in place: the
+    # ensure_ascii=False reserialization below then carried the live surrogate straight into the
+    # sqlite3 bind. Found by an independent review pass, not by the tests that existed.
+    payload, dialect_escaped = wire.scrub(payload)
+    if dialect_escaped:
+        _dispatch_fact(state_dir, "unencodable_input",
+                       f"replaced {dialect_escaped} unpaired surrogate escape(s) materialized by "
+                       f"host-dialect normalization; evaluation continued on the repaired payload",
+                       blocked=False, disposition="REPAIRED", ids=_ids_from_payload(payload))
     if dialect_notes:
         # Persist WHAT WAS EVALUATED, not the host's spelling of it. The events table is the
         # rolling substrate every history decoder reads, and those decoders key on the PAYLOAD's
@@ -696,11 +858,13 @@ def main() -> int:
         _note_host_dialect(state_dir, payload.get("session_id"), dialect_notes, host_event)
     db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):
-        _dispatch_fact(state_dir, "db_init_failed", "lazy DB init failed", blocked=False)
+        _dispatch_fact(state_dir, "db_init_failed", "lazy DB init failed", blocked=False,
+                       ids=_ids_from_payload(payload))
         return 0  # transient infra -> loud-allow
     conn = _connect_with_retry(db_path)
     if conn is None:
-        _dispatch_fact(state_dir, "db_locked", "write lock not acquired within retry budget", blocked=False)
+        _dispatch_fact(state_dir, "db_locked", "write lock not acquired within retry budget",
+                       blocked=False, ids=_ids_from_payload(payload))
         return 0  # transient infra -> loud-allow
     try:
         citations.refresh_if_stale(conn)
@@ -711,7 +875,8 @@ def main() -> int:
     except Exception as exc:
         # an unexpected fault in evaluation must never crash the hook to a non-zero exit, and must
         # never be silent -> loud-allow + fact. (Exception, not BaseException: Ctrl-C propagates.)
-        _dispatch_fact(state_dir, "exception", f"{type(exc).__name__}: {exc}", blocked=False)
+        _dispatch_fact(state_dir, "exception", f"{type(exc).__name__}: {exc}", blocked=False,
+                       ids=_ids_from_payload(payload))
     finally:
         conn.close()
     return 0

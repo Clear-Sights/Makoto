@@ -69,7 +69,13 @@ def test_dispatch_loose_comparator_emits_block_json(tmp_path):
 
 def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
     """HYBRID: unparseable stdin = a transient/truncated pipe (a real envelope is always valid JSON)
-    -> loud-ALLOW (exit 0, empty stdout) AND an on-the-record fact. Never a silent fail-open."""
+    -> loud-ALLOW (exit 0) AND an on-the-record fact. Never a silent fail-open.
+
+    The stdout assertion INVERTED on purpose. It used to require an empty wire, which made "never a
+    silent fail-open" true only of the audit file -- and hook stderr on exit 0 reaches the debug log
+    alone, so from the user's seat, the model's seat, and the transcript, a skipped check was
+    indistinguishable from a clean pass. `systemMessage` is the universal output field that is
+    actually surfaced. The fail DIRECTION is unchanged: still allow, still exit 0."""
     state_dir = _setup_state(tmp_path)
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
@@ -81,7 +87,9 @@ def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
         cwd=str(Path(__file__).parent.parent),
     )
     assert proc.returncode == 0
-    assert proc.stdout == b""
+    body = json.loads(proc.stdout.decode())
+    assert "ALLOWED WITHOUT BEING CHECKED" in body["systemMessage"]
+    assert "permissionDecision" not in proc.stdout.decode(), "a notice must never become a decision"
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.unparseable_payload" for f in facts), facts
 
@@ -1981,7 +1989,13 @@ def test_dispatch_lazy_init_failure_fails_open_not_crash(tmp_path):
         "lazy-init failure must fail OPEN (exit 0), never crash the hook; "
         f"got rc={proc.returncode}, stderr={proc.stderr.decode('utf-8')!r}"
     )
-    assert proc.stdout == b"", "a failed-open dispatch must emit no decision"
+    # "No DECISION" is the invariant, and it still holds. What a failed-open dispatch now DOES
+    # emit is a `systemMessage` notice, because a fail-open whose only trace is stderr is
+    # invisible to the user, the model and the transcript alike.
+    out = proc.stdout.decode("utf-8")
+    assert "permissionDecision" not in out and '"decision"' not in out, (
+        f"a failed-open dispatch must emit no decision; got {out!r}")
+    assert "ALLOWED WITHOUT BEING CHECKED" in json.loads(out)["systemMessage"]
 
 
 def test_connect_with_retry_sleeps_backoff_between_attempts(monkeypatch):
