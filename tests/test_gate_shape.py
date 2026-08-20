@@ -115,7 +115,7 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "claimedProduceAbsent.py": 2,
     "undischargedCommitment.py": 7,
     "falseGreenClaim.py": 1,
-    "silentlyDroppedCommitment.py": 6,
+    "silentlyDroppedCommitment.py": 7,
     "fabricatedToolAction.py": 3,
     "namedTestTeeth.py": 7,                                # 6->7, 2026-07-09: recorded_failed_names/
                                                             # recorded_passed_names now share one

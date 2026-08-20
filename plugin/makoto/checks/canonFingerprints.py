@@ -46,6 +46,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
         try:
             import makoto.state.ledger as _ackblock
             ack = _ackblock.find_ack_block(name, transcript_path=transcript_path,
+                                           gate_pattern_id="gate.canon_fingerprints",
                                            session_id=session_id, root=state_root)
         except Exception:
             ack = None

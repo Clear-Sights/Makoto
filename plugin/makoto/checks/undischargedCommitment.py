@@ -118,8 +118,11 @@ def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys
     Uncertain (no universal claim, no open commitments, empty text) -> None.
 
     This is the plain-argument twin of `run` below: both walk the same
-    `_open_advance_claims`/`_advance_discharged`/`_advance_finding` triple, so the gate cannot
-    drift between its GateContext wiring and its directly-callable form.
+    `_open_advance_claims`/`_advance_discharged`/`_advance_finding` triple, so the claim
+    extraction, the discharge test and the message cannot drift between the GateContext wiring
+    and this directly-callable form. The one thing it cannot supply is the GateContext itself —
+    it passes None as the `_c` argument the two helpers currently ignore, so a helper that
+    starts reading `_c` must grow a plain-argument path here too.
     """
     for claim in _open_advance_claims(text, open_commits):
         if _advance_discharged(claim, None, touched_keys=touched_keys, fs_exists=fs_exists,
