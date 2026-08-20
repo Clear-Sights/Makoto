@@ -40,6 +40,7 @@ layout, only the file boundary moved.
 """
 from __future__ import annotations
 import ast
+import os
 
 from makoto.vocab import _MAKOTO_ALLOW_RX
 from makoto.substrate._stdlib_ast_helpers import _callee_chain, iter_touched_python_sources
@@ -208,6 +209,63 @@ def _helper_names_that_assert(tree) -> frozenset:
                 asserts.add(name)
                 changed = True
     return frozenset(asserts)
+
+
+def _imported_helper_names_that_assert(tree, path: str) -> frozenset:
+    """Names imported from a SIBLING module whose definition there asserts.
+
+    `_helper_names_that_assert` is deliberately same-file, which leaves one FP class uncovered:
+    the SHARED plant-and-restore helper. A "can this check fail" test whose whole body is
+    `smoke_replace(self, path, old, new, ...)` -- where the imported helper plants a fault,
+    asserts the named test goes red, restores it, and asserts byte-identity -- reads as
+    no_assertion and fires. Measured: it fired on all three of Gyroscope's teeth tests, each of
+    which asserts four times inside that helper. A gate that fires on the very tests written to
+    prove other tests can fail is exactly the shape that gets the gate switched off.
+
+    ONE hop, and only to a module resolvable next to this file: the sibling's own same-file
+    transitive closure counts, but the sibling's imports are NOT followed, so this stays a
+    name-resolved fact and never becomes a call-graph solver. Any failure to resolve, read or
+    parse adds NOTHING and leaves the finding exactly as it was -- the same FN-safe direction as
+    the same-file index, since these names can only make a sub-pattern fire less.
+    """
+    names: set = set()
+    here = os.path.dirname(os.path.abspath(path))
+    for node in ast.iter_child_nodes(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        wanted = {a.name: (a.asname or a.name) for a in node.names if a.name != "*"}
+        parts = (node.module or "").split(".") if node.module else []
+        if not wanted or not parts:
+            continue
+        roots = []
+        if node.level:                                    # from .plant_support import smoke_replace
+            root = here
+            for _ in range(node.level - 1):
+                root = os.path.dirname(root)
+            roots.append(root)
+        else:                                             # from tests.plant_support import ...
+            root = here
+            for _ in range(5):                            # bounded: never an unbounded walk to /
+                roots.append(root)
+                parent = os.path.dirname(root)
+                if parent == root:
+                    break
+                root = parent
+        for root in roots:
+            candidate = os.path.join(root, *parts) + ".py"
+            if not os.path.isfile(candidate):
+                continue
+            try:
+                with open(candidate, encoding="utf-8", errors="replace") as fh:
+                    sibling = ast.parse(fh.read())
+            except (OSError, SyntaxError, ValueError):
+                break                                     # unreadable/unparseable: add nothing
+            asserting = _helper_names_that_assert(sibling)
+            for original, local in wanted.items():
+                if original in asserting:
+                    names.add(local)
+            break
+    return frozenset(names)
 
 
 def _has_skip_decorator(func) -> bool:
@@ -466,7 +524,8 @@ def analyze_file(src: str, path: str) -> list:
         tree = ast.parse(src)
     except SyntaxError:
         return []                                             # fail-open: skip unparseable files
-    helper_asserts = _helper_names_that_assert(tree)
+    helper_asserts = (_helper_names_that_assert(tree)
+                      | _imported_helper_names_that_assert(tree, path))
     out = []
     for func in _iter_test_functions(tree):
         for f in _analyze_test_function(func, helper_asserts):

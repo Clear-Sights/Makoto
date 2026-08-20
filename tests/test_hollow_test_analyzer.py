@@ -431,3 +431,51 @@ def test_analyze_file_reports_multiple_kinds():
     assert ("test_swallowed", "swallowed_failure") in kinds
     assert not any(f["func"] == "test_legit" for f in findings)
     assert all(f["file"] == "test_m.py" for f in findings)
+
+
+# --- the SHARED plant-and-restore helper (imported, not same-file) ----------------------------
+# `_helper_names_that_assert` is same-file by construction, so a "can this check fail" test whose
+# only statement is a call into a sibling module read as no_assertion. Measured: it fired on all
+# three of Gyroscope's teeth tests, each asserting four times inside the imported helper. A gate
+# that fires on the very tests written to prove other tests can fail is what gets a gate disabled.
+
+_IMPORTS_HELPER = ("from tests.plant_support import smoke_replace\n\n"
+                   "class C:\n"
+                   "    def test_the_check_can_fail(self):\n"
+                   "        smoke_replace(self, 'p', b'a', b'b')\n")
+
+
+def _with_sibling_helper(tmp_path, helper_body):
+    """Write a tests/ package holding plant_support.py, and the importing test beside it."""
+    pkg = tmp_path / "tests"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "plant_support.py").write_text(helper_body, encoding="utf-8")
+    target = pkg / "test_probe.py"
+    target.write_text(_IMPORTS_HELPER, encoding="utf-8")
+    return str(target)
+
+
+def test_imported_helper_that_asserts_suppresses_no_assertion(tmp_path):
+    path = _with_sibling_helper(tmp_path, "def smoke_replace(case, path, old, new):\n"
+                                          "    case.assertNotEqual(0, run(path, old, new))\n")
+    assert analyze_file(_IMPORTS_HELPER, path) == []
+
+
+def test_TEETH_imported_helper_that_never_asserts_still_fires(tmp_path):
+    # Crossing the file boundary must not become a blanket excuse: a helper that asserts nothing
+    # leaves the test hollow, and that has to stay reportable.
+    path = _with_sibling_helper(tmp_path, "def smoke_replace(case, path, old, new):\n"
+                                          "    return None\n")
+    assert [f["kind"] for f in analyze_file(_IMPORTS_HELPER, path)] == ["no_assertion"]
+
+
+def test_TEETH_unresolvable_import_adds_nothing(tmp_path):
+    # An import naming no readable module leaves the verdict exactly as it was, rather than
+    # crediting the test with an assertion it never makes.
+    src = ("from nowhere.at_all import smoke_replace\n\n"
+           "def test_the_check_can_fail():\n"
+           "    smoke_replace('p')\n")
+    target = tmp_path / "test_probe.py"
+    target.write_text(src, encoding="utf-8")
+    assert [f["kind"] for f in analyze_file(src, str(target))] == ["no_assertion"]
