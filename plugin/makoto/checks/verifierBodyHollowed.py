@@ -92,12 +92,6 @@ def _swallows(stmt) -> bool:
     return isinstance(stmt, ast.Assert) and _is_tautology(stmt.test)
 
 
-def _single_effective(body) -> Optional[ast.stmt]:
-    """The body's single statement after dropping a leading docstring, else None."""
-    b = _post_docstring(body)
-    return b[0] if len(b) == 1 else None
-
-
 def _post_docstring(body):
     """`body` minus a leading docstring statement."""
     if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \

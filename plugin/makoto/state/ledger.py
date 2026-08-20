@@ -209,13 +209,6 @@ _DEFAULT_STREAM = "chain"
 OPEN = "open"
 
 
-def norm_sha256(content: str) -> str:
-    """sha256 of the per-line-rstripped normalization of `content` — a reformat that changes only
-    trailing whitespace hashes identically, an internal-whitespace change does not. 64-char hex."""
-    normalized = "\n".join(line.rstrip() for line in content.splitlines())
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-
-
 def _dumps(row: dict) -> str:
     """The one byte-stable JSON line every write shares: sorted keys, unicode kept, compact."""
     return json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
@@ -228,15 +221,19 @@ def canonical(row: dict) -> str:
 
 
 def _row_hash(prev_hash: str, row: dict) -> str:
-    """sha256 of the EXACT link bytes (prev_hash + canonical), NOT norm_sha256: the chain hash
-    must bind byte-for-byte. norm_sha256's per-line rstrip runs over str.splitlines(), which
+    """sha256 of the EXACT link bytes (prev_hash + canonical): the chain hash must bind
+    byte-for-byte, so it must NOT normalize whitespace first.
+
+    The rejected construction hashed a per-line-rstripped copy built with
+    str.splitlines(). splitlines()
     also breaks on U+2028/U+2029/U+0085 — characters `_dumps` emits literally
     (ensure_ascii=False) and which are agent-controlled (record_update chain-appends Bash
     stdout as `value`) — so two DISTINCT rows ("ok \u2028next" vs "ok\u2028next") produced
     the identical row_hash and verify_chain certified a swapped/edited row. For every row free
     of those separators this digest is byte-identical to the old one (canonical JSON can carry
     no raw \n and never ends in whitespace), so existing chains and the CHAIN-FORMAT v1
-    vectors verify unchanged."""
+    vectors verify unchanged. The normalizing helper itself is gone: it had no caller
+    left, and a hashing footgun with no user is a trap set for the next reader."""
     return hashlib.sha256((prev_hash + canonical(row)).encode("utf-8")).hexdigest()
 
 
