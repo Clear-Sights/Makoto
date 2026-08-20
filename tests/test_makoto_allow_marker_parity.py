@@ -27,7 +27,7 @@ import pytest
 from makoto.checks import deadPureStatement, hollowTest
 from makoto.kit import makoto_allowed
 
-_CHECKS_DIR = Path(__file__).resolve().parent.parent / "makoto" / "checks"
+_CHECKS_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 
 REASONED = "# makoto-allow: intentional, reviewed 2026-08-14"
 BARE = "# makoto-allow"

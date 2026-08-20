@@ -156,8 +156,8 @@ def test_silent_on_pnpm_exec_nonrunner():
 # when masked. Locks test coverage to the CLAIMED scope (a minimum floor) so a future regex edit
 # can't silently break an untested family. All 31 verified firing 2026-05-29.
 _RUNNER_FAMILIES = [
-    "pytest", "go test ./...", "cargo test", "cargo check", "npm test", "yarn test", "pnpm test",
-    "jest", "vitest", "mocha", "tsc", "ruff check", "eslint", "flake8", "mypy", "pyright", "pylint",
+    "pytest", "go test ./...", "cargo test", "cargo check", "npm test", "npm run test", "npm run lint", "npm check", "yarn test", "yarn lint", "pnpm test", "pnpm check",
+    "jest", "vitest", "mocha", "tsc", "ruff", "ruff check", "ruff format .", "eslint", "flake8", "mypy", "pyright", "pylint",
     "make test", "make check", "make lint", "bazel test", "dotnet test", "gradle test", "gradle check",
     "mvn test", "phpunit", "rspec", "ctest", "dune test", "dune build", "swift test",
 ]
@@ -203,3 +203,24 @@ def test_fires_when_unmasked_runner_precedes_masked_runner():
     # runner, sets reason, and fires. (The triage's `pytest||true && npm test` fires on BOTH versions
     # and does NOT redden — this ordering is the verified distinguishing input.)
     assert predicate(current_event=_bash("pytest tests/ && pytest other/ || true"), history=[], pattern=_PAT) is not None
+
+
+def test_live_catalog_registration_is_reachable_in_dispatch():
+    """Every test above drives predicate() through the synthetic _PAT (a test-fixture shape),
+    so nothing pinned the LIVE registration: the real CHECK's keywords could be neutered and
+    the whole suite stayed green. This pins the live wiring end to end: the catalog entry for
+    content.verifier_exit_masking must carry a predicate module, be admitted by dispatch's own
+    keyword prefilter for a representative masked-verifier Bash payload, and fire through that
+    entry."""
+    import json
+    from makoto import dispatch
+    from makoto.registry import load_precheck_catalog
+
+    check = next(c for c in load_precheck_catalog() if c.id == "content.verifier_exit_masking")
+    assert check.predicate_module, "live check lost its predicate module: unreachable in dispatch"
+    evt = _bash("pytest tests/ -q || true")
+    assert dispatch._keyword_hit(check, json.dumps(evt)), (
+        "live keywords no longer admit a masked verifier command: "
+        "content.verifier_exit_masking is unreachable in dispatch")
+    f = predicate(current_event=evt, history=[], pattern=check)
+    assert f is not None and f.pattern_id == "content.verifier_exit_masking"

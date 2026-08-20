@@ -12,10 +12,10 @@ from makoto.vocab import PreCheck
 PATTERN = PreCheck(id="event.identical_retry", fire_level="error", description="x", retry_hint="y")
 
 
-def _post_row(command: str, stdout: str) -> dict:
+def _post_row(command: str, stdout: str, exit_code: int = 1) -> dict:
     return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
                         "tool_input": {"command": command},
-                        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": 1}}}
+                        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": exit_code}}}
 
 
 def _failure_row(command: str, error: str, *, is_interrupt=False) -> dict:
@@ -56,6 +56,16 @@ def test_failure_terminal_blocks_identical_retry_only_when_deterministic():
 def test_transient_failure_terminal_never_blocks_identical_retry():
     command = "curl https://api.example.com/status"
     history = [_failure_row(command, "Connection error")]
+    assert predicate(current_event=_pre_event(command), history=history, pattern=PATTERN) is None
+
+
+def test_silent_on_identical_rerun_after_a_succeeded_prior_call():
+    """FP guard the battery never covered: a prior call whose RECORDED exit is 0 SUCCEEDED,
+    however deterministic-failure-shaped its output text is (grepping logs for the phrase
+    'No such file or directory' puts that marker in a passing call's stdout). Re-running a
+    succeeded command is not a retry of a failure and must never block."""
+    command = 'grep -rn "No such file or directory" logs/app.log'
+    history = [_post_row(command, '42:err = "No such file or directory"', exit_code=0)]
     assert predicate(current_event=_pre_event(command), history=history, pattern=PATTERN) is None
 
 

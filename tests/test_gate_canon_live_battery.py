@@ -105,6 +105,62 @@ def test_red_three_consecutive_identical_failing_calls_still_fires_canon_recur(t
         f"canon.recur MUST fire on a 3-run of identical failing calls -- battery VOID: {msgs}"
 
 
+# ---- transient budget: confidently-transient error text exercises the classify_failure branch ----
+# Every fixture above classifies None ('E1'/'E_TIMEOUT': UNCERTAIN), so `classify_failure(...)
+# is not False` only ever took one branch — the transient budget in both primitives was live
+# code no test reached (stubbing classify_failure to None left the whole battery green).
+_TRANSIENT_ERR = "503 Service Unavailable: try again"
+
+
+def test_law1_transient_fixture_actually_classifies_transient():
+    """The discriminating precondition of the three tests below: the fixture text really is
+    confidently transient (False), not UNCERTAIN (None) — otherwise they exercise nothing new."""
+    from makoto.kit import classify_failure
+    assert classify_failure(_TRANSIENT_ERR) is False
+    assert classify_failure("E1") is None, "the battery's UNCERTAIN fixtures must stay UNCERTAIN"
+
+
+def test_tn_single_transient_failure_at_turn_end_stays_silent(tmp_path):
+    """canon.timeout's transient budget: the FIRST confidently transient failure of a key at
+    turn end is a recoverable blip with one retry opportunity — silent. (An UNCERTAIN error in
+    the same position fires: that contrast is exactly the classify_failure branch.)"""
+    cwd = str(tmp_path)
+    history = [_row(1, cwd, "Bash", {"command": "flaky-fetch"}, {"error": _TRANSIENT_ERR})]
+    msgs = _canon_messages(history, cwd)
+    assert not any(m.startswith("canon.timeout:") for m in msgs), \
+        f"canon.timeout FALSE-POSITIVE: one transient failure has a retry budget: {msgs}"
+    assert not any(m.startswith("canon.recur:") for m in msgs), \
+        f"canon.recur FALSE-POSITIVE: a single call is never a retry loop: {msgs}"
+
+
+def test_red_second_transient_failure_at_turn_end_fires_canon_timeout(tmp_path):
+    """The budget is ONE retry: a key that accumulated two transient failures since its last
+    success, with the turn still closing on that same failing key, fires canon.timeout.
+    canon.recur stays silent here — its all-transient runs need a three-failure budget."""
+    cwd = str(tmp_path)
+    ti = {"command": "flaky-fetch"}
+    history = [
+        _row(1, cwd, "Bash", ti, {"error": _TRANSIENT_ERR}),
+        _row(2, cwd, "Bash", ti, {"error": _TRANSIENT_ERR}),
+    ]
+    msgs = _canon_messages(history, cwd)
+    assert any(m.startswith("canon.timeout:") for m in msgs), \
+        f"canon.timeout MUST fire once the transient budget is spent -- battery VOID: {msgs}"
+    assert not any(m.startswith("canon.recur:") for m in msgs), \
+        f"canon.recur FALSE-POSITIVE: 2 all-transient failures are inside its 3-failure budget: {msgs}"
+
+
+def test_red_three_transient_failures_fire_canon_recur(tmp_path):
+    """canon.recur's transient budget: an all-transient consecutive run becomes stuck only after
+    the key accumulates three transient failures across the stream."""
+    cwd = str(tmp_path)
+    ti = {"command": "flaky-fetch"}
+    history = [_row(i, cwd, "Bash", ti, {"error": _TRANSIENT_ERR}) for i in range(1, 4)]
+    msgs = _canon_messages(history, cwd)
+    assert any(m.startswith("canon.recur:") for m in msgs), \
+        f"canon.recur MUST fire after three transient failures of one key -- battery VOID: {msgs}"
+
+
 # ---- TN population: MUST every one stay silent ----------------------------------------------------
 def test_tn_recur_and_timeout_silent_when_the_run_ends_in_success(tmp_path):
     """The same identical-retry shape as the RED recur fixture, but the LAST occurrence succeeds --

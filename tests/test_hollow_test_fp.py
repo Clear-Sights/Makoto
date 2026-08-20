@@ -24,7 +24,7 @@ from tests._fpHarness import measure
 from makoto.checks.hollowTest import analyze_file
 from makoto.checks.hollowTest import _run as adapter_run
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent   # .../Skill-lab-V5
+REPO_ROOT = Path(__file__).resolve().parent.parent   # Makoto repository root
 
 
 def _f(src, path="test_m.py"):
@@ -177,7 +177,7 @@ def test_analyzer_itself_does_not_apply_makoto_allow():
 # zero fires -- exactly like test_liveness_fp.py::test_fp_zero_on_makoto_source.
 def test_fp_zero_on_makoto_nontest_source():
     from tests._repo_scope import tracked_py_files
-    makoto_root = REPO_ROOT / "makoto"
+    makoto_root = REPO_ROOT
     files = tracked_py_files(makoto_root)    # already root-pinned; route through the shared lister
     rep = measure([str(makoto_root / f) for f in files], _analyzer)
     assert rep["fires"] == 0, f"pre-registered falsifier FIRED — triage each candidate FP: {rep['detail']}"
@@ -240,9 +240,9 @@ def _annotated_hollow_test_functions(files: list[str]) -> set[str]:
 
 
 def test_corpus_fp_makoto_own_tests():
-    if not (REPO_ROOT / "makoto").is_dir():
-        pytest.skip("makoto/ sibling not present (standalone makoto checkout)")
-    files = _corpus_py_files("makoto")
+    if not REPO_ROOT.is_dir():
+        pytest.skip("Makoto repository root is unavailable")
+    files = _corpus_py_files(".")
     rep = measure(files, _analyzer)
     fires_by_func = {f["func"] for f in rep["detail"]}
     # The raw analyzer must retain every corpus-local, deliberately hollow annotated positive;
@@ -279,7 +279,7 @@ def _new_pattern_fires(repo_relative_root: str) -> list:
 
 
 def test_corpus_fp_4a_4b_makoto_own_tests():
-    assert _new_pattern_fires("makoto") == []
+    assert _new_pattern_fires(".") == []
 
 
 def test_corpus_fp_4a_4b_assay_tests():
@@ -294,4 +294,3 @@ def test_corpus_fp_4a_4b_ventura_tests():
     # ventura's one real skipif usage (test_live_smoke_one_token_round_trip) is gated on a genuine
     # env-var check, not a tautology -- correctly silent. See the H8 comment block above.
     assert _new_pattern_fires("ventura") == []
-

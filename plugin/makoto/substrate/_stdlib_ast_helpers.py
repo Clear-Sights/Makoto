@@ -1,0 +1,107 @@
+"""Shared stdlib-only helpers for the detector engines that deliberately isolate themselves from
+mutable Makoto substrate (`deadPureStatement.py`, `hollowTest.py`) -- so tampering with shared
+plugin logic (substrate.factories, checks._shared, ...) can't silently blind either detector.
+
+This module exists to satisfy that property WITHOUT duplicating the six functions below
+byte-for-byte across both files (found via AST alpha-equivalence, 2026-07-09): both detectors
+import ONLY this module, which itself imports nothing beyond `os`/`tempfile`/`pathlib`/`ast` --
+so the import-graph-isolation property is preserved and enforced (see
+tests/test_detector_engines_are_stdlib_isolated.py), not just asserted by a docstring.
+
+Do not add an import of anything outside the stdlib to this file -- doing so would break the one
+property it exists to protect for every detector that imports it.
+"""
+from __future__ import annotations
+
+import ast
+import os
+import tempfile
+from pathlib import Path
+
+
+def _scratch_roots() -> tuple[str, ...]:
+    roots: dict[str, None] = {}                              # dict == insertion-ordered set: on Linux
+    for d in (tempfile.gettempdir(), "/tmp", "/var/folders", os.path.expanduser("~/.claude")):
+        try:                                                 # gettempdir() IS /tmp, so the two entries
+            roots[os.path.realpath(d)] = None                # collapse instead of being scanned twice
+        except OSError:
+            pass
+    return tuple(roots)
+
+
+_SCRATCH_ROOTS = _scratch_roots()
+
+
+def _under(path: str, root: str) -> bool:
+    return path == root or path.startswith(root + os.sep)
+
+
+def _is_scratch(p, cwd) -> bool:
+    """A touched .py is out-of-scope scratch iff cwd is KNOWN, the file is NOT inside that working
+    dir, AND it lives under a known temp/scratch root. A file under cwd is the closed unit under
+    construction (this is how pytest tmp fixtures and real project files appear) and always counts;
+    only stray scratch OUTSIDE the working project (e.g. /tmp/mining/*, the live-session
+    contamination vector) is skipped. This realizes "a block counts only when opened AND closed" at
+    the unit-closure layer: the analyzer's detection logic is untouched, the firing scope narrows to
+    closed work. Suppression requires a known cwd AND a scratch root -- never a blanket skip -- so an
+    unknown working dir keeps the gate's full teeth and a real (non-temp) file always fires."""
+    if not cwd:
+        return False                                         # working dir unknown -> never suppress (FN-safe)
+    rp = os.path.realpath(str(p))
+    if _under(rp, os.path.realpath(str(cwd))):
+        return False                                         # inside the working dir -> in scope
+    return any(_under(rp, r) for r in _SCRATCH_ROOTS)        # outside cwd AND in a scratch root -> stray scratch
+
+
+def _read(fs_read, p):
+    return fs_read(p) if callable(fs_read) else Path(p).read_text(encoding="utf-8")
+
+
+def _callee_chain(call: ast.Call) -> str:
+    """Dotted callee name of a Call (`self.assertTrue`, `np.testing.assert_allclose`, `pytest.raises`)."""
+    parts: list = []
+    f = call.func
+    while True:
+        if isinstance(f, ast.Attribute):
+            parts.append(f.attr)
+            f = f.value
+        elif isinstance(f, ast.Call):
+            f = f.func                       # `X().<m>` -> keep walking X
+        elif isinstance(f, ast.Name):
+            parts.append(f.id)
+            break
+        else:
+            break
+    return ".".join(reversed(parts))
+
+
+def iter_touched_python_sources(touched, cwd, fs_read):
+    """Yield (touched_key, source_text) for every in-scope .py file the turn touched -- the
+    iteration scaffold deadPureStatement._run and hollowTest._run previously duplicated line for
+    line (2026-07-09 dedup; the two bodies differed only INSIDE the loop). Contract preserved
+    exactly: a possibly-relative touched key is anchored to the event's OWN cwd, never the
+    dispatch process's ambient one (matches dispatch.py's real fs_read/fs_exists join) -- a
+    relative key with NO known cwd is unanchorable and is skipped outright, because resolving
+    it would read whatever same-named file sits in the hook process's ambient CWD and cite the
+    touched key with another file's line numbers. The caller projects these three GateContext
+    inputs explicitly so each check's signature remains locally visible; stray scratch outside
+    the working project is skipped; ANY per-file read fault (an OSError, a UnicodeDecodeError
+    from a non-UTF-8 source, a raising fs_read) or an fs_read miss (None) skips THAT file only,
+    never crashes the gate -- one unreadable file must not abort the scan of every other touched
+    file. `touched` is a set; iteration is sorted so which file a Finding cites is reproducible
+    for identical input across processes (hash randomization otherwise reorders it)."""
+    for p in sorted(touched, key=str):
+        if not str(p).endswith(".py"):
+            continue
+        if not cwd and not os.path.isabs(str(p)):
+            continue
+        real_p = p if os.path.isabs(str(p)) else os.path.join(cwd, p)
+        if _is_scratch(real_p, cwd):
+            continue
+        try:
+            src = _read(fs_read, real_p)
+        except Exception:
+            continue
+        if not isinstance(src, str):
+            continue
+        yield p, src

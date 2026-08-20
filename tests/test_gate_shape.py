@@ -44,7 +44,7 @@ def _live_gates() -> list:
         key=lambda c: c.id,
     )
 
-GATES_DIR = Path(__file__).resolve().parent.parent / "makoto" / "checks"
+GATES_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 
 # ---- the declared design (single source; the package must MATCH it) --------------------------
 # The 11 named Stop-gate modules — each is its adapter AND its own engine merged into one file
@@ -115,7 +115,8 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "claimedProduceAbsent.py": 2,
     "undischargedCommitment.py": 7,
     "falseGreenClaim.py": 1,
-    "silentlyDroppedCommitment.py": 6,
+    "silentlyDroppedCommitment.py": 6,                     # 7->6, 2026-08-20: _drop_def_or_class
+                                                            # inlined into its single call site
     "fabricatedToolAction.py": 3,
     "namedTestTeeth.py": 7,                                # 6->7, 2026-07-09: recorded_failed_names/
                                                             # recorded_passed_names now share one
@@ -130,10 +131,12 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
                                                             # note asked for). 2->3, 2026-07-22:
                                                             # _default_plugin_fs_read added (two-source
                                                             # wiring check, plugin manifest fallback)
-    "hollowTest.py": 30,                                   # engine + adapter merged (_run lives here);
+    "hollowTest.py": 31,                                   # engine + adapter merged (_run lives here);
                                                             # 35->30, 2026-07-09: _callee_chain/_scratch_roots/
                                                             # _under/_is_scratch/_read extracted to
-                                                            # _stdlib_ast_helpers.py
+                                                            # _stdlib_ast_helpers.py. 30->31, 2026-08-20:
+                                                            # _imported_helper_names_that_assert (the shared
+                                                            # plant-and-restore helper FP class)
     "canonTimeoutRecur.py": 17,                            # engine + adapter merged (canon_gate lives here);
                                                             # 15->17, 2026-08-16 (#17 port): _pairing_input
                                                             # (dunder-insensitive Pre<->Post pairing identity)

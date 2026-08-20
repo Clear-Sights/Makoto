@@ -5,6 +5,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).parent.parent
+# The subtree a user installs. `pyproject.toml` and `marketplace.json` stay at the repository
+# root; the plugin manifest, hooks, commands and package moved inside it so that tests, eval
+# and docs stop being delivered along with the plugin.
+PLUGIN = REPO_ROOT / "plugin"
 
 _SEMVER_RX = re.compile(r"^\d+\.\d+\.\d+(?:[-.][\w.]+)?$")
 
@@ -19,7 +23,7 @@ def _pyproject_version() -> str:
 
 def test_plugin_json_has_required_fields():
     """plugin.json declares name, semver-shaped version matching pyproject, description, license."""
-    p = REPO_ROOT / ".claude-plugin" / "plugin.json"
+    p = PLUGIN / ".claude-plugin" / "plugin.json"
     assert p.is_file(), "missing .claude-plugin/plugin.json"
     data = json.loads(p.read_text())
     assert data["name"] == "makoto"
@@ -40,13 +44,18 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
     and citation capture (capture.py). PostToolUseFailure retains ran-and-failed calls with their
     real top-level error/is_interrupt terminal instead of leaving a dangling PreToolUse.
     """
-    p = REPO_ROOT / "hooks" / "hooks.json"
+    p = PLUGIN / "hooks" / "hooks.json"
     assert p.is_file(), "missing hooks/hooks.json"
     data = json.loads(p.read_text())
     hooks = data["hooks"]
-    for evt in ("PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop"):
+    expected_events = (
+        "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SubagentStop", "SessionStart",
+    )
+    for evt in expected_events:
         assert evt in hooks, f"missing {evt} in hooks.json"
+        assert hooks[evt], f"{evt} must register at least one matcher"
         for entry in hooks[evt]:
+            assert entry["hooks"], f"{evt} matcher must register at least one hook"
             for h in entry["hooks"]:
                 assert h["type"] == "command"
                 assert "_dispatch_shim.sh" in h["command"]
@@ -55,7 +64,7 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
 
 def test_dispatch_shim_exists_and_executable():
     """_dispatch_shim.sh exists inside the package, is a POSIX sh script."""
-    shim = REPO_ROOT / "makoto" / "_dispatch_shim.sh"
+    shim = PLUGIN / "makoto" / "_dispatch_shim.sh"
     assert shim.is_file(), "missing _dispatch_shim.sh"
     first_line = shim.read_text().splitlines()[0]
     assert first_line == "#!/bin/sh", f"shim must use #!/bin/sh; got: {first_line!r}"
@@ -64,7 +73,7 @@ def test_dispatch_shim_exists_and_executable():
 
 def test_dispatch_shim_invokes_makoto_dispatch():
     """shim execs `python -m makoto.dispatch`."""
-    shim_text = (REPO_ROOT / "makoto" / "_dispatch_shim.sh").read_text()
+    shim_text = (PLUGIN / "makoto" / "_dispatch_shim.sh").read_text()
     assert "makoto.dispatch" in shim_text
     assert "MAKOTO_PYTHON" in shim_text or "python3" in shim_text
 
@@ -90,9 +99,18 @@ def test_slash_commands_are_read_only():
     body could weaken makoto — enforcing the 'read-only commands only' invariant so a
     future 'status' command can't silently grow a --mute flag.
     """
-    cmd_dir = REPO_ROOT / "commands"
-    if not cmd_dir.is_dir():
-        return  # ships no slash commands -> trivially read-only
+    cmd_dir = PLUGIN / "commands"
+    # ABSENCE IS LOUD, never trivially green: this plugin DOES ship slash commands (status/
+    # pattern/show), and the header above records that the manifest, hooks, commands and package
+    # were JUST moved into plugin/ -- a repeat of that move that misses commands/ would otherwise
+    # disarm this entire read-only guard with no signal (the old `if not cmd_dir.is_dir(): return`
+    # exited 0 having asserted nothing). If makoto ever genuinely stops shipping slash commands,
+    # change this assertion IN THE SAME COMMIT that deletes them, stating that decision here.
+    assert cmd_dir.is_dir(), (
+        "plugin/commands/ is missing -- the read-only slash-command guard has nothing to check. "
+        "If commands moved, update PLUGIN/cmd_dir here; if they were removed on purpose, say so "
+        "here in the same change."
+    )
     md_files = sorted(cmd_dir.glob("*.md"))
     assert md_files, "commands/ exists but ships no .md commands"
 
@@ -137,7 +155,7 @@ def test_plugin_description_predicate_count_matches_disk():
     def _live_gates():
         return [c for c in load_checks(edge="Stop") if c.may_block]
 
-    desc = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())["description"]
+    desc = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text())["description"]
     for phrase_rx, loader, tier in (
         (r"(\d+)\s+pre-checks", load_precheck_catalog, "pre-check"),
         (r"(\d+)\s+Stop gates", _live_gates, "Stop gate"),
@@ -149,3 +167,21 @@ def test_plugin_description_predicate_count_matches_disk():
             f"plugin.json claims {claimed} {tier}s but the live loader has {actual} — "
             f"update the description (or the catalog)."
         )
+
+
+def test_live_loader_resolves_from_this_tree():
+    """The doc-vs-code materiality binding is only material if `makoto` IS this tree's package.
+
+    A stale editable install (__editable__.makoto-*.pth) resolved `from makoto.registry import
+    ...` to a DIFFERENT checkout (verified live: PKG /home/user/makoto-dev/...), so
+    test_plugin_description_predicate_count_matches_disk compared THIS repo's plugin.json
+    against ANOTHER tree's catalog -- both count claims could stay green while this repo's
+    catalog drifted, the exact class the README-materiality header names. Run the suite with
+    this tree's plugin/ first on PYTHONPATH."""
+    import makoto
+    pkg = Path(makoto.__file__).resolve()
+    assert pkg.is_relative_to(PLUGIN.resolve()), (
+        f"imported makoto resolves to {pkg}, not this repo's {PLUGIN} -- the count-binding "
+        f"tests above are comparing this repo's docs against a different tree's code. "
+        f"Run with PYTHONPATH={PLUGIN} (or fix the editable install)."
+    )

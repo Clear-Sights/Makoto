@@ -4,9 +4,9 @@ gate.hollowTest (formerly gate.hollow_test) -- previously two byte-near-identica
 2026-07-09), merged into one parameterized runner rather than left as twins.
 
 `measure(paths, analyzer)` runs the real `analyzer.analyze_file` over each path and returns the
-total fire count plus the per-fire detail. It is the same analyzer the live Stop hook fires, so the
-count it reports is the analyzer's actual false-positive surface over the corpus -- no separate,
-weaker re-implementation.
+total fire count, scan counts, and per-fire detail. It is the same analyzer the live Stop hook
+fires, so the count it reports is the analyzer's actual false-positive surface over the corpus --
+no separate, weaker re-implementation.
 
 Test-support tooling only (see `tests/test_liveness_fp.py`, `tests/test_hollow_test_fp.py`) -- not
 imported by any live dispatch/gate code, so it lives HERE in `tests/` (bedrock audit, 2026-07-10:
@@ -18,11 +18,19 @@ from pathlib import Path
 
 
 def measure(paths, analyzer) -> dict:
+    paths = list(paths)
+    if not paths:
+        raise ValueError("false-positive corpus is empty")
     fires = []
+    files_read = 0
     for p in paths:
+        path = Path(p)
+        if not path.is_absolute():
+            path = Path(__file__).resolve().parent.parent / path
         try:
-            src = Path(p).read_text(encoding="utf-8")
-        except OSError:
-            continue
-        fires.extend(analyzer.analyze_file(src, str(p)))
-    return {"fires": len(fires), "detail": fires}
+            src = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise OSError(f"false-positive corpus member is unreadable: {path}") from exc
+        files_read += 1
+        fires.extend(analyzer.analyze_file(src, str(path)))
+    return {"fires": len(fires), "detail": fires, "files_read": files_read, "files_skipped": 0}

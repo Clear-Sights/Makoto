@@ -37,7 +37,9 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORPUS = pathlib.Path(__file__).resolve().parent / "corpus"
 
-DISPATCH_CWD = ROOT
+# The package sits under plugin/ -- that subtree is the installed plugin. Replaying from the
+# repository root would dispatch against a `makoto` this repository no longer has there.
+DISPATCH_CWD = ROOT / "plugin"
 STATE_ENV = "MAKOTO_STATE_DIR"
 
 

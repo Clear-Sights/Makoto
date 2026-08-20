@@ -61,6 +61,10 @@ def test_completion_detected_past_tense():
     assert ("section:9.3", "done") in hits
 
 
+def test_completion_is_silent_on_not_done_yet():
+    assert source_plan_item_completions("Task #19 is not done yet.") == set()
+
+
 def test_retraction_detected_negation():
     hits = source_plan_item_completions("Never mind §9.3, skipping it.")
     assert ("section:9.3", "retracted") in hits

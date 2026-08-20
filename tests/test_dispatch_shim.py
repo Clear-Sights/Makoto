@@ -19,7 +19,10 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-SHIM = REPO / "makoto" / "_dispatch_shim.sh"
+# The shim is invoked as ${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh, and CLAUDE_PLUGIN_ROOT
+# is the installed subtree -- plugin/, not the repository root.
+PLUGIN = REPO / "plugin"
+SHIM = PLUGIN / "makoto" / "_dispatch_shim.sh"
 
 EVENT = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
          "tool_input": {"command": "ls"}, "session_id": "shim-test",
@@ -50,7 +53,7 @@ def test_decoy_package_in_cwd_cannot_shadow_the_plugin(tmp_path, bare_python_dir
     (tmp_path / "makoto").mkdir()
     (tmp_path / "makoto" / "__init__.py").write_text("")
     proc = _run_shim(cwd=tmp_path, state_dir=tmp_path / "state", env_overrides={
-        "CLAUDE_PLUGIN_ROOT": str(REPO),
+        "CLAUDE_PLUGIN_ROOT": str(PLUGIN),
         "PATH": f"{bare_python_dir}{os.pathsep}{os.environ['PATH']}",
     })
     assert proc.returncode == 0, proc.stderr

@@ -6,7 +6,6 @@ AuditRow + append_row + read_rows + append_error + _make_snippet — the
 functions the dispatcher actually uses.
 """
 import json
-from dataclasses import asdict
 import pytest
 from makoto.state.audit import AuditRow, append_row, read_rows, append_error
 
@@ -28,24 +27,11 @@ def _sample_row(**overrides) -> AuditRow:
     return AuditRow(**base)
 
 
-def test_auditrow_fields_dataclass_round_trip():
-    """AuditRow holds all fields and asdict round-trips them."""
-    row = AuditRow(
-        ts="2026-05-24T03:45:32.123456Z",
-        event="live.pre_tool_use",
-        hook_kind="PreToolUse",
-        session_id="abc123",
-        project_root="/tmp/proj",
-        pattern_fires=["content.integrity_suppression_flag"],
-        exit_code=2,
-        retry_hint_emitted=True,
-        findings=[{"pattern_id": "content.integrity_suppression_flag", "level": "error",
-                   "file": "x.md", "line": 5, "snippet": "Hill 1980"}],
-    )
-    d = asdict(row)
-    assert d["ts"] == "2026-05-24T03:45:32.123456Z"
-    assert d["pattern_fires"] == ["content.integrity_suppression_flag"]
-    assert d["findings"][0]["snippet"] == "Hill 1980"
+def test_auditrow_optional_observability_fields_are_serialized(tmp_path):
+    append_row(tmp_path, _sample_row(tool_name="Write", oversight_clamp={"active": True}))
+    row = json.loads((tmp_path / "audit.jsonl").read_text())
+    assert row["tool_name"] == "Write"
+    assert row["oversight_clamp"] == {"active": True}
 
 
 def test_append_row_creates_jsonl_with_one_line(tmp_path):
@@ -154,6 +140,7 @@ def test_append_row_chain_fault_never_blocks_audit_jsonl_write(tmp_path, monkeyp
     rows = list(read_rows(tmp_path))
     assert len(rows) == 1
     assert rows[0]["event"] == "live.stop"
+    assert "prev_hash" not in rows[0] and "row_hash" not in rows[0]
 
 
 def test_append_error_writes_to_dispatch_errors_jsonl(tmp_path):
@@ -170,6 +157,10 @@ def test_append_error_writes_to_dispatch_errors_jsonl(tmp_path):
     assert row["exc_type"] == "ValueError"
     assert "boom" in row["exc_message"]
     assert "ts" in row
+    assert row["ts"].endswith("Z")
+    from makoto.state import ledger
+    chain_rows = list(ledger.read(root=tmp_path))
+    assert len(chain_rows) == 1 and chain_rows[0]["kind"] == "dispatch-error"
 
 
 def test_append_error_does_not_touch_audit_jsonl(tmp_path):

@@ -12,6 +12,7 @@ def test_commitments_module_owns_the_retraction_cluster():
                  "_surfaced_retraction_locations", "_fenced_spans",
                  "_retract_interrogative_or_conditional", "_retract_recommitted"):
         assert hasattr(commitments, name), name
+        assert getattr(commitments, name).__module__ == "makoto.state.commitments", name
 
 # (test_commitments_only_imports_downward moved: the no-upward-edge property — commitments never
 # imports verdict/dispatch/a named check — is enforced by tests/test_import_direction.py, seam 7.)

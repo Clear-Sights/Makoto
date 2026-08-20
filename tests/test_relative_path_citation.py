@@ -8,7 +8,7 @@ def test_fires_on_bare_relative_directory_path():
 
 def test_fires_on_bare_file_line_citation():
     hits = find_relative_citations("the bug is in audit.py:93")
-    assert [p for p, _ in hits] == ["audit.py:93"]
+    assert hits == [("audit.py:93", 14)]
 
 
 def test_silent_on_absolute_path():

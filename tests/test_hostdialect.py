@@ -37,7 +37,7 @@ def _run_dispatch(state_dir, payload) -> tuple[int, str]:
     proc = subprocess.run(
         [sys.executable, "-m", "makoto.dispatch"],
         input=(payload if isinstance(payload, bytes) else json.dumps(payload).encode("utf-8")),
-        capture_output=True, env=env, cwd=str(Path(__file__).parent.parent),
+        capture_output=True, env=env, cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     return proc.returncode, proc.stdout.decode("utf-8")
 

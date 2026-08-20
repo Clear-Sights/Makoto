@@ -77,20 +77,29 @@ def test_refresh_if_stale_rebuilds_when_mtime_row_missing(tmp_path):
 
 
 def test_refresh_if_stale_reraises_rebuild_failure_after_rollback(tmp_path, monkeypatch):
-    """Rollback is not a discharge: the exact rebuild failure must still escape."""
+    """Rollback is not a discharge: the exact rebuild failure must still escape, AND the
+    rollback itself must be real. The fake rebuild DELETES a pre-seeded sentinel row inside the
+    transaction before raising — only an actual ROLLBACK can bring the sentinel back, so a
+    refresh that skips (or commits instead of) the rollback goes red here. (The old shape
+    asserted COUNT(*)==0 on a table that was empty from creation and a fake that raised before
+    ever touching it: guaranteed-true regardless of rollback.)"""
     from makoto.state import citations
     cit = tmp_path / "CITATIONS.md"
     cit.write_text("Smith 2020\n")
     conn = _conn_with_config(tmp_path, str(cit), mtime_str="-1")
+    # the sentinel the transaction must restore
+    conn.execute("INSERT INTO canonical_citations VALUES ('Sentinel 1900', 'pre-seeded')")
 
     def fail_rebuild(_conn, _path):
-        raise RuntimeError("makhard rebuild sentinel")
+        _conn.execute("DELETE FROM canonical_citations")   # destructive work INSIDE the txn...
+        raise RuntimeError("makhard rebuild sentinel")     # ...then the failure
 
     monkeypatch.setattr(citations, "_rebuild_canonical", fail_rebuild)
     with pytest.raises(RuntimeError, match="makhard rebuild sentinel"):
         citations.refresh_if_stale(conn)
-    # BEGIN was rolled back before the error escaped; the connection is usable.
-    assert conn.execute("SELECT COUNT(*) FROM canonical_citations").fetchone()[0] == 0
+    # The ROLLBACK really happened: the sentinel deleted inside the failed txn is back.
+    rows = conn.execute("SELECT cite FROM canonical_citations").fetchall()
+    assert rows == [("Sentinel 1900",)], f"rollback did not restore the pre-seeded sentinel: {rows}"
     conn.close()
 
 

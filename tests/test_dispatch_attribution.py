@@ -72,7 +72,7 @@ def test_unparseable_stdin_still_recovers_the_ids(tmp_path):
     assert rows[0]["id_source"] == "raw-scan"
 
 
-def test_predicate_faults_are_attributed_too(tmp_path, monkeypatch):
+def test_predicate_faults_are_attributed_too(tmp_path):
     """A predicate that raises is the other half of this log, and it was equally anonymous."""
     from makoto.state import audit
     audit.append_error(Path(state_dir := _setup_state(tmp_path)), 7, "content.some_check",

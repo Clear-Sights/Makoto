@@ -8,9 +8,10 @@ def test_pattern_list_prints_table_of_all_patterns(capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "ID" in out and "POSTURE" in out and "DESCRIPTION" in out
-    # A representative span of live catalog ids appears
-    for pid in ("content.verifier_predicate_weakened", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_exit_masking", "content.fabricated_commit_sha", "content.self_mute_guard"):
-        assert pid in out, f"pattern {pid} missing from list output"
+    from makoto.registry import load_precheck_catalog
+    listed_ids = {line.split()[0] for line in out.splitlines()[2:] if line.strip()}
+    live_ids = {check.id for check in load_precheck_catalog()}
+    assert listed_ids == live_ids, "pattern list must print one row for every live catalog id"
 
 
 def test_pattern_show_known_id_prints_full_detail(capsys):
@@ -21,9 +22,10 @@ def test_pattern_show_known_id_prints_full_detail(capsys):
     assert "id" in out and "content.verifier_predicate_weakened" in out
     assert "posture" in out
     assert "keywords" in out
-    assert "predicate" in out
+    field_table, source_preview = out.split("---\n", 1)
+    assert "predicate" in field_table
     # source preview present
-    assert "source:" in out or "regex_file_predicate" in out
+    assert "source:" in source_preview or "regex_file_predicate" in source_preview
 
 
 def test_pattern_show_unknown_id_returns_2_with_helpful_stderr(capsys):

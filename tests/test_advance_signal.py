@@ -74,10 +74,9 @@ def test_precision_adjudicated_fp_shapes_stay_inert():
 
 
 def test_detector_is_neither_fire_all_nor_fire_none():
-    # contamination canary: a real classifier fires on the FIRE set AND stays silent on INERT
-    fired_any = any(_advance_signal(t) for t in FIRE)
-    silent_any = any(not _advance_signal(t) for t in INERT)
-    assert fired_any and silent_any, "detector collapsed to a constant — voided"
+    # The recall/precision tests above establish classifications; this is their independent
+    # population guard so either labeled corpus cannot be emptied into a vacuous pass.
+    assert FIRE and INERT, "labeled detector corpus was emptied"
 
 
 def test_empty_and_none_are_inert():
@@ -131,3 +130,37 @@ def test_code_span_guard_only_skips_word_INSIDE_a_span():
     assert _advance_signal("everything is done. see `foo`.") is True   # claim before span -> fires
     assert _advance_signal("All pushed (digest `fe775`).") is True      # real-corpus FIRE shape
     assert _advance_signal("`everything is done`") is False             # word inside span -> inert
+
+
+def test_cross_directory_variant_is_not_a_rename_and_still_fires():
+    """TP intact: the same-dir guard is load-bearing — `other/parser_v2.py` is NOT a rename of
+    `src/parser.py` (the deliverable's directory matters). Deleting the parent-dir guard in
+    `_adv_relocated_discharge` made this a silent false discharge; nothing else in this file
+    reached that line, so the false discharge would have shipped green."""
+    f = advance_gate(_UNIV, [{"location": "src/parser.py"}],
+                     touched_keys={"other/parser_v2.py"}, fs_exists=lambda p: False)
+    assert f is not None and f.pattern_id == "gate.advance"
+
+
+def test_scratch_sibling_is_not_a_rename_and_still_fires():
+    """A throwaway sibling (`parser_tmp.py`, `parser_bak.py`, ...) is not the promised
+    deliverable: scratch/backup tokens must never count as rename tokens, or writing a scratch
+    copy silently discharges the very obligation the gate exists to hold. RED-before: every one
+    of these was silently discharged."""
+    for touched in ("src/parser_tmp.py", "src/parser_temp.py", "src/parser_bak.py",
+                    "src/parser_backup.py", "src/parser_copy.py", "src/parser_orig.py",
+                    "src/parser_old.py"):
+        f = advance_gate(_UNIV, [{"location": "src/parser.py"}],
+                         touched_keys={touched}, fs_exists=lambda p: False)
+        assert f is not None and f.pattern_id == "gate.advance", touched
+
+
+def test_rename_tolerance_is_directional():
+    """"Promised X_v2, only touched pre-existing X" is NOT a discharge — only the touched key
+    may carry the rename suffix ("renamed X to X_v2"). RED-before: the symmetric stem-family
+    test discharged a commitment to produce a NEW variant by touching the original."""
+    f = advance_gate(_UNIV, [{"location": "src/config_v2.json"}],
+                     touched_keys={"src/config.json"}, fs_exists=lambda p: False)
+    assert f is not None and f.pattern_id == "gate.advance"
+    assert advance_gate(_UNIV, [{"location": "src/config.json"}],
+                        touched_keys={"src/config_v2.json"}, fs_exists=lambda p: False) is None

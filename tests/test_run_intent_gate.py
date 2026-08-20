@@ -8,7 +8,9 @@ only ever be checked starting at the NEXT one. FP-safe by design: closed first-p
 closed process-lifecycle-verb lexicon (mirroring gate.claimed_running's own verb set), plus the
 usual quoted/negated/question/idiom clause guards."""
 import json
+import sqlite3
 
+from makoto.dispatch import _select_recent
 from makoto.checks.runIntentUnfulfilled import (
     run_promised_gate, _run_intent_claim, _last_stop_index, _bash_call_after,
 )
@@ -179,7 +181,18 @@ def test_tn_check_verb_not_in_closed_set():
 
 
 def test_tn_a_question_not_a_declarative_promise():
+    # Rejected on the auxiliary axis before the question veto is ever consulted.
     assert _run_intent_claim("Should I run the tests?") is None
+    # PINS THE QUESTION VETO ITSELF: this text MATCHES _RUN_INTENT_CLAIM_RX ("I'll run"), so
+    # only the containing-sentence-ends-'?' veto can reject it. Deleting the veto (or inverting
+    # it to fire only on questions -- the declarative TPs above pin that direction) fails here.
+    assert _run_intent_claim("I'll run the tests?") is None
+
+
+def test_tn_a_long_question_is_still_vetoed():
+    # The '?' sits >200 chars past the match end: the veto must scan to the real sentence
+    # terminator, not a fixed window.
+    assert _run_intent_claim("I'll run the tests " + "and tidy the imports " * 12 + "?") is None
 
 
 def test_tn_quoted_inside_backticks():
@@ -297,6 +310,18 @@ def test_silent_when_a_bash_call_discharges_it():
     assert run_promised_gate(history=hist) is None
 
 
+def test_dispatch_history_derivation_does_not_cross_sessions():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE events (id INTEGER, ts TEXT, event_type TEXT, cwd TEXT, payload TEXT, session_id TEXT)")
+    conn.execute("INSERT INTO events VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'Stop', '/repo', ?, 's1')",
+                 [json.dumps(_stop("I'll run the tests now.")["payload"])])
+    conn.execute("INSERT INTO events VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'PostToolUse', '/repo', ?, 's2')",
+                 [json.dumps(_post("pytest -q", exitCode=0)["payload"])])
+    history = _select_recent(conn, "s1", 3)
+    assert len(history) == 1
+    assert run_promised_gate(history=history) is not None
+
+
 def test_silent_when_wrapper_typed_bash_call_discharges_it():
     """ADR 0039 shape: wrapper-only event types must not make the gate false-fire."""
     hist = [_wrapper_typed(
@@ -327,12 +352,25 @@ def test_fires_only_for_the_most_recent_prior_turn():
 
 
 def test_fires_again_across_a_second_unfulfilled_turn():
-    # turn 1 promises with nothing said turn 2 either -- turn 2's own silence is itself
-    # inspectable as "the prior turn" for a THIRD Stop's evaluation
-    hist = [_stop("I'll run the tests now."), _stop("Still thinking about this.")]
+    # Each new unfulfilled run promise is independently checked on the following Stop.
+    hist = [_stop("I'll run the tests now."), _stop("I'll restart the server now.")]
     f = run_promised_gate(history=hist)
-    assert f is None  # turn 2 made no promise of its own -- nothing for a hypothetical turn 3 to cite yet
-    # (turn 1's own dropped promise was already the subject of turn 2's OWN evaluation, not re-derived here)
+    assert f is not None and "restart" in f.message.lower()
+
+
+# --- the open/closed line: gate.run_promised is a BLOCKING error, and stays one ---
+def test_gate_is_a_blocking_error_not_an_advisory():
+    """Pins which side of the open/closed line this gate lands on. Every other test in this file
+    is satisfied by an advisory downgrade (nothing read `f.level`, `CHECK.posture`, or
+    `CHECK.may_block`, and `CHECK` was not even imported) — this one goes red on it, the same way
+    test_relative_path_citation.py and test_self_wired_check.py pin their own levels."""
+    from makoto.checks.runIntentUnfulfilled import CHECK
+    f = run_promised_gate(history=[_stop("I'll run the tests now.")])
+    assert f is not None and f.level == "error", f"fired finding must be a blocking error: {f!r}"
+    assert f.retry_hint, "a blocking gate must hand the agent a retry hint"
+    assert CHECK.id == "gate.run_promised" and CHECK.applies_at == "Stop"
+    assert CHECK.posture == "BLOCK", f"posture downgraded: {CHECK.posture!r}"
+    assert CHECK.may_block is True, "may_block=False severs the gate from _emit_decision"
 
 
 def test_silent_empty_history():

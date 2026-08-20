@@ -102,3 +102,132 @@ def test_prior_tool_result_grounding_still_works(check):
     history = [(1, "2026-08-19T10:00:00Z", "PostToolUse", "/tmp",
                 json.dumps({"tool_response": {"results": URL}}))]
     assert predicate(current_event=_event(), history=history, pattern=check) is None
+
+def test_transcript_separators_splitlines_handles_are_all_seen(tmp_path):
+    """A REGRESSION, caused by an optimization and caught by an independent review pass.
+
+    `user_turn_texts` was briefly rewritten to iterate an open file handle under `islice`, to apply
+    its line bound before reading the whole transcript rather than after. File iteration splits only
+    on `\n`; `str.splitlines()` also splits on `\v`, `\f`, `\x1c`-`\x1e`, `\x85`, U+2028 and U+2029.
+    A transcript carrying any of those collapsed into ONE unparseable line and the function returned
+    [] -- no user turns at all, not merely a missed one.
+
+    That empty list is not inert. `_user_supplied` reads it as "the user never typed this URL" and
+    `content.unsourced_webfetch` DENIES, stating exactly that as its reason. So the optimization
+    turned an ordinary WebFetch of a URL the user HAD typed into a hard deny resting on a false
+    fact. This test pins every separator `splitlines()` recognises, so the bound can only ever be
+    reintroduced by a form that splits on the same set.
+    """
+    from makoto.state.ledger import user_turn_texts
+
+    def record(text):
+        return json.dumps({"message": {"role": "user",
+                                       "content": [{"type": "text", "text": text}]}})
+
+    for separator in ("\n", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"):
+        path = tmp_path / f"transcript-{ord(separator)}.jsonl"
+        path.write_text(record("first turn") + separator + record("fetch https://vendor.example/api"),
+                        encoding="utf-8")
+        turns = user_turn_texts(str(path))
+        assert len(turns) == 2, (
+            f"separator U+{ord(separator):04X} lost a user turn: {turns!r} -- a WebFetch of a URL "
+            f"the user typed would be denied for 'the user never typed it'")
+        assert any("https://vendor.example/api" in t for t in turns)
+
+
+def test_transcript_line_bound_is_still_applied(tmp_path):
+    """The bound the reverted optimization existed to enforce must still hold."""
+    from makoto.state.ledger import user_turn_texts
+
+    path = tmp_path / "long.jsonl"
+    path.write_text("\n".join(
+        json.dumps({"message": {"role": "user", "content": [{"type": "text", "text": f"turn {i}"}]}})
+        for i in range(50)), encoding="utf-8")
+    assert len(user_turn_texts(str(path), limit=10)) == 10
+
+
+# --- regressions found by an independent high-effort review pass ------------------------------
+
+def test_a_proper_prefix_of_a_typed_url_is_not_the_typed_url(tmp_path, check):
+    """The oracle exempted every PREFIX of anything the user ever pasted.
+
+    `in` is substring containment, and the docstring it implemented says "no prefix match". So a
+    user who typed `.../reference-internal-only` silently pre-approved `.../reference` -- a
+    DIFFERENT resource they never named -- and the agent could invent it and be waved through by
+    the one channel this check treats as ground truth.
+    """
+    typed = URL + "-internal-only"
+    t = _transcript(tmp_path, [_user_turn(f"please fetch {typed}")])
+    finding = predicate(current_event=_event(url=URL, transcript_path=t), history=[], pattern=check)
+    assert finding is not None and finding.pattern_id == "content.unsourced_webfetch"
+
+
+def test_the_url_the_user_actually_typed_is_still_exempt(tmp_path, check):
+    """The other half: tightening the boundary must not start denying the exact typed url."""
+    typed = URL + "-internal-only"
+    t = _transcript(tmp_path, [_user_turn(f"please fetch {typed}")])
+    assert predicate(current_event=_event(url=typed, transcript_path=t),
+                     history=[], pattern=check) is None
+
+
+@pytest.mark.parametrize("wrapper", ["fetch {}.", "see ({})", "{}", "read {}, then stop",
+                                     "<{}>", '"{}"', "{}; thanks"])
+def test_ordinary_sentence_punctuation_does_not_revoke_the_exemption(tmp_path, check, wrapper):
+    """The failure mode the boundary check could EASILY introduce, pinned so it cannot.
+
+    People end sentences with urls. If a trailing `.` or `)` counted as part of the url, this fix
+    would deny the single most ordinary way a human supplies one -- reintroducing the exact false
+    deny the exemption was written to stop.
+    """
+    t = _transcript(tmp_path, [_user_turn(wrapper.format(URL))])
+    assert predicate(current_event=_event(transcript_path=t), history=[], pattern=check) is None
+
+
+def test_a_bom_prefixed_transcript_still_yields_its_first_turn(tmp_path, check):
+    """A UTF-8 BOM glued U+FEFF onto the FIRST record, so that record alone failed to parse.
+
+    The first record is where a session's opening message lives -- routinely the very turn
+    carrying the url -- and losing it lands as "the user never typed it", i.e. a hard deny resting
+    on a false fact.
+    """
+    p = tmp_path / "bom.jsonl"
+    p.write_bytes(b"\xef\xbb\xbf" + json.dumps(_user_turn(f"fetch {URL}")).encode("utf-8") + b"\n")
+    assert predicate(current_event=_event(transcript_path=str(p)),
+                     history=[], pattern=check) is None
+
+
+@pytest.mark.parametrize("typed,why", [
+    ("https://obscure-vendor.example/api/v3/reference?token=secret", "query string"),
+    ("https://obscure-vendor.example/api/v3/reference.json", "file extension"),
+    ("https://obscure-vendor.example/api/v3/reference\u00e9", "non-ascii continuation"),
+])
+def test_a_longer_url_sharing_our_prefix_is_not_an_exemption(tmp_path, check, typed, why):
+    """Found by an independent review pass, after the first fix.
+
+    The first attempt listed the characters that CONTINUE a url and rejected a match followed by
+    one. That set is impossible to enumerate and each omission is a silent false ALLOW: `?`, `.`
+    and every non-ascii letter were missing, so three different resources the user never named
+    were each waved through by the one channel this check treats as ground truth.
+    """
+    t = _transcript(tmp_path, [_user_turn(f"please fetch {typed}")])
+    finding = predicate(current_event=_event(url=URL, transcript_path=t), history=[], pattern=check)
+    assert finding is not None, f"{why}: a different resource was exempted as user-supplied"
+
+
+def test_a_url_inside_a_markdown_link_is_still_the_users_url(tmp_path, check):
+    """The boundary rule must read the whole token, not the next character: a markdown link puts
+    a `)` after the url, and people paste links that way."""
+    t = _transcript(tmp_path, [_user_turn(f"see [the docs]({URL}) for this")])
+    assert predicate(current_event=_event(transcript_path=t), history=[], pattern=check) is None
+
+
+def test_a_bom_on_every_chunk_boundary_still_yields_every_turn(tmp_path, check):
+    """`utf-8-sig` strips a BOM only at BYTE ZERO. A transcript assembled from separately-written
+    chunks -- a resumed or merged session -- carries one at the head of each chunk, and every
+    record after the first was silently unparseable."""
+    p = tmp_path / "chunked.jsonl"
+    bom = b"\xef\xbb\xbf"
+    p.write_bytes(bom + json.dumps(_user_turn("hello")).encode("utf-8") + b"\n"
+                  + bom + json.dumps(_user_turn(f"fetch {URL}")).encode("utf-8") + b"\n")
+    assert predicate(current_event=_event(transcript_path=str(p)),
+                     history=[], pattern=check) is None

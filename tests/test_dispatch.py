@@ -1,3 +1,4 @@
+import io
 """end-to-end dispatcher tests for makoto/dispatch.py (SQLite(WAL) backend)."""
 import json
 import os
@@ -84,7 +85,7 @@ def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
         input=b"not json{{{",
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0
     body = json.loads(proc.stdout.decode())
@@ -170,7 +171,7 @@ def test_dispatch_non_object_payload_blocks_exit_2_with_fact(tmp_path):
         proc = subprocess.run(
             [sys.executable, "-m", "makoto.dispatch"],
             input=raw, capture_output=True, env=env,
-            cwd=str(Path(__file__).parent.parent),
+            cwd=str(Path(__file__).parent.parent / "plugin"),
         )
         assert proc.returncode == 2, (raw, proc.returncode, proc.stderr)
         assert b"object" in proc.stderr.lower(), (raw, proc.stderr)
@@ -242,7 +243,7 @@ def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0
     db_file = state_dir / "makoto.record.db"
@@ -1949,7 +1950,7 @@ def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0
     out = proc.stdout.decode("utf-8")
@@ -1983,7 +1984,7 @@ def test_dispatch_lazy_init_failure_fails_open_not_crash(tmp_path):
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0, (
         "lazy-init failure must fail OPEN (exit 0), never crash the hook; "
@@ -2136,3 +2137,242 @@ def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
         "an error-level finding must record exit_code=2 in the audit row; "
         f"got {fire_rows[0].get('exit_code')!r}"
     )
+
+
+# --- regressions found by an independent high-effort review pass ------------------------------
+
+def test_a_failing_error_logger_does_not_abandon_the_remaining_checks(tmp_path, monkeypatch):
+    """Observability must never decide a verdict, and here it did -- in the worst direction.
+
+    `audit.append_error` on a predicate's ERROR path was unguarded, so an append that raised
+    escaped `_run_predicates` entirely: every pattern after the raising one went unevaluated, and
+    the unwind landed in `_dispatch`'s catch-all, which records a loud-allow and returns 0. A
+    later predicate that would have DENIED simply never ran. A failure in the error LOGGER turned
+    a deny into an allow.
+    """
+    import types
+    from makoto import dispatch as D
+    from makoto.state import audit as A
+    from makoto.vocab import Finding
+
+    ran = []
+    boom = types.ModuleType("mk_boom")
+    def _boom(**_kw):
+        ran.append("boom")
+        raise RuntimeError("predicate exploded")
+    boom.predicate = _boom
+    denier = types.ModuleType("mk_denier")
+    def _deny(**_kw):
+        ran.append("denier")
+        return Finding(pattern_id="x.deny", file="f.py", line=1, level="error",
+                       message="would have DENIED", snippet="")
+    denier.predicate = _deny
+    monkeypatch.setitem(sys.modules, "mk_boom", boom)
+    monkeypatch.setitem(sys.modules, "mk_denier", denier)
+
+    class P:
+        def __init__(self, i, m):
+            self.id, self.predicate_module = i, m
+    monkeypatch.setattr(D, "load_precheck_catalog",
+                        lambda: [P("x.boom", "mk_boom"), P("x.deny", "mk_denier")])
+    monkeypatch.setattr(D, "_keyword_hit", lambda p, raw: True)
+    monkeypatch.setattr(D, "_disabled_pattern_ids", lambda: set())
+    monkeypatch.setattr(A, "append_error",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("ledger disk full")))
+
+    findings = D._run_predicates(None, {"session_id": "s"}, [], 1, tmp_path, "raw")
+    assert ran == ["boom", "denier"], f"the later check never ran: {ran}"
+    assert [f.pattern_id for f in findings] == ["x.deny"], "the DENY was lost"
+
+
+def test_a_failed_decision_write_is_reported_rather_than_silently_dropped(tmp_path):
+    """Two of these fixes collided here, and this test records how the collision was settled.
+
+    The wire claim was moved BEFORE the write so a half-written decision could not be followed by
+    a whole second JSON object. Then a review pass showed the same claim silenced the notice when
+    the write failed having emitted NOTHING -- the DENY reached nobody, the notice reached nobody,
+    and an unchecked call looked like a clean pass.
+
+    The two cannot both be satisfied, because a raised `write` does not say how many bytes landed.
+    So the trade is made deliberately: when the decision write FAILS, the notice is emitted. A
+    fragment on stdout is unparseable whether or not something follows it, so the notice cannot
+    turn a good response into a bad one -- while suppressing it loses the only signal that says a
+    check did not decide anything. The claim still does its original job on the path that matters:
+    a decision that was written SUCCESSFULLY is never followed by a notice.
+    """
+    from makoto import dispatch as D
+    from makoto.vocab import Finding
+
+    # ONE stream for the decision AND the notice, because in production there is only one: the
+    # earlier version handed `_emit_decision` a private object and then pointed `sys.stdout` at a
+    # fresh buffer, so it asserted a notice was PRODUCED while never showing what the wire ends up
+    # holding. That is the only question this trade turns on.
+    class HalfDeadStream:
+        """First write keeps 12 characters and raises; later writes land. A disk that filled and
+        was freed, an EINTR -- the case where the notice actually reaches the wire behind the
+        fragment, which is the case the trade has to be judged on."""
+
+        def __init__(self):
+            self.written = ""
+            self.calls = 0
+
+        def write(self, s):
+            self.calls += 1
+            if self.calls == 1:
+                self.written += s[:12]
+                raise BrokenPipeError("pipe closed mid-write")
+            self.written += s
+            return len(s)
+
+    class DeadStream:
+        def write(self, s):
+            raise BrokenPipeError("pipe closed for good")
+
+    saved = (D._stdout_written, list(D._notices), D._decision_write_failed)
+    finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
+                      message="denied", snippet="")
+
+    class GoodStream:
+        def __init__(self):
+            self.written = ""
+
+        def write(self, s):
+            self.written += s
+            return len(s)
+
+    try:
+        # 1. a SUCCESSFUL decision still shuts the notice emitter up, on the SAME stream.
+        D._stdout_written, D._decision_write_failed = False, False
+        D._notices[:] = ["[db_locked] write lock not acquired"]
+        good = GoodStream()
+        D._emit_decision([finding], "PreToolUse", stream=good)
+        delivered = good.written
+        real, sys.stdout = sys.stdout, good
+        try:
+            D._emit_notices()
+        finally:
+            sys.stdout = real
+        assert good.written == delivered, "a notice was appended behind a delivered decision"
+        assert json.loads(good.written)["hookSpecificOutput"], "the decision is not intact JSON"
+
+        # 2. a FAILED decision write is reported instead -- and this is what the wire then holds.
+        D._stdout_written, D._decision_write_failed = False, False
+        D._notices[:] = ["[db_locked] write lock not acquired"]
+        stream = HalfDeadStream()
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=stream)
+        assert D._stdout_written is True
+        assert D._decision_write_failed is True
+        fragment = stream.written
+        assert fragment == '{"hookSpecif', f"unexpected fragment: {fragment!r}"
+        real, sys.stdout = sys.stdout, stream
+        try:
+            D._emit_notices()
+        finally:
+            sys.stdout = real
+        assert "systemMessage" in stream.written, "the undelivered decision was never reported"
+        # The trade, asserted rather than asserted-around: the wire now carries the fragment with
+        # the notice behind it, and that is NOT parseable. It was not parseable before the notice
+        # either -- a 12-character fragment never is -- so the notice destroys nothing and is the
+        # only thing on the wire that explains why no decision arrived. Written down as a test so
+        # the cost is visible to whoever revisits this, instead of living in a comment.
+        with pytest.raises(ValueError):
+            json.loads(stream.written)
+        assert stream.written.startswith(fragment)
+
+        # 3. a stream that is dead for good: the notice cannot land, and must not raise either.
+        D._stdout_written, D._decision_write_failed = False, False
+        D._notices[:] = ["[db_locked] write lock not acquired"]
+        dead = DeadStream()
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=dead)
+        real, sys.stdout = sys.stdout, dead
+        try:
+            D._emit_notices()          # must swallow: reporting never outranks returning
+        finally:
+            sys.stdout = real
+    finally:
+        D._stdout_written, D._notices[:], D._decision_write_failed = saved[0], saved[1], saved[2]
+
+
+def test_a_prologue_fault_is_a_loud_allow_not_a_crash(tmp_path, monkeypatch, capsys):
+    """`_dispatch` wraps only the HANDLER, so its whole prologue ran with no catch, and `main`'s
+    `finally` does not absorb -- it re-raises. A fault in the stdin read, the state-dir resolve,
+    the parse or the chain self-verify left the hook with a traceback and a non-zero exit instead
+    of the loud-allow that IS this plugin's declared fail direction for carriage faults.
+    """
+    from makoto import dispatch as D
+    monkeypatch.setattr(D.wire, "read_stdin",
+                        lambda: (_ for _ in ()).throw(RuntimeError("carriage exploded")))
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
+    assert D.main() == 0
+    err = capsys.readouterr()
+    assert "prologue_exception" in err.err
+    assert "carriage exploded" in err.err
+
+
+def test_a_decision_that_never_reached_the_wire_still_reports_the_fault(tmp_path):
+    """Found by an independent review pass, against the previous fix.
+
+    Claiming the wire before the write closed the fragment-plus-second-object corruption, but it
+    also claimed the wire when the write raised having emitted NOTHING -- EPIPE on the first byte,
+    a closed fd. Then the DENY reached nobody AND the notice was suppressed, so a call that was
+    never decided looked exactly like a clean pass. The claim must not silence the report when
+    there is nothing on the wire to protect.
+    """
+    from makoto import dispatch as D
+    from makoto.vocab import Finding
+
+    class RejectsOutright:
+        """Rejects the first write having emitted NOTHING, then accepts. One object, used for the
+        decision AND the notice, because pointing `sys.stdout` at a fresh buffer for the second
+        call proved only that a notice was ATTEMPTED -- on a stream that was still dead it could
+        not have landed, and the test's name promises it reaches the wire."""
+
+        def __init__(self):
+            self.written = ""
+            self.calls = 0
+
+        def write(self, s):
+            self.calls += 1
+            if self.calls == 1:
+                raise BrokenPipeError("rejected before any byte was written")
+            self.written += s
+            return len(s)
+
+    saved = (D._stdout_written, list(D._notices), D._decision_write_failed)
+    D._stdout_written, D._decision_write_failed = False, False
+    D._notices[:] = ["[db_locked] write lock not acquired"]
+    try:
+        finding = Finding(pattern_id="content.x", file="f.py", line=1, level="error",
+                          message="denied", snippet="")
+        stream = RejectsOutright()
+        with pytest.raises(BrokenPipeError):
+            D._emit_decision([finding], "PreToolUse", stream=stream)
+        assert stream.written == "", "the decision was supposed to reach nobody"
+        real, sys.stdout = sys.stdout, stream
+        try:
+            D._emit_notices()
+        finally:
+            sys.stdout = real
+        assert stream.written, "the call was never decided and nobody was told"
+        assert "systemMessage" in stream.written
+        # Zero bytes of decision landed, so unlike the half-written case there is no fragment in
+        # front of the notice: the wire carries ONE valid object, and it is the one that says the
+        # call went undecided.
+        assert json.loads(stream.written)["systemMessage"]
+    finally:
+        D._stdout_written, D._notices[:], D._decision_write_failed = saved[0], saved[1], saved[2]
+
+
+def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch, capsys):
+    """`_notices` and `_stdout_written` are module globals. A second `main()` in one interpreter
+    re-reported the first call's faults under the wrong event and grew the list without bound."""
+    from makoto import dispatch as D
+    monkeypatch.setattr(D.wire, "read_stdin",
+                        lambda: (_ for _ in ()).throw(RuntimeError("carriage exploded")))
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
+    D.main()
+    capsys.readouterr()
+    D.main()
+    assert len(D._notices) == 1, f"notices accumulated across calls: {D._notices!r}"

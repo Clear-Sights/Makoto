@@ -22,7 +22,9 @@ def test_run_stop_checks_threads_history_into_context(monkeypatch):
 
     def spy(**kw):
         captured.update(kw)
-        return real(**kw)
+        result = real(**kw)
+        captured["constructed_history"] = result.history
+        return result
 
     monkeypatch.setattr(CTX, "GateContext", spy)
     hist = [(1, "t", "live.posttooluse", "/repo",
@@ -30,3 +32,4 @@ def test_run_stop_checks_threads_history_into_context(monkeypatch):
     D.run_stop_checks(_conn(), {"hook_event_name": "Stop", "last_assistant_message": "hi",
                                 "session_id": "s", "cwd": "/repo"}, hist)
     assert captured.get("history") == hist
+    assert captured.get("constructed_history") == hist

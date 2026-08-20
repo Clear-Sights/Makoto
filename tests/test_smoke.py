@@ -45,8 +45,9 @@ def test_install_wires_hooks_and_records_manifest(tmp_path, monkeypatch):
     from makoto.install import cmd_install
     assert cmd_install() == 0
     settings = json.loads((fake_home / ".claude" / "settings.json").read_text())
-    wired = json.dumps(settings.get("hooks", {})).lower()
-    assert "makoto" in wired, "install must wire a makoto-dispatching hook entry"
+    from makoto.checks.selfWiredCheck import _missing_makoto_events
+    assert _missing_makoto_events(settings.get("hooks", {})) == [], \
+        "install must wire every required event to makoto dispatch"
     manifest = fake_home / ".claude" / "makoto_state" / "configchange_manifest.json"
     assert manifest.exists(), "install must record the ConfigChange manifest"
 
@@ -96,4 +97,12 @@ def test_readme_references_exist():
     refs += [m for m in re.findall(r"\]\(([^)]+)\)", readme)
              if not m.startswith(("http://", "https://", "#", "mailto:"))]
     missing = [r for r in refs if not (root / r.split("#")[0]).exists()]
+    # Population guard: refs is an existence-filtered, regex-derived collection, so an empty refs
+    # makes `missing == []` vacuously — a README restructure that stops both regexes matching
+    # (single-quoted src, reference-style links) would pass while checking zero links. The suite's
+    # own docstring records that exact regression shipping once (docs/demo/), so the collection
+    # must be proven populated, embedded images included, before its emptiness can mean "clean".
+    assert refs, "README yielded no scannable references -- extraction regexes matched nothing (vacuous pass)"
+    assert any(r.endswith((".svg", ".png", ".gif", ".jpg", ".jpeg")) for r in refs), \
+        "no embedded image refs extracted from README -- the docs/demo regression class is unguarded"
     assert not missing, f"README references missing files: {missing}"

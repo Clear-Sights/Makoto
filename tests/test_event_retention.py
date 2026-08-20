@@ -34,16 +34,20 @@ def _insert(conn, sid, etype, hours_ago):
 
 def test_prune_drops_old_keeps_recent(tmp_path):
     conn = _db(tmp_path)
-    _insert(conn, "s1", "PostToolUse", hours_ago=5)    # outside default 3h window
+    _insert(conn, "s1", "PostToolUse", hours_ago=2)    # outside default 1.5h window
     _insert(conn, "s1", "PostToolUse", hours_ago=0.1)  # inside
     _prune_old_events(conn)
     rows = conn.execute("SELECT count(*) FROM events").fetchone()[0]
-    assert rows == 1, "exactly the recent event should survive the default 3h window"
+    assert rows == 1, "exactly the recent event should survive the default 1.5h window"
 
 
 def test_window_is_env_tunable(tmp_path, monkeypatch):
+    # 1.2h, NOT 1.0h: at exactly the window edge the row's age and the cutoff are the same
+    # instant, so the outcome turns on a sub-second tie-break rather than on the env var. That
+    # spelling was measured flaky at 1 failure in 25 isolated runs. 1.2 keeps both properties
+    # the test needs -- inside the 1.5h default, outside the 1h tuned window -- with margin.
     conn = _db(tmp_path)
-    _insert(conn, "s1", "PostToolUse", hours_ago=2)    # inside default 3h, OUTSIDE a 1h window
+    _insert(conn, "s1", "PostToolUse", hours_ago=1.2)  # inside default 1.5h, OUTSIDE a 1h window
     monkeypatch.setenv("MAKOTO_EVENT_RETENTION_HOURS", "1")
     assert _event_retention_hours() == 1.0
     _prune_old_events(conn)
@@ -67,7 +71,7 @@ def test_ingest_prunes_on_every_write(tmp_path):
 
 
 def test_select_recent_window_unaffected_by_prune(tmp_path):
-    # the prune window (3h) is strictly wider than the _select_recent query window (1h),
+    # the prune window (1.5h) is strictly wider than the _select_recent query window (1h),
     # so a within-1h event a predicate needs is never pruned out from under it.
     conn = _db(tmp_path)
     cur = conn.execute(

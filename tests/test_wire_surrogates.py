@@ -190,3 +190,34 @@ def test_repair_count_is_bytes_not_malformed_runs():
     assert n == 1
     _text, n = wire._decode_counting("legit � char".encode("utf-8"))
     assert n == 0, "a genuine U+FFFD is not damage"
+
+
+def test_two_damaged_keys_do_not_collapse_into_one_losing_a_value():
+    """Scrubbing is not injective on keys: every surrogate becomes the same U+FFFD.
+
+    Found by an independent review pass. `wire.scrub({"\\ud800": 1, "\\ud801": 2})` returned
+    `({'\\ufffd': 2}, 2)` -- a repair count of 2 sitting next to a dict that had silently lost a
+    field. This module's one promise is that repair is ON THE RECORD; deleting a field without a
+    word is the opposite of that, and the field could have been `tool_input`.
+    """
+    from makoto.core import wire
+    value, n = wire.scrub({"\ud800": 1, "\ud801": 2})
+    assert n == 2
+    assert sorted(value.values()) == [1, 2], f"a value was discarded: {value!r}"
+    assert not any("\ud800" <= c <= "\udfff" for k in value for c in k)
+
+
+def test_a_repaired_key_does_not_evict_a_clean_key_of_the_same_name():
+    """The ordering case: the clean key keeps its own name, whichever side of the dict it is on.
+
+    BOTH orderings, because the docstring promised both and only one was run. Which key `scrub`
+    reaches first decides which one gets the renamed slot, so a one-sided test leaves the more
+    dangerous half -- the clean key encountered SECOND, after the repaired one already took the
+    name -- unexercised. Both pass today; the point is that a regression in either direction now
+    has something to trip over.
+    """
+    from makoto.core import wire
+    for payload in ({"\ud800": 1, "\ufffd": 2}, {"\ufffd": 2, "\ud800": 1}):
+        value, _n = wire.scrub(payload)
+        assert sorted(value.values()) == [1, 2], f"a value was discarded: {value!r}"
+        assert value["\ufffd"] == 2, f"the clean key lost its name: {value!r}"

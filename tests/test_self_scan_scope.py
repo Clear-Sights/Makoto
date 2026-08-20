@@ -41,6 +41,12 @@ def test_scope_is_cwd_independent(tmp_path):
     _git(["add", "-A"], r)
     _git(["commit", "-qm", "seed"], r)
     baseline = set(tracked_py_files(r / "faculty"))
+    # Non-empty, exact-content guard: tracked_py_files is fail-open (any git failure returns []),
+    # so without this the three comparisons below are `set() == set()` and the test proves only
+    # self-consistency. Pinning the exact corpus both rejects the empty fail-open result AND
+    # asserts the named hazard file (loud.py, which a bare cwd-scoped ls-files would sweep in)
+    # is absent — an over-broad lister can no longer pass.
+    assert baseline == {"live.py"}, f"scope corpus wrong (fail-open or over-broad): {baseline!r}"
     here = os.getcwd()
     try:
         os.chdir(r)
