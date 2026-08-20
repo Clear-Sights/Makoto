@@ -13,9 +13,8 @@ tests/test_detector_engines_are_stdlib_isolated.py enforces).
 from __future__ import annotations
 import ast
 
-from makoto.vocab import _MAKOTO_ALLOW_RX
+from makoto.vocab import Finding, _MAKOTO_ALLOW_RX
 from makoto.substrate._stdlib_ast_helpers import iter_touched_python_sources
-from makoto.vocab import Finding
 
 _PURE_BUILTINS = frozenset(
     "len str int float bool tuple list dict set frozenset abs min max sum "

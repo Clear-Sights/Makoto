@@ -499,12 +499,9 @@ BLOCK_IDS: frozenset = frozenset({
 })
 
 
-def _literals(formula: str) -> List[str]:
-    return [p.strip() for p in formula.split("∧")]
-
-
 def _fires(formula: str, atoms: Dict[str, bool]) -> bool:
-    for lit in _literals(formula):
+    for part in formula.split("∧"):
+        lit = part.strip()
         neg = lit.startswith("NOT_")
         val = atoms.get(lit[4:] if neg else lit, False)
         if neg:

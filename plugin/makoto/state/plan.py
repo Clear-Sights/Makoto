@@ -380,8 +380,7 @@ def source_plan_item_completions(text: str) -> set:
 
 
 def commitment_key(session_id: str, label: str) -> str:
-    raw = f"{session_id}\x00{label}"
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+    return hashlib.sha1(f"{session_id}\x00{label}".encode("utf-8")).hexdigest()
 
 
 def record_plan_item(conn, session_id: str, item: dict) -> str:
