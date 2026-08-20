@@ -30,7 +30,11 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # by install.py's `_install_bash_scripts`/`_wire_claude_hooks`; two-segment path so a bare
 # `dispatch.sh` living anywhere else does not match), `${CLAUDE_PLUGIN_ROOT}/makoto/
 # _dispatch_shim.sh` (the ONE plugin-manifest shim form -- see hooks/hooks.json, which wires
-# every declared event to that single script), and the module forms `-m makoto.dispatch` /
+# every declared event to that single script; matched below by BARE BASENAME, WITHOUT the
+# `makoto_state[/\\]`-style directory anchor its dispatch.sh sibling carries, so as written any
+# command naming a `_dispatch_shim.sh` at ANY path satisfies this alternative -- the asymmetry
+# is stated here rather than implied away, since the paragraph above turns on the anchoring),
+# and the module forms `-m makoto.dispatch` /
 # `-m makoto.configchange` (the two hook entrypoints, both of which have a live `__main__`;
 # `\b` so `makoto.dispatcher_v2` never matches).
 #

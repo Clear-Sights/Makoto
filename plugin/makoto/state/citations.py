@@ -1,16 +1,16 @@
 """Citation machinery — keep `canonical_citations` in sync with reality.
 
-Three cooperating concerns over one canonical citation shape (the table pattern-1.6
+Two cooperating concerns over one canonical citation shape (the table pattern-1.6
 validates against):
 
   - extract_citations(text): the lowest-level primitive — Author-Year strings in text
         -> (cite, line, snippet), stopword- and ISO-date-filtered. pattern-1.6 calls it.
-  - refresh_if_stale(conn): when docs/CITATIONS.md's mtime exceeds the stored
+  - refresh_if_stale(conn): when docs/CITATIONS.md's mtime differs from the stored
         mtime, atomically rebuild canonical_citations from the file.
 
-All use the single canonical lexicons._CITATION_RX, so extraction, the on-disk
+All use the single canonical vocab._CITATION_RX, so extraction, the on-disk
 refresh, and pattern-1.6 validation all agree on what a citation looks like
-byte-for-byte. Knight-Leveson: stdlib only (re, os, pathlib); the sqlite3 conn
+byte-for-byte. Knight-Leveson: stdlib only (os, pathlib); the sqlite3 conn
 is passed in. Spec §5.2 (refresh); v1.0.5 (extract stopword/date filter).
 
 SPEC-5 Task 8: capture() (PostToolUse research-tool citation harvesting) and its
@@ -62,7 +62,7 @@ def extract_citations(text: str) -> list[tuple[str, int, str]]:
 # --- refresh: docs/CITATIONS.md (on mtime change) -> rebuilt canonical_citations --
 
 def refresh_if_stale(conn) -> None:
-    """if docs/CITATIONS.md mtime exceeds stored mtime, rebuild canonical_citations.
+    """if docs/CITATIONS.md mtime differs from stored mtime, rebuild canonical_citations.
 
     Spec §5.2. Called by dispatch.py after the sqlite connect, before any predicate
     runs. Single source of truth: both the path AND the stored mtime live in the
@@ -102,7 +102,9 @@ def refresh_if_stale(conn) -> None:
 def _rebuild_canonical(conn, cfg_path: str) -> None:
     """DELETE FROM canonical_citations + INSERT extracted cites. Caller manages txn."""
     text = Path(cfg_path).read_text(encoding="utf-8")
-    rows = list({(m.group(0).strip(),) for m in _CITATION_RX.finditer(text)})
+    # group(0) is anchored [A-Z]...\d{4}, so it never carries surrounding whitespace.
+    # The set dedups: `cite` is the PRIMARY KEY and the INSERT below has no OR IGNORE.
+    rows = list({(m.group(0),) for m in _CITATION_RX.finditer(text)})
     conn.execute("DELETE FROM canonical_citations")
     if rows:
         conn.executemany(

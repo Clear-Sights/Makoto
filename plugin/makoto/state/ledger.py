@@ -8,10 +8,16 @@ read the fields the live hook actually emits — never a hand-built shape.
 Pure data layer: callers pass an open sqlite3 connection whose `ledger` table
 matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts).
 """
+import fcntl
+import hashlib
+import json
 import re
+from pathlib import Path
+from typing import Optional
 
 from makoto.checks import normalize_path
 from makoto.kit import bash_output_text, is_test_runner
+from makoto.state.store import _state_dir as _chain_state_dir
 
 _PATH_IN_CMD_RX = re.compile(r"[\w.\-]+/[\w.\-]+\.\w+|`?([\w.\-]+\.\w+)`?")
 
@@ -35,8 +41,9 @@ def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) 
     resolution for the chain write only (see `store_root`); sqlite's own root always comes from
     `conn`, unaffected."""
     tool = ev.get("tool_name", "")
+    tool_input = ev.get("tool_input", {})
     if tool in ("Write", "Edit", "MultiEdit"):
-        key = normalize_path(ev.get("tool_input", {}).get("file_path", ""))
+        key = normalize_path(tool_input.get("file_path", ""))
         if not key:
             return
         # §7.1 content-depth: a Write states the file's FULL content, so record its stripped
@@ -45,7 +52,7 @@ def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) 
         # (the file is not zero-byte just because a patch is small), so they stay value=None.
         value = None
         if tool == "Write":
-            content = ev.get("tool_input", {}).get("content", "")
+            content = tool_input.get("content", "")
             value = str(len((content or "").strip()))
         _upsert(conn, key, "touched", value, None, event_id, session_id, root=root)
     elif tool == "Bash":
@@ -57,11 +64,9 @@ def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) 
         # "=== 3 failed ===" is never consulted (the cat-a-log FP firewall). Store the OUTPUT TAIL,
         # where the pass/fail VERDICT ('=== N failed/passed in Xs ===') always lives; any other Bash
         # stays kind='value' with the head, exactly as before.
-        cmd = ev.get("tool_input", {}).get("command", "") or ""
-        if is_test_runner(cmd):
-            _upsert(conn, _bash_key(ev), "testrun", text[-500:], exit_code, event_id, session_id, root=root)
-        else:
-            _upsert(conn, _bash_key(ev), "value", text[:500], exit_code, event_id, session_id, root=root)
+        cmd = tool_input.get("command", "") or ""
+        kind, value = ("testrun", text[-500:]) if is_test_runner(cmd) else ("value", text[:500])
+        _upsert(conn, _bash_key(ev), kind, value, exit_code, event_id, session_id, root=root)
 
 
 def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=None) -> None:
@@ -189,14 +194,6 @@ def latest_testrun(conn, session_id: str) -> str:
 # Relationship to the sqlite surface above: sqlite stays the latest-wins QUERY INDEX; this is
 # the tamper-evident RECORD. Two surfaces, one module, no third store (rule 5).
 # =============================================================================================
-import fcntl
-import hashlib
-import json as _json
-from pathlib import Path
-from typing import Optional
-
-from makoto.state.store import _state_dir as _chain_state_dir
-
 _DEFAULT_STREAM = "chain"
 OPEN = "open"
 
@@ -210,7 +207,7 @@ def norm_sha256(content: str) -> str:
 
 def _dumps(row: dict) -> str:
     """The one byte-stable JSON line every write shares: sorted keys, unicode kept, compact."""
-    return _json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
 def canonical(row: dict) -> str:
@@ -274,7 +271,7 @@ def read(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> list:
             if not stripped:
                 continue
             try:
-                rows.append(_json.loads(stripped))
+                rows.append(json.loads(stripped))
             except ValueError:
                 break
     return rows
@@ -323,7 +320,7 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
         if not stripped:
             continue
         try:
-            row = _json.loads(stripped)
+            row = json.loads(stripped)
         except ValueError:
             return idx
         if not isinstance(row, dict):
@@ -378,7 +375,6 @@ decision itself is re-derived from the transcript on every evaluation, never rea
 row (`record_ack_block_if_new` only avoids duplicate chain rows across repeated Stops -- see its
 own docstring).
 """
-import json
 _ACK_RX = re.compile(
     r"makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
 # [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon

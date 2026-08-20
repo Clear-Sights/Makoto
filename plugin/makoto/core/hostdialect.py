@@ -82,18 +82,26 @@ _FIELD_ALIASES = {
 }
 
 
+def _present(value) -> bool:
+    """Does the payload actually carry this value? The empty string counts as ABSENT.
+
+    One rule, one place: a host that sends `"conversation_id": ""` has told us nothing, and
+    treating that as a filled protocol field would let an empty spelling shadow a real one."""
+    return value not in (None, "")
+
+
 def alias_index(known) -> dict:
     """Map every unambiguous case-folded spelling of `known` to its canonical member.
 
     Derived from the caller's own event set (see the module docstring): a name is folded only if
     its lowercase form belongs to exactly one known name, so a caller whose table already
     distinguishes two names by case keeps deciding those by exact match alone."""
-    counts: dict = {}
+    folded: dict = {}
     for name in known:
         if isinstance(name, str):
-            counts[name.lower()] = counts.get(name.lower(), 0) + 1
-    return {name.lower(): name for name in known
-            if isinstance(name, str) and counts.get(name.lower()) == 1}
+            low = name.lower()
+            folded[low] = None if low in folded else name   # a second spelling refuses the fold
+    return {low: name for low, name in folded.items() if name is not None}
 
 
 def canonical_event(event, known):
@@ -121,8 +129,9 @@ def _as_response_dict(value):
         try:
             decoded = json.loads(value)
         except Exception:
-            return {"output": value}
-        return decoded if isinstance(decoded, dict) else {"output": value}
+            decoded = None
+        if isinstance(decoded, dict):
+            return decoded
     return {"output": value}
 
 
@@ -156,10 +165,10 @@ def normalize_payload(payload: dict, known_events) -> tuple:
         out["hook_event_name"] = canon
 
     for field, sources in _FIELD_ALIASES.items():
-        if out.get(field) not in (None, ""):
+        if _present(out.get(field)):
             continue                                  # host already speaks the protocol
         for src in sources:
-            if out.get(src) in (None, ""):
+            if not _present(out.get(src)):
                 continue
             value = out[src]
             out[field] = _as_response_dict(value) if field == "tool_response" else value
@@ -171,7 +180,7 @@ def normalize_payload(payload: dict, known_events) -> tuple:
     if target is not None:
         ti = out.get("tool_input")
         evidence = _TOOL_EVIDENCE.get(tool)
-        if isinstance(ti, dict) and (evidence is None or ti.get(evidence) not in (None, "")):
+        if isinstance(ti, dict) and (evidence is None or _present(ti.get(evidence))):
             notes["tool_name"] = tool
             out["tool_name"] = target
 

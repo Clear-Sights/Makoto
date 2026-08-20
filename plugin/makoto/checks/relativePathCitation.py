@@ -18,27 +18,31 @@ Detection is DELIBERATELY narrow and syntactic (never a judgment call about whet
     documented convention: "include the pattern file_path:line_number").
   - Already-absolute ('/...') tokens are not flagged -- they ARE clickable.
   - A token inside a fenced code block (```...```) is code being shown, not a citation being
-    made, so it is excluded (same fence-parity discipline `session/commitments.py` uses).
+    made, so it is excluded (same fence-parity discipline `state/commitments.py` uses).
   - A token immediately preceded by a URL scheme (http://, https://, ftp://) is excluded -- a URL
     path segment is not a filesystem citation.
   - A dotted CODE IDENTIFIER (`Finding.source_event_id`, `obj.method`) or a version/pattern id
     ("v1.2", "1.4.1") is excluded by requiring the post-dot segment to be a plausible lowercase
     file extension, never purely digits and never capitalized (same firewall
-    `session/commitments.py::_is_file_shaped` already uses for exactly this false-positive
+    `state/commitments.py::_is_file_shaped` already uses for exactly this false-positive
     class).
 """
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from typing import Optional
 
 from makoto.vocab import Finding
 
 # A plausible file EXTENSION: short, lowercase, alphanumeric, not purely numeric -- the same
-# firewall session/commitments.py::_is_file_shaped uses to separate a real filename from a
+# firewall state/commitments.py::_is_file_shaped uses to separate a real filename from a
 # dotted code identifier or a version/pattern id.
 _EXT_RX = r"[a-z][a-z0-9]{0,4}"
-# A directory-qualified path: at least one '<segment>/' before a dotted basename.
+# A directory-qualified path: at least one '<segment>/' before a dotted basename. NOTE the two
+# alternatives are not symmetric: the `~/` branch admits only a dotted basename DIRECTLY under the
+# home root ('~/foo.py'), because no '<segment>/' repetition follows it -- '~/.claude/foo.py' is
+# not matched today, and the leading-'/' lookbehind blocks re-entry at the inner '.claude/foo.py'.
 _DIR_QUALIFIED_RX = re.compile(
     rf"(?<![\w/.~-])((?:~/|(?:[\w.-]+/)+)[\w.-]*\.{_EXT_RX}(?::\d+)?)(?![\w/])"
 )
@@ -52,10 +56,13 @@ _URL_SCHEME_RX = re.compile(r"(?:https?|ftp)://[\w.\-/]*$")
 _FENCE_RX = re.compile(r"(?m)^\s{0,3}```")
 
 
-def _in_fence(text: str, offset: int) -> bool:
+def _in_fence(fence_ends: list, offset: int) -> bool:
     """True iff `offset` sits inside a ```fenced code block``` -- an ODD count of ``` fences
-    before it means so (same parity trick `session/commitments.py::_promise_location` uses)."""
-    return len(_FENCE_RX.findall(text[:offset])) % 2 == 1
+    before it means so (same parity trick `state/commitments.py::_promise_location` uses).
+    Identical to `len(_FENCE_RX.findall(text[:offset])) % 2 == 1`: a marker is counted by that
+    prefix scan exactly when it ends at or before `offset`, i.e. when it fits wholly inside the
+    prefix, which is what `bisect_right` over the marker END offsets counts."""
+    return bisect_right(fence_ends, offset) % 2 == 1
 
 
 def _after_url_scheme(text: str, start: int) -> bool:
@@ -64,19 +71,29 @@ def _after_url_scheme(text: str, start: int) -> bool:
     return bool(_URL_SCHEME_RX.search(text[max(0, start - 32):start]))
 
 
-def find_relative_citations(text: str) -> list:
+def find_relative_citations(text: str) -> list[tuple[str, int]]:
     """Return [(path, offset), ...] for every non-absolute, non-URL, non-fenced path-shaped
     citation in `text`, in order of first appearance, each path reported once."""
     if not text:
         return []
+    # End offset of every ``` fence marker, ascending -- scanned ONCE per call so the parity test
+    # in `_in_fence` is a bisect, not a fresh whole-prefix scan per candidate (that form was
+    # quadratic: a long turn citing many paths re-scanned the text once per citation). Inlined
+    # rather than extracted: tests/test_gate_shape.py pins this module's top-level def count.
+    fence_ends = [m.end() for m in _FENCE_RX.finditer(text)]
     seen = set()
     out = []
     for rx in (_DIR_QUALIFIED_RX, _BARE_CITATION_RX):
         for m in rx.finditer(text):
             path = m.group(1)
+            # Belt-and-braces: the absolute-path and URL guards are ALREADY implied by the two
+            # patterns' shared `(?<![\w/.~-])` lookbehind -- no match can begin with '/', and none
+            # can begin right after the '/' or host chars a URL prefix ends in -- so neither can
+            # fire as written. Both are kept as the explicit statement of intent that survives a
+            # future loosening of that lookbehind. The fence guard is the live one.
             if path.startswith("/"):
                 continue                              # already absolute -> clickable, not flagged
-            if _in_fence(text, m.start()):
+            if _in_fence(fence_ends, m.start()):
                 continue                              # code being shown, not a citation
             if _after_url_scheme(text, m.start()):
                 continue                              # a URL path segment, not a filesystem path
@@ -112,6 +129,12 @@ def relative_path_gate(text: str) -> Optional[Finding]:
 
 
 from makoto.registry import Check as _Check
+# `may_block=True` alongside posture="ADVISE" is the same structural-eligibility-only declaration
+# selfWiredCheck.py carries: dispatch._blocking_gate_ids() keys off may_block alone, so the finding
+# does reach _emit_decision -- where it folds to verdict.ADVISE, and the Stop/SubagentStop wire
+# table has no ADVISE entry, so it renders {} and never denies. The never-blocks guarantee rests on
+# posture=="ADVISE" plus level="advisory", not on this flag (pinned by
+# tests/test_dispatch.py::test_dispatch_relative_path_citation_gate_never_blocks_even_when_it_fires).
 CHECK = _Check(id="gate.relative_path_citation", applies_at="Stop", posture="ADVISE",
                tests="PATTERN_MATCH",
                eats=frozenset({"text"}),

@@ -43,7 +43,22 @@ _LEAD_RUNNER_RX = re.compile(
     r"|bazel\s+test|dotnet\s+test|gradle\s+(?:test|check)|mvn\s+test|phpunit|rspec|ctest"
     r"|dune\s+(?:test|build)|swift\s+test)\b"
 )
-_WRAPPERS = ("sudo", "env", "time", "nice", "exec", "command", "builtin")
+_WRAPPERS = frozenset({"sudo", "env", "time", "nice", "exec", "command", "builtin"})
+_PYTHON_RX = re.compile(r"python[0-9.]*")
+# Launcher -> the subcommands after which the next token is the delegated runner.
+_LAUNCHER_SUBCOMMANDS = {
+    "poetry": ("run",), "uv": ("run",), "pdm": ("run",), "hatch": ("run",),
+    "pipenv": ("run",), "pnpm": ("exec", "dlx"),
+}
+
+
+def _skip_assignments(toks: list, i: int) -> int:
+    """Advance past leading ``VAR=value`` tokens."""
+    while i < len(toks) and "=" in toks[i] and not toks[i].startswith("-"):
+        i += 1
+    return i
+
+
 def _is_runner_command(c: str) -> bool:
     """True iff the statement's LEADING command (after VAR= / wrappers / launcher prefixes) is a verifier.
 
@@ -52,23 +67,18 @@ def _is_runner_command(c: str) -> bool:
     FP-SAFE: `python -m pip install` / `poetry run python app.py` keep a NON-runner leading -> never fire.
     """
     toks = c.strip().split()
-    i = 0
-    while i < len(toks) and "=" in toks[i] and not toks[i].startswith("-"):
-        i += 1
+    i = _skip_assignments(toks, 0)
     while i < len(toks) and toks[i] in _WRAPPERS:
-        i += 1
-        while i < len(toks) and "=" in toks[i] and not toks[i].startswith("-"):
-            i += 1
+        i = _skip_assignments(toks, i + 1)
     # Strip ONE launcher prefix that delegates to a real runner (the runner then leads).
     if i < len(toks):
         t = toks[i]
-        if re.match(r"^python[0-9.]*$", t) and i + 1 < len(toks) and toks[i + 1] == "-m":
+        nxt = toks[i + 1] if i + 1 < len(toks) else None
+        if _PYTHON_RX.fullmatch(t) and nxt == "-m":
             i += 2
         elif t == "npx":
             i += 1
-        elif t in ("poetry", "uv", "pdm", "hatch", "pipenv") and i + 1 < len(toks) and toks[i + 1] == "run":
-            i += 2
-        elif t == "pnpm" and i + 1 < len(toks) and toks[i + 1] in ("exec", "dlx"):
+        elif nxt is not None and nxt in _LAUNCHER_SUBCOMMANDS.get(t, ()):
             i += 2
     return bool(_LEAD_RUNNER_RX.match(" ".join(toks[i:])))
 
@@ -88,10 +98,9 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
         if not _is_runner_command(" ".join(argv)):
             continue
         next_argv = segments[idx + 1][0] if idx + 1 < len(segments) else []
-        if operator == "||" and next_argv in (["true"], [":"]):
-            reason = "verifier failure masked by `|| true`"
-        elif operator == ";" and next_argv in (["true"], [":"]):
-            reason = "verifier failure masked by `; true`"  # `; true` makes exit 0 regardless
+        if operator in ("||", ";") and next_argv in (["true"], [":"]):
+            # Either shape forces the statement's exit to 0 regardless of the runner's.
+            reason = f"verifier failure masked by `{operator} true`"
         elif set_e:
             reason = "`set +e` disables exit-on-error around a verifier"
         if reason:

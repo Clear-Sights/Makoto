@@ -182,13 +182,6 @@ def recur_stuck(calls: list) -> bool:
     fresh success (even a lone one, not itself part of a run>=2) for a key overwrites an earlier
     bad verdict for that same key and resets its transient budget. See
     docs/adr/0022-recur-stuck-latest-run-wins.md for the decision history."""
-    def _no_info_err(c) -> bool:
-        return interrupted(c) or bool(self_error_code(c))
-
-    def _transient_err(c) -> bool:
-        error = self_error_code(c)
-        return _no_info_err(c) and error is not None and classify_failure(str(error)) is False
-
     def _run_is_bad(key, length, all_err, all_transient) -> bool:
         if length < 2 or not all_err:
             return False
@@ -202,8 +195,11 @@ def recur_stuck(calls: list) -> bool:
     run_len = 0
     for c in calls or ():
         key = (c.get("name", ""), _canon_input(c.get("input")))
-        call_err = _no_info_err(c)
-        call_transient = _transient_err(c)
+        call_err = timed_out(c)          # the same direct-error-state terminal the gate installs
+        error = self_error_code(c)
+        # a confidently transient, self-reported failure is budgeted, not counted as stuck yet
+        call_transient = (call_err and error is not None
+                          and classify_failure(str(error)) is False)
         if not call_err:
             transient_failures[key] = 0
         elif call_transient:
@@ -322,26 +318,27 @@ def calls_from_history(history) -> list:
     presence-of-work discharge. Fail-open per row (a malformed row is skipped, via `_decode_row`)."""
     decoded = [d for d in (_decode_row(r) for r in (history or ())) if d is not None]
 
-    # pair each PostToolUse to the nearest PRECEDING still-unpaired identical PreToolUse.
-    paired_pre: set = set()
-    for j, (etype, name, ti, _tr) in enumerate(decoded):
-        if etype != "PostToolUse":
-            continue
+    # pair each PostToolUse to the nearest PRECEDING still-unpaired identical PreToolUse: one
+    # pass, keeping a per-key STACK of the Pre indices still waiting for a terminal. Popping that
+    # stack yields exactly the nearest preceding unpaired Pre a backward rescan would have found,
+    # while computing `_pairing_input` once per row instead of once per (Post, candidate) pair.
+    unpaired_pre: dict = {}
+    for i, (etype, name, ti, _tr) in enumerate(decoded):
         key = (name, _pairing_input(ti))
-        for i in range(j - 1, -1, -1):
-            if i in paired_pre:
-                continue
-            et2, n2, ti2, _ = decoded[i]
-            if et2 == "PreToolUse" and (n2, _pairing_input(ti2)) == key:
-                paired_pre.add(i)
-                break
+        if etype == "PreToolUse":
+            unpaired_pre.setdefault(key, []).append(i)
+        elif etype == "PostToolUse":
+            waiting = unpaired_pre.get(key)
+            if waiting:
+                waiting.pop()
+    dangling_pre = {i for waiting in unpaired_pre.values() for i in waiting}
 
     last_index = len(decoded) - 1
     out: list = []
     for i, (etype, name, ti, tr) in enumerate(decoded):
         if etype == "PostToolUse":
             out.append({"name": name, "input": ti, "result": tr})
-        elif i not in paired_pre and i != last_index:
+        elif i in dangling_pre and i != last_index:
             # dangling PreToolUse, NOT the last tool-related row before Stop -> mid-turn
             # abandonment: something else happened afterward and this call was still never
             # resolved. Synthesize the failure Call. (If i == last_index it is left silent —
@@ -399,10 +396,10 @@ def _release_clause(cid: str) -> str:
     Generated per-id rather than written per-entry so a primitive cannot be added to
     CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —
     the affordance is structural, not prose that the next author must remember to copy."""
-    return (f" If this finding is a genuinely unresolvable, already-reviewed block — or a "
+    return (" If this finding is a genuinely unresolvable, already-reviewed block — or a "
             f"misfire you have verified — say exactly `makoto release.operator {cid}: <reason>` "
-            f"in a real (non-tool, non-quoted) reply; that is the only discharge other than "
-            f"changing what the detector actually reads.")
+            "in a real (non-tool, non-quoted) reply; that is the only discharge other than "
+            "changing what the detector actually reads.")
 
 
 def fired_primitives(history) -> Iterable:

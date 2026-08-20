@@ -44,17 +44,16 @@ Detection (FP-SAFE BY DESIGN):
      "URL seen in a prior tool_result" short-circuit).
   5. Otherwise the SHA is presented as proof with no work behind it -> fire.
 
-Warning-level + fail-open: never blocks (never restricts the user); any decode
-or shape failure returns None. Graduate to error after the adversary loop
-confirms zero FP.
+Error-level + BLOCK posture (graduated from warning once the adversary loop
+confirmed zero FP). A fire is a blocking decision on the AI's OWN Stop claim,
+never a restriction on a USER-directed action; any decode or shape failure
+returns None.
 
 Knight-Leveson: stdlib re + json only; no network/LLM in the hot path.
 """
 from __future__ import annotations
 import re
 from typing import Optional
-from makoto.vocab import Finding
-from makoto.registry import Check
 from makoto.kit import claim_vs_history_predicate, iter_tool_events, raw_payload_str
 from makoto.vocab import _QUOTED_RX  # L0 shared lexicon (dedup: was a byte-identical local copy)
 
@@ -178,7 +177,6 @@ _NEG_REF_RX = re.compile(
     | \bregarding\s+the\s+commit\b          # "Regarding the commit <sha>..."
     | \babout\s+the\s+commit\b
     | \bthe\s+commit\b[^\n]{0,12}?\byou\b   # "the commit <sha> you ..."
-    | \bnot\s+committed\b
     # PRE-EXISTING / UPSTREAM frame: a commit that already existed BEFORE this
     # session — a debugging-AI attributing a regression to a prior commit, not
     # presenting its OWN just-done work. "<sha> was pushed before I started",

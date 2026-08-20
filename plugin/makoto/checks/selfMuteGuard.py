@@ -61,6 +61,12 @@ _GLOBAL_DISABLE_RX = re.compile(r'"disableAllHooks"\s*:\s*true\b', re.IGNORECASE
 # the un-wire branch (which keys on `_makoto_managed`) misses because the marker stays in both.
 
 
+def _around(text: str, m: "re.Match") -> str:
+    """40 chars of context either side of a match. Snippet/observability only -- the verdict
+    is already settled by the match itself, so this never feeds a decision."""
+    return text[max(0, m.start() - 40): m.end() + 40]
+
+
 def _removed_text(tool_input: dict) -> str:
     """text being REMOVED/REPLACED: Edit.old_string or MultiEdit edits' old_strings."""
     old = tool_input.get("old_string") or ""
@@ -84,14 +90,13 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     reason = None
     snippet = ""
     m = _DISABLE_ENV_RX.search(new_content) or _DISABLE_PATTERNS_RX.search(new_content)
-    gm = _GLOBAL_DISABLE_RX.search(new_content)
     if m:
         reason = f"introduces makoto-disabling env var ({m.group(0).strip()!r})"
-        snippet = new_content[max(0, m.start() - 40): m.end() + 40]
-    elif gm:
+        snippet = _around(new_content, m)
+    elif gm := _GLOBAL_DISABLE_RX.search(new_content):
         # NEW-1: a global hook kill-switch silences EVERY hook (makoto included) in one move.
         reason = "introduces a global hook kill-switch (`disableAllHooks: true`)"
-        snippet = new_content[max(0, gm.start() - 40): gm.end() + 40]
+        snippet = _around(new_content, gm)
     elif _MANAGED_RX.search(removed) and not _MANAGED_RX.search(new_content):
         # un-wiring: a `_makoto_managed` hook in the REMOVED text, gone from the new text.
         reason = "removes makoto's `_makoto_managed` hook entry (un-wires the guard)"

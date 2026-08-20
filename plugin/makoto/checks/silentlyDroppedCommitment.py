@@ -19,17 +19,22 @@ _DROP_NEG_FRAME_RX = re.compile(
     r"rather\s+than|instead\s+of|avoid|without|no\s+need\s+to|not\s+going\s+to)\b", re.I)
 _DROP_SYMDEF = r"(?:async\s+def|def|class|const|function)\s+([A-Za-z_]\w*)"
 _DROP_PRE = rf"{_DROP_FORWARD}\s+(?:\w+\s+){{0,2}}?{_DROP_VERB}\b"
+_DROP_DET = r"(?:a\s+|an\s+|the\s+|new\s+)*"
+def _drop_loc_tail(preps):
+    """The OPTIONAL trailing '<preposition> <path>' locator the claim regexes share — same body
+    (clause-bounded, non-greedy, capturing `loc`), only the preposition set differs per kind."""
+    return rf"(?:\b[^.;\n]*?\b(?:{preps})\s+(?P<loc>{_DROP_PATH}))?"
 _DROP_RX_COUNT = re.compile(
     rf"{_DROP_PRE}\s+(?:a\s+|an\s+|the\s+)?(\d+)\s+(?:new\s+|more\s+|additional\s+)?({_DROP_THING})"
-    rf"(?:\b[^.;\n]*?\b(?:to|in|into|inside|for|under|within)\s+(?P<loc>{_DROP_PATH}))?", re.I)
+    + _drop_loc_tail("to|in|into|inside|for|under|within"), re.I)
 _DROP_RX_LINES = re.compile(
     rf"{_DROP_PRE}\s+(?:lines?\s+)(\d+)\s*(?:-|–|to|through|thru)\s*(\d+)"
-    rf"(?:\b[^.;\n]*?\b(?:of|in|to|into|within)\s+(?P<loc>{_DROP_PATH}))?", re.I)
+    + _drop_loc_tail("of|in|to|into|within"), re.I)
 _DROP_RX_SYMBOL = re.compile(
-    rf"{_DROP_PRE}\s+(?:a\s+|an\s+|the\s+|new\s+)*{_DROP_SYMDEF}"
-    rf"(?:\b[^.;\n]*?\b(?:to|in|into|inside|within)\s+(?P<loc>{_DROP_PATH}))?", re.I)
+    rf"{_DROP_PRE}\s+{_DROP_DET}{_DROP_SYMDEF}"
+    + _drop_loc_tail("to|in|into|inside|within"), re.I)
 _DROP_RX_ARTIFACT = re.compile(
-    rf"{_DROP_PRE}\s+(?:a\s+|an\s+|the\s+|new\s+)*(?:file\s+|module\s+|script\s+|config\s+)?(?P<loc>{_DROP_PATH})", re.I)
+    rf"{_DROP_PRE}\s+{_DROP_DET}(?:file\s+|module\s+|script\s+|config\s+)?(?P<loc>{_DROP_PATH})", re.I)
 # Counts a defined callable in ANY surface form, so a "create N functions/helpers" count-claim
 # discharges against lambda/arrow/partial-bound helpers too (the measured FP: 3 lambda-assigned
 # helpers left the def-only counter at 0 and false-fired). Forms: py `def`/`class`; JS
@@ -63,31 +68,34 @@ def _drop_extract_forward_claims(text):
         pre = text[max(0, m.start() - 24):m.start()]
         return bool(_DROP_NEG_FRAME_RX.search(pre) or _DROP_NEG_FRAME_RX.search(m.group(0)[:40]))
 
-    for m in _DROP_RX_LINES.finditer(text):
-        if _overlaps(m.start(), m.end()) or _negated(m) or not m.group("loc"):
-            continue
+    def _candidates(rx, *, require_loc=False):
+        """Live (unconsumed, unnegated) matches of `rx`. Lazy on purpose: `consumed` keeps
+        growing as the caller appends the spans it actually turns into claims, so a match the
+        caller SKIPS (n<=0, unlocatable artifact) leaves its span free for a later kind."""
+        for m in rx.finditer(text):
+            if _overlaps(m.start(), m.end()) or _negated(m):
+                continue
+            if require_loc and not m.group("loc"):
+                continue
+            yield m
+
+    for m in _candidates(_DROP_RX_LINES, require_loc=True):
         lo, hi = int(m.group(1)), int(m.group(2))
         if hi < lo:
             lo, hi = hi, lo
         claims.append(("line_range", m.group("loc"), (lo, hi), m.group(0)))
         consumed.append((m.start(), m.end()))
-    for m in _DROP_RX_COUNT.finditer(text):
-        if _overlaps(m.start(), m.end()) or _negated(m) or not m.group("loc"):
-            continue
+    for m in _candidates(_DROP_RX_COUNT, require_loc=True):
         n = int(m.group(1))
         if n <= 0:
             continue
         claims.append(("count", m.group("loc"), n, m.group(0)))
         consumed.append((m.start(), m.end()))
-    for m in _DROP_RX_SYMBOL.finditer(text):
-        if _overlaps(m.start(), m.end()) or _negated(m):
-            continue
+    for m in _candidates(_DROP_RX_SYMBOL):
         sym = m.group(1)
         claims.append(("named_symbol", m.group("loc") or sym, sym, m.group(0)))
         consumed.append((m.start(), m.end()))
-    for m in _DROP_RX_ARTIFACT.finditer(text):
-        if _overlaps(m.start(), m.end()) or _negated(m):
-            continue
+    for m in _candidates(_DROP_RX_ARTIFACT):
         loc = m.group("loc")
         if not loc or not re.search(r"[\w-]+\.[A-Za-z]", loc):
             continue

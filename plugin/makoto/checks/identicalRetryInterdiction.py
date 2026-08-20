@@ -24,8 +24,8 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from makoto.kit import classify_failure
-from makoto.kit import bash_output_text, decode_history_event, failure_terminal_result
+from makoto.kit import (bash_output_text, classify_failure, decode_history_event,
+                        failure_terminal_result)
 from makoto.vocab import Finding
 from makoto.registry import Check
 
@@ -57,10 +57,10 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     # INCLUDE failed terminals: this check reasons about the immediately prior failed attempt.
     if event_type not in ("PostToolUse", "PostToolUseFailure"):
         return None
-    ti = ev.get("tool_input", {}) or {}
+    ti = ev.get("tool_input") or {}
     if event_type == "PostToolUseFailure":
         return ti, failure_terminal_result(ev)["error"]
-    tr = ev.get("tool_response", {}) or {}
+    tr = ev.get("tool_response") or {}
     text = bash_output_text(tr) if isinstance(tr, dict) else str(tr)
     return ti, text
 
@@ -75,7 +75,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     if prior is None:
         return None
     prior_input, prior_result_text = prior
-    current_input = current_event.get("tool_input", {}) or {}
+    current_input = current_event.get("tool_input") or {}
     if _canon_input(prior_input) != _canon_input(current_input):
         return None                          # not a retry of the SAME call -- silent
     if classify_failure(prior_result_text) is not True:

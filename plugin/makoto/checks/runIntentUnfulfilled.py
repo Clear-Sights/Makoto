@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from typing import Optional
 
 from makoto.vocab import Finding
@@ -53,6 +54,12 @@ from makoto.kit import decode_history_event, decode_history_row
 # every history-based gate in this catalog already lives with (`_select_recent`).
 
 
+# The first sentence-terminating character after a match -- the question veto below reads only
+# whether that character is '?'. Not vocab.py's `_SENTENCE_SPLIT_RX` (which splits on a boundary
+# plus its trailing whitespace); this one has to name the terminator itself.
+_SENTENCE_END_RX = re.compile(r"[.!?\n]")
+
+
 def _run_intent_claim(text: str):
     """Return the re.Match of a first-person forward run-intent promise in `text`, else None.
     Mirrors claimedRunningAbsent._running_claim's shape: quoted/fenced spans excluded, a negated
@@ -69,12 +76,8 @@ def _run_intent_claim(text: str):
             continue                                  # "I'll never run ..." -- filler swallowed 'never'
         if _RUN_INTENT_IDIOM_VETO_RX.search(text[b:b + 40]):
             continue                                  # "run it by you" / "run through" / "run the numbers"
-        stop = len(text)
-        for i in range(b, min(len(text), b + 200)):
-            if text[i] in ".!?\n":
-                stop = i
-                break
-        if text[stop:stop + 1] == "?":
+        end = _SENTENCE_END_RX.search(text, b, b + 200)
+        if end is not None and end.group(0) == "?":
             continue                                  # a question, not a declarative promise
         return m
     return None

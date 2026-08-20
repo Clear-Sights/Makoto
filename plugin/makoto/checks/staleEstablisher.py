@@ -1,25 +1,31 @@
-"""makoto.checks.staleEstablisher -- the ground-truth staleness detector (OPT-IN, ADVISORY
-tier, NEVER BLOCK). Ported BY SHAPE (rule 5) from `assay/assay/patterns/stale_establisher.py`,
-re-homed onto Makoto's own `checks._planNode.Plan`.
+"""makoto.checks.staleEstablisher -- the ground-truth staleness detector (ADVISORY tier,
+NEVER BLOCK; inert until a project declares a plan). Ported BY SHAPE (rule 5) from
+`assay/assay/patterns/stale_establisher.py`, re-homed onto Makoto's own
+`substrate._planNode.Plan`.
 
 Fires when a plan node's establisher is recorded DONE but the artifact it named no longer
-exists on disk -- the one gap `checks._planNode.Plan`'s pure name->status scan cannot see,
+exists on disk -- the one gap `substrate._planNode.Plan`'s pure name->status scan cannot see,
 because a node's `status` is a claim about history, never a live filesystem read. This is the
-ONE deliberate, explicitly opt-in departure from every other check's content-blind,
-filesystem-blind design (an `os.path.exists` call). DETECTIVE tier: a fired verdict is an
-ADVISORY, never a deny -- escalating this to a blocking tier is a product decision left to the
-caller, not made here.
+ONE deliberate departure from every other check's content-blind, filesystem-blind design (an
+`os.path.exists` call); the only thing gating it is the declared plan itself -- given one it
+runs on EVERY Stop, with no per-check enable/disable switch. DETECTIVE tier: a fired verdict
+is an ADVISORY, never a deny -- escalating this to a blocking tier is a product decision left
+to the caller, not made here.
 
-WIRING (deliberately NOT via `registry.load_stopchecks`'s GATE discovery): every id that
-mechanism discovers auto-BLOCKS by construction ("discovered<=>live<=>blocking -- no shadow
-tier", see `checks/_shared.py`) -- exactly the tier this check must never enter. Instead,
-`makoto/dispatch.py`'s `run_stop_checks` calls `check(ctx.plan)` directly and appends its
-Finding to the audited-but-never-blocking list (its `pattern_id` never enters
-`_blocking_gate_ids()`, so it is STRUCTURALLY incapable of blocking, not just labeled advisory).
-This module still exports a `CHECK` (posture=ADVISE) purely for `checks._loader`'s /
-`checks.undeclaredFalsifiable`'s completeness discovery -- it is NOT a `GATE` and is never
-scanned by `load_stopchecks()`'s blocking-id derivation, so it carries none of that
-mechanism's L2-import firewall either.
+WIRING: discovery is the ORDINARY one -- `registry.load_checks(edge="Stop")` finds this
+module's `CHECK` like every other Stop check, and `context.run_stop_checks` appends its Finding
+to the audited-but-never-blocking list. What keeps it out of the blocking tier is `may_block`
+staying at its `False` default: `dispatch._blocking_gate_ids()` is `load_checks(edge="Stop")`
+FILTERED on `may_block`, so this pattern_id can never enter it whatever `.level` its own Finding
+carries -- STRUCTURALLY incapable of blocking, not merely labeled advisory (pinned by
+`tests/test_stale_establisher.py::test_never_discovered_as_a_blocking_stop_gate`). Before the
+2026-07-10 discovery unification this module was instead a direct-call carve-out, because the
+then-current `load_stopchecks()` GATE discovery made every id it found auto-BLOCK by
+construction ("discovered<=>live<=>blocking") -- exactly the tier this check must never enter.
+That mechanism is gone and the carve-out with it; the never-blocks guarantee now rests on
+`may_block=False` alone. Being an ordinarily discovered named check module, this file IS subject
+to the same L2 import firewall as its siblings (tests/test_import_direction.py -- notably, no
+reaching into the sibling `makoto.state.plan` store).
 
 Reads: the declared Plan (never mutated) and `os.path.exists` on each DONE node's `where`.
 Never reads file CONTENT -- existence only, so it stays content-blind even though it is no
@@ -43,19 +49,23 @@ def check(plan: Optional[Plan]) -> Optional[Finding]:
     `None`. `plan=None` (no declared plan) is inert.
 
     Walks the plan in declared order; for each DONE node, checks whether any LATER node shares
-    its passthrough (per the same recurrence rule `checks._planNode` reads) and, only then,
+    its passthrough (per the same recurrence rule `substrate._planNode` reads) and, only then,
     whether the establisher's `where` still exists on disk (the expensive/impure check runs
     last, only when a dependent makes it matter). The first such contradiction fires; a plan
     with none is an affirmative clean pass (`None`)."""
     if plan is None:
         return None
     nodes = plan.nodes()
+    # Last plan-index at which each passthrough-name occurs. Later entries overwrite earlier
+    # ones, so `last_use[p] > i` is exactly "some LATER node shares this name" -- the same
+    # answer as rescanning `nodes[i + 1:]` per DONE node, without that scan's O(n) slice COPY
+    # on the Stop hot path.
+    last_use = {node.passthrough: i for i, node in enumerate(nodes)}
     for i, node in enumerate(nodes):
         if node.status != DONE:
             continue
-        has_dependent = any(later.passthrough == node.passthrough for later in nodes[i + 1:])
-        if not has_dependent:
-            continue
+        if last_use[node.passthrough] <= i:
+            continue          # no dependent -- nobody would misread this gap as satisfied
         if os.path.exists(node.where):
             continue
         return Finding(

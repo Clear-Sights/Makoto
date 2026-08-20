@@ -16,6 +16,22 @@ _DIRECT_TEST_RUNNERS = frozenset({
     "pytest", "py.test", "nox", "tox", "jest", "vitest", "mocha", "ava", "jasmine",
     "rspec", "phpunit", "ctest",
 })
+# Runners whose test intent lives in a target word (`npm test`, `yarn test:ci`, ...).
+_TEST_TARGET_RUNNERS = frozenset({
+    "rails", "npm", "yarn", "pnpm", "make", "just", "mvn", "gradle", "gradlew",
+})
+_LAUNCH_WRAPPERS = frozenset({"command", "nohup", "sudo", "env"})
+# Wrappers that may themselves be followed by another wrapper; the others end the strip.
+_CHAINABLE_WRAPPERS = frozenset({"env", "sudo"})
+_NESTED_SHELL_PROGRAMS = frozenset({"ssh", "sh", "bash", "zsh"})
+_GIT_VALUED_OPTIONS = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace"})
+_PYTHON_RX = re.compile(r"python[0-9.]*")
+_SHORT_FLAG_RX = re.compile(r"-[A-Za-z]+")
+
+
+def _basename(word: str) -> str:
+    """Trailing path component of an argv word (``/usr/bin/git`` -> ``git``)."""
+    return word.rsplit("/", 1)[-1]
 
 
 def _effective_argv(argv):
@@ -23,12 +39,12 @@ def _effective_argv(argv):
     argv = list(argv)
     while argv and _ASSIGNMENT_RX.fullmatch(argv[0]):
         argv.pop(0)
-    while argv and argv[0].rsplit("/", 1)[-1] in {"command", "nohup", "sudo", "env"}:
-        wrapper = argv.pop(0).rsplit("/", 1)[-1]
+    while argv and _basename(argv[0]) in _LAUNCH_WRAPPERS:
+        wrapper = _basename(argv.pop(0))
         while argv and (argv[0].startswith("-") or _ASSIGNMENT_RX.fullmatch(argv[0])):
             # env/sudo options with separate values are intentionally outside this small parser.
             argv.pop(0)
-        if wrapper not in {"env", "sudo"}:
+        if wrapper not in _CHAINABLE_WRAPPERS:
             break
     return argv
 
@@ -59,7 +75,7 @@ def _shell_segments(command: str):
     nested = []
     for argv, _operator in segments:
         effective = _effective_argv(argv)
-        if effective and effective[0].rsplit("/", 1)[-1] in {"ssh", "sh", "bash", "zsh"}:
+        if effective and _basename(effective[0]) in _NESTED_SHELL_PROGRAMS:
             for arg in effective[1:]:
                 if any(ch.isspace() for ch in arg):
                     nested.extend(_shell_segments(arg))
@@ -69,11 +85,10 @@ def _shell_segments(command: str):
 def _git_subcommand(argv):
     args = list(argv[1:])
     while args:
-        if args[0] in {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}:
+        if args[0] in _GIT_VALUED_OPTIONS:
             args = args[2:]
-        elif args[0].startswith(("--git-dir=", "--work-tree=", "--namespace=")):
-            args.pop(0)
         elif args[0].startswith("-"):
+            # Covers the ``--git-dir=...`` glued forms too: value and flag are one word.
             args.pop(0)
         else:
             return args[0], args[1:]
@@ -89,13 +104,13 @@ def _is_test_argv(raw_argv) -> bool:
     argv = _effective_argv(raw_argv)
     if not argv:
         return False
-    program = argv[0].rsplit("/", 1)[-1]
+    program = _basename(argv[0])
     args = argv[1:]
     if program in _DIRECT_TEST_RUNNERS:
         return True
-    if program == "rails":
+    if program in _TEST_TARGET_RUNNERS:
         return _test_target(args)
-    if re.fullmatch(r"python[0-9.]*", program):
+    if _PYTHON_RX.fullmatch(program):
         if any(a == "-m" and b in {"pytest", "unittest"} for a, b in zip(args, args[1:])):
             return True
         return any(a.lstrip("./") in {
@@ -104,10 +119,6 @@ def _is_test_argv(raw_argv) -> bool:
         } for a in args)
     if program in {"go", "cargo"}:
         return "test" in args or (program == "cargo" and "nextest" in args)
-    if program in {"npm", "yarn", "pnpm", "make", "just", "mvn"}:
-        return _test_target(args)
-    if program in {"gradle", "gradlew"}:
-        return _test_target(args)
     if program == "npx":
         nested = [a for a in args if not a.startswith("-")]
         return bool(nested) and _is_test_argv(nested)
@@ -121,7 +132,7 @@ def _is_test_argv(raw_argv) -> bool:
 def _is_git_push_argv(raw_argv) -> bool:
     """True only for a real, non-dry-run ``git push`` argv."""
     argv = _effective_argv(raw_argv)
-    if not argv or argv[0].rsplit("/", 1)[-1] != "git":
+    if not argv or _basename(argv[0]) != "git":
         return False
     subcommand, args = _git_subcommand(argv)
     if subcommand != "push":
@@ -129,7 +140,7 @@ def _is_git_push_argv(raw_argv) -> bool:
     for arg in args:
         if arg == "--dry-run" or arg.startswith("--dry-run="):
             return False
-        if re.fullmatch(r"-[A-Za-z]+", arg) and "n" in arg[1:]:
+        if _SHORT_FLAG_RX.fullmatch(arg) and "n" in arg[1:]:
             return False
     return True
 

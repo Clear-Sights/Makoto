@@ -7,22 +7,25 @@ beyond the lazy-init bootstrap in dispatch._ensure_db_initialized.
 Knight-Leveson: stdlib `sqlite3` only. No LLM, no HTTP.
 
 Connections open in autocommit mode (`isolation_level=None`) so the explicit
-BEGIN/COMMIT/ROLLBACK in refresh_citations is honored verbatim rather than
+BEGIN/COMMIT/ROLLBACK in citations.refresh_if_stale is honored verbatim rather than
 fighting the driver's implicit transaction management. WAL gives concurrent
 readers + a single writer, so parallel hook fires no longer serialize on a
 file-level write lock the way the DuckDB backend did.
 
 Tables (all idempotent via IF NOT EXISTS):
   events              — append-only event log; (session_id, ts) + event_type indexes
-  canonical_citations — Author-Year lookup populated by refresh_citations
+  canonical_citations — Author-Year lookup populated by citations.refresh_if_stale
   config              — key/value seed (canonical_citations_path + _mtime)
   ledger              — results/touches keyed by normalized location, latest-wins
   commitments         — open located commitments the advance gate reads (un-windowed)
   plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
+  plan_item_commitments — forward promises to plan/task LABELS, discharged purely textually
 
-Spec: docs/archive/specs/2026-05-31-makoto-bidirectional-falsifiability-design.md §8 (stores).
+Spec: §8 (stores) of the bidirectional-falsifiability design; that document is no longer
+in-tree — git history is the recovery path.
 """
 from __future__ import annotations
+import os
 import sqlite3
 from pathlib import Path
 
@@ -117,7 +120,7 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
         # discharge (_discharged reads touched_keys/fs_exists, meaningless for a label). Sourced
         # and discharged PURELY TEXTUALLY (a later first-person completion/retraction statement
         # naming the same label); un-windowed by session, same "a promise doesn't expire because
-        # an hour passed" rule `commitments` follows. See session/planItems.py.
+        # an hour passed" rule `commitments` follows. See state/plan.py.
         conn.execute("""
             CREATE TABLE IF NOT EXISTS plan_item_commitments (
                 commitment_key  TEXT PRIMARY KEY,
@@ -155,7 +158,6 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
 # Importable by dispatch.py, citations refresh, and tests without circular imports
 # (Knight-Leveson: stdlib only).
 # =============================================================================================
-import os
 
 
 def _state_dir() -> Path:

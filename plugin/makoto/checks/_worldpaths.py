@@ -42,8 +42,9 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from makoto.kit import _path_components, _suffix_match, pushed_ref_matches_world, resolve_in_worktree
-from makoto.kit import iter_tool_events
+from makoto.kit import _path_components, _suffix_match, iter_tool_events
+# Facade re-exports (see module docstring), not used below:
+from makoto.kit import pushed_ref_matches_world, resolve_in_worktree
 
 # `git -C <dir> pull|fetch` — the dir may be bare, or single/double quoted (spaces, CJK).
 _GIT_C_RX = re.compile(
@@ -67,7 +68,7 @@ def synced_repo_roots(history, cwd, cap=_ROOT_CAP):
     for tool, cmd, _resp in iter_tool_events(history):
         if len(roots) >= cap:
             break
-        if (tool or "") != "Bash" or not cmd:
+        if tool != "Bash" or not cmd:
             continue
         for rx in (_GIT_C_RX, _CD_GIT_RX):
             for m in rx.finditer(cmd):
@@ -84,7 +85,7 @@ def synced_repo_roots(history, cwd, cap=_ROOT_CAP):
                         roots.append(d)
                 except Exception:
                     continue
-    return roots[:cap]
+    return roots[:cap]           # one event can append several roots past the top-of-loop break
 
 
 def resolve_in_synced_repos(loc, roots):
@@ -95,7 +96,7 @@ def resolve_in_synced_repos(loc, roots):
     if not comps or not roots:
         return None
     base = comps[-1]
-    if not base or base in (".", ".."):
+    if base in (".", ".."):
         return None
     for root in roots:
         try:

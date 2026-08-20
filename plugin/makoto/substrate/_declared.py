@@ -2,18 +2,29 @@
 pattern IDs that SHOULD resolve to a live module (SPEC-5 Task 2 Step 6). `{id: file_stem}`.
 
 Every check module landed in this package (Tasks 3-9's ~19 prechecks, ~11 stopchecks, the
-merging Assay checks, and the 27 canon fingerprints) adds ONE entry here, alongside dropping in
-its own `.py` file -- the two are meant to move together; `checks.undeclaredFalsifiable` audits
-that they actually do (a module with no manifest entry is a different, separate concern from
-this file -- see that check's own `orphan_modules`, which needs no manifest at all; this
-manifest exists so a DELETED or RENAMED module, or a manifest entry that never got a module
-written for it, also gets caught -- the entry lingers even after its file is gone/never
-existed).
+merging Assay checks, and the 27 canon fingerprints) is meant to add ONE entry here alongside
+dropping in its own `.py` file -- the two are meant to move together.
 
-Starts containing exactly today's live catalog (just this task's own new check) so the
-completeness check reports zero drift at rest; grows by one line per module Tasks 3-9 land.
+Only ONE of those two directions is machine-audited, and only over the KEYS. `orphan_ids` (in
+`checks.undeclaredFalsifiable`) walks manifest -> reality: an ID listed here that no live
+`CHECK.id` matches is reported, which is why this manifest exists at all -- a deleted module, a
+module whose `CHECK.id` changed, or an entry that never got a module written for it all leave a
+lingering key that gets caught.
+
+Two gaps are NOT covered, and neither is enforced anywhere else:
+  * The file_stem VALUES are never read by any code -- `orphan_ids` iterates keys only. They are
+    documentation, not a validated mapping, so renaming a module's `.py` file while keeping its
+    `CHECK.id` leaves a stem here pointing at a file that no longer exists, silently.
+  * The reality -> manifest direction is unaudited. `orphan_modules` reports on-disk modules that
+    expose no loader-valid `CHECK`; it never compares the catalog against this manifest, so a
+    perfectly live module that was simply never added here is caught by nothing -- and an
+    unlisted module has no key to dangle, so its later deletion goes unreported too.
+Keeping this file complete and its stems truthful is therefore still a hand-maintenance duty.
+
+Started as exactly the live catalog (just this task's own new check) so the completeness check
+reported zero drift at rest; grows by one line per module landed.
 """
-DECLARED_IDS: dict = {
+DECLARED_IDS: dict[str, str] = {
     "gate.undeclared_falsifiable": "undeclaredFalsifiable",
     # content.cert_verify_disabled, content.jwt_signature_disabled, content.cert_none_mode,
     # content.timing_unsafe_compare, content.jwt_none_alg, content.paramiko_host_key_weakened,

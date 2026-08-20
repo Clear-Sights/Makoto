@@ -32,8 +32,8 @@ file or DB I/O anywhere in this module. IMPORTS ONLY stdlib.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Iterable, List, Optional
+from dataclasses import dataclass, replace
+from typing import Dict, Iterable, List, Optional, Set
 
 # node status (the append-only advance: OPEN -> DONE)
 OPEN = "open"
@@ -82,39 +82,41 @@ class Plan:
         node starts OPEN. Returns the stored node."""
         node = PlanNode(what=what, passthrough=passthrough, where=where, id=id, status=status)
         for existing in self._nodes:
-            if existing.id == node.id:
-                if (
-                    existing.what == node.what
-                    and existing.passthrough == node.passthrough
-                    and existing.where == node.where
-                ):
-                    return existing
-                raise ValueError(f"node {node.id!r} already declared with a different shape")
+            if existing.id != node.id:
+                continue
+            if (existing.what, existing.passthrough, existing.where) == (
+                node.what,
+                node.passthrough,
+                node.where,
+            ):
+                return existing
+            raise ValueError(f"node {node.id!r} already declared with a different shape")
         self._nodes.append(node)
         return node
+
+    # --- lookup (the one id -> position scan; shared, never re-implemented) --
+    def _index(self, id: str) -> int:
+        """Position of node ``id`` in ledger order (``KeyError`` if never declared). The FIRST
+        match wins, so a duplicate id (only reachable via ``from_rows``, which does not
+        de-duplicate) resolves to its earliest declaration."""
+        for i, n in enumerate(self._nodes):
+            if n.id == id:
+                return i
+        raise KeyError(id)
 
     # --- advance ------------------------------------------------------------
     def mark_done(self, id: str) -> None:
         """Advance the node ``id`` to DONE in place (``KeyError`` if never declared)."""
-        for i, node in enumerate(self._nodes):
-            if node.id == id:
-                self._nodes[i] = PlanNode(
-                    what=node.what,
-                    passthrough=node.passthrough,
-                    where=node.where,
-                    id=node.id,
-                    status=DONE,
-                )
-                return
-        raise KeyError(id)
+        i = self._index(id)
+        self._nodes[i] = replace(self._nodes[i], status=DONE)
 
     # --- resolution (a live call -> the declared node it advances) ----------
     def resolve(self, where: str, what: Optional[str] = None) -> Optional[str]:
         """Return the id of the declared node a live call at ``where`` advances, else ``None``.
         Prefers an exact ``(where, what)`` match; falls back to the FIRST node at ``where``.
         Among equals prefers the first OPEN node, else the first match."""
-        exact = [n for n in self._nodes if n.where == where and (what is None or n.what == what)]
-        pool = exact if exact else [n for n in self._nodes if n.where == where]
+        at_where = [n for n in self._nodes if n.where == where]
+        pool = [n for n in at_where if what is None or n.what == what] or at_where
         if not pool:
             return None
         for n in pool:
@@ -123,13 +125,7 @@ class Plan:
         return pool[0].id
 
     # --- the GAP rule (dependencies as gaps, read off the ledger by name) ---
-    def _index(self, id: str) -> int:
-        for i, n in enumerate(self._nodes):
-            if n.id == id:
-                return i
-        raise KeyError(id)
-
-    def unmet_deps(self, id: str) -> set:
+    def unmet_deps(self, id: str) -> Set[str]:
         """Return the GAP -- earlier nodes sharing ``id``'s passthrough-name not yet DONE.
         ``KeyError`` if ``id`` is absent. The FIRST node to name a passthrough has no earlier
         same-name node, so its gap set is empty."""
@@ -147,19 +143,19 @@ class Plan:
         return bool(self.unmet_deps(id))
 
     # --- the forgetting / passthrough-recurrence home (name -> location) ----
-    def passthrough_locations(self) -> dict:
+    def passthrough_locations(self) -> Dict[str, Set[str]]:
         """Return ``{passthrough-name -> set-of-WHEREs}`` -- the no-forgetting multiset."""
-        out: dict = {}
+        out: Dict[str, Set[str]] = {}
         for n in self._nodes:
             out.setdefault(n.passthrough, set()).add(n.where)
         return out
 
     # --- reads --------------------------------------------------------------
-    def open_nodes(self) -> set:
+    def open_nodes(self) -> Set[str]:
         """Return the set of ids of nodes whose ``status`` is OPEN."""
         return {n.id for n in self._nodes if n.status == OPEN}
 
-    def remainder(self) -> set:
+    def remainder(self) -> Set[str]:
         """Return the open nodes -- the Stop gate's hint (the unfinished remainder)."""
         return self.open_nodes()
 
@@ -168,7 +164,7 @@ class Plan:
         return list(self._nodes)
 
     # --- record (serialization; text<->object only, no I/O) -----------------
-    def rows(self) -> list:
+    def rows(self) -> List[dict]:
         """Return the node rows as plain dicts, in PLAN ORDER (order is load-bearing)."""
         return [
             {

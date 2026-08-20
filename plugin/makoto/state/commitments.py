@@ -128,6 +128,8 @@ _FILE_EXT_RX = re.compile(r"[a-z0-9]{1,5}")
 # A leading-slash word with no inner separator is a SLASH-COMMAND ('/loop', '/makoto:status'),
 # not a filesystem path — detect_locations over-matched the leading '/'.
 _SLASH_COMMAND_RX = re.compile(r"/[A-Za-z][\w:.-]*")
+# A capital anywhere in the token -> the LICENSE / Makefile spelling of a dotless convention.
+_HAS_CAPITAL_RX = re.compile(r"[A-Z]")
 
 
 def _is_file_shaped(loc: str) -> bool:
@@ -146,7 +148,7 @@ def _is_file_shaped(loc: str) -> bool:
     if "." in core:
         ext = core.rsplit(".", 1)[1]
         return bool(_FILE_EXT_RX.fullmatch(ext)) and not ext.isdigit()  # plausible ext, not a code/id tail
-    return bool(re.search(r"[A-Z]", loc)) and loc.lower() in _KNOWN_DOTLESS
+    return bool(_HAS_CAPITAL_RX.search(loc)) and loc.lower() in _KNOWN_DOTLESS
 
 
 def _promise_location(text: str) -> Optional[str]:
@@ -156,6 +158,7 @@ def _promise_location(text: str) -> Optional[str]:
     promise, a passive/copular frame, a conditional offer, a third-person/adverbial subject, a
     file-tree listing, or a path no produce verb governs (a mention, a noun-modifier) stay
     inert — that is what keeps the advance gate from false-firing on a non-commitment."""
+    fence_ends = [m.end() for m in _FENCE_RX.finditer(text)]   # scan fences ONCE, not per path
     for loc, a, b in detect_locations(text):
         if not _is_file_shaped(loc):
             continue                              # bare lowercase word -> prose, not a real file
@@ -163,16 +166,17 @@ def _promise_location(text: str) -> Optional[str]:
         le = text.find("\n", b)
         if _non_prose_line(text[ls:le if le != -1 else len(text)]):
             continue                              # path sits in a file-tree diagram or table row
-        if len(_FENCE_RX.findall(text[:a])) % 2 == 1:
+        if sum(1 for e in fence_ends if e <= a) % 2 == 1:
             continue                              # path sits inside a ```fenced code block``` -> code, not a promise
         if _PROPOSAL_MARK_RX.search(text[max(0, ls - 200):a]):
             continue                              # path sits under/within a proposal header ("Option A:", "New Task N", "worth building")
-        before = text[max(0, a - _BIND_BEFORE):a]
+        bstart = max(0, a - _BIND_BEFORE)
+        before = text[bstart:a]
         if _PAST_PRODUCE_RX.search(before):
             continue                              # "added X" -> completion, not a promise
         if _NEGATED_PROMISE_RX.search(before + " " + text[b:b + 8]):
             continue                              # "won't add X" -> retraction, not a promise
-        mp = _PATH_PAREN_RX.match(text[b:])
+        mp = _PATH_PAREN_RX.match(text, b)
         if mp and _OPTIONAL_MARK_RX.search(mp.group(1)):
             continue                              # "Add X (opt-in/optional)" -> an offered option, not a promise
         for vm in _PRODUCE_VERB_RX.finditer(before):
@@ -183,7 +187,7 @@ def _promise_location(text: str) -> Optional[str]:
                 continue                          # "X is wired" -> a state, not a promise
             if _OFFER_COND_RX.search(pre[-46:]):
                 continue                          # "if you greenlight ... write X" -> an offer
-            line_pref = text[ls:max(0, a - _BIND_BEFORE) + vm.start()]
+            line_pref = text[ls:bstart + vm.start()]
             if not _LINE_INITIAL_RX.match(line_pref) and not _FIRST_PERSON_RX.search(line_pref):
                 continue                          # mid-line, no first-person subject -> not my promise
             return loc                            # a first-person/imperative produce verb governs path
@@ -204,8 +208,7 @@ def source_commitment(text: str) -> Optional[dict]:
     loc = _promise_location(text)
     if not loc:
         return None
-    qty = detect_quantity(text)
-    qmin, qmax = qty if qty else (None, None)
+    qmin, qmax = detect_quantity(text) or (None, None)
     return {"location": normalize_path(loc), "qty_min": qmin, "qty_max": qmax}
 
 
@@ -249,7 +252,6 @@ def set_status(conn, key: str, status: str, *, retract_param: Optional[str] = No
     conn.commit()
 
 # === Retraction: surfaced-retraction detection + the reconcile decision (spec §4 — L2) ===
-# Surfaced-retraction detection + the reconcile decision (spec §4 retraction — L2).
 #
 # A commitment is VALIDLY retracted only when the assistant EXPLICITLY drops it with a
 # subject-bound reason: reconcile's closed parameter set (R = a recorded result that
@@ -304,16 +306,18 @@ def _fenced_spans(text: str):
     return [(m.start(), m.end()) for m in _FENCE_SPAN_RX.finditer(text)]
 
 
+_RETRACT_COND_RX = re.compile(r"\b(if|unless|when|whether|assuming|in case)\b", re.I)
+_RETRACT_MODAL_Q_RX = re.compile(
+    r"^\s*(?:should|shall|can|could|may|would|do|does|did)\s+(?:i|we)\b", re.I)
+
+
 def _retract_interrogative_or_conditional(pre: str, after: str) -> bool:
     """A question ("Should I skip X?") or a conditional ("if tests fail we drop X") is not an
     actual retraction decision."""
     clause = pre.rsplit(".", 1)[-1]
-    if re.search(r"\b(if|unless|when|whether|assuming|in case)\b", clause, re.I):
-        return True
-    if re.match(r"^\s*(?:should|shall|can|could|may|would|do|does|did)\s+(?:i|we)\b",
-                clause.strip(), re.I):
-        return True
-    return "?" in after[:30]
+    return bool(_RETRACT_COND_RX.search(clause)
+                or _RETRACT_MODAL_Q_RX.match(clause.strip())
+                or "?" in after[:30])
 
 
 def _retract_recommitted(text: str, loc: str, path_end: int) -> bool:
@@ -385,7 +389,7 @@ def _surfaced_retraction_locations(text: str) -> set:
                 break
         # (2) a post-positive predicate after the path ("X is out of scope", "X can wait")
         if not bound:
-            pm = _RETRACT_POST_RX.match(after) or _RETRACT_POST_RX.match(after.lstrip())
+            pm = _RETRACT_POST_RX.match(after)   # ^[\s,]* in the pattern already skips leading space
             if pm and not _NEG_FRAME_RX.search(after[:pm.end()]) and "?" not in after[:40]:
                 bound = True
         if not bound:

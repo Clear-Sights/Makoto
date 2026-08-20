@@ -3,7 +3,7 @@ import re
 from typing import Optional
 
 from makoto.vocab import Finding
-from makoto.vocab import _ANSI_SGR_RX, _TEETH_FRAME_RX
+from makoto.vocab import _ANSI_SGR_RX, _TEETH_FRAME_RX, _SENTENCE_SPLIT_RX
 from makoto.kit import iter_tool_events
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
@@ -40,7 +40,10 @@ _NEG_RX = re.compile(r"\b(?:not|never|no|fail(?:s|ed|ing)?|don['’]?t|doesn['�
                      r"didn['’]?t|isn['’]?t|won['’]?t|can['’]?t)\b", re.IGNORECASE)
 _FORWARD_RX = re.compile(r"\b(?:will|going\s+to|gonna|once|after|when|next|should|need(?:s)?\s+to|"
                          r"to\s+make|let['’]?s|I['’]?ll|expect(?:s|ed|ing)?)\b", re.IGNORECASE)
-_SENT_SPLIT_RX = re.compile(r"(?<=[.!?])\s|\n")
+# The clause boundary that isolates the text immediately governing the name.
+_CLAUSE_SPLIT_RX = re.compile(r"[,;:—]")
+# Sentence split reuses vocab._SENTENCE_SPLIT_RX -- this file held the repo's last
+# byte-identical private copy; every other consumer already imports the vocab object.
 
 # Recorded per-test FAILED / PASSED markers (the evidence side). Case-SENSITIVE runner tokens so
 # prose like "failed to connect" never matches. Both orderings (verdict leads / trails the id).
@@ -86,14 +89,14 @@ def claimed_passing_names(text: str) -> set:
     if not text:
         return set()
     out = set()
-    for sent in _SENT_SPLIT_RX.split(text):
+    for sent in _SENTENCE_SPLIT_RX.split(text):
         if not _PASS_PRED_RX.search(sent):
             continue
         for nm in _TESTNAME_RX.finditer(sent):
             name = nm.group(0)
             a = nm.start()
             pre = sent[max(0, a - 80):a]
-            clause = re.split(r"[,;:—]", pre)[-1]
+            clause = _CLAUSE_SPLIT_RX.split(pre)[-1]
             post = sent[nm.end():nm.end() + 40]
             if _NEG_RX.search(clause + " " + post):
                 continue

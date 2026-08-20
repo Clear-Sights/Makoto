@@ -1,7 +1,7 @@
 """gate.canon_fingerprints_advisory -- SPEC-5 Task 9 (Makoto absorbs Assay): the ADVISE-tier half
 of the 17 in-scope canon session fingerprints (of the original 27-fingerprint THE_CANON,
 REF-lever-graded-primitives/signalminer/grade_planted.py) ported onto Makoto's real Stop-gate
-observable surface. See makoto/checks/_canonAtoms.py's module docstring/BLOCK_IDS comment for the
+observable surface. See makoto/substrate/_canonAtoms.py's module docstring/BLOCK_IDS comment for the
 full scope-cut and posture-citation trail: these 13 either rest on a soft/claim atom the gold-oracle
 finding doc's robust core does not name, or are among the doc's explicitly-named WORST DISQUALIFIED
 fingerprints (nogreen_secret_testedit, red_no_green, claim_secret, claim_revert) -- so per SPEC-5's
@@ -32,9 +32,9 @@ def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
             pattern_id="gate.canon_fingerprints_advisory",
             file="", line=0, level="advisory",
             message=(f"canon.{name}: {formula} -- a gaming-shaped session fingerprint fired. "
-                      f"ADVISORY only: this fingerprint rests on a soft/claim atom or is among the "
-                      f"gold-oracle finding's named disqualified fingerprints, so it is recorded "
-                      f"but never blocks."),
+                     "ADVISORY only: this fingerprint rests on a soft/claim atom or is among the "
+                     "gold-oracle finding's named disqualified fingerprints, so it is recorded "
+                     "but never blocks."),
             retry_hint="Advisory only -- review the flagged behavior; this never blocks a turn.",
         ))
     return out

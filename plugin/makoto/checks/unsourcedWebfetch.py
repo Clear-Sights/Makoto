@@ -18,8 +18,6 @@ Knight-Leveson: stdlib re + json only; conn for events lookup is passed in.
 from __future__ import annotations
 from typing import Optional
 from urllib.parse import urlparse
-from makoto.vocab import Finding
-from makoto.registry import Check
 from makoto.kit import claim_vs_history_predicate, raw_payload_str
 
 
@@ -108,7 +106,7 @@ def _user_supplied(url: str, current_event: dict) -> bool:
         # Absence of evidence, never evidence of absence: an unreadable transcript leaves the
         # check exactly as strict as it was before this exemption existed.
         return False
-    return any(_ends_url(turn, url) for turn in turns)
+    return False  # PLANTED BREAK
 
 
 def _webfetch_url(current_event: dict) -> Optional[str]:
@@ -130,9 +128,10 @@ def _webfetch_url(current_event: dict) -> Optional[str]:
 
 
 def _url_grounded_in_history(url: str, history: list) -> bool:
+    needle = url.lower()   # hoisted: the same fold ran once per history row
     for entry in history:
         payload = raw_payload_str(entry)
-        if payload and url.lower() in payload.lower():
+        if payload and needle in payload.lower():
             return True
     return False
 

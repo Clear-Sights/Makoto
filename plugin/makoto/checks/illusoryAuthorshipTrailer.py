@@ -38,7 +38,6 @@ own keywords rather than the factory's name.
 # is the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
-from makoto.registry import Check
 from makoto.kit import introduced_regex_predicate
 
 # The illusory authorship/generation claim, Claude/Anthropic-gated. Case-insensitive:
@@ -49,7 +48,7 @@ _CLAUDE_AUTHOR_RX = re.compile(
     r"|noreply@anthropic\.com"                                      # the routing address itself
     r"|claude[ \t-]*session:[ \t]*https?://"                        # session-provenance trailer
     r"|(?:generated|authored|written|made|created)\s+(?:with|by)"   # attribution verb ...
-    r"[^a-zA-Z0-9]{0,3}claude\b",                                    # ... governing Claude
+    r"[^a-zA-Z0-9]{0,3}claude\b",                                   # ... governing Claude
     re.IGNORECASE,
 )
 

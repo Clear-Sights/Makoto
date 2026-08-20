@@ -15,9 +15,14 @@ _ADV_RENAME_SUFFIX_RX = re.compile(r"(?:[_-](?:v?\d+|new|old|final|copy|orig|bac
 
 
 def _adv_stem_core(basename: str):
-    """(stem, core): the basename minus extension, and that stem minus a trailing rename suffix."""
-    stem = basename[:basename.rfind(".")] if "." in basename else basename
-    return stem, _ADV_RENAME_SUFFIX_RX.sub("", stem)
+    """(stem, core, ext): the basename minus extension, that stem minus a trailing rename suffix,
+    and the extension itself (leading dot; "" when there is no dot).
+
+    The dot rule is deliberately NOT os.path.splitext's: a dotfile (".bashrc") is all-extension
+    with an empty stem, which is what the same-file-type comparison below wants."""
+    cut = basename.rfind(".")
+    stem, ext = (basename[:cut], basename[cut:]) if cut >= 0 else (basename, "")
+    return stem, _ADV_RENAME_SUFFIX_RX.sub("", stem), ext
 
 
 def _adv_relocated_discharge(commit_loc: str, touched_keys) -> bool:
@@ -32,23 +37,16 @@ def _adv_relocated_discharge(commit_loc: str, touched_keys) -> bool:
     c_comps = _path_components(commit_loc)
     if not c_comps:
         return False
-    c_base = c_comps[-1]
-    c_ext = c_base[c_base.rfind("."):] if "." in c_base else ""
-    c_stem, c_core = _adv_stem_core(c_base)
-    c_dir = c_comps[:-1]
+    c_stem, c_core, c_ext = _adv_stem_core(c_comps[-1])
     for k in touched_keys or ():
         k_comps = _path_components(k)
         if not k_comps:
             continue
-        k_base = k_comps[-1]
-        k_ext = k_base[k_base.rfind("."):] if "." in k_base else ""
+        k_stem, k_core, k_ext = _adv_stem_core(k_comps[-1])
         if k_ext.lower() != c_ext.lower():
             continue                                  # different file type -> not a rename
-        same_dir = (bool(c_dir) and bool(k_comps[:-1]) and c_dir[-1] == k_comps[:-1][-1]) \
-            or (not c_dir and not k_comps[:-1])
-        if not same_dir:
+        if c_comps[-2:-1] != k_comps[-2:-1]:          # parent-dir component, or [] when top-level
             continue                                  # moved out of dir -> not a same-dir rename
-        k_stem, k_core = _adv_stem_core(k_base)
         if c_core and k_core and c_core == k_core and (c_stem != k_stem or c_core != c_stem):
             return True                               # same stem family, one is the renamed variant
     return False
@@ -82,7 +80,31 @@ def _advance_signal(text: str) -> bool:
             continue                                  # "once everything is done" -> forward promise
         return True                                   # a head quantifier binds this done-word
     return False
-def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys=None, fs_size=None) -> Optional[Finding]:
+
+
+def _open_advance_claims(text, opens):
+    return opens or () if _advance_signal(text) else ()
+
+
+def _advance_discharged(claim, _c, *, touched_keys, fs_exists, empty_keys, fs_size) -> bool:
+    return _discharged(
+        claim["location"], touched_keys, fs_exists,
+        empty_keys=empty_keys, fs_size=fs_size,
+    ) or _adv_relocated_discharge(claim["location"], touched_keys)   # renamed path (FP fix)
+
+
+def _advance_finding(claim, _c):
+    loc_n = normalize_path(claim["location"])
+    return Finding(
+        pattern_id="gate.advance", file=loc_n, line=0, level="error",
+        message=(f"Advancing past an open commitment to {loc_n} with no recorded result — "
+                 "discharge it, or retract it with a checked reason."),
+        retry_hint="Touch the location, or retract the commitment with a valid reason (R/U).",
+    )
+
+
+def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys=None,
+                 fs_size=None) -> Optional[Finding]:
     """Fires when the AI claims UNIVERSAL completion while an open located commitment is
     undischarged — a verifiable contradiction between "everything is complete" and a promised
     path that is provably not done.
@@ -94,46 +116,17 @@ def advance_gate(text, open_commits, *, touched_keys, fs_exists=None, empty_keys
       2. an open commitment's location is undischarged (not in the ledger AND not on
          disk — fail-open re-derivation covers a dropped touch).
     Uncertain (no universal claim, no open commitments, empty text) -> None.
+
+    This is the plain-argument twin of `run` below: both walk the same
+    `_open_advance_claims`/`_advance_discharged`/`_advance_finding` triple, so the gate cannot
+    drift between its GateContext wiring and its directly-callable form.
     """
-    if not _advance_signal(text):
-        return None
-    for c in open_commits or ():
-        if _discharged(c["location"], touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
+    for claim in _open_advance_claims(text, open_commits):
+        if _advance_discharged(claim, None, touched_keys=touched_keys, fs_exists=fs_exists,
+                               empty_keys=empty_keys, fs_size=fs_size):
             continue
-        if _adv_relocated_discharge(c["location"], touched_keys):
-            continue                                  # commitment satisfied at a renamed path (FP fix)
-        loc_n = normalize_path(c["location"])
-        return Finding(
-            pattern_id="gate.advance",
-            file=loc_n,
-            line=0,
-            level="error",
-            message=(f"Advancing past an open commitment to {loc_n} with no recorded "
-                     f"result — discharge it, or retract it with a checked reason."),
-            retry_hint="Touch the location, or retract the commitment with a valid reason (R/U).",
-        )
+        return _advance_finding(claim, None)
     return None
-
-
-def _open_advance_claims(text, opens):
-    return opens or () if _advance_signal(text) else ()
-
-
-def _advance_discharged(claim, _c, *, touched_keys, fs_exists, empty_keys, fs_size) -> bool:
-    return _discharged(
-        claim["location"], touched_keys, fs_exists,
-        empty_keys=empty_keys, fs_size=fs_size,
-    ) or _adv_relocated_discharge(claim["location"], touched_keys)
-
-
-def _advance_finding(claim, _c):
-    loc_n = normalize_path(claim["location"])
-    return Finding(
-        pattern_id="gate.advance", file=loc_n, line=0, level="error",
-        message=(f"Advancing past an open commitment to {loc_n} with no recorded result — "
-                 "discharge it, or retract it with a checked reason."),
-        retry_hint="Touch the location, or retract the commitment with a valid reason (R/U).",
-    )
 
 
 run = claim_vs_ledger_predicate(

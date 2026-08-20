@@ -6,20 +6,20 @@ session — either in a git commit (Bash `command`) or in written file content (
 MultiEdit introduced text) — matching Claude Code's own synthetic marker text
 (`"[Request interrupted by user]"`, `makoto/state/ledger.py`'s `_SYNTHETIC_MARKERS`) or a
 paraphrase of it ("interrupted by the user", "user interrupted"). That marker is HARNESS-
-SYNTHESIZED, host-written, never model-written (see ackblock.py's own spoof-proof-attribution
-note) — so an agent citing it as an excuse for incomplete/abandoned work, when no such
-interruption is anywhere in this session's own recorded history, is presenting a fabricated
-event the same way content.fabricated_commit_sha catches a hallucinated SHA: a claim dressed up
-as evidence, with no real event behind it.
+SYNTHESIZED, host-written, never model-written (see `makoto/state/ledger.py`'s own
+`_is_genuine_user_turn` spoof-proof-attribution note) — so an agent citing it as an excuse
+for incomplete/abandoned work, when no such interruption is anywhere in this session's own
+recorded history, is presenting a fabricated event the same way
+content.fabricated_commit_sha catches a hallucinated SHA: a claim dressed up as evidence,
+with no real event behind it.
 
 Grounded, not over-broad: if this session's OWN history actually carries a genuine
 `tool_response.interrupted == true` row or a PostToolUseFailure `is_interrupt == true` terminal,
 the claim is TRUE and never fires — this check widens nothing about what counts as a real
 interruption; it only catches the claim being made with NO real interruption anywhere in the
-record. A bare description of the marker
-itself (this module's own docstring, ackblock.py's `_SYNTHETIC_MARKERS` tuple, a test
-fixture) is exempted the same way every other check's own documentation is: `makoto-allow:
-<reason>`.
+record. A bare description of the marker itself (this module's own docstring, that same
+`_SYNTHETIC_MARKERS` tuple, a test fixture) is exempted the same way every other check's own
+documentation is: `makoto-allow: <reason>`.
 
 Knight-Leveson: stdlib re only.
 
@@ -31,9 +31,7 @@ derives PATTERN_MATCH vs. CLAIM_VS_HISTORY from the presence of that keyword at 
 """
 from __future__ import annotations
 import re
-from makoto.registry import Check
-from makoto.kit import introduced_regex_predicate
-from makoto.kit import decode_history_event
+from makoto.kit import decode_history_event, introduced_regex_predicate
 
 # The claim, however it's phrased. Matches the harness's own literal bracketed marker AND
 # looser prose paraphrases -- both are the same claim ("the user is why this stopped").

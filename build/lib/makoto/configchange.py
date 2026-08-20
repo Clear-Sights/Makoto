@@ -162,7 +162,7 @@ def configchange_verdict(event, *, settings_json: Optional[dict] = None,
     return ConfigChangeVerdict(
         config_source=config_source, config_path=config_path,
         applicable=True, evaluated=True, stripped=stripped, missing_events=missing,
-        fires=False, reason=reason,
+        fires=stripped, reason=reason,
     )
 
 

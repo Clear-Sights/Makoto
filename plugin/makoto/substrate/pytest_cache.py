@@ -1,4 +1,4 @@
-"""lib/pytest_cache.py (L1) — existence-filtered reader over pytest's own on-disk record.
+"""makoto.substrate.pytest_cache (L1) — existence-filtered reader over pytest's own on-disk record.
 
 ACCESS CONTRACT (spec §0, Makoto-not-Historia): deterministic direct-pointer I/O ONLY.
 This module opens exactly ONE determined file (`<cwd>/.pytest_cache/v/cache/lastfailed`)
@@ -55,7 +55,7 @@ def _node_exists(cwd: str, node: str) -> bool:
     return bool(re.search(rf"\bdef\s+{re.escape(name)}\b", src))
 
 
-def stale_failing_node(cwd: str):
+def stale_failing_node(cwd: str) -> str | None:
     """The FIRST (sorted) lastfailed node that still exists on disk, else None.
 
     None on: no cwd, no cache file, unparseable/non-dict JSON, every entry filtered

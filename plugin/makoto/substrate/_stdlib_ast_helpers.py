@@ -20,10 +20,10 @@ from pathlib import Path
 
 
 def _scratch_roots() -> tuple[str, ...]:
-    roots = []
+    roots: dict[str, None] = {}                              # dict == insertion-ordered set: on Linux
     for d in (tempfile.gettempdir(), "/tmp", "/var/folders", os.path.expanduser("~/.claude")):
-        try:
-            roots.append(os.path.realpath(d))
+        try:                                                 # gettempdir() IS /tmp, so the two entries
+            roots[os.path.realpath(d)] = None                # collapse instead of being scanned twice
         except OSError:
             pass
     return tuple(roots)
@@ -54,8 +54,7 @@ def _is_scratch(p, cwd) -> bool:
 
 
 def _read(fs_read, p):
-    fn = fs_read
-    return fn(p) if callable(fn) else Path(p).read_text(encoding="utf-8")
+    return fs_read(p) if callable(fs_read) else Path(p).read_text(encoding="utf-8")
 
 
 def _callee_chain(call: ast.Call) -> str:
@@ -83,9 +82,8 @@ def iter_touched_python_sources(touched, cwd, fs_read):
     exactly: a possibly-relative touched key is anchored to the event's OWN cwd, never the
     dispatch process's ambient one (matches dispatch.py's real fs_read/fs_exists join). The
     caller projects these three GateContext inputs explicitly so each check's signature remains
-    locally visible; stray
-    scratch outside the working project is skipped; an OSError or fs_read miss (None) skips the
-    file, never crashes the gate."""
+    locally visible; stray scratch outside the working project is skipped; an OSError or fs_read
+    miss (None) skips the file, never crashes the gate."""
     for p in touched:
         if not str(p).endswith(".py"):
             continue

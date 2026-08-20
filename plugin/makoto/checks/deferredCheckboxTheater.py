@@ -3,7 +3,8 @@
 Fires when PreToolUse writes docs/pristine-baseline.md with a checked-off
 DEFERRED line — '[x] DEFERRED' is checkbox theater: the item isn't actually
 done, just deferred. Either complete or leave unchecked.
-Scaffold extracted to substrate.factories.regex_file_predicate (1.0.3 R1).
+Scaffold extracted to makoto.kit.regex_file_predicate (1.0.3 R1; the factory's
+former home, substrate/factories.py, is now folded into makoto.kit).
 Knight-Leveson: stdlib re only.
 """
 # See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
@@ -17,7 +18,7 @@ from makoto.kit import regex_file_predicate
 
 predicate = regex_file_predicate(
     target_rx=re.compile(r"docs/pristine-baseline\.md$"),
-    body_rx=re.compile(r"\[\s*x\s*\]\s+DEFERRED|\[\s*x\s*\]\s+deferred"),
+    body_rx=re.compile(r"\[\s*x\s*\]\s+(?:DEFERRED|deferred)"),
 )
 
 

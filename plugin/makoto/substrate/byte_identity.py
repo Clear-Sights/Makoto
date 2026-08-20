@@ -36,7 +36,7 @@ class ByteIdentity:
     __slots__ = ("_canon",)
 
     def __init__(self, blob: object) -> None:
-        object.__setattr__(self, "_canon", _canon(blob))
+        self._canon = _canon(blob)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ByteIdentity):
@@ -44,10 +44,6 @@ class ByteIdentity:
         if isinstance(other, (str, bytes)):
             return self._canon == _canon(other)
         return NotImplemented
-
-    def __ne__(self, other: object) -> bool:
-        eq = self.__eq__(other)
-        return eq if eq is NotImplemented else (not eq)
 
     def __len__(self) -> int:
         return len(self._canon)

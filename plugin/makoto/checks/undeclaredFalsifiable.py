@@ -31,13 +31,14 @@ from makoto.verdict import ADVISE
 from makoto.vocab import Finding
 
 
-def orphan_modules(*, package_dir: Optional[Path] = None) -> list:
+def orphan_modules(*, package_dir: Optional[Path] = None) -> list[str]:
     """File stems present in checks/ that do NOT produce a `load_checks()`-discoverable CHECK:
     exists on disk, not discoverable/registered. Sorted for determinism."""
     return sorted(stem for stem, chk in scan(package_dir=package_dir).items() if chk is None)
 
 
-def orphan_ids(*, package_dir: Optional[Path] = None, declared: Optional[dict] = None) -> list:
+def orphan_ids(*, package_dir: Optional[Path] = None,
+               declared: Optional[dict] = None) -> list[str]:
     """IDs listed in the declared-IDs manifest with no live module backing them: declared, no
     module. `declared` defaults to the real catalog's `_declared.DECLARED_IDS` (test-injectable
     so a test can plant a dangling ID without touching the real manifest). Sorted for
@@ -49,7 +50,7 @@ def orphan_ids(*, package_dir: Optional[Path] = None, declared: Optional[dict] =
 
 
 def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
-                                 declared: Optional[dict] = None) -> Optional[Finding]:
+                                declared: Optional[dict] = None) -> Optional[Finding]:
     """Fires iff the checks/ catalog has an orphan on either side (see `orphan_modules` /
     `orphan_ids`); `None` (no finding) on a fully consistent catalog. Fail-open by
     construction: both halves already fail-open internally (`scan` never raises)."""
@@ -59,9 +60,11 @@ def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
         return None
     parts = []
     if mods:
-        parts.append(f"orphan module(s) on disk with no live CHECK registered: {', '.join(mods)}")
+        parts.append("orphan module(s) on disk with no live CHECK registered: "
+                     + ", ".join(mods))
     if ids:
-        parts.append(f"declared ID(s) in the manifest with no live module backing them: {', '.join(ids)}")
+        parts.append("declared ID(s) in the manifest with no live module backing them: "
+                     + ", ".join(ids))
     return Finding(
         pattern_id="gate.undeclared_falsifiable",
         file="makoto/checks/",
@@ -69,8 +72,8 @@ def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
         level="advisory",
         message="checks/ catalog completeness drift -- " + "; ".join(parts),
         retry_hint=("Fix the checks/ catalog: give every on-disk module a valid CHECK "
-                     "(id/applies_at/posture), and either implement or remove every "
-                     "declared-but-missing manifest entry in _declared.py."),
+                    "(id/applies_at/posture), and either implement or remove every "
+                    "declared-but-missing manifest entry in _declared.py."),
     )
 
 

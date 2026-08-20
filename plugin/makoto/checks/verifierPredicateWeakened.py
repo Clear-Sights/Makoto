@@ -1,7 +1,17 @@
 """content.verifier_predicate_weakened predicate — verifier predicate weakened (loose-comparator shape).
 
+Fires when a PreToolUse Write/Edit/MultiEdit INTRODUCES, on the constitution integrity-check
+surface (`constitution/integrity/checks/[^/]+\\.py$`), one of the loose-comparator spellings a
+strict `==` status test gets weakened into: `.startswith(` / `.endswith(` / `re.match` /
+`re.search` / `in [`.
+
+SCOPED to that literal comparator vocabulary. Other weakening shapes -- `in (`/`in {` membership,
+a relaxed numeric bound, an `assert` downgraded to a log/warning, a dropped negation -- are NOT
+matched by `body_rx` and do not fire here.
+
 Reads tool_input.content (NOT disk) per the §5.6 semantic-frame correction.
-Scaffold extracted to substrate.factories.regex_file_predicate (1.0.3 R1).
+Scaffold reused from makoto.kit.regex_file_predicate (1.0.3 R1; the factory's former home,
+substrate/factories.py, is now folded into makoto.kit).
 Knight-Leveson: stdlib re only.
 """
 # See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag

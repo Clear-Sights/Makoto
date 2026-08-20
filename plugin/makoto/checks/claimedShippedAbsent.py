@@ -98,12 +98,13 @@ def _shipped_claim(text: str):
     anchored status-report verb), while the state regex permits present copulas only."""
     if not text:
         return None
-    spans = _code_spans(text)
     matches = sorted(
-        list(_SHIPPED_ACTION_CLAIM_RX.finditer(text))
-        + list(_SHIPPED_STATE_CLAIM_RX.finditer(text)),
+        [*_SHIPPED_ACTION_CLAIM_RX.finditer(text), *_SHIPPED_STATE_CLAIM_RX.finditer(text)],
         key=lambda m: m.start(),
     )
+    if not matches:
+        return None                     # no candidate claim -> skip the fence/backtick span scan
+    spans = _code_spans(text)
     for m in matches:
         a = m.start()
         if any(s <= a < e for s, e in spans):
@@ -138,14 +139,16 @@ def _successful_remote_mutation(history) -> bool:
         if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
             continue
         name = ev.get("tool_name", "")
-        tool_input = ev.get("tool_input") or {}
         response = ev.get("tool_response")
         if name == "Bash":
+            tool_input = ev.get("tool_input")
             command = str(tool_input.get("command", "") or "") if isinstance(tool_input, dict) else ""
+            # Stricter than _response_succeeded alone: a push terminal must carry an EXPLICIT zero
+            # exit code, not merely the absence of an error field. _response_succeeded runs first
+            # because it subsumes the dict guard the .get() below needs.
             if (_command_pushes_git(command)
-                    and isinstance(response, dict)
-                    and response.get("exitCode", response.get("exit")) == 0
-                    and _response_succeeded(response)):
+                    and _response_succeeded(response)
+                    and response.get("exitCode", response.get("exit")) == 0):
                 return True
         elif name in _REMOTE_MUTATING_TOOL_NAMES and _response_succeeded(response):
             if name.endswith("merge_pull_request") and response.get("merged") is not True:

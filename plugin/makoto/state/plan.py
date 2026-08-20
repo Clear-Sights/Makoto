@@ -26,12 +26,18 @@ Stdlib only; no LLM, no HTTP.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 from typing import Optional
 
 from makoto.checks import normalize_path
 from makoto.substrate._planNode import Plan
+# _OFFER_COND_RX / _FIRST_PERSON_RX: L0 shared lexicon (makoto.vocab -- dedup: was a
+# byte-identical local copy of the exact regexes commitments.py hoisted; the plan-item section
+# below already said it "mirrors commitments.py's hardened guards" without the dedup happening).
+from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 
 # SessionStart only declares from the artifact on a genuinely-new session (mirrors Assay's own
 # STARTUP-gated `declare_from_artifact`) -- a resume/clear/compact must never re-declare.
@@ -124,6 +130,21 @@ def _read_artifact_plan(cwd: str) -> Optional[Plan]:
     return raw
 
 
+def _admit_artifact_plan(cwd: str, session_id: str, conn) -> Optional[Plan]:
+    """Read the artifact and declare it LATEST-WINS -- the shared tail BOTH admission paths run.
+    Absent / unreadable / malformed / empty declares NOTHING (fail-open, `None`); a plan carrying
+    a NON-FALSIFIABLE node is REJECTED whole (`declare_plan` raises; caught -> `None`, fail-closed
+    on tamper, not on absence). Returns the declared `Plan` or `None`."""
+    raw = _read_artifact_plan(cwd)
+    if raw is None:
+        return None
+    try:
+        declare_plan(conn, session_id, raw)
+    except ValueError:
+        return None
+    return load_plan(conn, session_id)
+
+
 def declare_from_session_artifact(
     cwd: str, session_id: str, conn, *, source: str = ""
 ) -> Optional[Plan]:
@@ -137,14 +158,7 @@ def declare_from_session_artifact(
     """
     if source != STARTUP:
         return None
-    raw = _read_artifact_plan(cwd)
-    if raw is None:
-        return None
-    try:
-        declare_plan(conn, session_id, raw)
-    except ValueError:
-        return None
-    return load_plan(conn, session_id)
+    return _admit_artifact_plan(cwd, session_id, conn)
 
 
 def declare_from_live_write(cwd: str, session_id: str, conn) -> Optional[Plan]:
@@ -158,39 +172,29 @@ def declare_from_live_write(cwd: str, session_id: str, conn) -> Optional[Plan]:
     `makoto/events.py`'s PostToolUse entry. Same fail-open contract: absent, unreadable,
     malformed, empty, or non-falsifiable content declares nothing and returns `None`.
     """
-    raw = _read_artifact_plan(cwd)
-    if raw is None:
-        return None
-    try:
-        declare_plan(conn, session_id, raw)
-    except ValueError:
-        return None
-    return load_plan(conn, session_id)
+    return _admit_artifact_plan(cwd, session_id, conn)
 
 
 # =============================================================================================
 # plan-item commitments (merged from session/planItems.py -- Stage 2 seam 1)
-_PLAN_ITEMS_DOC = """Plan-item commitments store: source open PLAN/TASK-LABELED promises ("I'll finish §9.3",
-"next I need to close out Task #19") from the assistant's own text, and read them back
-un-windowed by session.
-
-Distinct from `session/commitments.py` (which sources a promise to a FILE PATH and discharges
-it by checking the filesystem/touched-keys): a plan/task label ("§9.3", "Task #19") has no
-filesystem location at all, so discharge here is PURELY TEXTUAL -- a later first-person
-completion statement naming the same label, or an explicit retraction. This closes the gap a
-real session hit: a forward commitment phrased as a section/task reference, never a file path,
-was silently dropped and never appeared in ANY commitment store because `commitments.py`'s
-sourcer requires a file-shaped location and found none.
-
-Sourcing discipline mirrors `commitments.py`'s hardened guards (first-person, active, non-past,
-non-negated, non-conditional) at the same rigor tier, scoped down for this narrower label-shaped
-surface rather than re-deriving from a real-session FP corpus this module has not been measured
-against yet -- see the module docstring's own caveat below.
-
-Stdlib only; no LLM, no HTTP.
-"""
-import hashlib
-import re
+# Plan-item commitments store: source open PLAN/TASK-LABELED promises ("I'll finish §9.3",
+# "next I need to close out Task #19") from the assistant's own text, and read them back
+# un-windowed by session.
+#
+# Distinct from `session/commitments.py` (which sources a promise to a FILE PATH and discharges
+# it by checking the filesystem/touched-keys): a plan/task label ("§9.3", "Task #19") has no
+# filesystem location at all, so discharge here is PURELY TEXTUAL -- a later first-person
+# completion statement naming the same label, or an explicit retraction. This closes the gap a
+# real session hit: a forward commitment phrased as a section/task reference, never a file path,
+# was silently dropped and never appeared in ANY commitment store because `commitments.py`'s
+# sourcer requires a file-shaped location and found none.
+#
+# Sourcing discipline mirrors `commitments.py`'s hardened guards (first-person, active, non-past,
+# non-negated, non-conditional) at the same rigor tier, scoped down for this narrower label-shaped
+# surface rather than re-deriving from a real-session FP corpus this module has not been measured
+# against yet -- see the module docstring's own caveat below.
+#
+# Stdlib only; no LLM, no HTTP.
 
 # A plan/task label: "§9", "§9.3", "Task #19", "task 19". Word-bounded so it never swallows a
 # surrounding sentence.
@@ -209,10 +213,6 @@ _NEGATED_RX = re.compile(
     r"not planning to|no longer|skip(?:ping)?|never\s?mind|dropping|drop(?:ped)?|"
     r"not\s+(?:doing|finishing|completing|going\s+to))\b",
     re.IGNORECASE)
-# _OFFER_COND_RX / _FIRST_PERSON_RX: L0 shared lexicon (makoto.vocab -- dedup: was a
-# byte-identical local copy of the exact regexes commitments.py hoisted; this file's own comment
-# already said it "mirrors commitments.py's hardened guards" without the dedup happening).
-from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 _BIND_BEFORE = 60
 _BIND_AFTER = 40
 
@@ -246,7 +246,8 @@ def source_plan_item_promise(text: str) -> Optional[dict]:
     for m in _LABEL_RX.finditer(text):
         a, b = m.span()
         line_start = text.rfind("\n", 0, a) + 1
-        before = text[max(0, a - _BIND_BEFORE):a]
+        before_start = max(0, a - _BIND_BEFORE)
+        before = text[before_start:a]
         after = text[b:b + _BIND_AFTER]
         if _NEGATED_RX.search(before) or _NEGATED_RX.search(after):
             continue                                  # "won't finish §9.3" / "skip §9.3" -> not a promise
@@ -257,10 +258,11 @@ def source_plan_item_promise(text: str) -> Optional[dict]:
             continue                                  # label mentioned with no forward verb governing it
         if _OFFER_COND_RX.search(before[:vm.start()][-46:]):
             continue                                  # "if you want, I'll finish §9.3" -> a conditional offer
-        if not _first_person_governs(text, a - (len(before) - vm.start()), line_start):
+        if not _first_person_governs(text, before_start + vm.start(), line_start):
             continue
         label = _normalize_label(m.group(1))
-        desc = text[line_start:text.find("\n", b) if text.find("\n", b) != -1 else len(text)].strip()
+        line_end = text.find("\n", b)
+        desc = text[line_start:line_end if line_end != -1 else len(text)].strip()
         return {"label": label, "description": desc[:200]}
     return None
 

@@ -18,13 +18,18 @@ from typing import Optional
 from makoto.vocab import Finding
 
 
+# At most this many labels are named inline in the reminder; any remainder is counted, not named.
+_LABEL_CAP = 8
+
+
 def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
     """Fire iff any plan-item commitment is still OPEN for this session -- a gentle, named
     reminder, never a block. `open_items=[]` (nothing open) is silent."""
     if not open_items:
         return None
-    labels = ", ".join(i["label"] for i in open_items[:8])
-    more = f" (+{len(open_items) - 8} more)" if len(open_items) > 8 else ""
+    labels = ", ".join(i["label"] for i in open_items[:_LABEL_CAP])
+    hidden = len(open_items) - _LABEL_CAP
+    more = f" (+{hidden} more)" if hidden > 0 else ""
     return Finding(
         pattern_id="gate.plan_item_drift",
         file="",

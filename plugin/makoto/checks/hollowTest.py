@@ -112,6 +112,19 @@ def _is_assertion_call(node) -> bool:
     return chain == "pytest.raises"
 
 
+def _is_recognized_assertion(node, helper_asserts: frozenset = frozenset()) -> bool:
+    """An `ast.Assert`, a name-recognized assertion-shaped call, or a call to a same-file helper
+    function proven (by `_helper_names_that_assert`) to assert internally."""
+    if isinstance(node, ast.Assert):
+        return True
+    if isinstance(node, ast.Call):
+        if _is_assertion_call(node):
+            return True
+        if isinstance(node.func, ast.Name) and node.func.id in helper_asserts:
+            return True
+    return False
+
+
 def _local_helper_index(tree):
     """name -> FunctionDef/AsyncFunctionDef node, for every MODULE-LEVEL function (methods and
     nested defs excluded). A same-file, name-resolved fact only — never a general call-graph
@@ -129,59 +142,40 @@ def _helper_names_that_assert(tree) -> frozenset:
     extremely common 'shared assert helper' pattern (a test's only observable check is a call to a
     same-file helper like `_clean(call)` / `_assert_ok(x)` that itself does `assert not x.fired`) --
     corpus-found FP class (assay's test_forbidden_location.py). Generous/FN-safe by construction:
-    it can only make a sub-pattern fire LESS, never more. Bounded fixpoint over a finite function
-    set, so it always terminates."""
-    idx = _local_helper_index(tree)
+    it can only make a sub-pattern fire LESS, never more. Each body is walked exactly ONCE, into
+    (does it assert directly?, which bare names does it call?); the fixpoint then closes over that
+    finite, already-extracted call graph, so it always terminates."""
     asserts: set = set()
+    calls: dict = {}
+    for name, func in _local_helper_index(tree).items():
+        called: set = set()
+        for n in _iter_own_scope(func.body):
+            if _is_recognized_assertion(n):
+                asserts.add(name)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
+                called.add(n.func.id)
+        calls[name] = called
     changed = True
     while changed:
         changed = False
-        for name, func in idx.items():
-            if name in asserts:
-                continue
-            for n in _iter_own_scope(func.body):
-                if isinstance(n, ast.Assert):
-                    asserts.add(name)
-                    changed = True
-                    break
-                if isinstance(n, ast.Call):
-                    if _is_assertion_call(n):
-                        asserts.add(name)
-                        changed = True
-                        break
-                    if isinstance(n.func, ast.Name) and n.func.id in asserts:
-                        asserts.add(name)
-                        changed = True
-                        break
+        for name, called in calls.items():
+            if name not in asserts and called & asserts:
+                asserts.add(name)
+                changed = True
     return frozenset(asserts)
 
 
-def _is_recognized_assertion(node, helper_asserts: frozenset = frozenset()) -> bool:
-    """An `ast.Assert`, a name-recognized assertion-shaped call, or a call to a same-file helper
-    function proven (by `_helper_names_that_assert`) to assert internally."""
-    if isinstance(node, ast.Assert):
-        return True
-    if isinstance(node, ast.Call):
-        if _is_assertion_call(node):
-            return True
-        if isinstance(node.func, ast.Name) and node.func.id in helper_asserts:
-            return True
-    return False
-
-
 def _has_skip_decorator(func) -> bool:
+    """True iff some decorator's dotted name contains `skip` (case-insensitive) -- `@pytest.mark.skip`,
+    `@unittest.skipIf(...)`, a bare `@skip`, ..."""
     for dec in func.decorator_list:
         node = dec.func if isinstance(dec, ast.Call) else dec
         parts: list = []
-        while True:
-            if isinstance(node, ast.Attribute):
-                parts.append(node.attr)
-                node = node.value
-            elif isinstance(node, ast.Name):
-                parts.append(node.id)
-                break
-            else:
-                break
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
         if "skip" in ".".join(reversed(parts)).lower():
             return True
     return False
@@ -239,11 +233,7 @@ def _try_has_qualifying_handler(try_stmt) -> bool:
 
 
 def _try_body_has_call(try_stmt) -> bool:
-    for s in try_stmt.body:
-        for n in ast.walk(s):
-            if isinstance(n, ast.Call):
-                return True
-    return False
+    return any(_contains_call(s) for s in try_stmt.body)
 
 
 def _is_swallowed_failure(try_stmt, func_stmts, helper_asserts: frozenset = frozenset()) -> bool:
@@ -268,10 +258,9 @@ def _iter_nested_defs(stmts):
     instant it hits ANY nested scope, so this naturally finds each directly-reachable nested def
     without also picking up a def-inside-that-def (out of scope for this sub-pattern; see the
     module docstring)."""
-    for s in stmts:
-        for n in _walk_own_scope(s):
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                yield n
+    for n in _iter_own_scope(stmts):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            yield n
 
 
 def _analyze_nested_test_functions(func, helper_asserts: frozenset = frozenset()) -> list:
@@ -279,8 +268,7 @@ def _analyze_nested_test_functions(func, helper_asserts: frozenset = frozenset()
     for nested in _iter_nested_defs(func.body):
         if not nested.name.startswith("test_"):
             continue
-        nested_scope = list(_iter_own_scope(nested.body))
-        if any(_is_recognized_assertion(n, helper_asserts) for n in nested_scope):
+        if any(_is_recognized_assertion(n, helper_asserts) for n in _iter_own_scope(nested.body)):
             findings.append({"line": nested.lineno, "func": nested.name, "kind": "uncollectable_nested"})
     return findings
 

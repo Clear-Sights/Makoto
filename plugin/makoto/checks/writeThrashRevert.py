@@ -17,7 +17,8 @@ NotebookEdit is SILENT, and a PRIOR Edit/MultiEdit/NotebookEdit is not counted a
 Copy-by-shape from the makoto-dev ancestor (rule 5 / FD11), re-homed onto live Makoto: it carries
 its OWN whole-file-Write history walker so a PreToolUse precheck does not import the Stop-gate
 engine. The ONLY content read is through ByteIdentity (==/len/hash only), so this body CANNOT read
-content MEANING — only content IDENTITY. Stdlib only; imports only makoto.vocab + makoto.substrate."""
+content MEANING — only content IDENTITY. Stdlib only; the only imports are makoto.substrate,
+makoto.kit, makoto.vocab and makoto.registry."""
 from __future__ import annotations
 
 from typing import Optional
@@ -35,7 +36,7 @@ def _prior_whole_file_writes(history, path: str) -> list:
     (id, ts, event_type, cwd, raw_payload_json) tuples _select_recent returns OR dicts with a
     'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped.
 
-    Row-decode step shared via substrate.io.decode_history_row (2026-07-09 dedup: this function and
+    Row-decode step shared via makoto.kit.decode_history_row (2026-07-09 dedup: this function and
     substrate._canonAtoms._decode_row each re-derived the same tuple/dict-payload sniff + json.loads
     by hand -- found duplicated by jscpd). Only this function's own Write/content filter stays local."""
     out: list = []
@@ -46,7 +47,7 @@ def _prior_whole_file_writes(history, path: str) -> list:
         inp = ev.get("tool_input") or {}
         if not isinstance(inp, dict) or inp.get("file_path") != path or "content" not in inp:
             continue
-        out.append(ByteIdentity(inp.get("content")))
+        out.append(ByteIdentity(inp["content"]))
     return out
 
 
@@ -56,20 +57,26 @@ def predicate(*, current_event: dict, history: list,
         return None
     # Whole-file Write ONLY. A current Edit/MultiEdit/NotebookEdit carries only a fragment, not a
     # closed whole-file unit, so it is never judged here (fragment compares are the FP class).
-    if current_event.get("tool_name", "") != "Write":
+    if current_event.get("tool_name") != "Write":
         return None
-    ti = current_event.get("tool_input", {}) or {}
-    path = ti.get("file_path", "") or ""
+    ti = current_event.get("tool_input") or {}
+    path = ti.get("file_path") or ""
     if not path or "content" not in ti:
         return None                       # no path / no whole-file content -> nothing to revert
-    now = ByteIdentity(ti.get("content"))
+    now = ByteIdentity(ti["content"])
 
     prior = _prior_whole_file_writes(history, path)
     # A->B->A: some EARLIER whole-file Write of this path == now (an A), AND at least one whole-file
     # Write of DIFFERENT content (a B) lies AFTER that earlier A. A bare A->A repeat (no intervening
     # different content) is a no-op rewrite, not a revert.
-    for i, earlier in enumerate(prior):
-        if earlier == now and any(mid != now for mid in prior[i + 1:]):
+    # One pass, no tail re-slice per candidate: "an A with some differing B after it" is the same
+    # statement as "a differing B with some equal A before it", so a single left-to-right walk
+    # carrying `seen_earlier_a` decides it.
+    seen_earlier_a = False
+    for earlier in prior:
+        if earlier == now:
+            seen_earlier_a = True
+        elif seen_earlier_a:
             return Finding(
                 pattern_id=pattern.id,
                 file=path,

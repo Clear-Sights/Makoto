@@ -3,17 +3,17 @@
 Ported BY SHAPE (rule 5 -- copy, never import) from `assay/assay/patterns/contract_order.py`,
 re-homed onto Makoto's own `substrate._planNode.Plan` + the `plans` sqlite table (SPEC-5 Makoto
 absorbs Assay). contractOrder reads gaps-in-ledger, NOT a DAG: a dependency is a GAP read off
-the plan BY PASSTHROUGH-NAME (`Plan.order_violation`/`Plan.unmet_deps`), never a declared edge
+the plan BY PASSTHROUGH-NAME (`Plan.unmet_deps`), never a declared edge
 -- the sole home for that scan is `substrate._planNode`, consulted here, never re-implemented.
 
 TWO firing surfaces from ONE module, mirroring Assay's single `ContractOrder` class's two
 guards:
-  * the PRE gap guard (`predicate`, wired via the loader-backed catalog -- `schema.load_prechecks`
+  * the PRE gap guard (`predicate`, wired via the loader-backed catalog -- `registry.load_precheck_catalog`
     -> `dispatch._run_predicates` -- BLOCK): a Write/Edit/MultiEdit/NotebookEdit call advancing a plan node whose passthrough-
     establisher is not yet DONE is the partial-order contradiction.
   * the STOP remainder guard (this module's `EXTRA_CHECKS` Stop surface, discovered by
     `registry.load_checks(edge="Stop")`, blocking-eligible via `may_block=True`;
-    context shape: `substrate/_shared.py`): the turn ending with the plan's `remainder()` non-empty.
+    context shape: `context.GateContext`): the turn ending with the plan's `remainder()` non-empty.
 
 LAYERING FIREWALL: as a discovered Stop GATE this module is subject to the same L2-import
 firewall every gate module is (`tests/test_import_direction.py`'s pipeline-order firewall) -- it never
@@ -75,11 +75,16 @@ def _event_location(tool_name: str, tool_input: dict) -> Optional[str]:
 def _gap_finding(plan: Plan, tool_name: str, loc: str) -> Optional[dict]:
     """`{"nid", "unmet"}` iff `loc` advances a declared node whose establisher is unmet, else
     `None`. Resolves the call's WHERE to the node it advances via `Plan.resolve`, then consults
-    `Plan.order_violation` (the name->status gap scan `checks._planNode` owns)."""
+    `Plan.unmet_deps` (the name->status gap scan `substrate._planNode` owns) ONCE -- its
+    `Plan.order_violation` sibling is BY DEFINITION `bool(unmet_deps(...))`, so asking both
+    re-walks the whole plan a second time for an answer already in hand."""
     nid = plan.resolve(loc, tool_name)
-    if nid is None or not plan.order_violation(nid):
+    if nid is None:
         return None
-    return {"nid": nid, "unmet": sorted(plan.unmet_deps(nid))}
+    unmet = plan.unmet_deps(nid)
+    if not unmet:
+        return None
+    return {"nid": nid, "unmet": sorted(unmet)}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -134,10 +139,10 @@ RETRY_HINT = 'Finish the node(s) that establish this passthrough (the unmet ids 
 DESCRIPTION = 'declared-plan contract gap -- a Write/Edit/MultiEdit/NotebookEdit advances a plan node whose passthrough-establisher is not yet DONE'
 
 # tests="": registered ONE_OFF -- this module owns both Pre and Stop surfaces.
-CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=predicate, predicate_module=__name__, keywords=('file_path', 'notebook_path'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))
+CHECK = Check(id="gate.contract_order", applies_at="Pre", posture="BLOCK", run=predicate, predicate_module=__name__, keywords=_LOCATION_KEYS, retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}))
 
 # This module's Stop-side surface shares the SAME id as its Pre-side CHECK above but fires at a
-# different edge -- checks._loader.discover()'s EXTRA_CHECKS convention (the sole dual-surface
+# different edge -- registry.discover()'s EXTRA_CHECKS convention (the sole dual-surface
 # case in the catalog) makes the Stop-side visible to the unified loader instead of needing a
 # direct-call carve-out in run_stop_checks. may_block=True: this Stop-side surface used to be
 # discoverable via the now-retired GATE/load_stopchecks() mechanism.

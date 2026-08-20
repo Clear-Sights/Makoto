@@ -32,7 +32,12 @@ def _missing_makoto_events(hooks, *, plugin_root=None, plugin_fs_read=None) -> l
     duplicate it — this predicate now checks both before calling an event missing). Empty list
     means fully wired. `plugin_root` defaults to the live $CLAUDE_PLUGIN_ROOT and `plugin_fs_read`
     to a real file read when not supplied, so this stays pure/injectable for tests exactly like
-    the settings.json side already is — see tests/test_self_wired_check.py."""
+    the settings.json side already is — see tests/test_self_wired_check.py.
+
+    `hooks` NORMALIZATION IS PART OF THIS CONTRACT, not an incidental guard: a missing/None/
+    non-dict `hooks` is read as {} (i.e. "wires nothing", so all three events report missing),
+    so no caller needs its own isinstance pre-guard. Load-bearing for
+    `test_hooks_key_not_a_dict_fails_open_to_missing_all`; do not drop it."""
     settings_hooks = hooks if isinstance(hooks, dict) else {}
     still_missing = [event for event in _MAKOTO_EVENTS if not _event_wired(settings_hooks, event)]
     if not still_missing:
@@ -90,9 +95,10 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None) -> Option
         return None
     if not isinstance(data, dict):
         return None
-    hooks = data.get("hooks")
-    missing = _missing_makoto_events(hooks if isinstance(hooks, dict) else {},
-                                      plugin_root=plugin_root, plugin_fs_read=plugin_fs_read)
+    # No isinstance pre-guard here: normalizing a missing/non-dict "hooks" to {} is part of
+    # `_missing_makoto_events`'s own documented contract (see its docstring).
+    missing = _missing_makoto_events(data.get("hooks"), plugin_root=plugin_root,
+                                     plugin_fs_read=plugin_fs_read)
     if not missing:
         return None
     named = ", ".join(missing)
@@ -102,12 +108,12 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None) -> Option
         line=0,
         level="advisory",
         message=(f"makoto's hook wiring is missing an entry for: {named} in BOTH "
-                 f".claude/settings.json and the plugin manifest (if resolvable). "
-                 f"This is a PARTIAL-STRIP signal only — it cannot see a simultaneous strip of "
-                 f"all three events from both sources at once (see this check's own docstring / "
-                 f"docs/self-defense-asymmetry-followup.md)."),
+                 ".claude/settings.json and the plugin manifest (if resolvable). "
+                 "This is a PARTIAL-STRIP signal only — it cannot see a simultaneous strip of "
+                 "all three events from both sources at once (see this check's own docstring / "
+                 "docs/self-defense-asymmetry-followup.md)."),
         retry_hint=("Advisory only, never blocking: confirm this was an intentional change, or "
-                     "restore the missing hook entry via `makoto install`."),
+                    "restore the missing hook entry via `makoto install`."),
     )
 
 

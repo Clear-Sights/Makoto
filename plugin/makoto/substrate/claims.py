@@ -10,6 +10,12 @@ from makoto.vocab import (
     _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
 )
 
+# Compiled once at import, like every other pattern in this layer. `_INLINE_CODE_RX` is the
+# inline-`backtick` half of _code_spans (the fenced half is the L0 single source); `_WORD_RX`
+# tokenises the pre-head modifier window, and runs once per candidate match.
+_INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
+_WORD_RX = re.compile(r"\w+")
+
 
 # ---- whole-suite pass-claim signal (Theme A relocation, 2026-06-09) ----
 # _code_spans relocated from stopchecks/_common.py in the same change: lib must not import
@@ -21,9 +27,8 @@ def _code_spans(text: str):
     """Char ranges inside ``` fences OR inline `backticks` — a done-word there is QUOTED
     (code/output, e.g. the literal `done|complete|finished`), not the AI's own prose claim.
     The fenced half consumes the L0 single-source lexicons._FENCE_SPAN_RX (dedup U2)."""
-    spans = [(m.start(), m.end()) for m in _FENCE_SPAN_RX.finditer(text)]
-    spans += [(m.start(), m.end()) for m in re.finditer(r"`[^`\n]+`", text)]
-    return spans
+    return ([m.span() for m in _FENCE_SPAN_RX.finditer(text)]
+            + [m.span() for m in _INLINE_CODE_RX.finditer(text)])
 
 
 def whole_suite_pass_claim(text: str):
@@ -59,25 +64,16 @@ def whole_suite_pass_claim(text: str):
         # a count to the run is the un-FP-safe quantity gate makoto already cut). A non-universal
         # WORD ('parser tests', 'these tests') scopes a SUBSET. Both fail open; only a bare or
         # universally-quantified whole-suite head ('tests', 'all tests', 'the test suite') fires.
-        toks = re.findall(r"\w+", text[max(0, a - 40):a])
         scoped = False
-        i = len(toks) - 1
-        while i >= 0:
-            t = toks[i]
-            if t.isdigit():
-                scoped = True                          # enumerated count -> out of scope
-                break
+        for t in reversed(_WORD_RX.findall(text[max(0, a - 40):a])):
             tl = t.lower()
-            if tl in _GREEN_UNIVERSAL_PREMOD:
-                if tl == "test":                       # 'test suite' connector -> keep walking back
-                    i -= 1
-                    continue
-                break                                  # a universal quantifier -> whole-suite -> fire
-            scoped = True                              # a restricting word -> subset
-            break
+            if t.isdigit() or tl not in _GREEN_UNIVERSAL_PREMOD:
+                scoped = True                          # enumerated count / restricting word -> subset
+                break
+            if tl != "test":                           # a universal quantifier -> whole-suite -> fire
+                break
+            # 'test suite' connector -> keep walking back over the remaining modifiers
         if scoped:
             continue
         return m
     return None
-
-

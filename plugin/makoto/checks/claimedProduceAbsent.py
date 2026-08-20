@@ -24,6 +24,12 @@ from makoto.kit import _BIND_BEFORE, DISCHARGE_EATS, _discharge_kwargs, _dischar
 # fuller frame instead: `read(s) from` (the read FP), `so` / `matches` / `requires` (the
 # subordinate-clause FP). Including bare `to`/`from` over-narrowed and silenced live TPs
 # (FP remediation 2026-06-25; tests/test_gates.py + tests/test_substrate_teeth.py pin the TPs).
+# How far back before the produce verb a forward/negation frame is looked for, to disarm the
+# claim ("will add `X`", "didn't add `X`"). Deliberately narrower than the verb->path bind
+# (_BIND_BEFORE) so a stray "not"/"next" far upstream cannot silence a live claim. NOTE: it is a
+# flat character window, NOT trimmed at a clause break, so a negation in the preceding sentence
+# still disarms the claim whenever it happens to land inside the window.
+_FRAME_NEAR = 40
 _PRODUCE_OBJ_SEP_RX = re.compile(
     r"\b(?:so|against|match(?:es|ing)?|reads?\s+from|requires?|"
     r"according\s+to|based\s+on|conform(?:s|ing)?\s+to)\b", re.I)
@@ -55,13 +61,15 @@ def _production_claim_location(text):
                 continue                              # subordinator/read-frame separates verb and
                                                       # path -> path is a referenced source, not the
                                                       # verb's direct object (the measured FP)
-            near = pre[-40:]
+            near = pre[-_FRAME_NEAR:]
             if _FORWARD_FRAME_RX.search(near):
                 continue                              # "will add X" -> a plan, not a claim
             if _NEG_FRAME_RX.search(near):
                 continue                              # "didn't add X" -> admission (2.8), not a false claim
             return loc
     return None
+
+
 def completion_gate(
     text, *, touched_keys, fs_exists=None, empty_keys=None, fs_size=None, cwd=None,
 ) -> Optional[Finding]:
@@ -88,7 +96,7 @@ def completion_gate(
         # Preserve _discharged's content-depth law for this widened path: a zero-byte
         # non-conventional artifact still does not substantiate a production claim.
         if _discharged(
-            loc, (), lambda _p: True,
+            loc, (), fs_exists=lambda _p: True,
             fs_size=lambda _p: os.path.getsize(worktree_path),
         ):
             return None

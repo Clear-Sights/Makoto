@@ -30,6 +30,9 @@ from makoto.substrate.pytest_cache import stale_failing_node
 # tests/test_stale_pass_gate.py carries the measured-latency falsifier for the ceiling.
 
 _TEETH_WINDOW = 160
+# Lookback for the gate-local forward guard: enough to reach the head of a long leading
+# sentence ("Once I fix the import in the loader, ... the tests pass").
+_LEAD_WINDOW = 240
 
 
 def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
@@ -45,7 +48,7 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
     # stops at the last comma — right for green_claim (its conjunct is a recorded red RUN), wrong
     # here, where "Once I fix the import, the tests pass" coexists with a live red lastfailed by
     # construction. The whole leading sentence is scanned so the conditional head is seen.
-    lead = _SENTENCE_SPLIT_RX.split(text[max(0, m.start() - 240):m.start()])[-1]
+    lead = _SENTENCE_SPLIT_RX.split(text[max(0, m.start() - _LEAD_WINDOW):m.start()])[-1]
     if _ADV_FORWARD_RX.search(lead):
         return None                      # forward/conditional-framed claim, not a present assertion
     window = text[max(0, m.start() - _TEETH_WINDOW):m.end() + _TEETH_WINDOW]

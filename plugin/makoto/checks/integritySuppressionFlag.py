@@ -36,13 +36,13 @@ from makoto.vocab import _INTEG_VOCAB as _INTEG   # shared L0 integrity vocab (s
 
 _TARGET_RX = re.compile(r"\.toml$")
 
-# `_INTEG` is the shared L0 integrity vocabulary (imported above from lexicons; the narrowing
-# rationale is homed there). `p14._INTEG` stays a module attribute; pattern_1_2 (env-gated audit)
-# consumes the same source.
+# `_INTEG` stays a module attribute under exactly that name: tests/test_lexicons.py pins
+# `integritySuppressionFlag._INTEG is vocab._INTEG_VOCAB`. The narrowing rationale is homed with
+# the vocabulary in `makoto.vocab`; content.env_gated_audit consumes the same object, no second copy.
 
 # a STANDALONE assignment line whose key names an integrity concept and carries a
-# suppression suffix set true: `^ <integ>..._skip = true`. MULTILINE so `^`/`$`
-# bind to each physical line; quotes optional for TOML quoted keys.
+# suppression suffix set true: `^ <integ>..._skip = true`. MULTILINE so `^` binds
+# to each physical line; quotes optional for TOML quoted keys.
 _FLAG_RX = re.compile(
     r"(?im)^[ \t]*[\"']?\w*(?:" + _INTEG + r")\w*_(?:skip|bypass|inapplicable)[\"']?"
     r"[ \t]*=[ \t]*true\b"

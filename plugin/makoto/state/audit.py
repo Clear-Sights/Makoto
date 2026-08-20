@@ -1,11 +1,14 @@
 """append-only observability log — JSONL writer + reader + structured error log.
 
-Two file outputs under $MAKOTO_STATE_DIR/:
+Three file outputs under $MAKOTO_STATE_DIR/:
 - audit.jsonl           : one row per Finding-producing dispatcher invocation (only-fires policy, 1.0.2)
 - dispatch_errors.jsonl : one row per predicate that raised an unexpected exception
+- exemptions.jsonl      : one row per REAL match suppressed by an agent escape valve
 
-Both are append-only, line-delimited JSON, safe for concurrent appends under POSIX
-PIPE_BUF semantics (rows are well under 4KB).
+All three are append-only, line-delimited JSON. Concurrent appends lean on O_APPEND
+short-write atomicity, which holds only while a row stays inside the atomic write unit
+(~PIPE_BUF, 4KB): true of an error or exemption row, NOT guaranteed of an audit row,
+whose `findings` list carries every finding's message AND snippet.
 
 The 1.0.3 collapse pass removed summarize() / read_recent_events() and the
 `makoto audit summary|tail|filter` CLI — `jq < audit.jsonl` covers ad-hoc queries
@@ -46,9 +49,10 @@ class AuditRow:
 def _append_jsonl(state_root: Path, filename: str, obj: dict) -> None:
     """serialize obj to compact JSON and append one line to <state_root>/<filename>.
 
-    Creates state_root if missing. POSIX guarantees atomicity for short append-mode
-    writes (<= PIPE_BUF, ~4KB); one row is well under, so concurrent appends don't
-    interleave. The sole writer for both append-only logs (append_row + append_error).
+    Creates state_root if missing. Short append-mode writes (<= PIPE_BUF, ~4KB) do not
+    interleave between concurrent hook processes; a row ABOVE that size carries no such
+    guarantee (see the module docstring). The sole writer for all three append-only logs
+    (append_row, append_error, append_exemption).
     """
     state_root.mkdir(parents=True, exist_ok=True)
     log = state_root / filename
@@ -60,18 +64,13 @@ def append_row(state_root: Path, row: AuditRow) -> None:
     """serialize row to JSON and append one line to <state_root>/audit.jsonl.
 
     Task 2 slice 3b (owner decision: unify -- every dispatch audit row is chain-appended). The
-    SAME row is also appended to the chained, tamper-evident stream via
-    `ledger.append(..., root=state_root)` (an explicit root, per DESIGN DECISION 2026-07-07 --
-    audit.py's whole contract is an explicit `state_root`, never an env var, so the chain write
-    must land in exactly the caller's root, not wherever MAKOTO_STATE_DIR happens to point).
-    `prev_hash`/`row_hash` come back ADDITIVE on the audit.jsonl line -- existing readers use
-    dict.get, so pre-upgrade rows without these keys keep parsing identically, and audit.jsonl's
-    own history is NEVER rewritten (append-only law); the chain simply starts accumulating from
-    the first post-upgrade row onward. A chain-append fault must never block the older, more
-    foundational fires log -- caught and swallowed; audit.jsonl still gets its row either way.
+    SAME row goes to the chained, tamper-evident stream under kind="audit"; `_chain_then_append`
+    holds that shared contract (additive `prev_hash`/`row_hash`, history never rewritten, a chain
+    fault never blocking this write). The root is passed EXPLICITLY, per DESIGN DECISION
+    2026-07-07 -- audit.py's whole contract is an explicit `state_root`, never an env var, so the
+    chain write lands in exactly the caller's root, not wherever MAKOTO_STATE_DIR happens to point.
     """
-    obj = asdict(row)
-    _chain_then_append(state_root, "audit.jsonl", "audit", obj)
+    _chain_then_append(state_root, "audit.jsonl", "audit", asdict(row))
 
 
 def _chain_then_append(state_root: Path, filename: str, structural_kind: str,
@@ -96,7 +95,8 @@ def _chain_then_append(state_root: Path, filename: str, structural_kind: str,
 def _read_jsonl(state_root: Path, filename: str, since: str | None) -> Iterator[dict]:
     """stream <state_root>/<filename> line by line, yielding one dict per valid JSON row. Missing
     file -> empty; blank/malformed lines skipped; optional ISO-8601 `since` filters by `ts`. The one
-    reader both append-only logs share (read_rows + read_exemptions), so neither restates the loop."""
+    reader all three append-only logs share (read_rows, read_errors, read_exemptions), so none of
+    them restates the loop."""
     log = state_root / filename
     if not log.exists():
         return
@@ -167,9 +167,10 @@ def append_error(state_root: Path, event_id: int | None,
 def read_errors(state_root: Path, since: str | None = None) -> Iterator[dict]:
     """stream the dispatch-error log; one dict per valid JSON row. See _read_jsonl for the contract.
 
-    The reader that keeps this log from being write-only. `dispatch` uses it at Stop to answer
-    "were any checks skipped this session?" -- absence of a finding is only good news if nothing
-    was silently unable to produce one.
+    The reader that lets this log answer "were any checks skipped this session?" -- absence of a
+    finding is only good news if nothing was silently unable to produce one. NOTE (grep, 2026-08):
+    NO production caller reads it; `dispatch` only WRITES here, so in the shipped path that
+    question is answered only by `jq` or by a test, and this log is write-only in practice.
     """
     yield from _read_jsonl(state_root, "dispatch_errors.jsonl", since)
 
@@ -190,7 +191,7 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
     Task 2 slice 4 (review-flagged gap, closed): also chain-appended (kind="exemption", root=
     state_root) so the receipt emitter's exemption_count cites a real `verify_chain`-backed row
     instead of an unchained file the receipt's own "every line re-runnable" claim couldn't honor.
-    Same fault-tolerance as append_row's chain wire: a chain fault never blocks this write.
+    Chain wiring and its fault tolerance are `_chain_then_append`'s, shared with append_row.
     """
     obj = {
         "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),

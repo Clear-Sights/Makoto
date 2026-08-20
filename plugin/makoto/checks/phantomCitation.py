@@ -61,7 +61,8 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     """fire on first Author-Year string not present in canonical_citations."""
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
-    fp = current_event.get("tool_input", {}).get("file_path", "")
+    tool_input = current_event.get("tool_input", {})
+    fp = tool_input.get("file_path", "")
     if not _TARGET_RX.search(fp) or fp.endswith("docs/CITATIONS.md"):
         return None
     if conn is None:
@@ -72,7 +73,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     # there false-fires now that makoto runs globally.
     if not _within_governed_tree(fp, current_event.get("cwd", ""), _governed_root(conn)):
         return None
-    content = scan_target_content(current_event.get("tool_input", {}))
+    content = scan_target_content(tool_input)
     if makoto_allowed(content):
         return None  # AI documented these citations as legitimate (see CLAUDE.md)
     cites = extract_citations(content)
@@ -85,10 +86,10 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
         [c[0] for c in cites]
     ).fetchall()
     canonical_set = {row[0] for row in canonical_rows}
-    phantom = [c for c in cites if c[0] not in canonical_set]
-    if not phantom:
+    phantom = next((c for c in cites if c[0] not in canonical_set), None)
+    if phantom is None:
         return None
-    cite_str, line_no, snippet = phantom[0]
+    cite_str, line_no, snippet = phantom
     return Finding(
         pattern_id=pattern.id,
         file=fp,

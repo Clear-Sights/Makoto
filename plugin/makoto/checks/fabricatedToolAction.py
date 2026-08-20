@@ -36,7 +36,8 @@ def _distinctive(obj: str) -> bool:
     if obj.startswith("`"):
         return True
     o = obj.strip("`'\".,;:)(")
-    return bool("/" in o or o.endswith(".py") or o.startswith("http") or re.search(r"\.\w{2,4}$", o))
+    # a '.py' tail is already covered by the generic \.\w{2,4}$ extension test below (dedup)
+    return bool("/" in o or o.startswith("http") or re.search(r"\.\w{2,4}$", o))
 
 
 def _action_signal(text: str):
@@ -55,7 +56,7 @@ def _action_signal(text: str):
         # ran X", "I ran X previously"). Scan the claim's own sentence (the frame can lead or trail
         # the verb). turn_tool_calls only sees THIS turn, so such a truthful recap reads as fabricated
         # -> fail open. The sentence is delimited cheaply on the surrounding terminators.
-        s0 = max((text.rfind(p, 0, m.start()) for p in (". ", "! ", "? ", "\n")), default=-1) + 1
+        s0 = max(text.rfind(p, 0, m.start()) for p in (". ", "! ", "? ", "\n")) + 1
         e1 = min((p for p in (text.find(". ", m.end()), text.find("\n", m.end())) if p != -1),
                  default=len(text))
         if _PRIOR_TURN.search(text[s0:e1 + 1]):

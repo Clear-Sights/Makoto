@@ -43,10 +43,10 @@ from makoto.kit import decode_history_event, failure_terminal_result
 # CROSS-AGENT EVIDENCE (2026-07-23): unlike every other gate, this one reads
 # `ctx.history_all_agents` -- every agent-thread's settled PostToolUse/PostToolUseFailure Bash
 # rows pooled, not narrowed to the calling thread by `_history_for_agent`. A subagent dispatched
-# to start/verify a process is
-# real session evidence the main thread's own claim must see; the thread-boundary firewall exists
-# to stop a DANGLING (in-flight) PreToolUse from synthesizing a FAILURE across threads, a risk
-# that does not apply to a settled PostToolUse/PostToolUseFailure Bash terminal. Residual,
+# to start/verify a process is real session evidence the main thread's own claim must see; the
+# thread-boundary firewall exists to stop a DANGLING (in-flight) PreToolUse from synthesizing a
+# FAILURE across threads, a risk that does not apply to a settled PostToolUse/PostToolUseFailure
+# Bash terminal. Residual,
 # accepted risk: an unrelated subagent's unrelated process-lifecycle-shaped call failing could
 # wrongly implicate this claim -- narrower than the false positive this closes (a real launch
 # invisible only because a different thread made it), not eliminated.
@@ -116,10 +116,10 @@ def _latest_process_call_failed(history) -> Optional[bool]:
     for cmd, tr, is_failure_terminal in _bash_postuse_calls(history):
         if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
             continue
-        direct_error = is_failure_terminal
         interrupted = tr.get("interrupted") is True
         exit_code = tr.get("exitCode", tr.get("exit"))
-        verdict = bool(direct_error or interrupted or (exit_code is not None and exit_code != 0))
+        verdict = bool(is_failure_terminal or interrupted
+                       or (exit_code is not None and exit_code != 0))
     return verdict
 
 
@@ -137,19 +137,21 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
         return Finding(
             pattern_id="gate.claimed_running", file="", line=0, level="error",
             message=("Claim states a process/service is running, but no process-start or "
-                      "liveness-check command appears anywhere in this session's recorded "
-                      "history — the word must match the world."),
+                     "liveness-check command appears anywhere in this session's recorded "
+                     "history — the word must match the world."),
             retry_hint=("Actually start or verify the process with a real Bash call and cite a "
-                        "clean result, or scope/retract the running claim."))
+                        "clean result, or scope/retract the running claim."),
+        )
     if failed:
         return Finding(
             pattern_id="gate.claimed_running", file="", line=0, level="error",
             message=("Claim states a process/service is running, but the most recently recorded "
-                      "process-start/liveness-check call ended in a direct error state "
-                      "(interrupted, a non-zero exit, or a failed-tool error terminal) — the "
-                      "word must match the world."),
+                     "process-start/liveness-check call ended in a direct error state "
+                     "(interrupted, a non-zero exit, or a failed-tool error terminal) — the "
+                     "word must match the world."),
             retry_hint=("Re-run the start/health-check to a real successful result and cite it, "
-                        "or scope/retract the running claim."))
+                        "or scope/retract the running claim."),
+        )
     return None
 
 

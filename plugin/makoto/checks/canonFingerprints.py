@@ -1,7 +1,7 @@
 """gate.canon_fingerprints -- SPEC-5 Task 9 (Makoto absorbs Assay): the BLOCK-tier half of the 17
 in-scope canon session fingerprints (of the original 27-fingerprint THE_CANON,
 REF-lever-graded-primitives/signalminer/grade_planted.py) ported onto Makoto's real Stop-gate
-observable surface. See makoto/checks/_canonAtoms.py's module docstring for the full scope-cut
+observable surface. See makoto/substrate/_canonAtoms.py's module docstring for the full scope-cut
 (10 of 27 need unimplemented atoms, not ported) and porting-fidelity notes, and its BLOCK_IDS for
 the citation trail on exactly which 4 of the 17 are blocking-capable by construction.
 
@@ -11,9 +11,10 @@ but tests/test_stop_gate_level_invariant.py enforces "one gate id -> one fixed F
 ("error", unless the id is named in its advisory allowlist) -- a single mixed-posture module would
 violate that invariant the moment both tiers fired in the same turn. Resolution: TWO gate modules
 (this one, BLOCK-only; canonFingerprintsAdvisory.py, ADVISE-only), sharing their atom/decode logic
-via the package-plumbing file _canonAtoms.py (underscore-prefixed like _shared.py, so
-checks._loader's scan skips it -- not itself a detector). Both are flat files directly in checks/,
-so SPEC-5's "flat checks/, no sub-package" layout rule still holds.
+via the package-plumbing file makoto/substrate/_canonAtoms.py (it sits in the substrate package,
+outside the `checks/*.py` glob registry's `_candidate_files` scans, and is underscore-prefixed on
+top of that -- not itself a detector). Both gate modules are flat files directly in checks/, so
+SPEC-5's "flat checks/, no sub-package" layout rule still holds.
 """
 from __future__ import annotations
 

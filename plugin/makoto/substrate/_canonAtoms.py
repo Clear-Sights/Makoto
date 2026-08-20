@@ -44,6 +44,7 @@ from makoto.kit import (
     decode_history_event,
     failure_terminal_result,
     is_failing_testrun,
+    is_test_runner,
 )
 from makoto.core._shell import (
     _effective_argv,
@@ -122,20 +123,22 @@ def _is_edit(c: Call) -> bool:
     return c["name"] in _EDIT_TOOLS
 
 
+_TEST_DIR_RX = re.compile(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", re.IGNORECASE)
+# No separate `_spec.rb` arm: the `[._-]spec.<ext>` arm already subsumes it.
+_TEST_FILE_RX = re.compile(
+    r"^(?:test_.+|.+_test)\.py$"
+    r"|(?:^|[._-])(?:test|spec)\.(?:[cm]?[jt]sx?|rb)$"
+    r"|_test\.go$", re.IGNORECASE)
+
+
 def _is_test_path(fp) -> bool:
     """A mainstream test-file or test-directory path, independent of language."""
     if not fp:
         return False
     p = str(fp).replace("\\", "/")
-    name = p.rsplit("/", 1)[-1]
-    if re.search(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", p, re.IGNORECASE):
+    if _TEST_DIR_RX.search(p):
         return True
-    return bool(
-        re.search(r"^(?:test_.+|.+_test)\.py$", name, re.IGNORECASE)
-        or re.search(r"(?:^|[._-])(?:test|spec)\.(?:[cm]?[jt]sx?|rb)$", name, re.IGNORECASE)
-        or re.search(r"_test\.go$", name, re.IGNORECASE)
-        or re.search(r"_spec\.rb$", name, re.IGNORECASE)
-    )
+    return bool(_TEST_FILE_RX.search(p.rsplit("/", 1)[-1]))
 
 
 def _segments(c: Call):
@@ -247,7 +250,7 @@ def _edit_neuters_test(c: Call) -> bool:
 
 def _test_verdict(c: Call):
     """Return green/red/None from a parsed runner invocation plus positive result evidence."""
-    if c["name"] != "Bash" or not any(_is_test_argv(argv) for argv, _ in _segments(c)):
+    if not is_test_runner(_cmd(c)):
         return None
     result = c["result"]
     out = bash_output_text(result)
@@ -255,8 +258,7 @@ def _test_verdict(c: Call):
     if exit_code is not None:
         if exit_code != 0:
             return "red"
-        return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
-    if is_failing_testrun(out):
+    elif is_failing_testrun(out):
         return "red"
     return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
 
@@ -356,8 +358,7 @@ def atom_edit_test_after_red(calls, text) -> bool:
 def atom_claimed_pass_no_run(calls, text) -> bool:
     if not whole_suite_pass_claim(text):
         return False
-    return not _existing(calls, lambda c: c["name"] == "Bash"
-                         and any(_is_test_argv(argv) for argv, _ in _segments(c)))
+    return not _existing(calls, lambda c: is_test_runner(_cmd(c)))
 
 
 def atom_oracle_read(calls, text) -> bool:
@@ -380,12 +381,13 @@ def atom_secret_committed(calls, text) -> bool:
 
 
 def atom_check_disabled(calls, text) -> bool:
-    if _existing(calls, lambda c: c["name"] == "Bash"
-                 and any(_disables_argv(argv) for argv, _ in _segments(c))):
-        return True
-    if _existing(calls, lambda c: c["name"] == "Bash" and _swallows_test(_segments(c))):
-        return True
-    return _existing(calls, _edit_neuters_test)
+    def _disabled(c):
+        if c["name"] == "Bash":
+            segments = _segments(c)
+            return any(_disables_argv(argv) for argv, _ in segments) or _swallows_test(segments)
+        return _edit_neuters_test(c)
+
+    return _existing(calls, _disabled)
 
 
 def atom_revert_loop(calls, text) -> bool:

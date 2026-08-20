@@ -43,10 +43,13 @@ _TARGET_RX = re.compile(r"constitution/integrity/checks/[^/]+\.py$")
 # a verifier-named function: the name contains an integrity/verification verb. Narrow context
 # (the integrity-checks dir) makes these names load-bearing rather than generic.
 _VERIFIER_NAME_RX = re.compile(r"(?i)(verif|valid|integrit|attest|check|ensure|enforce|assert)")
+_BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
 
 
 def _is_truthy_const(node) -> bool:
-    return isinstance(node, ast.Constant) and node.value is not None and bool(node.value) is True
+    """True iff `node` is a literal constant that is TRUTHY (`True` / `1` / a non-empty literal).
+    `None` and every falsy literal are excluded — `bool(None)` is already False."""
+    return isinstance(node, ast.Constant) and bool(node.value)
 
 
 def _swallows(stmt) -> bool:
@@ -61,21 +64,19 @@ def _swallows(stmt) -> bool:
 
 def _single_effective(body) -> Optional[ast.stmt]:
     """The body's single statement after dropping a leading docstring, else None."""
-    b = list(body)
+    b = body
     if b and isinstance(b[0], ast.Expr) and isinstance(b[0].value, ast.Constant) \
             and isinstance(b[0].value.value, str):
         b = b[1:]
     return b[0] if len(b) == 1 else None
 
 
-def _hollow_body(fn) -> bool:
-    """True iff the function body (post-docstring) is exactly one neutering statement —
-    `pass` / `return <truthy-const>` / `assert <truthy-const>` (an always-pass / do-nothing check)."""
-    stmt = _single_effective(fn.body)
+def _hollow_body(body) -> bool:
+    """True iff `body` (post-docstring) is exactly one neutering statement —
+    `pass` / `return <truthy-const>` / `assert <truthy-const>` (an always-pass / do-nothing check).
+    Shared by both arms: a hollowed function body and a swallowing except-handler body."""
+    stmt = _single_effective(body)
     return stmt is not None and _swallows(stmt)
-
-
-_BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
 
 
 def _broad_except(handler: ast.ExceptHandler) -> bool:
@@ -94,15 +95,13 @@ def _hollow_node_match(node: ast.AST) -> Optional[str]:
     # (original + assert-True arm) a verifier-named function NEUTERED to a single
     # pass / return-truthy / assert-truthy statement.
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
-            and _VERIFIER_NAME_RX.search(node.name) and _hollow_body(node):
+            and _VERIFIER_NAME_RX.search(node.name) and _hollow_body(node.body):
         return f"def {node.name}() -> hollow"
     # (swallowed-exception arm) a BROAD except handler whose body swallows the failure into a pass —
     # the runtime sibling of body-hollowing. Broad-only + the integrity-path anchor + makoto-allow
     # carry FP-safety; a specific-typed except (honest narrowing) never fires.
-    if isinstance(node, ast.ExceptHandler) and _broad_except(node):
-        stmt = _single_effective(node.body)
-        if stmt is not None and _swallows(stmt):
-            return "broad except -> swallow"
+    if isinstance(node, ast.ExceptHandler) and _broad_except(node) and _hollow_body(node.body):
+        return "broad except -> swallow"
     return None
 
 

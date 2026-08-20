@@ -20,8 +20,15 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
       2. `testrun_output` (the latest kind='testrun' ledger row, passed in by run_stop_checks) is a
          FAILING run per `is_failing_testrun` — xfail-safe and 0-failed-safe, so an
          expected-fail run ('=== 681 passed, 3 xfailed ===') or a clean run does NOT fire.
-    Silent when: no green claim, no test runner ran (empty output), or the latest run passed. The
-    'most recent' ordering means a fix-and-rerun-green supersedes an earlier red and never fires."""
+    Silent when: no green claim, no test runner ran (empty output), or the latest recorded run
+    carries no RECOGNIZED failure token. That last case is BROADER than 'the latest run passed':
+    `is_failing_testrun` detects the PRESENCE of failure, never the presence of success, so a run
+    that really was red but whose recorded 500-char output tail holds no failure token (a
+    timeout/'Killed' tail, a bare 'ERROR:' collection abort, a coverage/warnings footer that pushed
+    the summary out of the tail) is silent here — and the ledger `exit` column recorded on that same
+    row is never consulted. This is the gate's known absence-reads-as-green edge, stated, not
+    inferred. The 'most recent' ordering means a fix-and-rerun-green supersedes an earlier red and
+    never fires; it is also SCOPE-BLIND — a narrow green re-run supersedes a whole-suite red."""
     if not whole_suite_pass_claim(text):
         return None                                  # no whole-suite green claim -> inert
     if not testrun_output or not is_failing_testrun(testrun_output):

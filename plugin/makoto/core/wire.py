@@ -119,8 +119,8 @@ def read_stdin() -> tuple[str, int]:
 
     Returns (text, replaced). Reading `.buffer` rather than the text wrapper is the load-bearing
     part: it takes the decode away from whatever error handler the ambient locale happened to
-    install. A stream without a `.buffer` (a host that hands us text) is
-    read as text and scrubbed instead -- same guarantee, one door further in.
+    install. A stream without a `.buffer` (a host that hands us text) is read as text and scrubbed
+    instead -- same guarantee, one door further in.
     """
     buffer = getattr(sys.stdin, "buffer", None)
     if buffer is not None:
@@ -130,6 +130,11 @@ def read_stdin() -> tuple[str, int]:
             # A closed or non-binary buffer: fall through to the text path rather than making the
             # hook's first act a crash.
             data = None
+        # `is not None`, not a truthiness test, and the reason it is a separate statement rather
+        # than an `else:` on the try: a NON-BLOCKING stdin's `read()` returns None (not b"") when
+        # no data is ready, and handing that to `_decode_counting` is an AttributeError on
+        # `.decode` -- a crash on the read path, which is the one path that must not crash. b"" is
+        # a real answer (an empty envelope) and takes the decode path as it should.
         if data is not None:
             return _decode_counting(data)
     return scrub_text(sys.stdin.read() or "")
@@ -162,14 +167,28 @@ def _decode_counting(data: bytes) -> tuple[str, int]:
 
 
 def harden_stderr() -> None:
-    """Pin stderr to a never-raising error handler.
+    """Pin BOTH outbound streams -- stderr AND stdout -- to a never-raising error handler.
 
-    Every fail-open path in `dispatch` ends in a `print(..., file=sys.stderr)` that interpolates an
-    exception message. When the exception is itself about an unencodable character, that print can
-    raise -- turning the on-the-record fact into a second, unrecorded crash and taking the hook's
-    exit code with it. The reporting path must be the one thing that cannot fail.
+    stderr: every fail-open path in `dispatch` ends in a `print(..., file=sys.stderr)` that
+    interpolates an exception message. When the exception is itself about an unencodable character,
+    that print can raise -- turning the on-the-record fact into a second, unrecorded crash and
+    taking the hook's exit code with it. The reporting path must be the one thing that cannot fail.
+    CPython already defaults stderr to `backslashreplace`, so this leg is belt-and-braces: it earns
+    its keep only when the host, or a test harness, handed us a stricter stderr.
 
-    Best-effort: `reconfigure` needs a TextIOWrapper, and a stderr that is something else is left
+    stdout is the leg that is actually load-bearing, despite the name this function is stuck with
+    (`dispatch` calls it by name; a module does not get to rename its own callers). stdout carries
+    the ONE decision object, and CPython does NOT default it to a forgiving handler: `strict`
+    ordinarily, and `surrogateescape` under the PEP 540 UTF-8 mode a hook subprocess actually runs
+    in. Both defaults break the one-well-formed-JSON-object-on-stdout contract if a surrogate ever
+    reaches that encoder -- `strict` raises PART-WAY THROUGH the write and leaves a truncated
+    object on the pipe, and `surrogateescape` writes the original undecodable BYTE straight back
+    out, leaving an object the host's UTF-8 JSON reader cannot decode. `replace` yields a U+FFFD
+    and a well-formed object in both cases. Nothing should ever reach here carrying a surrogate --
+    that is this module's whole promise -- so this is the floor under the promise, not a substitute
+    for keeping it.
+
+    Best-effort: `reconfigure` needs a TextIOWrapper, and a stream that is something else is left
     alone rather than replaced.
     """
     for stream in (sys.stderr, sys.stdout):

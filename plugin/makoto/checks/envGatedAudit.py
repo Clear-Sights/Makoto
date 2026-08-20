@@ -34,10 +34,10 @@ import ast
 import re
 from typing import Optional
 
-from makoto.vocab import _INTEG_VOCAB
+from makoto.vocab import _INTEG_VOCAB, _PY_FILE_RX as _TARGET_RX
 from makoto.kit import ast_introduced_predicate, callee_chain
 
-from makoto.vocab import _PY_FILE_RX as _TARGET_RX  # .py only — .md is prose (worst old FP was CLAUDE.md)
+# `_TARGET_RX` is .py-only — .md is prose (the worst old FP was CLAUDE.md).
 _INTEG_RX = re.compile(_INTEG_VOCAB, re.I)  # the shared L0 integrity vocabulary (single source; content.integrity_suppression_flag too)
 
 # An env-var READ in CALL form (callee_chain) vs SUBSCRIPT form (value chain).
@@ -80,19 +80,17 @@ def _names_integrity_concept(node: ast.AST) -> bool:
     return False
 
 
-def _env_key_names_integrity(test: ast.AST) -> bool:
-    """True iff the env-var KEY string read in ``test`` names an integrity concept
-    (``os.getenv("ENABLE_AUDIT")`` / ``os.environ["VERIFY_MODE"]``). Reads the first positional str
-    arg of the env CALL, or the subscript key of ``os.environ[...]``."""
-    for sub in ast.walk(test):
-        key: Optional[ast.AST] = None
-        if isinstance(sub, ast.Call) and _is_env_read(sub) and sub.args:
-            key = sub.args[0]
-        elif isinstance(sub, ast.Subscript) and _is_env_read(sub):
-            key = sub.slice
-        if isinstance(key, ast.Constant) and isinstance(key.value, str) and _INTEG_RX.search(key.value):
-            return True
-    return False
+def _env_key(env_read: ast.AST) -> str:
+    """The literal env-var KEY string read by an env-read node (``_is_env_read`` already holds):
+    the first positional arg of the env CALL (``os.getenv("ENABLE_AUDIT")``), or the subscript key
+    of ``os.environ["VERIFY_MODE"]``. Empty when the key is absent or not a ``str`` literal — a
+    computed key names nothing."""
+    key: Optional[ast.AST] = None
+    if isinstance(env_read, ast.Call):
+        key = env_read.args[0] if env_read.args else None
+    elif isinstance(env_read, ast.Subscript):
+        key = env_read.slice
+    return key.value if isinstance(key, ast.Constant) and isinstance(key.value, str) else ""
 
 
 def _node_match(node: ast.AST) -> Optional[str]:
@@ -100,9 +98,10 @@ def _node_match(node: ast.AST) -> Optional[str]:
     integrity/audit/verification concept."""
     if not isinstance(node, ast.If):
         return None
-    if not any(_is_env_read(sub) for sub in ast.walk(node.test)):
+    env_reads = [sub for sub in ast.walk(node.test) if _is_env_read(sub)]
+    if not env_reads:
         return None                                  # the gate condition must READ an env var
-    if _env_key_names_integrity(node.test):
+    if any(_INTEG_RX.search(_env_key(read)) for read in env_reads):
         return "env-gated audit (env-var key names an integrity/verification concept)"
     if any(_names_integrity_concept(stmt) for stmt in node.body):
         return "env-gated audit (the env-gated body runs an integrity/audit/verification op)"

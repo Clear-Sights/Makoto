@@ -138,14 +138,15 @@ def captured_locals(func) -> set:
     captured = set()
     nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
-    for child in ast.iter_child_nodes(func):
-        for n in ast.walk(child):
-            if isinstance(n, nested):
-                for inner in ast.walk(n):
-                    if isinstance(inner, ast.Name) and isinstance(inner.ctx, ast.Load):
-                        captured.add(inner.id)
-            if isinstance(n, ast.NamedExpr) and isinstance(n.target, ast.Name):
-                captured.add(n.target.id)                   # walrus leak
+    for n in ast.walk(func):
+        if n is func:
+            continue                                        # func itself is a `nested` type, not a nested scope
+        if isinstance(n, nested):
+            for inner in ast.walk(n):
+                if isinstance(inner, ast.Name) and isinstance(inner.ctx, ast.Load):
+                    captured.add(inner.id)
+        if isinstance(n, ast.NamedExpr) and isinstance(n.target, ast.Name):
+            captured.add(n.target.id)                       # walrus leak
     return captured
 
 
@@ -153,25 +154,23 @@ def live_locals(func) -> set:
     """Locals whose value reaches an output. Fixpoint over a conservative seed set."""
     escaping = _escaping_names(func)
     locals_ = {a.arg for a in func.args.args} | {a.arg for a in getattr(func.args, 'kwonlyargs', [])}
-    body = list(ast.walk(func))
     live = set(captured_locals(func))                       # captured locals are live
     # seed: names read by returns/yields, by effect statements, and inside try/with bodies
     seeds = []
-    for n in body:
-        if isinstance(n, (ast.Return, ast.Yield, ast.YieldFrom)) and getattr(n, "value", None) is not None:
-            seeds.append(n.value)
+    for stmt in ast.walk(func):
+        if isinstance(stmt, (ast.Return, ast.Yield, ast.YieldFrom)) and getattr(stmt, "value", None) is not None:
+            seeds.append(stmt.value)
         # A `raise X from Y` is an OUTPUT: the raised value (and cause) escapes the function, so every
         # name it reads is live. Without this seed an exception accumulator (`last_exc = None` … then
         # `raise RuntimeError(last_exc)`) had its None-init flagged dead — a false positive.
-        if isinstance(n, ast.Raise):
-            if n.exc is not None:
-                seeds.append(n.exc)
-            if n.cause is not None:
-                seeds.append(n.cause)
-    for stmt in ast.walk(func):
-        if isinstance(stmt, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Expr)):
-            if is_effect(stmt, locals_, escaping):
-                seeds.append(stmt)
+        if isinstance(stmt, ast.Raise):
+            if stmt.exc is not None:
+                seeds.append(stmt.exc)
+            if stmt.cause is not None:
+                seeds.append(stmt.cause)
+        if isinstance(stmt, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Expr)) \
+                and is_effect(stmt, locals_, escaping):
+            seeds.append(stmt)
         if isinstance(stmt, (ast.Try, ast.With, ast.AsyncWith)):
             for s in stmt.body:
                 nm = _assigned_name(s)
@@ -212,14 +211,18 @@ def live_locals(func) -> set:
         live |= _names_read(s)
     # fixpoint: if a live local is assigned from expr, the names that expr reads become live
     changed = True
-    assigns = [(s, _assigned_name(s)) for s in ast.walk(func)
-               if _assigned_name(s) is not None]
     # Tuple/list-unpack assigns (`tool, pattern = sample_patterns[i]`) have no single _assigned_name,
     # so the plain fixpoint never propagated their RHS reads. If ANY unpacked target is live, the RHS
     # value reaches a live binding, so its reads are live too. Gated on a live target (not seeded
     # unconditionally) so a genuinely-dead feeder of UNUSED unpack targets still fires — no FN.
-    unpacks = [(s, _unpack_target_names(s)) for s in ast.walk(func)
-               if _unpack_target_names(s)]
+    assigns, unpacks = [], []
+    for s in ast.walk(func):
+        name = _assigned_name(s)
+        if name is not None:
+            assigns.append((s, name))
+        unpacked = _unpack_target_names(s)
+        if unpacked:
+            unpacks.append((s, unpacked))
     while changed:
         changed = False
         for stmt, name in assigns:
@@ -243,8 +246,8 @@ def _local_names(func) -> set:
     """Every name bound in THIS function scope: params + kwonly + any name assigned in its body
     (excluding nested-scope bodies). A read of such a name is pure (reading a local has no effect);
     operator-dispatch impurity is handled separately by `_builtin_typed`/`_typed_locals`."""
-    names = {a.arg for a in func.args.args} | {a.arg for a in getattr(func.args, 'kwonlyargs', [])}
-    names |= {a.arg for a in getattr(func.args, 'posonlyargs', [])}
+    names = {a.arg for a in (func.args.args + getattr(func.args, 'kwonlyargs', [])
+                             + getattr(func.args, 'posonlyargs', []))}
     if func.args.vararg:
         names.add(func.args.vararg.arg)
     if func.args.kwarg:
@@ -263,7 +266,7 @@ def _local_names(func) -> set:
     return names
 
 
-def _typed_locals(func, locals_) -> set:
+def _typed_locals(func) -> set:
     """Locals provably holding a builtin-typed value at EVERY binding: a name is typed only if it has
     at least one binding and ALL of its bindings are a single-target Assign/AnnAssign whose RHS is
     builtin-typed (given the locals proven so far). Monotone fixpoint. A NAME proven typed lets a
@@ -331,38 +334,40 @@ def illusory_statements(func) -> list:
     """Statements that are provably pure, not effects, and whose result never reaches I/O."""
     escaping = _escaping_names(func)
     locals_ = _local_names(func)
-    typed = _typed_locals(func, locals_)
+    typed = _typed_locals(func)
     live = live_locals(func)
     captured = captured_locals(func)
     out = []
     for stmt in func.body:
-        _scan(stmt, func, locals_, escaping, typed, live, captured, out)
+        _scan(stmt, locals_, escaping, typed, live, captured, out)
     return out
 
 
-def _scan(stmt, func, locals_, escaping, typed, live, captured, out):
+def _scan(stmt, locals_, escaping, typed, live, captured, out):
     # Recurse into EVERY nested block (present-closure / block-containment model). Liveness is
     # function-global, so a pure unused value is dead inside a loop too. Nested def/lambda/class are
     # SEPARATE scopes -> skipped (analyze_file walks them as their own FunctionDefs). try/with-body
     # assigns are already in `live` (live_locals seeds them) so they are never flagged here.
     if isinstance(stmt, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-        name = _assigned_name(stmt)
         rhs = stmt.value
-        if (rhs is not None and is_pure(rhs, locals_, typed) and not is_effect(stmt, locals_, escaping)
-                and name is not None and name not in live and name not in captured):
-            out.append(stmt)
-        elif name is None and isinstance(stmt, ast.Assign):
-            # No single-Name target -> a TUPLE/LIST/CHAINED-target assign (`a, b = 1, 2`; `a = b = 5`;
-            # `[a, b] = [1, 2]`; `(x,) = (1+2,)`). Without this branch every-name-dead unpacks were a
-            # silent FN. Flag dead iff: the RHS is pure, the stmt is not an effect (an attr/subscript
-            # store target IS an effect via is_effect, so those are excluded), there is at least one
-            # bound Store Name, and EVERY bound name is dead AND uncaptured — any one live/captured
-            # target keeps the whole binding live. (is_pure/is_effect/live/captured reused verbatim.)
-            names = {n.id for t in stmt.targets for n in ast.walk(t)
+        if rhs is None or not is_pure(rhs, locals_, typed) or is_effect(stmt, locals_, escaping):
+            return                                          # impure / effectful / bare annotation
+        # Which names does this binding bind? A single-Name target is the common case; anything else
+        # is a TUPLE/LIST/CHAINED-target assign (`a, b = 1, 2`; `a = b = 5`; `[a, b] = [1, 2]`;
+        # `(x,) = (1+2,)`) — without those every-name-dead unpacks were a silent FN. (An attr/
+        # subscript store target IS an effect via is_effect, so it already returned above.)
+        name = _assigned_name(stmt)
+        if name is not None:
+            bound = {name}
+        elif isinstance(stmt, ast.Assign):
+            bound = {n.id for t in stmt.targets for n in ast.walk(t)
                      if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
-            if (names and is_pure(rhs, locals_, typed) and not is_effect(stmt, locals_, escaping)
-                    and all(nm not in live and nm not in captured for nm in names)):
-                out.append(stmt)
+        else:
+            bound = set()                                   # AnnAssign/AugAssign on a non-Name target
+        # Dead iff there is at least one bound name and EVERY one is dead AND uncaptured — any single
+        # live/captured target keeps the whole binding live.
+        if bound and all(nm not in live and nm not in captured for nm in bound):
+            out.append(stmt)
     elif isinstance(stmt, ast.Expr):
         # A bare LITERAL statement is not illusory WORK: a string Constant is a docstring / block
         # comment (material as __doc__), `...` is an intentional stub placeholder, a bare number is a
@@ -373,16 +378,16 @@ def _scan(stmt, func, locals_, escaping, typed, live, captured, out):
             out.append(stmt)                                # bare pure computation: illusory
     elif isinstance(stmt, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith)):
         for s in (*stmt.body, *getattr(stmt, "orelse", [])):
-            _scan(s, func, locals_, escaping, typed, live, captured, out)
+            _scan(s, locals_, escaping, typed, live, captured, out)
     elif isinstance(stmt, ast.Try):
         for s in (*stmt.body, *[b for h in stmt.handlers for b in h.body],
                   *stmt.orelse, *stmt.finalbody):
-            _scan(s, func, locals_, escaping, typed, live, captured, out)
+            _scan(s, locals_, escaping, typed, live, captured, out)
     elif isinstance(stmt, ast.Match):
         # Descend into each case body — a dead pure statement inside a `match` arm is still dead.
         for case in stmt.cases:
             for s in case.body:
-                _scan(s, func, locals_, escaping, typed, live, captured, out)
+                _scan(s, locals_, escaping, typed, live, captured, out)
     # ast.FunctionDef / AsyncFunctionDef / Lambda / ClassDef: separate scopes, NOT scanned here.
 
 
