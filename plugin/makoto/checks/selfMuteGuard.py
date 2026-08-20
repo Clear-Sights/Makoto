@@ -68,10 +68,20 @@ def _around(text: str, m: "re.Match") -> str:
 
 
 def _removed_text(tool_input: dict) -> str:
-    """text being REMOVED/REPLACED: Edit.old_string or MultiEdit edits' old_strings."""
+    """text being REMOVED/REPLACED: Edit.old_string or MultiEdit edits' old_strings.
+
+    Every read is coerced with `str`, and that is load-bearing rather than defensive tidying. The
+    host payload is untrusted in SHAPE as well as content: a non-string `old_string` (an int, a
+    list) made the `"\\n".join(...)` below raise `TypeError`, `dispatch._run_predicates` logged it
+    and `continue`d, and this check was skipped ENTIRELY -- so the un-wiring edit sitting in the
+    very same payload was never examined. Fail-OPEN on a BLOCK-posture meta check whose only job is
+    to notice makoto being switched off, reachable by putting a non-string in one field.
+    """
     old = tool_input.get("old_string") or ""
+    if not isinstance(old, str):
+        old = str(old)
     if not old and isinstance(tool_input.get("edits"), list):
-        old = "\n".join(e.get("old_string", "") for e in tool_input["edits"]
+        old = "\n".join(str(e.get("old_string")) for e in tool_input["edits"]
                         if isinstance(e, dict) and e.get("old_string"))
     return old
 

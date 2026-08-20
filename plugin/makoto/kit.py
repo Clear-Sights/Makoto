@@ -963,8 +963,23 @@ def _discharged(location: str, touched_keys, fs_exists, *, empty_keys=None, fs_s
     return False
 
 
+def _default_veto(claim, _c, *, touched_keys, fs_exists, empty_keys=None, fs_size=None) -> bool:
+    """Default veto: treat the claim as a location and ask the shared discharge test.
+
+    An ADAPTER, not sugar. `_discharged` is `(location, touched_keys, fs_exists, *, ...)`, but a
+    veto is called `(claim, ctx, **facts)` -- so naming `_discharged` itself as the default handed
+    the `GateContext` to the `touched_keys` slot positionally AND again as a keyword:
+    `TypeError: _discharged() got multiple values for argument 'touched_keys'`, raised at Stop, i.e.
+    a decision error and a spurious fail-CLOSED block, for any caller that did not pass its own
+    `veto=`. Latent only because the sole caller today does.
+    """
+    location = claim.get("location", "") if isinstance(claim, dict) else claim
+    return _discharged(location, touched_keys, fs_exists,
+                       empty_keys=empty_keys, fs_size=fs_size)
+
+
 def claim_vs_ledger_predicate(
-    *, extract_claims, veto=_discharged, message,
+    *, extract_claims, veto=_default_veto, message,
 ) -> Callable[..., Optional[Finding]]:
     """Build a Stop check comparing extracted claims with the discharge ledger."""
     def _run(c):
@@ -987,10 +1002,18 @@ def claim_vs_ledger_predicate(
     return _run
 
 
+class _CarriageFault(str):
+    """Truthy sentinel for "Git did not answer", distinct from "the path is absent"."""
+    __slots__ = ()
+
+
+CARRIAGE_FAULT = _CarriageFault("<git carriage fault>")
+
+
 def resolve_in_worktree(loc, cwd):
     """Resolve a repo-relative claim from `cwd`'s Git worktree root.
 
-    Return an existing path or None. The candidate is confined to the worktree root, and every
+    Return an existing path, None, or `CARRIAGE_FAULT`. The candidate is confined to the worktree root, and every
     successful return ends in a live existence check. Tracking is not required: the cwd-relative
     filesystem discharge already accepts a newly-created, untracked deliverable.
     """
@@ -1012,6 +1035,13 @@ def resolve_in_worktree(loc, cwd):
         if os.path.commonpath((root, candidate)) != root:
             return None
         return candidate if os.path.exists(candidate) else None
+    except (OSError, subprocess.SubprocessError):
+        # See `pushed_ref_matches_world`: `git` unreachable is a CARRIAGE fault, and returning None
+        # spelled it "the deliverable is absent" -- the exact value that makes the caller DENY. The
+        # worktree was never consulted, so absence was never established. Callers must treat this
+        # sentinel as fail-open; it is truthy so a caller that ignores it fails safe rather than
+        # denying, and identity-comparable so one that handles it can.
+        return CARRIAGE_FAULT
     except Exception:
         return None
 
@@ -1059,6 +1089,14 @@ def pushed_ref_matches_world(text, cwd):
         )
         object_ids = result.stdout.splitlines()
         return result.returncode == 0 and len(object_ids) == 2 and object_ids[0] == object_ids[1]
+    except (OSError, subprocess.SubprocessError):
+        # CARRIAGE, not evidence. `git` missing from PATH, the _LOCAL_GIT_TIMEOUT budget blown, any
+        # OS error -- none of them observed anything about the refs, yet `return False` handed the
+        # caller the same value a genuine mismatch produces, and the caller DENIES on False. A real
+        # push then read as unpushed and the deny asserted a fact nobody established. This repo's
+        # rule is open on carriage, closed on decision, so an unanswered question does not
+        # contradict the claim.
+        return True
     except Exception:
         return False
 

@@ -7,7 +7,8 @@ from makoto.vocab import Finding
 from makoto.vocab import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
-from makoto.kit import _BIND_BEFORE, DISCHARGE_EATS, _discharge_kwargs, _discharged, resolve_in_worktree
+from makoto.kit import (_BIND_BEFORE, CARRIAGE_FAULT, DISCHARGE_EATS, _discharge_kwargs,
+                        _discharged, resolve_in_worktree)
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -92,6 +93,11 @@ def completion_gate(
     if _discharged(loc, touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
         return None                                  # verified (ledger) or fail-open (filesystem)
     worktree_path = resolve_in_worktree(loc, cwd)
+    if worktree_path is CARRIAGE_FAULT:
+        # Git itself never answered, so the worktree was not consulted and absence was not
+        # established. Carriage faults fail OPEN here; denying would assert the deliverable is
+        # missing on evidence nobody collected.
+        return None
     if worktree_path:
         # Preserve _discharged's content-depth law for this widened path: a zero-byte
         # non-conventional artifact still does not substantiate a production claim.
