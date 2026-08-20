@@ -26,12 +26,25 @@ Homepage = "https://github.com/Clear-Sights/Makoto"
 [tool.setuptools]
 # The package lives under plugin/ -- that directory IS the installed plugin, and nothing
 # outside it ships. See .claude-plugin/marketplace.json.
-package-dir = {"makoto" = "plugin/makoto"}
-packages = ["makoto"]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+# Discovery, not a literal list: `packages = ["makoto"]` shipped ONLY the top-level
+# modules, so makoto.core / makoto.state / makoto.checks / makoto.substrate were absent
+# from every built wheel and `makoto.dispatch` died on its first import. Matches the
+# idiom in the sibling Ward plugin.
+where = ["plugin"]
+include = ["makoto*"]
 
 [tool.setuptools.package-data]
 makoto = ["config/*.toml"]
 
 [tool.setuptools.exclude-package-data]
 makoto = ["tests/*", "docs/*", "*.bak"]
+
+[tool.pytest.ini_options]
+# Prefer the in-repo package over whatever else is on sys.path, so a checkout is
+# tested against its own source. Note this does NOT override a stale editable
+# install's sys.meta_path finder, which outranks sys.path -- if `import makoto`
+# resolves to another checkout, remove that install rather than relying on this.
+pythonpath = ["plugin"]
