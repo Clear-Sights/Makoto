@@ -13,6 +13,26 @@ PLUGIN = REPO_ROOT / "plugin"
 _SEMVER_RX = re.compile(r"^\d+\.\d+\.\d+(?:[-.][\w.]+)?$")
 
 
+def test_the_package_under_test_came_from_this_checkout():
+    """A green run here is evidence about THIS tree only if `makoto` was imported from it.
+
+    A bare `python3 -m pytest` in this repository resolves `makoto` to a DIFFERENT one via a
+    stale `__editable__.makoto-2.3.0.pth` in dist-packages, so `tests/` is read from this tree
+    while the package under test comes from another -- a split-brained run that reports passes
+    about code this branch does not contain. The review corpus recorded the same shape three
+    separate times, each time as an aside to some other finding, because nothing asserted it.
+
+    The two version tests in this file compare declarations that both live in this repository,
+    so they stay green under exactly this condition. This one names where the bytes came from.
+    CI installs this checkout (`pip install -e .`) and satisfies it."""
+    import makoto
+    origin = Path(makoto.__file__).resolve()
+    assert origin.is_relative_to(PLUGIN), (
+        f"tests import makoto from {origin}, which is outside {PLUGIN}: this run grades a "
+        f"different tree. Re-run with PYTHONPATH={PLUGIN}, or remove the stale editable install"
+    )
+
+
 def _pyproject_version() -> str:
     """extract the project version from pyproject.toml without a TOML parser."""
     text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
