@@ -84,6 +84,8 @@ no cross-module import needed post-merge — see the layout note above).
 """
 from __future__ import annotations
 import json
+import os
+import re
 from typing import Iterable, List
 
 from makoto.vocab import Finding
@@ -125,8 +127,15 @@ def exit_code(c: Call):
 
 
 def self_error_code(c: Call):
-    """agnostic terminal `self_error_code`: a harness-emitted error code/object on the result."""
-    return _result(c).get("error") or _result(c).get("error_code")
+    """agnostic terminal `self_error_code`: a harness-emitted error code/object on the result.
+    PRESENCE-based for the `error` field: a present, non-None `error` — even a falsy one such
+    as `""` — is a self-reported error state (the old `or`-chain collapsed `{"error": "",
+    "error_code": 0}` to None, so a turn closing on that terminal read green). `error_code`
+    keeps the truthy requirement: `0` is the conventional success code, not an error."""
+    r = _result(c)
+    if "error" in r and r["error"] is not None:
+        return r["error"]
+    return r.get("error_code") or None
 
 
 def stale_read_hint(c: Call):
@@ -154,8 +163,10 @@ def timed_out(c: Call) -> bool:
     """A direct, language-agnostic error state: the call was interrupted OR carried a self-emitted
     error code. Reads only agnostic terminals — no test-runner regex, no exit_code (a non-zero
     exit on an idempotent call, e.g. two identical `grep -r TODO` returning exit 1 / no-match, is
-    normal, not a timeout — exit_code buys no true positive here and costs false ones)."""
-    return interrupted(c) or bool(self_error_code(c))
+    normal, not a timeout — exit_code buys no true positive here and costs false ones). Presence
+    test (`is not None`), not truthiness: `self_error_code` reports a present-but-falsy `error`
+    field as `""`, which is still an error state (see its docstring)."""
+    return interrupted(c) or self_error_code(c) is not None
 
 
 # ---- sequence-aware primitives (read a span of the call stream, not one call) ----------------
@@ -194,7 +205,13 @@ def recur_stuck(calls: list) -> bool:
     run_all_transient = False  # every call in the current run is a confidently transient error
     run_len = 0
     for c in calls or ():
-        key = (c.get("name", ""), _canon_input(c.get("input")))
+        # Dunder-insensitive verdict identity (`_pairing_input`, like the Pre<->Post pairing):
+        # a harness bookkeeping key that VARIES per call (`__seq`) split a byte-identical retry
+        # loop into distinct keys, so recur never saw a run of length >= 2 — the injection
+        # class ADR 0024 documents, previously guarded on the pairing side only. A leading
+        # `__` is transport bookkeeping, never call semantics, so folding it cannot collapse
+        # two genuinely distinct calls (the same argument ADR 0024 makes for pairing).
+        key = (c.get("name", ""), _pairing_input(c.get("input")))
         call_err = timed_out(c)          # the same direct-error-state terminal the gate installs
         error = self_error_code(c)
         # a confidently transient, self-reported failure is budgeted, not counted as stuck yet
@@ -224,6 +241,13 @@ def recur_stuck(calls: list) -> bool:
     return any(last_bad.values())
 
 
+# The harness's own timeout wording ("Command timed out after 2m 0.0s"). Generic failure
+# vocabulary, not a runner or language token — the same tier as `kit.classify_failure`'s own
+# markers. Needed because classify_failure files ALL timeout text under its transient class,
+# which made canon.timeout silent on the exact condition it is named for.
+_TIMEOUT_TEXT_RX = re.compile(r"\btimed?\s?out\b", re.IGNORECASE)
+
+
 def timed_out_at_turn_end(calls: list) -> bool:
     """canon.timeout: the turn CLOSED on an UNRESOLVED direct error — the LAST decoded call before
     Stop is in a direct error state (`timed_out`: interrupted or self_error_code).
@@ -231,17 +255,43 @@ def timed_out_at_turn_end(calls: list) -> bool:
     Sequence-level, NOT per-call EXISTS: the signal is "left unresolved AT TURN-END", not "an
     error occurred somewhere in the turn". A call that errored but was RESOLVED before the turn
     closed — a later call succeeded, e.g. a flaky command re-run that finally passed — is not a
-    silent unresolved error, so it stays silent. Likewise, one non-interrupted failure whose error
-    text is confidently transient is a recoverable blip, not an unresolved-error turn end. An
-    explicit harness interruption still fires even when its accompanying text sounds transient;
-    deterministic and uncertain errors retain the ordinary one-call bar."""
+    silent unresolved error, so it stays silent. An explicit harness interruption still fires
+    even when its accompanying text sounds transient, and so does an error whose text carries
+    the harness's own TIMEOUT wording (`_TIMEOUT_TEXT_RX`): classify_failure files all timeout
+    text under its transient class, and letting that silence THIS primitive made canon.timeout
+    silent on the very condition it is named for. Deterministic and uncertain errors retain the
+    ordinary one-call bar. A confidently transient, non-interrupted failure is a recoverable
+    blip with ONE retry opportunity — the budget the stop_text has always asserted: the FIRST
+    transient failure of a key at turn end stays silent, but a key that has accumulated two or
+    more transient failures since its last success (identical calls, however many unrelated
+    calls sit between them — the non-consecutive gap recur's three-strike budget cannot see)
+    has used its retry opportunity, and a turn still closing on that same failing key fires."""
     if not calls:
         return False
     last = calls[-1]
     if interrupted(last):
         return True
     error = self_error_code(last)
-    return bool(error) and classify_failure(str(error)) is not False
+    if error is None:
+        return False
+    text = str(error)
+    if _TIMEOUT_TEXT_RX.search(text):
+        return True
+    if classify_failure(text) is not False:
+        return True
+    # confidently transient: budget the escape (one retry opportunity, per the stop_text).
+    key = (last.get("name", ""), _pairing_input(last.get("input")))
+    transients = 0
+    for c in calls:
+        if (c.get("name", ""), _pairing_input(c.get("input"))) != key:
+            continue
+        if not timed_out(c):
+            transients = 0                # this key's success resets its budget
+            continue
+        e = self_error_code(c)
+        if e is not None and classify_failure(str(e)) is False:
+            transients += 1
+    return transients >= 2
 
 
 def _canon_input(inp) -> str:
@@ -254,17 +304,21 @@ def _canon_input(inp) -> str:
 
 
 def _pairing_input(inp) -> str:
-    """`_canon_input` with leading-dunder keys dropped — the identity used ONLY to pair a
-    PostToolUse back to its own PreToolUse, never to judge a verdict.
+    """`_canon_input` with leading-dunder keys dropped — the call-identity fold used to pair a
+    PostToolUse back to its own PreToolUse AND (since the ADR 0024 follow-up) as the per-key
+    verdict identity inside this module's own sequence primitives (`recur_stuck`,
+    `timed_out_at_turn_end`'s transient budget).
 
     A harness may add bookkeeping keys to `tool_input` BETWEEN a call's Pre and its Post, so
     pairing on the FULL canonical input would leave a dangling Pre for a call that in fact
     succeeded. See docs/adr/0024-dunder-insensitive-call-pairing.md for the decision history.
+    The SAME injection class also broke the verdict side while it keyed on the full
+    `_canon_input`: a bookkeeping key that VARIES per call (`__seq`) split a byte-identical
+    retry loop into distinct keys, so recur never saw a run of length >= 2.
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
-    cannot collapse two genuinely distinct calls. This RELAXES PAIRING ONLY: `recur_stuck`,
-    `identical_retry` and every other primitive keep keying on the full `_canon_input`, so the
-    verdict's identity test is untouched and no true positive is widened away."""
+    cannot collapse two genuinely distinct calls — for pairing or for a verdict. Primitives in
+    OTHER modules (`identical_retry`) still key on their own folds."""
     if isinstance(inp, dict):
         return _canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
     return _canon_input(inp)
@@ -428,7 +482,58 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     block (a permission block the agent correctly declines to retry) -- text cannot change
     calls[-1], so without a real discharge it re-fires at every subsequent Stop. Reuses
     makoto.state.ledger's SAME transcript-re-derived, spoof-proof discharge (never trusted from
-    chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model"."""
+    chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model".
+
+    PRE-DENIED CALLS ARE NOT EVIDENCE: dispatch ingests the PreToolUse row BEFORE the Pre
+    handler denies it, and a Pre-denied call never gets a terminal -- so it decoded as a
+    dangling Pre and FD14-A synthesized `{"interrupted": True, ...}` for a call that was never
+    interrupted, never even ran: a BLOCK resting on a fabricated result. The events table alone
+    cannot distinguish a denied Pre from an abandoned one, but makoto's OWN audit log can
+    (dispatch appends an AuditRow for every blocking Pre fire, its findings stamped with the
+    event's own `source_event_id`). This adapter reads the audit log for this session's blocked
+    PreToolUse event ids and drops those Pre rows from the history BEFORE decoding, so nothing
+    is synthesized for them; best-effort (no state_root / unreadable audit leaves history
+    untouched, exactly as before). Row-id matching only works for the events-table tuple shape
+    (id, ts, event_type, cwd, payload) -- dict-shaped test rows carry no id and are never
+    dropped."""
+    denied_pre_ids: set = set()
+    if state_root is not None and session_id:
+        # Direct stdlib read of <state_root>/audit.jsonl, NOT `makoto.state.audit.read_rows`:
+        # the checks->state import firewall (tests/test_import_direction.py) admits only
+        # ledger/citations from a named check module, so this tiny line-per-JSON read is
+        # duplicated here on purpose (the same trade contractOrder makes with its plans SQL).
+        try:
+            audit_path = os.path.join(str(state_root), "audit.jsonl")
+            with open(audit_path, "r", encoding="utf-8") as fh:
+                audit_lines = fh.read().splitlines()
+            for line in audit_lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    arow = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(arow, dict):
+                    continue
+                if arow.get("session_id") != session_id:
+                    continue
+                if arow.get("hook_kind") != "PreToolUse":
+                    continue
+                for f in arow.get("findings") or ():
+                    if not isinstance(f, dict) or f.get("level") != "error":
+                        continue
+                    sid = f.get("source_event_id")
+                    if isinstance(sid, int) and sid:
+                        denied_pre_ids.add(sid)
+        except Exception:
+            denied_pre_ids = set()
+    if denied_pre_ids:
+        history = [
+            r for r in (history or ())
+            if not (isinstance(r, (tuple, list)) and len(r) >= 3
+                    and r[2] == "PreToolUse" and r[0] in denied_pre_ids)
+        ]
     out: List[Finding] = []
     for cid, stop_text, retry_hint in fired_primitives(history):
         ack = None

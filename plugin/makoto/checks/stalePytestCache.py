@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 
 from makoto.vocab import Finding
-from makoto.vocab import _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
+from makoto.vocab import _ADV_FORWARD_RX, _NEGATION_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
 from makoto.substrate.claims import whole_suite_pass_claim
 from makoto.substrate.pytest_cache import stale_failing_node
 
@@ -30,9 +30,6 @@ from makoto.substrate.pytest_cache import stale_failing_node
 # tests/test_stale_pass_gate.py carries the measured-latency falsifier for the ceiling.
 
 _TEETH_WINDOW = 160
-# Lookback for the gate-local forward guard: enough to reach the head of a long leading
-# sentence ("Once I fix the import in the loader, ... the tests pass").
-_LEAD_WINDOW = 240
 
 
 def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
@@ -44,13 +41,19 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
     m = whole_suite_pass_claim(text)
     if not m:
         return None
-    # Sentence-prefix forward guard, GATE-LOCAL (sentinel c): the shared signal's forward window
+    # Sentence-prefix guard, GATE-LOCAL (sentinel c): the shared signal's forward/negation window
     # stops at the last comma — right for green_claim (its conjunct is a recorded red RUN), wrong
-    # here, where "Once I fix the import, the tests pass" coexists with a live red lastfailed by
-    # construction. The whole leading sentence is scanned so the conditional head is seen.
-    lead = _SENTENCE_SPLIT_RX.split(text[max(0, m.start() - _LEAD_WINDOW):m.start()])[-1]
+    # here, where "Once I fix the import, the tests pass" (and "It is not the case that, as of
+    # this run, all tests pass") coexist with a live red lastfailed by construction. The WHOLE
+    # leading sentence is scanned — split over the full prefix, no fixed lookback cap, so a long
+    # leading clause cannot truncate away the conditional head — and it is scanned for BOTH the
+    # forward frame and a negation: a DENY here asserts "claim says the whole suite passes", so
+    # both frames make that assertion false.
+    lead = _SENTENCE_SPLIT_RX.split(text[:m.start()])[-1]
     if _ADV_FORWARD_RX.search(lead):
         return None                      # forward/conditional-framed claim, not a present assertion
+    if _NEGATION_RX.search(lead):
+        return None                      # negated claim: the text says the opposite of "all pass"
     window = text[max(0, m.start() - _TEETH_WINDOW):m.end() + _TEETH_WINDOW]
     if _TEETH_FRAME_RX.search(window):
         return None                      # deliberately-induced failure framing around the claim

@@ -249,7 +249,13 @@ def _edit_neuters_test(c: Call) -> bool:
 
 
 def _test_verdict(c: Call):
-    """Return green/red/None from a parsed runner invocation plus positive result evidence."""
+    """Return green/red/None from a parsed runner invocation plus positive result evidence.
+
+    A run delivered as a PostToolUseFailure terminal carries no exit code and no output --
+    only ``{"error", "interrupted"}`` (kit.failure_terminal_result). Transport must not decide
+    the verdict: the error text is that run's only evidence, so it is graded by the same
+    failure patterns the output would be. The generic ``"tool call failed"`` fallback stays
+    unmatched by is_failing_testrun, so an evidence-free failure terminal still grades None."""
     if not is_test_runner(_cmd(c)):
         return None
     result = c["result"]
@@ -258,7 +264,7 @@ def _test_verdict(c: Call):
     if exit_code is not None:
         if exit_code != 0:
             return "red"
-    elif is_failing_testrun(out):
+    elif is_failing_testrun(out if out.strip() else str(result.get("error") or "")):
         return "red"
     return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
 
@@ -303,21 +309,34 @@ def _existing(calls: Iterable[Call], pred) -> bool:
     return any(pred(c) for c in calls)
 
 
-def atom_tool_timeout(calls, text) -> bool:
-    """A harness interruption or non-transient direct error occurred.
+_EXPLICIT_TIMEOUT_RX = re.compile(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
 
-    One confidently transient, non-interrupted failure terminal is deliberately excluded: it is
-    evidence that the call failed, but not enough evidence that the turn timed out. Explicit
-    harness aborts still count even when their accompanying error text looks transient, while
-    deterministic and uncertain errors retain the ordinary one-call bar. This matches
-    canon.timeout's transient budget without hiding interrupted calls from the fingerprint atoms.
+
+def atom_tool_timeout(calls, text) -> bool:
+    """A harness interruption, an explicitly timeout-marked error (``tool_timeout``,
+    ``timed out`` -- matched without word boundaries, since ``_`` defeats ``\\b``), or a
+    confidently DETERMINISTIC direct error occurred.
+
+    Transient and UNCERTAIN failure terminals are deliberately excluded: each is evidence that
+    the call failed, but not enough evidence that the turn timed out. classify_failure's None
+    "is the safe default a BLOCK-tier caller must treat as 'do not fire'" (kit.py), and the
+    ``"tool call failed"`` fallback kit.failure_terminal_result substitutes for an absent error
+    detail is generic precisely so it stays unclassified -- reading it as a timeout made a
+    detail-free PostToolUseFailure row BLOCK where the same row with a transient error string
+    stayed silent (absence of evidence read as evidence). Explicit harness aborts still count
+    even when their accompanying error text looks transient.
     """
     def _is_timeout(c):
         result = c["result"]
         if result.get("interrupted") is True:
             return True
         error = result.get("error") or result.get("error_code")
-        return bool(error) and classify_failure(str(error)) is not False
+        if not error:
+            return False
+        detail = str(error)
+        if _EXPLICIT_TIMEOUT_RX.search(detail):
+            return True
+        return classify_failure(detail) is True
 
     return _existing(calls, _is_timeout)
 

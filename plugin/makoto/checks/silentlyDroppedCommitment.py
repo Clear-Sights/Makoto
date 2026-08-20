@@ -3,7 +3,7 @@ import os
 import re
 from typing import Optional
 from makoto.checks import normalize_path
-from makoto.vocab import _EMPTY_OK
+from makoto.vocab import _EMPTY_OK, _FENCE_SPAN_RX
 from makoto.vocab import Finding
 from makoto.kit import _path_components, _suffix_match
 
@@ -56,13 +56,22 @@ def _drop_extract_forward_claims(text):
     """[(kind, location, info, raw)] — a forward mutation frame + EXACTLY ONE identifying
     info + a resolvable-looking location. Vague promises (no info / no path) -> []. Precedence
     most-specific first (line_range > count > named_symbol > named_artifact); a span is
-    consumed by the first match. Negated forward frames are dropped."""
+    consumed by the first match. Negated forward frames are dropped. A frame inside a
+    ```code fence``` is QUOTED text (a shell command, a demo, someone else's words), never the
+    assistant's own commitment -- the L0 single-source `vocab._FENCE_SPAN_RX` decides what a
+    fence is, the same object `substrate/claims.py` and `state/commitments.py` consume; before
+    this exclusion a count claim pasted verbatim inside a fence fired a BLOCK the turn could
+    not discharge, because nothing was promised."""
     if not text:
         return []
     claims, consumed = [], []
+    fenced = [m.span() for m in _FENCE_SPAN_RX.finditer(text)]
 
     def _overlaps(a, b):
         return any(not (b <= s or a >= e) for s, e in consumed)
+
+    def _fenced_start(a):
+        return any(s <= a < e for s, e in fenced)
 
     def _negated(m):
         pre = text[max(0, m.start() - 24):m.start()]
@@ -73,7 +82,7 @@ def _drop_extract_forward_claims(text):
         growing as the caller appends the spans it actually turns into claims, so a match the
         caller SKIPS (n<=0, unlocatable artifact) leaves its span free for a later kind."""
         for m in rx.finditer(text):
-            if _overlaps(m.start(), m.end()) or _negated(m):
+            if _overlaps(m.start(), m.end()) or _negated(m) or _fenced_start(m.start()):
                 continue
             if require_loc and not m.group("loc"):
                 continue
@@ -91,9 +100,15 @@ def _drop_extract_forward_claims(text):
             continue
         claims.append(("count", m.group("loc"), n, m.group(0)))
         consumed.append((m.start(), m.end()))
-    for m in _candidates(_DROP_RX_SYMBOL):
+    # require_loc, exactly like count/line_range above: a symbol claim with no trailing path
+    # is a vague promise per this function's own contract ("no info / no path -> []"). The old
+    # `m.group("loc") or sym` fallback used the SYMBOL NAME as the location, which never
+    # resolves and never reads, so the discharge test returned False unconditionally -- a BLOCK
+    # on a false fact ("claimed to define `parse_config` in parse_config") even when the def
+    # was sitting in a touched file, with a non-path in the Finding's file field.
+    for m in _candidates(_DROP_RX_SYMBOL, require_loc=True):
         sym = m.group(1)
-        claims.append(("named_symbol", m.group("loc") or sym, sym, m.group(0)))
+        claims.append(("named_symbol", m.group("loc"), sym, m.group(0)))
         consumed.append((m.start(), m.end()))
     for m in _candidates(_DROP_RX_ARTIFACT):
         loc = m.group("loc")

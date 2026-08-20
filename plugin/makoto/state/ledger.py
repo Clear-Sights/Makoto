@@ -70,12 +70,21 @@ def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) 
 
 
 def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=None) -> None:
+    # The DO UPDATE carries a guard: a plain kind='value' Bash row must NOT overwrite a
+    # kind='testrun' row sharing its key. `pytest` in /repo files the failure tail under
+    # (key='/repo', kind='testrun'); the very next pathless `git status` upserts the SAME
+    # primary key as kind='value', silently destroying the recorded failure — green_claim_gate
+    # then reads latest_testrun()=='' and goes inert, absence reading as green. A later
+    # testrun still supersedes a testrun (latest-wins for a retest is unchanged), and a
+    # value row still supersedes a value row; the chain append below preserves every
+    # pre-upsert row either way.
     conn.execute(
         "INSERT INTO ledger (key, value, kind, exit, source_event_id, session_id, ts) "
         "VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now')) "
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value, kind=excluded.kind, "
         "exit=excluded.exit, source_event_id=excluded.source_event_id, "
-        "session_id=excluded.session_id, ts=excluded.ts",
+        "session_id=excluded.session_id, ts=excluded.ts "
+        "WHERE NOT (ledger.kind = 'testrun' AND excluded.kind = 'value')",
         [key, value, kind, exit_code, event_id, session_id],
     )
     conn.commit()
@@ -217,7 +226,16 @@ def canonical(row: dict) -> str:
 
 
 def _row_hash(prev_hash: str, row: dict) -> str:
-    return norm_sha256(prev_hash + canonical(row))
+    """sha256 of the EXACT link bytes (prev_hash + canonical), NOT norm_sha256: the chain hash
+    must bind byte-for-byte. norm_sha256's per-line rstrip runs over str.splitlines(), which
+    also breaks on U+2028/U+2029/U+0085 — characters `_dumps` emits literally
+    (ensure_ascii=False) and which are agent-controlled (record_update chain-appends Bash
+    stdout as `value`) — so two DISTINCT rows ("ok \u2028next" vs "ok\u2028next") produced
+    the identical row_hash and verify_chain certified a swapped/edited row. For every row free
+    of those separators this digest is byte-identical to the old one (canonical JSON can carry
+    no raw \n and never ends in whitespace), so existing chains and the CHAIN-FORMAT v1
+    vectors verify unchanged."""
+    return hashlib.sha256((prev_hash + canonical(row)).encode("utf-8")).hexdigest()
 
 
 def store_root(*, root: Optional[Path] = None) -> Path:
@@ -259,22 +277,51 @@ class _Locked:
 
 def read(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> list:
     """The named stream as an ordered list of row dicts. `[]` when absent (presence-detection).
-    A truncated/corrupt tail ends the read at that point — the well-formed PREFIX is returned,
-    never a raised parse error. Does NOT verify the chain (that is `verify_chain`)."""
+    A truncated/corrupt/undecodable tail ends the read at that point — the well-formed PREFIX
+    is returned, never a raised parse error. Reads BYTES and decodes per line: a single
+    non-UTF-8 byte anywhere in the file must degrade to the same corrupt-tail behavior, not
+    raise UnicodeDecodeError out of every chain reader forever. Does NOT verify the chain
+    (that is `verify_chain`)."""
     target = store_root(root=root) / f"{name}.jsonl"
-    if not target.exists():
+    try:
+        raw = target.read_bytes()
+    except OSError:
         return []
     rows = []
-    with open(target, "r", encoding="utf-8") as fh:
-        for raw in fh:
-            stripped = raw.strip()
-            if not stripped:
-                continue
-            try:
-                rows.append(json.loads(stripped))
-            except ValueError:
-                break
+    for raw_line in raw.split(b"\n"):
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        try:
+            rows.append(json.loads(stripped))
+        except ValueError:      # includes UnicodeDecodeError on a non-UTF-8 line
+            break
     return rows
+
+
+def _repair_torn_tail(target: Path) -> None:
+    """If the stream's final line is a PARTIAL write (no trailing newline — a tear from
+    ENOSPC/EDQUOT during flush, or a kill mid-write), finish or drop it under the caller's
+    lock BEFORE the next append: otherwise `append` opens in "a" and glues its row onto the
+    fragment, every chain reader is blind past the tear forever, and `append` keeps returning
+    populated rows as though recorded. A complete row merely missing its newline is completed;
+    an unparseable fragment is truncated away — that row never fully existed and its own
+    append already raised at tear time. A corrupt line WITH its newline intact is left
+    untouched: that is tamper territory, verify_chain's job to name, never silently rewritten."""
+    try:
+        with open(target, "rb+") as fh:
+            data = fh.read()
+            if not data or data.endswith(b"\n"):
+                return
+            tail = data.rsplit(b"\n", 1)[-1]
+            try:
+                json.loads(tail)
+            except ValueError:
+                fh.truncate(len(data) - len(tail))   # drop the torn fragment
+                return
+            fh.write(b"\n")                          # complete the un-newlined full row
+    except OSError:
+        return
 
 
 def append(row: dict, *, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> dict:
@@ -283,6 +330,7 @@ def append(row: dict, *, name: str = _DEFAULT_STREAM, root: Optional[Path] = Non
     stored row with `prev_hash`/`row_hash` populated. `root` overrides env-var resolution (see
     `store_root`)."""
     with _Locked(name, root=root):
+        _repair_torn_tail(store_root(root=root) / f"{name}.jsonl")
         existing = read(name=name, root=root)
         prev_hash = existing[-1].get("row_hash", "") if existing else ""
         stored = dict(row)
@@ -302,26 +350,27 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
     None when every link verifies (including the vacuously-intact absent/empty stream), else the
     0-based index of the FIRST row that fails to parse, is not a dict, or whose link does not
     match — the exact point an edit, deletion, reorder, or truncation broke the chain. NEVER
-    RAISES: an unreadable store reads as None. `root` overrides env-var resolution (see
+    RAISES: an unreadable store reads as None, and a NON-UTF-8 line is a broken row (its
+    index is returned) rather than a raised UnicodeDecodeError — the bytes are read raw and
+    decoded per line for exactly that reason. `root` overrides env-var resolution (see
     `store_root`) -- a caller verifying a chain it appended via an explicit root must pass the
     SAME root here, or it will resolve the wrong stream."""
     target = store_root(root=root) / f"{name}.jsonl"
     if not target.exists():
         return None
     try:
-        with open(target, "r", encoding="utf-8") as fh:
-            lines = list(fh)
+        raw = target.read_bytes()
     except OSError:
         return None
     expected_prev = ""
     idx = 0
-    for raw in lines:
-        stripped = raw.strip()
+    for raw_line in raw.split(b"\n"):
+        stripped = raw_line.strip()
         if not stripped:
             continue
         try:
             row = json.loads(stripped)
-        except ValueError:
+        except ValueError:      # unparseable OR undecodable line -> the exact broken row
             return idx
         if not isinstance(row, dict):
             return idx

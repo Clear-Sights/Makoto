@@ -44,6 +44,14 @@ def _prior_whole_file_writes(history, path: str) -> list:
         ev = decode_history_row(row)
         if not isinstance(ev, dict) or ev.get("tool_name") != "Write":
             continue
+        # LANDED content only: `_ingest_event` persists every row BEFORE its handler runs, so
+        # the history also holds PreToolUse rows (attempts, including DENIED ones) and
+        # PostToolUseFailure rows (writes that did NOT land). Counting those as "the file's
+        # content" made a write that never executed the intervening B — a DENY resting on a
+        # change that never happened. Only a successful PostToolUse row proves the disk held
+        # this content.
+        if ev.get("hook_event_name") != "PostToolUse":
+            continue
         inp = ev.get("tool_input") or {}
         if not isinstance(inp, dict) or inp.get("file_path") != path or "content" not in inp:
             continue

@@ -64,10 +64,15 @@ def _running_claim(text: str):
     head predicate, quoted/fenced spans excluded, a negated/forward-framed clause excluded (the
     window walks back to the last sentence boundary, so a leading 'once'/'when'/'if' anywhere in
     that same clause still voids the match). Requires a co-occurring first-person start verb
-    ANYWHERE in `text` (see module docstring) -- checked first since it is the cheaper reject."""
-    if not text or not _PROCESS_START_VERB_RX.search(text):
+    in `text` OUTSIDE quoted/fenced spans (see module docstring) -- the firewall is span-filtered
+    with the SAME _code_spans exclusion as the claim it guards, or a start verb merely QUOTED in
+    a fence/backticks would arm the very gate _code_spans was added to disarm."""
+    if not text:
         return None
     spans = _code_spans(text)
+    if not any(not any(s <= m.start() < e for s, e in spans)
+               for m in _PROCESS_START_VERB_RX.finditer(text)):
+        return None
     for m in _RUNNING_CLAIM_RX.finditer(text):
         a = m.start()
         if any(s <= a < e for s, e in spans):
@@ -83,10 +88,13 @@ def _bash_postuse_calls(history):
     """Yield (command, result_dict, is_failure_terminal) for every settled Bash terminal in
     `history`, in session order. A PostToolUseFailure's top-level error/is_interrupt fields become
     the same small result shape read below, while the boolean preserves where that error came
-    from. Reuses the canonical row/event decode; malformed rows fail open."""
+    from. Reuses the canonical row/event decode; a malformed row yields the (None, None, None)
+    marker so the caller can fail OPEN on it -- silently dropping it would push the emptiness
+    branch below toward BLOCK, the opposite of fail-open."""
     for row in history or ():
         ev = decode_history_event(row)
         if not isinstance(ev, dict):
+            yield None, None, None
             continue
         event_type = ev.get("hook_event_name")
         # INCLUDE failed terminals: this gate distinguishes "no evidence" from "ran and failed".
@@ -111,15 +119,26 @@ def _latest_process_call_failed(history) -> Optional[bool]:
     beyond "non-zero" and no language token. The failure event type itself is sufficient evidence;
     its optional error text need not be present, and `failure_terminal_result` supplies generic
     text only so every decoder receives one stable shape. Latest-wins, like
-    record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt."""
+    record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt.
+
+    An UNDECODABLE history row makes the None ("no evidence") answer unassertable: the dropped
+    row could be the very launch the claim cites, so absence of parseable evidence must not
+    become a positive "no such command exists" -- with any undecodable row present and no
+    decodable lifecycle verdict, this returns False (fail-open silence), never None."""
     verdict = None
+    saw_undecodable = False
     for cmd, tr, is_failure_terminal in _bash_postuse_calls(history):
+        if cmd is None:
+            saw_undecodable = True
+            continue
         if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
             continue
         interrupted = tr.get("interrupted") is True
         exit_code = tr.get("exitCode", tr.get("exit"))
         verdict = bool(is_failure_terminal or interrupted
                        or (exit_code is not None and exit_code != 0))
+    if verdict is None and saw_undecodable:
+        return False
     return verdict
 
 
@@ -137,8 +156,9 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
         return Finding(
             pattern_id="gate.claimed_running", file="", line=0, level="error",
             message=("Claim states a process/service is running, but no process-start or "
-                     "liveness-check command appears anywhere in this session's recorded "
-                     "history — the word must match the world."),
+                     "liveness-check Bash command appears in this session's recent recorded "
+                     "Bash history (the dispatcher's bounded event window) — the word must "
+                     "match the world."),
             retry_hint=("Actually start or verify the process with a real Bash call and cite a "
                         "clean result, or scope/retract the running claim."),
         )

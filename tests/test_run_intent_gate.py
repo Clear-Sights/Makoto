@@ -179,7 +179,18 @@ def test_tn_check_verb_not_in_closed_set():
 
 
 def test_tn_a_question_not_a_declarative_promise():
+    # Rejected on the auxiliary axis before the question veto is ever consulted.
     assert _run_intent_claim("Should I run the tests?") is None
+    # PINS THE QUESTION VETO ITSELF: this text MATCHES _RUN_INTENT_CLAIM_RX ("I'll run"), so
+    # only the containing-sentence-ends-'?' veto can reject it. Deleting the veto (or inverting
+    # it to fire only on questions -- the declarative TPs above pin that direction) fails here.
+    assert _run_intent_claim("I'll run the tests?") is None
+
+
+def test_tn_a_long_question_is_still_vetoed():
+    # The '?' sits >200 chars past the match end: the veto must scan to the real sentence
+    # terminator, not a fixed window.
+    assert _run_intent_claim("I'll run the tests " + "and tidy the imports " * 12 + "?") is None
 
 
 def test_tn_quoted_inside_backticks():
@@ -333,6 +344,21 @@ def test_fires_again_across_a_second_unfulfilled_turn():
     f = run_promised_gate(history=hist)
     assert f is None  # turn 2 made no promise of its own -- nothing for a hypothetical turn 3 to cite yet
     # (turn 1's own dropped promise was already the subject of turn 2's OWN evaluation, not re-derived here)
+
+
+# --- the open/closed line: gate.run_promised is a BLOCKING error, and stays one ---
+def test_gate_is_a_blocking_error_not_an_advisory():
+    """Pins which side of the open/closed line this gate lands on. Every other test in this file
+    is satisfied by an advisory downgrade (nothing read `f.level`, `CHECK.posture`, or
+    `CHECK.may_block`, and `CHECK` was not even imported) — this one goes red on it, the same way
+    test_relative_path_citation.py and test_self_wired_check.py pin their own levels."""
+    from makoto.checks.runIntentUnfulfilled import CHECK
+    f = run_promised_gate(history=[_stop("I'll run the tests now.")])
+    assert f is not None and f.level == "error", f"fired finding must be a blocking error: {f!r}"
+    assert f.retry_hint, "a blocking gate must hand the agent a retry hint"
+    assert CHECK.id == "gate.run_promised" and CHECK.applies_at == "Stop"
+    assert CHECK.posture == "BLOCK", f"posture downgraded: {CHECK.posture!r}"
+    assert CHECK.may_block is True, "may_block=False severs the gate from _emit_decision"
 
 
 def test_silent_empty_history():

@@ -76,7 +76,7 @@ def _run_intent_claim(text: str):
             continue                                  # "I'll never run ..." -- filler swallowed 'never'
         if _RUN_INTENT_IDIOM_VETO_RX.search(text[b:b + 40]):
             continue                                  # "run it by you" / "run through" / "run the numbers"
-        end = _SENTENCE_END_RX.search(text, b, b + 200)
+        end = _SENTENCE_END_RX.search(text, b)
         if end is not None and end.group(0) == "?":
             continue                                  # a question, not a declarative promise
         return m
@@ -114,7 +114,14 @@ def run_promised_gate(*, history=()) -> Optional[Finding]:
     (`_run_intent_claim`) and no Bash call appears anywhere in `history` since -- the one-turn
     grace period is structural (see module docstring), not computed here. Silent whenever no prior
     Stop/SubagentStop exists yet, the prior message made no such promise, or ANY Bash call
-    discharged it."""
+    discharged it.
+
+    `history` is the calling THREAD's own slice (`eats={"history"}`, narrowed by
+    `context._history_for_agent`), NOT the whole session: a run-intent promise is about this
+    thread's own next action, so a subagent's Bash call deliberately stays invisible (pinned by
+    tests/test_gate_run_promised_live_battery.py's subagent RED case -- the opposite of
+    gate.claimed_running's documented cross-agent pooling). The Finding text below therefore
+    claims exactly that thread scope, never "anywhere in this session"."""
     history = list(history or ())
     idx = _last_stop_index(history)
     if idx is None:
@@ -129,7 +136,7 @@ def run_promised_gate(*, history=()) -> Optional[Finding]:
     return Finding(
         pattern_id="gate.run_promised", file="", line=0, level="error",
         message=(f"Last turn promised to run something (\"{claim.group(0).strip()}\") but no "
-                  "Bash call appears anywhere in this session's recorded history since -- the "
+                  "Bash call appears in this agent thread's recorded history since -- the "
                   "word must match the world."),
         retry_hint=("Actually run it with a real Bash call, or retract/rescope the promise "
                      "before ending the turn."))

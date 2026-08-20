@@ -48,6 +48,16 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     conn = _connect(state_dir / "makoto.record.db")
     try:
+        # ONE transaction around every DDL statement AND the config seeds. In autocommit
+        # mode each statement committed separately, so a process interrupted after the
+        # CREATE TABLEs but before the two config seeds left a DB with tables and NO seed
+        # rows -- a state phantom-citation reads as "no canonical_citations_path
+        # configured" and enforces an empty allowlist globally (the exact failure the "-1"
+        # always-stale sentinel below was written to prevent, and which that sentinel
+        # cannot cover when its own row is the one missing). BEGIN IMMEDIATE takes the
+        # write lock up front so a concurrent init waits (busy_timeout) instead of
+        # interleaving; COMMIT publishes tables and seeds as one atom.
+        conn.execute("BEGIN IMMEDIATE")
         # events — append-only event log
         conn.execute("""
             CREATE TABLE IF NOT EXISTS events (
@@ -148,6 +158,13 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
             "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
             ["canonical_citations_mtime", "-1"],
         )
+        conn.execute("COMMIT")
+    except BaseException:
+        try:
+            conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass                      # already rolled back / lock lost -- the raise below is the fact
+        raise
     finally:
         conn.close()
 

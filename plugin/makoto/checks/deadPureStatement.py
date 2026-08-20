@@ -5,8 +5,10 @@ flat file here — same single-file choice as `hollowTest.py`/`canonTimeoutRecur
 contract, and `GateContext` are UNCHANGED — only the file/import path moved.
 
 The analyzer detects ILLUSORY statements: provably pure computations whose result never reaches
-I/O or a live binding (dead code shaped like work). Self-contained like `hollowTest.py`: zero
-imports beyond stdlib `ast`.
+I/O or a live binding (dead code shaped like work). Import-isolated like `hollowTest.py`: stdlib
+`ast` plus the whitelisted makoto substrate only (`makoto.vocab`,
+`makoto.substrate._stdlib_ast_helpers`, `makoto.registry` — the exact contract
+tests/test_detector_engines_are_stdlib_isolated.py enforces).
 """
 from __future__ import annotations
 import ast
@@ -21,6 +23,15 @@ _PURE_BUILTINS = frozenset(
 _PURE_BINOP = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
                ast.LShift, ast.RShift, ast.BitOr, ast.BitXor, ast.BitAnd)
 _PURE_UNARY = (ast.UAdd, ast.USub, ast.Invert, ast.Not)
+# `except*` (ast.TryStar, 3.11+) carries the same body/handlers/orelse/finalbody shape as ast.Try
+# and must be walked identically — a statement under `except*` is not invisible.
+_TRY_STMTS = (ast.Try, ast.TryStar) if hasattr(ast, "TryStar") else (ast.Try,)
+# The actual callables behind _PURE_BUILTINS (no import needed — builtins are in scope), for the
+# guarded constant-argument evaluation in `_scan`: a whitelisted call/arithmetic over literals
+# that RAISES (`int('abc')`, `1 // 0`, `min([])`) is an observable effect, not a removable no-op.
+_BUILTIN_FNS = {f.__name__: f for f in (
+    len, str, int, float, bool, tuple, list, dict, set, frozenset, abs, min, max, sum,
+    ord, chr, hash, round, isinstance, type, sorted, reversed)}
 
 
 def _builtin_typed(node, typed_locals=frozenset()) -> bool:
@@ -134,9 +145,11 @@ def _escaping_names(func) -> set:
 
 def captured_locals(func) -> set:
     """Names of the function's own locals that are referenced by a NESTED scope (closure/lambda/
-    comprehension) or leaked by a walrus — such locals are live regardless of straight-line use."""
+    comprehension/class body) or leaked by a walrus — such locals are live regardless of
+    straight-line use. `ast.ClassDef` counts: a class body executes in its own scope but READS the
+    enclosing function's locals (`class C: y = x`), so removing `x = 1` raises NameError."""
     captured = set()
-    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
+    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
     for n in ast.walk(func):
         if n is func:
@@ -171,7 +184,7 @@ def live_locals(func) -> set:
         if isinstance(stmt, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Expr)) \
                 and is_effect(stmt, locals_, escaping):
             seeds.append(stmt)
-        if isinstance(stmt, (ast.Try, ast.With, ast.AsyncWith)):
+        if isinstance(stmt, _TRY_STMTS + (ast.With, ast.AsyncWith)):
             for s in stmt.body:
                 nm = _assigned_name(s)
                 if nm:
@@ -252,17 +265,19 @@ def _local_names(func) -> set:
         names.add(func.args.vararg.arg)
     if func.args.kwarg:
         names.add(func.args.kwarg.arg)
-    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
     def _walk(node):
         for child in ast.iter_child_nodes(node):
+            if isinstance(child, nested):
+                continue                    # a nested scope's bindings are NOT this function's locals
             if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
                 names.add(child.id)
             if isinstance(child, ast.arg):
                 names.add(child.arg)
-            if not isinstance(child, nested):
-                _walk(child)
+            _walk(child)
     for stmt in func.body:
-        _walk(stmt)
+        if not isinstance(stmt, nested):    # a top-of-body nested def/class is a nested scope too
+            _walk(stmt)
     return names
 
 
@@ -274,8 +289,10 @@ def _typed_locals(func) -> set:
     while a bare parameter — never assigned here — and any name with even one non-typed/aliasing/aug
     binding stays untyped (operator-overload-safe; conservative, soundness over recall).
 
-    Disqualifiers (force untyped): a parameter binding, an AugAssign, a for/with/comprehension target,
-    a tuple/attr/subscript store, or an Assign whose RHS is not provably builtin-typed."""
+    Disqualifiers (force untyped): a parameter binding, an AugAssign, a for/with-as/except-as
+    target, a name declared `global`/`nonlocal` anywhere in the function (including a nonlocal
+    rebind inside a nested scope), a tuple/attr/subscript store, or an Assign whose RHS is not
+    provably builtin-typed."""
     # Collect, per name, the RHS of every clean single-target Assign/AnnAssign, and a disqualified set.
     good = {}           # name -> list of RHS nodes (all must end up builtin-typed)
     disqualified = set()
@@ -285,7 +302,10 @@ def _typed_locals(func) -> set:
         disqualified.add(func.args.vararg.arg)
     if func.args.kwarg:
         disqualified.add(func.args.kwarg.arg)
-    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+    # a `global`/`nonlocal` name — declared HERE, or rebound from any nested scope `_visit` skips —
+    # can hold anything at any time, so it is never provably builtin-typed
+    disqualified.update(_escaping_names(func))
+    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
     def _visit(node):
         if isinstance(node, ast.Assign):
             nm = _assigned_name(node)
@@ -309,13 +329,22 @@ def _typed_locals(func) -> set:
             for n in ast.walk(node.target):
                 if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
                     disqualified.add(n.id)                      # loop var type unknown
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if item.optional_vars is not None:
+                    for n in ast.walk(item.optional_vars):
+                        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                            disqualified.add(n.id)              # `with cm as v`: __enter__ result
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            disqualified.add(node.name)                         # `except E as v`: exception object
         elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
             disqualified.add(node.target.id)                    # walrus value unknown
         for child in ast.iter_child_nodes(node):
             if not isinstance(child, nested):
                 _visit(child)
     for stmt in func.body:
-        _visit(stmt)
+        if not isinstance(stmt, nested):    # a top-of-body nested def/class is a separate scope
+            _visit(stmt)
     # Fixpoint: a name is typed once ALL its good RHS are builtin-typed and it is not disqualified.
     typed = set()
     changed = True
@@ -331,27 +360,104 @@ def _typed_locals(func) -> set:
 
 
 def illusory_statements(func) -> list:
-    """Statements that are provably pure, not effects, and whose result never reaches I/O."""
+    """Statements that are provably pure, not effects, and whose result never reaches I/O.
+
+    `first_bind` maps each local to the smallest line number of any binding of it (params bind at
+    entry, i.e. line 0). `_scan` uses it as a flow guard: a local READ at or before its first
+    binding line (`z = x + 1` then `x = 5`) raises UnboundLocalError when evaluated, so the
+    statement is not provably pure and is never flagged — line-based, hence conservative in loops
+    (suppression only, FN-safe)."""
     escaping = _escaping_names(func)
     locals_ = _local_names(func)
     typed = _typed_locals(func)
     live = live_locals(func)
     captured = captured_locals(func)
+    first_bind = {}
+    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+    def _note(name, lineno):
+        if name not in first_bind or lineno < first_bind[name]:
+            first_bind[name] = lineno
+
+    for a in (func.args.args + getattr(func.args, "kwonlyargs", [])
+              + getattr(func.args, "posonlyargs", [])):
+        _note(a.arg, 0)                                     # a parameter is bound at entry
+    if func.args.vararg:
+        _note(func.args.vararg.arg, 0)
+    if func.args.kwarg:
+        _note(func.args.kwarg.arg, 0)
+    for nm in escaping:
+        _note(nm, 0)                                        # global/nonlocal: bound elsewhere
+
+    def _bindings(node):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, nested):
+                if not isinstance(child, ast.Lambda):       # a lambda binds no name of its own
+                    _note(child.name, child.lineno)         # the def/class NAME is a binding here
+                continue                                    # ...but its body is a separate scope
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                _note(child.id, child.lineno)
+            elif isinstance(child, ast.ExceptHandler) and child.name:
+                _note(child.name, child.lineno)
+            elif isinstance(child, ast.arg):
+                _note(child.arg, child.lineno)
+            _bindings(child)
+
+    for stmt in func.body:
+        if isinstance(stmt, nested):
+            if not isinstance(stmt, ast.Lambda):
+                _note(stmt.name, stmt.lineno)
+        else:
+            _bindings(stmt)
     out = []
     for stmt in func.body:
-        _scan(stmt, locals_, escaping, typed, live, captured, out)
+        _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out)
     return out
 
 
-def _scan(stmt, locals_, escaping, typed, live, captured, out):
+def _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out):
     # Recurse into EVERY nested block (present-closure / block-containment model). Liveness is
     # function-global, so a pure unused value is dead inside a loop too. Nested def/lambda/class are
     # SEPARATE scopes -> skipped (analyze_file walks them as their own FunctionDefs). try/with-body
     # assigns are already in `live` (live_locals seeds them) so they are never flagged here.
+    def _flow_unproven(node):
+        # a local read AT or BEFORE its first binding line raises UnboundLocalError when
+        # evaluated -> the statement is NOT provably pure (see illusory_statements' docstring)
+        return any(first_bind.get(nm, 0) >= stmt.lineno
+                   for nm in _names_read(node) if nm in locals_)
+
+    def _statically_raises(node):
+        # A whitelisted-pure expression over LITERALS that raises when evaluated (`int('abc')`,
+        # `1 // 0`, `min([])`) has an observable effect — raising — so "provably cannot have a
+        # side effect" would be a false fact and removal would change behaviour. Only literal
+        # operands are ever evaluated, so the probe is bounded by the source text itself.
+        for n in ast.walk(node):
+            if isinstance(n, ast.BinOp) and isinstance(n.op, (ast.Div, ast.FloorDiv, ast.Mod)):
+                try:
+                    l, r = ast.literal_eval(n.left), ast.literal_eval(n.right)
+                except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                    continue                                # non-literal operand: not evaluated
+                try:
+                    (l / r) if isinstance(n.op, ast.Div) else                         (l // r) if isinstance(n.op, ast.FloorDiv) else (l % r)
+                except Exception:
+                    return True
+            elif isinstance(n, ast.Call) and isinstance(n.func, ast.Name)                     and n.func.id in _BUILTIN_FNS and not n.keywords                     and not any(isinstance(a, ast.Starred) for a in n.args):
+                try:
+                    args = [ast.literal_eval(a) for a in n.args]
+                except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                    continue                                # non-literal argument: not evaluated
+                try:
+                    _BUILTIN_FNS[n.func.id](*args)
+                except Exception:
+                    return True
+        return False
+
     if isinstance(stmt, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
         rhs = stmt.value
         if rhs is None or not is_pure(rhs, locals_, typed) or is_effect(stmt, locals_, escaping):
             return                                          # impure / effectful / bare annotation
+        if _flow_unproven(rhs) or _statically_raises(rhs):
+            return                                          # evaluating it can raise: not removable
         # Which names does this binding bind? A single-Name target is the common case; anything else
         # is a TUPLE/LIST/CHAINED-target assign (`a, b = 1, 2`; `a = b = 5`; `[a, b] = [1, 2]`;
         # `(x,) = (1+2,)`) — without those every-name-dead unpacks were a silent FN. (An attr/
@@ -374,43 +480,78 @@ def _scan(stmt, locals_, escaping, typed, live, captured, out):
         # no-op — none is a computation shaped like work. The genuine target is a discarded
         # COMPUTATION (`x + 1`, `len(items)` on a typed local). So exclude bare Constants.
         if (not isinstance(stmt.value, ast.Constant)
-                and is_pure(stmt.value, locals_, typed) and not is_effect(stmt, locals_, escaping)):
+                and is_pure(stmt.value, locals_, typed) and not is_effect(stmt, locals_, escaping)
+                and not _flow_unproven(stmt.value) and not _statically_raises(stmt.value)):
             out.append(stmt)                                # bare pure computation: illusory
     elif isinstance(stmt, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith)):
         for s in (*stmt.body, *getattr(stmt, "orelse", [])):
-            _scan(s, locals_, escaping, typed, live, captured, out)
-    elif isinstance(stmt, ast.Try):
+            _scan(s, locals_, escaping, typed, live, captured, first_bind, out)
+    elif isinstance(stmt, _TRY_STMTS):
+        # ast.TryStar (`except*`) carries the identical statement shape — walked identically, so
+        # a dead pure statement under `except*` is exactly as visible as under plain `except`.
         for s in (*stmt.body, *[b for h in stmt.handlers for b in h.body],
                   *stmt.orelse, *stmt.finalbody):
-            _scan(s, locals_, escaping, typed, live, captured, out)
+            _scan(s, locals_, escaping, typed, live, captured, first_bind, out)
     elif isinstance(stmt, ast.Match):
         # Descend into each case body — a dead pure statement inside a `match` arm is still dead.
         for case in stmt.cases:
             for s in case.body:
-                _scan(s, locals_, escaping, typed, live, captured, out)
+                _scan(s, locals_, escaping, typed, live, captured, first_bind, out)
     # ast.FunctionDef / AsyncFunctionDef / Lambda / ClassDef: separate scopes, NOT scanned here.
 
 
 def analyze_file(src: str, path: str) -> list:
     try:
         tree = ast.parse(src)
-    except SyntaxError:
+    except (SyntaxError, RecursionError):
         return []                                           # fail-open: skip unparseable files
     lines = src.splitlines()
-    def _allowed(lineno):
+    # Redact every string-literal span before the marker scan: an exemption asserts an on-the-
+    # record audit trail, which only a COMMENT provides — a `makoto-allow:` sequence INSIDE a
+    # string literal (`z = len('see makoto-allow: the docs')`) is data, not a rationale, and must
+    # not exempt. Offsets are utf-8 byte columns (ast's own unit), hence the encode/decode hop.
+    redacted = [ln.encode("utf-8") for ln in lines]
+    for node in ast.walk(tree):
+        if not ((isinstance(node, ast.Constant) and isinstance(node.value, str))
+                or isinstance(node, ast.JoinedStr)):
+            continue
+        a, b = getattr(node, "lineno", None), getattr(node, "end_lineno", None)
+        if a is None or b is None:
+            continue
+        for li in range(a, b + 1):
+            if not 1 <= li <= len(redacted):
+                continue
+            raw = redacted[li - 1]
+            start = max(0, node.col_offset) if li == a else 0
+            end = min(len(raw), max(0, node.end_col_offset)) if li == b else len(raw)
+            if start < end:
+                redacted[li - 1] = raw[:start] + b" " * (end - start) + raw[end:]
+    redacted = [b.decode("utf-8", "replace") for b in redacted]
+
+    def _allowed(stmt):
         # On-the-record override via the ONE canonical marker predicate (§7.5b): a reasonless
         # `# makoto-allow` does NOT exempt, matching what this check's own finding text already
         # tells the author to write. An exemption marker asserts an audit trail; accepting one
-        # without a rationale accepts the assertion unmeasured.
+        # without a rationale accepts the assertion unmeasured. The marker is honored on ANY
+        # line of the statement's own span, so a multi-line statement's closing-line annotation
+        # (`)  # makoto-allow: ...`) exempts exactly like a single-line one.
         # See docs/adr/0026-liveness-allow-marker-strictness.md for the decision history.
-        return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
+        a = getattr(stmt, "lineno", 0)
+        b = getattr(stmt, "end_lineno", None) or a
+        return any(1 <= li <= len(redacted)
+                   and _MAKOTO_ALLOW_RX.search(redacted[li - 1]) is not None
+                   for li in range(a, b + 1))
     out = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for stmt in illusory_statements(node):
-                if _allowed(stmt.lineno):
-                    continue                                # exempt, never a fire
-                out.append({"file": path, "line": stmt.lineno, "func": node.name})
+    try:
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for stmt in illusory_statements(node):
+                    if _allowed(stmt):
+                        continue                            # exempt, never a fire
+                    out.append({"file": path, "line": stmt.lineno, "func": node.name})
+    except RecursionError:
+        return []       # carriage-shaped input (pathologically deep expression): fail open,
+                        # exactly like the unparseable-file branch above — never a Stop-hook crash
     return out
 
 

@@ -28,6 +28,21 @@ def _stated(pattern: str) -> int:
     return int(m.group(1))
 
 
+def test_readme_counts_bind_to_THIS_trees_loader():
+    """The binding below is only material if `makoto` IS this tree's package: a stale editable
+    install resolved the import to a different checkout (verified: /home/user/makoto-dev/...),
+    letting both count claims stay green while THIS repo's catalog drifted -- the exact gap the
+    module docstring says this file closes ("the README said 3 end-of-turn gates while 6 were
+    live, and nothing caught it")."""
+    import makoto
+    pkg = Path(makoto.__file__).resolve()
+    plugin = Path(__file__).resolve().parent.parent / "plugin"
+    assert pkg.is_relative_to(plugin), (
+        f"imported makoto resolves to {pkg}, not this repo's {plugin} -- README counts are "
+        f"being checked against a different tree. Run with PYTHONPATH={plugin}."
+    )
+
+
 def test_readme_precheck_count_matches_live():
     live = len([p for p in load_precheck_catalog() if p.predicate_module])
     assert _stated(r"\*\*(\d+) pre-checks\*\*") == live

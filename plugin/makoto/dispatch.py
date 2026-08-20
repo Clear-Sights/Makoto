@@ -598,10 +598,25 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         hint = _jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
-    mode = verdict.posture()
-    folded = verdict.apply(verdict.Decision(outcome, detail), mode,
-                           permission_mode=permission_mode,
-                           layer=_finding_layer(outcome, finding, mode, permission_mode))
+    # The fold itself is DECISION machinery: a raise out of `posture`/`_finding_layer`/`apply`
+    # (e.g. a malformed host value, or `_meta_check_ids` -> `load_checks` failing on the
+    # LOOSE/SILENT+BLOCK branch) used to unwind through this function into `_dispatch`'s
+    # carriage handler, which records a fact and returns 0 — a fired BLOCK converted into a
+    # clean exit-0 allow. This repo's rule is open on carriage, closed on decision: on a fold
+    # fault, honor the check's RAW outcome unchanged (the STRICT rule — a fold can only soften,
+    # so this never escalates a check that found nothing).
+    try:
+        mode = verdict.posture()
+        folded = verdict.apply(verdict.Decision(outcome, detail), mode,
+                               permission_mode=permission_mode,
+                               layer=_finding_layer(outcome, finding, mode, permission_mode))
+    except Exception as exc:
+        mode = verdict.DEFAULT_POSTURE
+        folded = verdict.Decision(
+            outcome,
+            f"{detail}\n[makoto: verdict fold failed and fails closed on the raw outcome: "
+            f"{type(exc).__name__}: {exc}]",
+        )
     if _recheck_certificate_enabled():
         # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
         # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
@@ -631,7 +646,43 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
                 "makoto could not certify its own verdict fold and is failing closed: "
                 f"{type(exc).__name__}: {exc}",
             )
-    body = verdict.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
+    # Meta-floor teeth at the Stop edges: `apply` floors a meta BLOCK to ASK under a softening
+    # posture, but `_STOP_WIRE` deliberately has no ASK entry ("ASK never blocks the agent from
+    # stopping" — pinned by tests/test_posture_wire.py), so at Stop/SubagentStop that floored
+    # ASK rendered {} — the tamper finding suppressed EXACTLY as the floor exists to prevent,
+    # indistinguishable from ALLOW. Both components are pinned; the composition is corrected
+    # here: a BLOCK from a meta-layer check that folded to ASK on a Stop-shaped edge renders as
+    # the BLOCK body (STRICT's own rendering), after the certificate check so the recorded fold
+    # stays coherent. Object-layer ASKs at Stop keep their pinned no-objection rendering.
+    if (hook_event in ("Stop", "SubagentStop") and outcome == verdict.BLOCK
+            and str(folded) == verdict.ASK):
+        try:
+            is_meta = finding.pattern_id in _meta_check_ids()
+        except Exception:
+            is_meta = True          # catalog unloadable: decision machinery -> fail closed
+        if is_meta:
+            folded = verdict.Decision(verdict.BLOCK, detail)
+    edge = _HOOK_TO_EDGE.get(hook_event, "Pre")
+    try:
+        body = verdict.dispatch_posture(edge, folded, hook_event)
+    except Exception as exc:
+        # Same fail-closed rule as the fold above: a raise while RENDERING the verdict must not
+        # become an exit-0 allow. Re-render what the fold already concluded with minimal
+        # hand-built bodies — never escalating: anything that folded below BLOCK/ASK stays {}.
+        reason = (f"makoto: {getattr(folded, 'detail', '') or detail} "
+                  f"[wire render failed and fails closed: {type(exc).__name__}: {exc}]")
+        if str(folded) == verdict.BLOCK and edge in ("Stop", "SubagentStop"):
+            body = {"decision": "block", "reason": reason, "hookEventName": hook_event}
+        elif str(folded) == verdict.BLOCK and edge == "Pre":
+            body = {"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                           "permissionDecision": "deny",
+                                           "permissionDecisionReason": reason}}
+        elif str(folded) == verdict.ASK and edge == "Pre":
+            body = {"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                           "permissionDecision": "ask",
+                                           "permissionDecisionReason": reason}}
+        else:
+            body = {}
     if body:
         global _stdout_written, _decision_write_failed
         # Claim the wire BEFORE the write, not after. The claim is about having BEGUN to write,

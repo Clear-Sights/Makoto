@@ -30,6 +30,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 from typing import Optional
 
 from makoto.checks import normalize_path
@@ -74,9 +75,25 @@ def declare_plan(conn, session_id: str, plan: Plan) -> None:
                 f"non-falsifiable declaration {row!r}: a declared node needs a concrete "
                 f"what + passthrough + where to be held to anything"
             )
+        status = row.get("status", "open")
+        if status != "open":
+            # A node born DONE (or any non-open status) at declare time is as unholdable as a
+            # vacuous one: there is nothing left to hold anyone to, so admitting it would empty
+            # the remainder without the work happening. Same whole-plan rejection as the
+            # falsifiability gate -- fail-closed on tamper, not on absence.
+            raise ValueError(
+                f"non-falsifiable declaration {row!r}: a declared node must start 'open' "
+                f"(got status {status!r}) -- work cannot be born already discharged"
+            )
+        node_id = row.get("id", "")
+        if node_id == f"{row['what']}::{row['passthrough']}::{row['where']}":
+            # The id was auto-derived from the RAW `where` (PlanNode.__post_init__); re-derive
+            # it from the normalized `where` so the stored node's identity and its `where`
+            # agree with the documented "<what>::<passthrough>::<where>" composite.
+            node_id = ""
         normalized.add_node(
             row["what"], row["passthrough"], where,
-            id=row.get("id", ""), status=row.get("status", "open"),
+            id=node_id, status=status,
         )
     _upsert(conn, session_id, normalized)
 
@@ -121,8 +138,32 @@ def _read_artifact_plan(cwd: str) -> Optional[Plan]:
             text = fh.read()
     except (OSError, ValueError):
         return None
+    # Parse PER LINE, not whole-artifact: one typo on line 3 of a 5-node plan must not silently
+    # discard the other 4 nodes (that made a malformed line indistinguishable from "no plan
+    # declared" -- absence reading green at Stop). A bad line is skipped LOUDLY (stderr, the
+    # same diagnostic channel configchange.py uses; never stdout, which carries the hook's one
+    # JSON object) and the remaining well-formed rows are still admitted. A line that is valid
+    # JSON but not an object (`[]`, `1`, `"x"`) is the same defect class, and previously escaped
+    # the fail-open contract entirely as an AttributeError out of `Plan.from_rows`.
+    rows = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            print(f"makoto: {artifact}:{lineno}: malformed JSON line skipped; "
+                  f"the remaining plan lines are still admitted", file=sys.stderr)
+            continue
+        if not isinstance(row, dict):
+            print(f"makoto: {artifact}:{lineno}: JSON line is not an object; skipped",
+                  file=sys.stderr)
+            continue
+        rows.append(row)
+    if not rows:
+        return None
     try:
-        raw = Plan.from_jsonl(text)
+        raw = Plan.from_rows(rows)
     except (ValueError, KeyError, TypeError):
         return None
     if not raw.rows():
@@ -215,6 +256,19 @@ _NEGATED_RX = re.compile(
     re.IGNORECASE)
 _BIND_BEFORE = 60
 _BIND_AFTER = 40
+# A negation immediately governing a past verb ("is not done yet", "isn't finished", "hasn't
+# been completed"): a copular/auxiliary negation before the participle means the item is
+# explicitly UNFINISHED -- neither a completion nor a retraction, so the item stays open.
+_NEG_BEFORE_VERB_RX = re.compile(
+    r"\b(?:not|never|isn'?t|aren'?t|wasn'?t|weren'?t|hasn'?t|haven'?t|hadn'?t|ain'?t)"
+    r"(?:\s+(?:been|yet|quite|fully|completely|entirely|actually|really))*\s+$",
+    re.IGNORECASE)
+# The verb is line-initial after at most a bullet/number marker -> an imperative plan bullet
+# ("- start §9.3", "1. finish §9.3"). Same convention as commitments.py's _LINE_INITIAL_RX.
+_LINE_INITIAL_RX = re.compile(r"^[\s\-*•>\d.)\]]*$")
+# First sentence terminator after the label -- a '?' there marks an interrogative ("Should I
+# start §9.3?"), which is an offer for approval, never a firm promise.
+_SENT_END_RX = re.compile(r"[.!?\n]")
 
 
 def _normalize_label(raw: str) -> str:
@@ -229,10 +283,16 @@ def _normalize_label(raw: str) -> str:
 
 def _first_person_governs(text: str, verb_start: int, line_start: int) -> bool:
     """True iff the clause containing the verb has a first-person subject, or the verb sits at
-    the start of the line (an imperative plan bullet, same convention as commitments.py)."""
+    the start of its line after at most a bullet/number marker (an imperative plan bullet, same
+    convention as commitments.py's _LINE_INITIAL_RX)."""
+    if verb_start < line_start:
+        # The verb sits on a PREVIOUS line (the label's line_start is past it): judge the verb
+        # against ITS OWN line, never a reversed/empty slice -- an empty prefix here used to
+        # read third-person prose on the prior line as a line-initial imperative.
+        line_start = text.rfind("\n", 0, verb_start) + 1
     prefix = text[line_start:verb_start]
-    if not prefix.strip():
-        return True                                   # line-initial verb -> imperative
+    if _LINE_INITIAL_RX.match(prefix):
+        return True                                   # line-initial verb -> imperative bullet
     return bool(_FIRST_PERSON_RX.search(prefix[-_BIND_BEFORE:]))
 
 
@@ -258,6 +318,11 @@ def source_plan_item_promise(text: str) -> Optional[dict]:
             continue                                  # label mentioned with no forward verb governing it
         if _OFFER_COND_RX.search(before[:vm.start()][-46:]):
             continue                                  # "if you want, I'll finish §9.3" -> a conditional offer
+        if _OFFER_COND_RX.search(after):
+            continue                                  # "I'll work on §9.3 if the tests pass" -> conditional too
+        sent_end = _SENT_END_RX.search(text, b)
+        if sent_end and sent_end.group() == "?":
+            continue                                  # "Should I start §9.3?" -> a question, not a promise
         if not _first_person_governs(text, before_start + vm.start(), line_start):
             continue
         label = _normalize_label(m.group(1))
@@ -267,21 +332,50 @@ def source_plan_item_promise(text: str) -> Optional[dict]:
     return None
 
 
+def _affirmed_past_verb(window: str):
+    """First _PAST_VERB_RX match in `window` NOT immediately negated ("is not done yet",
+    "isn't finished", "hasn't been completed"), else None. A negated participle is an
+    explicitly-unfinished statement, never a completion."""
+    for vm in _PAST_VERB_RX.finditer(window):
+        if _NEG_BEFORE_VERB_RX.search(window[:vm.start()]):
+            continue
+        return vm
+    return None
+
+
 def source_plan_item_completions(text: str) -> set:
-    """Labels this turn's text marks COMPLETE via a first-person past-tense verb governing them,
-    or explicitly RETRACTS via a negation frame -- {(label, 'done'|'retracted'), ...}."""
+    """Labels this turn's text marks COMPLETE via a first-person (or imperative bullet), active,
+    non-conditional, non-negated past-tense verb governing them, or explicitly RETRACTS via a
+    negation frame -- {(label, 'done'|'retracted'), ...}. The 'done' arm applies the SAME
+    discipline the promise sourcer above uses (first-person governance, no conditional frame):
+    "the user reported Task #19 was completed by someone else" or "once §9.3 is finished we can
+    ship" is not the assistant discharging its own item."""
     if not text:
         return set()
     out = set()
     for m in _LABEL_RX.finditer(text):
         a, b = m.span()
-        before = text[max(0, a - _BIND_BEFORE):a]
+        before_start = max(0, a - _BIND_BEFORE)
+        before = text[before_start:a]
         after = text[b:b + _BIND_AFTER]
         label = _normalize_label(m.group(1))
         if _NEGATED_RX.search(before) or _NEGATED_RX.search(after):
             out.add((label, "retracted"))
-        elif _PAST_VERB_RX.search(before) or _PAST_VERB_RX.search(after):
-            out.add((label, "done"))
+            continue
+        vm = _affirmed_past_verb(before)
+        if vm is not None:
+            verb_start = before_start + vm.start()
+        else:
+            vm = _affirmed_past_verb(after)
+            if vm is None:
+                continue                              # no affirmed completion verb governs this label
+            verb_start = b + vm.start()
+        if _OFFER_COND_RX.search(text[max(0, verb_start - 46):verb_start]):
+            continue                                  # "once §9.3 is finished ..." -> conditional, not a discharge
+        line_start = text.rfind("\n", 0, a) + 1
+        if not _first_person_governs(text, verb_start, line_start):
+            continue                                  # third-person/passive report -> not the assistant's own act
+        out.add((label, "done"))
     return out
 
 
@@ -372,5 +466,9 @@ def record_task_event(conn, session_id: str, payload: dict) -> None:
             set_plan_item_status(conn, session_id, label, "retracted")
         elif to == "in_progress":
             # a task this store never saw (resumed session) surfaces as open; an already-open
-            # or retracted-then-resumed one re-opens -- record_plan_item's own upsert rule.
+            # or retracted-then-resumed one re-opens -- record_plan_item's own upsert rule --
+            # and a COMPLETED-then-resumed one re-opens too: the harness says the task is live
+            # again, so a 'done' row must not stay discharged (record_plan_item's upsert only
+            # lifts 'retracted', hence the explicit status set after it).
             record_plan_item(conn, session_id, {"label": label, "description": ""})
+            set_plan_item_status(conn, session_id, label, "open")

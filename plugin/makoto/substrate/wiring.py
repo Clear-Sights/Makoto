@@ -30,11 +30,11 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # by install.py's `_install_bash_scripts`/`_wire_claude_hooks`; two-segment path so a bare
 # `dispatch.sh` living anywhere else does not match), `${CLAUDE_PLUGIN_ROOT}/makoto/
 # _dispatch_shim.sh` (the ONE plugin-manifest shim form -- see hooks/hooks.json, which wires
-# every declared event to that single script; matched below by BARE BASENAME, WITHOUT the
-# `makoto_state[/\\]`-style directory anchor its dispatch.sh sibling carries, so as written any
-# command naming a `_dispatch_shim.sh` at ANY path satisfies this alternative -- the asymmetry
-# is stated here rather than implied away, since the paragraph above turns on the anchoring),
-# and the module forms `-m makoto.dispatch` /
+# every declared event to that single script; matched below with the SAME two-segment
+# `makoto[/\\]` directory anchor its dispatch.sh sibling carries, plus a trailing `\b`, so a
+# foreign `/opt/other/_dispatch_shim.sh`, an `x_dispatch_shim.sh`, or a `_dispatch_shim.shhh`
+# never reads as makoto's -- an unanchored basename made a third-party hook absorbable/deletable
+# and let a decoy substring read as wired), and the module forms `-m makoto.dispatch` /
 # `-m makoto.configchange` (the two hook entrypoints, both of which have a live `__main__`;
 # `\b` so `makoto.dispatcher_v2` never matches).
 #
@@ -59,7 +59,7 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # case-sensitive replacement would silently un-recognize a form makoto had already installed.
 MAKOTO_INVOCATION_RX = re.compile(
     r"makoto_state[/\\]dispatch\.sh"
-    r"|_dispatch_shim\.sh"
+    r"|makoto[/\\]_dispatch_shim\.sh\b"
     r"|-m\s+makoto\.(?:dispatch|configchange)\b",
     re.IGNORECASE)
 
@@ -81,9 +81,24 @@ def entry_dispatches_to_makoto(entry) -> bool:
         return False
     if entry.get(MAKOTO_CLAUDE_FLAG):
         return True
+    return _entry_command_invokes_makoto(entry)
+
+
+def _entry_command_invokes_makoto(entry) -> bool:
+    """True iff one of the entry's hook COMMANDS is a makoto invocation form
+    (`MAKOTO_INVOCATION_RX`). The functional half of the wiring question: this is what
+    `event_wired` keys on, so a `_makoto_managed` entry whose command was gutted to a no-op
+    reads UNWIRED -- the flag is ownership metadata anyone editing settings.json can keep
+    while stripping the command, so it is over-sufficient as a wiredness signal even though
+    it stays sufficient for ownership (absorption/removal). A None "hooks" value is an
+    unwired entry, never a raise: this input is reachable from attacker-controlled
+    settings.json content, and a raise here would be swallowed per-predicate at the gate
+    (dispatch's per-predicate guard) into a silent fail-open."""
+    if not isinstance(entry, dict):
+        return False
     return any(isinstance(inner, dict)
                and MAKOTO_INVOCATION_RX.search(str(inner.get("command", "")))
-               for inner in entry.get("hooks", []))
+               for inner in entry.get("hooks") or ())
 
 
 # Removal and absorption need the SAME question detection answers -- see
@@ -95,10 +110,18 @@ def event_wired(hooks, event: str) -> bool:
     """True iff a hooks-shaped dict (either settings.json's own "hooks" key, or a plugin
     manifest's "hooks" key -- same shape, same semantics) wires `event` to makoto. Shared by both
     wiring sources so selfWiredCheck's two-source check applies IDENTICAL rigor to each -- this is
-    not "does a file exist", it is "does a real entry for this exact event name makoto"."""
+    not "does a file exist", it is "does a real entry for this exact event name makoto".
+
+    Keys on `_entry_command_invokes_makoto`, NOT on `entry_dispatches_to_makoto`: the
+    `_makoto_managed` flag alone must never read as wired. The flag is ownership metadata --
+    anyone who can edit settings.json can strip the command while keeping the flag, and
+    `entry_dispatches_to_makoto`'s docstring reasons only about the flag being INsufficient,
+    never about it being OVER-sufficient. A gutted managed entry (`{"_makoto_managed": true,
+    "hooks": [{"command": "true"}]}`, or no "hooks" key at all) reaches nothing, so it is
+    unwired -- ownership (absorption/removal) and wiredness are answered separately."""
     if not isinstance(hooks, dict):
         return False
-    return any(entry_dispatches_to_makoto(h) for h in hooks.get(event, []) or ())
+    return any(_entry_command_invokes_makoto(h) for h in hooks.get(event, []) or ())
 
 
 def read_plugin_manifest_hooks(plugin_root, fs_read) -> dict:

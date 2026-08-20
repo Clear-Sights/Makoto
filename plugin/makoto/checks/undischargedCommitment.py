@@ -10,8 +10,13 @@ from makoto.substrate.claims import _code_spans
 from makoto.kit import DISCHARGE_EATS, _discharged, _path_components, claim_vs_ledger_predicate
 
 
-# A version/variant rename suffix on a basename stem: parser_v2, config_old, handler-final, foo_copy.
-_ADV_RENAME_SUFFIX_RX = re.compile(r"(?:[_-](?:v?\d+|new|old|final|copy|orig|backup|bak|tmp|temp))+$", re.I)
+# A version/variant rename suffix on a basename stem: parser_v2, config_new, handler-final.
+# Deliberately EXCLUDES scratch/backup tokens (tmp/temp/bak/backup/copy/orig/old): writing
+# `parser_tmp.py` or `parser_bak.py` is a throwaway sibling, not the promised deliverable, and
+# treating it as a rename silently discharged the very obligation the advance gate exists to
+# hold (reproduced: open commitment `src/parser.py`, touch `src/parser_tmp.py`, claim "all
+# complete" -> gate silently clean).
+_ADV_RENAME_SUFFIX_RX = re.compile(r"(?:[_-](?:v?\d+|new|final))+$", re.I)
 
 
 def _adv_stem_core(basename: str):
@@ -28,12 +33,16 @@ def _adv_stem_core(basename: str):
 def _adv_relocated_discharge(commit_loc: str, touched_keys) -> bool:
     """Advance-LOCAL relocation tolerance: True iff a touched key looks like a RENAME of the open
     commitment — SAME parent dir, SAME extension, and one basename stem is the version/variant of
-    the other (parser.py -> parser_v2.py). This re-derives a discharge that _discharged's
-    separator-boundary suffix-match correctly misses for a moved path, WITHOUT loosening
-    _discharged itself (completion + dropped share it). It preserves the fakeexcuse firewall:
-    auth.py vs auth_helper.py is NOT a rename (`_helper` is not a version token), so it stays
-    undischarged and the gate still fires. Gated behind the open-commitment loop; never broadens
-    a genuinely-dropped commitment (no rename-touch -> False -> the TP still fires)."""
+    the other (parser.py -> parser_v2.py). DIRECTIONAL: only the TOUCHED key may carry the
+    rename suffix -- "renamed X to X_v2" (touched the variant) discharges, while "promised
+    X_v2, only touched pre-existing X" does not: a symmetric stem-family test discharged a
+    commitment to produce a NEW variant by touching the original. This re-derives a discharge
+    that _discharged's separator-boundary suffix-match correctly misses for a moved path,
+    WITHOUT loosening _discharged itself (completion + dropped share it). It preserves the
+    fakeexcuse firewall: auth.py vs auth_helper.py is NOT a rename (`_helper` is not a version
+    token), and a scratch sibling (auth_tmp.py, auth_bak.py) is NOT a rename either (see
+    _ADV_RENAME_SUFFIX_RX), so both stay undischarged and the gate still fires. Gated behind
+    the open-commitment loop."""
     c_comps = _path_components(commit_loc)
     if not c_comps:
         return False
@@ -47,8 +56,8 @@ def _adv_relocated_discharge(commit_loc: str, touched_keys) -> bool:
             continue                                  # different file type -> not a rename
         if c_comps[-2:-1] != k_comps[-2:-1]:          # parent-dir component, or [] when top-level
             continue                                  # moved out of dir -> not a same-dir rename
-        if c_core and k_core and c_core == k_core and (c_stem != k_stem or c_core != c_stem):
-            return True                               # same stem family, one is the renamed variant
+        if c_core and k_core and c_core == k_core and k_stem != k_core:
+            return True                               # the TOUCHED key is the renamed variant
     return False
 
 

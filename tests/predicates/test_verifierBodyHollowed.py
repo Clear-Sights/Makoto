@@ -147,3 +147,25 @@ def test_neg_assert_real_condition():
 def test_neg_specific_except_pass_off_broad():
     """`except ImportError: pass` (optional import) is specific, not broad -> silent."""
     assert not _fires(_P, "def check_x(s):\n    try:\n        import fast_lib\n    except ImportError:\n        pass\n")
+
+
+def test_live_catalog_registration_is_reachable_in_dispatch():
+    """Every test above drives predicate() through the synthetic _PAT (a test-fixture shape),
+    so nothing pinned the LIVE registration: the real CHECK's keywords could be neutered and
+    the whole suite stayed green. This pins the live wiring end to end: the catalog entry for
+    content.verifier_body_hollowed must carry a predicate module, be admitted by dispatch's
+    own keyword prefilter for a representative gutting Write on the guarded surface, and fire
+    through that entry."""
+    import json
+    from makoto import dispatch
+    from makoto.registry import load_precheck_catalog
+
+    check = next(c for c in load_precheck_catalog() if c.id == "content.verifier_body_hollowed")
+    assert check.predicate_module, "live check lost its predicate module: unreachable in dispatch"
+    evt = {"hook_event_name": "PreToolUse", "tool_name": "Write",
+           "tool_input": {"file_path": _P, "content": "def verify_seal(state):\n    return True\n"}}
+    assert dispatch._keyword_hit(check, json.dumps(evt)), (
+        "live keywords no longer admit a hollowing Write on the integrity-check surface: "
+        "content.verifier_body_hollowed is unreachable in dispatch")
+    f = predicate(current_event=evt, history=[], pattern=check)
+    assert f is not None and f.pattern_id == "content.verifier_body_hollowed"

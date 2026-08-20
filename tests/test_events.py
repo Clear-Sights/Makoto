@@ -119,6 +119,25 @@ def test_wired_moves_appear_in_dispatch_source():
             assert move_name in names, f"{name}: {move_name!r} not referenced in dispatch.py"
 
 
+def test_every_wired_event_routes_through_a_live_handler():
+    """HANDLERS is the actual routing table — pin it for EVERY wired event, not just one.
+
+    test_posttoolusefailure_uses_the_post_accumulation_route pins a single key, and
+    test_wired_moves_appear_in_dispatch_source only checks names appear somewhere in
+    dispatch.py source (Stop/SubagentStop/PostToolUse declare identical moves, so popping
+    an event out of HANDLERS left every test here green). Set-equality on the table itself
+    makes a dropped or stray routing entry redden loudly."""
+    from makoto.dispatch import HANDLERS
+
+    wired = {name for name, e in EVENTS.items() if e["status"] == "WIRED"}
+    assert set(HANDLERS) == wired, (
+        f"HANDLERS/EVENTS drift: missing={sorted(wired - set(HANDLERS))} "
+        f"stray={sorted(set(HANDLERS) - wired)}"
+    )
+    for name in wired:
+        assert callable(HANDLERS[name]), f"{name}: HANDLERS entry is not callable"
+
+
 # HOLE entries that assert specific code still exists — each maps to (file, anchor names) so a
 # deleted branch turns this matrix into a silent lie without this check. Only entries making a
 # checkable code claim are listed. (SessionStart/SubagentStop graduated HOLE→WIRED 2026-07-12,

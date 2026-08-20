@@ -57,7 +57,10 @@ def normalize_path(p: str) -> str:
     logical path mismatch its POSIX-authored form (Windows-portability fix)."""
     if not p:
         return ""
-    return os.path.normcase(os.path.normpath(p.strip())).rstrip("/\\").replace("\\", "/")
+    # `.lower()` does the case-folding the docstring promises: `os.path.normcase` is the
+    # identity on POSIX, which silently made every equality/suffix gate built on this
+    # case-sensitive on the platform the hook actually runs on.
+    return os.path.normcase(os.path.normpath(p.strip())).lower().rstrip("/\\").replace("\\", "/")
 
 
 def location_match(location: str, touched_keys) -> bool:
@@ -456,6 +459,11 @@ def introduced_text(tool_name: str, tool_input: dict) -> str:
         return ""
     if tool_name == "Bash":
         return tool_input.get("command", "") or ""
+    if tool_name == "NotebookEdit":
+        # NotebookEdit carries its new cell text under `new_source` (the key
+        # `substrate/_canonAtoms.py` already reads), not `content`/`new_string` —
+        # without this branch a flagged string introduced via a notebook cell read as clean.
+        return tool_input.get("new_source", "") or ""
     return scan_target_content(tool_input)
 
 
@@ -662,7 +670,9 @@ def claim_vs_history_predicate(
                         subject[max(0, match.start() - 80):match.end() + 40]
                     ):
                         continue
-                    claims.append(match.group(1) if match.groups() else match.group(0))
+                    # `lastindex`, not `groups()`: "the regex HAS groups" is not "group 1
+                    # matched" — a non-participating optional group yielded claims=[None].
+                    claims.append(match.group(1) if match.lastindex else match.group(0))
         for claimed in claims:
             if grounded_in_history(claimed, history):
                 continue
@@ -692,8 +702,6 @@ def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
     text = introduced_text(tool_name, tool_input)
     if not text:
         return None
-    if makoto_allowed(text):
-        return None  # universal exemption: AI documented this as legitimate (see CLAUDE.md)
     m = body_rx.search(text)
     if not m:
         return None
@@ -736,6 +744,18 @@ def introduced_regex_predicate(
         if hit is None:
             return None
         m, text, tool_input, tool_name = hit
+        if makoto_allowed(text):
+            # DETECT-THEN-EXEMPT (R5b), matching `_exempt_or_finding`: the match is real, the
+            # marker suppresses the Finding, and the suppression is RECORDED. The old order
+            # (exempt before matching, inside `_introduced_regex_scan`) wrote no exemption row,
+            # so this whole factory family suppressed silently.
+            line_no = text[: m.start()].count("\n") + 1
+            _record_exemption(
+                current_event, conn, pattern_id=pattern.id,
+                file=tool_input.get("file_path", "") or f"{tool_name or 'tool'} command",
+                line=line_no, reason=makoto_allow_reason(text) or "",
+                snippet=text[max(0, m.start() - 40): m.end() + 40].strip())
+            return None  # universal exemption: AI documented this as legitimate (see CLAUDE.md)
         if grounded_in_history is None:
             return _introduced_regex_finding(pattern, m, text, tool_input, tool_name)
         if grounded_in_history(history):
@@ -874,7 +894,12 @@ _BIND_BEFORE = 70
 _KNOWN_PATH_EXT_RX = re.compile(r"(?:" + _PATH_EXT + r")\Z", re.IGNORECASE)
 _LOCAL_GIT_TIMEOUT = 0.75
 _PUSH_BRANCH_RX = re.compile(
-    r"""\bpushed\b(?:(?![.!?\n]).){0,80}?\b(?:to|branch)\s+[`'"]?"""
+    # Filler tokens between "to"/"branch" and the ref name ("pushed to branch X",
+    # "pushed to the remote branch X") are skipped, not captured: capturing the literal
+    # word after the first "to" verified refs like `refs/heads/branch` that cannot exist,
+    # so the commonest truthful push phrasing was denied on a false fact.
+    r"""\bpushed\b(?:(?![.!?\n]).){0,80}?\b(?:to|branch)\s+"""
+    r"""(?:(?:the|a|my|new|remote|local|branch|origin)\s+)*[`'"]?"""
     r"""(?:origin/)?([A-Za-z0-9][A-Za-z0-9._/-]*)""",
     re.IGNORECASE,
 )
@@ -1028,9 +1053,13 @@ def resolve_in_worktree(loc, cwd):
         )
         if root_result.returncode != 0:
             return None
-        root = os.path.realpath(root_result.stdout.strip())
-        if not root:
+        root_out = root_result.stdout.strip()
+        if not root_out:
+            # Guard BEFORE realpath: os.path.realpath("") returns the hook process's cwd,
+            # which made this branch dead and re-rooted the confinement check at the wrong tree
+            # whenever rev-parse exited 0 with empty stdout.
             return None
+        root = os.path.realpath(root_out)
         candidate = os.path.realpath(os.path.join(root, loc))
         if os.path.commonpath((root, candidate)) != root:
             return None

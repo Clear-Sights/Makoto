@@ -15,14 +15,19 @@ boundary applied throughout below, distinct from Detent's byte-flow boundary.
 """
 from __future__ import annotations
 
-# Two pairs of events ride ONE dispatch route apiece and therefore one moves list apiece, spelled
-# once here so a change to a route cannot land on one row and silently miss its twin (nothing
-# compares the two rows: the reconciling test only asks that each named move exist in dispatch.py).
-# dispatch.HANDLERS maps PostToolUse and PostToolUseFailure to `_accumulate`, and Stop and
-# SubagentStop to `_evaluate_and_gate`.
+# Stop and SubagentStop ride ONE dispatch route and therefore one moves list, spelled once here
+# so a change to the route cannot land on one row and silently miss its twin (nothing compares
+# the two rows: the reconciling test only asks that each named move exist in dispatch.py).
+# dispatch.HANDLERS maps PostToolUse AND PostToolUseFailure to `_accumulate` too — but the moves
+# lists deliberately DIFFER: `_accumulate`'s first statement returns for PostToolUseFailure
+# (retention happens upstream in `_ingest_event`), so naming the accumulation moves on that row
+# would promise seven moves its handler never runs, a no-op event reading as fully accumulating.
 _POST_ACCUMULATION_MOVES = (
     "_accumulate", "_ledger.record_update", "compute_delta", "_plan_items.record_task_event",
-    "_event_location", "_plan.persist_plan", "_plan.declare_from_live_write")
+    "_event_location", "_plan.persist_plan", "_plan.declare_from_live_write",
+    # the test-delta ADVISE finding actually reaches the wire and the audit log from this
+    # event: _accumulate calls both (the row's own reason text says so).
+    "_emit_decision", "_record_audit")
 _STOP_GATE_MOVES = (
     "_evaluate_and_gate", "run_stop_checks", "_blocking_gate_ids", "_emit_decision")
 
@@ -43,14 +48,16 @@ EVENTS: dict[str, dict] = {
         "replace a plan mid-session at all), and the TaskCreate/TaskUpdate plan-item sync always "
         "run; the test-delta finding is the one ADVISE-tier exception, surfaced via "
         "_emit_decision")},
-    "PostToolUseFailure": {"status": "WIRED", "moves": _POST_ACCUMULATION_MOVES, "reason": (
+    "PostToolUseFailure": {"status": "WIRED", "moves": ("_accumulate",), "reason": (
         "was a HOLE because we had not evaluated the event at all. We learned from a live MCP "
         "failure that Claude Code delivers a call that ran and failed here, with top-level "
         "`error`/`is_interrupt`, instead of delivering PostToolUse. Leaving it unwired erased "
         "the real terminal and made history decoders invent a dangling-Pre failure with fixed "
-        "text. Wired 2026-08-18 through the same accumulation-only handler as PostToolUse so "
-        "the original failure terminal is retained for later claim checks; it never makes a "
-        "blocking decision on the Post edge")},
+        "text. Wired 2026-08-18 through the same accumulation-only handler as PostToolUse, "
+        "whose FIRST statement returns for this event — retention of the failure terminal "
+        "happens upstream in _ingest_event, so `_accumulate` is the only move this row can "
+        "honestly name; it never mutates the ledger/plan and never makes a blocking decision "
+        "on the Post edge")},
     "Stop": {"status": "WIRED", "moves": _STOP_GATE_MOVES},
     "SessionStart": {"status": "WIRED", "moves": (
         "_admit_plan", "declare_from_session_artifact"), "reason": (

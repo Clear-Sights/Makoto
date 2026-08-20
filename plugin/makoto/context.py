@@ -12,11 +12,11 @@ Knight-Leveson: stdlib only. NO LLM, NO HTTP. Called from `makoto.dispatch` (whi
 `from makoto.dispatch import run_stop_checks` consumer).
 """
 from __future__ import annotations
-import json
 import os
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
+from makoto.kit import decode_history_row
 from makoto.registry import load_checks
 from makoto.substrate._planNode import Plan
 
@@ -110,17 +110,12 @@ def _history_for_agent(history, stop_payload: dict) -> list:
 
     scoped = []
     for row in history or ():
-        if isinstance(row, (tuple, list)) and len(row) > 4:
-            raw = row[4]
-        elif hasattr(row, "get"):
-            raw = row.get("payload")
-        else:
-            continue
-        try:
-            payload = raw if isinstance(raw, dict) else json.loads(raw)
-        except Exception:
-            continue
-        if isinstance(payload, dict) and belongs(payload):
+        # The ONE canonical row-decode step (kit.decode_history_row), not a re-derived inline
+        # copy: the two diverged on an empty-dict payload (inline kept it and let it count as
+        # a structurally agentless row; the canonical decoder treats absent/empty as
+        # undecodable -> the row contributes nothing, per this function's own ambiguity rule).
+        payload = decode_history_row(row)
+        if payload is not None and belongs(payload):
             scoped.append(row)
     return scoped
 
@@ -144,9 +139,12 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         # risk this firewall exists to stop (see GateContext.history_all_agents).
         history_all_agents = history
         history = _history_for_agent(history, payload)
+        # NO early return on empty text: five BLOCK gates (gate.canon, gate.contract_order,
+        # gate.hollow_test, gate.liveness, gate.run_promised) never read `text` and must still
+        # evaluate — skipping the whole catalog because `last_assistant_message` is absent made
+        # absence read as green. Text-reading gates see "" and are naturally silent (no claim,
+        # no finding), so this widens nothing for them.
         text = payload.get("last_assistant_message") or ""
-        if not text:
-            return []
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
         from makoto.state import commitments as _C
@@ -203,7 +201,14 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
                 if not os.path.exists(full):
                     if _wp_roots is None:
                         from makoto.checks._worldpaths import synced_repo_roots
-                        _wp_roots = synced_repo_roots(history, cwd)
+                        # UNNARROWED history, deliberately: a `git pull|fetch` is a COMPLETED
+                        # PostToolUse Bash row, so it carries none of the dangling-PreToolUse
+                        # risk the thread firewall exists to stop (the same completed-evidence
+                        # reasoning gate.claimed_running/_shipped document for
+                        # history_all_agents). Narrowed history made a SUBAGENT's sync
+                        # invisible here, and gate.completion DENIED a true claim about a file
+                        # that pull had landed on disk.
+                        _wp_roots = synced_repo_roots(history_all_agents, cwd)
                     if _wp_roots:
                         from makoto.checks._worldpaths import resolve_in_synced_repos
                         alt = resolve_in_synced_repos(p, _wp_roots)

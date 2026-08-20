@@ -39,10 +39,16 @@ from typing import Optional
 
 from makoto.kit import ast_introduced_predicate
 
-_TARGET_RX = re.compile(r"constitution/integrity/checks/[^/]+\.py$")
-# a verifier-named function: the name contains an integrity/verification verb. Narrow context
-# (the integrity-checks dir) makes these names load-bearing rather than generic.
-_VERIFIER_NAME_RX = re.compile(r"(?i)(verif|valid|integrit|attest|check|ensure|enforce|assert)")
+# `[/\\]` + `.+`: the anchor covers the whole surface it claims — nested
+# `…/checks/sub/seal.py` and a backslash-delivered Windows path both stayed silent under the
+# old `constitution/integrity/checks/[^/]+\.py$`.
+_TARGET_RX = re.compile(r"constitution[/\\]integrity[/\\]checks[/\\].+\.py$")
+# a verifier-named function: the name contains an integrity/verification verb, or IS a generic
+# entry-point name (`run`/`main`, anchored; `predicate`/`probe`/`scan`/`seal` substrings) —
+# gutting the dispatch function of an integrity check was invisible under the verb list alone.
+# Narrow context (the integrity-checks dir) makes these names load-bearing rather than generic.
+_VERIFIER_NAME_RX = re.compile(
+    r"(?i)(verif|valid|integrit|attest|check|ensure|enforce|assert|predicate|probe|scan|seal|^run$|^main$)")
 _BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
 
 
@@ -52,31 +58,63 @@ def _is_truthy_const(node) -> bool:
     return isinstance(node, ast.Constant) and bool(node.value)
 
 
+def _is_tautology(node) -> bool:
+    """True iff `node` is an ALWAYS-TRUTHY expression: a truthy literal, `not <falsy-const>`,
+    `bool(<truthy-const>)`, or a comparison whose two sides are the same expression under
+    `==`/`is`/`<=`/`>=` (`1 == 1`, `s == s`). The literal-constant-only test let trivially
+    tautological returns/asserts pass as real checking."""
+    if _is_truthy_const(node):
+        return True
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not) \
+            and isinstance(node.operand, ast.Constant) and not node.operand.value:
+        return True
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "bool" \
+            and len(node.args) == 1 and not node.keywords and _is_truthy_const(node.args[0]):
+        return True
+    if isinstance(node, ast.Compare) and len(node.comparators) == 1 \
+            and all(isinstance(op, (ast.Eq, ast.Is, ast.LtE, ast.GtE)) for op in node.ops) \
+            and ast.dump(node.left) == ast.dump(node.comparators[0]):
+        return True
+    return False
+
+
 def _swallows(stmt) -> bool:
-    """One statement that NEUTERS a check — converts a failure into a pass: `pass`,
-    `return <truthy-const>`, or `assert <truthy-const>` (a tautological always-pass assertion)."""
+    """One statement that NEUTERS a check — converts a failure into a pass: `pass`, a bare
+    `...` ellipsis stub (the no-op `hollowTest.py` already treats as one), `return <tautology>`,
+    or `assert <tautology>` (an always-pass assertion)."""
     if isinstance(stmt, ast.Pass):
         return True
-    if isinstance(stmt, ast.Return) and _is_truthy_const(stmt.value):
+    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) \
+            and stmt.value.value is Ellipsis:
         return True
-    return isinstance(stmt, ast.Assert) and _is_truthy_const(stmt.test)
+    if isinstance(stmt, ast.Return) and _is_tautology(stmt.value):
+        return True
+    return isinstance(stmt, ast.Assert) and _is_tautology(stmt.test)
 
 
 def _single_effective(body) -> Optional[ast.stmt]:
     """The body's single statement after dropping a leading docstring, else None."""
-    b = body
-    if b and isinstance(b[0], ast.Expr) and isinstance(b[0].value, ast.Constant) \
-            and isinstance(b[0].value.value, str):
-        b = b[1:]
+    b = _post_docstring(body)
     return b[0] if len(b) == 1 else None
 
 
+def _post_docstring(body):
+    """`body` minus a leading docstring statement."""
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        return body[1:]
+    return body
+
+
 def _hollow_body(body) -> bool:
-    """True iff `body` (post-docstring) is exactly one neutering statement —
-    `pass` / `return <truthy-const>` / `assert <truthy-const>` (an always-pass / do-nothing check).
-    Shared by both arms: a hollowed function body and a swallowing except-handler body."""
-    stmt = _single_effective(body)
-    return stmt is not None and _swallows(stmt)
+    """True iff `body` (post-docstring) is exactly one neutering statement — `pass` / `...` /
+    `return <tautology>` / `assert <tautology>` — or is EMPTY after the docstring (a
+    docstring-only body checks exactly as much as `pass` does). Shared by both arms: a hollowed
+    function body and a swallowing except-handler body."""
+    b = _post_docstring(body)
+    if not b:
+        return True                      # docstring-only: zero effective statements
+    return len(b) == 1 and _swallows(b[0])
 
 
 def _broad_except(handler: ast.ExceptHandler) -> bool:
@@ -88,7 +126,13 @@ def _broad_except(handler: ast.ExceptHandler) -> bool:
     if t is None:
         return True
     names = t.elts if isinstance(t, ast.Tuple) else [t]
-    return any(isinstance(n, ast.Name) and n.id in _BROAD_EXCEPT for n in names)
+    # The `Attribute` form (`except builtins.Exception:`) is the same broad catch spelled
+    # qualified — `checks/hollowTest.py:_is_broad_exc_name` already recognizes it; only
+    # recognizing `ast.Name` here read an attribute-qualified broad catch as honest narrowing.
+    return any(
+        (isinstance(n, ast.Name) and n.id in _BROAD_EXCEPT)
+        or (isinstance(n, ast.Attribute) and n.attr in _BROAD_EXCEPT)
+        for n in names)
 
 
 def _hollow_node_match(node: ast.AST) -> Optional[str]:
@@ -102,6 +146,14 @@ def _hollow_node_match(node: ast.AST) -> Optional[str]:
     # carry FP-safety; a specific-typed except (honest narrowing) never fires.
     if isinstance(node, ast.ExceptHandler) and _broad_except(node) and _hollow_body(node.body):
         return "broad except -> swallow"
+    # (lambda arm) a hollowed verifier BOUND as a lambda (`verify_seal = lambda s: True`) is an
+    # `ast.Assign`, not a `FunctionDef` — it was never examined, so the binding form evaded both
+    # arms wholesale.
+    if isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda) \
+            and _is_tautology(node.value.body):
+        for t in node.targets:
+            if isinstance(t, ast.Name) and _VERIFIER_NAME_RX.search(t.id):
+                return f"{t.id} = lambda -> hollow"
     return None
 
 

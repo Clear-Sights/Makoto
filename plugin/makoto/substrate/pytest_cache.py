@@ -2,8 +2,9 @@
 
 ACCESS CONTRACT (spec §0, Makoto-not-Historia): deterministic direct-pointer I/O ONLY.
 This module opens exactly ONE determined file (`<cwd>/.pytest_cache/v/cache/lastfailed`)
-and then follows only paths NAMED INSIDE it, scanning each for one concrete token
-(`def <test_name>`). O(entries), bounded by _MAX_ENTRIES, zero directory enumeration —
+and then follows only paths NAMED INSIDE it, scanning each for the node's own concrete
+tokens (a line-leading `def <test_name>`, plus `class <Name>` for each class segment).
+O(entries), bounded by _MAX_ENTRIES, zero directory enumeration —
 no enumeration primitive of any kind, ever (pinned by tests/test_pytest_cache.py).
 
 WHY existence-filtering (the staleness firewall): pytest clears a lastfailed entry only
@@ -31,20 +32,33 @@ _NAME_RX = re.compile(r"[A-Za-z_]\w*\Z")
 
 def _node_exists(cwd: str, node: str) -> bool:
     """Does lastfailed node-id `node` still exist on disk under `cwd`? Direct pointer:
-    the node carries its own path; for `file::...::name` the FINAL segment (parametrize
-    `[...]` id stripped) must appear as a `def <name>` in that file's text. Absolute or
-    parent-escaping paths are rejected (cross-project firewall); an unparseable name or
-    unreadable file -> False (fail-open: the gate stays silent)."""
+    the node carries its own path; for `file::(Class::)*name` the parametrize `[...]` id is
+    stripped, the FINAL segment must appear as a line-leading `def <name>` and every
+    intermediate segment as a line-leading `class <Class>` in that file's text — a
+    commented-out or string-embedded token, or a method whose class was renamed away, is
+    NOT a live node (pytest cannot collect it, so its entry can never clear). Absolute or
+    parent-escaping paths (either separator) and symlinks resolving outside `cwd` are
+    rejected (cross-project firewall); an unparseable name or unreadable file -> False
+    (fail-open: the gate stays silent)."""
     parts = node.split("::")
     rel = parts[0]
-    if not rel or os.path.isabs(rel) or rel.startswith("\\") or ".." in rel.split("/"):
+    if not rel or os.path.isabs(rel) or rel.startswith("\\") or ".." in re.split(r"[/\\]", rel):
         return False
     path = os.path.join(cwd, rel)
     if not os.path.isfile(path):
         return False
+    # Firewall, symlink half: a link inside cwd pointing outside it is another project's file.
+    real_cwd = os.path.realpath(cwd)
+    if not os.path.realpath(path).startswith(real_cwd.rstrip(os.sep) + os.sep):
+        return False
     if len(parts) == 1:
         return True                        # module-level entry (collection error) -> file is the node
-    name = parts[-1].split("[", 1)[0]
+    # Strip the parametrize id from the WHOLE node before re-splitting: a `::` inside the
+    # `[...]` id (parametrize over strings) must not displace the final segment. The scan
+    # starts after `rel` so a literal `[` in the path itself cannot truncate it.
+    cut = node.find("[", len(rel))
+    parts = (node[:cut] if cut != -1 else node).split("::")
+    name = parts[-1]
     if not _NAME_RX.match(name):
         return False
     try:
@@ -52,7 +66,12 @@ def _node_exists(cwd: str, node: str) -> bool:
             src = f.read(_MAX_READ_BYTES)
     except OSError:
         return False
-    return bool(re.search(rf"\bdef\s+{re.escape(name)}\b", src))
+    for cls in parts[1:-1]:
+        if not _NAME_RX.match(cls):
+            return False
+        if not re.search(rf"(?m)^[ \t]*class[ \t]+{re.escape(cls)}\b", src):
+            return False
+    return bool(re.search(rf"(?m)^[ \t]*(?:async[ \t]+)?def[ \t]+{re.escape(name)}\b", src))
 
 
 def stale_failing_node(cwd: str) -> str | None:
@@ -65,9 +84,14 @@ def stale_failing_node(cwd: str) -> str | None:
     if not cwd:
         return None
     p = os.path.join(cwd, ".pytest_cache", "v", "cache", "lastfailed")
+    # Same regular-file filter and byte cap as every pointed file: `isfile` is False for a
+    # FIFO (whose `open()` would hang the Stop hook past its budget), and a lastfailed past
+    # the cap is truncated -> unparseable -> silent (fail-open), never parsed in full.
+    if not os.path.isfile(p):
+        return None
     try:
         with open(p, encoding="utf-8") as f:
-            data = json.load(f)
+            data = json.loads(f.read(_MAX_READ_BYTES))
     except (OSError, ValueError):
         return None
     if not isinstance(data, dict):

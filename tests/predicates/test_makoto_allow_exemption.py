@@ -51,6 +51,11 @@ def citation_conn():
     import makoto.state.store as vdb
     vdb.init_db(tmp / "st", cit)
     conn = sqlite3.connect(str(tmp / "st" / "makoto.record.db"))
+    # Populate canonical_citations from CITATIONS.md (init_db only seeds the path; dispatch runs
+    # this refresh before any predicate). Without it the allowlist table is EMPTY, and the TP
+    # below "fired" only via the deny-everything-on-empty-allowlist defect, not via Smith 2020.
+    from makoto.state.citations import refresh_if_stale
+    refresh_if_stale(conn)
     yield conn
     conn.close()
 
@@ -67,6 +72,16 @@ def test_1_6_violation_fires_but_makoto_allow_exempts(citation_conn):
     assert _run("content.phantom_citation", content, "paper.md", "error", conn=citation_conn) is not None, "content.phantom_citation phantom citation must fire"
     exempted = content.rstrip() + "  <!-- makoto-allow: real source, cited from memory -->\n"
     assert _run("content.phantom_citation", exempted, "paper.md", "error", conn=citation_conn) is None, "content.phantom_citation: makoto-allow must exempt"
+
+
+def test_1_6_canonical_citation_is_silent(citation_conn):
+    """Pins the canonical-set LOOKUP itself: 'Smith 2020' IS in canonical_citations (the fixture
+    refreshes it from CITATIONS.md), so a canonical hit must be silent. Without this negative,
+    replacing the lookup with deny-everything keeps the phantom TP above green for the wrong
+    reason -- every Author-Year token reads as phantom against an ignored allowlist."""
+    content = "As shown by Smith 2020 the result holds.\n"
+    assert _run("content.phantom_citation", content, "paper.md", "error", conn=citation_conn) is None, \
+        "content.phantom_citation: a CANONICAL citation must never fire"
 
 
 def test_makoto_allow_requires_structured_reason():

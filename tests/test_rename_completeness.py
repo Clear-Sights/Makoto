@@ -12,6 +12,12 @@ ROOT = Path(__file__).parent.parent
 def _grep(pattern):
     r = subprocess.run(["grep", "-rnE", pattern, "--include=*.py", str(ROOT)],
                        capture_output=True, text=True)
+    # grep exit codes: 0 = matches, 1 = clean no-match, >1 = the SEARCH ITSELF failed (bad ROOT,
+    # bad pattern, missing --include support). Without this, "nothing was searched" returns []
+    # exactly like "nothing to find", and the completeness assertion below is satisfied by a
+    # broken sweep. A failed search must fail the test, never read as clean.
+    assert r.returncode in (0, 1), \
+        f"grep sweep itself failed (rc={r.returncode}): {r.stderr.strip() or r.stdout.strip()}"
     return [l for l in r.stdout.splitlines() if "__pycache__" not in l]
 
 
@@ -38,6 +44,16 @@ def test_no_residual_old_taxonomy_names():
                                   r'|makoto\.gates|makoto\.predicates')
                  if _is_real_offender(l)]
     assert offenders == [], "residual old taxonomy names:\n" + "\n".join(offenders)
+
+
+def test_TEETH_grep_sweep_reaches_the_tree():
+    """Positive control: the sweep must PROVE it can find a forbidden token before its empty
+    result may mean 'clean'. This very file spells `load_gates` inside the forbidden-pattern
+    regex (and is exempted as such by _is_real_offender), so a working grep over the real tree
+    always hits it — an empty raw result means the grep never reached the tree."""
+    hits = _grep(r"load_gates")
+    assert any("test_rename_completeness.py" in l for l in hits), \
+        f"positive control missing: grep found no load_gates token in the gate file itself ({hits!r})"
 
 
 def test_no_old_dirs():

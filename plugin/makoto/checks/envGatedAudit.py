@@ -14,7 +14,11 @@ audit survives in name while its guarantee is gutted). This is makoto's own CLAU
 Detection is an ACTIVE-CODE AST gate (``substrate.factories.parse_introduced``), not a string
 matcher: a comment / ``str`` Constant / docstring is never a real ``ast.If``, so a mention cannot
 fire; the integrity signal is read from the env-var KEY *or* the gated body's code identifiers;
-and ``callee_chain`` matches both call forms plus the subscript form. See
+and ``callee_chain`` matches both call forms plus the subscript form. The dispatch keyword
+prefilter is the raw substrings ``getenv``/``environ`` — a superset of every env-read spelling
+this module implements (``os.getenv``, bare imported ``getenv(``, ``os.environ.get``,
+``environ.get``, ``os.environ[``, ``environ[``, spaced ``os.environ [``), so a form the
+predicate would catch can never be silently dropped before the predicate runs. See
 docs/adr/0031-env-gated-audit-ast-rewrite.md for the migration history.
 
 NAME-AGNOSTIC: the integrity signal comes from the env-var KEY *or* a body code identifier, so it
@@ -115,4 +119,4 @@ from makoto.registry import Check as _Check
 RETRY_HINT = "Don't gate an audit/verification check behind an env var — `if os.getenv('...'): <audit>` makes the check opt-in, so it silently does nothing unless someone sets the flag (a hollowed integrity check). Run the check unconditionally; if a genuinely-optional diagnostic is intended, annotate the line with `makoto-allow: <reason>`."
 DESCRIPTION = 'env-gated audit/verification code (if os.environ.get(...)/os.getenv(...) gating an integrity op)'
 
-CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('os.environ.get', 'os.getenv', 'os.environ['), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="PATTERN_MATCH")
+CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('getenv', 'environ'), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="PATTERN_MATCH")

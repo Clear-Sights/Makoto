@@ -4,16 +4,20 @@ zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.
 
   1. no_assertion       — the test body asserts nothing at all (no `assert`, no assertion-shaped
                            call), and is not an explicitly `@skip`-decorated stub.
-  2. tautology           — an `assert True`, or an `assert x == x` / `assert x is x` where both
+  2. tautology           — an `assert` on a statically-truthy literal (`assert True`, `assert 1`,
+                           `assert "nonempty"`, `assert not False`), or an `assert x == x` /
+                           `assert x is x` where both
                            sides of the comparison are the textually-identical expression AND
-                           neither side contains a Call (a call can return a different object/value
-                           on each evaluation — e.g. `assert cache() is cache()` is a genuine
-                           memoization/identity check, not a tautology, even though both sides are
-                           syntactically identical; corpus-found FP, see test_gate_shape.py's own
+                           neither side contains a Call OR an attribute access (a call can return a
+                           different object/value on each evaluation — e.g. `assert cache() is
+                           cache()` is a genuine memoization/identity check; an attribute read can
+                           be a property whose value changes between reads — so neither is flagged;
+                           corpus-found FP, see test_gate_shape.py's own
                            `assert load_stopchecks() is load_stopchecks()`).
-  3. swallowed_failure   — a `try` around the call-under-test whose only `except` is both BROAD
-                           (bare/`Exception`/`BaseException`) and a no-op, with no assertion
-                           anywhere else in the function to catch a failure.
+  3. swallowed_failure   — a `try` around the call-under-test (or around the assertion itself)
+                           whose only `except` is both BROAD (bare/`Exception`/`BaseException`)
+                           and a no-op, with no assertion anywhere else in the function to catch a
+                           failure.
   4a. uncollectable_nested      — a test-shaped `def test_*` nested inside another function's body.
                            pytest's own collector never descends into a function looking for further
                            `def`s, so this can never be independently run/skipped/reported — only
@@ -57,22 +61,44 @@ def _bases_are_unittest_style(class_node) -> bool:
 
 
 def _iter_test_functions(tree):
-    """Yields every module-level function/async-function whose name starts with `test_` (pytest's
-    `python_functions` convention), plus every method of a module-level class whose name starts
-    with `Test` AND whose base list textually includes something containing `TestCase` (unittest
-    style) — for such a class, a bare `test`-prefixed method name (no underscore) also counts."""
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
-            yield node
-        elif isinstance(node, ast.ClassDef):
-            is_unittest = node.name.startswith("Test") and _bases_are_unittest_style(node)
-            for child in node.body:
-                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    continue
+    """Yields every function/async-function whose name starts with `test_` (pytest's
+    `python_functions` convention) that is reachable from module level WITHOUT crossing a function
+    boundary — i.e. also inside a module-level `if`/`try`/`with`/`for`/`while` block (pytest
+    collects those normally) and inside a class at any class-nesting depth. For a class whose name
+    starts with `Test` AND whose base list textually includes something containing `TestCase`
+    (unittest style), a bare `test`-prefixed method name (no underscore) also counts."""
+    blocks = [ast.If, ast.Try, ast.With, ast.AsyncWith, ast.For, ast.AsyncFor, ast.While,
+              ast.ExceptHandler]
+    if hasattr(ast, "TryStar"):
+        blocks.append(ast.TryStar)
+    if hasattr(ast, "match_case"):
+        blocks.extend([ast.Match, ast.match_case])
+    blocks = tuple(blocks)
+
+    def _from_class(cls_node):
+        is_unittest = cls_node.name.startswith("Test") and _bases_are_unittest_style(cls_node)
+        for child in cls_node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if child.name.startswith("test_"):
                     yield child
                 elif is_unittest and child.name.startswith("test"):
                     yield child
+            elif isinstance(child, ast.ClassDef):
+                yield from _from_class(child)
+            elif isinstance(child, blocks):
+                yield from _walk(ast.iter_child_nodes(child))
+
+    def _walk(nodes):
+        for node in nodes:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name.startswith("test_"):
+                    yield node
+            elif isinstance(node, ast.ClassDef):
+                yield from _from_class(node)
+            elif isinstance(node, blocks):
+                yield from _walk(ast.iter_child_nodes(node))
+
+    yield from _walk(ast.iter_child_nodes(tree))
 
 
 # ---- own-scope traversal (recurse into control-flow blocks, never into a nested def/lambda/class)
@@ -122,17 +148,31 @@ def _is_recognized_assertion(node, helper_asserts: frozenset = frozenset()) -> b
             return True
         if isinstance(node.func, ast.Name) and node.func.id in helper_asserts:
             return True
+        if (isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in ("self", "cls")
+                and node.func.attr in helper_asserts):
+            return True                                   # unittest-style `self._helper()` chain
     return False
 
 
 def _local_helper_index(tree):
-    """name -> FunctionDef/AsyncFunctionDef node, for every MODULE-LEVEL function (methods and
-    nested defs excluded). A same-file, name-resolved fact only — never a general call-graph
-    solver, and never crossing file boundaries."""
+    """name -> FunctionDef/AsyncFunctionDef node, for every module-level function PLUS every
+    method of a module-level class (any class-nesting depth) — the latter so the standard
+    unittest `self._helper()` assert-helper resolves (nested defs stay excluded). A same-file,
+    name-resolved fact only — never a general call-graph solver, and never crossing file
+    boundaries; a name collision resolves to the LAST definition, which is FN-safe (it can only
+    suppress a fire, never add one)."""
     idx = {}
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            idx[node.name] = node
+
+    def _collect(nodes):
+        for node in nodes:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                idx[node.name] = node
+            elif isinstance(node, ast.ClassDef):
+                _collect(node.body)
+
+    _collect(ast.iter_child_nodes(tree))
     return idx
 
 
@@ -152,8 +192,13 @@ def _helper_names_that_assert(tree) -> frozenset:
         for n in _iter_own_scope(func.body):
             if _is_recognized_assertion(n):
                 asserts.add(name)
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
-                called.add(n.func.id)
+            if isinstance(n, ast.Call):
+                if isinstance(n.func, ast.Name):
+                    called.add(n.func.id)
+                elif (isinstance(n.func, ast.Attribute)
+                        and isinstance(n.func.value, ast.Name)
+                        and n.func.value.id in ("self", "cls")):
+                    called.add(n.func.attr)               # method-to-method helper chain
         calls[name] = called
     changed = True
     while changed:
@@ -166,8 +211,10 @@ def _helper_names_that_assert(tree) -> frozenset:
 
 
 def _has_skip_decorator(func) -> bool:
-    """True iff some decorator's dotted name contains `skip` (case-insensitive) -- `@pytest.mark.skip`,
-    `@unittest.skipIf(...)`, a bare `@skip`, ..."""
+    """True iff some decorator's FINAL dotted-name component is exactly a skip-family callable
+    (case-insensitive `skip`/`skipif`/`skipunless`/`skiptest`) -- `@pytest.mark.skip`,
+    `@unittest.skipIf(...)`, a bare `@skip`. A name that merely CONTAINS the substring `skip`
+    (`@with_skiplist`) is some other decorator and must not silently disable sub-pattern 1."""
     for dec in func.decorator_list:
         node = dec.func if isinstance(dec, ast.Call) else dec
         parts: list = []
@@ -176,7 +223,7 @@ def _has_skip_decorator(func) -> bool:
             node = node.value
         if isinstance(node, ast.Name):
             parts.append(node.id)
-        if "skip" in ".".join(reversed(parts)).lower():
+        if parts and parts[0].lower() in ("skip", "skipif", "skipunless", "skiptest"):
             return True
     return False
 
@@ -187,12 +234,28 @@ def _contains_call(node) -> bool:
 
 # ---- sub-pattern 2: literal tautology ------------------------------------------------------------
 def _is_tautology(test) -> bool:
-    if isinstance(test, ast.Constant) and test.value is True:
-        return True
+    def _literal_truth(node):
+        """bool(<literal>) when the truth value is statically decidable, else None. Covers every
+        `ast.literal_eval`-able display (`1`, `"nonempty"`, `[1]`, `(0,)`) plus `not <literal>`."""
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+            inner = _literal_truth(node.operand)
+            return None if inner is None else (not inner)
+        try:
+            return bool(ast.literal_eval(node))
+        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+            return None                                   # not a literal: truth unknown
+    if _literal_truth(test) is True:
+        return True                                       # a statically-truthy literal always passes
     if isinstance(test, ast.Compare) and len(test.ops) == 1 and isinstance(test.ops[0], (ast.Eq, ast.Is)):
         left_node, right_node = test.left, test.comparators[0]
-        if _contains_call(left_node) or _contains_call(right_node):
-            return False                     # a Call can return a different value each evaluation
+
+        def _may_dispatch(n):
+            # a Call can return a different value each evaluation; an Attribute read can be a
+            # property whose value changes between reads (`assert self.n == self.n`)
+            return any(isinstance(x, (ast.Call, ast.Attribute)) for x in ast.walk(n))
+
+        if _may_dispatch(left_node) or _may_dispatch(right_node):
+            return False
         left = ast.dump(left_node, annotate_fields=False)
         right = ast.dump(right_node, annotate_fields=False)
         return left == right
@@ -239,7 +302,10 @@ def _try_body_has_call(try_stmt) -> bool:
 def _is_swallowed_failure(try_stmt, func_stmts, helper_asserts: frozenset = frozenset()) -> bool:
     if not _try_has_qualifying_handler(try_stmt):
         return False
-    if not _try_body_has_call(try_stmt):
+    # the try body must contain something that can FAIL: a call under test, or an assertion the
+    # broad no-op handler would swallow (`try: assert x == 5 / except Exception: pass`)
+    if not _try_body_has_call(try_stmt) and not any(
+            isinstance(n, ast.Assert) for s in try_stmt.body for n in _walk_own_scope(s)):
         return False
     try_subtree_ids = {id(n) for n in _walk_own_scope(try_stmt)}
     for n in _iter_own_scope(func_stmts):
@@ -287,10 +353,14 @@ def _is_skipif_call(node) -> bool:
 
 def _decorator_skipif_conditions(func):
     """Yields the condition-expression node of each `skipif`/`skipIf`-shaped decorator on func that
-    actually carries a positional condition argument."""
+    actually carries a condition — positional, or the `condition=` keyword spelling
+    (`@pytest.mark.skipif(condition=True, ...)`)."""
     for dec in func.decorator_list:
-        if isinstance(dec, ast.Call) and _is_skipif_call(dec) and dec.args:
-            yield dec, dec.args[0]
+        if isinstance(dec, ast.Call) and _is_skipif_call(dec):
+            cond = dec.args[0] if dec.args else next(
+                (kw.value for kw in dec.keywords if kw.arg == "condition"), None)
+            if cond is not None:
+                yield dec, cond
 
 
 def _is_skip_call_stmt(stmt) -> bool:
@@ -312,12 +382,17 @@ def _is_skip_call_stmt(stmt) -> bool:
 
 
 def _function_body_always_skip_guard(func):
-    """The function's FIRST statement, if (and only if) it is `if <cond>: pytest.skip(...)` /
+    """The function's FIRST statement (ignoring a leading docstring, which is documentation, not
+    a statement), if (and only if) it is `if <cond>: pytest.skip(...)` /
     `if <cond>: raise unittest.SkipTest(...)` -- deliberately shallow (first-statement-only, per the
     mission spec) so this never overreaches into scanning every branch of the function body."""
-    if not func.body:
+    body = func.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        body = body[1:]                                   # a docstring is documentation, not a statement
+    if not body:
         return None
-    first = func.body[0]
+    first = body[0]
     if isinstance(first, ast.If) and any(_is_skip_call_stmt(s) for s in first.body):
         return first
     return None
@@ -344,8 +419,14 @@ def _analyze_module_level_always_skip(tree) -> list:
         if not any(isinstance(t, ast.Name) and t.id == "pytestmark" for t in node.targets):
             continue
         value = node.value
-        if isinstance(value, ast.Call) and _is_skipif_call(value) and value.args and _is_tautology(value.args[0]):
-            findings.append({"line": node.lineno, "func": "<module>", "kind": "uncollectable_always_skip"})
+        marks = value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value]
+        for mark in marks:                                # `pytestmark = [pytest.mark.skipif(...)]`
+            if not (isinstance(mark, ast.Call) and _is_skipif_call(mark)):
+                continue
+            cond = mark.args[0] if mark.args else next(
+                (kw.value for kw in mark.keywords if kw.arg == "condition"), None)
+            if cond is not None and _is_tautology(cond):
+                findings.append({"line": node.lineno, "func": "<module>", "kind": "uncollectable_always_skip"})
     return findings
 
 
@@ -354,9 +435,14 @@ def _analyze_test_function(func, helper_asserts: frozenset = frozenset()) -> lis
     findings = []
     stmts = func.body
     scope_nodes = list(_iter_own_scope(stmts))
+    nested_findings = _analyze_nested_test_functions(func, helper_asserts)
 
+    # ONE construct, ONE fire: when the only "assertion" lives in an uncollectable nested test
+    # def, the specific uncollectable_nested finding below already blocks — stacking a second
+    # no_assertion fire on the enclosing function would demand two `makoto-allow` lines to clear
+    # one construct.
     if not any(_is_recognized_assertion(n, helper_asserts) for n in scope_nodes) \
-            and not _has_skip_decorator(func):
+            and not _has_skip_decorator(func) and not nested_findings:
         findings.append({"line": func.lineno, "func": func.name, "kind": "no_assertion"})
 
     for n in scope_nodes:
@@ -367,7 +453,7 @@ def _analyze_test_function(func, helper_asserts: frozenset = frozenset()) -> lis
         if isinstance(n, ast.Try) and _is_swallowed_failure(n, stmts, helper_asserts):
             findings.append({"line": n.lineno, "func": func.name, "kind": "swallowed_failure"})
 
-    findings.extend(_analyze_nested_test_functions(func, helper_asserts))
+    findings.extend(nested_findings)
     findings.extend(_analyze_always_skip(func))
 
     return findings
@@ -401,10 +487,12 @@ def analyze_file(src: str, path: str) -> list:
 
 
 _KIND_MESSAGE = {
-    "no_assertion": "test `{func}` (line {line}) contains no assertion of any kind — it passes "
-                     "regardless of what the code under test does",
-    "tautology": "test `{func}` (line {line}) asserts a tautology (`assert True`, or comparing an "
-                 "expression to itself) — it can never fail",
+    "no_assertion": "test `{func}` (line {line}) contains no assertion of any kind — it cannot "
+                     "detect wrong results; only an unhandled exception in the code it calls can "
+                     "ever fail it",
+    "tautology": "test `{func}` (line {line}) asserts a tautology (a statically-truthy literal "
+                 "like `assert True`, or comparing an expression to itself) — it pins no actual "
+                 "behavior of the code under test",
     "swallowed_failure": "test `{func}` (line {line}) wraps its only call-under-test in a try/except "
                           "that silently swallows any failure (broad except, no-op body, no assertion "
                           "elsewhere to catch it)",
@@ -438,6 +526,27 @@ def _run(ctx) -> list:
     # deadPureStatement._run via the stdlib-isolated helper home
     for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         lines = src.splitlines()
+        if _is_test_filename(str(p)):
+            # A test file that does not parse cannot be analyzed OR collected: absence of
+            # findings over it would be vacuous, not clean. This is a decision input (the very
+            # corpus this gate rules on), not a transport failure, so it must not fail open the
+            # way an unreadable file does — report it instead of silently skipping it.
+            try:
+                ast.parse(src)
+            except SyntaxError as e:
+                bad_line = e.lineno or 1
+                if not _allowed(bad_line, lines):
+                    out.append(Finding(
+                        pattern_id="gate.hollow_test",
+                        file=str(p),
+                        line=bad_line,
+                        level="error",
+                        message=(f"hollow test scan impossible: test file does not parse "
+                                 f"(SyntaxError near line {bad_line}), so none of its tests can "
+                                 "be collected or evaluated — fix the syntax error, or annotate "
+                                 "`# makoto-allow: <reason>` on that line only if intentional."),
+                    ))
+                continue
         for f in analyze_file(src, str(p)):
             if _allowed(f["line"], lines):
                 continue                                       # exempt, never a fire
@@ -447,8 +556,9 @@ def _run(ctx) -> list:
                 line=f["line"],
                 level="error",                                # a BLOCKING finding
                 message=("hollow test: " + _KIND_MESSAGE[f["kind"]].format(func=f["func"], line=f["line"])
-                          + ". A test that cannot fail is not a test; make it assert real behavior or "
-                            "remove it; annotate `# makoto-allow: <reason>` only if intentional."),
+                          + ". A test that cannot catch a failure is not a test; make it assert real "
+                            "behavior or remove it; annotate `# makoto-allow: <reason>` only if "
+                            "intentional."),
             ))
     return out
 

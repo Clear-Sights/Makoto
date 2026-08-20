@@ -27,9 +27,9 @@ from makoto.kit import (_BIND_BEFORE, CARRIAGE_FAULT, DISCHARGE_EATS, _discharge
 # (FP remediation 2026-06-25; tests/test_gates.py + tests/test_substrate_teeth.py pin the TPs).
 # How far back before the produce verb a forward/negation frame is looked for, to disarm the
 # claim ("will add `X`", "didn't add `X`"). Deliberately narrower than the verb->path bind
-# (_BIND_BEFORE) so a stray "not"/"next" far upstream cannot silence a live claim. NOTE: it is a
-# flat character window, NOT trimmed at a clause break, so a negation in the preceding sentence
-# still disarms the claim whenever it happens to land inside the window.
+# (_BIND_BEFORE) so a stray "not"/"next" far upstream cannot silence a live claim, AND trimmed
+# at the last clause break inside the window, so a negation in the PRECEDING sentence ("Two
+# tests still do not pass. I created X") cannot disarm a live current-clause claim either.
 _FRAME_NEAR = 40
 _PRODUCE_OBJ_SEP_RX = re.compile(
     r"\b(?:so|against|match(?:es|ing)?|reads?\s+from|requires?|"
@@ -44,9 +44,11 @@ def _production_claim_location(text):
     BEFORE the path, in the SAME clause, in active voice — "I created `X`", "Wrote `X`". A
     path is INERT when no produce verb governs it (a heading, a reference, a deliverable
     list), when the verb is passive/copular ("`X` was written", "it's wired"), when a clause
-    break separates them ("deletions landed; … the `X`"), or in a forward/negated frame
-    ("will add `X`", "didn't add `X`"). This is the verifiable core: a claim the assistant
-    itself produced this specific file."""
+    break separates them ("deletions landed; … the `X`"), when a negation stands in the
+    verb->path gap ("updated the docs, though I never created `X`" — the later, negated verb
+    is the one governing the path, so the earlier verb must not hijack it), or in a
+    forward/negated frame ("will add `X`", "didn't add `X`"). This is the verifiable core: a
+    claim the assistant itself produced this specific file."""
     if not text:
         return None
     for loc, a, b in detect_locations(text):
@@ -62,7 +64,19 @@ def _production_claim_location(text):
                 continue                              # subordinator/read-frame separates verb and
                                                       # path -> path is a referenced source, not the
                                                       # verb's direct object (the measured FP)
+            if _NEG_FRAME_RX.search(between):
+                continue                              # "updated ..., though I never created X" ->
+                                                      # the negated later verb governs the path;
+                                                      # the claim text explicitly disowns it
             near = pre[-_FRAME_NEAR:]
+            trailing_break = None
+            for trailing_break in _CLAUSE_BREAK_RX.finditer(near):
+                pass                                  # keep the LAST clause break in the window
+            if trailing_break is not None:
+                # Trim the frame window at the last clause break: a negation or forward frame
+                # in the PREVIOUS sentence ("Two tests still do not pass. I created X") must
+                # not disarm a live, current-clause claim — absence would read as green.
+                near = near[trailing_break.end():]
             if _FORWARD_FRAME_RX.search(near):
                 continue                              # "will add X" -> a plan, not a claim
             if _NEG_FRAME_RX.search(near):

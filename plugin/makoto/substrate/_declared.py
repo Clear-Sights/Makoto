@@ -42,7 +42,9 @@ DECLARED_IDS: dict[str, str] = {
     "content.fabricated_commit_sha": "fabricatedCommitSha",
     "content.self_mute_guard": "selfMuteGuard",
     "content.illusory_authorship_trailer": "illusoryAuthorshipTrailer",
+    "content.illusory_interruption_claim": "illusoryInterruptionClaim",
     "event.thrash_revert": "writeThrashRevert",
+    "event.identical_retry": "identicalRetryInterdiction",
     # SPEC-5 Task 4: the stop-gate catalog (formerly makoto/stopchecks/stopcheck_*.py + engines),
     # migrated into this flat package with descriptive names. Declared `.id`s are UNCHANGED from
     # the pre-migration stopchecks/ catalog -- only the filename/import path moved.
@@ -76,4 +78,10 @@ DECLARED_IDS: dict[str, str] = {
     # Immediate completed-remote-action sibling: a pushed/merged/live claim must be backed by a
     # successful Bash git-push or an explicitly recognized remote-mutating tool call.
     "gate.claimed_shipped": "claimedShippedAbsent",
+    # 2026-08-20 completeness sweep: four live modules had shipped without their manifest line,
+    # so deleting any of them (or breaking its CHECK) was invisible to `orphan_ids` — the
+    # reality -> manifest gap this file's own docstring warns about. Adding the keys closes it
+    # for these four; keeping this manifest complete remains a hand-maintenance duty.
+    "gate.plan_item_drift": "planItemDrift",
+    "gate.relative_path_citation": "relativePathCitation",
 }

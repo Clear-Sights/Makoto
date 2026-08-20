@@ -102,3 +102,42 @@ def test_mute_guard_still_catches_gutting_the_settings_form():
     old = json.dumps(_entry("/home/u/.claude/makoto_state/dispatch.sh"))
     f = _mute_predicate(old, json.dumps(_entry("true")))
     assert f is not None
+
+
+# ---- (c') the foreign-path / decoy shim spellings, pinned RED-before the anchor fix ----------
+def test_a_foreign_path_dispatch_shim_is_not_owned():              # RED-before
+    """An un-anchored `_dispatch_shim.sh` alternative read ANY command containing that basename
+    as makoto's dispatch: a user's own `/opt/acme/_dispatch_shim.sh` hook was absorbable and
+    deletable, and the mute guard false-BLOCKed an edit removing it (Pre-tier is certified at
+    zero false positives, test_pre_tier_block_invariant.py)."""
+    for cmd in ("/opt/acme/_dispatch_shim.sh",
+                "x_dispatch_shim.sh",
+                "true # _dispatch_shim.sh",
+                "makoto/_dispatch_shim.shhh"):
+        assert entry_dispatches_to_makoto(_entry(cmd)) is False, cmd
+        assert entry_owned_by_makoto(_entry(cmd)) is False, cmd
+
+
+def test_mute_guard_does_not_false_block_a_users_own_foreign_shim():   # RED-before
+    old = json.dumps(_entry("/opt/acme/_dispatch_shim.sh"))
+    assert _mute_predicate(old, "{}") is None
+
+
+def test_gutted_managed_entry_does_not_read_as_wired():            # RED-before
+    """The `_makoto_managed` flag alone is ownership metadata, not wiredness: an entry whose
+    command was gutted to a no-op (or whose "hooks" key was stripped entirely) reaches nothing,
+    so `event_wired` must report it unwired for `gate.self_wired` to fire. Ownership
+    (`entry_dispatches_to_makoto`, absorption/uninstall) still honors the flag."""
+    gutted = {"PreToolUse": [{"_makoto_managed": True, "matcher": "*",
+                              "hooks": [{"type": "command", "command": "true # _dispatch_shim.sh"}]}]}
+    assert event_wired(gutted, "PreToolUse") is False
+    assert event_wired({"PreToolUse": [{"_makoto_managed": True}]}, "PreToolUse") is False
+    real = {"PreToolUse": [{"_makoto_managed": True, "matcher": "*",
+                            "hooks": [{"type": "command",
+                                       "command": "/home/u/.claude/makoto_state/dispatch.sh"}]}]}
+    assert event_wired(real, "PreToolUse") is True
+
+
+def test_null_hooks_value_reads_unwired_never_raises():            # RED-before (raised TypeError)
+    assert entry_dispatches_to_makoto({"matcher": "*", "hooks": None}) is False
+    assert event_wired({"PreToolUse": [{"matcher": "*", "hooks": None}]}, "PreToolUse") is False

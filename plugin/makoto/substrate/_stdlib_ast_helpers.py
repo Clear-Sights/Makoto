@@ -80,19 +80,27 @@ def iter_touched_python_sources(touched, cwd, fs_read):
     iteration scaffold deadPureStatement._run and hollowTest._run previously duplicated line for
     line (2026-07-09 dedup; the two bodies differed only INSIDE the loop). Contract preserved
     exactly: a possibly-relative touched key is anchored to the event's OWN cwd, never the
-    dispatch process's ambient one (matches dispatch.py's real fs_read/fs_exists join). The
-    caller projects these three GateContext inputs explicitly so each check's signature remains
-    locally visible; stray scratch outside the working project is skipped; an OSError or fs_read
-    miss (None) skips the file, never crashes the gate."""
-    for p in touched:
+    dispatch process's ambient one (matches dispatch.py's real fs_read/fs_exists join) -- a
+    relative key with NO known cwd is unanchorable and is skipped outright, because resolving
+    it would read whatever same-named file sits in the hook process's ambient CWD and cite the
+    touched key with another file's line numbers. The caller projects these three GateContext
+    inputs explicitly so each check's signature remains locally visible; stray scratch outside
+    the working project is skipped; ANY per-file read fault (an OSError, a UnicodeDecodeError
+    from a non-UTF-8 source, a raising fs_read) or an fs_read miss (None) skips THAT file only,
+    never crashes the gate -- one unreadable file must not abort the scan of every other touched
+    file. `touched` is a set; iteration is sorted so which file a Finding cites is reproducible
+    for identical input across processes (hash randomization otherwise reorders it)."""
+    for p in sorted(touched, key=str):
         if not str(p).endswith(".py"):
             continue
-        real_p = p if not cwd or os.path.isabs(str(p)) else os.path.join(cwd, p)
+        if not cwd and not os.path.isabs(str(p)):
+            continue
+        real_p = p if os.path.isabs(str(p)) else os.path.join(cwd, p)
         if _is_scratch(real_p, cwd):
             continue
         try:
             src = _read(fs_read, real_p)
-        except OSError:
+        except Exception:
             continue
         if not isinstance(src, str):
             continue

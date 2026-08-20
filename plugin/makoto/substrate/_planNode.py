@@ -57,9 +57,33 @@ class PlanNode:
     status: str = OPEN
 
     def __post_init__(self) -> None:
-        """Default ``id`` to the ``"<what>::<passthrough>::<where>"`` composite when unset."""
+        """Normalize ``status`` into the closed OPEN/DONE vocabulary and default ``id`` to the
+        ``"<what>::<passthrough>::<where>"`` composite when unset.
+
+        STATUS: whitespace/case variants (``"OPEN"``, ``"open "``) normalize to their token; any
+        OTHER value (``"pending"``, a typo, a non-str) coerces to OPEN. An out-of-vocabulary
+        status must never exist in a stored node: it would be "not unfinished" to the Stop gate's
+        ``open_nodes()``/``remainder()`` whitelist yet "not done" to ``unmet_deps()``'s blacklist
+        — invisible to the finish check while still blocking dependents, i.e. a contract the Stop
+        gate reads as green without the work ever being finishable. Unknown = not-yet-done = OPEN
+        (fail-closed: the remainder stays non-empty until a real ``mark_done``).
+
+        ID: the composite escapes ``\`` then ``:`` inside each component (``a::b`` ->
+        ``a\:\:b``), so the ``::`` separators are unambiguous and the triple -> id map is
+        INJECTIVE — two distinct triples can never collide into one id and poison the whole plan
+        via ``add_node``'s different-shape guard. Components without ``:``/``\`` (the entire
+        normal population) keep their exact historical id."""
+        s = self.status if isinstance(self.status, str) else ""
+        s = s.strip().lower()
+        if s not in (OPEN, DONE):
+            s = OPEN
+        if s != self.status:
+            object.__setattr__(self, "status", s)
         if not self.id:
-            object.__setattr__(self, "id", f"{self.what}::{self.passthrough}::{self.where}")
+            def esc(part: str) -> str:
+                return part.replace("\\", "\\\\").replace(":", "\\:")
+            object.__setattr__(
+                self, "id", f"{esc(self.what)}::{esc(self.passthrough)}::{esc(self.where)}")
 
 
 class Plan:

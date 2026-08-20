@@ -200,7 +200,18 @@ def discover(*, package_dir: Optional[Path] = None, edge: Optional[str] = None) 
         if chk is not None:
             primary.append(chk)
         extra.extend(x for x in (getattr(mod, "EXTRA_CHECKS", None) or []) if _valid_check(x))
-    return primary + extra
+    # Identity dedupe: a module listing the SAME object as both `CHECK` and an `EXTRA_CHECKS`
+    # entry (tests/test_gate_shape.py accepts either placement, so nothing upstream rejects
+    # listing both) must not get that one check evaluated twice in a single verdict -- the
+    # same finding would be emitted twice for one event. Distinct objects sharing an id (the
+    # documented dual-surface shape, e.g. contractOrder.py) are untouched.
+    out, seen = [], set()
+    for chk in primary + extra:
+        if id(chk) in seen:
+            continue
+        seen.add(id(chk))
+        out.append(chk)
+    return out
 
 
 def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = None) -> list:

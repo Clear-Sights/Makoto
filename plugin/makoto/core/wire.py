@@ -137,7 +137,9 @@ def read_stdin() -> tuple[str, int]:
         # a real answer (an empty envelope) and takes the decode path as it should.
         if data is not None:
             return _decode_counting(data)
-    return scrub_text(sys.stdin.read() or "")
+    # Same BOM rule as the byte path: a host that hands us TEXT can hand us a leading U+FEFF
+    # too, and json.loads refuses it ("Unexpected UTF-8 BOM") -- see _decode_counting.
+    return scrub_text((sys.stdin.read() or "").lstrip("\ufeff"))
 
 
 def _decode_counting(data: bytes) -> tuple[str, int]:
@@ -147,8 +149,15 @@ def _decode_counting(data: bytes) -> tuple[str, int]:
     never be inflated by a U+FFFD the host legitimately sent. A number that cries wolf gets ignored,
     and takes the next real one with it.
     """
+    # "utf-8-sig", not "utf-8": a UTF-8 BOM (b"\xef\xbb\xbf") on the envelope strict-decodes
+    # to a leading U+FEFF that json.loads then REFUSES ("Unexpected UTF-8 BOM (decode using
+    # utf-8-sig)"), so a structurally perfect payload took the unparseable_payload loud-allow --
+    # every check disabled for that call, and the recorded reason ("stdin was not valid JSON")
+    # false. state/ledger.py already reads its own files with utf-8-sig for exactly this class;
+    # this is the one remaining door in the family that never got the pattern. A BOM is a
+    # legitimate encoding artifact, not damage, so it does not count as a repair.
     try:
-        return scrub_text(data.decode("utf-8"))
+        return scrub_text(data.decode("utf-8-sig"))
     except UnicodeDecodeError:
         pass
     # `surrogateescape`, then scrub -- NOT `errors="replace"`.
@@ -163,7 +172,7 @@ def _decode_counting(data: bytes) -> tuple[str, int]:
     # keeps the module's one guarantee: no surrogate leaves here. It also retires the
     # `data.count(b"\xef\xbf\xbd")` correction entirely, since surrogateescape never touches a
     # U+FFFD the host legitimately sent.
-    return scrub_text(data.decode("utf-8", errors="surrogateescape"))
+    return scrub_text(data.decode("utf-8-sig", errors="surrogateescape"))
 
 
 def harden_stderr() -> None:

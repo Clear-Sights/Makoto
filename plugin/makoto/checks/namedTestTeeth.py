@@ -4,7 +4,7 @@ from typing import Optional
 
 from makoto.vocab import Finding
 from makoto.vocab import _ANSI_SGR_RX, _TEETH_FRAME_RX, _SENTENCE_SPLIT_RX
-from makoto.kit import iter_tool_events
+from makoto.kit import is_test_runner, iter_tool_events
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -42,15 +42,30 @@ _FORWARD_RX = re.compile(r"\b(?:will|going\s+to|gonna|once|after|when|next|shoul
                          r"to\s+make|let['’]?s|I['’]?ll|expect(?:s|ed|ing)?)\b", re.IGNORECASE)
 # The clause boundary that isolates the text immediately governing the name.
 _CLAUSE_SPLIT_RX = re.compile(r"[,;:—]")
+# One actual quoted run (straight or curly), single-line: the (#4) exemption is span-membership.
+_QUOTE_SPAN_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”')
 # Sentence split reuses vocab._SENTENCE_SPLIT_RX -- this file held the repo's last
 # byte-identical private copy; every other consumer already imports the vocab object.
 
 # Recorded per-test FAILED / PASSED markers (the evidence side). Case-SENSITIVE runner tokens so
 # prose like "failed to connect" never matches. Both orderings (verdict leads / trails the id).
-_REC_FAIL_LEAD_RX = re.compile(r"^(?:FAILED|ERROR)\s+\S*?::(?P<name>test_[A-Za-z0-9_]+)", re.MULTILINE)
-_REC_FAIL_TRAIL_RX = re.compile(r"::(?P<name>test_[A-Za-z0-9_]+)\b[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
-_REC_PASS_LEAD_RX = re.compile(r"^(?:PASSED)\s+\S*?::(?P<name>test_[A-Za-z0-9_]+)", re.MULTILINE)
-_REC_PASS_TRAIL_RX = re.compile(r"::(?P<name>test_[A-Za-z0-9_]+)\b[^\n]*?\b(?:PASSED)\b", re.MULTILINE)
+# The lead forms tolerate a line PREFIX before the verdict token (pytest-xdist emits
+# "[gw0] [100%] PASSED tests/…::test_x"; the old ^-anchor recorded that runner's FAILED via the
+# short-summary line but never its PASSED, so a real red became undischargeable). The id captures
+# the MODULE PATH (the header's "exact test id" pin — a bare-name key let tests/a's failure deny a
+# claim about tests/b's same-named green test) and any PARAMETRIZATION suffix (stripping it let a
+# green test_charge[eur] discharge a red test_charge[usd]).
+_TEST_ID = r"(?P<path>\S*?)::(?P<name>test_[A-Za-z0-9_]+(?:\[[^\]\n]*\])?)"
+_REC_FAIL_LEAD_RX = re.compile(r"^[^\n]*?\b(?:FAILED|ERROR)\s+" + _TEST_ID, re.MULTILINE)
+_REC_FAIL_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
+_REC_PASS_LEAD_RX = re.compile(r"^[^\n]*?\bPASSED\s+" + _TEST_ID, re.MULTILINE)
+_REC_PASS_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\bPASSED\b", re.MULTILINE)
+# (#1)/(#2) teeth-frame SCOPE: the frame voids only verdict records in its own vicinity (this
+# many chars around the record), never the whole response — one incidental teeth word in a
+# traceback must not discard every recorded failure in the run, and symmetrically a PASSED
+# recorded inside deliberately-induced-failure framing is no material discharge either.
+_TEETH_SCOPE_BEFORE = 200
+_TEETH_SCOPE_AFTER = 120
 
 # (#1) DELIBERATELY-INDUCED failure framing (a FAILED produced by mutation/teeth testing is not a
 # material failure): _TEETH_FRAME_RX LIFTED to lexicons (consolidation T2.2, byte-identical) —
@@ -92,27 +107,38 @@ def claimed_passing_names(text: str) -> set:
     for sent in _SENTENCE_SPLIT_RX.split(text):
         if not _PASS_PRED_RX.search(sent):
             continue
+        # (#4) QUOTED material: citing a phrase to examine, correct, or retract it — e.g. 'my
+        # sentence ("...test_foo now pass") reads as a claim... retracting it' — is not itself a
+        # fresh, present-tense assertion. The neg/forward checks below only see a small window
+        # local to the name; a retraction two sentences later is invisible to them, so a quoted
+        # span is excluded here regardless of what surrounds it. The exemption is a SPAN test
+        # (the name must lie inside one actual quoted run), not a loose any-quote-before-and-
+        # after test — 'the "smoke" tier: test_charge passes and the "core" tier too' quotes two
+        # OTHER words, and its genuine claim over test_charge must still bind.
+        quote_spans = [m.span() for m in _QUOTE_SPAN_RX.finditer(sent)]
         for nm in _TESTNAME_RX.finditer(sent):
             name = nm.group(0)
-            a = nm.start()
-            pre = sent[max(0, a - 80):a]
-            clause = _CLAUSE_SPLIT_RX.split(pre)[-1]
-            post = sent[nm.end():nm.end() + 40]
-            if _NEG_RX.search(clause + " " + post):
+            a, b = nm.start(), nm.end()
+            if any(s <= a and b <= e for s, e in quote_spans):
                 continue
-            if _FORWARD_RX.search(clause):
+            # The CLAUSE containing the name bounds every binding decision — negation, forward
+            # framing, and the pass predicate itself. A predicate in a DIFFERENT clause
+            # ("test_charge is quarantined, everything else passes") governs different material
+            # and must not bind to this name.
+            cstart = 0
+            for m in _CLAUSE_SPLIT_RX.finditer(sent, 0, a):
+                cstart = m.end()
+            cm = _CLAUSE_SPLIT_RX.search(sent, b)
+            cend = cm.start() if cm else len(sent)
+            pre = sent[max(cstart, a - 80):a]
+            post = sent[b:min(cend, b + 40)]
+            if _NEG_RX.search(pre + " " + post):
+                continue
+            if _FORWARD_RX.search(pre):
                 continue
             if _ENUM_COUNT_RX.search(sent) and _EXCLUDE_RX.search(sent[:a]):
                 continue
-            # (#4) QUOTED material (an opening quote earlier in the sentence, a closing quote
-            # later): citing a phrase to examine, correct, or retract it — e.g. 'my sentence
-            # ("...test_foo now pass") reads as a claim... retracting it' — is not itself a fresh,
-            # present-tense assertion. The neg/forward checks above only see a ~120-char window
-            # local to the name; a retraction two sentences later is invisible to them, so a
-            # quoted span is excluded here regardless of what surrounds it.
-            if any(q in sent[:a] for q in '"“') and any(q in sent[nm.end():] for q in '"”'):
-                continue
-            window = sent[max(0, a - 80):nm.end() + 60]
+            window = sent[max(cstart, a - 80):min(cend, b + 60)]
             if _external_pass_predicate(window):
                 out.add(name)
     return out
@@ -138,21 +164,42 @@ def recorded_passed_names(text: str) -> set:
 
 
 def current_named_verdicts(history) -> dict:
-    """{test_name: 'FAIL'|'PASS'} from the recorded test-runner outputs in `history`, in order.
-    Last verdict wins (a fix-and-rerun-green discharges an earlier red; a re-fail re-opens). ANSI is
-    stripped first (vitest/jest colorize verdict lines). A FAILED inside mutation/teeth framing (#1)
-    is not recorded as a material failure."""
+    """{full_test_id: 'FAIL'|'PASS'} from the recorded TEST-RUNNER outputs in `history`, in
+    order. The key is the exact recorded id — `path::name[param]` — matching the header's
+    "exact test id" pin (a bare-name key let tests/a's failure shadow tests/b's same-named
+    test, and let one parametrized case discharge another). Only responses of a recognized
+    test-runner invocation are read (`kit.is_test_runner` on the recorded command): a FAILED
+    line the agent merely DISPLAYED — `cat old.log` — is not a run and must never ground a
+    DENY. Within one response, records apply in TEXTUAL ORDER and the last verdict wins (a
+    run-fix-rerun sequence captured in one Bash call ends on its true final verdict), exactly
+    as the last verdict wins across responses (a fix-and-rerun-green discharges an earlier
+    red; a re-fail re-opens). ANSI is stripped first (vitest/jest colorize verdict lines). A
+    verdict recorded inside mutation/teeth framing (#1) is not material — scoped to the
+    record's own vicinity (`_TEETH_SCOPE_*`), never the whole response, and applied
+    SYMMETRICALLY: a framed FAILED is no material failure, and a framed PASSED (a pass under
+    deliberately-induced-failure framing is evidence the test cannot fail) is no material
+    discharge either."""
     verdict = {}
-    for _tool, _cmd, resp in iter_tool_events(history):
-        if not resp:
+    for _tool, cmd, resp in iter_tool_events(history):
+        if not resp or not is_test_runner(cmd or ""):
             continue
         resp = _ANSI_SGR_RX.sub("", resp)
-        for nm in recorded_passed_names(resp):
-            verdict[nm] = "PASS"
-        if _TEETH_FRAME_RX.search(resp):
-            continue                                  # deliberately-induced failure -> not material
-        for nm in recorded_failed_names(resp):
-            verdict[nm] = "FAIL"
+        # Short-circuit through the shared per-name parsers (the same evidence primitives
+        # kit.compute_delta reuses) before the positioned scan below: most runner responses
+        # carry no per-test verdict lines at all.
+        if not (recorded_failed_names(resp) or recorded_passed_names(resp)):
+            continue
+        records = []
+        for rx, v in ((_REC_FAIL_LEAD_RX, "FAIL"), (_REC_FAIL_TRAIL_RX, "FAIL"),
+                      (_REC_PASS_LEAD_RX, "PASS"), (_REC_PASS_TRAIL_RX, "PASS")):
+            for m in rx.finditer(resp):
+                records.append(
+                    (m.start(), m.end(), f'{m.group("path")}::{m.group("name")}', v))
+        for start, end, tid, v in sorted(records):
+            window = resp[max(0, start - _TEETH_SCOPE_BEFORE):end + _TEETH_SCOPE_AFTER]
+            if _TEETH_FRAME_RX.search(window):
+                continue                              # deliberately-induced -> not material
+            verdict[tid] = v
     return verdict
 
 
@@ -165,17 +212,42 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
     if not names:
         return None
     verdict = current_named_verdicts(history)
-    failing = sorted(nm for nm in names if verdict.get(nm) == "FAIL")
+    # A prose claim names a BARE test function; the recorded verdicts carry exact ids
+    # (path::name[param]). Group the recorded ids by module path: parametrized cases of one
+    # function are ONE family (a green test_charge[eur] never discharges a red
+    # test_charge[usd]), while same-named functions in DIFFERENT modules are DISTINCT candidate
+    # referents of the bare name — DENY only when EVERY candidate family holds a red, because a
+    # DENY over an ambiguous name that might refer to a green test rests on a false fact.
+    failing = []
+    for nm in sorted(names):
+        families = {}
+        for tid, v in verdict.items():
+            path, _, ident = tid.rpartition("::")
+            if ident.split("[", 1)[0] == nm:
+                families.setdefault(path, []).append((tid, v))
+        if not families:
+            continue
+        red_ids = []
+        every_family_red = True
+        for members in families.values():
+            fam_red = sorted(tid for tid, v in members if v == "FAIL")
+            if fam_red:
+                red_ids.extend(fam_red)
+            else:
+                every_family_red = False
+        if every_family_red and red_ids:
+            failing.append((nm, sorted(red_ids)[0]))
     if not failing:
         return None
-    nm = failing[0]
+    nm, red_id = failing[0]
     return Finding(
         pattern_id="gate.named_test",
         file="tests",
         line=0,
         level="error",
         message=(f"Claim states {nm} passes, but the most recent recorded run of that exact test "
-                 f"shows it FAILED — re-run {nm} to green and cite it, or retract the claim."),
+                 f"({red_id}) shows it FAILED — re-run {nm} to green and cite it, or retract "
+                 f"the claim."),
         retry_hint=f"Re-run {nm} and cite the green result, or narrow/retract the claim.",
     )
 

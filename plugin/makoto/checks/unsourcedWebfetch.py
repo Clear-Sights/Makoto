@@ -16,9 +16,12 @@ clearly-grounded case there is; see `_user_supplied` for the measured misfire.
 Knight-Leveson: stdlib re + json only; conn for events lookup is passed in.
 """
 from __future__ import annotations
+import json
+import os
 from typing import Optional
 from urllib.parse import urlparse
-from makoto.kit import claim_vs_history_predicate, raw_payload_str
+from makoto.kit import raw_payload_str
+from makoto.vocab import Finding
 
 
 # Allowlisted hosts the agent legitimately knows from training data.
@@ -53,16 +56,30 @@ _TRUSTED_HOSTS = frozenset({
 # It also handles a url inside a markdown link, `[docs](https://vendor.example/a)`, where the tail
 # is `)`.
 _TRAILING_PUNCT = ".,;:!?)>]}\"'`"
+# What may PRECEDE a url and still leave it a url the source actually named, rather than a
+# fragment EMBEDDED in a longer one. The trailing rule alone anchors only the END of the match:
+# `https://web.archive.org/web/2020/https://vendor.example/secret` ends in whitespace after the
+# embedded url, so the old check exempted `https://vendor.example/secret` — likewise
+# `?to=https://vendor.example/admin` inside a redirect. Any wayback/redirect/query-parameter url
+# pre-approved the resource embedded in it. The character immediately BEFORE the match decides:
+# an alphanumeric or url-body character (`/=&?%+~@#._-`) means the match continues an enclosing
+# token, so it is NOT the named url; whitespace, start-of-text, or opening/citation punctuation
+# (`(`, `[`, `<`, quotes — the markdown-link and JSON-encoded cases) means the url stands alone.
+_URL_EMBED_PREV = set("/=&?%+~@#._-")
 
 
 def _ends_url(turn: str, url: str) -> bool:
-    """True iff `url` occurs in `turn` as a COMPLETE url rather than as a prefix of a longer one."""
+    """True iff `url` occurs in `turn` as a COMPLETE, STANDALONE url — anchored at BOTH ends:
+    not a prefix of a longer url (trailing token rule) and not embedded inside a longer one
+    (leading character rule, `_URL_EMBED_PREV`)."""
     start = turn.find(url)
     while start != -1:
+        prev = turn[start - 1] if start > 0 else ""
+        embedded = bool(prev) and (prev.isalnum() or prev in _URL_EMBED_PREV)
         tail = turn[start + len(url):]
         # Everything from the end of the match to the next whitespace: the rest of this token.
         rest = "" if (not tail or tail[0].isspace()) else tail.split(None, 1)[0]
-        if not rest or all(c in _TRAILING_PUNCT for c in rest):
+        if not embedded and (not rest or all(c in _TRAILING_PUNCT for c in rest)):
             return True
         start = turn.find(url, start + 1)
     return False
@@ -128,20 +145,82 @@ def _webfetch_url(current_event: dict) -> Optional[str]:
 
 
 def _url_grounded_in_history(url: str, history: list) -> bool:
+    """True iff `url` was RETURNED by a prior tool call — present, as a standalone url
+    (`_ends_url`, case-folded), in the settled `tool_response` content of a prior event.
+
+    RESPONSE-ONLY, by construction. The old form searched the whole raw payload of EVERY
+    event type, which made the check self-defeating three ways, each probed live: a prior
+    PreToolUse row of the byte-identical WebFetch grounded its own retry (the agent's REQUEST
+    approving the agent's request); a `Bash: echo <url>`'s payload grounded the url the agent
+    had just typed; and a bare unanchored substring test grounded every proper prefix of
+    anything a response ever contained — the defect class `_user_supplied`'s docstring names,
+    left unfixed in this sibling arm. Now: the row must parse, must carry a `tool_response`
+    (a Pre row has none — a request is not evidence), the url must stand alone in that
+    response's text, and an event whose own `tool_input` carries the url confirms nothing
+    (the tool merely reflected what the agent fed it — `echo`, `printf`, a heredoc — which is
+    a permission slip the agent wrote itself, not the world returning the url).
+
+    `raw_payload_str` stays the canonical row unwrap (test_campaign_dedup pins the identity),
+    used here first as a cheap pre-filter before the row is parsed."""
     needle = url.lower()   # hoisted: the same fold ran once per history row
     for entry in history:
         payload = raw_payload_str(entry)
-        if payload and needle in payload.lower():
-            return True
+        if not payload or needle not in payload.lower():
+            continue
+        try:
+            ev = json.loads(payload)
+        except ValueError:
+            continue                       # an unparseable row cannot prove settled output
+        if not isinstance(ev, dict):
+            continue
+        resp = ev.get("tool_response")
+        if resp is None:
+            continue                       # no settled response -> a request, not evidence
+        resp_text = resp if isinstance(resp, str) else json.dumps(resp)
+        if not _ends_url(resp_text.lower(), needle):
+            continue
+        ti = ev.get("tool_input")
+        ti_text = ti if isinstance(ti, str) else ("" if ti is None else json.dumps(ti))
+        if needle in ti_text.lower():
+            continue                       # the event echoed its own input -> self-written
+        return True
     return False
 
 
-predicate = claim_vs_history_predicate(
-    claim_rxs=(), neg_ref_rx=None, grounded_in_history=_url_grounded_in_history,
-    tool_gate=_webfetch_url,
-    message=("row {id} ({description}): this URL was never returned by a prior tool call in "
-             "this session, and the user never typed it"),
-)
+def _oracle_consulted(transcript_path) -> bool:
+    """True iff the user-turn oracle channel was actually AVAILABLE to consult: a transcript
+    path was supplied and points at a readable file. The deny message must never assert "the
+    user never typed it" when no transcript was ever read — that is a hard deny resting on a
+    false fact, the one thing a gate must never do (state/ledger.py's own doctrine). The
+    EXEMPTION side stays exactly as strict either way (`_user_supplied` still returns False on
+    an absent/unreadable transcript — absence of evidence, never evidence of absence); only
+    the STATED REASON changes."""
+    return bool(transcript_path) and os.path.isfile(transcript_path)
+
+
+def predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    """The Pre predicate (same signature dispatch calls every predicate_module with). Fires iff
+    the WebFetch url passes no short-circuit (`_webfetch_url`: trusted host, user-typed) and is
+    not grounded in a prior tool RESPONSE (`_url_grounded_in_history`). The message states only
+    what was actually checked: the user-typed clause is asserted only when a transcript was
+    available to consult (`_oracle_consulted`)."""
+    url = _webfetch_url(current_event)
+    if url is None:
+        return None
+    if _url_grounded_in_history(url, history):
+        return None
+    if _oracle_consulted(current_event.get("transcript_path")):
+        oracle_clause = "the user never typed it"
+    else:
+        oracle_clause = ("no readable transcript was available to check whether the user "
+                         "typed it")
+    return Finding(
+        pattern_id=pattern.id, file="", line=0, level="error",
+        message=(f"row {pattern.id} ({pattern.description}): this URL was never returned in a "
+                 f"prior tool call's response in this session, and {oracle_clause}"),
+        retry_hint=pattern.retry_hint,
+        snippet=str(url)[:200],
+    )
 
 
 from makoto.registry import Check as _Check

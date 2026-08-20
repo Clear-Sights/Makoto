@@ -61,6 +61,15 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     if event_type == "PostToolUseFailure":
         return ti, failure_terminal_result(ev)["error"]
     tr = ev.get("tool_response") or {}
+    if isinstance(tr, dict):
+        # A RECORDED zero exit is a call that SUCCEEDED: there is no failure to interdict,
+        # whatever failure-shaped PHRASES its output happens to carry (e.g. grepping logs for
+        # "No such file or directory" puts the marker in stdout of a passing call). Only an
+        # explicitly recorded 0 short-circuits; an absent exit code still defers to
+        # `classify_failure` over the output text, exactly as before.
+        recorded_exit = tr.get("exitCode", tr.get("exit"))
+        if recorded_exit == 0 and not isinstance(recorded_exit, bool):
+            return None
     text = bash_output_text(tr) if isinstance(tr, dict) else str(tr)
     return ti, text
 

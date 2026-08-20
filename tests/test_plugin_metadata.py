@@ -95,8 +95,17 @@ def test_slash_commands_are_read_only():
     future 'status' command can't silently grow a --mute flag.
     """
     cmd_dir = PLUGIN / "commands"
-    if not cmd_dir.is_dir():
-        return  # ships no slash commands -> trivially read-only
+    # ABSENCE IS LOUD, never trivially green: this plugin DOES ship slash commands (status/
+    # pattern/show), and the header above records that the manifest, hooks, commands and package
+    # were JUST moved into plugin/ -- a repeat of that move that misses commands/ would otherwise
+    # disarm this entire read-only guard with no signal (the old `if not cmd_dir.is_dir(): return`
+    # exited 0 having asserted nothing). If makoto ever genuinely stops shipping slash commands,
+    # change this assertion IN THE SAME COMMIT that deletes them, stating that decision here.
+    assert cmd_dir.is_dir(), (
+        "plugin/commands/ is missing -- the read-only slash-command guard has nothing to check. "
+        "If commands moved, update PLUGIN/cmd_dir here; if they were removed on purpose, say so "
+        "here in the same change."
+    )
     md_files = sorted(cmd_dir.glob("*.md"))
     assert md_files, "commands/ exists but ships no .md commands"
 
@@ -153,3 +162,21 @@ def test_plugin_description_predicate_count_matches_disk():
             f"plugin.json claims {claimed} {tier}s but the live loader has {actual} — "
             f"update the description (or the catalog)."
         )
+
+
+def test_live_loader_resolves_from_this_tree():
+    """The doc-vs-code materiality binding is only material if `makoto` IS this tree's package.
+
+    A stale editable install (__editable__.makoto-*.pth) resolved `from makoto.registry import
+    ...` to a DIFFERENT checkout (verified live: PKG /home/user/makoto-dev/...), so
+    test_plugin_description_predicate_count_matches_disk compared THIS repo's plugin.json
+    against ANOTHER tree's catalog -- both count claims could stay green while this repo's
+    catalog drifted, the exact class the README-materiality header names. Run the suite with
+    this tree's plugin/ first on PYTHONPATH."""
+    import makoto
+    pkg = Path(makoto.__file__).resolve()
+    assert pkg.is_relative_to(PLUGIN.resolve()), (
+        f"imported makoto resolves to {pkg}, not this repo's {PLUGIN} -- the count-binding "
+        f"tests above are comparing this repo's docs against a different tree's code. "
+        f"Run with PYTHONPATH={PLUGIN} (or fix the editable install)."
+    )

@@ -96,4 +96,12 @@ def test_readme_references_exist():
     refs += [m for m in re.findall(r"\]\(([^)]+)\)", readme)
              if not m.startswith(("http://", "https://", "#", "mailto:"))]
     missing = [r for r in refs if not (root / r.split("#")[0]).exists()]
+    # Population guard: refs is an existence-filtered, regex-derived collection, so an empty refs
+    # makes `missing == []` vacuously — a README restructure that stops both regexes matching
+    # (single-quoted src, reference-style links) would pass while checking zero links. The suite's
+    # own docstring records that exact regression shipping once (docs/demo/), so the collection
+    # must be proven populated, embedded images included, before its emptiness can mean "clean".
+    assert refs, "README yielded no scannable references -- extraction regexes matched nothing (vacuous pass)"
+    assert any(r.endswith((".svg", ".png", ".gif", ".jpg", ".jpeg")) for r in refs), \
+        "no embedded image refs extracted from README -- the docs/demo regression class is unguarded"
     assert not missing, f"README references missing files: {missing}"

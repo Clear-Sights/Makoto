@@ -28,7 +28,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+# parent.parent (tests/ -> repo root), NOT parent.parent.parent: the extra .parent resolved
+# to the DIRECTORY ABOVE this checkout, so the module-level skip's existence probe ran against
+# the wrong tree — the skip's stated cause ("standalone makoto checkout") was indistinguishable
+# from a mis-computed root, and a matching doc one level up would have run the map against a
+# foreign repository.
+REPO_ROOT = Path(__file__).resolve().parent.parent
 ASSAY_TESTS = REPO_ROOT / "assay" / "tests"
 if not (REPO_ROOT / "EXECUTION_PLAN.md").exists():
     # Standalone makoto checkout (no Skill-lab-V5 monorepo siblings): the parity map's source
@@ -188,10 +193,13 @@ def test_every_ported_or_partial_destination_exists_and_has_tests():
 def test_every_excluded_entry_cites_a_real_documented_decision():
     for name, entry in PARITY.items():
         if entry["status"] != "EXCLUDED" and "decision" not in entry:
-            continue
+            continue   # non-EXCLUDED entry offering no citation: nothing to verify
         cite = entry.get("decision")
-        if cite is None:
-            continue
+        # An EXCLUDED entry with NO decision key reaches here with cite=None. The old
+        # `if cite is None: continue` skipped it — the exact absence this test is named
+        # for was passed over, and only entries already carrying a citation were checked.
+        assert cite is not None, (
+            f"{name}: EXCLUDED but cites no documented decision at all")
         assert any(cite in doc for doc in _ALL_DOCS), (
             f"{name}: cited decision {cite!r} not found in EXECUTION_PLAN.md, DEFERRED.md, "
             f"or SPEC-5-MAKOTO-ABSORBS-ASSAY.md")
