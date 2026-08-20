@@ -106,7 +106,7 @@ def _user_supplied(url: str, current_event: dict) -> bool:
         # Absence of evidence, never evidence of absence: an unreadable transcript leaves the
         # check exactly as strict as it was before this exemption existed.
         return False
-    return False  # PLANTED BREAK
+    return any(_ends_url(turn, url) for turn in turns)
 
 
 def _webfetch_url(current_event: dict) -> Optional[str]:

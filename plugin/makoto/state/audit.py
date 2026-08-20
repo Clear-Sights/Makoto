@@ -1,9 +1,11 @@
 """append-only observability log — JSONL writer + reader + structured error log.
 
-Three file outputs under $MAKOTO_STATE_DIR/:
+Three append-only file outputs under the caller's state root:
 - audit.jsonl           : one row per Finding-producing dispatcher invocation (only-fires policy, 1.0.2)
 - dispatch_errors.jsonl : one row per predicate that raised an unexpected exception
 - exemptions.jsonl      : one row per REAL match suppressed by an agent escape valve
+audit.jsonl and exemptions.jsonl are ALSO chain-appended, so ledger's own chain.jsonl +
+chain.lock land in that same root (see `_chain_then_append`); dispatch_errors.jsonl is not.
 
 All three are append-only, line-delimited JSON. Concurrent appends lean on O_APPEND
 short-write atomicity, which holds only while a row stays inside the atomic write unit
