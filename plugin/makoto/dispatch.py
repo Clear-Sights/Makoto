@@ -609,13 +609,28 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         # design (see makoto.verdict's recheck section); that raise is unreachable unless
         # MAKOTO_RECHECK_CERTIFICATE is explicitly set.
         from makoto.verdict import VerdictCertificate, recheck_certificate
-        recheck_certificate(VerdictCertificate(
-            findings=tuple(findings),
-            mode=mode,
-            permission_mode=permission_mode,
-            claimed_outcome=str(folded),
-            claimed_detail=getattr(folded, "detail", ""),
-        ))
+        try:
+            recheck_certificate(VerdictCertificate(
+                findings=tuple(findings),
+                mode=mode,
+                permission_mode=permission_mode,
+                claimed_outcome=str(folded),
+                claimed_detail=getattr(folded, "detail", ""),
+            ))
+        except Exception as exc:
+            # CAUGHT, and the direction matters more than the catch. Letting the raise fly was the
+            # whole defect: it unwound past this wire write into `_dispatch`'s carriage handler,
+            # which records a fact and returns 0 -- so the one mechanism built to catch a corrupted
+            # fold produced NO verdict at all and the call was allowed. Detecting tampering in the
+            # verdict machinery and then failing OPEN on the detection is worse than not checking.
+            # A fold mismatch is a DECISION fault, not a carriage fault, and this repo's rule is
+            # open on carriage, closed on decision -- so the mismatch becomes the verdict, at BLOCK,
+            # bypassing `apply` entirely (the fold is exactly what is not to be trusted here).
+            folded = verdict.Decision(
+                verdict.BLOCK,
+                "makoto could not certify its own verdict fold and is failing closed: "
+                f"{type(exc).__name__}: {exc}",
+            )
     body = verdict.dispatch_posture(_HOOK_TO_EDGE.get(hook_event, "Pre"), folded, hook_event)
     if body:
         global _stdout_written, _decision_write_failed

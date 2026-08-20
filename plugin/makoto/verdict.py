@@ -120,8 +120,17 @@ _REDUCED_OVERSIGHT_MODES = frozenset({"bypassPermissions", "dontAsk"})
 
 def is_oversight_clamped(permission_mode) -> bool:
     """True iff `permission_mode` is one of the two modes where Claude Code's own human-
-    confirmation layer is off (`apply` forces STRICT in this case regardless of MAKOTO_MODE)."""
-    return permission_mode in _REDUCED_OVERSIGHT_MODES
+    confirmation layer is off (`apply` forces STRICT in this case regardless of MAKOTO_MODE).
+
+    GUARDED on type, and it has to be: `in` against a frozenset HASHES its argument, so an
+    unhashable `permission_mode` raised `TypeError` here instead of answering False. The host value
+    arrives unfiltered (`dispatch.py` reads `payload.get("permission_mode")`), the raise unwound out
+    of `_emit_decision` before anything was written, and dispatch's carriage handler turned it into
+    a loud-ALLOW exit 0 -- a malformed payload key converting a fired DENY into a clean pass.
+    Anything that is not a mode string is, by definition, not one of the two reduced-oversight
+    modes.
+    """
+    return isinstance(permission_mode, str) and permission_mode in _REDUCED_OVERSIGHT_MODES
 
 
 def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> str:
