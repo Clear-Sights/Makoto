@@ -112,7 +112,9 @@ def test_rows_roundtrip_via_from_rows():
     plan.mark_done("n1")
     rebuilt = Plan.from_rows(plan.rows())
     assert rebuilt.rows() == plan.rows()
-    assert rebuilt.nodes()[0].status == DONE
+    node = rebuilt.nodes()[0]
+    assert node.status == DONE
+    assert (node.what, node.passthrough, node.where) == ("Write", "auth.py", "/repo/auth.py")
 
 
 def test_from_jsonl_parses_lines_preserving_order():

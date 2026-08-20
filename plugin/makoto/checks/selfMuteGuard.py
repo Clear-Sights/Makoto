@@ -27,12 +27,14 @@ from makoto.registry import Check
 from makoto.substrate.wiring import MAKOTO_INVOCATION_RX as _MAKOTO_CMD_RX
 
 # The file makoto wires into: ~/.claude/settings.json (or settings.local.json).
-_SETTINGS_RX = re.compile(r"\.claude/settings(?:\.local)?\.json$")
+_SETTINGS_RX = re.compile(r"(?:\.claude[/\\]settings(?:\.local)?\.json|hooks[/\\]hooks\.json)$",
+                          re.IGNORECASE)
 # A makoto-disable env var SET to a TRUTHY value — JSON ("KEY": "1") or shell (KEY=1).
 # Truthy-only is the FP guard: setting DISABLE to 0/false is RE-ENABLING makoto and
 # must never fire.
 _DISABLE_ENV_RX = re.compile(
-    r"MAKOTO_(?:DISABLE\w*|PAUSE)\b\s*[\"']?\s*[:=]\s*[\"']?(?:1|true|yes|on)\b",
+    r"MAKOTO_(?:DISABLE\w*|PAUSE)\b\s*[\"']?\s*[:=]\s*[\"']?(?:1|true|yes|on)"
+    r"(?=\s*(?:$|[}\]]|[\"']\s*(?:[,}\]]|$)))",
     re.IGNORECASE)
 # MAKOTO_DISABLE_PATTERNS is NOT a boolean — its value is a LIST of check ids, and ANY
 # non-empty value disables those checks (a selective self-mute the truthy-only regex above
@@ -132,9 +134,8 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     )
 
 
-from makoto.registry import Check as _Check
 # tests="": registered ONE_OFF -- hardcoded self-mute immunity must not use universal routing.
 RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
-CHECK = _Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=RETRY_HINT, description=DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}))
+CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=RETRY_HINT, description=DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}))

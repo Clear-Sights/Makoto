@@ -308,7 +308,7 @@ def _plugin_wiring_report() -> dict:
     something makoto reads, so this reports what it can observe ($CLAUDE_PLUGIN_ROOT and the
     manifest there) and says plainly when it cannot observe the rest. An unknown reported as
     unknown is the point: the previous output implied a completeness it never checked."""
-    root = os.environ.get("CLAUDE_PLUGIN_ROOT") or ""
+    root = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if not root:
         return {"plugin_hooks_declared": None,
                 "note": "CLAUDE_PLUGIN_ROOT is unset here, so the marketplace plugin's wiring "

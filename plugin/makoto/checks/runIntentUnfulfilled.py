@@ -57,7 +57,8 @@ from makoto.kit import decode_history_event, decode_history_row
 # The first sentence-terminating character after a match -- the question veto below reads only
 # whether that character is '?'. Not vocab.py's `_SENTENCE_SPLIT_RX` (which splits on a boundary
 # plus its trailing whitespace); this one has to name the terminator itself.
-_SENTENCE_END_RX = re.compile(r"[.!?\n]")
+_SENTENCE_END_RX = re.compile(r"\?|[.!](?=\s*(?:$|[A-Z]))|\n")
+_QUOTED_SPAN_RX = re.compile(r'"[^"\n]*"|\'[^\'\n]*\'')
 
 
 def _run_intent_claim(text: str):
@@ -67,14 +68,14 @@ def _run_intent_claim(text: str):
     (the containing sentence ends '?') voided."""
     if not text:
         return None
-    spans = _code_spans(text)
+    spans = _code_spans(text) + [m.span() for m in _QUOTED_SPAN_RX.finditer(text)]
     for m in _RUN_INTENT_CLAIM_RX.finditer(text):
         a, b = m.start(), m.end()
         if any(s <= a < e for s, e in spans):
             continue                                  # quoted/fenced -> not the agent's own prose claim
         if _NEGATION_RX.search(m.group(0)):
             continue                                  # "I'll never run ..." -- filler swallowed 'never'
-        if _RUN_INTENT_IDIOM_VETO_RX.search(text[b:b + 40]):
+        if _RUN_INTENT_IDIOM_VETO_RX.search(text[b:]):
             continue                                  # "run it by you" / "run through" / "run the numbers"
         end = _SENTENCE_END_RX.search(text, b)
         if end is not None and end.group(0) == "?":
@@ -129,9 +130,7 @@ def run_promised_gate(*, history=()) -> Optional[Finding]:
     prior = decode_history_row(history[idx])
     prior_text = (prior or {}).get("last_assistant_message") or ""
     claim = _run_intent_claim(prior_text)
-    if claim is None:
-        return None
-    if _bash_call_after(history, idx):
+    if claim is None or _bash_call_after(history, idx):
         return None
     return Finding(
         pattern_id="gate.run_promised", file="", line=0, level="error",

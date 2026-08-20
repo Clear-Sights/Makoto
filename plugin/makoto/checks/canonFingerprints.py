@@ -42,7 +42,6 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     for name, formula, is_block in fired_canon_fingerprints(calls, text or ""):
         if not is_block:
             continue
-        ack = None
         try:
             import makoto.state.ledger as _ackblock
             ack = _ackblock.find_ack_block(name, transcript_path=transcript_path,

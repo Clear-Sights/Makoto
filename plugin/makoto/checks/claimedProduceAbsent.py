@@ -34,11 +34,12 @@ _FRAME_NEAR = 40
 _PRODUCE_OBJ_SEP_RX = re.compile(
     r"\b(?:so|against|match(?:es|ing)?|reads?\s+from|requires?|"
     r"according\s+to|based\s+on|conform(?:s|ing)?\s+to)\b", re.I)
+_PASSIVE_PREFIX_RX = re.compile(
+    r"\b(?:was|were|is|are|been|being|be|am)(?:\s+[\w-]+){0,2}\s*$", re.IGNORECASE)
 
 
-def _production_claim_location(text):
-    """Return the first located path that is the direct object of an ACTIVE first-person
-    production claim, else None.
+def _production_claim_locations(text):
+    """Yield located paths that are direct objects of ACTIVE first-person production claims.
 
     Required structure (the 'make it clearer' fix for the measured FP): a produce verb sits
     BEFORE the path, in the SAME clause, in active voice — "I created `X`", "Wrote `X`". A
@@ -50,12 +51,12 @@ def _production_claim_location(text):
     forward/negated frame ("will add `X`", "didn't add `X`"). This is the verifiable core: a
     claim the assistant itself produced this specific file."""
     if not text:
-        return None
+        return
     for loc, a, b in detect_locations(text):
         before = text[max(0, a - _BIND_BEFORE):a]
         for vm in _PRODUCE_VERB_RX.finditer(before):
             pre = before[:vm.start()]
-            if _BE_AUX_RX.search(pre):
+            if _BE_AUX_RX.search(pre) or _PASSIVE_PREFIX_RX.search(pre):
                 continue                              # passive/copular -> not a self-production claim
             between = before[vm.end():]
             if _CLAUSE_BREAK_RX.search(between):
@@ -81,8 +82,8 @@ def _production_claim_location(text):
                 continue                              # "will add X" -> a plan, not a claim
             if _NEG_FRAME_RX.search(near):
                 continue                              # "didn't add X" -> admission (2.8), not a false claim
-            return loc
-    return None
+            yield loc
+            break
 
 
 def completion_gate(
@@ -101,35 +102,31 @@ def completion_gate(
     A produced-claim that IS touched, or that the filesystem confirms, is silent (fail-open).
     Only an unbacked production claim bites.
     """
-    loc = _production_claim_location(text)
-    if not loc:
-        return None                                  # no verifiable production claim -> inert
-    if _discharged(loc, touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
-        return None                                  # verified (ledger) or fail-open (filesystem)
-    worktree_path = resolve_in_worktree(loc, cwd)
-    if worktree_path is CARRIAGE_FAULT:
-        # Git itself never answered, so the worktree was not consulted and absence was not
-        # established. Carriage faults fail OPEN here; denying would assert the deliverable is
-        # missing on evidence nobody collected.
-        return None
-    if worktree_path:
-        # Preserve _discharged's content-depth law for this widened path: a zero-byte
-        # non-conventional artifact still does not substantiate a production claim.
-        if _discharged(
-            loc, (), fs_exists=lambda _p: True,
-            fs_size=lambda _p: os.path.getsize(worktree_path),
-        ):
-            return None
-    loc_n = normalize_path(loc)
-    return Finding(
-        pattern_id="gate.completion",
-        file=loc_n,
-        line=0,
-        level="error",
-        message=(f"Claim states {loc_n} was produced, but it is neither in the results "
-                 f"ledger nor on disk — the word must match the world."),
-        retry_hint="Produce/touch the cited location, or retract with a checked reason.",
-    )
+    for loc in _production_claim_locations(text):
+        if _discharged(loc, touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
+            continue                                  # verified (ledger) or fail-open (filesystem)
+        worktree_path = resolve_in_worktree(loc, cwd)
+        if worktree_path is CARRIAGE_FAULT:
+            continue
+        if worktree_path:
+            # Preserve _discharged's content-depth law for this widened path: a zero-byte
+            # non-conventional artifact still does not substantiate a production claim.
+            if _discharged(
+                loc, (), fs_exists=lambda _p: True,
+                fs_size=lambda _p: os.path.getsize(worktree_path),
+            ):
+                continue
+        loc_n = normalize_path(loc)
+        return Finding(
+            pattern_id="gate.completion",
+            file=loc_n,
+            line=0,
+            level="error",
+            message=(f"Claim states {loc_n} was produced, but it is neither in the results "
+                     f"ledger nor on disk — the word must match the world."),
+            retry_hint="Produce/touch the cited location, or retract with a checked reason.",
+        )
+    return None
 
 
 from makoto.registry import Check as _Check

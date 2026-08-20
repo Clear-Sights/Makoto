@@ -156,8 +156,8 @@ def test_silent_on_pnpm_exec_nonrunner():
 # when masked. Locks test coverage to the CLAIMED scope (a minimum floor) so a future regex edit
 # can't silently break an untested family. All 31 verified firing 2026-05-29.
 _RUNNER_FAMILIES = [
-    "pytest", "go test ./...", "cargo test", "cargo check", "npm test", "yarn test", "pnpm test",
-    "jest", "vitest", "mocha", "tsc", "ruff check", "eslint", "flake8", "mypy", "pyright", "pylint",
+    "pytest", "go test ./...", "cargo test", "cargo check", "npm test", "npm run test", "npm run lint", "npm check", "yarn test", "yarn lint", "pnpm test", "pnpm check",
+    "jest", "vitest", "mocha", "tsc", "ruff", "ruff check", "ruff format .", "eslint", "flake8", "mypy", "pyright", "pylint",
     "make test", "make check", "make lint", "bazel test", "dotnet test", "gradle test", "gradle check",
     "mvn test", "phpunit", "rspec", "ctest", "dune test", "dune build", "swift test",
 ]

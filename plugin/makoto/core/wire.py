@@ -139,7 +139,10 @@ def read_stdin() -> tuple[str, int]:
             return _decode_counting(data)
     # Same BOM rule as the byte path: a host that hands us TEXT can hand us a leading U+FEFF
     # too, and json.loads refuses it ("Unexpected UTF-8 BOM") -- see _decode_counting.
-    return scrub_text((sys.stdin.read() or "").lstrip("\ufeff"))
+    try:
+        return scrub_text((sys.stdin.read() or "").lstrip("\ufeff"))
+    except (AttributeError, TypeError, ValueError, OSError):
+        return "", 0
 
 
 def _decode_counting(data: bytes) -> tuple[str, int]:
@@ -202,6 +205,6 @@ def harden_stderr() -> None:
     """
     for stream in (sys.stderr, sys.stdout):
         try:
-            stream.reconfigure(errors="replace")
-        except (AttributeError, ValueError, OSError):
+            stream.reconfigure(errors="backslashreplace" if stream is sys.stderr else "replace")
+        except (AttributeError, TypeError, ValueError, OSError):
             pass

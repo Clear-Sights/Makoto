@@ -5,7 +5,7 @@ import importlib
 import sqlite3
 
 
-def test_run_stop_checks_lives_in_dispatch():
+def test_run_stop_checks_lives_in_dispatch(tmp_path):
     from makoto.dispatch import run_stop_checks
     c = sqlite3.connect(":memory:", isolation_level=None)
     c.execute("CREATE TABLE commitments (commitment_key TEXT PRIMARY KEY, session_id TEXT, "
@@ -14,13 +14,12 @@ def test_run_stop_checks_lives_in_dispatch():
     c.execute("CREATE TABLE ledger (key TEXT PRIMARY KEY, value TEXT, kind TEXT NOT NULL, "
               "exit INTEGER, source_event_id INTEGER, session_id TEXT, ts TEXT)")
     out = run_stop_checks(c, {"last_assistant_message": "Done. I created zzz_nope.py.",
-                             "session_id": "s", "cwd": "/tmp"})
+                             "session_id": "s", "cwd": str(tmp_path)})
     assert any(f.pattern_id == "gate.completion" for f in out)
 
 
 def test_engine_module_is_dissolved():
-    try:
-        importlib.import_module("makoto.engine")
-    except ModuleNotFoundError:
+    if importlib.util.find_spec("makoto.engine") is None:
         return
+    importlib.import_module("makoto.engine")
     raise AssertionError("makoto.engine must be dissolved (no shim, spec §7)")

@@ -27,9 +27,8 @@ That mechanism is gone and the carve-out with it; the never-blocks guarantee now
 to the same L2 import firewall as its siblings (tests/test_import_direction.py -- notably, no
 reaching into the sibling `makoto.state.plan` store).
 
-Reads: the declared Plan (never mutated) and `os.path.exists` on each DONE node's `where`.
-Never reads file CONTENT -- existence only, so it stays content-blind even though it is no
-longer ledger-blind.
+Reads: the declared Plan (never mutated) and the existence/size of each DONE node's `where`.
+An empty artifact is not an establisher: it supplies none of the work a dependent needs.
 """
 from __future__ import annotations
 
@@ -66,7 +65,12 @@ def check(plan: Optional[Plan]) -> Optional[Finding]:
             continue
         if last_use[node.passthrough] <= i:
             continue          # no dependent -- nobody would misread this gap as satisfied
-        if os.path.exists(node.where):
+        # A missing locator is malformed stored state, not evidence about the empty path. An
+        # empty artifact is likewise not an established dependency: every other artifact-backed
+        # commitment treats zero bytes as undelivered.
+        if not node.where:
+            continue
+        if os.path.exists(node.where) and os.path.getsize(node.where) > 0:
             continue
         return Finding(
             pattern_id="gate.stale_establisher",

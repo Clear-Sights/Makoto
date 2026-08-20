@@ -6,6 +6,7 @@ said "3 end-of-turn gates" while 6 were live, and nothing caught it.)
 """
 from __future__ import annotations
 import re
+import sys
 from pathlib import Path
 
 from makoto.registry import load_precheck_catalog
@@ -53,7 +54,9 @@ def test_readme_stop_gate_count_matches_live():
 
 
 def test_readme_lists_every_live_gate_id():
-    for g in _live_gates():
+    live = _live_gates()
+    assert live, "Stop-gate catalog must be non-empty before checking its README coverage"
+    for g in live:
         assert g.id in README, f"README does not mention live gate {g.id}"
 
 
@@ -65,6 +68,13 @@ def test_readme_lists_the_liveness_gate():
     assert "gate.liveness" in README
 
 
-def test_TEETH_stated_parser_would_catch_a_drift():
-    # the parser reads a real number, so a stale count (e.g. the old "3") would mismatch the live 6.
-    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") != 3 or len(_live_gates()) == 3
+def test_TEETH_stated_parser_reads_a_planted_stale_count(monkeypatch):
+    """The parser itself must distinguish a planted stale README count from the live catalog."""
+    live = len(_live_gates())
+    stale = live + 1
+    monkeypatch.setattr(
+        sys.modules[__name__], "README",
+        re.sub(r"\*\*\d+ end-of-turn gates\*\*", f"**{stale} end-of-turn gates**", README),
+    )
+    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") == stale
+    assert _stated(r"\*\*(\d+) end-of-turn gates\*\*") != len(_live_gates())

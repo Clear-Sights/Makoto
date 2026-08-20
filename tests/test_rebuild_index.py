@@ -91,3 +91,11 @@ def test_rebuild_only_replays_the_verified_prefix(tmp_path):
 def test_rebuild_on_absent_chain_replays_zero_rows(tmp_path):
     state_dir, conn = _setup(tmp_path)
     assert rebuild_ledger_table_from_chain(conn, root=state_dir) == 0
+
+
+def test_rebuild_rejects_an_unrecognized_chain_row_kind(tmp_path):
+    state_dir, conn = _setup(tmp_path)
+    ledger.append({"kind": "renamed", "key": "a.py", "value": "x"}, root=state_dir)
+    import pytest
+    with pytest.raises(ValueError, match="unrecognized kind"):
+        rebuild_ledger_table_from_chain(conn, root=state_dir)

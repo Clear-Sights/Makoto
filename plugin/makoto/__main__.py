@@ -65,8 +65,8 @@ def _cmd_pattern_show(pid: str) -> int:
             mod = importlib.import_module(p.predicate_module)
             src_file = inspect.getsourcefile(mod) or "<unknown>"
             print(f"source: {src_file}")
-            src_lines = Path(src_file).read_text(encoding="utf-8").splitlines()[:30]
-            for i, line in enumerate(src_lines, 1):
+            for i, line in enumerate(
+                    Path(src_file).read_text(encoding="utf-8").splitlines()[:30], 1):
                 print(f"{i:>3}  {line}")
         except Exception as exc:
             print(f"(could not load predicate source: {exc})", file=sys.stderr)

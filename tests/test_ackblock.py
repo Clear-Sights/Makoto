@@ -129,6 +129,29 @@ def test_ack_rejected_when_fingerprint_id_does_not_match(tmp_path):
     assert find_ack_block("notestedit_destruct", transcript_path=str(p), root=tmp_path) is None
 
 
+def test_ack_rejected_when_phrase_is_discussed_or_refused(tmp_path):
+    _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
+    for text in (
+        'what does "makoto release.operator notestedit_destruct: reviewed" even mean?',
+        "don't say makoto release.operator notestedit_destruct: not approved",
+    ):
+        p = _write_transcript(tmp_path, [_user_turn(text, "2026-07-07T02:00:00Z")])
+        assert find_ack_block("notestedit_destruct", transcript_path=str(p), root=tmp_path) is None
+
+
+def test_bom_prefixed_ack_is_derived_then_recorded(tmp_path):
+    _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
+    entry = _user_turn("makoto release.operator notestedit_destruct: reviewed",
+                       "2026-07-07T02:00:00Z")
+    p = tmp_path / "transcript.jsonl"
+    p.write_bytes(b"\xef\xbb\xbf" + json.dumps(entry).encode() + b"\n")
+    ack = find_ack_block("notestedit_destruct", transcript_path=str(p), root=tmp_path)
+    assert ack is not None
+    assert record_ack_block_if_new(ack, session_id="s1", root=tmp_path) is True
+    rows = [r for r in ledger.read(root=tmp_path) if r.get("kind") == "release.operator"]
+    assert rows[0]["fingerprint_id"] == ack["fingerprint_id"]
+
+
 # ---- record_ack_block_if_new: chain-append + idempotency ----------------------------------------
 def test_record_ack_block_if_new_appends_once(tmp_path):
     ack = {"fingerprint_id": "notestedit_destruct", "reason": "reviewed", "ts": "2026-07-07T02:00:00Z"}

@@ -121,6 +121,7 @@ def test_check_export_shape():
     assert CHECK.id == "gate.self_wired"
     assert CHECK.applies_at == "Stop"
     assert CHECK.posture == "ADVISE"
+    assert CHECK.may_block is True
 
 
 def test_check_run_adapter_delegates_to_self_wired_gate():

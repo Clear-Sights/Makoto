@@ -37,8 +37,8 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
         level="advisory",
         message=(
             f"plan/task-labeled commitment(s) still open: {labels}{more}. A textual-only signal "
-            f"(no filesystem ground truth for a label) -- confirm each is genuinely still pending, "
-            f"not silently dropped."
+            "(no filesystem ground truth for a label) -- confirm each is genuinely still pending, "
+            "not silently dropped."
         ),
         retry_hint="Mark each done (a first-person past-tense statement naming it) or retract it explicitly.",
     )

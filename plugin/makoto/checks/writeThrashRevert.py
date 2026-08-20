@@ -1,4 +1,4 @@
-"""PREVENTIVE-at-PreToolUse precheck write.thrash_revert (CANON-PORT-1) — flag a Write that REVERTS
+"""PREVENTIVE-at-PreToolUse precheck event.thrash_revert (CANON-PORT-1) — flag a Write that REVERTS
 a file back to a byte-identical copy of an earlier whole-file content this session (an A->B->A
 oscillation) at PreToolUse time.
 
@@ -67,7 +67,9 @@ def predicate(*, current_event: dict, history: list,
     # closed whole-file unit, so it is never judged here (fragment compares are the FP class).
     if current_event.get("tool_name") != "Write":
         return None
-    ti = current_event.get("tool_input") or {}
+    ti = current_event.get("tool_input")
+    if not isinstance(ti, dict):
+        return None
     path = ti.get("file_path") or ""
     if not path or "content" not in ti:
         return None                       # no path / no whole-file content -> nothing to revert
@@ -101,8 +103,7 @@ def predicate(*, current_event: dict, history: list,
             )
     return None
 
-from makoto.registry import Check as _Check
 RETRY_HINT = 'Decide which content is correct and write it once; do not revert to an earlier whole-file version after changing it.'
 DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 
-CHECK = _Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="CLAIM_VS_HISTORY")
+CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=RETRY_HINT, description=DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="CLAIM_VS_HISTORY")

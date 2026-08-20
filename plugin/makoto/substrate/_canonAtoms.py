@@ -280,11 +280,17 @@ def _disables_argv(raw_argv) -> bool:
         if not _DISABLE_RX.fullmatch(token):
             continue
         if token.startswith("SKIP="):
-            return index < argv.index(effective[0])
+            if index < argv.index(effective[0]):
+                return True
+            continue
         if token == "--force":
-            return program == "git" and git_subcommand in {"clean", "push"}
+            if program == "git" and git_subcommand in {"clean", "push"}:
+                return True
+            continue
         if token in {"--no-verify", "--no-gpg-sign"}:
-            return program == "git"
+            if program == "git":
+                return True
+            continue
         return True
     return False
 

@@ -65,6 +65,8 @@ def _event_location(tool_name: str, tool_input: dict) -> Optional[str]:
     advance -- reads `file_path`/`notebook_path` off the tool input, never argument meaning."""
     if tool_name not in _LOCATING_TOOLS:
         return None
+    if not isinstance(tool_input, dict):
+        return None
     for key in _LOCATION_KEYS:
         value = tool_input.get(key)
         if isinstance(value, str) and value:

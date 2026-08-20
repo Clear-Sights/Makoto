@@ -111,7 +111,7 @@ def resolve_in_synced_repos(loc, roots):
                 if not _suffix_match(comps, _path_components(rel)):
                     continue          # glob over-match (zindex.md for index.md) — firewall holds
                 full = os.path.join(root, rel)
-                if os.path.exists(full):
+                if os.path.isfile(full):
                     return full
         except Exception:
             continue

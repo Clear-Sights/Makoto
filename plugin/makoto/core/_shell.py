@@ -33,6 +33,9 @@ _LAUNCH_WRAPPERS = frozenset({
 _TIMEOUT_DURATION_RX = re.compile(r"\d+(?:\.\d+)?[smhd]?")
 _NESTED_SHELL_PROGRAMS = frozenset({"ssh", "sh", "bash", "zsh"})
 _GIT_VALUED_OPTIONS = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace"})
+_SUDO_VALUED_OPTIONS = frozenset({"-u", "-g", "-h", "-p", "-r", "-t", "-C",
+                                  "--user", "--group", "--host", "--prompt", "--role",
+                                  "--type", "--close-from"})
 _PYTHON_RX = re.compile(r"python[0-9.]*")
 _SHORT_FLAG_RX = re.compile(r"-[A-Za-z]+")
 
@@ -54,8 +57,12 @@ def _effective_argv(argv):
     while argv and _basename(argv[0]) in _LAUNCH_WRAPPERS:
         wrapper = _basename(argv.pop(0))
         while argv and (argv[0].startswith("-") or _ASSIGNMENT_RX.fullmatch(argv[0])):
-            # env/sudo options with separate values are intentionally outside this small parser.
-            argv.pop(0)
+            option = argv.pop(0)
+            # Wrapper options such as ``sudo -u bob`` consume the following word too.  Leaving
+            # that value at argv[0] makes it masquerade as the launched program and loses the
+            # command evidence that follows it.
+            if wrapper == "sudo" and option in _SUDO_VALUED_OPTIONS and argv:
+                argv.pop(0)
         if wrapper == "timeout" and argv and _TIMEOUT_DURATION_RX.fullmatch(argv[0]):
             argv.pop(0)
     return argv
@@ -172,14 +179,36 @@ def _shell_segments(command: str):
 
     # Preserve real commands passed to a shell/ssh as one quoted argument without scanning
     # arbitrary quoted arguments of unrelated programs.
-    nested = []
-    for argv, _operator in segments:
+    expanded = []
+    for argv, operator in segments:
         effective = _effective_argv(argv)
         if effective and _basename(effective[0]) in _NESTED_SHELL_PROGRAMS:
-            for arg in effective[1:]:
-                if any(ch.isspace() for ch in arg):
-                    nested.extend(_shell_segments(arg))
-    return segments + nested
+            program = _basename(effective[0])
+            command = None
+            if program == "ssh":
+                positional = [arg for arg in effective[1:] if not arg.startswith("-")]
+                if len(positional) > 1:
+                    command = " ".join(positional[1:])
+            elif "-c" in effective[1:]:
+                pos = effective.index("-c", 1)
+                if pos + 1 < len(effective):
+                    command = effective[pos + 1]
+            if command is None:
+                expanded.append((argv, operator))
+                continue
+            # ``bash -c pytest`` is as much a shell invocation as the quoted form; the
+            # old whitespace gate silently missed it.  Splice nested segments *here*, not
+            # after all outer segments, so the outer control operator remains adjacent to
+            # the command it controls.
+            nested = _shell_segments(command)
+            if nested:
+                nested[-1] = (nested[-1][0], operator)
+                expanded.extend(nested)
+            else:
+                expanded.append((argv, operator))
+        else:
+            expanded.append((argv, operator))
+    return expanded
 
 
 def _git_subcommand(argv):

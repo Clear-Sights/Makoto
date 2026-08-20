@@ -11,6 +11,10 @@ from __future__ import annotations
 from makoto.substrate._canonAtoms import THE_CANON_17
 
 
+def test_canon_has_all_seventeen_formulas():
+    assert len(THE_CANON_17) == 17
+
+
 def _literal_set(formula: str) -> set:
     out = set()
     for lit in formula.split(" AND ") if " AND " in formula else formula.split("∧"):

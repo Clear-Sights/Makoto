@@ -5,7 +5,7 @@ Scope: only the dedup-clear-win fixtures. Speculative history-builder fixtures
 introduced when v1.1 predicate tests reveal their concrete shape, not pre-abstracted.
 
 Provides:
-  evt(file_path, content, event="PreToolUse", tool_name=None) -> dict
+  evt(file_path=None, content=None, event="PreToolUse", tool_name=None) -> dict
   stop_evt(message="", session_id="s") -> dict
   loaded_pattern(pid) -> PreCheck  (loads from real patterns.toml by id)
   state_dir(tmp_path) -> Path  (a real makoto state dir + CITATIONS.md, ready for init_db callers)
@@ -27,13 +27,17 @@ from makoto.registry import load_precheck_catalog
 @pytest.fixture
 def evt():
     """build a minimal PreToolUse (or override-event) payload."""
-    def _evt(file_path: str = "", content: str = "",
-             event: str = "PreToolUse", tool_name: str = ""):
-        return {
-            "hook_event_name": event,
-            "tool_name": tool_name,
-            "tool_input": {"file_path": file_path, "content": content},
-        }
+    def _evt(file_path: str | None = None, content: str | None = None,
+             event: str = "PreToolUse", tool_name: str | None = None):
+        tool_input = {}
+        if file_path is not None:
+            tool_input["file_path"] = file_path
+        if content is not None:
+            tool_input["content"] = content
+        payload = {"hook_event_name": event, "tool_input": tool_input}
+        if tool_name is not None:
+            payload["tool_name"] = tool_name
+        return payload
     return _evt
 
 
@@ -45,7 +49,7 @@ def stop_evt():
             "hook_event_name": "Stop",
             "session_id": session_id,
             "stop_reason": "end_turn",
-            "response": message,
+            "last_assistant_message": message,
         }
     return _stop
 
@@ -91,7 +95,7 @@ def state_dir(tmp_path):
 
 
 def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
-    """invoke `python -m makoto.dispatch` with payload on stdin; return (exit, stdout)."""
+    """Invoke the dispatcher and fail loudly if its subprocess crashes."""
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     if extra_env:
@@ -103,7 +107,12 @@ def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tu
         env=env,
         cwd=str(Path(__file__).parent.parent / "plugin"),
     )
-    return proc.returncode, proc.stdout.decode("utf-8")
+    stdout = proc.stdout.decode("utf-8")
+    stderr = proc.stderr.decode("utf-8", errors="replace")
+    assert proc.returncode == 0, (
+        f"makoto.dispatch exited {proc.returncode}; stderr follows:\n{stderr}"
+    )
+    return proc.returncode, stdout
 
 
 @pytest.fixture

@@ -17,6 +17,10 @@ import ast
 from pathlib import Path
 
 PKG = Path(__file__).resolve().parents[1] / "plugin" / "makoto"
+_ROOT_FILES = {
+    "__init__.py", "__main__.py", "_dispatch_shim.sh", "configchange.py", "context.py",
+    "dispatch.py", "events.py", "install.py", "kit.py", "registry.py", "verdict.py", "vocab.py",
+}
 
 _RANK = {  # the layout order: an import may only point at a strictly lower rank
     "makoto": 0, "makoto.vocab": 0, "makoto.core": 0, "makoto.registry": 0,   # leaves
@@ -77,6 +81,12 @@ def test_every_import_points_earlier_in_the_layout_order():
                 if t.startswith("makoto") and not _edge_ok(m, t):
                     bad.append(f"{m} -> {t}")
     assert not bad, "backward/lateral import(s) against the pipeline order:\n" + "\n".join(bad)
+
+
+def test_package_root_membership_is_explicit():
+    actual = {p.name for p in PKG.iterdir() if p.is_file() and p.suffix == ".py"}
+    actual.add("_dispatch_shim.sh") if (PKG / "_dispatch_shim.sh").is_file() else None
+    assert actual == _ROOT_FILES
 
 
 def test_TEETH_direction_checker_rejects_planted_backward_edges():

@@ -28,6 +28,15 @@ def rebuild_ledger_table_from_chain(conn, *, root: Optional[Path] = None) -> int
     everywhere else it's read. `root=None` is always passed to `_upsert`'s own chain-append
     param, so a rebuild NEVER re-appends to the chain it is reading from. Returns the count of
     rows actually replayed."""
+    chain = _ledger.store_root(root=root) / "chain.jsonl"
+    if chain.exists() and not chain.is_file():
+        raise ValueError(f"ledger chain is not a regular file: {chain}")
+    try:
+        chain.read_bytes()
+    except FileNotFoundError:
+        return 0
+    except OSError as exc:
+        raise OSError(f"ledger chain is unreadable: {chain}") from exc
     verified_through = _ledger.verify_chain(root=root)
     rows = _ledger.read(root=root)
     if verified_through is not None:
@@ -36,7 +45,7 @@ def rebuild_ledger_table_from_chain(conn, *, root: Optional[Path] = None) -> int
     for row in rows:
         kind = row.get("kind")
         if kind not in _LEDGER_KINDS:
-            continue
+            raise ValueError(f"ledger row has unrecognized kind {kind!r}")
         _ledger._upsert(conn, row.get("key"), kind, row.get("value"), row.get("exit"),
                         row.get("source_event_id"), row.get("session_id"), root=None)
         replayed += 1

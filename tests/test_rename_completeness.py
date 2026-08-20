@@ -30,13 +30,13 @@ def _is_real_offender(line: str) -> bool:
                            old `Pattern`/`Gate` dataclass; it is a stdlib symbol the rename must not touch.
       - this gate file   : the completeness gate must spell the forbidden tokens to forbid them.
     """
-    if "GateContext" in line:
-        return False
-    if "re.Pattern" in line or "re.Gate" in line:   # makoto-allow: stdlib re.Pattern type, not makoto's renamed Pattern dataclass
-        return False
     if "test_rename_completeness.py" in line:        # makoto-allow: the gate names the tokens it forbids
         return False
-    return True
+    # Remove only the sanctioned stdlib token, then test what remains.  Dropping a whole line
+    # would hide a genuine residual sharing that line.
+    line = line.replace("re.Pattern", "").replace("re.Gate", "")
+    return bool(__import__("re").search(
+        r'\bGate\b|\bPattern\b|load_gates|load_patterns|run_stop_gates|makoto\.gates|makoto\.predicates', line))
 
 
 def test_no_residual_old_taxonomy_names():
@@ -57,4 +57,5 @@ def test_TEETH_grep_sweep_reaches_the_tree():
 
 
 def test_no_old_dirs():
-    assert not (ROOT / "gates").exists() and not (ROOT / "predicates").exists()
+    package = ROOT / "plugin" / "makoto"
+    assert not (package / "gates").exists() and not (package / "predicates").exists()

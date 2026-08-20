@@ -50,8 +50,6 @@ _DROP_DEF_COUNTER = re.compile(
     r"|^\s*\w+\s*=\s*(?:lambda\b|partial\b|functools\.partial\b)",
     re.M)
 _DROP_TEST_COUNTER = re.compile(r"^\s*(?:async\s+def|def)\s+test\w*", re.M)
-def _drop_def_or_class(sym):
-    return re.compile(rf"^\s*(?:async\s+def|def|class|const|function\*?)\s+{re.escape(sym)}\b", re.M)
 def _drop_extract_forward_claims(text):
     """[(kind, location, info, raw)] — a forward mutation frame + EXACTLY ONE identifying
     info + a resolvable-looking location. Vague promises (no info / no path) -> []. Precedence
@@ -170,7 +168,11 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
             return size != 0
         return touched
     if kind == "named_symbol":
-        return bool(_drop_def_or_class(info).search(content)) if content is not None else False
+        if content is None:
+            return False
+        return bool(re.search(
+            rf"^\s*(?:async\s+def|def|class|const|function\*?)\s+{re.escape(info)}\b",
+            content, re.M))
     if kind == "count":
         if content is None:
             return False
@@ -194,8 +196,6 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
     said-but-not-done, a claim ✗ the assistant's own end-of-turn ledger/filesystem. A vague
     promise with no identifying info never extracts (so never fires); a negated frame
     ("I won't add X") never fires; a discharged claim is silent (fail-open)."""
-    if not text:
-        return None
     for kind, loc, info, raw in _drop_extract_forward_claims(text):
         path = _drop_resolve_location(loc, touched_keys) or loc
         if _drop_discharged(kind, info, raw, path, touched_keys=touched_keys, empty_keys=empty_keys,

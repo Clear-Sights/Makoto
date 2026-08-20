@@ -184,5 +184,9 @@ def _state_dir() -> Path:
     """
     env = os.environ.get("MAKOTO_STATE_DIR")
     if env:
-        return Path(env)
+        configured = Path(env).expanduser()
+        # Hook processes run with the target repository as cwd, which can differ between
+        # PostToolUse and Stop. A relative override must therefore be anchored independently of
+        # cwd or one session is silently split across stores.
+        return configured if configured.is_absolute() else Path.home() / configured
     return Path.home() / ".claude" / "makoto_state"

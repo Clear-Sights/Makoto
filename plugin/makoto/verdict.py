@@ -165,6 +165,12 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
     ASK/ADVISE folds by the ordinary rules (the docstring'd contract is exactly "a meta BLOCK
     never softening below ASK", nothing broader).
     """
+    def softened(value: str):
+        # A Decision is a str subclass, but its detail is the finding's only coordinate on the
+        # wire.  Returning a bare token here discards that coordinate and can make a softened
+        # advisory state a false explanation of what fired.
+        return Decision(value, outcome.detail) if isinstance(outcome, Decision) else value
+
     if outcome not in _OUTCOMES:
         return ALLOW
     if outcome == ALLOW:
@@ -172,13 +178,13 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
     if is_oversight_clamped(permission_mode):
         return outcome                      # forced STRICT: honor the raw outcome unchanged
     if outcome == BLOCK and layer == "meta" and posture_value in (LOOSE, SILENT):
-        return ASK          # meta floor: tamper detection never softens below ASK
+        return softened(ASK)          # meta floor: tamper detection never softens below ASK
     if posture_value == SILENT:
-        return ALLOW
+        return softened(ALLOW)
     if posture_value == LOOSE:
-        return ADVISE if outcome == BLOCK else outcome
+        return softened(ADVISE) if outcome == BLOCK else outcome
     if posture_value == ASK_POSTURE:
-        return ASK if outcome in (BLOCK, ASK) else outcome
+        return softened(ASK) if outcome in (BLOCK, ASK) else outcome
     # STRICT (and the fail-closed default): honor the raw outcome unchanged.
     return outcome
 

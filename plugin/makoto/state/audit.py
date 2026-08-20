@@ -4,8 +4,8 @@ Three append-only file outputs under the caller's state root:
 - audit.jsonl           : one row per Finding-producing dispatcher invocation (only-fires policy, 1.0.2)
 - dispatch_errors.jsonl : one row per predicate that raised an unexpected exception
 - exemptions.jsonl      : one row per REAL match suppressed by an agent escape valve
-audit.jsonl and exemptions.jsonl are ALSO chain-appended, so ledger's own chain.jsonl +
-chain.lock land in that same root (see `_chain_then_append`); dispatch_errors.jsonl is not.
+All three streams are chain-appended, so ledger's own chain.jsonl + chain.lock land in that same
+root (see `_chain_then_append`).
 
 All three are append-only, line-delimited JSON. Concurrent appends lean on O_APPEND
 short-write atomicity, which holds only while a row stays inside the atomic write unit
@@ -152,8 +152,8 @@ def append_error(state_root: Path, event_id: int | None,
     Additive: every field is keyword-only with a default, and readers use dict.get, so pre-upgrade
     rows keep parsing identically.
     """
-    _append_jsonl(state_root, "dispatch_errors.jsonl", {
-        "ts": datetime.now(timezone.utc).isoformat(),
+    _chain_then_append(state_root, "dispatch_errors.jsonl", "dispatch-error", {
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "plugin": "makoto",
         "event_id": event_id,
         "pattern_id": pattern_id,
@@ -209,8 +209,8 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
     # obj's own "kind" field is the SUPPRESSION mechanism ('makoto-allow'/'disabled-pattern'),
     # which collides with the chain row's STRUCTURAL kind ("exemption") -- renamed to
     # exemption_kind in the chain payload only; the exemptions.jsonl line's own "kind" is untouched.
-    chain_payload = {k: v for k, v in obj.items() if k != "kind"}
-    chain_payload["exemption_kind"] = obj["kind"]
+    chain_payload = obj.copy()
+    chain_payload["exemption_kind"] = chain_payload.pop("kind")
     _chain_then_append(state_root, "exemptions.jsonl", "exemption", obj, chain_payload)
 
 

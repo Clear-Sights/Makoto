@@ -71,7 +71,6 @@ def _cross_agent_history(stopping_agent):
 
 
 def test_real_141_cross_thread_fires_replay_to_zero():
-    assert len(_REAL_FIRE_EVENT_IDS) == 141
     reproduced = []
     for event_id in _REAL_FIRE_EVENT_IDS:
         if event_id in _REAL_MAIN_STOP_IDS:

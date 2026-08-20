@@ -57,7 +57,7 @@ class PlanNode:
     status: str = OPEN
 
     def __post_init__(self) -> None:
-        """Normalize ``status`` into the closed OPEN/DONE vocabulary and default ``id`` to the
+        r"""Normalize ``status`` into the closed OPEN/DONE vocabulary and default ``id`` to the
         ``"<what>::<passthrough>::<where>"`` composite when unset.
 
         STATUS: whitespace/case variants (``"OPEN"``, ``"open "``) normalize to their token; any
@@ -220,5 +220,4 @@ class Plan:
     @classmethod
     def from_jsonl(cls, text: str) -> "Plan":
         """Parse byte-stable JSONL text back into a ``Plan``."""
-        rows = [json.loads(line) for line in text.splitlines() if line.strip()]
-        return cls.from_rows(rows)
+        return cls.from_rows([json.loads(line) for line in text.splitlines() if line.strip()])

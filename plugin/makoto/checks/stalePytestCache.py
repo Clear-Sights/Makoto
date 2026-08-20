@@ -65,9 +65,9 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
         file=node.split("::", 1)[0],
         line=0,
         level="error",
-        message=(f"Claim says the whole suite passes, but pytest's own lastfailed record names "
+        message=("Claim says the whole suite passes, but pytest's own lastfailed record names "
                  f"{node} as failing and that test still exists — re-run the suite and cite the "
-                 f"green result, or retract the claim."),
+                 "green result, or retract the claim."),
         retry_hint=f"Re-run the full suite (or {node}) and cite the green output, or narrow/retract the claim.",
     )
 

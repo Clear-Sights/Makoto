@@ -142,6 +142,7 @@ def test_append_exemption_also_chain_appends_with_renamed_kind(state_dir):
 def test_set_exemption_sink_is_restorable(tmp_path):
     """set_exemption_sink installs/clears the injected recorder; the dispatcher's is the live one."""
     saved = factories._EXEMPTION_SINK
+    assert saved is not None, "the dispatcher must install the live exemption audit sink at import time"
     try:
         factories.set_exemption_sink(None)
         assert factories._EXEMPTION_SINK is None

@@ -23,9 +23,8 @@ from makoto.vocab import Finding
 def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
     """One ADVISORY (never blocking) Finding per non-robust-core canon fingerprint that fires on
     this session's call stream. Silent (empty list) when none fire."""
-    calls = calls_from_history(history)
     out: List[Finding] = []
-    for name, formula, is_block in fired_canon_fingerprints(calls, text or ""):
+    for name, formula, is_block in fired_canon_fingerprints(calls_from_history(history), text or ""):
         if is_block:
             continue
         out.append(Finding(

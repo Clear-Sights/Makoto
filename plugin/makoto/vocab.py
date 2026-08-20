@@ -225,6 +225,7 @@ _CITATION_AUTHOR_STOPWORDS = frozenset({
     "Saved", "Updated", "Created", "Modified", "Added", "Removed", "Deleted",
     "Changed", "Fixed", "Built", "Generated", "Posted", "Published",
     "Started", "Stopped", "Run", "Ran", "Sent", "Received",
+    "Copyright", "Since", "Merged", "Reviewed", "Bumped",
     # Pronouns
     "We", "I", "He", "She", "It", "They", "You",
     # Common sentence-starters
@@ -324,7 +325,7 @@ _DONE_WORD = (r"(?:done|complete|completed|finished|finalis\w+|finaliz\w+|implem
 # TASKS" is the done-word used ADJECTIVALLY inside a noun phrase ("all [adj] [noun]") — a
 # distributive determiner, not a predicate (real-corpus FP: "Missing from ALL deployed tools").
 # "All done.", "everything is landed and …", "all pushed (digest …)" are predicates -> fire.
-_DONE_TRAIL = (r"(?=\s*(?:$|[.,;:!?()\[\]{}<>\"'»—–\-]|"
+_DONE_TRAIL = (r"(?=\s*(?:$|[.,;:!()\[\]{}<>\"'»—–\-]|"
                r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also)\b))")
 # Function words permitted between the head and the done-word (copulas, adverbs, conjunctions,
 # anaphora). A CONTENT noun/number is NOT here, so a determiner reading breaks the match.
@@ -403,7 +404,7 @@ _RUNNING_SUBJECT = (
 # mid-word match: "itinerary" cannot satisfy `(?:is|are|'s|'re)` at the position right after
 # "it", so that alternative fails there and the engine moves on).
 _RUNNING_PRED = (
-    r"(?:is|are|'s|'re)\s*(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+)?"
+    r"(?:is|are|['’]s|['’]re)\s*(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+)?"
     r"(?:up\s+and\s+running|running|live|up|listening|serving)\b"
 )
 # Two subject-less alternatives for banner-style status prose ("Now running.", "listening on
@@ -423,7 +424,7 @@ _RUNNING_CLAIM_RX = re.compile(
 # (running/live/up/listening/serving) are deliberately EXCLUDED from this list — including one
 # would make the co-occurrence requirement circular against _RUNNING_CLAIM_RX's own predicate.
 _PROCESS_START_VERB_RX = re.compile(
-    r"\bI(?:'ve|'d|\s+have)?\s+(?:just\s+)?(?:started|launched|spun\s+up|spinning\s+up|"
+    r"\bI(?:['’]ve|['’]d|\s+have)?\s+(?:just\s+)?(?:started|launched|spun\s+up|spinning\s+up|"
     r"brought\s+up|booted|kicked\s+off|fired\s+up|restarted|re-started|ran|deployed|stood\s+up)\b",
     re.IGNORECASE)
 # Bash-command classifier for "this call concerns a long-lived process's lifecycle" — open-world,
@@ -488,7 +489,7 @@ _RUN_INTENT_CLAIM_RX = re.compile(
 # BY Y" is the approval idiom ("I'll run this by you first"), "run THROUGH X" is a walkthrough/
 # review idiom, "run the/some numbers" is a mental-math idiom -- none of them is execution intent.
 _RUN_INTENT_IDIOM_VETO_RX = re.compile(
-    r"^\s*(?:\w+\s+){0,3}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
+    r"^\s*(?:\w+\s+){0,12}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
     r"|^\s*through\b"
     r"|^\s*(?:the\s+|some\s+)?numbers\b",
     re.IGNORECASE)
@@ -546,8 +547,11 @@ _SHIPPED_STATE_CLAIM_RX = re.compile(
 # NORMALIZED-EQUALITY membership (the fakeexcuse firewall): retracting cache.py never clears
 # auth.py.
 _RETRACT_VERB_RX = re.compile(
-    r"\b(?:skipp?|dropp?|deferr?|deprioriti[sz]|descop|postpon|shelv|sideline|backlog|"
-    r"punt|park|tabl|pull)\w*"
+    r"\b(?:skip(?:s|ped|ping)?|drop(?:s|ped|ping)?|defer(?:s|red|ring)?|"
+    r"deprioriti[sz](?:e|es|ed|ing|ation)?|descope(?:s|d|ing)?|"
+    r"postpone(?:s|d|ing)?|shelve(?:s|d|ing)?|sideline(?:s|d|ing)?|"
+    r"backlog(?:s|ged|ging)?|punt(?:s|ed|ing)?|park(?:s|ed|ing)?|"
+    r"table(?:s|d|ing)?|pull(?:s|ed)?)\b"
     r"|\bleav(?:e|ing)\b|\bcut\b|\bhold(?:ing)?\s+off\b"
     r"|\bno longer (?:add|need|includ|requir|plan|go)\w*",
     re.IGNORECASE)

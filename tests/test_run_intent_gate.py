@@ -8,7 +8,9 @@ only ever be checked starting at the NEXT one. FP-safe by design: closed first-p
 closed process-lifecycle-verb lexicon (mirroring gate.claimed_running's own verb set), plus the
 usual quoted/negated/question/idiom clause guards."""
 import json
+import sqlite3
 
+from makoto.dispatch import _select_recent
 from makoto.checks.runIntentUnfulfilled import (
     run_promised_gate, _run_intent_claim, _last_stop_index, _bash_call_after,
 )
@@ -308,6 +310,18 @@ def test_silent_when_a_bash_call_discharges_it():
     assert run_promised_gate(history=hist) is None
 
 
+def test_dispatch_history_derivation_does_not_cross_sessions():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE events (id INTEGER, ts TEXT, event_type TEXT, cwd TEXT, payload TEXT, session_id TEXT)")
+    conn.execute("INSERT INTO events VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'Stop', '/repo', ?, 's1')",
+                 [json.dumps(_stop("I'll run the tests now.")["payload"])])
+    conn.execute("INSERT INTO events VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 'PostToolUse', '/repo', ?, 's2')",
+                 [json.dumps(_post("pytest -q", exitCode=0)["payload"])])
+    history = _select_recent(conn, "s1", 3)
+    assert len(history) == 1
+    assert run_promised_gate(history=history) is not None
+
+
 def test_silent_when_wrapper_typed_bash_call_discharges_it():
     """ADR 0039 shape: wrapper-only event types must not make the gate false-fire."""
     hist = [_wrapper_typed(
@@ -338,12 +352,10 @@ def test_fires_only_for_the_most_recent_prior_turn():
 
 
 def test_fires_again_across_a_second_unfulfilled_turn():
-    # turn 1 promises with nothing said turn 2 either -- turn 2's own silence is itself
-    # inspectable as "the prior turn" for a THIRD Stop's evaluation
-    hist = [_stop("I'll run the tests now."), _stop("Still thinking about this.")]
+    # Each new unfulfilled run promise is independently checked on the following Stop.
+    hist = [_stop("I'll run the tests now."), _stop("I'll restart the server now.")]
     f = run_promised_gate(history=hist)
-    assert f is None  # turn 2 made no promise of its own -- nothing for a hypothetical turn 3 to cite yet
-    # (turn 1's own dropped promise was already the subject of turn 2's OWN evaluation, not re-derived here)
+    assert f is not None and "restart" in f.message.lower()
 
 
 # --- the open/closed line: gate.run_promised is a BLOCKING error, and stays one ---

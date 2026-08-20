@@ -19,7 +19,9 @@ from makoto.checks import normalize_path
 from makoto.kit import bash_output_text, is_test_runner
 from makoto.state.store import _state_dir as _chain_state_dir
 
-_PATH_IN_CMD_RX = re.compile(r"[\w.\-]+/[\w.\-]+\.\w+|`?([\w.\-]+\.\w+)`?")
+_PATH_IN_CMD_RX = re.compile(
+    r"(?<![=\w.\-])(?P<path>`?(?:/[\w.\-]+)+/[\w.\-]+\.\w+|[\w.\-]+/[\w.\-]+\.\w+|[\w.\-]+\.\w+`?)"
+)
 
 
 def _bash_key(ev: dict) -> str:
@@ -28,7 +30,7 @@ def _bash_key(ev: dict) -> str:
     cmd = ev.get("tool_input", {}).get("command", "") or ""
     m = _PATH_IN_CMD_RX.search(cmd)
     if m:
-        return normalize_path(m.group(0))
+        return normalize_path(m.group("path").strip("`"))
     return normalize_path(ev.get("cwd", "")) or "bash"
 
 
@@ -425,7 +427,7 @@ row (`record_ack_block_if_new` only avoids duplicate chain rows across repeated 
 own docstring).
 """
 _ACK_RX = re.compile(
-    r"makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
+    r"^\s*makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
 # [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon
 # itself (id becomes "name:", never matching the real fingerprint id) -- found live by
 # test_genuine_ack_after_first_fired_discharges/test_ack_rejected_when_reason_is_empty, which
@@ -585,16 +587,18 @@ def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
     if not p.exists():
         return None
     try:
-        lines = p.read_text(encoding="utf-8").splitlines()
-    except OSError:
+        lines = p.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    except (OSError, ValueError):
         return None
     for line in lines:
-        line = line.strip()
+        line = line.strip().strip("\ufeff").strip()
         if not line:
             continue
         try:
             entry = json.loads(line)
         except ValueError:
+            continue
+        if not isinstance(entry, dict):
             continue
         text = _is_genuine_user_turn(entry)
         if text is None:

@@ -108,6 +108,16 @@ def test_red_latest_healthcheck_nonzero_exit_fires(tmp_path):
     assert msgs, f"gate.claimed_running MUST fire when the latest healthcheck exited non-zero -- battery VOID: {msgs}"
 
 
+def test_red_post_tool_failure_without_exit_data_fires(tmp_path):
+    """The terminal failure event has no exitCode/interrupted field; its event type is the
+    evidence. This pins the PostToolUseFailure decoder arm used by live hooks."""
+    cwd = str(tmp_path)
+    history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {},
+                    event_type="PostToolUseFailure")]
+    msgs = _claimed_running_messages(history, cwd, text=_CLAIM)
+    assert msgs, f"gate.claimed_running MUST fire on a PostToolUseFailure launch: {msgs}"
+
+
 def test_red_latest_of_two_calls_is_the_failing_one_fires(tmp_path):
     """Adversarial ordering: an EARLIER clean launch, then a LATER failing healthcheck -- latest
     must win, proving this isn't merely 'was anything ever clean'."""
@@ -225,6 +235,8 @@ def test_law1_precondition_present_on_red_absent_on_tn_and_clean(tmp_path):
         [_row(1, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 7})],
         [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0}),
          _row(2, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 7})],
+        [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {},
+              event_type="PostToolUseFailure")],
     ]
     red_none_histories = [
         [],

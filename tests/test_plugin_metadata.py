@@ -48,9 +48,14 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
     assert p.is_file(), "missing hooks/hooks.json"
     data = json.loads(p.read_text())
     hooks = data["hooks"]
-    for evt in ("PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop"):
+    expected_events = (
+        "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SubagentStop", "SessionStart",
+    )
+    for evt in expected_events:
         assert evt in hooks, f"missing {evt} in hooks.json"
+        assert hooks[evt], f"{evt} must register at least one matcher"
         for entry in hooks[evt]:
+            assert entry["hooks"], f"{evt} matcher must register at least one hook"
             for h in entry["hooks"]:
                 assert h["type"] == "command"
                 assert "_dispatch_shim.sh" in h["command"]

@@ -102,19 +102,19 @@ def _named_test_run(fixture) -> bool:
     return named_test_gate(text, history=history) is not None
 
 
-def _test_run_row(stdout: str) -> dict:
+def _test_run_row(stdout: str, exit_code: int) -> dict:
     return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
                         "tool_input": {"command": "pytest -q"},
-                        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": 1}}}
+                        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": exit_code}}}
 
 
 def _named_test_detector() -> MintedDetector:
     negative = ("test_foo passes now.",
-               [_test_run_row("PASSED tests/test_x.py::test_foo\n")])
+               [_test_run_row("PASSED tests/test_x.py::test_foo\n", 0)])
     # THE INVERSE MUTATION (named in the plan itself): a claimed-pass-over-red -- same claim text,
     # the recorded run changed to a FAILURE of that exact named test.
     positive = ("test_foo passes now.",
-               [_test_run_row("FAILED tests/test_x.py::test_foo\n")])
+               [_test_run_row("FAILED tests/test_x.py::test_foo\n", 1)])
     return MintedDetector(id="gate.named_test", category="stop-gate",
                           negative=negative, positive=positive, run=_named_test_run)
 

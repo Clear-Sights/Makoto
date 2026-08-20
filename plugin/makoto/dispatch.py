@@ -18,6 +18,7 @@ path's imports are deliberately narrow.
 from __future__ import annotations
 import importlib
 import json
+import math
 import os
 import re
 import sys
@@ -43,6 +44,7 @@ from makoto.context import GateContext, _history_for_agent, run_stop_checks
 
 _EVENT_MAP = {
     "PreToolUse":          "live.pre_tool_use",
+    "PostToolUse":         "live.post_tool_use",
     "PostToolUseFailure":  "live.post_tool_use_failure",
     "Stop":                "live.stop",
     "SubagentStop":        "live.subagent_stop",
@@ -59,7 +61,7 @@ def _state_dir_from_conn(conn) -> Path | None:
         for _seq, name, file in conn.execute("PRAGMA database_list").fetchall():
             if name == "main" and file:
                 return Path(file).parent
-    except Exception:
+    except (json.JSONDecodeError, RecursionError):
         return None
     return None
 
@@ -104,7 +106,7 @@ def _parse_payload(raw: str) -> object:
     treats an unparseable pipe (loud-allow) and a non-object payload (block) differently."""
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except Exception:
         return _PARSE_FAILED
 
 
@@ -351,7 +353,7 @@ def _event_retention_hours() -> float:
         v = float(raw)
     except ValueError:        # raw is always str (env.get default "") — TypeError arm was dead
         return _EVENT_RETENTION_HOURS_DEFAULT
-    return v if v > 0 else _EVENT_RETENTION_HOURS_DEFAULT
+    return v if math.isfinite(v) and v > 0 else _EVENT_RETENTION_HOURS_DEFAULT
 
 
 def _prune_old_events(conn) -> None:
@@ -828,6 +830,8 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)
+        _dispatch_fact(state_dir, "exception", f"ledger update failed: {type(exc).__name__}: {exc}",
+                       blocked=False, ids=_ids_from_payload(payload))
 
 
 def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
