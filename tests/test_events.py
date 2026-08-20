@@ -19,6 +19,9 @@ from pathlib import Path
 from makoto.events import EVENTS
 
 REPO = Path(__file__).resolve().parent.parent
+# The installed subtree. The paths below are plugin-relative -- `makoto/dispatch.py`,
+# `hooks/hooks.json` -- which is what they mean to a user, so they resolve against it.
+PLUGIN = REPO / "plugin"
 
 # The harness's own hook-event enum (settings schema + hooks reference, 2026-07-10) — the same
 # pin Detent's tests/test_events.py uses, since both faculties sit on the same harness. This is a
@@ -83,7 +86,7 @@ def test_dispositions_are_legal_and_reasoned():
 
 def test_hooks_json_wires_exactly_the_wired_events():
     wired = {name for name, e in EVENTS.items() if e["status"] == "WIRED"}
-    hooks = json.loads((REPO / "hooks" / "hooks.json").read_text())["hooks"]
+    hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
     assert set(hooks) == wired
 
 
@@ -91,7 +94,7 @@ def test_hooks_json_wired_events_point_at_the_real_dispatcher():
     """Key presence alone doesn't prove wiring — a stray matcher pointing at some other command
     would pass a set-equality check. Every WIRED event's command must actually route to Makoto's
     own dispatcher, not merely exist under the right key."""
-    hooks = json.loads((REPO / "hooks" / "hooks.json").read_text())["hooks"]
+    hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
     wired = {name for name, e in EVENTS.items() if e["status"] == "WIRED"}
     for name in wired:
         commands = [h["command"] for matcher in hooks[name] for h in matcher["hooks"]]
@@ -108,7 +111,7 @@ def test_posttoolusefailure_uses_the_post_accumulation_route():
 
 
 def test_wired_moves_appear_in_dispatch_source():
-    names = _referenced_names((REPO / "makoto" / "dispatch.py").read_text())
+    names = _referenced_names((PLUGIN / "makoto" / "dispatch.py").read_text())
     for name, entry in EVENTS.items():
         if entry["status"] != "WIRED":
             continue
@@ -129,6 +132,6 @@ _HOLE_CODE_ANCHORS = {
 def test_hole_code_claims_still_exist():
     for name, (rel_path, anchors) in _HOLE_CODE_ANCHORS.items():
         assert EVENTS[name]["status"] == "HOLE", name
-        names = _referenced_names((REPO / rel_path).read_text())
+        names = _referenced_names((PLUGIN / rel_path).read_text())
         for anchor in anchors:
             assert anchor in names, f"{name}: {anchor!r} not referenced in {rel_path}"

@@ -21,7 +21,7 @@ def test_lexicons_exports_all_regex_symbols():
 
 
 def test_lexicons_is_L0_no_inpackage_imports():
-    src = Path(__file__).resolve().parent.parent / "makoto" / "vocab.py"
+    src = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "vocab.py"
     tree = ast.parse(src.read_text())
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:

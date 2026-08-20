@@ -5,6 +5,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).parent.parent
+# The subtree a user installs. `pyproject.toml` and `marketplace.json` stay at the repository
+# root; the plugin manifest, hooks, commands and package moved inside it so that tests, eval
+# and docs stop being delivered along with the plugin.
+PLUGIN = REPO_ROOT / "plugin"
 
 _SEMVER_RX = re.compile(r"^\d+\.\d+\.\d+(?:[-.][\w.]+)?$")
 
@@ -19,7 +23,7 @@ def _pyproject_version() -> str:
 
 def test_plugin_json_has_required_fields():
     """plugin.json declares name, semver-shaped version matching pyproject, description, license."""
-    p = REPO_ROOT / ".claude-plugin" / "plugin.json"
+    p = PLUGIN / ".claude-plugin" / "plugin.json"
     assert p.is_file(), "missing .claude-plugin/plugin.json"
     data = json.loads(p.read_text())
     assert data["name"] == "makoto"
@@ -40,7 +44,7 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
     and citation capture (capture.py). PostToolUseFailure retains ran-and-failed calls with their
     real top-level error/is_interrupt terminal instead of leaving a dangling PreToolUse.
     """
-    p = REPO_ROOT / "hooks" / "hooks.json"
+    p = PLUGIN / "hooks" / "hooks.json"
     assert p.is_file(), "missing hooks/hooks.json"
     data = json.loads(p.read_text())
     hooks = data["hooks"]
@@ -55,7 +59,7 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
 
 def test_dispatch_shim_exists_and_executable():
     """_dispatch_shim.sh exists inside the package, is a POSIX sh script."""
-    shim = REPO_ROOT / "makoto" / "_dispatch_shim.sh"
+    shim = PLUGIN / "makoto" / "_dispatch_shim.sh"
     assert shim.is_file(), "missing _dispatch_shim.sh"
     first_line = shim.read_text().splitlines()[0]
     assert first_line == "#!/bin/sh", f"shim must use #!/bin/sh; got: {first_line!r}"
@@ -64,7 +68,7 @@ def test_dispatch_shim_exists_and_executable():
 
 def test_dispatch_shim_invokes_makoto_dispatch():
     """shim execs `python -m makoto.dispatch`."""
-    shim_text = (REPO_ROOT / "makoto" / "_dispatch_shim.sh").read_text()
+    shim_text = (PLUGIN / "makoto" / "_dispatch_shim.sh").read_text()
     assert "makoto.dispatch" in shim_text
     assert "MAKOTO_PYTHON" in shim_text or "python3" in shim_text
 
@@ -90,7 +94,7 @@ def test_slash_commands_are_read_only():
     body could weaken makoto — enforcing the 'read-only commands only' invariant so a
     future 'status' command can't silently grow a --mute flag.
     """
-    cmd_dir = REPO_ROOT / "commands"
+    cmd_dir = PLUGIN / "commands"
     if not cmd_dir.is_dir():
         return  # ships no slash commands -> trivially read-only
     md_files = sorted(cmd_dir.glob("*.md"))
@@ -137,7 +141,7 @@ def test_plugin_description_predicate_count_matches_disk():
     def _live_gates():
         return [c for c in load_checks(edge="Stop") if c.may_block]
 
-    desc = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())["description"]
+    desc = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text())["description"]
     for phrase_rx, loader, tier in (
         (r"(\d+)\s+pre-checks", load_precheck_catalog, "pre-check"),
         (r"(\d+)\s+Stop gates", _live_gates, "Stop gate"),

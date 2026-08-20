@@ -15,8 +15,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_CHECKS_DIR = Path(__file__).resolve().parent.parent / "makoto" / "checks"
-_SUBSTRATE_DIR = Path(__file__).resolve().parent.parent / "makoto" / "substrate"
+_CHECKS_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
+_SUBSTRATE_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "substrate"
 _ALLOWED_STDLIB = {"ast", "os", "tempfile", "pathlib", "__future__"}
 _ALLOWED_MAKOTO = {"makoto.context", "makoto.substrate._stdlib_ast_helpers", "makoto.vocab",
                    "makoto.registry"}

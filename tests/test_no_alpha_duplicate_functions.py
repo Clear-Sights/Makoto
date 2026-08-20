@@ -20,7 +20,7 @@ import hashlib
 from collections import defaultdict
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent / "makoto"
+_ROOT = Path(__file__).resolve().parent.parent / "plugin" / "makoto"
 
 # (file, function) pairs allowed to be alpha-equivalent, with the reason on record.
 _EXEMPT_PAIRS = {

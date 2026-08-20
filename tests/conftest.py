@@ -101,7 +101,7 @@ def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tu
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     return proc.returncode, proc.stdout.decode("utf-8")
 

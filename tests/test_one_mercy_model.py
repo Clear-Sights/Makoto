@@ -55,7 +55,7 @@ def test_advisory_tier_fire_is_a_chained_row(tmp_path, monkeypatch):
     def dispatch(payload):
         proc = subprocess.run([_sys.executable, "-m", "makoto.dispatch"],
                               input=json.dumps(payload).encode(), capture_output=True,
-                              env=full_env, cwd=str(Path(__file__).parent.parent))
+                              env=full_env, cwd=str(Path(__file__).parent.parent / "plugin"))
         return proc.returncode, proc.stdout.decode()
 
     sid = "mercy-advisory"

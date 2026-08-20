@@ -27,8 +27,18 @@ REPO = Path(__file__).resolve().parent.parent
 # presence, means this test suite runs the SAME source unmodified in both trees and never asserts
 # a doc must exist that a deliberate exclusion already removed -- the exclusion list is the one
 # source of truth for what should ship, not a second copy here.
-_LIVING_DOCS_DECLARED = ["README.md", "docs/SPIRIT.md", "makoto/docs/MAKOTO-CONVENTIONS.md", "makoto/docs/CITATIONS.md"]
+_LIVING_DOCS_DECLARED = ["README.md", "docs/SPIRIT.md",
+                         "plugin/makoto/docs/MAKOTO-CONVENTIONS.md",
+                         "plugin/makoto/docs/CITATIONS.md"]
 LIVING_DOCS = [d for d in _LIVING_DOCS_DECLARED if (REPO / d).exists()]
+
+# The ONLY doc allowed to be absent, per the exclusion list quoted above. Every other absence is
+# a path that moved or a doc that was deleted, and the filter cannot tell those from a deliberate
+# exclusion: it just generates fewer parametrised cases, which reads exactly like a clean run.
+# Measured -- moving the package under plugin/ left these two declarations pointing at
+# `makoto/docs/...`, dropped both docs, and took EIGHT checks off the board in silence. The suite
+# went green with 1845 instead of 1853 and named nothing. Absence must not read as green.
+_MAY_BE_ABSENT = {"docs/SPIRIT.md"}
 
 # A term that must not be presented as makoto's CURRENT substrate (it migrated to SQLite).
 SUBSTRATE_DENYLIST = ["duckdb"]
@@ -39,6 +49,14 @@ _LINK_RX = re.compile(r"\]\(([^)]+)\)")
 # Epoch reset (2026-07-10): only the canonical family.name shape exists -- the alias table and
 # the legacy numeric ids were retired outright (state predating the reset is archived or wiped).
 _PATID_RX = re.compile(r"(?:pattern|row|patterns)\s+((?:content|event|gate)\.\w+)", re.I)
+
+
+def test_every_declared_living_doc_is_present_or_deliberately_excluded():
+    """The filter above must thin this list only for the one declared reason."""
+    unexpected = sorted(set(_LIVING_DOCS_DECLARED) - set(LIVING_DOCS) - _MAY_BE_ABSENT)
+    assert not unexpected, (
+        f"declared living doc(s) absent for no declared reason: {unexpected}. Every check over "
+        f"them stopped being generated rather than failing.")
 
 
 def _cli_command_paths():

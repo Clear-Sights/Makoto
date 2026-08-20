@@ -16,7 +16,7 @@ Two deliberate call-time back-edges (lazy imports that break cycles) are named e
 import ast
 from pathlib import Path
 
-PKG = Path(__file__).resolve().parents[1] / "makoto"
+PKG = Path(__file__).resolve().parents[1] / "plugin" / "makoto"
 
 _RANK = {  # the layout order: an import may only point at a strictly lower rank
     "makoto": 0, "makoto.vocab": 0, "makoto.core": 0, "makoto.registry": 0,   # leaves

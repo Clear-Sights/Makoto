@@ -85,7 +85,7 @@ def test_dispatch_unparseable_stdin_loud_allows_with_fact(tmp_path):
         input=b"not json{{{",
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0
     body = json.loads(proc.stdout.decode())
@@ -171,7 +171,7 @@ def test_dispatch_non_object_payload_blocks_exit_2_with_fact(tmp_path):
         proc = subprocess.run(
             [sys.executable, "-m", "makoto.dispatch"],
             input=raw, capture_output=True, env=env,
-            cwd=str(Path(__file__).parent.parent),
+            cwd=str(Path(__file__).parent.parent / "plugin"),
         )
         assert proc.returncode == 2, (raw, proc.returncode, proc.stderr)
         assert b"object" in proc.stderr.lower(), (raw, proc.stderr)
@@ -243,7 +243,7 @@ def test_dispatch_lazy_init_creates_db_when_absent(tmp_path):
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0
     db_file = state_dir / "makoto.record.db"
@@ -1950,7 +1950,7 @@ def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0
     out = proc.stdout.decode("utf-8")
@@ -1984,7 +1984,7 @@ def test_dispatch_lazy_init_failure_fails_open_not_crash(tmp_path):
         input=json.dumps(payload).encode("utf-8"),
         capture_output=True,
         env=env,
-        cwd=str(Path(__file__).parent.parent),
+        cwd=str(Path(__file__).parent.parent / "plugin"),
     )
     assert proc.returncode == 0, (
         "lazy-init failure must fail OPEN (exit 0), never crash the hook; "

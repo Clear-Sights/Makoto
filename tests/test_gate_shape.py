@@ -44,7 +44,7 @@ def _live_gates() -> list:
         key=lambda c: c.id,
     )
 
-GATES_DIR = Path(__file__).resolve().parent.parent / "makoto" / "checks"
+GATES_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 
 # ---- the declared design (single source; the package must MATCH it) --------------------------
 # The 11 named Stop-gate modules — each is its adapter AND its own engine merged into one file

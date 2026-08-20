@@ -24,7 +24,9 @@ dependencies = []
 Homepage = "https://github.com/Clear-Sights/Makoto"
 
 [tool.setuptools]
-package-dir = {"makoto" = "makoto"}
+# The package lives under plugin/ -- that directory IS the installed plugin, and nothing
+# outside it ships. See .claude-plugin/marketplace.json.
+package-dir = {"makoto" = "plugin/makoto"}
 packages = ["makoto"]
 include-package-data = true
 
