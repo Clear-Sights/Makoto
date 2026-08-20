@@ -5,6 +5,33 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-08-20
+
+### Added
+- **`PostToolUseFailure` is wired**, and `canon.recur` carries a transient budget, so a call that
+  failed for an infrastructural reason and then resolved is no longer reported as STUCK.
+- **Reproducible corpus replay** (`python3 eval/replay.py`) as release-time evidence.
+
+### Fixed
+- **Fail-open holes that turned a fired DENY into exit 0.** Two paths in `verdict`/`dispatch`
+  raised a decision and then exited successfully anyway; a denial that is not delivered is
+  indistinguishable, from the outside, from a call that was never judged.
+- **Logging failures no longer change verdicts.** A journal write that failed could flip the
+  decision it was only supposed to record, and three wrong-verdict paths alongside it.
+- **The surrogate fail-open**: undecodable bytes crashed the encoder and the crash read as
+  allow. Every `dispatch_errors` row is now attributed, and `unsourced_webfetch` was narrowed.
+- Three further decision-integrity holes in `selfMuteGuard`/`kit`.
+- `configchange` imported `Path` too late for `_resolved_config_path` to resolve.
+- `hollowTest` resolves imported assert-helpers, so its own teeth tests stop firing on helpers.
+- Reverted a transcript `islice` bound that produced a denial resting on a false fact.
+
+### Internal (no user-facing behavior change)
+- **The installed subtree is `plugin/`**, so the test suite stops shipping to users, and the
+  declared subpackages are actually built — `makoto.state`/`makoto.core` were absent from the
+  built distribution, which made the hook die on import in a real install.
+- The 102-file review corpus moved out of the public tree; two dead functions removed by
+  mechanical inventory; a per-file simplify pass across `plugin/makoto`.
+
 ## [2.3.0] — 2026-08-16
 
 ### Added

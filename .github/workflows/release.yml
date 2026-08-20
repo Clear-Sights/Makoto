@@ -2,11 +2,6 @@ name: Manual Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g. 2.0.0), must match a CHANGELOG.md ## [X.Y.Z] heading'
-        required: true
-        default: '2.0.0'
 
 permissions:
   contents: write
@@ -19,9 +14,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The version is READ, never typed. A hand-entered release input is exactly what cut
+      # `v2.4.0` against a manifest still declaring `2.3.0`: the tag and the number a user
+      # actually installs came from two places and nothing compared them. One source, one value,
+      # and the disagreement becomes unrepresentable rather than merely discouraged.
+      - name: Derive the version from the plugin manifest
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
+          PACKAGED=$(python3 -c "import re, pathlib; print(re.search(r'^version\s*=\s*\"([^\"]+)\"', pathlib.Path('pyproject.toml').read_text(encoding='utf-8'), re.M).group(1))")
+          if [ "$VERSION" != "$PACKAGED" ]; then
+            echo "plugin.json declares $VERSION but pyproject.toml declares $PACKAGED" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "releasing v$VERSION"
+
       - name: Extract release notes from CHANGELOG.md
         run: |
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           awk -v ver="$VERSION" '
             $0 ~ ("^## \\[" ver "\\]") {flag=1; next}
             flag && /^## \[/ {flag=0}
@@ -38,7 +49,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           TAG="v$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
