@@ -39,6 +39,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
@@ -260,12 +261,13 @@ def _resolved_config_path(config_path: str) -> str:
     expression -- the same "two callers independently computing one derived value" shape
     `_record_fire`'s docstring records as what let its own `exit_code` rot.
 
-    LIVE DEFECT, recorded not fixed here (fixing it changes verdicts, so it is a review finding,
-    not a cleanup): `Path` is NOT imported in this module, so `Path(config_path)` raises
-    `NameError`, the `except Exception` swallows it, and this function TODAY always returns
-    `config_path` verbatim -- never resolved. Consequences: a manifest entry (written resolved by
-    `install._record_configchange_manifest`) never matches a symlinked or relative `config_path`,
-    and a relative `config_path` becomes a snapshot key shared by every project that has one."""
+    History: `Path` was missing from this module's imports, so `Path(config_path)` raised
+    `NameError`, the `except Exception` below swallowed it, and this function always returned
+    `config_path` verbatim -- never resolved. A manifest entry (written resolved by
+    `install._record_configchange_manifest`) therefore never matched a symlinked or relative
+    `config_path`, silently degrading `_should_block` from its blocking tier to advisory, and a
+    relative `config_path` became a snapshot key shared by every project that had one. The import
+    is now present, so the resolution the rest of this docstring describes actually happens."""
     try:
         return str(Path(config_path).resolve()) if config_path else ""
     except Exception:
