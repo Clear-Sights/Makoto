@@ -173,7 +173,7 @@ install from the [Courthouse](https://github.com/Clear-Sights/Courthouse) market
 | Engine | Judges | One line |
 |---|---|---|
 | [**Ward**](https://github.com/Clear-Sights/Ward) | the pending **act** | nothing outright bad happens |
-| [**Gyroscope**](https://github.com/Clear-Sights/Gyroscope) | the **sequence** | a session neither capsizes nor gets lost |
+| [**Keel**](https://github.com/Clear-Sights/Keel) | the **sequence** | a session neither capsizes nor gets lost |
 | **Makoto** (this repo) | the **statement** | words aren't empty |
 
 ## Non-plugin install (power users)

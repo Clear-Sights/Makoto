@@ -144,7 +144,7 @@ def append_error(state_root: Path, event_id: int | None,
     means recovered by scanning the raw stdin text, "" means none were available. A recovered id
     that does not say it was recovered is worse than no id, so the provenance ships with the value.
 
-    `plugin` is constant here and deliberately so: Ward, Gyroscope and Makoto all register
+    `plugin` is constant here and deliberately so: Ward, Keel and Makoto all register
     PreToolUse `*` and all three can emit a deny, so a row that does not name its author is
     unattributable the moment more than one of them is installed -- which is the shipped
     Courthouse configuration.
