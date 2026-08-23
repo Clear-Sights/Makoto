@@ -23,6 +23,13 @@ import pytest
 
 from makoto.registry import load_precheck_catalog
 
+# The session-level skip guard: a skipped test is NOT-EVALUABLE, never a pass. Its hooks live in
+# `_skipGuard` so a real pytest subprocess can load the same three functions this suite runs under,
+# which is what `test_skip_guard.py` does to keep them seen-failing. Imported by name because
+# pytest discovers hooks by attribute on the conftest module.
+from tests._skipGuard import (  # noqa: F401  -- imported for hook registration
+    pytest_collectreport, pytest_runtest_logreport, pytest_sessionfinish, pytest_terminal_summary)
+
 
 @pytest.fixture
 def evt():
