@@ -6,9 +6,11 @@ Mirrors test_liveness_fp.py's structure and rigor bar:
 - H3  the soundness sentinel set (legitimate shapes that must never fire) is ALL silent,
 - H4  makoto-allow exemption, applied in the ADAPTER (not the analyzer — see stopcheck_hollow_test.py),
 - H7  the pre-registered falsifier: measure() over makoto's own non-test source == 0 fires,
-- H8  the real corpus-FP measurement over three real test suites (makoto/tests, assay, ventura),
-      with every fire triaged by hand (see comments) rather than silently asserted to zero.
-- H8b the same corpus measurement isolated to sub-patterns 4a/4b specifically (0/0/0 fires).
+- H8  the real corpus-FP measurement over makoto's own test suite, with every fire triaged by hand
+      (see comments) rather than silently asserted to zero. It measured three suites when this
+      package lived in a monorepo; the assay/ and ventura/ arms are deleted, not skipped, and the
+      comment at H8 records why -- they had skipped on every run this repository has ever made.
+- H8b the same corpus measurement isolated to sub-patterns 4a/4b specifically (0 fires).
 
 A FIRING soundness sentinel means a real analyzer bug. NEVER weaken a sentinel to get green.
 """
@@ -240,8 +242,10 @@ def _annotated_hollow_test_functions(files: list[str]) -> set[str]:
 
 
 def test_corpus_fp_makoto_own_tests():
-    if not REPO_ROOT.is_dir():
-        pytest.skip("Makoto repository root is unavailable")
+    # An `assert`, never a skip. This root is derived from `__file__`, so the only way it is
+    # missing is that the derivation broke -- and a skip there would silently retire the one
+    # corpus-FP measurement that still runs, reporting green because nothing was measured.
+    assert REPO_ROOT.is_dir(), f"corpus root did not resolve: {REPO_ROOT}"
     files = _corpus_py_files(".")
     rep = measure(files, _analyzer)
     fires_by_func = {f["func"] for f in rep["detail"]}
@@ -252,22 +256,24 @@ def test_corpus_fp_makoto_own_tests():
         f"unexpected fire set (triage new fires before changing this assertion): {rep['detail']}")
 
 
-def test_corpus_fp_assay_tests():
-    if not (REPO_ROOT / "assay").is_dir():
-        pytest.skip("assay/ sibling not present (standalone makoto checkout)")
-    rep = measure(_corpus_py_files("assay"), _analyzer)
-    assert rep["fires"] == 0, f"unexpected assay fire(s) -- triage: {rep['detail']}"
-
-
-def test_corpus_fp_ventura_tests():
-    if not (REPO_ROOT / "ventura").is_dir():
-        pytest.skip("ventura/ sibling not present (standalone makoto checkout)")
-    rep = measure(_corpus_py_files("ventura"), _analyzer)
-    fires_by_func = {f["func"] for f in rep["detail"]}
-    assert fires_by_func == {
-        "test_enumerate_doc_sections_h1_excluded",
-        "test_p2_hash_verify_still_rejects_tampered_content",
-    }, f"unexpected fire set (triage new fires before changing this assertion): {rep['detail']}"
+# THE assay/ AND ventura/ CORPORA ARE GONE, AND SO ARE THE TESTS THAT MEASURED THEM.
+# They lived in the Skill-lab-V5 monorepo, beside this package. A standalone checkout -- which is
+# what CI checks out and what a consumer installs -- has no siblings, so both tests skipped on
+# every run this repository has ever made, and reported the suite green while measuring nothing.
+# Both source repositories are now archived, so the condition is not merely unmet here; it can
+# never be met again from anywhere.
+#
+# Deleted rather than left skipping, per the standing ruling that a reference nothing can satisfy
+# is not a dependency to satisfy but a claim to delete. The measurements they made are in git
+# history with their last recorded fire sets; nothing that still runs depended on them, and no
+# certification in the README rests on them -- the shipped-corpus measurement below and the
+# canon_fingerprints gold sets are both in this repository and both run.
+#
+# Worth naming because this suite ships a detector for the shape: `hollowTest` fires on a test
+# whose body skips itself. It could not fire on these, because `(REPO_ROOT / "assay").is_dir()` is
+# a runtime condition rather than a syntactic tautology -- true in the monorepo the code was
+# written in, permanently false everywhere it has run since. Static analysis cannot see that; the
+# session-level skip guard in `tests/conftest.py` can, which is why it now exists.
 
 
 # --- H8b: the same real corpus-FP measurement, isolated to JUST the new 4a/4b sub-patterns --------
@@ -282,15 +288,4 @@ def test_corpus_fp_4a_4b_makoto_own_tests():
     assert _new_pattern_fires(".") == []
 
 
-def test_corpus_fp_4a_4b_assay_tests():
-    if not (REPO_ROOT / "assay").is_dir():
-        pytest.skip("assay/ sibling not present (standalone makoto checkout)")
-    assert _new_pattern_fires("assay") == []
-
-
-def test_corpus_fp_4a_4b_ventura_tests():
-    if not (REPO_ROOT / "ventura").is_dir():
-        pytest.skip("ventura/ sibling not present (standalone makoto checkout)")
-    # ventura's one real skipif usage (test_live_smoke_one_token_round_trip) is gated on a genuine
-    # env-var check, not a tautology -- correctly silent. See the H8 comment block above.
-    assert _new_pattern_fires("ventura") == []
+# The 4a/4b arms over assay/ and ventura/ went with their corpora, for the reason recorded above.
