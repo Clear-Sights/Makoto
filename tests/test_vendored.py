@@ -43,6 +43,25 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 HEADER = ("SYMBOL", "LOCAL-PATH", "OWNER-REPO", "OWNER-PATH", "DIGEST", "WHY")
 
 
+# `ast.dump` is not a stable serialization: Python 3.13 stopped emitting optional fields that
+# held their empty default (`keywords=[]`, `orelse=[]`, `finalbody=[]`), so identical source
+# digested differently on 3.12 and 3.13 and the fence reported drift on a Python upgrade. A gate
+# that fires on lookalikes gets disabled, and disabling it destroys the coverage it did have, so
+# the serialization is spelled here instead of inherited from the interpreter: every field is
+# emitted, always, and the fields that exist only on some versions are named and skipped.
+_VERSION_VARYING_FIELDS = frozenset({"type_comment", "type_params", "kind"})
+
+
+def _canonical(node):
+    if isinstance(node, ast.AST):
+        fields = ", ".join(f"{name}={_canonical(getattr(node, name, None))}"
+                           for name in node._fields if name not in _VERSION_VARYING_FIELDS)
+        return f"{type(node).__name__}({fields})"
+    if isinstance(node, list):
+        return "[" + ", ".join(_canonical(item) for item in node) + "]"
+    return repr(node)
+
+
 def _parse(path):
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
@@ -73,7 +92,7 @@ def _contract(path, symbol, root):
     node = found[0]
     if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         # A constant: its value is the whole contract.  The target name is already the row key.
-        return ast.dump(node.value, include_attributes=False), None
+        return _canonical(node.value), None
     body = list(node.body)
     if (body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)
             and isinstance(body[0].value.value, str)):
@@ -85,7 +104,7 @@ def _contract(path, symbol, root):
     if node.args.kwarg:
         arguments.append("**" + node.args.kwarg.arg)
     return repr(arguments) + "\n" + "\n".join(
-        ast.dump(statement, include_attributes=False) for statement in body), None
+        _canonical(statement) for statement in body), None
 
 
 def digest(path, symbol, root):
