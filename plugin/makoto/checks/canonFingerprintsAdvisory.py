@@ -9,7 +9,7 @@ own total-retention rule they stay in the catalog, evaluated and recorded, but N
 
 Sibling of canonFingerprints.py (the BLOCK-tier half); see that module's docstring for why this is
 two gate modules instead of one (tests/test_stop_gate_level_invariant.py's one-gate-id/one-fixed-
-level invariant). This id is named in that test's own _ADVISORY_ALLOWLIST, the same mechanism
+level invariant). This id is named in makoto.registry's _ADVISORY_ALLOWLIST, the same mechanism
 gate.self_wired (FD6) already uses for its own advisory-only tier.
 """
 from __future__ import annotations
