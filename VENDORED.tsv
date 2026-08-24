@@ -1,0 +1,17 @@
+# Vendored-contract ledger.  Each row pins the digest of one symbol this repository
+# copied from another, so drift must be re-pinned deliberately rather than happening
+# quietly.  A digest covers argument names and the AST body with the leading docstring
+# removed -- the copies already differ in docstrings and are correct -- and, for a
+# constant row, the constant's value.  Comments and formatting are not part of it.
+# Every in-repository constant a fenced body reads carries its own row: changing a
+# regex drifts behaviour without touching any body, so bodies alone are not enough.
+# This fence compares each copy against its own pinned digest, never against the
+# owner's live source: no repository reads another's tree.
+# Ward owns the four AST predicates: they are security-check helpers native to Ward's
+# checks.py.  Makoto's copies stay copies because each plugin must install alone.
+SYMBOL	LOCAL-PATH	OWNER-REPO	OWNER-PATH	DIGEST	WHY
+is_false_const	plugin/makoto/kit.py	Ward	plugin/ward/checks.py	f86d1fdae533f010fc2d9759ffb3a50cb255711b6e80784ec6a32b987552dca0	TLS verification-disabled predicate vendored from Ward
+is_cert_none	plugin/makoto/kit.py	Ward	plugin/ward/checks.py	fba1369c9179e67449e5217943f26cd330754801c25093ea452f8438dd04b703	TLS CERT_NONE predicate vendored from Ward
+callee_chain	plugin/makoto/kit.py	Ward	plugin/ward/checks.py	135ca9193bc3a8d170151e83495b0e6d44baf96d1c8efd6c4fc26efcedb22fbe	AST callee extraction vendored from Ward
+jwt_decode_callee_chain	plugin/makoto/kit.py	Ward	plugin/ward/checks.py	dc37c120682e694c22890b8b295cb33c3334f0f036b7dbb072f103e5c489f6a7	JWT decode callee predicate vendored from Ward
+JWT_CALLEE_RX	plugin/makoto/vocab.py	Ward	plugin/ward/checks.py	f6d55025d25b8220065e988a52ee37f7c3a40e79b28073059c35ec5200dd89b6	JWT callee regex read by jwt_decode_callee_chain; vendored from Ward's _JWT_CALLEE_RX
