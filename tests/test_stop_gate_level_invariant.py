@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import os
 
-from makoto.registry import load_checks
+from makoto.registry import _ADVISORY_ALLOWLIST, load_checks
 from makoto.context import GateContext
 
 
@@ -35,22 +35,6 @@ def _live_gates() -> list:
     """The checks eligible to reach the Stop decision pipeline at all (formerly:
     load_stopchecks()'s GATE-export scan) -- Check.may_block=True."""
     return [c for c in load_checks(edge="Stop") if c.may_block]
-
-# The ONLY documented exception to "every Stop-gate finding blocks" (2026-07-05, DESIGN DECISION 6):
-# gate.self_wired ships at level="advisory" so a partial hook-wiring strip is recorded to the audit
-# trail without ever blocking a turn (stopchecks/stopcheck_self_wired.py's own docstring; behavioral
-# pin: tests/test_dispatch.py::test_dispatch_self_wired_gate_never_blocks_even_when_it_fires).
-# Adding a gate id here must cite its own DESIGN DECISION the same way.
-#
-# gate.canon_fingerprints_advisory (SPEC-5 Task 9, DESIGN DECISION 26) is the second: 13 of the 17
-# ported canon session fingerprints rest on a soft/claim atom the gold-oracle finding doc's robust
-# core does not name, or are among that doc's explicitly-named WORST DISQUALIFIED fingerprints —
-# SPEC-5's own total-retention rule keeps them in the catalog, evaluated and recorded, but never
-# blocking. Its sibling gate.canon_fingerprints (the 4 robust-core, blocking-capable fingerprints)
-# is intentionally NOT here — it always emits level="error" (see canonFingerprints.py).
-_ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
-                                  "gate.relative_path_citation", "gate.plan_item_drift"})  # FD6, FD26, 2026-07-09
-
 
 def _ctx(**over):
     base = dict(text="", touched=frozenset(), empty=frozenset(), opens=(), testrun_output="",

@@ -30,7 +30,7 @@ import dataclasses
 import importlib
 from pathlib import Path
 
-from makoto.registry import Check, load_checks
+from makoto.registry import Check, _ADVISORY_ALLOWLIST, load_checks
 from makoto.context import GateContext
 
 
@@ -65,7 +65,7 @@ GATE_MODULE_STEMS = {
                              # DELIBERATELY NOT a discovered GATE (no GATE export) -- it is
                              # invoked directly by run_stop_checks so its finding can never enter
                              # _blocking_gate_ids(), rather than needing a cited DESIGN-DECISION
-                             # _ADVISORY_ALLOWLIST entry (test_stop_gate_level_invariant.py) this
+                             # _ADVISORY_ALLOWLIST entry (makoto.registry) this
                              # worker has no standing to mint.
     "relativePathCitation", # 2026-07-09: advisory-only, flags a chat response citing a non-
                              # absolute (unclickable) path. Discovered normally, like selfWiredCheck.

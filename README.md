@@ -16,9 +16,21 @@ accept without re-deriving it.
 ## What it catches
 
 makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, and `Stop` — and **blocks**
-(exit 2, which Claude Code treats as block-and-retry) on **15 pre-checks** across five families and
-**19 end-of-turn gates**. Every pre-check and every end-of-turn gate but four blocks; there is no
-silent "warning" tier for those (see [Fire level](#fire-level)) — the four documented exceptions are
+(exit 2, which Claude Code treats as block-and-retry) on pre-checks across five families and on
+blocking end-of-turn gates. The live inventory is:
+
+<!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
+
+- **15 pre-checks** (all blocking)
+- **21 Stop checks** (all checks registered at the Stop edge)
+- **19 end-of-turn gates** (`may_block=True`)
+- **15 blocking end-of-turn gates** (not advisory-allowlisted)
+- **4 advisory end-of-turn gates** (advisory-allowlisted)
+
+<!-- END GENERATED: check-counts -->
+
+Every pre-check and every non-advisory end-of-turn gate blocks; there is no silent "warning" tier
+for those (see [Fire level](#fire-level)) — the documented exceptions are
 `gate.self_wired`, `gate.canon_fingerprints_advisory`, `gate.relative_path_citation`, and
 `gate.plan_item_drift` (below), advisory-only checks that by design never block.
 
@@ -240,10 +252,10 @@ tool through — is itself an illusory word, the exact weakening shape makoto ex
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
 blocks at proven zero corpus-FP, or it is cut — zero false positives on the shipped corpus and gold
 negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
-from field use and is not part of that measurement). This still governs all 15 pre-checks (`_ALLOWED_FIRE_LEVELS
-= {"error"}`, enforced at load) and 15 of the 19 end-of-turn gates.
+from field use and is not part of that measurement). This still governs every pre-check
+(`_ALLOWED_FIRE_LEVELS = {"error"}`, enforced at load) and every non-advisory end-of-turn gate.
 
-**Four narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05),
+**The narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05),
 `gate.canon_fingerprints_advisory` (SPEC-5 Task 9, DESIGN DECISION 26), `gate.relative_path_citation`,
 and `gate.plan_item_drift` (both 2026-07-09) fire at `level="advisory"`, not `"error"`, so each is
 recorded to the audit log but never emitted as a block decision. None is a reintroduction of the cut
@@ -321,7 +333,7 @@ mis-block or mis-allow a tool call — a fundamental separation-of-concerns inva
 
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
-Separate from the 15 pre-checks and 19 end-of-turn checks above: an optional `ConfigChange` hook
+Separate from the generated check inventory above: an optional `ConfigChange` hook
 entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
 being stripped. Two tiers, both fail-open on any unexpected fault:
 
@@ -393,4 +405,3 @@ Each SVG is rendered directly from that scenario's real logged stdout/stderr, no
 Regenerate: `python docs/demo/render_demo.py && python docs/demo/render_svg.py` (the latter needs
 `humanize`, `pip install humanize`, for demo-only friendlier byte counts; never a core-package
 dependency, see that script's own docstring).
-
