@@ -15,13 +15,13 @@ accept without re-deriving it.
 
 ## What it catches
 
-makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, and `Stop` — and **blocks**
-(exit 2, which Claude Code treats as block-and-retry) on pre-checks across five families and on
-blocking end-of-turn gates. The live inventory is:
+makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, and `Stop` — and
+**blocks** on pre-check findings and blocking end-of-turn gate findings. The live inventory is:
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
 - **15 pre-checks** (all blocking)
+- Pre-check ids grouped by dotted prefix — `content`: **12**, `event`: **2**, `gate`: **1**
 - **21 Stop checks** (all checks registered at the Stop edge)
 - **19 end-of-turn gates** (`may_block=True`)
 - **15 blocking end-of-turn gates** (not advisory-allowlisted)
@@ -59,7 +59,7 @@ for those (see [Fire level](#fire-level)) — the documented exceptions are
 The table below is the summary; the long-form description of every gate is in
 [docs/CATALOG.md](docs/CATALOG.md) (relocated from this section, word for word).
 
-The **certification** column uses three values, each naming its own denominator:
+The **certification** column uses the following labels, each naming its own denominator:
 
 - **established** — certified at zero false positives on the named negative sets: the shipped
   corpus for the ordinary blocking gates (the warning-tier-elimination invariant below — a
@@ -88,14 +88,21 @@ The **certification** column uses three values, each naming its own denominator:
 | `gate.liveness` | a statement with no live effect inside a closed function | blocking | established |
 | `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |
 | `gate.canon` | last call ended in an unresolved direct error, or a byte-identical stuck retry loop | blocking | replayed |
-| `gate.canon_fingerprints` | 4 of 17 ported canon fingerprints, robust-core by gold-oracle certification | blocking | established |
+| `gate.canon_fingerprints` | ported canon fingerprints in the robust core established by gold-oracle certification | blocking | established |
 | `gate.contract_order` | turn ends with a declared Plan's dependency remainder non-empty | blocking | established |
 | `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | advisory | advisory |
-| `gate.canon_fingerprints_advisory` | the other 13 canon fingerprints (soft/claim atoms or gold-disqualified) | advisory | advisory |
+| `gate.canon_fingerprints_advisory` | the advisory remainder (soft/claim atoms or gold-disqualified) | advisory | advisory |
 | `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |
 | `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
 
 Inspect the live catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
+
+<!-- BEGIN GENERATED: canon-split | source: makoto.substrate._canonAtoms | regenerate: python3 tools/render_checks.py --write -->
+
+- blocking robust core: **4 of 17** ported canon fingerprints
+- advisory remainder: **13** ported canon fingerprints
+
+<!-- END GENERATED: canon-split -->
 
 ### Discharging a permanent session-level block
 
@@ -150,7 +157,7 @@ State dir + `makoto.db` are created lazily on the first hook invocation.
 
 ### Companion setting (optional): suppress the harness auto-trailer
 
-An illusory AI-authorship commit trailer reaches a commit through two doors. Pre-Check `content.illusory_authorship_trailer` blocks
+An illusory AI-authorship commit trailer can reach a commit through either path. Pre-Check `content.illusory_authorship_trailer` blocks
 the **agent-authored** one — the trailer typed into a `git commit` message or into file content, the
 surface no setting can reach. The other door is Claude Code's own **automatic** append, which a
 setting governs. To close it at the source, set in `~/.claude/settings.json`:
@@ -177,9 +184,9 @@ python -m makoto uninstall                   # removes old settings.json entries
 
 ## Siblings
 
-Makoto is one of three engines that split one taxonomy — act, sequence, statement — and share
-nothing else. Each installs alone; none inherits or implies the others' coverage. All three
-install from the [Courthouse](https://github.com/Clear-Sights/Courthouse) marketplace:
+Makoto owns the statement surface alongside the independently installed engines for act and
+sequence. None inherits or implies the others' coverage. The marketplace inventory is owned by
+[Courthouse](https://github.com/Clear-Sights/Courthouse):
 `claude plugin marketplace add Clear-Sights/Courthouse`.
 
 | Engine | Judges | One line |
@@ -237,23 +244,35 @@ If you want to inspect or hand-wire what the plugin does, add to the `hooks.PreT
 Bracket the additions with `# makoto-managed-begin` / `# makoto-managed-end` markers for idempotent
 removal.
 
-## Exit codes
+## Dispatcher outcomes
 
-| Code | Meaning |
-|---|---|
-| 0 | No error finding. The tool call proceeds normally. |
-| 2 | At least one error-level finding. Claude Code interprets exit 2 as block-and-retry: the tool call (or the turn, for a Stop gate) is blocked, the stderr diagnostic is surfaced to the agent as a tool-error message, and the agent retries with that feedback in context. |
+The shipped shim communicates findings using the measured response fields below. Invalid input is
+the distinct process-error path.
+
+<!-- BEGIN GENERATED: dispatch-contract | source: plugin/makoto/_dispatch_shim.sh | regenerate: python3 tools/render_checks.py --write -->
+
+| Outcome | Observed mechanism | Process exit |
+|---|---|---|
+| clean PreToolUse call | no blocking decision | **0** |
+| error-level pre-check finding | stdout JSON `hookSpecificOutput.permissionDecision='deny'` | **0** |
+| Stop-gate finding | stdout JSON `decision='block'` | **0** |
+| invalid/non-object payload | no blocking decision | **2** |
+
+<!-- END GENERATED: dispatch-contract -->
 
 ## Fire level
 
-Every live pattern blocks (`fire_level = "error"` → exit 2). makoto deliberately has **no
+Every non-advisory live pattern blocks through the dispatcher mechanism measured above. makoto deliberately has **no
 non-blocking tier**: a `warning`/`disabled` resting state — witnessing a violation and letting the
 tool through — is itself an illusory word, the exact weakening shape makoto exists to catch. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
 blocks at proven zero corpus-FP, or it is cut — zero false positives on the shipped corpus and gold
 negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
-from field use and is not part of that measurement). This still governs every pre-check
-(`_ALLOWED_FIRE_LEVELS = {"error"}`, enforced at load) and every non-advisory end-of-turn gate.
+from field use and is not part of that measurement). This still governs every pre-check and every non-advisory
+end-of-turn gate. The invariant is enforced by the suite, not at load: `makoto.vocab` carries
+`fire_level` "by convention -- no longer runtime-checked here", and the allowed set lives in
+`tests/_toml_pattern_fixture.py`, with `tests/test_stop_gate_level_invariant.py` firing every live
+gate and asserting the level it emits.
 
 **The narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05),
 `gate.canon_fingerprints_advisory` (SPEC-5 Task 9, DESIGN DECISION 26), `gate.relative_path_citation`,
@@ -263,7 +282,7 @@ recorded to the audit log but never emitted as a block decision. None is a reint
 wiring, shipped advisory-only by explicit DESIGN DECISION as partial-strip *detection*, not prevention
 (it cannot see, and does not claim to see, a simultaneous full strip of all three hook entries — see
 `docs/self-defense-asymmetry-followup.md`, which stays OPEN); `gate.canon_fingerprints_advisory`
-covers 13 ported canon fingerprints that rest on a soft/claim atom or are explicitly disqualified
+covers the measured advisory remainder of ported canon fingerprints that rest on a soft/claim atom or are explicitly disqualified
 against real-Claude gold, kept in the catalog at non-blocking advisory per SPEC-5's total-retention
 rule rather than dropped; `gate.relative_path_citation` flags a chat response citing a non-absolute
 (unclickable) path — a communication-quality signal, not an integrity violation; `gate.plan_item_drift`
@@ -277,7 +296,7 @@ Each pattern carries a one-line, imperative `retry_hint` telling the agent what 
 finding fires, the hint is printed on a second stderr line after the diagnostic:
 
 ```
-[makoto ERROR] row content.verifier_predicate_weakened (verifier predicate weakened — loose-comparator shape): matched 'startswith(' at line 231
+[makoto ERROR] row content.verifier_predicate_weakened (verifier predicate weakened — loose-comparator shape): matched 'startswith('
                retry: Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. ...
 ```
 
@@ -296,7 +315,7 @@ without leaking whole-file contents. It's plain JSONL — query it with `jq` or 
 | `session_id` | Opaque session token |
 | `project_root` | Absolute project root at invocation time |
 | `pattern_fires` | List of pattern IDs that fired; `[]` if clean |
-| `exit_code` | `0` (clean) \| `2` (finding emitted, block-and-retry) |
+| `exit_code` | Process status observed for the corresponding dispatcher outcome above |
 | `retry_hint_emitted` | Boolean — at least one fired pattern had a non-empty `retry_hint` |
 | `findings` | Per-finding `{pattern_id, level, file, line, snippet}` |
 
@@ -308,7 +327,7 @@ row carries `plugin`, `session_id`, `tool_name`, `hook_event` and `id_source`.
 
 Those fields were missing. `audit.jsonl` has carried the session and tool since 1.0.2 and this log
 carried neither — so a *fire* was attributable and a *miss* was not, and every row here is a check
-that did not run. When 30 fail-opens landed in one day, "did they affect this session?" could not
+that did not run. When a batch of fail-opens landed together, "did they affect this session?" could not
 be answered from the record. `id_source` says how the ids were obtained (`payload`, or `raw-scan`
 when the envelope did not parse and they had to be recovered from the raw text); a recovered id
 that does not admit it was recovered is worse than no id.
@@ -318,7 +337,8 @@ bytes that had to be fixed, and evaluation then continued normally), and `NOTE`.
 
 ### A fail-open is never silent
 
-Hook stderr on exit 0 reaches the debug log only — not the transcript, not the user, not the model.
+Hook stderr from an otherwise successful dispatch reaches the debug log only — not the transcript,
+not the user, not the model.
 So "loud-allow + a stderr line" was loud to nobody, and a skipped check looked exactly like a clean
 pass from every seat. Every fail-open now also emits a `systemMessage` saying the call was
 **allowed without being checked**. The direction is unchanged; only the visibility is. See
@@ -335,7 +355,7 @@ mis-block or mis-allow a tool call — a fundamental separation-of-concerns inva
 
 Separate from the generated check inventory above: an optional `ConfigChange` hook
 entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
-being stripped. Two tiers, both fail-open on any unexpected fault:
+being stripped. Both tiers fail open on any unexpected fault:
 
 - **Advisory** (unconditional): a settings edit that looks stripped, but with no evidence this exact
   path was ever genuinely wired, logs a stderr line + an audit row (`gate.configchange_advisory`) and
@@ -366,8 +386,8 @@ KEPT one. Here is the whole chain for one small, real, synthetic session
 3. **RECORD**: the test-delta redirect (Task 3) fires on the pass/fail flip and is ITSELF
    chain-appended (`kind="audit"`); the redirect's own firing is part of the permanent record,
    not just a line on someone's terminal.
-4. **RECEIPT**: `makoto receipt --session demo-session-001` reports 2 claims, both trace-bound
-   to a `verify_chain`-checkable row, 0 exemptions:
+4. **RECEIPT**: `makoto receipt --session demo-session-001` reports the measured claims and
+   exemptions below; every claim is trace-bound to a `verify_chain`-checkable row:
 
 ```json
 {
@@ -386,19 +406,25 @@ chained, receipted claims, not a linter that yells and leaves no trace.
 ### Reproduce it: corpus replay
 
 `python3 eval/replay.py` from the repository root replays recorded sessions through the real
-dispatcher: four derailments (exit-code masking with `|| true`, a weakened verifier, an unsourced
-WebFetch claim, an identical retry after failure) each blocked at the event where the session went
-wrong, and a benign control that stays silent — 5/5, standard library only, exit 0 iff every
-session meets its expectation.
+dispatcher. The executable summary below measures its derailment fixtures, total result, and
+success contract.
 
 ### Live demo: real terminal sessions
 
-`docs/demo/render_demo.py` drives 3 REAL scenarios through the actual dispatchers (not the frozen
-corpus above) against a fresh, throwaway state dir each, and captures the genuine stdout/stderr:
+`docs/demo/render_demo.py` drives the measured REAL scenarios through the actual dispatchers (not
+the frozen corpus above) against a fresh, throwaway state dir each, and captures genuine stdout/stderr.
 
-<img src="docs/demo/screenshots/block.svg" alt="a genuine PreToolUse block" width="700"><br>
-<img src="docs/demo/screenshots/receipt.svg" alt="word -> deed -> record -> receipt, end to end" width="700"><br>
-<img src="docs/demo/screenshots/configchange.svg" alt="a ConfigChange advisory fire" width="700">
+<!-- BEGIN GENERATED: demo-measurements | source: eval/replay.py + docs/demo | regenerate: python3 tools/render_checks.py --write -->
+
+- corpus replay: **4 derailments**, **5/5** sessions pass; the command exits successfully only when every expectation holds
+- live demo: **3 REAL scenarios**
+- receipt demo: **2 claims**, **0 exemptions**
+
+<!-- END GENERATED: demo-measurements -->
+
+<img src="docs/demo/screenshots/block.svg" alt="a genuine PreToolUse block"><br>
+<img src="docs/demo/screenshots/receipt.svg" alt="word -> deed -> record -> receipt, end to end"><br>
+<img src="docs/demo/screenshots/configchange.svg" alt="a ConfigChange advisory fire">
 
 Each SVG is rendered directly from that scenario's real logged stdout/stderr, not hand-written.
 
