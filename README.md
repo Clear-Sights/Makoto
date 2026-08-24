@@ -8,6 +8,8 @@ fix, verified the certificate — makoto holds that word against its record. If 
 or the verification was quietly disabled, makoto blocks the tool call (or the end-of-turn) and hands
 the agent a one-line correction to retry against.
 
+That publication claim is deliberately bounded: Shipped plugin — installable and versioned. The dispatcher is replay-tested against authored sessions; its effect on a live session's outcome is unmeasured.
+
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
 in deed. A word it lets through becomes spendable: trustworthy tender a reviewer or another agent can
