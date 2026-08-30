@@ -684,7 +684,16 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             is_meta = True          # catalog unloadable: decision machinery -> fail closed
         if is_meta:
             folded = verdict.Decision(verdict.BLOCK, detail)
-    edge = _HOOK_TO_EDGE.get(hook_event, "Pre")
+    # Pass the hook through as its own edge when unmapped, rather than aliasing it to "Pre".
+    # The old default was silent and it lied: a finding on SessionStart -- which IS registered
+    # in hooks.json, so the host does send it -- rendered
+    # {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": ...}},
+    # telling the host the event was a tool pre-flight when it was a session start, and
+    # applying a tool-permission decision to an event with no tool in it. `dispatch_posture`
+    # already returns {} for an edge its table does not carry, which is the honest answer:
+    # no wire, no decision. The finding is still recorded by _record_audit either way, so
+    # this drops a mislabelled body, never the record of the fire.
+    edge = _HOOK_TO_EDGE.get(hook_event, hook_event)
     try:
         body = verdict.dispatch_posture(edge, folded, hook_event)
     except Exception as exc:
