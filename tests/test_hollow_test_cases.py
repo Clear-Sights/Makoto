@@ -31,11 +31,41 @@ def test_cases_file_is_well_formed():
 
 
 def test_every_shipped_sub_pattern_has_a_fires_case():
-    fires_kinds_covered = {c["id"] for c in CASES if c["bucket"] == "fires"}
-    assert fires_kinds_covered == {
+    """Coverage measured from what the cases FIRE, not from what they are named.
+
+    This compared fixture `id` strings against a hard-coded set, so a case called
+    `fires-tautology` that actually exercises `no_assertion` satisfied it and the tautology
+    sub-pattern went uncovered under a name claiming otherwise. The ids are still required to
+    match -- a case whose name lies about its subject is its own defect -- but the coverage
+    claim is now derived by running each case and reading the `kind` of what came back.
+    """
+    named = {c["id"] for c in CASES if c["bucket"] == "fires"}
+    expected_ids = {
         "fires-no_assertion", "fires-tautology", "fires-swallowed_failure",
         "fires-uncollectable_nested", "fires-uncollectable_always_skip",
     }
+    assert named == expected_ids
+
+    fired = {}
+    for case in CASES:
+        if case["bucket"] != "fires":
+            continue
+        kinds = {finding.get("kind") for finding in analyze_file(case["source"], case["path"])}
+        assert kinds, f"{case['id']}: a fires-case fired nothing, so it covers no sub-pattern"
+        fired[case["id"]] = kinds
+
+    # Each case must fire the sub-pattern its NAME claims. `fires-swallowed_failure` also fires
+    # no_assertion -- a swallowed failure is an assertion-less body by construction -- so the
+    # named kind must be PRESENT, not the only one.
+    for case_id, kinds in sorted(fired.items()):
+        claimed = case_id.split("-", 1)[1]
+        assert claimed in kinds, (
+            f"{case_id} is named for {claimed!r} and fires {sorted(kinds)}; the coverage this "
+            f"test reports would be about a sub-pattern nothing here exercises")
+
+    covered = set().union(*fired.values())
+    assert {cid.split("-", 1)[1] for cid in expected_ids} <= covered, (
+        f"a shipped sub-pattern has no case that fires it: covered {sorted(covered)}")
 
 
 def test_json_fixture_cases_fire_as_expected():

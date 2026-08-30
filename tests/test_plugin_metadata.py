@@ -98,6 +98,13 @@ def test_dispatch_shim_invokes_makoto_dispatch():
     # this test is named for what the shim EXECS. Comments are stripped, and the module must
     # appear as the argument to `-m` on a line that runs an interpreter.
     code = "\n".join(line.split("#", 1)[0] for line in shim_text.splitlines())
+    # STATED LIMIT, and the division of labour that bounds it. This reads the shim's SOURCE:
+    # it establishes that an `exec ... -m makoto.dispatch` line is written and not commented
+    # out, NOT that the line is reached -- an exec inside `if false; then ... fi` would satisfy
+    # it. Reachability is answered next door, behaviourally:
+    # tests/test_dispatch_shim.py::test_decoy_package_in_cwd_cannot_shadow_the_plugin runs the
+    # shim and requires the record database that only makoto.dispatch creates. Neither test is
+    # sufficient alone; the pair is what makes the claim.
     invoking = [line for line in code.splitlines()
                 if re.match(r"\s*exec\b.*-m\s+makoto\.dispatch\b", line)]
     assert invoking, (
