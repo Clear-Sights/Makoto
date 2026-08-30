@@ -94,8 +94,20 @@ def test_dispatch_shim_exists_and_executable():
 def test_dispatch_shim_invokes_makoto_dispatch():
     """shim execs `python -m makoto.dispatch`."""
     shim_text = (PLUGIN / "makoto" / "_dispatch_shim.sh").read_text()
-    assert "makoto.dispatch" in shim_text
-    assert "MAKOTO_PYTHON" in shim_text or "python3" in shim_text
+    # NOT `"makoto.dispatch" in shim_text`: a comment or a dead branch carries the name too, and
+    # this test is named for what the shim EXECS. Comments are stripped, and the module must
+    # appear as the argument to `-m` on a line that runs an interpreter.
+    code = "\n".join(line.split("#", 1)[0] for line in shim_text.splitlines())
+    invoking = [line for line in code.splitlines()
+                if re.match(r"\s*exec\b.*-m\s+makoto\.dispatch\b", line)]
+    assert invoking, (
+        f"no line in the shim EXECS `-m makoto.dispatch`, which is what this test is named for; "
+        f"the name appearing in the file is not the same as the shim running it:\n{code}")
+    # ...and the interpreter it execs is resolved rather than assumed. Kept as a separate
+    # assertion because it is a separate claim: the exec above is about WHAT runs, this is about
+    # which python does.
+    assert re.search(r"(MAKOTO_PYTHON|PYTHON_BIN|python3)", code), (
+        f"the shim names no interpreter to resolve:\n{code}")
 
 
 def _exec_commands(md_text: str) -> list[str]:

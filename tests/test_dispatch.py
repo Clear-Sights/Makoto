@@ -1960,15 +1960,35 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
                         for piece in _ast.walk(target):
                             if isinstance(piece, _ast.Name):
                                 produced.add(piece.id)
+            # An assertion has to be ABOUT THE BLOCK, not merely about the produced value.
+            # `assert result is not None` mentions it and says nothing about blocking, which is
+            # the claim this law makes; every real test here asserts on the decision, its
+            # "block" verdict, or the reason text. Anything derived from the produced value is
+            # accepted -- `decision = json.loads(out)` then `assert decision["decision"] ==
+            # "block"` -- by following assignments transitively from the driver's result.
+            derived = set(produced)
+            for _pass in range(4):          # a fixed point over the short chains these tests use
+                for node in _ast.walk(fn):
+                    if isinstance(node, _ast.Assign):
+                        mentioned = {n.id for n in _ast.walk(node.value)
+                                     if isinstance(n, _ast.Name)}
+                        if mentioned & derived:
+                            for target in node.targets:
+                                for piece in _ast.walk(target):
+                                    if isinstance(piece, _ast.Name):
+                                        derived.add(piece.id)
             for node in _ast.walk(fn):
                 if not isinstance(node, _ast.Assert):
                     continue
-                mentioned = {n.id for n in _ast.walk(node) if isinstance(n, _ast.Name)}
-                if mentioned & produced:
-                    return True
-                # `assert _run_dispatch(...)[0] == 0` -- the call inside the assertion itself.
-                if any(isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
-                       and n.func.id in _DISPATCH_DRIVERS for n in _ast.walk(node)):
+                names = {n.id for n in _ast.walk(node) if isinstance(n, _ast.Name)}
+                touches_result = bool(names & derived) or any(
+                    isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                    and n.func.id in _DISPATCH_DRIVERS for n in _ast.walk(node))
+                if not touches_result:
+                    continue
+                text = _ast.dump(node)
+                if "'block'" in text or '"block"' in text or "block" in names \
+                        or "decision" in text or "reason" in text:
                     return True
             return False
         if not any(_drives_and_asserts(named[name]) for name in found):
@@ -1978,8 +1998,9 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
                          f"set-membership pin is not enough — see this test's docstring): {missing}")
     assert not hollow, (
         f"these gates have a correctly NAMED dispatch-block test that never drives the "
-        f"dispatcher, or never asserts on what it produced -- `assert True` after a dispatch "
-        f"call is not coverage, so the name is the only evidence: {hollow}")
+        f"dispatcher, or never asserts that it BLOCKED -- `assert True`, or `assert result is "
+        f"not None`, after a dispatch call is not coverage of blocking, so the name is the only "
+        f"evidence: {hollow}")
 
 
 # ---------------------------------------------------------------------------

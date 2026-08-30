@@ -14,6 +14,7 @@ in a comment, a docstring, or dead code after the real reference is deleted must
 """
 import ast
 import json
+import shlex
 from pathlib import Path
 
 from makoto.events import EVENTS
@@ -98,8 +99,20 @@ def test_hooks_json_wired_events_point_at_the_real_dispatcher():
     wired = {name for name, e in EVENTS.items() if e["status"] == "WIRED"}
     for name in wired:
         commands = [h["command"] for matcher in hooks[name] for h in matcher["hooks"]]
-        assert any("_dispatch_shim.sh" in c or "makoto.dispatch" in c for c in commands), \
-            f"{name}: no command routes to makoto's dispatcher: {commands}"
+        # A SUBSTRING IS NOT A ROUTE. `echo makoto.dispatch` contains the name and dispatches
+        # nothing; so does a command that mentions the shim in an argument to something else.
+        # The command's own executable -- its first shell word, with ${CLAUDE_PLUGIN_ROOT}
+        # resolved -- has to BE the shim, and that file has to exist.
+        routed = []
+        for command in commands:
+            executable = shlex.split(command)[0] if command.strip() else ""
+            resolved = executable.replace("${CLAUDE_PLUGIN_ROOT}", str(PLUGIN)) \
+                                 .replace("$CLAUDE_PLUGIN_ROOT", str(PLUGIN))
+            if Path(resolved).name == "_dispatch_shim.sh" and Path(resolved).is_file():
+                routed.append(command)
+        assert routed, (
+            f"{name}: no command's own executable is makoto's dispatch shim. Mentioning the "
+            f"name in an argument routes nothing: {commands}")
 
 
 def test_posttoolusefailure_uses_the_post_accumulation_route():
