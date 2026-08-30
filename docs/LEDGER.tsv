@@ -13,9 +13,16 @@
 #                predicate and pins what it does and does not fire on.
 #              * Stop -- test_stop_gate_level_invariant, which fires EVERY live gate
 #                through its real .run(ctx), the exact call run_stop_checks makes.
-#            Verified by disarming rather than by reading: neutering
-#            illusoryInterruptionClaim's regex reddens 6 tests in its own file, and
-#            neutering writeThrashRevert's predicate reddens 8.
+#            Verified by disarming rather than by reading, and the disarm is NAMED so the
+#            number is reproducible. Re-measured 2026-08-30 against a 1934-test suite:
+#              * illusoryInterruptionClaim -- replace _INTERRUPTION_CLAIM_RX with a regex that
+#                matches nothing: 6 tests redden, all in tests/predicates/.
+#              * writeThrashRevert -- make `predicate` return None as its first statement:
+#                3 tests redden, including test_live_catalog_registration_is_reachable_in_dispatch.
+#            The second read 8 before this re-measurement and nothing checked it, so it had
+#            drifted as the suite changed. These are RECORDED measurements, not a gate: no test
+#            re-runs them, because two disarmed suite passes cost ~90s on every run. Reproduce
+#            with the disarms exactly as named above.
 #
 # FIRES_VIA  the edge. Of five allowed edges only Pre and Stop carry any check; Post,
 #            SessionStart and SubagentStop admit checks nothing declares, and a check on
