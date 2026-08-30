@@ -187,9 +187,50 @@ def test_check_declares_exactly_what_it_eats(key):
 
 
 def test_signature_law_catches_an_underdeclared_fixture():
+    """Run the law's own derivation over a planted gate, not set arithmetic on two literals.
+
+    This assigned `derived = frozenset({"text"})` by hand and asserted
+    `derived - fixture.eats == {"text"}` -- arithmetic on two values the test itself wrote, true
+    whatever `_walk_reads` does and even if `_walk_reads` did not exist. It is named for catching
+    an underdeclared fixture and it never ran the code that catches one.
+
+    What the parametrised cases above do and do not cover, stated rather than assumed. A
+    derivation that goes completely blind IS caught by them: `derived` becomes empty while the
+    shipped `eats` declarations are not, so they fail (measured -- planting `return set()` in
+    `_walk_reads` reddens 37 of the 38 tests in this module). What they cannot catch is
+    CO-DRIFT: a derivation that stops seeing one particular pattern, in a repository where the
+    `eats` declarations were written by reading that same derivation's output. Then both sides
+    move together and equality still holds. This test is the independent anchor for that case --
+    a body whose reads are known by construction, not by asking the derivation.
+
+    The plant is a gate body that READS a context field and declares nothing, put through
+    `_walk_reads` exactly as `derived_reads()` puts the real ones. Its control is in the same
+    test: a body reading nothing must derive nothing, so a derivation that simply returns every
+    field cannot pass either.
+    """
+    underdeclared = ast.parse(
+        "def run(ctx):\n"
+        "    if ctx.text:\n"
+        "        return ctx.touched\n"
+        "    return None\n"
+    )
+    body = next(iter(_functions(underdeclared).values()))
+    derived = _walk_reads(body, _functions(underdeclared), STOP_CONTEXT_FIELDS, set(), {"ctx"})
     fixture = Check("fixture.underdeclared", "Stop", "ADVISE", eats=frozenset())
-    derived = frozenset({"text"})
-    assert derived - fixture.eats == frozenset({"text"})
+    assert derived == {"text", "touched"}, (
+        f"the derivation no longer sees fields a gate body reads: got {sorted(derived)}, "
+        f"expected text and touched from a body that reads exactly those two."
+    )
+    assert derived - fixture.eats == {"text", "touched"}, (
+        "the law does not report a gate that reads context fields it declares none of"
+    )
+
+    silent = ast.parse("def run(ctx):\n    return None\n")
+    quiet = next(iter(_functions(silent).values()))
+    assert _walk_reads(quiet, _functions(silent), STOP_CONTEXT_FIELDS, set(), {"ctx"}) == set(), (
+        "CONTROL: a body that reads no context field must derive nothing; a derivation that "
+        "returns every field would satisfy the assertions above without seeing anything"
+    )
 
 
 def test_discharge_eats_matches_helper_body_exactly():

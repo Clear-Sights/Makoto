@@ -16,6 +16,10 @@ import pytest
 # import the shared plain-function twins from tests.conftest directly, not from this module.
 from tests.conftest import _setup_state, _run_dispatch
 
+# The functions that actually put an event through the dispatcher. A test that calls none of
+# these has not driven anything, whatever it is named.
+_DISPATCH_DRIVERS = {"_run_dispatch", "run_dispatch"}
+
 
 def _dispatch_facts(state_dir) -> list:
     """read the HYBRID can't-evaluate facts (dispatch_errors.jsonl rows)."""
@@ -1907,12 +1911,41 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     # pin is test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fires below.
     _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
                         "gate.relative_path_citation", "gate.plan_item_drift"}
-    src = _P(__file__).read_text()
-    missing = [gid for gid in _blocking_gate_ids()
-               if gid not in _ADVISORY_EXEMPT
-               and f"def test_dispatch_{gid.split('.')[-1]}_gate_blocks" not in src]
+    # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
+    # so an empty function with the right name -- or one that asserts nothing, or never reaches
+    # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is
+    # still how the test is found, but the function it names must now be parsed and required to
+    # do the two things the law is about: drive the dispatcher, and assert on what came back.
+    import ast as _ast
+    tree = _ast.parse(_P(__file__).read_text())
+    named = {}
+    for node in _ast.walk(tree):
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            named.setdefault(node.name, node)
+
+    missing, hollow = [], []
+    for gid in sorted(_blocking_gate_ids()):
+        if gid in _ADVISORY_EXEMPT:
+            continue
+        prefix = f"test_dispatch_{gid.split('.')[-1]}_gate_blocks"
+        found = [name for name in named if name.startswith(prefix)]
+        if not found:
+            missing.append(gid)
+            continue
+        # At least one of the tests bearing this name must both call the dispatcher and assert.
+        def _drives_and_asserts(fn):
+            calls = {n.func.id for n in _ast.walk(fn)
+                     if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)}
+            asserts = any(isinstance(n, _ast.Assert) for n in _ast.walk(fn))
+            return bool(calls & _DISPATCH_DRIVERS) and asserts
+        if not any(_drives_and_asserts(named[name]) for name in found):
+            hollow.append(f"{gid} -> {sorted(found)}")
+
     assert not missing, (f"blocking gate(s) without a BEHAVIORAL dispatch-block test (a structural "
                          f"set-membership pin is not enough — see this test's docstring): {missing}")
+    assert not hollow, (
+        f"these gates have a correctly NAMED dispatch-block test that never drives the dispatcher "
+        f"or never asserts, so the name is the only evidence: {hollow}")
 
 
 # ---------------------------------------------------------------------------
