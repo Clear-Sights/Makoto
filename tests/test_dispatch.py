@@ -1874,8 +1874,12 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.run_promised",  # claimed_running's forward-looking sibling (2026-07-23)
                           "gate.claimed_shipped"}  # completed remote-mutation claim-vs-record gate
-    # may_block <=> reaches the pipeline: the set is not hand-maintained, it IS the may_block ids.
-    assert set(_blocking_gate_ids()) == discovered
+    # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
+    # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
+    # restatement that holds however the dispatcher behaves. It stays as documentation of the
+    # correspondence, marked as what it is, and the CLAIM behind it -- "may_block <=> reaches the
+    # pipeline" -- is observed below instead of asserted here.
+    assert set(_blocking_gate_ids()) == discovered   # by construction; see the round-trip below
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
     # references it, and the package exposes no such callable (re-adding it as a gate turns this
     # red). No separate `.fn` attribute anymore (GATE/StopCheck retired) -- introspect the actual
@@ -1934,18 +1938,48 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
             continue
         # At least one of the tests bearing this name must both call the dispatcher and assert.
         def _drives_and_asserts(fn):
-            calls = {n.func.id for n in _ast.walk(fn)
-                     if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)}
-            asserts = any(isinstance(n, _ast.Assert) for n in _ast.walk(fn))
-            return bool(calls & _DISPATCH_DRIVERS) and asserts
+            """Drove the dispatcher AND asserted on what came back.
+
+            `any assert` was the previous bar, so `_run_dispatch(...)` followed by
+            `assert True` satisfied a law about behavioural coverage. An assertion has to
+            mention something the dispatch produced: a name bound from a driver call, or the
+            call's result used directly.
+            """
+            drivers = {n for n in _ast.walk(fn)
+                       if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                       and n.func.id in _DISPATCH_DRIVERS}
+            if not drivers:
+                return False
+            # Names bound from a driver call: `out = _run_dispatch(...)`, `rc, out = ...`.
+            produced = set()
+            for node in _ast.walk(fn):
+                if isinstance(node, _ast.Assign) and isinstance(node.value, _ast.Call) \
+                        and isinstance(node.value.func, _ast.Name) \
+                        and node.value.func.id in _DISPATCH_DRIVERS:
+                    for target in node.targets:
+                        for piece in _ast.walk(target):
+                            if isinstance(piece, _ast.Name):
+                                produced.add(piece.id)
+            for node in _ast.walk(fn):
+                if not isinstance(node, _ast.Assert):
+                    continue
+                mentioned = {n.id for n in _ast.walk(node) if isinstance(n, _ast.Name)}
+                if mentioned & produced:
+                    return True
+                # `assert _run_dispatch(...)[0] == 0` -- the call inside the assertion itself.
+                if any(isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                       and n.func.id in _DISPATCH_DRIVERS for n in _ast.walk(node)):
+                    return True
+            return False
         if not any(_drives_and_asserts(named[name]) for name in found):
             hollow.append(f"{gid} -> {sorted(found)}")
 
     assert not missing, (f"blocking gate(s) without a BEHAVIORAL dispatch-block test (a structural "
                          f"set-membership pin is not enough — see this test's docstring): {missing}")
     assert not hollow, (
-        f"these gates have a correctly NAMED dispatch-block test that never drives the dispatcher "
-        f"or never asserts, so the name is the only evidence: {hollow}")
+        f"these gates have a correctly NAMED dispatch-block test that never drives the "
+        f"dispatcher, or never asserts on what it produced -- `assert True` after a dispatch "
+        f"call is not coverage, so the name is the only evidence: {hollow}")
 
 
 # ---------------------------------------------------------------------------
@@ -2409,3 +2443,49 @@ def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch,
     capsys.readouterr()
     D.main()
     assert len(D._notices) == 1, f"notices accumulated across calls: {D._notices!r}"
+
+
+def test_may_block_is_what_actually_reaches_the_decision(monkeypatch, capsys, state_dir):
+    """may_block <=> reaches the pipeline, OBSERVED in both directions.
+
+    The correspondence is asserted elsewhere by comparing two sets that are the same set by
+    construction. What that comparison stands for is a fact about the dispatcher: a finding from
+    a may_block gate reaches `_emit_decision`, and one from a non-may_block Stop check does not.
+    Neither half is visible to any set comparison, and if `_evaluate_and_gate` stopped consulting
+    `_blocking_gate_ids()` altogether every such comparison would still hold.
+
+    Both halves are driven here through `_evaluate_and_gate` itself, with `run_stop_checks`
+    replaced by one returning a planted Finding at the worst level the vocabulary has.
+    """
+    import json as _json
+    import sqlite3
+    from makoto import dispatch as D
+    from makoto.registry import load_checks
+
+    eligible = sorted(D._blocking_gate_ids())
+    excluded = sorted({c.id for c in load_checks(edge="Stop") if not c.may_block})
+    assert eligible, "no gate is blocking-eligible; the first half below would be vacuous"
+    assert excluded, "no Stop check is excluded; the second half below would be vacuous"
+
+    payload = {"hook_event_name": "Stop", "session_id": "may-block-roundtrip",
+               "cwd": str(state_dir), "last_assistant_message": "done"}
+
+    def drive(pattern_id):
+        planted = D.Finding(pattern_id=pattern_id, file="x.py", line=1, level="error",
+                            message="planted", retry_hint="")
+        monkeypatch.setattr(D, "run_stop_checks", lambda *a, **k: [planted])
+        monkeypatch.setattr(D, "_gates_enabled", lambda *a, **k: True)
+        conn = sqlite3.connect(str(state_dir / "makoto.record.db"), isolation_level=None)
+        try:
+            capsys.readouterr()
+            D._evaluate_and_gate(conn, payload, _json.dumps(payload), 1, state_dir)
+        finally:
+            conn.close()
+        return capsys.readouterr().out
+
+    assert drive(eligible[0]), (
+        f"{eligible[0]} is may_block=True and its finding produced no decision through "
+        f"_evaluate_and_gate; may_block no longer means 'reaches the pipeline'")
+    assert drive(excluded[0]) == "", (
+        f"{excluded[0]} is may_block=False and its finding reached the decision anyway; the "
+        f"dispatcher is not consulting _blocking_gate_ids()")

@@ -228,6 +228,26 @@ def test_every_gate_scenario_actually_fires(tmp_path):
     assert not silent, f"scenario(s) did not fire (fixture drift?): {silent}"
 
 
+def _violation(gate_id: str, level: str):
+    """THE invariant, as a callable, so its teeth test can APPLY it instead of restating it.
+
+    The teeth test below used to spell out `(id not in allowlist) and (level != "error")` in its
+    own words. That proves nothing about the rule that ships: the two can be edited apart and
+    the teeth test goes on passing over a rule that has stopped discriminating. Both callers run
+    this function now.
+    """
+    if gate_id in _ADVISORY_ALLOWLIST:
+        if level == "error":
+            return (gate_id, level, "allowlisted gate emitted 'error' — allowlist entry is "
+                                    "stale, remove it")
+        return None
+    if level != "error":
+        return (gate_id, level, "non-blocking level on a non-allowlisted gate — either this is "
+                                "a bug, or the gate needs an explicit, named, "
+                                "DESIGN-DECISION-cited allowlist entry")
+    return None
+
+
 def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
     """The runtime invariant: every live Stop gate's emitted Finding.level is "error" (the sole
     blocking level, makoto.vocab._ALLOWED_FIRE_LEVELS) UNLESS its id is in _ADVISORY_ALLOWLIST.
@@ -236,14 +256,9 @@ def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
     violations = []
     for g in _live_gates():
         for finding in _findings_for(g, tmp_path / g.id):
-            if g.id in _ADVISORY_ALLOWLIST:
-                if finding.level == "error":
-                    violations.append((g.id, finding.level, "allowlisted gate emitted 'error' — "
-                                        "allowlist entry is stale, remove it"))
-            elif finding.level != "error":
-                violations.append((g.id, finding.level, "non-blocking level on a non-allowlisted "
-                                    "gate — either this is a bug, or the gate needs an explicit, "
-                                    "named, DESIGN-DECISION-cited allowlist entry"))
+            violation = _violation(g.id, finding.level)
+            if violation:
+                violations.append(violation)
     assert not violations, violations
 
 
@@ -252,10 +267,16 @@ def test_TEETH_allowlist_check_catches_an_unnamed_advisory_gate():
     gate id NOT in the allowlist that emits level="advisory" must be flagged by the same logic
     the real test above applies, proving the check has discriminating power rather than always
     passing vacuously."""
-    fake_id, fake_level = "gate.not_on_the_allowlist", "advisory"
-    is_violation = (fake_id not in _ADVISORY_ALLOWLIST) and (fake_level != "error")
-    assert is_violation
-    # and the real allowlisted exception must NOT be flagged as a violation:
-    real_id, real_level = "gate.self_wired", "advisory"
-    is_violation_real = (real_id not in _ADVISORY_ALLOWLIST) and (real_level != "error")
-    assert not is_violation_real
+    assert _ADVISORY_ALLOWLIST, "the allowlist is empty; both halves below would be vacuous"
+    # An id NOT on the allowlist emitting a non-blocking level: the defect the rule exists for.
+    assert _violation("gate.not_on_the_allowlist", "advisory") is not None, (
+        "the shipped invariant does not report an unnamed gate shipping an advisory level")
+    # ...and a named exception at the same level must NOT be reported, or the rule reports
+    # everything and its silence above means nothing.
+    named = sorted(_ADVISORY_ALLOWLIST)[0]
+    assert _violation(named, "advisory") is None, (
+        f"the shipped invariant reports {named}, which is on the allowlist precisely so it may "
+        f"ship an advisory level")
+    # The other direction the rule also owns: an allowlisted gate that has started blocking.
+    assert _violation(named, "error") is not None, (
+        f"a stale allowlist entry -- {named} now emitting 'error' -- goes unreported")

@@ -237,6 +237,16 @@ def test_gate_dataclass_has_no_undeclared_shadow_state():
     assert live_ids == EXPECTED_LIVE_GATE_IDS
     non_blocking_stop_checks = [c for c in load_checks(edge="Stop") if not c.may_block]
     assert non_blocking_stop_checks, "expected at least staleEstablisher/undeclaredFalsifiable"
+    # BY CONSTRUCTION on real input, and marked as such. `EXPECTED_LIVE_GATE_IDS` was just
+    # asserted equal to the may_block-True ids, and `non_blocking_stop_checks` is the may_block-
+    # False ones, so the two are complementary halves of one catalog and cannot intersect
+    # however the dispatcher behaves. This stays as the statement of the partition, and its
+    # discriminating power lives in the teeth test that plants a leak into it.
+    #
+    # The CLAIM the partition stands for -- may_block decides what reaches the decision -- is
+    # observed, not restated, in tests/test_dispatch.py::
+    # test_may_block_is_what_actually_reaches_the_decision, which drives a planted finding from
+    # each side through _evaluate_and_gate and requires opposite outcomes.
     violation = _partition_violation({c.id for c in non_blocking_stop_checks})
     assert violation is None, violation
 
