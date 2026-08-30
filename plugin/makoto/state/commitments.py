@@ -167,13 +167,6 @@ def _is_file_shaped(loc: str) -> bool:
     return bool(_HAS_CAPITAL_RX.search(loc)) and loc.lower() in _KNOWN_DOTLESS
 
 
-def _promise_location(text: str) -> Optional[str]:
-    """First promised path (see _promise_match), location only — kept for callers/mirrors that
-    want just the surface."""
-    m = _promise_match(text)
-    return m[0] if m else None
-
-
 def _promise_match(text: str):
     """(location, start, end) for the first path that is the object/destination of an ACTIVE,
     FIRST-PERSON forward production promise, else None. A produce verb must GOVERN the path
