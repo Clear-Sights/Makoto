@@ -187,7 +187,12 @@ def test_each_live_gate_exports_a_well_formed_CHECK():
         assert isinstance(g, Check)
         assert callable(g.run)
         assert g.applies_at == "Stop"
-        assert g.may_block is True
+        # `may_block is True` used to be asserted here. `_live_gates()` is DEFINED as
+        # `[c for c in load_checks(edge="Stop") if c.may_block]`, so that assertion was the
+        # selection restated: it could not fail while this loop had anything to iterate over.
+        # The property it was reaching for -- that the may_block set is exactly the designed set
+        # -- is checked where it can fail, in test_discovered_gates_match_the_design above,
+        # against EXPECTED_LIVE_GATE_IDS.
         # the CHECK (or EXTRA_CHECKS entry) lives in the merged adapter+engine module.
         home = g.run.__module__
         assert home.startswith("makoto.checks.")
