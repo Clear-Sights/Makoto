@@ -124,7 +124,7 @@ def test_discharge_exact_and_empty():
     assert _discharged("src/auth.py", set(), None) is False
 
 
-# --- line-level pinning: _non_prose_line + _promise_location slice boundary --------------------
+# --- line-level pinning: _non_prose_line + _promise_match slice boundary --------------------
 # A markdown TABLE row (>=2 cell pipes) is a listing, not a sentence, even when a produce verb
 # ("Add") sits line-initial AHEAD of the path and the pipes trail it (so _GOVERN_BREAK_RX, which
 # only scans the text BEFORE the path, never sees them). _non_prose_line is the SOLE guard that

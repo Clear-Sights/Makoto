@@ -58,7 +58,7 @@ _FENCE_RX = re.compile(r"(?m)^\s{0,3}```")
 
 def _in_fence(fence_ends: list, offset: int) -> bool:
     """True iff `offset` sits inside a ```fenced code block``` -- an ODD count of ``` fences
-    before it means so (same parity trick `state/commitments.py::_promise_location` uses).
+    before it means so (same parity trick `state/commitments.py::_promise_match` uses).
     Identical to `len(_FENCE_RX.findall(text[:offset])) % 2 == 1`: a marker is counted by that
     prefix scan exactly when it ends at or before `offset`, i.e. when it fits wholly inside the
     prefix, which is what `bisect_right` over the marker END offsets counts."""

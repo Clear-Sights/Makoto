@@ -46,7 +46,21 @@ def _run_shim(cwd: Path, env_overrides: dict, state_dir: Path) -> subprocess.Com
 
 
 def test_shim_is_executable():
-    assert os.access(SHIM, os.X_OK)
+    """The bit GIT records, not the one this checkout happens to have.
+
+    `os.access(SHIM, os.X_OK)` reads the working tree, and git's mode is what an installing user
+    receives: a local `chmod +x` passes this over an index recording 100644. Both are checked --
+    the index because it ships, the working tree because the tests below have to run it.
+    """
+    done = subprocess.run(["git", "ls-files", "-s", "--", str(SHIM.relative_to(REPO))],
+                          cwd=REPO, capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0 and done.stdout.strip(), (
+        f"git does not track {SHIM}; its recorded mode cannot be read, and absence is not a pass")
+    mode = done.stdout.split()[0]
+    assert mode == "100755", (
+        f"git records mode {mode} for the shim; it must be 100755, because that is the bit an "
+        f"installing user receives. A local chmod does not change it.")
+    assert os.access(SHIM, os.X_OK), "the shim is not executable in this checkout"
 
 
 def test_decoy_package_in_cwd_cannot_shadow_the_plugin(tmp_path, bare_python_dir):
@@ -58,6 +72,14 @@ def test_decoy_package_in_cwd_cannot_shadow_the_plugin(tmp_path, bare_python_dir
     })
     assert proc.returncode == 0, proc.stderr
     assert "No module named" not in proc.stderr, proc.stderr
+    # EVIDENCE THE REAL MODULE RAN, not just that something exited 0. Both assertions above are
+    # satisfied by a shim replaced with `exit 0`, which is the opposite of what this test is
+    # named for: it claims resolution reached the plugin's own package. `makoto.dispatch` opens
+    # its record database in MAKOTO_STATE_DIR on any event, and a stub creates nothing there.
+    assert (tmp_path / "state" / "makoto.record.db").is_file(), (
+        f"the shim exited 0 and left no record database in {tmp_path / 'state'}; nothing shows "
+        f"makoto.dispatch was resolved and executed, which is the whole claim here. "
+        f"stdout={proc.stdout[:300]!r} stderr={proc.stderr[-300:]!r}")
 
 
 def test_unusable_plugin_root_fails_open_loudly(tmp_path):

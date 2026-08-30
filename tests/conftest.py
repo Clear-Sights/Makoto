@@ -116,6 +116,10 @@ def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tu
     )
     stdout = proc.stdout.decode("utf-8")
     stderr = proc.stderr.decode("utf-8", errors="replace")
+    # THIS HELPER ALREADY GUARDS THE EXIT CODE, so a caller's own `assert rc == 0` observes a
+    # value this line has already guaranteed and can never go red. Existing callers keep theirs
+    # -- removing them is a wide mechanical diff with no behavioural gain -- but a new test
+    # should assert on the DECISION rather than repeat this.
     assert proc.returncode == 0, (
         f"makoto.dispatch exited {proc.returncode}; stderr follows:\n{stderr}"
     )

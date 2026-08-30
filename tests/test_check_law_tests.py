@@ -118,8 +118,28 @@ def _module_calls(tree: ast.Module) -> set[str]:
     return calls | {name.rsplit(".", 1)[-1] for name in calls}
 
 
+def _discarded_calls(tree: ast.Module) -> set[str]:
+    """Primitives called as a BARE STATEMENT, so whatever they return is thrown away.
+
+    `_module_calls` answers "is this primitive called". A call whose result nothing reads is not
+    evidence: the check can call the history reader, ignore what it says, and return a verdict
+    reached some other way, while the shape law sees the name and passes. Only calls in
+    statement position are collected here -- a call inside a comparison, an assignment, a return
+    or an argument is used by definition.
+    """
+    discarded = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            name = _call_name(node.value)
+            if name:
+                discarded.add(name)
+                discarded.add(name.rsplit(".", 1)[-1])
+    return discarded
+
+
 def _has_required_evidence(shape: str, tree: ast.Module) -> bool:
-    calls = _module_calls(tree)
+    # A primitive whose result is discarded does not count as having been consulted.
+    calls = _module_calls(tree) - _discarded_calls(tree)
     if shape == "CLAIM_VS_HISTORY":
         return bool(calls & HISTORY_PRIMITIVES)
     if shape == "CLAIM_VS_LEDGER":
@@ -199,7 +219,12 @@ def test_check_declares_and_evidences_result_shape(key, check, tree):
         assert check.tests == factory_shape
     else:
         assert _has_required_evidence(check.tests, tree), (
-            f"{key}: declares {check.tests} without its required evidence primitive"
+            f"{key}: declares {check.tests} without its required evidence primitive, or calls "
+            f"one only as a bare statement and discards what it returns. STATED LIMIT: this "
+            f"law reads the module's source -- it establishes that the primitive is consulted "
+            f"and its result used, not that the verdict is derived from it. The behavioural "
+            f"half is tests/predicates/<check>.py and the universal law in "
+            f"tests/test_stop_gate_level_invariant.py."
         )
 
 

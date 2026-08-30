@@ -99,13 +99,26 @@ def render_demo() -> list[str]:
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    scenarios = [name for name in vars(module)
-                 if name.startswith("scenario_") and callable(vars(module)[name])]
+    # "REAL scenarios" was a count of NAMES: every `scenario_*` callable in the module, while
+    # only `scenario_receipt` was ever executed here. The README therefore published a
+    # denominator over scenarios this renderer had not run -- a scenario that raised, or that
+    # produced no log at all, still counted toward the number claiming they are real. The count
+    # is now what actually ran and left a log behind.
+    scenarios = sorted(name for name in vars(module)
+                       if name.startswith("scenario_") and callable(vars(module)[name]))
+    if not scenarios:
+        raise RuntimeError("render_demo.py declares no scenario, so the demo count is vacuous")
     with tempfile.TemporaryDirectory(prefix="makoto-readme-demo-") as directory:
         demo_root = Path(directory)
         module.LOGS_DIR = demo_root / "logs"
-        with redirect_stdout(io.StringIO()):
-            module.scenario_receipt(demo_root)
+        for name in scenarios:
+            with redirect_stdout(io.StringIO()):
+                vars(module)[name](demo_root)
+        produced = sorted(path.stem for path in module.LOGS_DIR.glob("*.json"))
+        if len(produced) != len(scenarios):
+            raise RuntimeError(
+                f"{len(scenarios)} scenarios ran and {len(produced)} logs were produced "
+                f"({produced}); a scenario that leaves no log is not a REAL scenario")
         receipt = json.loads((module.LOGS_DIR / "receipt.json").read_text(encoding="utf-8"))
         receipt_body = json.loads(receipt["steps"][-1]["stdout"])
     replay = subprocess.run([sys.executable, "eval/replay.py"], cwd=REPO, text=True,
@@ -118,7 +131,7 @@ def render_demo() -> list[str]:
     )
     return [
         f"- corpus replay: **{derailments} derailments**, **{fields['passed']}/{fields['sessions']}** sessions pass; the command exits successfully only when every expectation holds",
-        f"- live demo: **{len(scenarios)} REAL scenarios**",
+        f"- live demo: **{len(produced)} REAL scenarios**",
         f"- receipt demo: **{receipt_body['claim_count']} claims**, **{receipt_body['exemption_count']} exemptions**",
     ]
 

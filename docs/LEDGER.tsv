@@ -1,0 +1,67 @@
+# LEDGER — Makoto, at 5a49fb8
+#
+# One row per check. Mostly a projection of load_checks(): Check already declares eats,
+# tests, applies_at, layer and may_block, so those columns are extracted, not measured.
+#
+# WITNESS    CORRECTED. An earlier version of this file cited
+#            `test_pre_tier_block_invariant` as the witness for all 15 Pre checks. That
+#            law asserts each check's `posture` FIELD equals BLOCK. It never runs a
+#            check, so it is not evidence that one fires -- the same class of
+#            non-evidence as Keel's occasion algebra, and this file was asserting it as
+#            a witness. The real witnesses are named per row:
+#              * Pre  -- its own file under tests/predicates/, which drives the
+#                predicate and pins what it does and does not fire on.
+#              * Stop -- test_stop_gate_level_invariant, which fires EVERY live gate
+#                through its real .run(ctx), the exact call run_stop_checks makes.
+#            Verified by disarming rather than by reading, and the disarm is NAMED so the
+#            number is reproducible. Re-measured 2026-08-30 against a 1934-test suite:
+#              * illusoryInterruptionClaim -- replace _INTERRUPTION_CLAIM_RX with a regex that
+#                matches nothing: 6 tests redden, all in tests/predicates/.
+#              * writeThrashRevert -- make `predicate` return None as its first statement:
+#                3 tests redden, including test_live_catalog_registration_is_reachable_in_dispatch.
+#            The second read 8 before this re-measurement and nothing checked it, so it had
+#            drifted as the suite changed. These are RECORDED measurements, not a gate: no test
+#            re-runs them, because two disarmed suite passes cost ~90s on every run. Reproduce
+#            with the disarms exactly as named above.
+#
+# FIRES_VIA  the edge. Of five allowed edges only Pre and Stop carry any check; Post,
+#            SessionStart and SubagentStop admit checks nothing declares, and a check on
+#            an edge the dispatcher cannot deliver would load clean and never fire.
+
+repo	piece	seam	eats	fires_via	posture	may_block	layer	witness	label
+Makoto	content.deferred_checkbox_theater	plugin/makoto/checks/makoto.checks.deferredCheckboxTheater	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_deferredCheckboxTheater.py	machine-checked
+Makoto	content.env_gated_audit	plugin/makoto/checks/makoto.checks.envGatedAudit	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_envGatedAudit.py	machine-checked
+Makoto	content.fabricated_commit_sha	plugin/makoto/checks/makoto.checks.fabricatedCommitSha	current_event,history,pattern	Pre	BLOCK	False	object	tests/predicates/test_fabricatedCommitSha.py	machine-checked
+Makoto	content.illusory_authorship_trailer	plugin/makoto/checks/makoto.checks.illusoryAuthorshipTrailer	conn,current_event,history,pattern	Pre	BLOCK	False	object	tests/predicates/test_illusoryAuthorshipTrailer.py	machine-checked
+Makoto	content.illusory_interruption_claim	plugin/makoto/checks/makoto.checks.illusoryInterruptionClaim	conn,current_event,history,pattern	Pre	BLOCK	False	object	tests/predicates/test_illusoryInterruptionClaim.py	machine-checked
+Makoto	content.integrity_suppression_flag	plugin/makoto/checks/makoto.checks.integritySuppressionFlag	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_integritySuppressionFlag.py	machine-checked
+Makoto	content.phantom_citation	plugin/makoto/checks/makoto.checks.phantomCitation	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_phantomCitation.py	machine-checked
+Makoto	content.self_mute_guard	plugin/makoto/checks/makoto.checks.selfMuteGuard	current_event,pattern	Pre	BLOCK	False	meta	tests/predicates/test_selfMuteGuard.py	machine-checked
+Makoto	content.unsourced_webfetch	plugin/makoto/checks/makoto.checks.unsourcedWebfetch	current_event,history,pattern	Pre	BLOCK	False	object	tests/predicates/test_unsourcedWebfetch.py	machine-checked
+Makoto	content.verifier_body_hollowed	plugin/makoto/checks/makoto.checks.verifierBodyHollowed	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_verifierBodyHollowed.py	machine-checked
+Makoto	content.verifier_exit_masking	plugin/makoto/checks/makoto.checks.verifierExitMasking	current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_verifierExitMasking.py	machine-checked
+Makoto	content.verifier_predicate_weakened	plugin/makoto/checks/makoto.checks.verifierPredicateWeakened	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_verifierPredicateWeakened.py	machine-checked
+Makoto	event.identical_retry	plugin/makoto/checks/makoto.checks.identicalRetryInterdiction	current_event,history,pattern	Pre	BLOCK	False	object	tests/predicates/test_identical_retry_interdiction.py	machine-checked
+Makoto	event.thrash_revert	plugin/makoto/checks/makoto.checks.writeThrashRevert	current_event,history,pattern	Pre	BLOCK	False	object	tests/predicates/test_writeThrashRevert.py	machine-checked
+Makoto	gate.contract_order	plugin/makoto/checks/makoto.checks.contractOrder	conn,current_event,pattern	Pre	BLOCK	False	object	tests/predicates/test_contract_order.py	machine-checked
+Makoto	gate.advance	plugin/makoto/checks/gate.advance	empty,fs_exists,fs_size,opens,text,touched	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.canon	plugin/makoto/checks/gate.canon	history,session_id,state_root,transcript_path	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.canon_fingerprints	plugin/makoto/checks/gate.canon_fingerprints	history,session_id,state_root,text,transcript_path	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.canon_fingerprints_advisory	plugin/makoto/checks/gate.canon_fingerprints_advisory	history,text	Stop	ADVISE	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.claimed_running	plugin/makoto/checks/gate.claimed_running	history_all_agents,text	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.claimed_shipped	plugin/makoto/checks/gate.claimed_shipped	cwd,history_all_agents,text	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.completion	plugin/makoto/checks/gate.completion	cwd,empty,fs_exists,fs_size,text,touched	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.contract_order	plugin/makoto/checks/gate.contract_order	plan	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.dropped	plugin/makoto/checks/gate.dropped	empty,fs_exists,fs_read,fs_size,text,touched	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.fabricated_action	plugin/makoto/checks/gate.fabricated_action	history,text	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.green_claim	plugin/makoto/checks/gate.green_claim	testrun_output,text	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.hollow_test	plugin/makoto/checks/gate.hollow_test	cwd,fs_read,touched	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.liveness	plugin/makoto/checks/gate.liveness	cwd,fs_read,touched	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.named_test	plugin/makoto/checks/gate.named_test	history,text	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.plan_item_drift	plugin/makoto/checks/gate.plan_item_drift	open_plan_items	Stop	ADVISE	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.relative_path_citation	plugin/makoto/checks/gate.relative_path_citation	text	Stop	ADVISE	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.run_promised	plugin/makoto/checks/gate.run_promised	history	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.self_wired	plugin/makoto/checks/gate.self_wired	fs_read	Stop	ADVISE	True	meta	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.stale_establisher	plugin/makoto/checks/gate.stale_establisher	plan	Stop	advise	False	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.stale_pass	plugin/makoto/checks/gate.stale_pass	cwd,text	Stop	BLOCK	True	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked
+Makoto	gate.undeclared_falsifiable	plugin/makoto/checks/gate.undeclared_falsifiable	(none)	Stop	advise	False	object	test_stop_gate_level_invariant (fires it through its real .run(ctx))	machine-checked

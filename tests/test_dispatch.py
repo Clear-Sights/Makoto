@@ -16,6 +16,10 @@ import pytest
 # import the shared plain-function twins from tests.conftest directly, not from this module.
 from tests.conftest import _setup_state, _run_dispatch
 
+# The functions that actually put an event through the dispatcher. A test that calls none of
+# these has not driven anything, whatever it is named.
+_DISPATCH_DRIVERS = {"_run_dispatch", "run_dispatch"}
+
 
 def _dispatch_facts(state_dir) -> list:
     """read the HYBRID can't-evaluate facts (dispatch_errors.jsonl rows)."""
@@ -1870,8 +1874,12 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.run_promised",  # claimed_running's forward-looking sibling (2026-07-23)
                           "gate.claimed_shipped"}  # completed remote-mutation claim-vs-record gate
-    # may_block <=> reaches the pipeline: the set is not hand-maintained, it IS the may_block ids.
-    assert set(_blocking_gate_ids()) == discovered
+    # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
+    # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
+    # restatement that holds however the dispatcher behaves. It stays as documentation of the
+    # correspondence, marked as what it is, and the CLAIM behind it -- "may_block <=> reaches the
+    # pipeline" -- is observed below instead of asserted here.
+    assert set(_blocking_gate_ids()) == discovered   # by construction; see the round-trip below
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
     # references it, and the package exposes no such callable (re-adding it as a gate turns this
     # red). No separate `.fn` attribute anymore (GATE/StopCheck retired) -- introspect the actual
@@ -1907,12 +1915,92 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     # pin is test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fires below.
     _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
                         "gate.relative_path_citation", "gate.plan_item_drift"}
-    src = _P(__file__).read_text()
-    missing = [gid for gid in _blocking_gate_ids()
-               if gid not in _ADVISORY_EXEMPT
-               and f"def test_dispatch_{gid.split('.')[-1]}_gate_blocks" not in src]
+    # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
+    # so an empty function with the right name -- or one that asserts nothing, or never reaches
+    # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is
+    # still how the test is found, but the function it names must now be parsed and required to
+    # do the two things the law is about: drive the dispatcher, and assert on what came back.
+    import ast as _ast
+    tree = _ast.parse(_P(__file__).read_text())
+    named = {}
+    for node in _ast.walk(tree):
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            named.setdefault(node.name, node)
+
+    missing, hollow = [], []
+    for gid in sorted(_blocking_gate_ids()):
+        if gid in _ADVISORY_EXEMPT:
+            continue
+        prefix = f"test_dispatch_{gid.split('.')[-1]}_gate_blocks"
+        found = [name for name in named if name.startswith(prefix)]
+        if not found:
+            missing.append(gid)
+            continue
+        # At least one of the tests bearing this name must both call the dispatcher and assert.
+        def _drives_and_asserts(fn):
+            """Drove the dispatcher AND asserted on what came back.
+
+            `any assert` was the previous bar, so `_run_dispatch(...)` followed by
+            `assert True` satisfied a law about behavioural coverage. An assertion has to
+            mention something the dispatch produced: a name bound from a driver call, or the
+            call's result used directly.
+            """
+            drivers = {n for n in _ast.walk(fn)
+                       if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                       and n.func.id in _DISPATCH_DRIVERS}
+            if not drivers:
+                return False
+            # Names bound from a driver call: `out = _run_dispatch(...)`, `rc, out = ...`.
+            produced = set()
+            for node in _ast.walk(fn):
+                if isinstance(node, _ast.Assign) and isinstance(node.value, _ast.Call) \
+                        and isinstance(node.value.func, _ast.Name) \
+                        and node.value.func.id in _DISPATCH_DRIVERS:
+                    for target in node.targets:
+                        for piece in _ast.walk(target):
+                            if isinstance(piece, _ast.Name):
+                                produced.add(piece.id)
+            # An assertion has to be ABOUT THE BLOCK, not merely about the produced value.
+            # `assert result is not None` mentions it and says nothing about blocking, which is
+            # the claim this law makes; every real test here asserts on the decision, its
+            # "block" verdict, or the reason text. Anything derived from the produced value is
+            # accepted -- `decision = json.loads(out)` then `assert decision["decision"] ==
+            # "block"` -- by following assignments transitively from the driver's result.
+            derived = set(produced)
+            for _pass in range(4):          # a fixed point over the short chains these tests use
+                for node in _ast.walk(fn):
+                    if isinstance(node, _ast.Assign):
+                        mentioned = {n.id for n in _ast.walk(node.value)
+                                     if isinstance(n, _ast.Name)}
+                        if mentioned & derived:
+                            for target in node.targets:
+                                for piece in _ast.walk(target):
+                                    if isinstance(piece, _ast.Name):
+                                        derived.add(piece.id)
+            for node in _ast.walk(fn):
+                if not isinstance(node, _ast.Assert):
+                    continue
+                names = {n.id for n in _ast.walk(node) if isinstance(n, _ast.Name)}
+                touches_result = bool(names & derived) or any(
+                    isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                    and n.func.id in _DISPATCH_DRIVERS for n in _ast.walk(node))
+                if not touches_result:
+                    continue
+                text = _ast.dump(node)
+                if "'block'" in text or '"block"' in text or "block" in names \
+                        or "decision" in text or "reason" in text:
+                    return True
+            return False
+        if not any(_drives_and_asserts(named[name]) for name in found):
+            hollow.append(f"{gid} -> {sorted(found)}")
+
     assert not missing, (f"blocking gate(s) without a BEHAVIORAL dispatch-block test (a structural "
                          f"set-membership pin is not enough — see this test's docstring): {missing}")
+    assert not hollow, (
+        f"these gates have a correctly NAMED dispatch-block test that never drives the "
+        f"dispatcher, or never asserts that it BLOCKED -- `assert True`, or `assert result is "
+        f"not None`, after a dispatch call is not coverage of blocking, so the name is the only "
+        f"evidence: {hollow}")
 
 
 # ---------------------------------------------------------------------------
@@ -2376,3 +2464,49 @@ def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch,
     capsys.readouterr()
     D.main()
     assert len(D._notices) == 1, f"notices accumulated across calls: {D._notices!r}"
+
+
+def test_may_block_is_what_actually_reaches_the_decision(monkeypatch, capsys, state_dir):
+    """may_block <=> reaches the pipeline, OBSERVED in both directions.
+
+    The correspondence is asserted elsewhere by comparing two sets that are the same set by
+    construction. What that comparison stands for is a fact about the dispatcher: a finding from
+    a may_block gate reaches `_emit_decision`, and one from a non-may_block Stop check does not.
+    Neither half is visible to any set comparison, and if `_evaluate_and_gate` stopped consulting
+    `_blocking_gate_ids()` altogether every such comparison would still hold.
+
+    Both halves are driven here through `_evaluate_and_gate` itself, with `run_stop_checks`
+    replaced by one returning a planted Finding at the worst level the vocabulary has.
+    """
+    import json as _json
+    import sqlite3
+    from makoto import dispatch as D
+    from makoto.registry import load_checks
+
+    eligible = sorted(D._blocking_gate_ids())
+    excluded = sorted({c.id for c in load_checks(edge="Stop") if not c.may_block})
+    assert eligible, "no gate is blocking-eligible; the first half below would be vacuous"
+    assert excluded, "no Stop check is excluded; the second half below would be vacuous"
+
+    payload = {"hook_event_name": "Stop", "session_id": "may-block-roundtrip",
+               "cwd": str(state_dir), "last_assistant_message": "done"}
+
+    def drive(pattern_id):
+        planted = D.Finding(pattern_id=pattern_id, file="x.py", line=1, level="error",
+                            message="planted", retry_hint="")
+        monkeypatch.setattr(D, "run_stop_checks", lambda *a, **k: [planted])
+        monkeypatch.setattr(D, "_gates_enabled", lambda *a, **k: True)
+        conn = sqlite3.connect(str(state_dir / "makoto.record.db"), isolation_level=None)
+        try:
+            capsys.readouterr()
+            D._evaluate_and_gate(conn, payload, _json.dumps(payload), 1, state_dir)
+        finally:
+            conn.close()
+        return capsys.readouterr().out
+
+    assert drive(eligible[0]), (
+        f"{eligible[0]} is may_block=True and its finding produced no decision through "
+        f"_evaluate_and_gate; may_block no longer means 'reaches the pipeline'")
+    assert drive(excluded[0]) == "", (
+        f"{excluded[0]} is may_block=False and its finding reached the decision anyway; the "
+        f"dispatcher is not consulting _blocking_gate_ids()")

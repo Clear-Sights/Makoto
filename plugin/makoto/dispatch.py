@@ -537,6 +537,26 @@ def _recheck_certificate_enabled() -> bool:
     return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _named(finding) -> str:
+    """The finding's message, guaranteed to name the check that produced it.
+
+    A DENIAL THAT DOES NOT NAME ITS OWN ROW CANNOT BE CITED, LOOKED UP, OR TOLD APART. The
+    pattern-driven rows in `kit.py` build their message as `row {pattern.id} (...)`, so they
+    already carried it. Every hand-written predicate had to remember to, and
+    `event.identical_retry` did not: its denial read as bare prose, so a reader could not tell
+    which of the fifteen Pre rows had spoken, and the replay corpus could not attribute the fire
+    to a row at all.
+
+    Fixed at the one place every finding passes through rather than in each predicate, because a
+    convention each author must remember is the same defect waiting on the next author.
+    """
+    pattern_id = getattr(finding, "pattern_id", "") or ""
+    message = finding.message
+    if pattern_id and pattern_id not in message:
+        return f"row {pattern_id}: {message}"
+    return message
+
+
 def _worst_finding(findings: list[Finding]) -> tuple[str, Finding] | None:
     """Pick the worst-outcome finding — BLOCK > ASK > ADVISE > ALLOW, first one at that rank
     (matching `_build_decision`'s old `errors[0]` precedent when multiple BLOCK findings fire).
@@ -595,7 +615,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     if worst is None:
         return
     outcome, finding = worst
-    detail = finding.message
+    detail = _named(finding)
     if outcome == verdict.BLOCK:
         hint = _jit_hint(finding)
         if hint:
@@ -664,7 +684,16 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             is_meta = True          # catalog unloadable: decision machinery -> fail closed
         if is_meta:
             folded = verdict.Decision(verdict.BLOCK, detail)
-    edge = _HOOK_TO_EDGE.get(hook_event, "Pre")
+    # Pass the hook through as its own edge when unmapped, rather than aliasing it to "Pre".
+    # The old default was silent and it lied: a finding on SessionStart -- which IS registered
+    # in hooks.json, so the host does send it -- rendered
+    # {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": ...}},
+    # telling the host the event was a tool pre-flight when it was a session start, and
+    # applying a tool-permission decision to an event with no tool in it. `dispatch_posture`
+    # already returns {} for an edge its table does not carry, which is the honest answer:
+    # no wire, no decision. The finding is still recorded by _record_audit either way, so
+    # this drops a mislabelled body, never the record of the fire.
+    edge = _HOOK_TO_EDGE.get(hook_event, hook_event)
     try:
         body = verdict.dispatch_posture(edge, folded, hook_event)
     except Exception as exc:

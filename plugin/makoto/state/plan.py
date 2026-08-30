@@ -298,7 +298,7 @@ def _first_person_governs(text: str, verb_start: int, line_start: int) -> bool:
 
 def source_plan_item_promise(text: str) -> Optional[dict]:
     """First plan/task label that is the object of a first-person, active, non-past, non-negated,
-    non-conditional FORWARD promise, else None. Mirrors `commitments.py::_promise_location`'s
+    non-conditional FORWARD promise, else None. Mirrors `commitments.py::_promise_match`'s
     clause discipline scoped to this label-shaped surface (not yet corpus-measured for FPs --
     named honestly in the module docstring)."""
     if not text:
