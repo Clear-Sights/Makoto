@@ -28,6 +28,7 @@ Exit 0 iff every session meets its expectation. Python standard library only.
 from __future__ import annotations
 
 import json
+import re
 import os
 import pathlib
 import subprocess
@@ -55,6 +56,14 @@ def dispatch(event: dict, state_dir: str) -> dict:
     except json.JSONDecodeError:
         decision = {}
     return {"decision": decision, "exit": proc.returncode}
+
+
+_ROW_IN_REASON = re.compile(r"\brow ([a-z]+\.[a-z0-9_]+)\b")
+
+
+def rows_named(reason: str | None) -> list[str]:
+    """The check ids a denial names. A fire nobody can attribute is a fire about nothing."""
+    return _ROW_IN_REASON.findall(reason or "")
 
 
 def fired(result: dict) -> str | None:
@@ -94,6 +103,24 @@ def replay(path: pathlib.Path) -> bool:
         return False
     print(f"   first fire at event [{first}]: {reasons[first]}")
     ok = first <= derails_at
+
+    # A SESSION MUST NAME THE CHECK IT EXERCISES, AND THE FIRE MUST BE THAT CHECK.
+    #
+    # Until this existed, replay asked only whether SOMETHING denied in time. A session named
+    # for one check passed on a denial from any other, so a corpus file was evidence that the
+    # dispatcher fires -- never evidence about the check in its filename. The unit suite already
+    # proves every check CAN fire; only this can say the check is still reachable through the
+    # real entrypoint, and which one spoke when several could have.
+    declared = header.get("check")
+    if not declared:
+        print("   FAIL: the header names no check, so this session is evidence about nothing")
+        return False
+    named = rows_named(reasons[first])
+    if declared not in named:
+        print(f"   FAIL: declared check {declared} did not fire; the first fire names "
+              f"{named or 'no check at all'}")
+        return False
+    print(f"   the fire is {declared}, which is the check this session declares")
     print("   fires at or before the derailment — OK" if ok
           else "   FAIL: first fire comes after the derailing event")
 
