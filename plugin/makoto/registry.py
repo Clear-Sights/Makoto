@@ -115,7 +115,13 @@ def _candidate_edges(path: Path) -> frozenset[str]:
     output (which files' CHECK objects show up) is unchanged by this function's existence
     either way; it only changes how many modules get imported to compute that output."""
     try:
-        text = path.read_text()
+        # utf-8, stated. The default here is `locale.getpreferredencoding(False)`, which is
+        # cp1252 on a Windows host -- and this read is the CHECK CATALOG loader, so a decode
+        # failure does not fail one check, it fails the population. Measured in the field:
+        # `UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d in position 3017`, whose
+        # call was then allowed without being checked. Python source is utf-8 by definition, so
+        # this is the encoding these files actually have, not a guess.
+        text = path.read_text(encoding="utf-8")
     except OSError:
         return ALLOWED_EDGES
     edges = frozenset(_APPLIES_AT_RE.findall(text))

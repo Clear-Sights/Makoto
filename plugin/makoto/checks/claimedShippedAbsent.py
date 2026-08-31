@@ -54,7 +54,7 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
         if branch is None:
             head = subprocess.run(
                 ["git", "-C", str(cwd), "symbolic-ref", "--quiet", "--short", "HEAD"],
-                capture_output=True, text=True, timeout=3.0,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3.0,
             )
             branch = head.stdout.strip() if head.returncode == 0 else ""
             if not branch:
@@ -64,11 +64,11 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
             return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="empty branch")
         local = subprocess.run(
             ["git", "-C", str(cwd), "rev-parse", "--verify", f"refs/heads/{branch}"],
-            capture_output=True, text=True, timeout=3.0,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3.0,
         )
         remote = subprocess.run(
             ["git", "-C", str(cwd), "ls-remote", "origin", f"refs/heads/{branch}"],
-            capture_output=True, text=True, timeout=3.0,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3.0,
         )
     except Exception as exc:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail=f"git observation unavailable: {exc}")
