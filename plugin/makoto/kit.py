@@ -1049,7 +1049,7 @@ def resolve_in_worktree(loc, cwd):
             return os.path.normpath(loc) if os.path.exists(loc) else None
         root_result = subprocess.run(
             ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
         )
         if root_result.returncode != 0:
             return None
@@ -1097,7 +1097,7 @@ def pushed_ref_matches_world(text, cwd):
         if branch is None:
             branch_result = subprocess.run(
                 ["git", "-C", cwd, "symbolic-ref", "--quiet", "--short", "HEAD"],
-                capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
             )
             if branch_result.returncode != 0:
                 return False
@@ -1114,7 +1114,7 @@ def pushed_ref_matches_world(text, cwd):
         refs = (f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")
         result = subprocess.run(
             ["git", "-C", cwd, "show-ref", "--verify", "--hash", *refs],
-            capture_output=True, text=True, timeout=_LOCAL_GIT_TIMEOUT,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
         )
         object_ids = result.stdout.splitlines()
         return result.returncode == 0 and len(object_ids) == 2 and object_ids[0] == object_ids[1]
