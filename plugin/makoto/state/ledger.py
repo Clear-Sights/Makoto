@@ -195,6 +195,36 @@ def latest_testrun(conn, session_id: str) -> str:
         return ""
 
 
+def latest_testrun_exit(conn, session_id: str) -> "int | None":
+    """The EXIT STATUS of the same row `latest_testrun` returns, or None if unrecorded.
+
+    Same table, same `kind='testrun'`, same `ORDER BY source_event_id DESC, rowid DESC` -- it must
+    be the same row or the pair lies, so the ordering is written identically here rather than
+    approximated. (One query returning both would be better still; it is kept separate only
+    because `latest_testrun`'s `-> str` contract is read by several callers.)
+
+    WHY THIS EXISTS. `green_claim_gate` decided a green claim by scanning the recorded 500-char
+    OUTPUT TAIL for a failure token, and its own docstring recorded the consequence: a run that
+    really was red but whose tail holds no recognized token -- a 'Killed' timeout, a bare
+    collection abort, a coverage footer that pushed the summary out of the tail -- read as green.
+    Detecting the PRESENCE of failure means absence is success by default.
+
+    The status was on that row the whole time. A number does not have a vocabulary, cannot be
+    paraphrased, and is not defeated by a tail that got truncated."""
+    try:
+        r = conn.execute(
+            "SELECT exit FROM ledger WHERE session_id = ? AND kind = 'testrun' "
+            "ORDER BY source_event_id DESC, rowid DESC LIMIT 1", [session_id]).fetchone()
+    except Exception:
+        return None
+    if not r or r[0] is None:
+        return None
+    try:
+        return int(r[0])
+    except (TypeError, ValueError):
+        return None
+
+
 # =============================================================================================
 # The chained, tamper-evident surface (owner decision 2026-07-07: verification lives IN the
 # ledger — the gates' verdicts depend on these rows, so the store and its verifier share one

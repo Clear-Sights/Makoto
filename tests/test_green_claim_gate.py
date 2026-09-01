@@ -9,6 +9,7 @@ from __future__ import annotations
 import sqlite3
 
 from makoto.substrate.claims import whole_suite_pass_claim
+from makoto.kit import is_failing_testrun
 from makoto.checks.falseGreenClaim import green_claim_gate
 from makoto.dispatch import run_stop_checks
 from makoto.state import ledger as L
@@ -101,9 +102,16 @@ def _conn():
     return c
 
 
-def _bash(c, cmd, stdout, ev_id, sid="s"):
+def _bash(c, cmd, stdout, ev_id, sid="s", exit_code=1):
+    """`exit_code` is explicit because the gate now READS it.
+
+    It used to be hardcoded to 1 for every recorded run, green ones included -- harmless while
+    nothing consulted the column, and a fixture that contradicted itself the moment something
+    did: `test_e2e_silent_after_fix_and_rerun_green` recorded `=== 12 passed ===` with a FAILING
+    status. Correcting it to 0 is making the fixture faithful, not weakening the case; the run it
+    is meant to represent exits 0."""
     L.record_update(c, {"tool_name": "Bash", "tool_input": {"command": cmd},
-                        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": 1}},
+                        "tool_response": {"stdout": stdout, "stderr": "", "exitCode": exit_code}},
                     event_id=ev_id, session_id=sid)
 
 
@@ -120,7 +128,7 @@ def test_e2e_silent_after_fix_and_rerun_green():
     -> NO fire. This is the dominant honest-corpus shape A must not false-block."""
     c = _conn()
     _bash(c, "python -m pytest tests/auth.py", "=== 1 failed in 1.0s ===", 1)
-    _bash(c, "python -m pytest tests/ -q", "=== 12 passed in 4.0s ===", 2)   # re-run, later ts/ev
+    _bash(c, "python -m pytest tests/ -q", "=== 12 passed in 4.0s ===", 2, exit_code=0)  # green re-run
     findings = run_stop_checks(c, {"last_assistant_message": "Fixed — all tests pass now.",
                                   "session_id": "s", "cwd": "/repo"})
     assert not any(f.pattern_id == "gate.green_claim" for f in findings)
@@ -135,3 +143,44 @@ def test_e2e_silent_when_cat_a_log_not_a_runner():
     findings = run_stop_checks(c, {"last_assistant_message": "All tests pass.",
                                   "session_id": "s", "cwd": "/repo"})
     assert not any(f.pattern_id == "gate.green_claim" for f in findings)
+
+def test_TEETH_a_red_run_whose_tail_kept_no_failure_token_still_fires():
+    """The absence-reads-as-green edge this gate's own docstring recorded, now closed.
+
+    `is_failing_testrun` detects the PRESENCE of a failure token, so a run that really was red but
+    whose recorded 500-char tail holds none -- a 'Killed' timeout, a bare collection abort, a
+    coverage footer that pushed the summary out of the tail -- read as GREEN. Absence was success
+    by default, which is what a negative check always does.
+
+    The status was on that same ledger row the whole time and was never consulted. A number has no
+    vocabulary, cannot be paraphrased, and does not depend on a tail surviving truncation -- so it
+    is checked FIRST and the token scan is the fallback, not the other way round.
+
+    Note the fixture this exposed: `_bash` hardcoded exitCode=1 for every recorded run, green ones
+    included, so `test_e2e_silent_after_fix_and_rerun_green` recorded `12 passed` with a FAILING
+    status. Harmless while nothing read the column; self-contradictory the moment something did.
+    """
+    c = _conn()
+    _bash(c, "python -m pytest tests/ -q", "Killed\n", 1, exit_code=1)   # red, tail has no token
+    assert not is_failing_testrun("Killed\n"), "premise: the tail carries no recognized token"
+    findings = run_stop_checks(c, {"last_assistant_message": "Done — all tests pass.",
+                                   "session_id": "s", "cwd": "/repo"})
+    assert any(f.pattern_id == "gate.green_claim" for f in findings), \
+        "a red run whose tail kept no failure token still read as green"
+
+
+def test_NON_VACUITY_a_green_status_with_a_green_tail_stays_silent():
+    """Firing on every run would satisfy the cell above and block every honest turn."""
+    c = _conn()
+    _bash(c, "python -m pytest tests/ -q", "=== 12 passed in 4.0s ===", 1, exit_code=0)
+    findings = run_stop_checks(c, {"last_assistant_message": "Done — all tests pass.",
+                                   "session_id": "s", "cwd": "/repo"})
+    assert not any(f.pattern_id == "gate.green_claim" for f in findings)
+
+
+def test_an_unrecorded_status_behaves_exactly_as_before():
+    """The new read must not turn 'we do not know' into a new way to fail."""
+    from makoto.checks.falseGreenClaim import green_claim_gate
+    claim = "All tests pass."
+    assert green_claim_gate(claim, testrun_output="Killed\n", testrun_exit=None) is None
+    assert green_claim_gate(claim, testrun_output="1 failed, 2 passed", testrun_exit=None) is not None

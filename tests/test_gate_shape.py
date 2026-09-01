@@ -104,6 +104,11 @@ EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
                                    # content.self_mute_guard / gate.self_wired are "meta" today
 EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output",
+                           "testrun_exit",   # the exit STATUS of the row `testrun_output` came
+                           # from. gate.green_claim reads the NUMBER, closing the half of its
+                           # absence-reads-as-green edge a token scan structurally cannot: a red
+                           # run whose 500-char tail kept no failure token read as green.
+                           # Defaulted to None, so an unrecorded status behaves as before.
                            "cwd", "fs_exists", "fs_size", "fs_read", "history",
                            "permission_mode", "agent_id", "agent_type", "plan",
                            "session_id", "transcript_path", "state_root",
@@ -114,7 +119,7 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output"
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
     "claimedProduceAbsent.py": 2,
     "undischargedCommitment.py": 7,
-    "falseGreenClaim.py": 1,
+    "falseGreenClaim.py": 2,
     "silentlyDroppedCommitment.py": 6,                     # 7->6, 2026-08-20: _drop_def_or_class
                                                             # inlined into its single call site
     "fabricatedToolAction.py": 3,
