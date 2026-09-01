@@ -37,6 +37,11 @@ class GateContext:
     history: Sequence = ()     # the events-table rows _select_recent returns (faithful: full
     #                            command + full tool_response per prior tool event). Fabrication
     #                            gates walk this like predicate content.unsourced_webfetch; default () keeps it optional.
+    testrun_exit: Optional[int] = None   # the exit STATUS of the same ledger row `testrun_output`
+    #   came from, or None when unrecorded -- see state.ledger.latest_testrun_exit for the
+    #   absence-reads-as-green edge it closes. DEFAULTED deliberately: every existing construction
+    #   of this substrate stays valid, and an unrecorded status behaves exactly as before rather
+    #   than becoming a new way to fail.
     permission_mode: Optional[str] = None   # raw hook payload's `permission_mode` field verbatim
     #   (CONFIRMED real, snake_case, top-level on every hook event — Claude Code hooks reference,
     #   fetched 2026-07-06: "default"|"plan"|"acceptEdits"|"auto"|"dontAsk"|"bypassPermissions").
@@ -258,6 +263,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         ctx = GateContext(
             text=text, touched=touched, empty=empty, opens=opens,
             testrun_output=_ledger.latest_testrun(conn, sid),
+            testrun_exit=_ledger.latest_testrun_exit(conn, sid),
             cwd=cwd, fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
             history=history,   # faithful events-table rows (A1.3) — fabrication gates walk this
             history_all_agents=history_all_agents,   # unnarrowed twin — see GateContext's own doc

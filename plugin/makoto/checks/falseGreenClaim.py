@@ -8,7 +8,7 @@ from makoto.substrate.claims import whole_suite_pass_claim
 # The prose half (the whole-suite green-claim signal) lives in substrate.claims.whole_suite_pass_claim,
 # shared with gate.stale_pass (which additionally uses the returned Match's POSITION for its teeth
 # window). See docs/adr/0032-green-claim-signal-relocation.md for the relocation history.
-def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
+def green_claim_gate(text, *, testrun_output, testrun_exit=None) -> Optional[Finding]:
     """Fire iff the assistant claims UNIVERSAL test success ('tests pass', 'the suite is green',
     'CI is green') while the MOST RECENT recorded test-runner output shows a REAL failure — a
     verifiable contradiction between "the tests pass" and the last run the world actually recorded.
@@ -31,8 +31,21 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
     never fires; it is also SCOPE-BLIND — a narrow green re-run supersedes a whole-suite red."""
     if not whole_suite_pass_claim(text):
         return None                                  # no whole-suite green claim -> inert
+    # THE STATUS FIRST, the tail second. A nonzero exit on the latest recorded testrun is the run
+    # saying it failed, in a number: it carries no vocabulary, cannot be paraphrased, and does not
+    # depend on a 500-char tail having kept the summary line. This is the half of the
+    # absence-reads-as-green edge that CAN be closed, and it is closed positively rather than by
+    # widening the token list -- a longer token list has the identical silent mode waiting for the
+    # next runner whose failure it does not spell.
+    if testrun_exit is not None and testrun_exit != 0:
+        return _finding()
     if not testrun_output or not is_failing_testrun(testrun_output):
         return None                                  # no run, or the latest run was green/xfail
+    return _finding()
+
+
+def _finding() -> Finding:
+    """One construction, reached by both signals, so the two cannot drift into two messages."""
     return Finding(
         pattern_id="gate.green_claim",
         file="tests",
@@ -47,5 +60,6 @@ def green_claim_gate(text, *, testrun_output) -> Optional[Finding]:
 from makoto.registry import Check as _Check
 # tests="": registered ONE_OFF -- claim-vs-history and test-run-delta genuinely straddle here.
 CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
-               eats=frozenset({"text", "testrun_output"}),
-               run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output))
+               eats=frozenset({"text", "testrun_output", "testrun_exit"}),
+               run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output,
+                                             testrun_exit=c.testrun_exit))
