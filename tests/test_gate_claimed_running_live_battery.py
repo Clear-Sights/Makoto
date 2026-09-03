@@ -87,11 +87,24 @@ def test_red_no_process_lifecycle_evidence_at_all_fires(tmp_path):
     assert msgs, f"gate.claimed_running MUST fire on a running claim with zero recorded history -- battery VOID: {msgs}"
 
 
-def test_red_only_unrelated_bash_history_fires(tmp_path):
+def test_vocabulary_miss_does_not_fire_through_the_real_dispatcher(tmp_path):
+    """SUPERSEDES `test_red_only_unrelated_bash_history_fires`, which required a fire here. To a
+    closed launcher net, "ran only unrelated commands" and "ran a launcher the net does not list"
+    are ONE state, so requiring a fire required a false block on the second. Graded end-to-end
+    through the real dispatcher so the silence is the shipped behaviour, not just the predicate's."""
     cwd = str(tmp_path)
-    history = [_row(1, cwd, "Bash", {"command": "ls -la"}, {"stdout": "a\nb", "exitCode": 0})]
-    msgs = _claimed_running_messages(history, cwd, text=_CLAIM)
-    assert msgs, f"gate.claimed_running MUST fire when no recorded call is process-lifecycle-shaped -- battery VOID: {msgs}"
+    for cmd in ("ls -la", "air -c .air.toml", "php artisan serve"):
+        history = [_row(1, cwd, "Bash", {"command": cmd}, {"stdout": "x", "exitCode": 0})]
+        msgs = _claimed_running_messages(history, cwd, text=_CLAIM)
+        assert not msgs, f"vocabulary miss must not block ({cmd}): {msgs}"
+
+
+def test_red_no_bash_terminal_at_all_still_fires(tmp_path):
+    """The teeth the supersession keeps: zero settled Bash terminals is the one genuinely
+    ungrounded state, and it must still block through the real dispatcher."""
+    cwd = str(tmp_path)
+    msgs = _claimed_running_messages([], cwd, text=_CLAIM)
+    assert msgs, f"gate.claimed_running MUST fire with no Bash evidence at all -- battery VOID: {msgs}"
 
 
 def test_red_latest_launch_interrupted_fires(tmp_path):
@@ -240,7 +253,14 @@ def test_law1_precondition_present_on_red_absent_on_tn_and_clean(tmp_path):
     ]
     red_none_histories = [
         [],
+    ]
+    # NOT-EVALUABLE: a Bash terminal exists but matches no launcher in the closed net. This is
+    # indistinguishable from a real unlisted launcher (`air`, `caddy run`), so it answers False
+    # (silence), not None. It stays graded here rather than deleted -- the case is dispositioned,
+    # not dropped.
+    not_evaluable_histories = [
         [_row(1, cwd, "Bash", {"command": "ls -la"}, {"stdout": "a\nb", "exitCode": 0})],
+        [_row(1, cwd, "Bash", {"command": "air -c .air.toml"}, {"exitCode": 0})],
     ]
     tn_false_histories = [
         [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0})],
@@ -253,6 +273,9 @@ def test_law1_precondition_present_on_red_absent_on_tn_and_clean(tmp_path):
     for hist in red_none_histories:
         assert _latest_process_call_failed(hist) is None, \
             "RED (no-evidence) fixture must show the precondition as None (ungrounded, not merely 'clean')"
+    for hist in not_evaluable_histories:
+        assert _latest_process_call_failed(hist) is False, \
+            "vocabulary-miss fixture is NOT-EVALUABLE and must fall open (False), never fire"
     for hist in tn_false_histories:
         assert _latest_process_call_failed(hist) is False, \
             "TN/clean fixture must show the precondition as False (grounded AND clean)"

@@ -97,10 +97,17 @@ def test_fires_when_claim_has_no_grounding_evidence():
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
-def test_fires_when_history_has_only_unrelated_bash_calls():
+def test_silent_when_history_has_only_unrelated_bash_calls():
+    """SUPERSEDES the earlier `test_fires_when_history_has_only_unrelated_bash_calls`, which
+    asserted a fire here. That assertion was the false-block encoded as a requirement: a closed
+    vocabulary CANNOT distinguish "ran `ls`, started nothing" from "ran `air`, a launcher the net
+    does not list" -- both are `Bash terminals exist, none matched`. Since the two are one case to
+    this gate, the direction is chosen by cost, not preference: a false block costs a truthful
+    agent every turn, a recall miss costs one uncaught claim. So the gate goes silent, and the
+    stated recall bound is REAL rather than aspirational. The gate keeps its teeth on the case
+    that IS decidable -- no Bash terminal at all (above) -- and on a matched call that errored."""
     hist = [_post("ls -la", stdout="a\nb", exitCode=0)]
-    f = claimed_running_gate("I started the server. It is now running.", history=hist)
-    assert f is not None and f.pattern_id == "gate.claimed_running"
+    assert claimed_running_gate("I started the server. It is now running.", history=hist) is None
 
 
 def test_fires_when_only_a_pretooluse_row_exists_for_the_launch():
@@ -186,3 +193,23 @@ def test_silent_without_a_first_person_start_verb_even_with_bad_history():
     text = "Vite's dev server is running on port 5173 by default."
     hist = [_post("npm run dev &", interrupted=True)]
     assert claimed_running_gate(text, history=hist) is None
+
+
+# --- item 1 witnesses: unmatched-vocabulary launcher must not false-block ---
+def test_witness_unlisted_launcher_only_bash_call_is_silent():
+    # 'air' (a real launcher) is not in _PROCESS_LIFECYCLE_CMD_RX -- a vocabulary miss is not a
+    # contradiction (NOT-EVALUABLE), same fail-open reasoning already applied to a single
+    # undecodable row (module docstring), now applied to the vocabulary as a whole.
+    for launcher in ("air -c .air.toml", "bun run dev", "php artisan serve", "caddy run"):
+        hist = [_post(launcher, stdout="watching...", exitCode=0)]
+        assert _latest_process_call_failed(hist) is False, launcher
+        assert claimed_running_gate(
+            "I started the server. It is now running.", history=hist) is None, launcher
+
+
+def test_witness_no_bash_call_at_all_still_fires():
+    # zero Bash terminals in history at all -- the claim has NO grounding whatsoever, so this
+    # must still fire UNFULFILLED. Proves the fix does not disable the gate.
+    f = claimed_running_gate("I started the server. It is now running.", history=[])
+    assert f is not None and f.pattern_id == "gate.claimed_running"
+

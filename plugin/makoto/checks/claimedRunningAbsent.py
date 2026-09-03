@@ -121,23 +121,36 @@ def _latest_process_call_failed(history) -> Optional[bool]:
     text only so every decoder receives one stable shape. Latest-wins, like
     record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt.
 
-    An UNDECODABLE history row makes the None ("no evidence") answer unassertable: the dropped
-    row could be the very launch the claim cites, so absence of parseable evidence must not
-    become a positive "no such command exists" -- with any undecodable row present and no
-    decodable lifecycle verdict, this returns False (fail-open silence), never None."""
+    None is reserved for the ONE case with no grounding at all: not a single settled Bash terminal
+    in the window. Two other cases look like "no match" and are NOT-EVALUABLE, so both answer False
+    (fail-open silence), never None:
+
+      * an UNDECODABLE history row -- the dropped row could be the very launch the claim cites, so
+        absence of parseable evidence must not become a positive "no such command exists";
+      * Bash terminals exist but none matches `_PROCESS_LIFECYCLE_CMD_RX` -- the net is a closed
+        vocabulary, so a real launcher outside it (`air`, `bun run dev`, `php artisan serve`,
+        `caddy run`) is a RECALL MISS, not a contradiction. Firing there would tell an agent that
+        genuinely started a server that no process-start command appears, which is a false block in
+        the expensive direction. This is the same fail-open reasoning the undecodable row already
+        gets, applied to the vocabulary as a whole rather than to one row.
+
+    The fix is deliberately NOT "widen the net": a longer closed list is as monotone as a short
+    one, and the next unlisted launcher would false-block identically."""
     verdict = None
     saw_undecodable = False
+    saw_bash_terminal = False
     for cmd, tr, is_failure_terminal in _bash_postuse_calls(history):
         if cmd is None:
             saw_undecodable = True
             continue
+        saw_bash_terminal = True
         if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
             continue
         interrupted = tr.get("interrupted") is True
         exit_code = tr.get("exitCode", tr.get("exit"))
         verdict = bool(is_failure_terminal or interrupted
                        or (exit_code is not None and exit_code != 0))
-    if verdict is None and saw_undecodable:
+    if verdict is None and (saw_undecodable or saw_bash_terminal):
         return False
     return verdict
 
