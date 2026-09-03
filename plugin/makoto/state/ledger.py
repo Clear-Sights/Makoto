@@ -8,12 +8,24 @@ read the fields the live hook actually emits — never a hand-built shape.
 Pure data layer: callers pass an open sqlite3 connection whose `ledger` table
 matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts).
 """
-import fcntl
 import hashlib
 import json
 import re
+import time
 from pathlib import Path
 from typing import Optional
+
+# The exclusive lock below is the chain's one concurrency guard, and `fcntl` does not exist on
+# Windows. Imported unconditionally it raised ModuleNotFoundError out of every ledger update, and
+# dispatch's deliberate fail-open then let EVERY call through unchecked -- total loss of coverage
+# on one OS, announced only as a fault notice. Windows' own exclusive-region lock is `msvcrt`.
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on Windows, and by the injection test
+    fcntl = None
+    import msvcrt
+else:
+    msvcrt = None
 
 from makoto.checks import normalize_path
 from makoto.kit import bash_output_text, is_test_runner
@@ -282,6 +294,48 @@ def _lock_path(root: Path, name: str) -> Path:
     return root / f"{name}.lock"
 
 
+# Windows' `msvcrt.locking` has no blocking-forever mode: `LK_LOCK` retries for ten seconds and
+# then raises, so the wait is bounded either way. Polling `LK_NBLCK` keeps that bound explicit and
+# owned here rather than inherited from the C runtime.
+_LOCK_TIMEOUT_S = 10.0
+_LOCK_POLL_S = 0.01
+
+
+def _lock_exclusive(fh) -> None:
+    """Take the exclusive lock on `fh`, blocking until it is ours.
+
+    Both backends lock the WHOLE-FILE region every other process locks: flock is inherently
+    whole-file, and the msvcrt path seeks to 0 and locks one byte, so every waiter contends over
+    byte 0 of the same sidecar. Locking at the current position instead would let two appenders
+    hold disjoint regions and fork the chain -- the exact failure this lock exists to prevent.
+    """
+    if fcntl is not None:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        return
+    fh.seek(0)
+    deadline = time.monotonic() + _LOCK_TIMEOUT_S
+    while True:
+        try:
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            return
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(_LOCK_POLL_S)
+
+
+def _unlock(fh) -> None:
+    """Release before close. flock releases on close by itself; msvcrt must be told, and an
+    already-released region raises OSError, which is the state we wanted anyway."""
+    if fcntl is not None:
+        return
+    fh.seek(0)
+    try:
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+    except OSError:
+        pass
+
+
 class _Locked:
     """Exclusive advisory lock over stream `name`'s content-free sidecar, held across the whole
     append (tail-read + write) so a concurrent append can never fork the chain."""
@@ -295,12 +349,13 @@ class _Locked:
         root = store_root(root=self._root)
         root.mkdir(parents=True, exist_ok=True)
         self._fh = open(_lock_path(root, self._name), "a+", encoding="utf-8")
-        fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX)
+        _lock_exclusive(self._fh)
         return self
 
     def __exit__(self, *exc):
         if self._fh is not None:
-            self._fh.close()  # flock releases on close/process-exit
+            _unlock(self._fh)
+            self._fh.close()
             self._fh = None
 
 
