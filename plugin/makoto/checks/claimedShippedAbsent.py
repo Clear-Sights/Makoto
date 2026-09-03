@@ -168,8 +168,45 @@ def _response_succeeded(response) -> bool:
     return True
 
 
-def _successful_remote_mutation(history) -> bool:
-    """True iff pooled history contains a completed, successful remote mutation."""
+def _successful_remote_mutation(history) -> Optional[bool]:
+    """Three-valued pooled-history evidence for a completed remote mutation.
+
+      True  — a settled, successful remote mutation is recorded; the claim is discharged.
+      False — the gate is GROUNDED and the evidence is negative: either a real remote-mutation
+              ATTEMPT is recorded and none of them settled successfully, or nothing
+              remote-shaped happened at all in a window that also contains no unclassifiable
+              Bash call. This is the firing case.
+      None  — NOT-EVALUABLE, and therefore SILENT. The gate could not decide, and a miss must
+              never be spent as a positive assertion of absence.
+
+    WHY None EXISTS (the sibling defect, gate.claimed_running / `_latest_process_call_failed`):
+    this module's remote-mutation vocabulary is CLOSED — `_REMOTE_MUTATING_TOOL_NAMES` (four
+    exact MCP names) plus `_command_pushes_git` (an argv parse that recognizes `git push`, and
+    nothing else). This estate ships by many other shapes: `gh pr merge`, `gh release create`,
+    `npm publish`, `docker push`, `flyctl deploy`, `./deploy.sh`, `scp`, `rsync`. Every one of
+    them is a vocabulary MISS. Returning False there told an agent that had genuinely shipped
+    that "no recorded mutation evidence backs it" — a false block in the expensive direction,
+    the exact shape just repaired in gate.claimed_running.
+
+    So a recorded Bash terminal whose command is NOT a recognized push makes the window
+    undecidable: any Bash command could be a shipping action this net cannot read. Likewise an
+    UNDECODABLE row — the dropped row could be the very mutation the claim cites.
+
+    The doubt flags apply ONLY when nothing matched. Once a real attempt IS recorded the gate is
+    grounded and an unrelated `ls` in the same window cannot buy the claim silence.
+
+    NOT FIXED BY WIDENING THE NET: a longer closed list is exactly as monotone as a short one,
+    and the next unlisted shipping command would false-block identically.
+
+    RECALL COST, stated rather than hidden: an agent that runs ANY Bash command at all and then
+    claims a non-push shipping action it never performed is no longer blocked by this arm. The
+    teeth that remain are (a) an empty / Bash-free window, (b) a recorded attempt that failed,
+    and (c) for push claims specifically, `pushed_tip_matches_remote`'s MISMATCH against the
+    real remote, which reads the world and not the vocabulary.
+    """
+    saw_undecodable = False
+    saw_unreadable_bash = False
+    saw_attempt = False
 
     def _as_dict(response):
         # The live harness can deliver an MCP result as a JSON string; parse it so real
@@ -206,7 +243,10 @@ def _successful_remote_mutation(history) -> bool:
 
     for row in history or ():
         ev = decode_history_row(row)
-        if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+        if not isinstance(ev, dict):
+            saw_undecodable = True
+            continue
+        if ev.get("hook_event_name") != "PostToolUse":
             continue
         name = ev.get("tool_name", "")
         response = _as_dict(ev.get("tool_response"))
@@ -220,14 +260,25 @@ def _successful_remote_mutation(history) -> bool:
             exit_code = response.get("exitCode") if isinstance(response, dict) else None
             if exit_code is None and isinstance(response, dict):
                 exit_code = response.get("exit")
-            if (_command_pushes_git(command)
-                    and _response_succeeded(response)
-                    and exit_code == 0):
-                return True
-        elif name in _REMOTE_MUTATING_TOOL_NAMES and _response_succeeded(response):
-            if name.endswith("merge_pull_request") and not _merged_true(response):
+            if not _command_pushes_git(command):
+                # A Bash terminal this net cannot classify. `gh pr merge`, `npm publish`,
+                # `docker push`, `./deploy.sh` all land here — so does `ls`. The check cannot
+                # tell them apart, which is precisely why the window stops being decidable.
+                saw_unreadable_bash = True
                 continue
-            return True
+            saw_attempt = True
+            if _response_succeeded(response) and exit_code == 0:
+                return True
+        elif name in _REMOTE_MUTATING_TOOL_NAMES:
+            saw_attempt = True
+            if _response_succeeded(response):
+                if name.endswith("merge_pull_request") and not _merged_true(response):
+                    continue
+                return True
+    if saw_attempt:
+        return False            # grounded: a real attempt is recorded and none of them succeeded
+    if saw_undecodable or saw_unreadable_bash:
+        return None             # NOT-EVALUABLE: a vocabulary miss is silent, never an assertion
     return False
 
 
@@ -250,6 +301,19 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
         PreToolUse mutation row) FIRES — absence is checked, never read as green with nothing
         checked at all — while a history with no attempted remote mutation whatsoever (e.g.
         only an `echo 'git push ...'`) remains outside a verdict.
+
+    WHAT THIS GATE CANNOT DECIDE (stated, not hidden — it reads a raw Bash command string and
+    has no typed "this call shipped something" field to read instead; the Bash tool envelope
+    carries only `tool_input.command`):
+
+      * WHICH command shipped. `_command_pushes_git` parses argv and recognizes `git push`
+        alone. Every other shipping shape (`gh pr merge`, `npm publish`, `docker push`,
+        `./deploy.sh`) is unreadable, so `_successful_remote_mutation` answers None and this
+        gate stays SILENT rather than asserting absence.
+      * WHETHER a claim's object is the thing a recorded command touched. No coreference
+        between "it" / "#42" and a command's owner/repo/ref is attempted, deliberately.
+      * WHETHER a non-push remote mutation actually reached the world. Only the push arm
+        consults the world (`ls-remote`); merge/publish/deploy claims rest on the transcript.
     """
 
     def _attempted_remote_mutation(rows) -> bool:
@@ -292,7 +356,10 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
                 continue        # upheld, or world present but unobservable (fail-open)
             if not _attempted_remote_mutation(history):
                 continue        # no cwd AND no recorded attempt: outside a verdict
-        if _successful_remote_mutation(history):
+        # Three-valued: True discharges the claim, None is NOT-EVALUABLE and stays silent.
+        # ONLY an explicit False — a grounded negative — reaches the Finding below, so a
+        # vocabulary miss can never be spent as a positive assertion that nothing shipped.
+        if _successful_remote_mutation(history) is not False:
             continue
         return Finding(
             pattern_id="gate.claimed_shipped", file="", line=0, level="error",
