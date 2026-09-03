@@ -97,13 +97,28 @@ def test_git_push_with_global_options_is_evidence():
 
 
 def test_dry_run_push_is_not_evidence_regardless_of_flag_position():
+    """SUPERSEDES the pre-2026-09-03 form of this test, which asserted
+    `_successful_remote_mutation(...) is False` for a dry-run push.
+
+    WHAT IT ASSERTED AND WHY THAT WAS THE DEFECT: `False` is this helper's FIRING value — a
+    grounded claim that nothing shipped. A dry-run push is not a recognized push, so it fell
+    through the closed vocabulary exactly as `gh pr merge`, `npm publish`, and `./deploy.sh`
+    do. Pinning `False` there pinned "a vocabulary miss is a positive assertion of absence" as
+    a requirement — the same shape repaired in gate.claimed_running (`_latest_process_call_failed`).
+
+    WHAT IS ASSERTED NOW: a dry-run push is still NOT evidence — it must never return True.
+    It is NOT-EVALUABLE (None) instead of firing. The property under test is unchanged
+    ("a dry run does not discharge a shipping claim"); only the disposition of the miss moved
+    from BLOCK to silence.
+    """
     for command in (
         "git push --dry-run origin main",
         "git push origin main --dry-run",
         "git push -n origin main",
         "git push origin main -n",
     ):
-        assert _successful_remote_mutation([_bash(command, exitCode=0)]) is False, command
+        assert _successful_remote_mutation([_bash(command, exitCode=0)]) is not True, command
+        assert _successful_remote_mutation([_bash(command, exitCode=0)]) is None, command
 
 
 def test_failed_interrupted_or_unsettled_push_is_not_evidence():
@@ -155,7 +170,18 @@ def test_read_only_or_similarly_named_tool_is_not_evidence():
 
 
 def test_malformed_history_rows_fail_open_as_evidence():
-    assert _successful_remote_mutation([{"payload": "{"}, ("short",), None]) is False
+    """SUPERSEDES the pre-2026-09-03 form, which asserted `is False` for an all-undecodable
+    window while its own name promised "fail open".
+
+    WHAT IT ASSERTED AND WHY THAT WAS THE DEFECT: `False` is the FIRING value. The test's name
+    and its assertion disagreed — a window of rows nobody could decode produced a BLOCK stating
+    that no mutation evidence exists, when the dropped row could have been the very push the
+    claim cites. Absence of parseable evidence is not evidence of absence.
+
+    WHAT IS ASSERTED NOW: the name's actual promise. An undecodable window is NOT-EVALUABLE
+    (None) and therefore silent.
+    """
+    assert _successful_remote_mutation([{"payload": "{"}, ("short",), None]) is None
 
 
 # End-to-end pure gate verdict.

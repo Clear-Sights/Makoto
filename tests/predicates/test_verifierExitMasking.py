@@ -205,6 +205,70 @@ def test_fires_when_unmasked_runner_precedes_masked_runner():
     assert predicate(current_event=_bash("pytest tests/ && pytest other/ || true"), history=[], pattern=_PAT) is not None
 
 
+# --- THE WIDE LOCAL-VERIFIER TIER (2026-09-03): recognized, but ADVISORY, never blocking -------
+# The recall hole: _LEAD_RUNNER_RX knows pytest / go test / npm test and is blind to this
+# estate's own shapes. Widening a BLOCK vocabulary is expensive, so recognition is widened only
+# under ADVISE. These tests pin BOTH halves of that asymmetry — a miss caught, and a deny NOT
+# spent on it.
+
+_LOCAL_MASKED = [
+    "python3 -m unittest discover || true",
+    "./gates.sh || true",
+    "python3 tools/render_checks.py --check ; true",
+    "bash ci-check.sh || echo skip",
+    "python -m coverage run -m unittest || true",
+]
+
+
+@pytest.mark.parametrize("command", _LOCAL_MASKED)
+def test_local_verifier_mask_is_recognized(command):
+    f = predicate(current_event=_bash(command), history=[], pattern=_PAT)
+    assert f is not None, f"recall hole still open: {command!r} masked and unseen"
+
+
+@pytest.mark.parametrize("command", _LOCAL_MASKED)
+def test_local_verifier_mask_never_blocks(command):
+    """THE ASYMMETRY. The wide tier rests on file NAMING, a heuristic, so it may only surface.
+    `level="advisory"` routes through dispatch._OUTCOME_FOR_LEVEL to verdict.ADVISE, which at
+    the Pre edge allows the call and injects additionalContext."""
+    f = predicate(current_event=_bash(command), history=[], pattern=_PAT)
+    assert f.level == "advisory", f"a naming heuristic must never deny a call: {command!r}"
+
+
+def test_narrow_block_tier_is_unchanged_by_the_widening():
+    """The widening must not leak into the blocking tier: a _LEAD_RUNNER_RX runner still denies."""
+    for command in ("pytest tests/ -q || true", "go test ./... ; true", "npm test || true",
+                    "python -m pytest || true"):
+        f = predicate(current_event=_bash(command), history=[], pattern=_PAT)
+        assert f is not None and f.level == "error", f"BLOCK tier weakened by the widening: {command!r}"
+
+
+def test_local_tier_does_not_fire_on_an_unmasked_local_verifier():
+    assert predicate(current_event=_bash("./gates.sh"), history=[], pattern=_PAT) is None
+    assert predicate(current_event=_bash("python3 -m unittest discover"), history=[], pattern=_PAT) is None
+
+
+def test_local_tier_does_not_fire_on_a_masked_non_verifier_script():
+    """FP-safety of the naming heuristic: an ordinary script is not a verifier."""
+    for command in ("./deploy.sh || true", "python3 manage.py migrate || true",
+                    "bash setup.sh || true"):
+        assert predicate(current_event=_bash(command), history=[], pattern=_PAT) is None, command
+
+
+def test_the_wide_tier_residue_is_stated_and_real():
+    """THE MISS IS COUNTED, NOT HIDDEN. The wide tier is itself a closed list keyed on file
+    naming, and this pins its documented residue rather than pretending coverage is total:
+    a verifier whose name carries no verification word is NOT recognized. This test exists so
+    the limit is a measured fact in the suite, not a sentence in a docstring nobody re-derives.
+    If a future change closes one of these, MOVE it to _LOCAL_MASKED — do not delete the case.
+    """
+    for command in ("python3 eval/replay.py || true", "./go || true",
+                    "./bin/verify-everything || true"):
+        assert predicate(current_event=_bash(command), history=[], pattern=_PAT) is None, (
+            f"{command!r} is now recognized — good; move it into _LOCAL_MASKED and shrink the "
+            "residue list in the module docstring")
+
+
 def test_live_catalog_registration_is_reachable_in_dispatch():
     """Every test above drives predicate() through the synthetic _PAT (a test-fixture shape),
     so nothing pinned the LIVE registration: the real CHECK's keywords could be neutered and

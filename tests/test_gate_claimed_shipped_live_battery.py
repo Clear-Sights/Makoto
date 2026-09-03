@@ -121,6 +121,35 @@ def test_not_evaluable_dry_run_transcript_stays_silent_with_cwd(tmp_path):
     assert not msgs, f"NOT_EVALUABLE with a cwd present must stay silent: {msgs}"
 
 
+def test_false_block_a_vocabulary_miss_never_asserts_absence(tmp_path):
+    """The false-block repair (2026-09-03), the sibling of gate.claimed_running's.
+
+    The remote-mutation vocabulary is CLOSED: four MCP tool names plus an argv parse that
+    recognizes `git push` alone. An agent that genuinely ships with any other command is a
+    vocabulary MISS, and a miss used to return the helper's FIRING value — so the gate told an
+    agent that had really shipped that no mutation evidence backs its claim. A miss must be
+    NOT-EVALUABLE and SILENT.
+    """
+    cwd = str(tmp_path)
+    for command in ("gh pr merge 42 --squash", "npm publish --access public",
+                    "docker push registry.example/app:v2", "./deploy.sh production"):
+        history = [_row(1, cwd, "Bash", {"command": command}, {"exitCode": 0})]
+        msgs = _messages(history, cwd, "I shipped the change.")
+        assert not msgs, f"FALSE BLOCK: {command!r} is unreadable, not proof of absence: {msgs}"
+
+
+def test_teeth_survive_the_false_block_repair(tmp_path):
+    """The repair must not become a blanket amnesty. A window with NO Bash call at all is still
+    grounded, and a recorded attempt that failed is still grounded — both must fire."""
+    cwd = str(tmp_path)
+    assert _messages([], cwd, "I merged the PR."), \
+        "teeth lost: an empty window is grounded and must still fire"
+    failed = [_row(1, cwd, "merge_pull_request", {}, {"error": "conflict"}),
+              _row(2, cwd, "Bash", {"command": "ls -la"}, {"exitCode": 0})]
+    assert _messages(failed, cwd, "I merged the PR."), \
+        "teeth lost: an unrelated Bash call must not buy silence once an attempt is grounded"
+
+
 def test_red_failed_github_merge_does_not_back_claim(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "merge_pull_request", {"pullNumber": 42},
@@ -226,11 +255,23 @@ def test_tn_local_file_production_claim_remains_completion_scope(tmp_path):
 # Law 1: transcript evidence fixtures genuinely carry opposite predicate values.
 def test_law1_remote_mutation_precondition_separates_red_and_clean(tmp_path):
     cwd = str(tmp_path)
+    # SUPERSEDES the pre-2026-09-03 `red` list, which included the dry-run push row
+    # (`git push --dry-run origin main`, exit 0) and asserted `is False` for it.
+    #
+    # WHY THAT ROW LEFT `red`: `False` is the FIRING value, and a dry-run push is a VOCABULARY
+    # MISS — `_command_pushes_git` does not recognize it, exactly as it does not recognize
+    # `gh pr merge` or `npm publish`. Keeping it red pinned "an unclassifiable Bash command is a
+    # positive assertion that nothing shipped", the false-block shape repaired in
+    # gate.claimed_running. It moves to `not_evaluable` below, where it is asserted to be
+    # silent AND asserted still not to discharge a claim.
     red = [
         [],
-        [_row(1, cwd, "Bash", {"command": "git push --dry-run origin main"}, {"exitCode": 0})],
         [_row(1, cwd, "Bash", {"command": "git push origin main"}, {"exitCode": 1})],
         [_row(1, cwd, "merge_pull_request", {}, {"error": "conflict"})],
+    ]
+    not_evaluable = [
+        [_row(1, cwd, "Bash", {"command": "git push --dry-run origin main"}, {"exitCode": 0})],
+        [_row(1, cwd, "Bash", {"command": "gh pr merge 42 --squash"}, {"exitCode": 0})],
     ]
     clean = [
         [_row(1, cwd, "Bash", {"command": "git push origin main"}, {"exitCode": 0})],
@@ -241,3 +282,6 @@ def test_law1_remote_mutation_precondition_separates_red_and_clean(tmp_path):
         assert _successful_remote_mutation(history) is False
     for history in clean:
         assert _successful_remote_mutation(history) is True
+    for history in not_evaluable:
+        assert _successful_remote_mutation(history) is None
+        assert _successful_remote_mutation(history) is not True
