@@ -5,6 +5,44 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-09-03
+
+### Fixed
+- **Makoto ran no checks at all on Windows.** `state/ledger.py` imported `fcntl` — a Unix-only
+  module — at module scope for the one `flock` guarding the hash chain against concurrent
+  appends. On Windows the import raised, so every ledger update raised, and the dispatcher's
+  deliberate fail-open let **every call through unchecked**, announcing itself only as a
+  per-call fault notice. The lock now selects a backend: `flock` where it exists, `msvcrt`'s
+  exclusive-region lock where it does not, both contending over the same byte of the same
+  sidecar. `tests/test_platform_portability.py` holds the hook path to it.
+- **`gate.claimed_running` blocked truthful agents.** A closed launcher vocabulary returned its
+  *firing* value when nothing matched, so an agent that really started a server with `air`,
+  `bun run dev`, `php artisan serve` or `caddy run` was blocked and told it never started
+  anything. A vocabulary miss is now NOT-EVALUABLE and silent; the gate keeps its teeth where
+  no settled Bash terminal exists at all.
+- **`gate.claimed_shipped` had the same defect**, and blocked agents that really shipped with
+  `gh pr merge`, `npm publish`, `docker push` or a deploy script. Now three-valued: absence is
+  asserted only when a real attempt is on record and none succeeded, so an unrelated command
+  cannot buy silence once an attempt exists.
+- **`gate.green_claim` reads the exit status**, not only the output tail.
+- **Text I/O on the hook path names its encoding.** A single curly quote in a file a check read
+  killed that check under the Windows platform default (`charmap`), one OS and not the other.
+
+### Added
+- **`verifierExitMasking` recognizes this estate's own verifiers** — `python3 -m unittest`,
+  coverage, tox, nox, and interpreter-or-direct invocation of a script whose file name carries a
+  verification word. The wide tier is **advisory**: it surfaces a masked verifier without denying
+  the call, and the narrow blocking vocabulary is unchanged. The stated cost, pinned by a test:
+  a genuinely masked `./gates.sh || true` is surfaced but not stopped, and the tier's own residue
+  is asserted rather than described.
+- Laws that hold the shipped tree to its claims: no unguarded platform-only import on the hook
+  path, and no text-mode I/O relying on the platform default.
+
+### Changed
+- A checked claim replaces several that were satisfied by a substring, a fixture, or a name:
+  `may_block` is observed to reach the pipeline, denials are guaranteed to name their row and
+  replay checks that they did, and check counts are rendered from the registry that owns them.
+
 ## [2.4.0] — 2026-08-20
 
 ### Added
