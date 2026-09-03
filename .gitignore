@@ -4,3 +4,8 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 build/
+
+# Never public: the review ledger and the assumption audit (audit trail).
+docs/ASSUMPTIONS.tsv
+docs/LEDGER.tsv
+docs/ledger/
