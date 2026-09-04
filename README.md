@@ -31,6 +31,13 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- END GENERATED: check-counts -->
 
+Two different things are called a *gate* in that list, and the counts are not comparable. The
+`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is a
+check registered at the Stop edge with `may_block=True`. The one pre-check carrying the prefix,
+`gate.contract_order`, is not an end-of-turn gate — it has a same-named Stop sibling that is, and
+the two are separate checks with separate predicates. Every count above is scoped by edge, so no
+check is counted twice within a line.
+
 Every pre-check and every non-advisory end-of-turn gate blocks; there is no silent "warning" tier
 for those (see [Fire level](#fire-level)) — the documented exceptions are
 `gate.self_wired`, `gate.canon_fingerprints_advisory`, `gate.relative_path_citation`, and
@@ -264,9 +271,14 @@ the distinct process-error path.
 
 ## Fire level
 
-Every non-advisory live pattern blocks through the dispatcher mechanism measured above. makoto deliberately has **no
-non-blocking tier**: a `warning`/`disabled` resting state — witnessing a violation and letting the
-tool through — is itself an illusory word, the exact weakening shape makoto exists to catch. The
+Every non-advisory live pattern blocks through the dispatcher mechanism measured above. makoto
+deliberately has **no non-blocking *tier***: no resting state a check can be assigned to, no
+`warning`/`disabled` level to demote a pattern into — witnessing a violation and letting the tool
+through as a matter of policy is itself an illusory word, the exact weakening shape makoto exists
+to catch. Four checks do fire without blocking, and they are named below; the claim is that no
+*category* admits them, not that the count is zero. There is no predicate that qualifies a check
+as advisory — each of the four carries its own dated argument, and a fifth would need its own.
+That is deliberate: a rule for admitting advisory checks is the tier, rebuilt. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
 blocks at proven zero corpus-FP, or it is cut — zero false positives on the shipped corpus and gold
 negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
