@@ -30,7 +30,9 @@ outside the check registry, so no registry predicate is defined over it. And "bl
 core" below counts canon fingerprints in `_canonAtoms.BLOCK_IDS`, a population of patterns.
 
 *Advisory* names seven things. Two are columns of the catalog table: the Certification label, and
-the Fire column, which prints `Finding.level`. Two are check tiers: `registry.POSTURE_ADVISE`, a
+the Fire column -- which is a two-valued TIER label reading `blocking` or `advisory`, not a print
+of `Finding.level`, whose values are `error` and `advisory`; that column is therefore also a
+sixth producer of the word *blocking* above. Two are check tiers: `registry.POSTURE_ADVISE`, a
 check's declared tier, and membership of `registry._ADVISORY_ALLOWLIST` -- `blocking_eligible`
 consults the posture, not the allowlist, and `registry.py` warns in its own words that the two
 agree only because today's four happen to coincide. One is a raw outcome, `verdict.ADVISE`. One
@@ -38,23 +40,27 @@ is `gate.configchange_advisory`, which fires without blocking from outside the r
 in neither the allowlist nor the count. The last is the canon "advisory remainder" of
 fingerprints resting on a soft or disqualified atom.
 
-*Silent* has four senses and they sit on different axes, which is why one of them looked like a
+*Silent* has five senses and they sit on different axes, which is why one of them looked like a
 contradiction. A fail-open is never silent: `dispatch.py` emits its notice whenever a check
 faulted, gated on the fault and never on posture. A check "staying silent" emitted no finding.
 `verdict.SILENT` is a configured posture that softens outcomes toward ALLOW -- but not
 unconditionally: a meta-layer BLOCK still floors at ASK, and it is `# record only`, so audit rows
-are written either way. And a verifier "silently neutered" is the SUBJECT's code losing a check,
-which is what several patterns exist to catch.
+are written either way. A verifier "silently neutered" is the SUBJECT's code losing a check,
+which is what several patterns exist to catch. And a "silent bypass" is a fifth thing again -- an
+override that leaves no record, which is why an allow carries its rationale and why the oversight
+clamp is "never overridden SILENTLY".
 
 *A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
 `testrun`); where this page says the agent "claims" something it means the utterance a row may
 later record; and where it says "the claim is", the page is asserting something itself. *A check*
 in a pattern description is one in the subject's code; a check of makoto's own is a
-`registry.Check`. *The record* has five referents: the session's recorded call stream; the RECORD
+`registry.Check`. *The record* has six referents: the session's recorded call stream; the RECORD
 step of the receipt chain, an appended `kind="audit"` row; the written logs `audit.jsonl` and
 `dispatch_errors.jsonl`, which outlive the session; a FOREIGN ledger, as in `gate.stale_pass`
 reading pytest's own `lastfailed`; and "on the record" for a `makoto-allow:` rationale left in
-the subject's source.
+the subject's source. The durable store the word is named after is `makoto.record.db`, the SQLite
+file under the state dir -- a sixth referent, and the one several of the others are checked
+against.
 
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
@@ -219,7 +225,7 @@ auto-wire dispatch on enable. Claude Code registers `PreToolUse`, `PostToolUse`,
 automatically (which `exec`s `python -m makoto._dispatch`). `~/.claude/settings.json` is NOT
 modified — the plugin system manages its own hook registry.
 
-State dir + `makoto.db` are created lazily on the first hook invocation.
+State dir + `makoto.record.db` are created lazily on the first hook invocation.
 
 ### Companion setting (optional): suppress the harness auto-trailer
 
@@ -268,7 +274,7 @@ pip install -e /path/to/makoto
 # Then add makoto hook entries to ~/.claude/settings.json manually — see "Manual wiring" below.
 ```
 
-The state dir and `makoto.db` are created lazily on the first hook invocation; there is no separate
+The state dir and `makoto.record.db` are created lazily on the first hook invocation; there is no separate
 init step.
 
 ## Uninstall
@@ -281,7 +287,7 @@ init step.
 python -m makoto uninstall   # removes makoto-managed settings.json entries
 ```
 
-The state dir (`~/.claude/makoto_state/`) is preserved on uninstall — `audit.jsonl` and `makoto.db`
+The state dir (`~/.claude/makoto_state/`) is preserved on uninstall — `audit.jsonl` and `makoto.record.db`
 remain for forensic value. To fully reset, `rm -rf` the dir.
 
 ## CLI
