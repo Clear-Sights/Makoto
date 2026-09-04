@@ -15,6 +15,17 @@ facts ("France doesn't exist to it"); it only checks that a claimed word is kept
 in deed. A word it lets through becomes spendable: trustworthy tender a reviewer or another agent can
 accept without re-deriving it.
 
+Both of those words are literal here, and the thing they name ships. The **tender** is the receipt
+(`makoto.state.ledger.emit_receipt`, and the Receipt section below): a read-time view over the
+chain, never persisted, listing each claim with its own `row_index` and `row_hash`. A claim is
+**spendable** when it is `trace_bound` -- at or before `verified_through`'s cut, so the chain from
+the claim to that point verifies -- and only three row kinds are claims at all: `verdict`,
+`certified-fact` and `testrun`, the kinds that assert something about the world. Records of deeds
+and machinery (`audit`, `touched`, `release.operator`, `fetch`, `exemption`) are not claims and are
+counted separately. "Without re-deriving it" is what the row hash buys: the reviewer re-checks a
+citation instead of re-running the work. A claim after the first broken link is still listed,
+undisguised, and is not counted as trace-bound -- it is exactly the not-spendable case.
+
 ## What it catches
 
 makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, and `Stop` — and
