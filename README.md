@@ -10,10 +10,78 @@ the agent a one-line correction to retry against.
 
 That publication claim is deliberately bounded: Shipped plugin — installable and versioned. The dispatcher is replay-tested against authored sessions; its effect on a live session's outcome is unmeasured.
 
+**Integrity**, as this tool uses the word, is exactly that agreement: a claim the agent made this
+turn is matched by the record of the deed it names. Nothing wider — not correctness, not code
+quality, not whether the deed was a good idea. So `gate.relative_path_citation` says a bare
+path is "a communication-quality signal, not an integrity violation": it contradicts no claim
+against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is
+the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
+code* — and is not a second definition of this one.
+
+**Six words this page reuses. None has a single owner, so each is listed with every artifact
+that produces it.** *Blocking* is an outcome -- the act is stopped -- and these artifacts produce it. NO COUNT is
+stated for this list or the next: a number in prose that nothing checks drifts from the list
+beside it, which is how the *advisory* list came to say seven while naming eight, and how
+this list said five while the paragraph below names a sixth.
+`verdict.BLOCK` is the raw one a check returns; `verdict.apply` folds it by posture and
+`dispatch.py` turns the result into a Pre-edge `permissionDecision: "deny"` or a Stop-edge
+`{"decision": "block"}`. `registry.POSTURE_BLOCK` is a check's own declared tier, an input to
+that folding and not the same vocabulary. `registry.blocking_eligible` (Stop edge, `may_block`,
+posture BLOCK) decides which end-of-turn gates the count above calls blocking, and is False for
+every pre-check even though pre-checks deny. `configchange.py` emits a block of its own from
+outside the check registry, so no registry predicate is defined over it. And "blocking robust
+core" below counts canon fingerprints in `_canonAtoms.BLOCK_IDS`, a population of patterns.
+
+*Advisory* names these things. Two are columns of the catalog table: the Certification label, and
+the Fire column -- which is a two-valued TIER label reading `blocking` or `advisory`, not a print
+of `Finding.level`, whose values are `error` and `advisory`; that column is therefore also a
+producer of the word *blocking* above. Two are check tiers: `registry.POSTURE_ADVISE`, a
+check's declared tier, and membership of `registry._ADVISORY_ALLOWLIST` -- `blocking_eligible`
+consults the posture, not the allowlist, and `registry.py` warns in its own words that the two
+agree only because today's four happen to coincide. One is a raw outcome, `verdict.ADVISE`. One
+is `gate.configchange_advisory`, which fires without blocking from outside the registry, so it is
+in neither the allowlist nor the count. One is the canon "advisory remainder" of fingerprints
+resting on a soft or disqualified atom. The last is `Finding.level == "advisory"`, which the Fire
+column reports but is not -- checks emit it directly, and `dispatch.py`'s `_OUTCOME_FOR_LEVEL`
+maps it to `verdict.ADVISE`.
+
+*Silent* has five senses and they sit on different axes, which is why one of them looked like a
+contradiction. A fail-open is never silent: `dispatch.py` emits its notice whenever a check
+faulted, gated on the fault and never on posture. A check "staying silent" emitted no finding.
+`verdict.SILENT` is a configured posture that softens outcomes toward ALLOW -- but not
+unconditionally: a meta-layer BLOCK still floors at ASK, and it is `# record only`, so audit rows
+are written either way. A verifier "silently neutered" is the SUBJECT's code losing a check,
+which is what several patterns exist to catch. And a "silent bypass" is a fifth thing again -- an
+override that leaves no record, which is why an allow carries its rationale and why the oversight
+clamp is "never overridden SILENTLY".
+
+*A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
+`testrun`); where this page says the agent "claims" something it means the utterance a row may
+later record; and where it says "the claim is", the page is asserting something itself. *A check*
+in a pattern description is one in the subject's code; a check of makoto's own is a
+`registry.Check`. *The record* has six referents: the session's recorded call stream; the RECORD
+step of the receipt chain, an appended `kind="audit"` row; the written logs `audit.jsonl` and
+`dispatch_errors.jsonl`, which outlive the session; a FOREIGN ledger, as in `gate.stale_pass`
+reading pytest's own `lastfailed`; and "on the record" for a `makoto-allow:` rationale left in
+the subject's source. The durable store the word is named after is `makoto.record.db`, the SQLite
+file under the state dir -- a sixth referent, and the one several of the others are checked
+against.
+
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
 in deed. A word it lets through becomes spendable: trustworthy tender a reviewer or another agent can
 accept without re-deriving it.
+
+Both of those words are literal here, and the thing they name ships. The **tender** is the receipt
+(`makoto.state.ledger.emit_receipt`, and the Receipt section below): a read-time view over the
+chain, never persisted, listing each claim with its own `row_index` and `row_hash`. A claim is
+**spendable** when it is `trace_bound` -- at or before `verified_through`'s cut, so the chain from
+the claim to that point verifies -- and only three row kinds are claims at all: `verdict`,
+`certified-fact` and `testrun`, the kinds that assert something about the world. Records of deeds
+and machinery (`audit`, `touched`, `release.operator`, `fetch`, `exemption`) are not claims and are
+counted separately. "Without re-deriving it" is what the row hash buys: the reviewer re-checks a
+citation instead of re-running the work. A claim after the first broken link is still listed,
+undisguised, and is not counted as trace-bound -- it is exactly the not-spendable case.
 
 ## What it catches
 
@@ -22,14 +90,21 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **15 pre-checks** (all blocking)
+- **15 pre-checks** (every one denies the tool call; `blocking_eligible` is about the Stop edge and is False for all of them)
 - Pre-check ids grouped by dotted prefix — `content`: **12**, `event`: **2**, `gate`: **1**
 - **21 Stop checks** (all checks registered at the Stop edge)
 - **19 end-of-turn gates** (`may_block=True`)
-- **15 blocking end-of-turn gates** (not advisory-allowlisted)
+- **15 blocking end-of-turn gates** (`registry.blocking_eligible`)
 - **4 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
+
+Two different things are called a *gate* in that list, and the counts are not comparable. The
+`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is a
+check registered at the Stop edge with `may_block=True`. The one pre-check carrying the prefix,
+`gate.contract_order`, is not an end-of-turn gate — it has a same-named Stop sibling that is, and
+the two are separate checks with separate predicates. Every count above is scoped by edge, so no
+check is counted twice within a line.
 
 Every pre-check and every non-advisory end-of-turn gate blocks; there is no silent "warning" tier
 for those (see [Fire level](#fire-level)) — the documented exceptions are
@@ -155,7 +230,7 @@ auto-wire dispatch on enable. Claude Code registers `PreToolUse`, `PostToolUse`,
 automatically (which `exec`s `python -m makoto._dispatch`). `~/.claude/settings.json` is NOT
 modified — the plugin system manages its own hook registry.
 
-State dir + `makoto.db` are created lazily on the first hook invocation.
+State dir + `makoto.record.db` are created lazily on the first hook invocation.
 
 ### Companion setting (optional): suppress the harness auto-trailer
 
@@ -204,7 +279,7 @@ pip install -e /path/to/makoto
 # Then add makoto hook entries to ~/.claude/settings.json manually — see "Manual wiring" below.
 ```
 
-The state dir and `makoto.db` are created lazily on the first hook invocation; there is no separate
+The state dir and `makoto.record.db` are created lazily on the first hook invocation; there is no separate
 init step.
 
 ## Uninstall
@@ -217,7 +292,7 @@ init step.
 python -m makoto uninstall   # removes makoto-managed settings.json entries
 ```
 
-The state dir (`~/.claude/makoto_state/`) is preserved on uninstall — `audit.jsonl` and `makoto.db`
+The state dir (`~/.claude/makoto_state/`) is preserved on uninstall — `audit.jsonl` and `makoto.record.db`
 remain for forensic value. To fully reset, `rm -rf` the dir.
 
 ## CLI
@@ -264,15 +339,22 @@ the distinct process-error path.
 
 ## Fire level
 
-Every non-advisory live pattern blocks through the dispatcher mechanism measured above. makoto deliberately has **no
-non-blocking tier**: a `warning`/`disabled` resting state — witnessing a violation and letting the
-tool through — is itself an illusory word, the exact weakening shape makoto exists to catch. The
+Every non-advisory live pattern blocks through the dispatcher mechanism measured above. makoto
+deliberately has **no non-blocking *tier***: no resting state a check can be assigned to, no
+`warning`/`disabled` level to demote a pattern into — witnessing a violation and letting the tool
+through as a matter of policy is itself an illusory word, the exact weakening shape makoto exists
+to catch. Four checks do fire without blocking, and they are named below; the claim is that no
+*category* admits them, not that the count is zero. There is no predicate that qualifies a check
+as advisory — each of the four carries its own dated argument, and a fifth would need its own.
+That is deliberate: a rule for admitting advisory checks is the tier, rebuilt. The
 earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
 blocks at proven zero corpus-FP, or it is cut — zero false positives on the shipped corpus and gold
 negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
 from field use and is not part of that measurement). This still governs every pre-check and every non-advisory
 end-of-turn gate. The invariant is enforced by the suite, not at load: `makoto.vocab` carries
-`fire_level` "by convention -- no longer runtime-checked here", and the allowed set lives in
+`fire_level` on its test-fixture `PreCheck` shape only -- "by convention -- no longer
+runtime-checked here", and not the home of this invariant; the level a live gate emits is
+`Finding.level`. The allowed set lives in
 `tests/_toml_pattern_fixture.py`, with `tests/test_stop_gate_level_invariant.py` firing every live
 gate and asserting the level it emits.
 

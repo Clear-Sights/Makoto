@@ -27,7 +27,7 @@ from typing import Optional
 
 from makoto.substrate._declared import DECLARED_IDS
 from makoto.registry import Check, scan
-from makoto.verdict import ADVISE
+from makoto.registry import POSTURE_ADVISE
 from makoto.vocab import Finding
 
 
@@ -81,6 +81,6 @@ def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
 CHECK = Check(
     id="gate.undeclared_falsifiable",
     applies_at="Stop",
-    posture=ADVISE,
+    posture=POSTURE_ADVISE,
     run=lambda ctx=None: undeclared_falsifiable_gate(),
 )

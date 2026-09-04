@@ -23,7 +23,7 @@ from makoto.checks.undeclaredFalsifiable import (
 def _good(tmp_path, name, id_, applies_at="Stop"):
     (tmp_path / name).write_text(
         "from makoto.registry import Check\n"
-        f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture='advise')\n"
+        f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture='ADVISE')\n"
     )
 
 
@@ -47,7 +47,7 @@ def test_module_with_a_malformed_check_is_an_orphan_module(tmp_path):
     # via load_checks() -- unregistered in the loader's eyes despite the file existing.
     (tmp_path / "mismatched.py").write_text(
         "from makoto.registry import Check\n"
-        "CHECK = Check(id='', applies_at='Stop', posture='advise')\n"
+        "CHECK = Check(id='', applies_at='Stop', posture='ADVISE')\n"
     )
     assert orphan_modules(package_dir=tmp_path) == ["mismatched"]
 
@@ -92,8 +92,8 @@ def test_gate_reports_both_orphan_kinds_together(tmp_path):
 def test_gate_is_advisory_never_blocking():
     # Never "error" -- per this repo's advisory-over-blocking standing policy, same tier as
     # gate.self_wired.
-    from makoto.verdict import ADVISE
-    assert CHECK.posture == ADVISE
+    from makoto.registry import POSTURE_ADVISE
+    assert CHECK.posture == POSTURE_ADVISE
 
 
 # ---- the real, live catalog: this check auditing itself ------------------------------------

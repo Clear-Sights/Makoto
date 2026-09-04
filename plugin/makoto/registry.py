@@ -45,6 +45,38 @@ TESTS_SHAPES = frozenset({
 _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
                                   "gate.relative_path_citation", "gate.plan_item_drift"})  # FD6, FD26, 2026-07-09
 
+# THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called
+# "posture" and they are three different vocabularies: a CHECK's native tier is `BLOCK`/`ADVISE`
+# (here); `makoto.verdict`'s OUTCOME vocabulary is `block`/`advise` lower-case; and
+# `verdict._POSTURES` is the operator's configured mode, `loose`/`strict`/`ask`/`silent`.
+# `_valid_check` used to require only that `posture` be truthy, so any spelling loaded -- and two
+# checks shipped their native tier spelled in the OUTCOME vocabulary's case. Nothing noticed,
+# because the one consumer that publishes a blocking count never read posture at all. With the
+# set closed, a fourth spelling cannot be loaded rather than being caught later by a reader.
+POSTURE_BLOCK = "BLOCK"
+POSTURE_ADVISE = "ADVISE"
+ALLOWED_POSTURES = frozenset({POSTURE_BLOCK, POSTURE_ADVISE})
+
+
+def blocking_eligible(check) -> bool:
+    """Which end-of-turn gates the catalog counts as blocking. ONE owner OF THAT COUNT,
+    called by every consumer of it -- not the one owner of the word: a pre-check denies
+    without being Stop-edge, `configchange` emits a block from outside this registry, and
+    `_canonAtoms.BLOCK_IDS` counts patterns rather than checks. README lists all of them.
+
+    The Check docstring below has always defined this as BOTH signals: `may_block is True`
+    AND `posture == BLOCK`. `tools/render_checks.py` implemented a different rule -- Stop
+    edge, `may_block`, and absence from `_ADVISORY_ALLOWLIST` -- and never consulted posture
+    at all. The two agree on today's catalog only because the allowlist happens to name
+    exactly the four checks whose posture is ADVISE. Set a gate's posture to ADVISE without
+    editing the allowlist and the README goes on calling it blocking, because the sentence
+    that defines the word and the code that publishes the count were different owners.
+    """
+    return (getattr(check, "applies_at", None) == "Stop"
+            and bool(getattr(check, "may_block", False))
+            and getattr(check, "posture", None) == POSTURE_BLOCK)
+
+
 _PACKAGE_DIR = Path(__file__).parent / "checks"
 
 
@@ -147,7 +179,7 @@ def _valid_check(chk) -> bool:
     return (
         bool(getattr(chk, "id", None))
         and getattr(chk, "applies_at", None) in ALLOWED_EDGES
-        and bool(getattr(chk, "posture", None))
+        and getattr(chk, "posture", None) in ALLOWED_POSTURES
     )
 
 

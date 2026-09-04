@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parent.parent
 PLUGIN = REPO / "plugin"
 sys.path.insert(0, str(PLUGIN))
 
-from makoto.registry import _ADVISORY_ALLOWLIST, load_checks  # noqa: E402
+from makoto.registry import _ADVISORY_ALLOWLIST, blocking_eligible, load_checks  # noqa: E402
 from makoto.substrate._canonAtoms import BLOCK_IDS, THE_CANON_17  # noqa: E402
 
 README = REPO / "README.md"
@@ -28,16 +28,28 @@ def render_counts() -> list[str]:
     pre = load_checks(edge="Pre")
     stop = load_checks(edge="Stop")
     gates = [check for check in stop if check.may_block]
-    advisory = [check for check in gates if check.id in _ADVISORY_ALLOWLIST]
-    blocking = [check for check in gates if check.id not in _ADVISORY_ALLOWLIST]
+    # The blocking-gate COUNT is read from `registry.blocking_eligible`, its one owner. The
+    # word itself has several producers and this is not all of them -- see README. This used to be allowlist membership alone, so a gate whose posture moved
+    # to ADVISE without an allowlist edit went on being published as blocking. The allowlist is
+    # still the advisory list -- but it is now asserted against the definition rather than
+    # standing in for it, so the two cannot drift apart silently.
+    blocking = [check for check in gates if blocking_eligible(check)]
+    advisory = [check for check in gates if not blocking_eligible(check)]
+    disagreement = sorted({c.id for c in gates if blocking_eligible(c)}
+                          ^ {c.id for c in gates if c.id not in _ADVISORY_ALLOWLIST})
+    if disagreement:
+        raise SystemExit(
+            "_ADVISORY_ALLOWLIST and registry.blocking_eligible disagree about: "
+            f"{disagreement}. One of them is wrong; the definition is blocking_eligible.")
     prefixes = Counter(check.id.partition(".")[0] for check in pre)
     prefix_text = ", ".join(f"`{key}`: **{value}**" for key, value in sorted(prefixes.items()))
     return [
-        f"- **{len(pre)} pre-checks** (all blocking)",
+        f"- **{len(pre)} pre-checks** (every one denies the tool call; `blocking_eligible` is "
+        f"about the Stop edge and is False for all of them)",
         f"- Pre-check ids grouped by dotted prefix — {prefix_text}",
         f"- **{len(stop)} Stop checks** (all checks registered at the Stop edge)",
         f"- **{len(gates)} end-of-turn gates** (`may_block=True`)",
-        f"- **{len(blocking)} blocking end-of-turn gates** (not advisory-allowlisted)",
+        f"- **{len(blocking)} blocking end-of-turn gates** (`registry.blocking_eligible`)",
         f"- **{len(advisory)} advisory end-of-turn gates** (advisory-allowlisted)",
     ]
 

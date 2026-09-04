@@ -38,7 +38,7 @@ from typing import Optional
 from makoto.registry import Check
 from makoto.kit import live_query_finding
 from makoto.substrate._planNode import DONE, Plan
-from makoto.verdict import ADVISE
+from makoto.registry import POSTURE_ADVISE
 from makoto.vocab import Finding
 
 
@@ -91,7 +91,7 @@ run = live_query_finding(query=lambda plan: check(plan), posture_label="gate.sta
 CHECK = Check(
     id="gate.stale_establisher",
     applies_at="Stop",
-    posture=ADVISE,
+    posture=POSTURE_ADVISE,
     eats=frozenset({"plan"}),
     run=run,
     tests="LIVE_QUERY",
