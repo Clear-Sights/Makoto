@@ -18,20 +18,36 @@ against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB`
 the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
 code* — and is not a second definition of this one.
 
-**Six words this page reuses, each owned in one place.** *Blocking* is
-`registry.blocking_eligible` -- Stop edge, `may_block`, posture BLOCK -- and is False for every
-pre-check; a pre-check stops an act by denying the tool call, which is a different mechanism, not
-a weaker one. *Advisory* names three things and they are not interchangeable: the certification
-label below, membership of `registry._ADVISORY_ALLOWLIST` (the four gates that fire without
-blocking), and the "advisory remainder" of canon fingerprints resting on a soft or disqualified
-atom. *A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
-`testrun`); where this page says the agent "claims" something it means the utterance that a row
-may later record. *Silent* is the operator's view -- a fail-open is never silent because it
-reaches a seat that can act on it -- while a check "staying silent" means it emitted no finding,
-which is loud in the audit log either way. *A check* in a pattern description is one in the
-subject's code; a check of makoto's own is a `registry.Check`. *The record* is the session's
-recorded call stream; the RECORD step of the receipt chain is the appended `kind="audit"` row,
-which is one entry in it.
+**Six words this page reuses. None of them has a single owner, so each is listed with every
+artifact that produces it.** *Blocking* describes an outcome -- the act is stopped -- and four
+different things produce it: `registry.blocking_eligible` (Stop edge, `may_block`, posture BLOCK)
+decides it for end-of-turn gates and owns the count above; a pre-check stops an act by denying
+the tool call, a different mechanism for which `blocking_eligible` is False; `configchange.py`
+emits a `{"decision": "block"}` of its own from outside the check registry, so no registry
+predicate is defined over it; and "blocking robust core" below counts canon fingerprints in
+`_canonAtoms.BLOCK_IDS`, a population of patterns rather than of checks.
+
+*Advisory* names five things. Three are about checks: the certification label below, membership
+of `registry._ADVISORY_ALLOWLIST` (four Stop gates), and `gate.configchange_advisory`, which
+fires without blocking and is deliberately NOT in that allowlist because it is not a registry
+gate. One is about patterns: the "advisory remainder" of canon fingerprints resting on a soft or
+disqualified atom. The fifth is `verdict.ADVISE`, one of the four raw outcomes a check can
+produce, which `registry.py` already flags as its own vocabulary.
+
+*Silent* has an operator sense and a machine sense, and they can disagree. A fail-open is never
+silent -- it reaches a seat that can act on it; a check "staying silent" emitted no finding and
+is loud in the audit log anyway. But `verdict.SILENT` is a configured POSTURE under which every
+outcome becomes ALLOW with no enforcement and no advisory, which is the one case where nothing
+surfaces. It is named here so the first sentence is not read as covering it.
+
+*A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
+`testrun`); where this page says the agent "claims" something it means the utterance a row may
+later record; and where the page says "the claim is", it is asserting something itself. *A check*
+in a pattern description is one in the subject's code; a check of makoto's own is a
+`registry.Check`. *The record* is the session's recorded call stream; the RECORD step of the
+receipt chain is the appended `kind="audit"` row, one entry in it; and where the page asks what
+"could not be answered from the record" it means the written logs -- `audit.jsonl` and
+`dispatch_errors.jsonl` -- which outlive the session the call stream belongs to.
 
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
