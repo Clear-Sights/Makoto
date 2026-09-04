@@ -28,8 +28,8 @@ def render_counts() -> list[str]:
     pre = load_checks(edge="Pre")
     stop = load_checks(edge="Stop")
     gates = [check for check in stop if check.may_block]
-    # `blocking` is read from its one owner, `registry.blocking_eligible`, which is where the
-    # word is defined. This used to be allowlist membership alone, so a gate whose posture moved
+    # The blocking-gate COUNT is read from `registry.blocking_eligible`, its one owner. The
+    # word itself has several producers and this is not all of them -- see README. This used to be allowlist membership alone, so a gate whose posture moved
     # to ADVISE without an allowlist edit went on being published as blocking. The allowlist is
     # still the advisory list -- but it is now asserted against the definition rather than
     # standing in for it, so the two cannot drift apart silently.

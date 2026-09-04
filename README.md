@@ -29,7 +29,7 @@ every pre-check even though pre-checks deny. `configchange.py` emits a block of 
 outside the check registry, so no registry predicate is defined over it. And "blocking robust
 core" below counts canon fingerprints in `_canonAtoms.BLOCK_IDS`, a population of patterns.
 
-*Advisory* names seven things. Two are columns of the catalog table: the Certification label, and
+*Advisory* names eight things. Two are columns of the catalog table: the Certification label, and
 the Fire column -- which is a two-valued TIER label reading `blocking` or `advisory`, not a print
 of `Finding.level`, whose values are `error` and `advisory`; that column is therefore also a
 sixth producer of the word *blocking* above. Two are check tiers: `registry.POSTURE_ADVISE`, a
@@ -37,8 +37,10 @@ check's declared tier, and membership of `registry._ADVISORY_ALLOWLIST` -- `bloc
 consults the posture, not the allowlist, and `registry.py` warns in its own words that the two
 agree only because today's four happen to coincide. One is a raw outcome, `verdict.ADVISE`. One
 is `gate.configchange_advisory`, which fires without blocking from outside the registry, so it is
-in neither the allowlist nor the count. The last is the canon "advisory remainder" of
-fingerprints resting on a soft or disqualified atom.
+in neither the allowlist nor the count. One is the canon "advisory remainder" of fingerprints
+resting on a soft or disqualified atom. The last is `Finding.level == "advisory"`, which the Fire
+column reports but is not -- eight checks emit it, and `dispatch.py`'s `_OUTCOME_FOR_LEVEL`
+maps it to `verdict.ADVISE`.
 
 *Silent* has five senses and they sit on different axes, which is why one of them looked like a
 contradiction. A fail-open is never silent: `dispatch.py` emits its notice whenever a check
