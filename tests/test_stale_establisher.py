@@ -121,5 +121,8 @@ def test_a_stale_establisher_finding_does_not_block_when_dispatch_runs_it(
 def test_check_export_is_advisory_and_stop_scoped():
     assert staleEstablisher.CHECK.id == "gate.stale_establisher"
     assert staleEstablisher.CHECK.applies_at == "Stop"
-    from makoto.verdict import ADVISE
-    assert staleEstablisher.CHECK.posture == ADVISE
+    # The CHECK-posture vocabulary, not `verdict`'s OUTCOME vocabulary that shares these
+    # names in lower case. This assertion used to read `verdict.ADVISE` ('advise'), which is
+    # what the module itself wrongly imported, so the test agreed with the defect.
+    from makoto.registry import POSTURE_ADVISE
+    assert staleEstablisher.CHECK.posture == POSTURE_ADVISE

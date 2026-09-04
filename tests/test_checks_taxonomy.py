@@ -18,7 +18,7 @@ import pytest
 from makoto.registry import Check, load_checks
 
 
-def _write(tmp_path, name, id_, applies_at, posture="advise"):
+def _write(tmp_path, name, id_, applies_at, posture="ADVISE"):
     (tmp_path / name).write_text(
         "from makoto.registry import Check\n"
         f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture={posture!r})\n"
