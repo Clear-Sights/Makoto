@@ -18,36 +18,43 @@ against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB`
 the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
 code* — and is not a second definition of this one.
 
-**Six words this page reuses. None of them has a single owner, so each is listed with every
-artifact that produces it.** *Blocking* describes an outcome -- the act is stopped -- and four
-different things produce it: `registry.blocking_eligible` (Stop edge, `may_block`, posture BLOCK)
-decides it for end-of-turn gates and owns the count above; a pre-check stops an act by denying
-the tool call, a different mechanism for which `blocking_eligible` is False; `configchange.py`
-emits a `{"decision": "block"}` of its own from outside the check registry, so no registry
-predicate is defined over it; and "blocking robust core" below counts canon fingerprints in
-`_canonAtoms.BLOCK_IDS`, a population of patterns rather than of checks.
+**Six words this page reuses. None has a single owner, so each is listed with every artifact
+that produces it.** *Blocking* is an outcome -- the act is stopped -- with five producers.
+`verdict.BLOCK` is the raw one a check returns; `verdict.apply` folds it by posture and
+`dispatch.py` turns the result into a Pre-edge `permissionDecision: "deny"` or a Stop-edge
+`{"decision": "block"}`. `registry.POSTURE_BLOCK` is a check's own declared tier, an input to
+that folding and not the same vocabulary. `registry.blocking_eligible` (Stop edge, `may_block`,
+posture BLOCK) decides which end-of-turn gates the count above calls blocking, and is False for
+every pre-check even though pre-checks deny. `configchange.py` emits a block of its own from
+outside the check registry, so no registry predicate is defined over it. And "blocking robust
+core" below counts canon fingerprints in `_canonAtoms.BLOCK_IDS`, a population of patterns.
 
-*Advisory* names five things. Three are about checks: the certification label below, membership
-of `registry._ADVISORY_ALLOWLIST` (four Stop gates), and `gate.configchange_advisory`, which
-fires without blocking and is deliberately NOT in that allowlist because it is not a registry
-gate. One is about patterns: the "advisory remainder" of canon fingerprints resting on a soft or
-disqualified atom. The fifth is `verdict.ADVISE`, one of the four raw outcomes a check can
-produce, which `registry.py` already flags as its own vocabulary.
+*Advisory* names seven things. Two are columns of the catalog table: the Certification label, and
+the Fire column, which prints `Finding.level`. Two are check tiers: `registry.POSTURE_ADVISE`, a
+check's declared tier, and membership of `registry._ADVISORY_ALLOWLIST` -- `blocking_eligible`
+consults the posture, not the allowlist, and `registry.py` warns in its own words that the two
+agree only because today's four happen to coincide. One is a raw outcome, `verdict.ADVISE`. One
+is `gate.configchange_advisory`, which fires without blocking from outside the registry, so it is
+in neither the allowlist nor the count. The last is the canon "advisory remainder" of
+fingerprints resting on a soft or disqualified atom.
 
-*Silent* has an operator sense and a machine sense, and they can disagree. A fail-open is never
-silent -- it reaches a seat that can act on it; a check "staying silent" emitted no finding and
-is loud in the audit log anyway. But `verdict.SILENT` is a configured POSTURE under which every
-outcome becomes ALLOW with no enforcement and no advisory, which is the one case where nothing
-surfaces. It is named here so the first sentence is not read as covering it.
+*Silent* has four senses and they sit on different axes, which is why one of them looked like a
+contradiction. A fail-open is never silent: `dispatch.py` emits its notice whenever a check
+faulted, gated on the fault and never on posture. A check "staying silent" emitted no finding.
+`verdict.SILENT` is a configured posture that softens outcomes toward ALLOW -- but not
+unconditionally: a meta-layer BLOCK still floors at ASK, and it is `# record only`, so audit rows
+are written either way. And a verifier "silently neutered" is the SUBJECT's code losing a check,
+which is what several patterns exist to catch.
 
 *A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
 `testrun`); where this page says the agent "claims" something it means the utterance a row may
-later record; and where the page says "the claim is", it is asserting something itself. *A check*
+later record; and where it says "the claim is", the page is asserting something itself. *A check*
 in a pattern description is one in the subject's code; a check of makoto's own is a
-`registry.Check`. *The record* is the session's recorded call stream; the RECORD step of the
-receipt chain is the appended `kind="audit"` row, one entry in it; and where the page asks what
-"could not be answered from the record" it means the written logs -- `audit.jsonl` and
-`dispatch_errors.jsonl` -- which outlive the session the call stream belongs to.
+`registry.Check`. *The record* has five referents: the session's recorded call stream; the RECORD
+step of the receipt chain, an appended `kind="audit"` row; the written logs `audit.jsonl` and
+`dispatch_errors.jsonl`, which outlive the session; a FOREIGN ledger, as in `gate.stale_pass`
+reading pytest's own `lastfailed`; and "on the record" for a `makoto-allow:` rationale left in
+the subject's source.
 
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
