@@ -10,6 +10,14 @@ the agent a one-line correction to retry against.
 
 That publication claim is deliberately bounded: Shipped plugin — installable and versioned. The dispatcher is replay-tested against authored sessions; its effect on a live session's outcome is unmeasured.
 
+**Integrity**, as this tool uses the word, is exactly that agreement: a claim the agent made this
+turn is matched by the record of the deed it names. Nothing wider — not correctness, not code
+quality, not whether the deed was a good idea. So `gate.relative_path_citation` says a bare
+path is "a communication-quality signal, not an integrity violation": it contradicts no claim
+against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is
+the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
+code* — and is not a second definition of this one.
+
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
 in deed. A word it lets through becomes spendable: trustworthy tender a reviewer or another agent can
