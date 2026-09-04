@@ -18,6 +18,21 @@ against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB`
 the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
 code* — and is not a second definition of this one.
 
+**Six words this page reuses, each owned in one place.** *Blocking* is
+`registry.blocking_eligible` -- Stop edge, `may_block`, posture BLOCK -- and is False for every
+pre-check; a pre-check stops an act by denying the tool call, which is a different mechanism, not
+a weaker one. *Advisory* names three things and they are not interchangeable: the certification
+label below, membership of `registry._ADVISORY_ALLOWLIST` (the four gates that fire without
+blocking), and the "advisory remainder" of canon fingerprints resting on a soft or disqualified
+atom. *A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
+`testrun`); where this page says the agent "claims" something it means the utterance that a row
+may later record. *Silent* is the operator's view -- a fail-open is never silent because it
+reaches a seat that can act on it -- while a check "staying silent" means it emitted no finding,
+which is loud in the audit log either way. *A check* in a pattern description is one in the
+subject's code; a check of makoto's own is a `registry.Check`. *The record* is the session's
+recorded call stream; the RECORD step of the receipt chain is the appended `kind="audit"` row,
+which is one entry in it.
+
 It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
 facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
 in deed. A word it lets through becomes spendable: trustworthy tender a reviewer or another agent can
@@ -41,11 +56,11 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **15 pre-checks** (all blocking)
+- **15 pre-checks** (every one denies the tool call; `blocking_eligible` is about the Stop edge and is False for all of them)
 - Pre-check ids grouped by dotted prefix — `content`: **12**, `event`: **2**, `gate`: **1**
 - **21 Stop checks** (all checks registered at the Stop edge)
 - **19 end-of-turn gates** (`may_block=True`)
-- **15 blocking end-of-turn gates** (not advisory-allowlisted)
+- **15 blocking end-of-turn gates** (`registry.blocking_eligible`)
 - **4 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
@@ -303,7 +318,9 @@ blocks at proven zero corpus-FP, or it is cut — zero false positives on the sh
 negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
 from field use and is not part of that measurement). This still governs every pre-check and every non-advisory
 end-of-turn gate. The invariant is enforced by the suite, not at load: `makoto.vocab` carries
-`fire_level` "by convention -- no longer runtime-checked here", and the allowed set lives in
+`fire_level` on its test-fixture `PreCheck` shape only -- "by convention -- no longer
+runtime-checked here", and not the home of this invariant; the level a live gate emits is
+`Finding.level`. The allowed set lives in
 `tests/_toml_pattern_fixture.py`, with `tests/test_stop_gate_level_invariant.py` firing every live
 gate and asserting the level it emits.
 

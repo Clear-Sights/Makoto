@@ -44,11 +44,12 @@ def render_counts() -> list[str]:
     prefixes = Counter(check.id.partition(".")[0] for check in pre)
     prefix_text = ", ".join(f"`{key}`: **{value}**" for key, value in sorted(prefixes.items()))
     return [
-        f"- **{len(pre)} pre-checks** (all blocking)",
+        f"- **{len(pre)} pre-checks** (every one denies the tool call; `blocking_eligible` is "
+        f"about the Stop edge and is False for all of them)",
         f"- Pre-check ids grouped by dotted prefix — {prefix_text}",
         f"- **{len(stop)} Stop checks** (all checks registered at the Stop edge)",
         f"- **{len(gates)} end-of-turn gates** (`may_block=True`)",
-        f"- **{len(blocking)} blocking end-of-turn gates** (not advisory-allowlisted)",
+        f"- **{len(blocking)} blocking end-of-turn gates** (`registry.blocking_eligible`)",
         f"- **{len(advisory)} advisory end-of-turn gates** (advisory-allowlisted)",
     ]
 

@@ -741,7 +741,9 @@ re-deriving it" and nothing emitted it. This closes that gap.
 DESIGN DECISION 2026-07-07 (curated brief: claim kinds, shape, persistence):
   1. Only `verdict`/`certified-fact`/`testrun` chain rows count as CLAIMS -- kinds that assert
      something about the world (the ancestor canon/mint.py's "spendable if backed by a real
-     deed" test). `audit`/`touched`/`release.operator`/`fetch`/`exemption` are records of deeds and
+     deed" test -- cited for WHY these three kinds and not the others, not as a second test of
+     spendability: in this package `spendable` means `trace_bound`, defined at the foot of this
+     docstring, and nothing here re-checks that a deed was performed). `audit`/`touched`/`release.operator`/`fetch`/`exemption` are records of deeds and
      machinery, not claims, and folding them in would blur exactly the distinction the receipt
      exists to expose.
   2. One dict per call: {ts, session_id, chain_name, verified_through, claims, claim_count,
