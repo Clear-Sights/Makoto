@@ -19,7 +19,10 @@ the lexical half of the same idea — the word-set naming integrity concepts *in
 code* — and is not a second definition of this one.
 
 **Six words this page reuses. None has a single owner, so each is listed with every artifact
-that produces it.** *Blocking* is an outcome -- the act is stopped -- with five producers.
+that produces it.** *Blocking* is an outcome -- the act is stopped -- and these artifacts produce it. NO COUNT is
+stated for this list or the next: a number in prose that nothing checks drifts from the list
+beside it, which is how the *advisory* list came to say seven while naming eight, and how
+this list said five while the paragraph below names a sixth.
 `verdict.BLOCK` is the raw one a check returns; `verdict.apply` folds it by posture and
 `dispatch.py` turns the result into a Pre-edge `permissionDecision: "deny"` or a Stop-edge
 `{"decision": "block"}`. `registry.POSTURE_BLOCK` is a check's own declared tier, an input to
@@ -29,17 +32,17 @@ every pre-check even though pre-checks deny. `configchange.py` emits a block of 
 outside the check registry, so no registry predicate is defined over it. And "blocking robust
 core" below counts canon fingerprints in `_canonAtoms.BLOCK_IDS`, a population of patterns.
 
-*Advisory* names eight things. Two are columns of the catalog table: the Certification label, and
+*Advisory* names these things. Two are columns of the catalog table: the Certification label, and
 the Fire column -- which is a two-valued TIER label reading `blocking` or `advisory`, not a print
 of `Finding.level`, whose values are `error` and `advisory`; that column is therefore also a
-sixth producer of the word *blocking* above. Two are check tiers: `registry.POSTURE_ADVISE`, a
+producer of the word *blocking* above. Two are check tiers: `registry.POSTURE_ADVISE`, a
 check's declared tier, and membership of `registry._ADVISORY_ALLOWLIST` -- `blocking_eligible`
 consults the posture, not the allowlist, and `registry.py` warns in its own words that the two
 agree only because today's four happen to coincide. One is a raw outcome, `verdict.ADVISE`. One
 is `gate.configchange_advisory`, which fires without blocking from outside the registry, so it is
 in neither the allowlist nor the count. One is the canon "advisory remainder" of fingerprints
 resting on a soft or disqualified atom. The last is `Finding.level == "advisory"`, which the Fire
-column reports but is not -- eight checks emit it, and `dispatch.py`'s `_OUTCOME_FOR_LEVEL`
+column reports but is not -- checks emit it directly, and `dispatch.py`'s `_OUTCOME_FOR_LEVEL`
 maps it to `verdict.ADVISE`.
 
 *Silent* has five senses and they sit on different axes, which is why one of them looked like a
