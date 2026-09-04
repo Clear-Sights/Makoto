@@ -120,17 +120,34 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool) -
         pass
 
 
-def _self_verify_chain(state_dir: Path) -> None:
+def _self_verify_chain(state_dir: Path, *, full: bool = False) -> None:
     """Task 2 slice 3 (owner: "Makoto should read its own ledger for verification -- its things
-    literally depend on it"). Re-derives the chain's own tamper-evidence at every dispatch, the
-    same every-event cadence Assay's kernel ran. OWNER DECISION (2026-07-07): advisory-first,
-    block-after-soak -- this ships ADVISORY ONLY (an on-the-record dispatch fact + a stderr line,
-    never a block) until real-session soak evidence earns the flip to block, itself a later,
-    separately-certified change. A clean or absent/empty chain is vacuously silent (verify_chain's
-    own contract). NEVER RAISES: a verification fault must not crash the hot path it protects."""
+    literally depend on it"). Re-derives the chain's own tamper-evidence at every dispatch.
+    OWNER DECISION (2026-07-07): advisory-first, block-after-soak -- this ships ADVISORY ONLY (an
+    on-the-record dispatch fact + a stderr line, never a block) until real-session soak evidence
+    earns the flip to block, itself a later, separately-certified change. A clean or absent/empty
+    chain is vacuously silent (verify_chain's own contract). NEVER RAISES: a verification fault
+    must not crash the hot path it protects.
+
+    CADENCE (owner decision 2026-09-04, superseding the every-event full walk Assay's kernel
+    ran): every dispatch still verifies, but only `full=True` -- Stop -- re-walks and re-hashes
+    the whole chain. Every other event verifies INCREMENTALLY: only the rows appended since the
+    last clean walk, starting from the recorded checkpoint. The full walk was O(chain) on every
+    single tool call, which on a real long-lived chain is seconds of hook latency per call.
+
+    WHAT THE INCREMENTAL PATH DOES AND DOES NOT DETECT. It detects anything wrong with the rows
+    after the checkpoint, plus any truncation, and any earlier edit that changes the file's byte
+    length (which moves the checkpoint's recorded offset off the head row it re-hashes every
+    time). It does NOT detect a BYTE-LENGTH-PRESERVING edit to a row before the checkpoint --
+    that stays invisible until the next Stop's full walk. Note the chain was never anchored
+    anyway: no path here has an external anchor for the chain head, so an actor able to rewrite
+    the stream could always rewrite every derived file in the same directory along with it. This
+    cadence delays detection of a tamper the full walk still catches; it adds no new blind spot
+    beyond that delay."""
     try:
         from makoto.record import ledger as _ledger
-        broken_at = _ledger.verify_chain()
+        broken_at = (_ledger.verify_chain_checkpointed() if full
+                     else _ledger.verify_chain_incremental())
     except Exception as exc:
         _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}", blocked=False)
         return
@@ -861,8 +878,15 @@ def main() -> int:
     ingest) and nothing about any event."""
     payload_raw = sys.stdin.read()
     state_dir = _state_dir()
-    _self_verify_chain(state_dir)
+    # Parse first, verify second -- the self-verify needs to know whether this is the Stop event
+    # that earns the full chain walk (see _self_verify_chain's CADENCE note). _parse_payload is
+    # total (it returns a sentinel rather than raising), so nothing below it changes: every
+    # not-evaluable envelope still gets its own fact and exit 2, and still gets a chain verify
+    # first, exactly as before.
     payload = _parse_payload(payload_raw)
+    _self_verify_chain(
+        state_dir,
+        full=isinstance(payload, dict) and payload.get("hook_event_name") == "Stop")
     if payload is _PARSE_FAILED:
         reason = ("stdin was empty -- no payload arrived at all"
                   if not payload_raw.strip() else "stdin was not valid JSON")

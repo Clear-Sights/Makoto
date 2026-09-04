@@ -202,6 +202,8 @@ def latest_testrun(conn, session_id: str) -> str:
 import fcntl
 import hashlib
 import json as _json
+import os
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -209,6 +211,17 @@ from makoto.record.state import _state_dir as _chain_state_dir
 
 _DEFAULT_STREAM = "chain"
 OPEN = "open"
+
+# Sidecar suffixes. Both hold the SAME triple -- {"rows": N, "head_hash": H, "bytes": B}, read
+# as "the stream's first B bytes hold N well-formed rows, the last of which hashes to H" -- but
+# they answer different questions and advance at different moments, so they are separate files:
+#   .tail.json      where the NEXT append chains from (advanced by append, under the lock)
+#   .verified.json  how far the chain has been re-walked and found intact (advanced by verify)
+# Both are DERIVED caches, never the record: every consumer validates the triple against the
+# stream's real byte length and falls back to reading the stream itself when it does not match.
+# Neither is an external anchor -- an attacker who can rewrite the stream can rewrite these too.
+_TAIL = "tail"
+_VERIFIED = "verified"
 
 
 def norm_sha256(content: str) -> str:
@@ -290,24 +303,117 @@ def read(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> list:
     return rows
 
 
+def _sidecar_path(root: Path, name: str, kind: str) -> Path:
+    return root / f"{name}.{kind}.json"
+
+
+def _read_sidecar(root: Path, name: str, kind: str) -> Optional[dict]:
+    """The sidecar triple, or None when it is absent, unreadable, or not the expected shape.
+    NEVER RAISES: every caller's fallback is to read the stream itself, so an unusable sidecar
+    must be indistinguishable from an absent one."""
+    try:
+        with open(_sidecar_path(root, name, kind), "r", encoding="utf-8") as fh:
+            data = _json.load(fh)
+    except (OSError, ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    rows, head, nbytes = data.get("rows"), data.get("head_hash"), data.get("bytes")
+    # bool is an int subclass; reject it explicitly rather than reading True as 1.
+    if isinstance(rows, bool) or isinstance(nbytes, bool):
+        return None
+    if not isinstance(rows, int) or not isinstance(nbytes, int) or not isinstance(head, str):
+        return None
+    if rows < 0 or nbytes < 0:
+        return None
+    return {"rows": rows, "head_hash": head, "bytes": nbytes}
+
+
+def _write_sidecar(root: Path, name: str, kind: str, *, rows: int, head_hash: str,
+                   nbytes: int) -> None:
+    """Replace the sidecar atomically (unique temp file in the same directory + `os.replace`),
+    so a reader never sees a half-written triple and two concurrent writers cannot interleave.
+    NEVER RAISES: a sidecar that fails to land only costs the next caller a full read."""
+    fd = None
+    tmp = None
+    try:
+        fd, tmp = tempfile.mkstemp(dir=str(root), prefix=f".{name}.{kind}.", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fd = None                      # fdopen owns it now
+            _json.dump({"rows": rows, "head_hash": head_hash, "bytes": nbytes}, fh)
+        os.replace(tmp, _sidecar_path(root, name, kind))
+        tmp = None
+    except Exception:
+        pass
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
 def append(row: dict, *, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> dict:
     """Append one row, computing its chain link — never rewrites an existing row. Holds the
     stream's exclusive lock across tail-read + append so the chain can never fork. Returns the
     stored row with `prev_hash`/`row_hash` populated. `root` overrides env-var resolution (see
-    `store_root`)."""
+    `store_root`). `append_indexed` is the same write; it also returns the row's chain index."""
+    stored, _index = append_indexed(row, name=name, root=root)
+    return stored
+
+
+def append_indexed(row: dict, *, name: str = _DEFAULT_STREAM,
+                   root: Optional[Path] = None) -> tuple:
+    """`append`, plus the 0-based CHAIN INDEX the written row occupies — the position a reader
+    walking the stream's well-formed rows in order would find it at. Returned rather than
+    re-derived: a caller that needs the index (claim_graph's projection) would otherwise have to
+    re-read the whole stream to find the row it just wrote, which is O(stream) per append.
+
+    The tail sidecar makes the common case O(1): when it matches the stream's current byte
+    length it names both the hash to chain from and the index to use, so no row is read at all.
+    Any mismatch — absent sidecar, unreadable sidecar, a crash between the row write and the
+    sidecar write, an external append, a rewrite, a truncation — falls back to the full `read()`
+    and chains from the last WELL-FORMED row, exactly as this function did before the sidecar
+    existed. The fallback repairs nothing: `bytes` is recorded as the file's real length, so a
+    corrupt tail keeps its bytes and this row goes after them, as always."""
     with _Locked(name, root=root):
-        existing = read(name=name, root=root)
-        prev_hash = existing[-1].get("row_hash", "") if existing else ""
+        root_path = store_root(root=root)
+        target = root_path / f"{name}.jsonl"
+        try:
+            size = os.path.getsize(target)
+        except OSError:                    # absent or unstattable -> take the fallback path
+            size = None
+        tail = _read_sidecar(root_path, name, _TAIL)
+        if tail is not None and size is not None and tail["bytes"] == size:
+            prev_hash = tail["head_hash"]
+            index = tail["rows"]
+        else:
+            existing = read(name=name, root=root)
+            prev_hash = existing[-1].get("row_hash", "") if existing else ""
+            index = len(existing)
         stored = dict(row)
         stored.setdefault("status", OPEN)
         stored["prev_hash"] = prev_hash
         stored.pop("row_hash", None)
         stored["row_hash"] = _row_hash(prev_hash, stored)
-        target = store_root(root=root) / f"{name}.jsonl"
         with open(target, "a", encoding="utf-8") as fh:
             fh.write(_dumps(stored) + "\n")
             fh.flush()
-    return stored
+            # the file's length as it ACTUALLY is, taken from the fd we just wrote through --
+            # not len() of the line, which counts characters, not the utf-8 bytes on disk.
+            try:
+                written = os.fstat(fh.fileno()).st_size
+            except OSError:
+                written = None
+        if written is not None:
+            _write_sidecar(root_path, name, _TAIL, rows=index + 1,
+                           head_hash=stored["row_hash"], nbytes=written)
+    return stored, index
 
 
 def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> Optional[int]:
@@ -345,3 +451,173 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
         expected_prev = row.get("row_hash", "")
         idx += 1
     return None
+
+
+def _scan_extent(target: Path) -> Optional[tuple]:
+    """(non-blank line count, the LAST such line's `row_hash`, byte length) for the stream as it
+    is right now — a byte-level pass that hashes nothing and parses only the last line. Only
+    meaningful as a checkpoint when a full `verify_chain` of the same file came back clean, which
+    is what makes "non-blank line count" and "well-formed row count" the same number. None when
+    the stream is unreadable or its last line is not a JSON object (in which case `verify_chain`
+    is about to name a broken row anyway, so nothing gets checkpointed)."""
+    if not target.exists():
+        return None
+    rows = 0
+    last = b""
+    size = 0
+    try:
+        with open(target, "rb") as fh:
+            for raw in fh:
+                size += len(raw)
+                try:
+                    text = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    return None
+                if not text.strip():
+                    continue
+                rows += 1
+                last = raw
+    except OSError:
+        return None
+    head = ""
+    if last:
+        try:
+            parsed = _json.loads(last.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return None
+        if not isinstance(parsed, dict):
+            return None
+        head = str(parsed.get("row_hash", "") or "")
+    return rows, head, size
+
+
+def _last_line_before(target: Path, offset: int) -> Optional[bytes]:
+    """The last non-blank line lying entirely within the stream's first `offset` bytes, read
+    backwards in chunks so the cost is the length of that one line, not of the stream. None when
+    there is none, the read fails, or a single line runs past the sanity bound."""
+    chunk = 4096
+    pos = offset
+    tail = b""
+    try:
+        with open(target, "rb") as fh:
+            while pos > 0:
+                step = min(chunk, pos)
+                pos -= step
+                fh.seek(pos)
+                tail = fh.read(step) + tail
+                parts = tail.split(b"\n")
+                # parts[0] is only a whole line once we have read back to the file's start.
+                for candidate in reversed(parts if pos == 0 else parts[1:]):
+                    if candidate.strip():
+                        return candidate
+                if len(tail) > (1 << 20):
+                    return None
+    except OSError:
+        return None
+    return None
+
+
+def _checkpoint_resumable(target: Path, checkpoint: dict) -> bool:
+    """Is it safe to trust `checkpoint` and verify only what follows it? Requires the stream to
+    be at least `bytes` long (anything shorter is a truncation) AND the last row inside those
+    bytes to still hash to `head_hash` (the cheap re-verify of the recorded head row). False
+    sends the caller to a full walk, which is always correct and only ever slower."""
+    try:
+        if os.path.getsize(target) < checkpoint["bytes"]:
+            return False
+    except OSError:
+        return False
+    if checkpoint["rows"] == 0:
+        # nothing verified yet: only a zero-length prefix with no head row is coherent.
+        return checkpoint["bytes"] == 0 and checkpoint["head_hash"] == ""
+    if checkpoint["bytes"] == 0:
+        return False
+    raw = _last_line_before(target, checkpoint["bytes"])
+    if raw is None:
+        return False
+    try:
+        row = _json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return isinstance(row, dict) and row.get("row_hash") == checkpoint["head_hash"]
+
+
+def _verify_suffix(target: Path, *, offset: int, index: int, prev_hash: str) -> tuple:
+    """Walk the stream from byte `offset`, chaining from `prev_hash` and numbering from `index`,
+    applying exactly `verify_chain`'s per-row checks. Returns
+    (broken_at_or_None, rows, head_hash, bytes) where the last three describe the extent walked
+    and are meaningful only when broken_at is None. Raises what `verify_chain` raises on the
+    same input (a non-utf-8 byte), so the caller's fault handling is unchanged."""
+    idx = index
+    expected_prev = prev_hash
+    consumed = offset
+    with open(target, "rb") as fh:
+        fh.seek(offset)
+        for raw in fh:
+            consumed += len(raw)
+            stripped = raw.decode("utf-8").strip()
+            if not stripped:
+                continue
+            try:
+                row = _json.loads(stripped)
+            except ValueError:
+                return idx, 0, "", 0
+            if not isinstance(row, dict):
+                return idx, 0, "", 0
+            if row.get("prev_hash", "") != expected_prev:
+                return idx, 0, "", 0
+            if row.get("row_hash") != _row_hash(expected_prev, row):
+                return idx, 0, "", 0
+            expected_prev = row.get("row_hash", "")
+            idx += 1
+    return None, idx, expected_prev, consumed
+
+
+def verify_chain_checkpointed(*, name: str = _DEFAULT_STREAM,
+                              root: Optional[Path] = None) -> Optional[int]:
+    """`verify_chain` — same full walk, same return contract — that ALSO records how far it got,
+    so a later `verify_chain_incremental` can start there. The extent is measured BEFORE the walk
+    on purpose: under a concurrent append the checkpoint then names a prefix the walk definitely
+    covered, never bytes the walk never saw."""
+    root_path = store_root(root=root)
+    target = root_path / f"{name}.jsonl"
+    extent = _scan_extent(target)
+    broken_at = verify_chain(name=name, root=root)
+    if broken_at is None and extent is not None:
+        rows, head, nbytes = extent
+        _write_sidecar(root_path, name, _VERIFIED, rows=rows, head_hash=head, nbytes=nbytes)
+    return broken_at
+
+
+def verify_chain_incremental(*, name: str = _DEFAULT_STREAM,
+                             root: Optional[Path] = None) -> Optional[int]:
+    """Verify only what has been appended since the last checkpoint. Same return contract as
+    `verify_chain`: None when clean, else the 0-based index of the first bad row, counted from
+    the start of the stream. Falls back to the full `verify_chain_checkpointed` walk whenever the
+    checkpoint cannot be trusted — absent, unreadable, longer than the stream (a truncation), or
+    naming a head row that no longer hashes to what was recorded.
+
+    WHAT THIS DOES NOT DETECT. A BYTE-LENGTH-PRESERVING edit to a row before the checkpoint is
+    invisible here until the next full walk. An edit that changes the byte length is caught, but
+    incidentally rather than by design: it shifts every later byte, so the line ending at the
+    recorded offset is no longer the recorded head row and the checkpoint is refused. And an
+    actor who can rewrite the stream can rewrite `<name>.verified.json` too — neither file is
+    anchored anywhere outside this directory — so the incremental pass narrows a tamper's
+    detection window, it does not close it. The full walk is what closes it."""
+    root_path = store_root(root=root)
+    target = root_path / f"{name}.jsonl"
+    if not target.exists():
+        return None
+    checkpoint = _read_sidecar(root_path, name, _VERIFIED)
+    if checkpoint is not None and _checkpoint_resumable(target, checkpoint):
+        try:
+            broken_at, rows, head, nbytes = _verify_suffix(
+                target, offset=checkpoint["bytes"], index=checkpoint["rows"],
+                prev_hash=checkpoint["head_hash"])
+        except OSError:
+            return None                    # unreadable store reads as clean (verify_chain's contract)
+        if broken_at is not None:
+            return broken_at
+        _write_sidecar(root_path, name, _VERIFIED, rows=rows, head_hash=head, nbytes=nbytes)
+        return None
+    return verify_chain_checkpointed(name=name, root=root)

@@ -32,13 +32,6 @@ def ensure_schema(conn) -> None:
     _create_claim_graph_tables(conn)
 
 
-def _row_index(root: Path, name: str, row_hash: str) -> Optional[int]:
-    for index, row in enumerate(ledger.read(name=name, root=root)):
-        if row.get("row_hash") == row_hash:
-            return index
-    return None
-
-
 def _project_row(conn, row: Mapping, *, row_index=None, row_hash="") -> bool:
     value = graph_model.row_to_graph_value(row)
     if value is None:
@@ -88,9 +81,11 @@ def persist_value(conn, value, *, root: Optional[Path] = None, name: str = "chai
     row_index = None
     row_hash = ""
     if root is not None:
-        stored = ledger.append(row, name=name, root=root)
+        # append_indexed hands back the index of the row it just wrote. The old code re-read the
+        # whole stream to find that row by hash, which made every persisted graph value cost one
+        # full parse of the chain -- four of them per PostToolUse.
+        stored, row_index = ledger.append_indexed(row, name=name, root=root)
         row_hash = stored.get("row_hash", "")
-        row_index = _row_index(root, name, row_hash)
         row = stored
     _project_row(conn, row, row_index=row_index, row_hash=row_hash)
     return True
