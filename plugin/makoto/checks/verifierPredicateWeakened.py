@@ -38,7 +38,7 @@ import re
 import textwrap
 from typing import Optional
 
-from makoto.kit import _exempt_or_finding, _gated_content, callee_chain, parse_introduced
+from makoto.kit import ast_introduced_predicate, callee_chain, parse_introduced
 
 _TARGET_RX = re.compile(r"constitution/integrity/checks/.+\.py$")
 _RE_LOOSE_CHAINS = frozenset({"re.match", "re.search"})
@@ -82,27 +82,7 @@ def _parse_fragment(content: str):
         return None, 0
 
 
-def predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional["object"]:
-    gated = _gated_content(current_event=current_event, target_rx=_TARGET_RX, exempt_rx=None)
-    if gated is None:
-        return None
-    fp, content = gated
-    tree, off = _parse_fragment(content)
-    if tree is None:
-        return None    # unparseable fragment -> never confirmed as active code -> silent (FN-safe)
-    for node in ast.walk(tree):
-        label = _loose_label(node)
-        if not label:
-            continue
-        line_no = max(1, getattr(node, "lineno", 1) - off)
-        lines = content.splitlines()
-        snippet = lines[line_no - 1].strip()[:120] if 0 < line_no <= len(lines) else str(label)
-        return _exempt_or_finding(
-            current_event=current_event, conn=conn, pattern=pattern, fp=fp, line_no=line_no,
-            snippet=snippet, content=content,
-            message=f"row {pattern.id} ({pattern.description}): active-code match {label!r} "
-                    f"at line {line_no}")
-    return None
+predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_loose_label, parse=_parse_fragment)
 
 
 from makoto.registry import Check as _Check

@@ -14,7 +14,7 @@ The real success lands under a DIFFERENT key, so it cannot flip the phantom run'
 the documented [ERR, ERR, OK] guard cannot help.
 
 The fix relaxes PAIRING ONLY (`_pairing_input`), never a verdict: `recur_stuck` and every other
-primitive keep keying on the full `_canon_input`. The true-positive cases below are what hold
+primitive keep keying on the full `canon_input`. The true-positive cases below are what hold
 that line -- a pairing relaxed until nothing dangles would discharge the gate while leaving its
 name in place.
 
@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 
 from makoto.checks.canonTimeoutRecur import (
-    _canon_input,
+    canon_input,
     _pairing_input,
     calls_from_history,
     fired_primitives,
@@ -55,16 +55,16 @@ def test_pairing_input_ignores_leading_dunder_keys():
 
 
 def test_the_verdict_identity_still_sees_them():
-    """PAIRED. Only pairing is dunder-insensitive; `_canon_input` -- what every verdict keys on --
+    """PAIRED. Only pairing is dunder-insensitive; `canon_input` -- what every verdict keys on --
     is unchanged, so the relaxation cannot leak into a judgment."""
-    assert _canon_input(BASE) != _canon_input(INJECTED)
+    assert canon_input(BASE) != canon_input(INJECTED)
 
 
 def test_pairing_input_never_collapses_genuinely_distinct_calls():
     """PAIRED REFUSAL. A leading `__` is a transport convention, never call semantics -- so
     dropping it must not make two different calls look like one."""
     assert _pairing_input({"command": "a"}) != _pairing_input({"command": "b"})
-    assert _pairing_input("scalar") == _canon_input("scalar")
+    assert _pairing_input("scalar") == canon_input("scalar")
 
 
 # ---- the four shapes from the report ----------------------------------------------------------

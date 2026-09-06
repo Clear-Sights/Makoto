@@ -89,7 +89,7 @@ import re
 from typing import Iterable, List
 
 from makoto.vocab import Finding
-from makoto.kit import classify_failure, decode_history_event, failure_terminal_result
+from makoto.kit import canon_input, classify_failure, decode_history_event, failure_terminal_result
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
 # "result": tool_response} — tool_input/tool_response are kept as full DICTS (not the flattened
@@ -294,17 +294,8 @@ def timed_out_at_turn_end(calls: list) -> bool:
     return transients >= 2
 
 
-def _canon_input(inp) -> str:
-    """A stable, identity-comparable serialization of a tool_input dict (key order-independent).
-    Used ONLY to compare two calls for byte-identity — it reads no content semantically."""
-    try:
-        return json.dumps(inp, sort_keys=True, default=str)
-    except Exception:
-        return repr(inp)
-
-
 def _pairing_input(inp) -> str:
-    """`_canon_input` with leading-dunder keys dropped — the call-identity fold used to pair a
+    """`canon_input` with leading-dunder keys dropped — the call-identity fold used to pair a
     PostToolUse back to its own PreToolUse AND (since the ADR 0024 follow-up) as the per-key
     verdict identity inside this module's own sequence primitives (`recur_stuck`,
     `timed_out_at_turn_end`'s transient budget).
@@ -313,15 +304,15 @@ def _pairing_input(inp) -> str:
     pairing on the FULL canonical input would leave a dangling Pre for a call that in fact
     succeeded. See docs/adr/0024-dunder-insensitive-call-pairing.md for the decision history.
     The SAME injection class also broke the verdict side while it keyed on the full
-    `_canon_input`: a bookkeeping key that VARIES per call (`__seq`) split a byte-identical
+    `canon_input`: a bookkeeping key that VARIES per call (`__seq`) split a byte-identical
     retry loop into distinct keys, so recur never saw a run of length >= 2.
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
     cannot collapse two genuinely distinct calls — for pairing or for a verdict. Primitives in
     OTHER modules (`identical_retry`) still key on their own folds."""
     if isinstance(inp, dict):
-        return _canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
-    return _canon_input(inp)
+        return canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
+    return canon_input(inp)
 
 
 # ---- the history -> Call adapter (protocol-field decode; fail-open per row) -------------------
@@ -359,7 +350,7 @@ def calls_from_history(history) -> list:
     preceding still-unpaired identical (tool name + `_pairing_input`) Pre, and only the terminal
     becomes a Call (the Pre is dropped) — so `recur_stuck`'s consecutive-run judgment is not
     corrupted by spurious result-less Calls (module docstring ADAPTATION NOTE).
-    Pairing uses `_pairing_input` (dunder-insensitive), NOT the full `_canon_input` the verdicts
+    Pairing uses `_pairing_input` (dunder-insensitive), NOT the full `canon_input` the verdicts
     key on: a harness may inject bookkeeping keys between a call's Pre and its Post, and pairing
     on those synthesized a phantom failure for a call that succeeded. See `_pairing_input`.
 

@@ -21,20 +21,14 @@ match by construction.
 """
 from __future__ import annotations
 
-import json
 from typing import Optional
 
-from makoto.kit import (bash_output_text, classify_failure, decode_history_event,
+from makoto.kit import (bash_output_text, canon_input, classify_failure, decode_history_event,
                         failure_terminal_result)
 from makoto.vocab import Finding
 from makoto.registry import Check
 
 
-def _canon_input(ti: dict) -> str:
-    try:
-        return json.dumps(ti, sort_keys=True, default=str)
-    except Exception:
-        return repr(ti)
 
 
 def _most_recent_completed_bash_call(history) -> Optional[tuple]:
@@ -85,7 +79,7 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
         return None
     prior_input, prior_result_text = prior
     current_input = current_event.get("tool_input") or {}
-    if _canon_input(prior_input) != _canon_input(current_input):
+    if canon_input(prior_input) != canon_input(current_input):
         return None                          # not a retry of the SAME call -- silent
     if classify_failure(prior_result_text) is not True:
         return None                          # transient or uncertain -- never fire (the ship bar)
