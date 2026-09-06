@@ -550,12 +550,23 @@ def jwt_decode_callee_chain(node) -> Optional[str]:
     return chain
 
 
+def canon_input(inp) -> str:
+    """A stable, identity-comparable serialization of a tool_input (key order-independent).
+    Compares two calls for byte-identity only; reads no content semantically. ONE owner:
+    canon.timeout/recur and identicalRetryInterdiction pair calls by the same fold."""
+    try:
+        return json.dumps(inp, sort_keys=True, default=str)
+    except Exception:
+        return repr(inp)
+
+
 def ast_introduced_predicate(
     *,
     target_rx: re.Pattern,
     node_match: Callable[[ast.AST], Optional[str]],
     exempt_rx: Optional[re.Pattern] = None,
     exempt_label: str = "",
+    parse: Callable[[str], tuple] = None,
 ) -> Callable[..., Optional[Finding]]:
     """Build a PreToolUse content-scan predicate that fires ONLY on a real AST node in the
     INTRODUCED code — the "only active code" companion to :func:`regex_file_predicate`.
@@ -577,7 +588,7 @@ def ast_introduced_predicate(
         if gated is None:
             return None
         fp, content = gated
-        tree, off = parse_introduced(content)
+        tree, off = (parse or parse_introduced)(content)
         if tree is None:
             return None  # unparseable fragment -> not confirmed active -> silent (FN-safe)
         for node in ast.walk(tree):
