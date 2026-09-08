@@ -1414,6 +1414,46 @@ def test_dispatch_claimed_running_gate_blocks_after_recorded_failed_launch(tmp_p
         "the claimed_running fire must be audited"
 
 
+def test_dispatch_unexamined_wall_gate_blocks_when_no_act_followed_the_operator(tmp_path):
+    """Behavioral blocking pin for gate.unexamined_wall (register G5) through the real dispatcher.
+
+    One genuine operator turn sets the window boundary; the session then records no tool call at
+    all, and the agent states that a fact cannot be determined. That is a wall declared with the
+    inventory unopened. The negative half is the next test."""
+    state_dir = _setup_state(tmp_path)
+    tp = tmp_path / "wall.jsonl"
+    tp.write_text(json.dumps({"type": "user", "message": {"role": "user", "content": "carry on"},
+                              "timestamp": "2026-09-08T10:00:00Z"}) + "\n", encoding="utf-8")
+    stop = {"hook_event_name": "Stop", "session_id": "wall_block", "cwd": str(tmp_path),
+            "transcript_path": str(tp),
+            "last_assistant_message": "There is no way to tell whether the suite passes."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out, "unexamined_wall must block an epistemic cannot stated with an empty act window"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    rows = [json.loads(line) for line in (state_dir / "audit.jsonl").read_text().splitlines()
+            if line.strip()]
+    assert any("gate.unexamined_wall" in row.get("pattern_fires", []) for row in rows), \
+        "the unexamined_wall fire must be audited"
+
+
+def test_dispatch_unexamined_wall_is_silent_when_a_refusal_is_not_epistemic(tmp_path):
+    """A refusal asserts nothing about what is knowable, so it is not G5 and must not block.
+    Without this cell the gate would be a can't-word matcher rather than a wall detector."""
+    state_dir = _setup_state(tmp_path)
+    tp = tmp_path / "wall2.jsonl"
+    tp.write_text(json.dumps({"type": "user", "message": {"role": "user", "content": "carry on"},
+                              "timestamp": "2026-09-08T10:00:00Z"}) + "\n", encoding="utf-8")
+    stop = {"hook_event_name": "Stop", "session_id": "wall_ok", "cwd": str(tmp_path),
+            "transcript_path": str(tp),
+            "last_assistant_message": "I can't help with that request."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    if out:
+        assert "gate.unexamined_wall" not in out
+
+
 def test_dispatch_claimed_consent_absent_gate_blocks_when_the_operator_never_spoke(tmp_path):
     """Behavioral blocking pin for gate.claimed_consent_absent through the real dispatcher.
 
@@ -1917,7 +1957,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.run_promised",  # claimed_running's forward-looking sibling (2026-07-23)
                           "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
-                          "gate.claimed_consent_absent"}  # claim-vs-ORACLE-record gate (2026-09-08)
+                          "gate.claimed_consent_absent",
+                          "gate.unexamined_wall"}   # register G5\'s runner
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the

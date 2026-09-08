@@ -180,6 +180,18 @@ def _scenario_claimed_shipped(tmp_path):
 
 # Every discovered gate id must have a firing scenario here — a new gate added to checks/
 # without an entry below fails loudly (KeyError) rather than being silently skipped.
+def _scenario_unexamined_wall(tmp_path):
+    # fires on an epistemic "cannot" stated with NO act since the operator last spoke. The
+    # transcript carries one genuine operator turn (the window boundary) and the history is
+    # empty, so the inventory was never opened.
+    import json as _json
+    tp = tmp_path / "wall_transcript.jsonl"
+    tp.write_text(_json.dumps({"message": {"role": "user", "content": "carry on"},
+                               "timestamp": "2026-09-08T10:00:00Z"}) + "\n", encoding="utf-8")
+    return _ctx(text="There is no way to tell whether the suite passes.",
+                history=[], transcript_path=str(tp))
+
+
 def _scenario_claimed_consent_absent(tmp_path):
     # fires on a claim citing the operator in a session whose transcript carries no genuine
     # operator turn at all. The transcript here holds one TOOL-RESULT-shaped user entry, which
@@ -195,6 +207,7 @@ def _scenario_claimed_consent_absent(tmp_path):
 
 _SCENARIOS = {
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
+    "gate.unexamined_wall": _scenario_unexamined_wall,
     "gate.completion": _scenario_completion,
     "gate.advance": _scenario_advance,
     "gate.green_claim": _scenario_green_claim,
