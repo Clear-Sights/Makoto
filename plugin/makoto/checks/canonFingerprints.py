@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import List
 
-from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
+from makoto.substrate._canonAtoms import calls_from_history, calls_since, fired_canon_fingerprints
 from makoto.vocab import Finding
 
 
@@ -37,7 +37,20 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     audit/receipt trail via `record_ack_block_if_new`, but the discharge decision itself is
     always freshly re-derived, never read back from that row. Silent (empty list) when no
     fingerprint fires, or every fired one is acked."""
-    calls = calls_from_history(history)
+    # THE ATOM WINDOW. Atoms are existentials, so over a whole session they are monotone: once a
+    # fingerprint has matched it can never stop matching, whatever the agent does next, and the
+    # typed phrase becomes its only exit. Evaluating over the calls since the operator last spoke
+    # makes it fire once, inform them, and reset when they next speak -- whatever they say --
+    # firing again only if the agent repeats the pattern after being told. The agent cannot force
+    # a reset: it cannot produce a genuine user turn. AliceLJY, issue #45's secondary half; #57.
+    # No transcript, or no genuine turn in it, means NO window -- the whole session, which is the
+    # strict direction and the prior behaviour. `release.operator` remains the explicit override.
+    try:
+        import makoto.state.ledger as _ackblock
+        since = _ackblock.last_operator_turn_ts(transcript_path)
+    except Exception:
+        since = None
+    calls = calls_since(history, since)
     out: List[Finding] = []
     for name, formula, is_block in fired_canon_fingerprints(calls, text or ""):
         if not is_block:

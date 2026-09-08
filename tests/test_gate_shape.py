@@ -50,6 +50,8 @@ GATES_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "chec
 # The 11 named Stop-gate modules — each is its adapter AND its own engine merged into one file
 # (SPEC-5 Task 4 folded what used to be a separate `stopcheck_X.py` + `X.py` engine pair together).
 GATE_MODULE_STEMS = {
+    "claimedConsentAbsent",  # the agent cites the operator's word in a session with no operator
+                             # turn at all -- the ORACLE channel as record, never as subject
     "claimedProduceAbsent", "undischargedCommitment", "falseGreenClaim", "silentlyDroppedCommitment",
     "fabricatedToolAction", "namedTestTeeth", "stalePytestCache",
     "deadPureStatement",    # liveness gate: adapter + its own AST analyzer engine, one file
@@ -98,7 +100,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim",
                           "gate.canon_fingerprints", "gate.canon_fingerprints_advisory",
                           "gate.contract_order",
                           "gate.relative_path_citation", "gate.plan_item_drift",
-                          "gate.claimed_running", "gate.run_promised", "gate.claimed_shipped"}
+                          "gate.claimed_running", "gate.run_promised", "gate.claimed_shipped",
+                          "gate.claimed_consent_absent"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -278,10 +281,10 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 19                # 7 ledger-gates + liveness + self_wired +
+    assert len(GATE_MODULE_FILES & present) == 20                # 7 ledger-gates + liveness + self_wired +
     # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + contractOrder (SPEC-5,
     # Makoto absorbs Assay) + relativePathCitation + planItemDrift (2026-07-09) + claimedRunningAbsent
-    # (2026-07-23) + runIntentUnfulfilled (2026-07-23)
+    # (2026-07-23) + runIntentUnfulfilled (2026-07-23) + claimedConsentAbsent (2026-09-08)
 
 
 def test_module_function_counts_match_the_design():

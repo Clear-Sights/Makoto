@@ -5,6 +5,32 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-09-08
+
+### Fixed
+- **Canon fingerprints were monotone: once matched, they could never stop matching.** Every canon
+  atom is `_existing(calls, pred)`, an existential over the whole session call stream, so once a
+  green test run and a timeout had each happened both were permanently true and the fingerprint
+  fired at every subsequent Stop whatever the agent did next. The typed `release.operator` phrase
+  was therefore its only exit — forcing a human onto a gate whose premise is that a claim is held
+  against the record and not against an utterance. Atoms are now evaluated over the calls **since
+  the operator last spoke**: the fingerprint fires once, the operator is informed, their next turn
+  resets the window whatever it says, and it fires again only if the agent repeats the pattern
+  after being told. The agent cannot manufacture a reset because it cannot produce a genuine user
+  turn. Reported by @AliceLJY as the secondary half of #45; it was the primary defect (#57).
+
+### Added
+- **`gate.claimed_consent_absent`** — blocks a claim citing the operator's approval, instruction or
+  word in a session whose transcript carries no genuine operator turn at all. An agent citing
+  approval it was never given has licensed itself. Fires only on an EMPTY oracle channel, never on
+  a paraphrase mismatch: absence is countable, similarity is judgement.
+
+### Known
+- Chain reads are O(chain) per hook call — 2.8 s PreToolUse, 12.4–19.2 s PostToolUse on a
+  214k-row chain, measured by @tkulczy2. #58.
+- An operator who spoke once, followed by an agent inventing a second different instruction, is
+  not caught by `gate.claimed_consent_absent`; that needs the claim compared to the turn's content.
+
 ## [2.6.0] — 2026-09-08
 
 ### Fixed

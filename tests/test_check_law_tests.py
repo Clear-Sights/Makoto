@@ -34,6 +34,14 @@ ONE_OFF = {
 HISTORY_PRIMITIVES = frozenset({
     "iter_tool_events", "raw_payload_str", "decode_history_row", "decode_history_event",
     "turn_tool_calls", "calls_from_history",
+    # `calls_since` is `calls_from_history` with the atom window applied (the calls since the
+    # operator last spoke). It reads the same history rows through the same decoder, so it is the
+    # same primitive at a narrower quantifier -- not a second way of consulting history.
+    "calls_since",
+    # `user_turn_texts` is the ORACLE half of the same session record: the host-written user
+    # turns, read as the record a claim ABOUT the operator is held against. Same session, same
+    # spoof-resistance (`_is_genuine_user_turn`), different channel.
+    "user_turn_texts",
 })
 LEDGER_PRIMITIVES = frozenset({"_discharged", "_discharge_kwargs", "_drop_discharged"})
 TESTRUN_PRIMITIVES = frozenset({

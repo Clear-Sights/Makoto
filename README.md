@@ -92,9 +92,9 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **15 pre-checks** (every one denies the tool call; `blocking_eligible` is about the Stop edge and is False for all of them)
 - Pre-check ids grouped by dotted prefix — `content`: **12**, `event`: **2**, `gate`: **1**
-- **21 Stop checks** (all checks registered at the Stop edge)
-- **19 end-of-turn gates** (`may_block=True`)
-- **15 blocking end-of-turn gates** (`registry.blocking_eligible`)
+- **22 Stop checks** (all checks registered at the Stop edge)
+- **20 end-of-turn gates** (`may_block=True`)
+- **16 blocking end-of-turn gates** (`registry.blocking_eligible`)
 - **4 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
@@ -162,6 +162,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.claimed_running` | "it's running/up" contradicted by this session's own Bash record | blocking | established |
 | `gate.run_promised` | last turn promised a run ("I'll run the tests") and no Bash call followed | blocking | established |
 | `gate.claimed_shipped` | "merged/pushed/live" with no successful remote-mutating call on record | blocking | established |
+| `gate.claimed_consent_absent` | cites the operator's approval, instruction or word in a session whose transcript carries no genuine operator turn at all | blocking | new |
 | `gate.liveness` | a statement with no live effect inside a closed function | blocking | established |
 | `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |
 | `gate.canon` | last call ended in an unresolved direct error, or a byte-identical stuck retry loop | blocking | replayed |
