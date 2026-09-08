@@ -5,6 +5,31 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-09-08
+
+### Fixed
+- **`release.operator` was unreachable exactly when it was needed.** `_ACK_RX` was compiled with
+  `re.I` alone and applied with `.search()` to the whole user turn, so its `^` bound at offset 0
+  of the turn. When a Stop gate blocks, the host prepends its feedback to the operator's next
+  turn, which pushed the operator's line off offset 0 — so the only discharge that gate documents
+  could not be typed. Reported by @AliceLJY (#45), with no code; reproduced here before the change.
+
+  The anchor is now per line, and the "non-quoted" rule the retry hint has always promised is
+  implemented with it: a fenced block, a 4-space indented block, an inline backtick span and a
+  blockquote no longer discharge a gate. Both halves land together because anchoring alone opens
+  the mirror defect — measured, all three quoted shapes discharge under a bare `re.M`.
+
+### Added
+- `CONTRIBUTING.md`, a pull request template, and an Acknowledgements table naming every outside
+  report that has changed this code — nine of them, from @AliceLJY and @tkulczy2.
+
+### Known
+- Canon fingerprints are monotone: every atom is an existential over the whole session, so a
+  fingerprint that has matched can never stop matching, and the typed phrase is the only exit.
+  The deeper half of #45, tracked as #57 and not fixed here.
+- Chain reads are O(chain) per hook call, measured at 2.8 s PreToolUse and 12.4–19.2 s
+  PostToolUse on a 214k-row chain by @tkulczy2. Tracked as #58.
+
 ## [2.5.0] — 2026-09-03
 
 ### Fixed
