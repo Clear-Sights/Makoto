@@ -519,10 +519,66 @@ _ACK_RX = re.compile(
 # The former dual-phrase acceptance existed to keep pre-rename records/habits working; the owner
 # retired that guarantee outright -- state predating the reset is archived (zip) or wiped, so
 # there is no history left whose meaning depends on the old phrase."""
+# ---------------------------------------------------------------------------------------------
+# The ack line must be UNQUOTED, which the gate's own retry hint has always promised ("say
+# exactly `makoto release.operator {name}: <reason>` in a real (non-tool, non-quoted) reply")
+# and which nothing implemented. The two halves are one fix and must land together:
+#
+#   * `_ACK_RX` was compiled with re.I only and applied with `.search()` to the WHOLE user turn,
+#     so its `^` bound at offset 0 of the turn. When a Stop gate blocks, the host prepends its
+#     feedback to the operator's next turn, which pushed the operator's line off offset 0 and
+#     made the only discharge this gate honors unreachable exactly when it was needed. Reported
+#     by AliceLJY (issue #45); reproduced here before the change.
+#
+#   * Anchoring per line without the quoting rule opens the mirror defect: a fenced block, a
+#     4-space indented block, or the phrase quoted in prose then discharges the gate. Measured:
+#     all three match under a bare re.M. (The hint as shipped does NOT, because its backtick sits
+#     immediately before `makoto` -- but that is an accident of wording, not a guard, which is
+#     why `test_the_gates_own_hint_never_discharges` pins it.)
+#
+# Scanning line by line rather than with re.M keeps `^\s*` per line and makes each exclusion a
+# readable rule instead of a lookaround.
+_FENCE_RX = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
+_INDENTED_CODE_RX = re.compile(r"^(?: {4}|\t)")
+
 _SYNTHETIC_MARKERS = (
     "<system-reminder", "<user-prompt-submit-hook", "<task-notification",
     "<local-command-caveat", "[request interrupted by user]",
 )
+
+
+def _unquoted_ack_matches(text: str):
+    r"""Yield `(fingerprint_id, reason)` for every UNQUOTED release.operator line in `text`.
+
+    Quoted means any of: inside a ``` / ~~~ fenced block, inside a 4-space or tab indented code
+    block, or inside an inline backtick span (a leading backtick already blocks `_ACK_RX`; the
+    parity guard catches a span opened on an earlier line). A blockquote line is excluded for
+    free -- `>` is not whitespace, so `^\s*makoto` cannot reach past it.
+
+    A turn may carry several candidate lines (prepended hook feedback plus what the operator
+    typed), so every line is examined rather than only the first match in the turn."""
+    fence = None
+    for line in text.split("\n"):
+        opener = _FENCE_RX.match(line)
+        if fence is not None:
+            if opener and opener.group(1)[0] == fence:
+                fence = None
+            continue
+        if opener:
+            fence = opener.group(1)[0]
+            continue
+        if _INDENTED_CODE_RX.match(line):
+            continue
+        m = _ACK_RX.match(line)
+        if not m:
+            continue
+        # group(2) can capture a bare leftover separator (an id-only ack backtracks to ":"), so
+        # strip stray punctuation before the truthiness check rather than trusting the regex.
+        acked_id = m.group(1).strip()
+        reason = m.group(2).strip().lstrip(":- ").strip()
+        if not acked_id or not reason:
+            continue
+        yield acked_id, reason
 
 
 def _entry_text(entry: dict) -> str:
@@ -688,17 +744,10 @@ def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
         ts = entry.get("timestamp", "")
         if not ts or ts <= since_ts:
             continue
-        m = _ACK_RX.search(text)
-        if not m:
-            continue
-        # group(2) can still capture a bare leftover separator (e.g. id-only "notestedit_destruct:"
-        # backtracks to reason=":") when nothing real follows -- strip stray leading punctuation
-        # before the truthiness check, rather than trust the regex to have consumed it.
-        acked_id = m.group(1).strip()
-        reason = m.group(2).strip().lstrip(":- ").strip()
-        if acked_id != fingerprint_id or not reason:
-            continue
-        return {"fingerprint_id": fingerprint_id, "reason": reason, "ts": ts}
+        for acked_id, reason in _unquoted_ack_matches(text):
+            if acked_id != fingerprint_id:
+                continue
+            return {"fingerprint_id": fingerprint_id, "reason": reason, "ts": ts}
     return None
 
 

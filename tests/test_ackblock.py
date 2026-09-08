@@ -168,3 +168,73 @@ def test_record_ack_block_if_new_is_idempotent_per_session(tmp_path):
     assert record_ack_block_if_new(ack, session_id="s1", root=tmp_path) is False
     rows = [r for r in ledger.read(root=tmp_path) if r.get("kind") == "release.operator"]
     assert len(rows) == 1
+
+
+# ---- the anchor and the non-quoted rule (issue #45, AliceLJY) -----------------------------------
+# `_ACK_RX` was applied with `.search()` to the whole turn, so its `^` bound at offset 0 of the
+# turn. A blocked Stop prepends the host's feedback to the operator's next turn, which pushed the
+# operator's line off offset 0 -- the only discharge this gate honors became unreachable exactly
+# when it was needed. Anchoring per line fixes that and opens the mirror defect, so the quoting
+# rule the retry hint has always promised lands with it. Both directions are pinned here.
+def test_ack_after_prepended_hook_feedback_discharges(tmp_path):
+    """Issue #45: the reported defect. This turn read as "no ack" before the fix."""
+    _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
+    text = ("Stop hook feedback:\n"
+            "- [gate.canon_fingerprints] canon.notestedit_destruct: fired\n"
+            "\n"
+            "makoto release.operator notestedit_destruct: reviewed, the deletion was intended")
+    p = _write_transcript(tmp_path, [_user_turn(text, "2026-07-07T02:00:00Z")])
+    ack = find_ack_block("notestedit_destruct", transcript_path=str(p), root=tmp_path)
+    assert ack is not None
+    assert ack["reason"] == "reviewed, the deletion was intended"
+
+
+def test_the_gates_own_hint_never_discharges(tmp_path):
+    """The gate's retry hint contains the literal phrase and is prepended to the operator's turn.
+    Fed as the whole turn it must NOT discharge -- otherwise the gate releases itself.
+
+    The hint text is taken from the shipped check rather than retyped, so a rewording that would
+    make it self-discharging reddens HERE instead of shipping."""
+    from makoto.checks import canonFingerprints
+    _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
+    name = "notestedit_destruct"
+    hint = (f"say exactly `makoto release.operator {name}: <reason>` in a "
+            f"real (non-tool, non-quoted) reply")
+    src = (canonFingerprints.__file__ or "")
+    assert "say exactly `makoto release.operator {name}: <reason>` in a " in \
+        open(src, encoding="utf-8").read(), \
+        "the hint's wording moved -- re-derive this test's `hint` from the shipped text"
+    p = _write_transcript(tmp_path, [_user_turn("Stop hook feedback:\n" + hint,
+                                                "2026-07-07T02:00:00Z")])
+    assert find_ack_block(name, transcript_path=str(p), root=tmp_path) is None
+
+
+def test_ack_inside_a_quoted_block_never_discharges(tmp_path):
+    """A fenced block, an indented code block, and the phrase quoted in prose each match under a
+    bare per-line anchor. Measured before the fix; each must read as no ack."""
+    _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
+    for text in (
+        "here is what it said:\n```\nmakoto release.operator notestedit_destruct: <reason>\n```",
+        "here is what it said:\n~~~\nmakoto release.operator notestedit_destruct: <reason>\n~~~",
+        "the docs say:\n\n    makoto release.operator notestedit_destruct: <reason>\n",
+        "> makoto release.operator notestedit_destruct: quoted from someone else",
+        "`makoto release.operator notestedit_destruct: inline`",
+    ):
+        p = _write_transcript(tmp_path, [_user_turn(text, "2026-07-07T02:00:00Z")])
+        assert find_ack_block("notestedit_destruct", transcript_path=str(p),
+                              root=tmp_path) is None, text
+
+
+def test_a_real_ack_beside_the_quoted_hint_still_discharges(tmp_path):
+    """The live shape: the host prepends feedback QUOTING the phrase, and the operator types it
+    for real below. The quoted one must be skipped and the real one honored -- a quoting rule
+    that swallowed the whole turn would re-create issue #45."""
+    _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
+    text = ("Stop hook feedback:\n"
+            "say exactly `makoto release.operator notestedit_destruct: <reason>` in a real reply\n"
+            "\n"
+            "makoto release.operator notestedit_destruct: I checked the diff, it is intended")
+    p = _write_transcript(tmp_path, [_user_turn(text, "2026-07-07T02:00:00Z")])
+    ack = find_ack_block("notestedit_destruct", transcript_path=str(p), root=tmp_path)
+    assert ack is not None
+    assert ack["reason"] == "I checked the diff, it is intended"

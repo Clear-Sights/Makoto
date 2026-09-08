@@ -259,6 +259,11 @@ python -m makoto uninstall                   # removes old settings.json entries
 /plugin install https://github.com/Clear-Sights/Makoto  # installs the plugin
 ```
 
+## Contributing
+
+Reports are welcome and are credited by name; pull requests from outside this repository are not
+merged. See [CONTRIBUTING.md](CONTRIBUTING.md) for why, and for what to send instead.
+
 ## Siblings
 
 Makoto owns the statement surface alongside the independently installed engines for act and
