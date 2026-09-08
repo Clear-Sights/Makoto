@@ -92,6 +92,37 @@ def calls_from_history(history) -> List[Call]:
     return [c for c in (_decode_row(r) for r in (history or ())) if c is not None]
 
 
+def _row_ts(row):
+    """The event ts of a history row. `_select_recent` yields (id, ts, event_type, cwd, payload);
+    a dict-shaped row is accepted too, as every other decoder here does."""
+    if isinstance(row, dict):
+        return row.get("ts")
+    try:
+        return row[1]
+    except (TypeError, IndexError, KeyError):
+        return None
+
+
+def calls_since(history, since_ts) -> List[Call]:
+    """The calls at or after `since_ts` -- the ATOM WINDOW.
+
+    Every atom below is `_existing(calls, pred)`, an existential. Over a whole session those are
+    monotone: once a predicate has been satisfied it stays satisfied, so a fingerprint that has
+    matched can never stop matching however the agent behaves afterwards, and the typed phrase
+    becomes its only exit. Evaluating over the calls since the operator last spoke is what makes
+    the fingerprint answerable by conduct instead of by utterance.
+
+    `since_ts` of None means NO WINDOW: the whole session, which is both the prior behaviour and
+    the strict direction. A window that cannot be established must never widen what passes.
+
+    A row whose ts cannot be read is KEPT, for the same reason: dropping it would narrow the
+    window on a decode failure, and a decode failure must not quiet a gate."""
+    if not since_ts:
+        return calls_from_history(history)
+    rows = [r for r in (history or ()) if (_row_ts(r) or "") >= since_ts or _row_ts(r) is None]
+    return calls_from_history(rows)
+
+
 # ---- call accessors (mirror primitives.py's own field reads) --------------------------------------
 def _cmd(c: Call) -> str:
     return str(c["input"].get("command", "")) if c["name"] == "Bash" else ""

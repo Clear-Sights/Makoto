@@ -180,7 +180,21 @@ def _scenario_claimed_shipped(tmp_path):
 
 # Every discovered gate id must have a firing scenario here — a new gate added to checks/
 # without an entry below fails loudly (KeyError) rather than being silently skipped.
+def _scenario_claimed_consent_absent(tmp_path):
+    # fires on a claim citing the operator in a session whose transcript carries no genuine
+    # operator turn at all. The transcript here holds one TOOL-RESULT-shaped user entry, which
+    # `_is_genuine_user_turn` refuses -- so the oracle channel is empty and every attribution to
+    # it is false, which is the whole firing condition.
+    import json as _json
+    tp = tmp_path / "transcript.jsonl"
+    tp.write_text(_json.dumps({"type": "user", "message": {"role": "user", "content": "ok"},
+                               "toolUseResult": {"stdout": ""},
+                               "timestamp": "2026-09-08T10:00:00Z"}) + "\n", encoding="utf-8")
+    return _ctx(text="You approved this, so I merged it.", transcript_path=str(tp))
+
+
 _SCENARIOS = {
+    "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
     "gate.completion": _scenario_completion,
     "gate.advance": _scenario_advance,
     "gate.green_claim": _scenario_green_claim,

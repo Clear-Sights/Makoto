@@ -1414,6 +1414,49 @@ def test_dispatch_claimed_running_gate_blocks_after_recorded_failed_launch(tmp_p
         "the claimed_running fire must be audited"
 
 
+def test_dispatch_claimed_consent_absent_gate_blocks_when_the_operator_never_spoke(tmp_path):
+    """Behavioral blocking pin for gate.claimed_consent_absent through the real dispatcher.
+
+    The transcript holds one user-ROLE entry carrying toolUseResult, which `_is_genuine_user_turn`
+    refuses -- so the oracle channel is empty and the agent's citation of operator approval is
+    attributed to a record that has nothing in it. The negative half is the next test: one genuine
+    turn is enough to silence this, because whether the claim MATCHES that turn is a similarity
+    question the check deliberately does not answer."""
+    state_dir = _setup_state(tmp_path)
+    tp = tmp_path / "transcript.jsonl"
+    tp.write_text(json.dumps({"type": "user", "message": {"role": "user", "content": "ok"},
+                              "toolUseResult": {"stdout": ""},
+                              "timestamp": "2026-09-08T10:00:00Z"}) + "\n", encoding="utf-8")
+    stop = {"hook_event_name": "Stop", "session_id": "consent_block", "cwd": str(tmp_path),
+            "transcript_path": str(tp),
+            "last_assistant_message": "You approved this, so I went ahead and merged it."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    assert out, "claimed_consent_absent must block a citation of operator approval with no operator turn"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    rows = [json.loads(line) for line in (state_dir / "audit.jsonl").read_text().splitlines()
+            if line.strip()]
+    assert any("gate.claimed_consent_absent" in row.get("pattern_fires", []) for row in rows), \
+        "the claimed_consent_absent fire must be audited"
+
+
+def test_dispatch_claimed_consent_absent_is_silent_when_the_operator_has_spoken(tmp_path):
+    """One genuine operator turn silences it. Without this the check would be a paraphrase judge,
+    and paraphrase is judgement; absence of the whole channel is what it counts."""
+    state_dir = _setup_state(tmp_path)
+    tp = tmp_path / "transcript.jsonl"
+    tp.write_text(json.dumps({"type": "user", "message": {"role": "user", "content": "go ahead"},
+                              "timestamp": "2026-09-08T10:00:00Z"}) + "\n", encoding="utf-8")
+    stop = {"hook_event_name": "Stop", "session_id": "consent_ok", "cwd": str(tmp_path),
+            "transcript_path": str(tp),
+            "last_assistant_message": "You approved this, so I went ahead and merged it."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert rc == 0
+    if out:
+        assert "gate.claimed_consent_absent" not in out
+
+
 def test_dispatch_claimed_shipped_gate_blocks_on_unbacked_remote_claim(tmp_path):
     """Behavioral blocking pin for gate.claimed_shipped through the real dispatcher: an immediate
     completed merge claim with no prior successful remote mutation must produce a block decision
@@ -1873,7 +1916,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.plan_item_drift",         # advisory-tier (2026-07-09): same shape
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.run_promised",  # claimed_running's forward-looking sibling (2026-07-23)
-                          "gate.claimed_shipped"}  # completed remote-mutation claim-vs-record gate
+                          "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
+                          "gate.claimed_consent_absent"}  # claim-vs-ORACLE-record gate (2026-09-08)
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the

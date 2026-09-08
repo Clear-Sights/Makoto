@@ -610,8 +610,8 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
     return text
 
 
-def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> list:
-    """Every genuine, host-written, non-synthetic user turn in the transcript, oldest first.
+def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) -> list:
+    """Every genuine, host-written, non-synthetic user turn as (text, timestamp), oldest first.
 
     The ORACLE channel, exposed for readers other than the ack scanner. `find_ack_block` has always
     needed "what did the human actually type, as opposed to what could the agent have produced" --
@@ -677,8 +677,44 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
             continue
         text = _is_genuine_user_turn(entry)
         if text:
-            texts.append(text)
+            texts.append((text, entry.get("timestamp")))
     return texts
+
+
+def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> list:
+    """Every genuine user turn's TEXT, oldest first. See `_genuine_user_turns` for the reader."""
+    return [text for text, _ in _genuine_user_turns(transcript_path, limit=limit)]
+
+
+def last_operator_turn_ts(transcript_path: Optional[str], *, limit: int = 4000) -> Optional[str]:
+    """The timestamp of the most recent genuine operator turn, or None if there is none.
+
+    This is the boundary of the ATOM WINDOW. A canon fingerprint is a conjunction of atoms, and
+    every atom is an existential over the calls it is given (`_canonAtoms._existing`). Given the
+    whole session, those existentials are monotone: once a green test run and a timeout have each
+    happened, both are permanently true and the fingerprint can never stop matching, whatever the
+    agent does next. The typed `release.operator` phrase is then the ONLY exit, which is what
+    forces a human -- on a gate whose whole premise is that a claim is held against the record and
+    not against an utterance. Reported by AliceLJY as the secondary half of issue #45; it is the
+    primary defect.
+
+    Windowing the atoms at the last operator turn makes the fingerprint fire once, inform the
+    operator, and reset when they next speak -- whatever they say. It fires again only if the
+    agent repeats the pattern after being told. No judgement is involved and nothing is asked of
+    the human.
+
+    The agent cannot manufacture a reset, because it cannot produce a genuine user turn:
+    `_is_genuine_user_turn` requires role=user, no toolUseResult, and no synthetic marker, and it
+    is the same predicate the ack already trusts. One boundary, one owner.
+
+    None when there is no transcript, no genuine turn, or no timestamp on it -- and None means
+    NO WINDOW, i.e. the whole session, which is the strict direction and the behaviour before
+    this existed. A window we cannot establish must never widen what the gate lets through.
+    """
+    for _, ts in reversed(_genuine_user_turns(transcript_path, limit=limit)):
+        if ts:
+            return str(ts)
+    return None
 
 
 def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
