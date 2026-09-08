@@ -34,12 +34,23 @@ finding is what mattered, and closing the PR does not discard it.
 
 ## Acknowledgements
 
-People outside this repository whose reports changed the code. Listed in the order received.
+People outside this repository whose reports changed the code, every one of them, oldest first.
+Nine reports from two people, and every closed one of them landed a fix.
 
-<!-- Add a row when the fix lands, never when the report arrives: the credit names a change. -->
+<!-- Add a row when the fix lands, never when the report arrives: the credit names a change.
+     Retroactive: every outside report that changed this code is listed, not only recent ones. -->
 
-| who | what they found | where it landed |
+| report | who | what they found |
 | --- | --- | --- |
+| [#2](https://github.com/Clear-Sights/Makoto/issues/2) | [@AliceLJY](https://github.com/AliceLJY) | `gate.completion` false-positive: a file produced remotely over ssh and landed by `git pull` read as an unproduced claim. |
+| [#10](https://github.com/Clear-Sights/Makoto/issues/10) | [@AliceLJY](https://github.com/AliceLJY) | `_DESTRUCTIVE_RX` false-positive on read-only `dd if=`, and the mirror miss of `of=`-first writes. |
+| [#14](https://github.com/Clear-Sights/Makoto/issues/14) | [@AliceLJY](https://github.com/AliceLJY) | `_DISABLE_RX` false-positive on a lowercase `dd skip=` argument -- the sibling of #10. |
+| [#15](https://github.com/Clear-Sights/Makoto/issues/15) | [@AliceLJY](https://github.com/AliceLJY) | A denylist audit naming a whole family of over- and under-matches, several BLOCK-level, with the shared root: the atoms scan the raw command string instead of parsing argv, quotes and comments. |
+| [#17](https://github.com/Clear-Sights/Makoto/issues/17) | [@AliceLJY](https://github.com/AliceLJY) | `canon.recur` false-positive: Pre/Post pairing breaks when the harness injects dunder keys. |
+| [#19](https://github.com/Clear-Sights/Makoto/issues/19) | [@tkulczy2](https://github.com/tkulczy2) | `_dispatch` rejected a camelCase `hookEventName` as `unknown_event` and exited 2, so Cursor-shaped sessions misrouted. |
+| [#20](https://github.com/Clear-Sights/Makoto/issues/20) | [@tkulczy2](https://github.com/tkulczy2) | `makoto uninstall` reported `"unwired": true` unconditionally, and silently removed nothing. |
+| [#28](https://github.com/Clear-Sights/Makoto/issues/28) | [@AliceLJY](https://github.com/AliceLJY) | `canon.recur` fired on transient failures and re-fired every Stop, because failed calls carry no PostToolUse. |
+| [#45](https://github.com/Clear-Sights/Makoto/issues/45) | [@AliceLJY](https://github.com/AliceLJY) | `_ACK_RX` anchored at offset 0 of the whole user turn, so prepended Stop-hook feedback made `release.operator` -- the only discharge that gate honors -- unreachable exactly when it was needed. And the deeper one they filed as secondary: every canon atom is an existential over the whole session, so a fingerprint that has matched can never stop matching, which is what forces a human. That half is still open. |
 
 ## Checking something yourself
 
