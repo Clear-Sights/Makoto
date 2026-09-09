@@ -3,7 +3,17 @@
 All notable changes to makoto. Versions follow the live check inventory
 (`load_prechecks` / `load_checks(edge="Stop")`), which the README count is tested against.
 
-## [Unreleased]
+## [2.8.2] — 2026-09-09
+
+### Fixed
+- Canon gates now use the same operator window, including queued Claude Code prompts and
+  explicit user interruptions. A host-delivered mid-turn message is read from its own text
+  block or queued-command attachment; copies inside tool results do not count as user input.
+  `PostToolUseFailure.is_interrupt` closes the old window without asking the operator to retry
+  the call they stopped. The optional `release.operator` override remains available, and new
+  failures after the boundary still block; an old release cannot authorize a future occurrence.
+  Boundary scans read the transcript's recent tail,
+  so a prompt after record 4000 is no longer silently lost.
 
 ## [2.8.1] — 2026-09-09
 

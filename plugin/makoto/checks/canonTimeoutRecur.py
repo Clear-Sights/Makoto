@@ -441,12 +441,12 @@ def _release_clause(cid: str) -> str:
     Generated per-id rather than written per-entry so a primitive cannot be added to
     CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —
     the affordance is structural, not prose that the next author must remember to copy."""
-    return (" If this finding is a genuinely unresolvable, already-reviewed block — or a "
-            "misfire you have verified — the human operator must say exactly "
+    return (" Any new genuine operator message or explicit operator interrupt starts a new "
+            "call window; repeating the failure there can block again. "
+            "For an optional explicit override of an already-reviewed finding, "
+            "the human operator must say exactly "
             f"`makoto release.operator {cid}: <reason>` in a user turn "
-            "(non-tool, non-quoted); an assistant reply cannot discharge this gate. "
-            "That is the only discharge other than "
-            "changing what the detector actually reads.")
+            "(non-tool, non-quoted); an assistant reply cannot discharge this gate.")
 
 
 def fired_primitives(history) -> Iterable:
@@ -470,6 +470,10 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     ("canon.timeout: ..." / "canon.recur: ..."). Returns [] (silent) when no installed primitive
     fires — the discriminator's true-negative path.
 
+    Both primitives read the same operator window as the fingerprint gate. A new genuine
+    message or explicit host user-interruption closes the old window; a later error is still
+    evaluated normally. Generic timeout/abort results do not establish operator intent.
+
     Task 0b part (b): canon.timeout has the SAME no-clean-terminal-state gap as
     gate.canon_fingerprints when the last error is a genuinely unresolvable, operator-surfaced
     block (a permission block the agent correctly declines to retry) -- text cannot change
@@ -489,6 +493,11 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     untouched, exactly as before). Row-id matching only works for the events-table tuple shape
     (id, ts, event_type, cwd, payload) -- dict-shaped test rows carry no id and are never
     dropped."""
+    try:
+        import makoto.state.ledger as _ackblock
+        history = _ackblock.operator_window(history, transcript_path)
+    except Exception:
+        pass
     denied_pre_ids: set = set()
     if state_root is not None and session_id:
         # Direct stdlib read of <state_root>/audit.jsonl, NOT `makoto.state.audit.read_rows`:
@@ -534,7 +543,7 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
             import makoto.state.ledger as _ackblock
             ack = _ackblock.find_ack_block(cid, transcript_path=transcript_path,
                                            gate_pattern_id="gate.canon",
-                                           session_id=session_id, root=state_root)
+                                           session_id=session_id, root=state_root, history=history)
         except Exception:
             ack = None
         if ack is not None:
