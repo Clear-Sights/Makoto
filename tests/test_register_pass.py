@@ -61,18 +61,23 @@ def test_register_map_reddens_on_an_entry_with_no_row(tmp_path, monkeypatch):
     assert register_map.main() == 2
 
 
-def test_vendored_register_matches_its_source_when_the_source_is_reachable():
-    """docs/REGISTER.md is a copy; measure-zero-dev/REGISTER.md is the source.
+# Digest of docs/REGISTER.md as vendored from measure-zero-dev. Re-pin deliberately
+# when the register is re-vendored; that edit is the record that a copy moved.
+REGISTER_DIGEST = "f262b53bcb839927ec045402522cff1ba64b6e9665cadf0d4734c858fd71ee69"
 
-    Two copies of one rule is register entry F2, so the drift is checked rather
-    than trusted. When the source is not on this machine the test skips: a
-    missing source is not evidence the copy is current, and saying so is C2.
+
+def test_vendored_register_matches_its_pinned_digest():
+    """docs/REGISTER.md is a copy, and this fence pins it.
+
+    Two copies of one rule is register entry F2. The fence compares the copy
+    against its own pinned digest, never against the owner's live tree -- the
+    rule VENDORED.tsv already states, and the reason it is stated: a check that
+    reads another repository only evaluates where that repository happens to
+    sit, which is entry E7. This one evaluates everywhere.
     """
     import hashlib
 
-    source = ROOT.parent / "measure-zero-dev" / "REGISTER.md"
-    if not source.exists():
-        import pytest
-        pytest.skip("register source not on this machine; drift NOT-EVALUABLE here")
-    digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
-    assert digest(ROOT / "docs" / "REGISTER.md") == digest(source)
+    actual = hashlib.sha256((ROOT / "docs" / "REGISTER.md").read_bytes()).hexdigest()
+    assert actual == REGISTER_DIGEST, (
+        "docs/REGISTER.md moved without its pin being updated; re-vendor and re-pin"
+    )
