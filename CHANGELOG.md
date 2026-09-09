@@ -5,6 +5,39 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-09-09
+
+### Added
+- **`gate.unexamined_wall`** — blocks an epistemic "cannot" (a fact cannot be told, known, checked
+  or determined) stated when no tool call at all has occurred since the operator's last genuine
+  turn. Register entry G5, WALL WITHOUT INVENTORY, had existed with no runner, which is entry B7
+  applied to G5. Same 0-FP construction as the consent gate: absence of the whole act window is
+  countable, where "the means were held" in general is a similarity question. A refusal and a
+  statement about capability in the abstract are excluded by design. Stated limit: one unrelated
+  call defeats it.
+- **The MERGING protocol, run over makoto's own check set** (`tools/merge_pass.py`). All 716
+  ordered same-edge pairs of the 38 checks are refuted: 543 structurally, because the survivor
+  does not read a channel the dropped check reads and so cannot decide that input (`eats` is
+  machine-enforced); 105 by disjoint dispatch prefilters; 68 by named witness inputs in
+  `docs/MERGE-WITNESSES.tsv`. **Zero merges** — the set is at a fixpoint, and the "claimed X,
+  channel absent" gates each survive because they name a different channel. Adding or widening a
+  check re-runs the whole grid, which is MERGING step 3 enforced rather than remembered.
+- **Register coverage map** (`docs/REGISTER-MAP.tsv`, `tools/register_map.py`). All 76 entries
+  carry a verdict: 50 RUNNER, 13 NOT-COUNTABLE, 13 OUT-OF-SUBJECT. NOT-COUNTABLE means the entry
+  is in makoto's subject but its test would be a similarity judgement, and the note names the
+  comparison it would need — G1, G2 and G3 sit there. A verdict with no note exits non-zero,
+  because an unexplained gap is how a gap becomes invisible.
+
+### Fixed
+- The vendored-register drift check read a sibling repository from beside the checkout and skipped
+  when it was absent, so it only ever evaluated where that repository happened to sit — entry E7.
+  It now pins the digest and asserts it unconditionally, following the rule `VENDORED.tsv` already
+  stated: a fence compares each copy against its own pinned digest, never against the owner's live
+  tree.
+- The merge-pass witness table named check ids that were never held against the registry, so a
+  deleted check left an orphan row that was never consulted and a renamed survivor left a row that
+  never matched — neither rotting loudly (entries F3 and D13). Both are now checked.
+
 ## [2.7.0] — 2026-09-08
 
 ### Fixed
