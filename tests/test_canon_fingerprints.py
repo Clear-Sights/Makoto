@@ -328,3 +328,20 @@ def test_a_forged_synthetic_ack_never_silences_the_gate(tmp_path):
     second = canon_fingerprint_block_gate(
         "", [_DESTRUCTIVE_ROW], transcript_path=str(p), session_id="s1", state_root=tmp_path)
     assert any(f.message.startswith("canon.notestedit_destruct:") for f in second)
+
+
+def test_an_old_release_cannot_silence_repeated_behavior_in_the_new_window(tmp_path):
+    import json
+    from makoto.state import ledger
+
+    t0, t1, t2 = (f"2026-09-09T{hour}:00:00Z" for hour in ("10", "11", "12"))
+    ledger.append({"kind": "audit", "session_id": "s1", "ts": t0,
+                   "pattern_fires": ["gate.canon_fingerprints"],
+                   "findings": [{"message": "canon.notestedit_destruct: fired"}]}, root=tmp_path)
+    path = _write_transcript(tmp_path, [_user_turn(
+        "makoto release.operator notestedit_destruct: old deletion reviewed", t1)])
+    repeated = [(2, t2, "PostToolUse", "/w", json.dumps(_DESTRUCTIVE_ROW["payload"]))]
+    findings = canon_fingerprint_block_gate(
+        "", repeated, transcript_path=str(path), session_id="s1", state_root=tmp_path)
+    assert any(f.message.startswith("canon.notestedit_destruct:") for f in findings), \
+        "a release of yesterday's behavior cannot pre-approve the next occurrence"

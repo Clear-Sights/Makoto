@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -28,7 +29,8 @@ else:
     msvcrt = None
 
 from makoto.checks import normalize_path
-from makoto.kit import bash_output_text, is_test_runner
+from makoto.kit import bash_output_text, decode_history_event, is_test_runner
+from makoto.substrate._canonAtoms import _row_ts
 from makoto.state.store import _state_dir as _chain_state_dir
 
 _PATH_IN_CMD_RX = re.compile(
@@ -546,6 +548,10 @@ _SYNTHETIC_MARKERS = (
     "<local-command-caveat", "[request interrupted by user]",
 )
 
+_MIDTURN_MESSAGE_RX = re.compile(
+    r"\A<system-reminder>\s*The user sent a new message while you were working:\s*\n"
+    r"(?P<prompt>.*?)\s*</system-reminder>\Z", re.DOTALL)
+
 
 def _unquoted_ack_matches(text: str):
     r"""Yield `(fingerprint_id, reason)` for every UNQUOTED release.operator line in `text`.
@@ -598,10 +604,34 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
     """Return the entry's text iff it is a genuine, host-written, non-synthetic user turn (ack
     contract points 1-3) -- else None. A tool result or a synthetic/system-injected turn can
     never qualify, no matter what text it happens to contain."""
+    # Claude records queued prompts as their own attachment, even when the rendered message
+    # appears beside tool output (anthropics/claude-code#49625, captured 2.1.112 transcript).
+    attachment = entry.get("attachment")
+    if (entry.get("type") == "attachment" and entry.get("userType") == "external"
+            and isinstance(attachment, dict) and attachment.get("type") == "queued_command"
+            and attachment.get("commandMode") == "prompt" and "toolUseResult" not in entry):
+        prompt = attachment.get("prompt")
+        return prompt if isinstance(prompt, str) else None
     msg = entry.get("message")
     if not isinstance(msg, dict) or msg.get("role") != "user":
         return None
-    if "toolUseResult" in entry:
+    # A mid-turn prompt may instead be a separate host text block in a user envelope that
+    # ALSO carries toolUseResult. Match that complete block, never a substring, tool_result
+    # content, stdout, or another synthetic reminder. Tool-returned copies cannot qualify.
+    content = msg.get("content")
+    if isinstance(content, list):
+        prompts = []
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "text":
+                continue
+            value = block.get("text")
+            match = _MIDTURN_MESSAGE_RX.fullmatch(value.strip()) if isinstance(value, str) else None
+            if match and match["prompt"].strip():
+                prompts.append(match["prompt"].strip())
+        if prompts:
+            return "\n".join(prompts)
+    if ("toolUseResult" in entry or (isinstance(content, list) and any(
+            isinstance(block, dict) and block.get("type") == "tool_result" for block in content))):
         return None
     text = _entry_text(entry)
     low = text.lower()
@@ -628,6 +658,16 @@ def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) ->
 
     `limit` bounds the scan; a transcript is unbounded in principle and this runs on a hot path.
     """
+    turns = []
+    for entry in _transcript_entries(transcript_path, limit=limit):
+        text = _is_genuine_user_turn(entry)
+        if text:
+            turns.append((text, entry.get("timestamp")))
+    return turns
+
+
+def _transcript_entries(transcript_path: Optional[str], *, limit: int, newest=False) -> list:
+    """Read bounded host records; boundary callers need the tail, provenance readers the head."""
     if not transcript_path:
         return []
     p = Path(transcript_path)
@@ -644,7 +684,7 @@ def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) ->
         raw = p.read_text(encoding="utf-8-sig", errors="replace")
     except OSError:
         return []
-    texts = []
+    entries = []
     # `splitlines()`, NOT iteration over the file handle, and the difference is a live false deny.
     #
     # This was briefly rewritten to `islice` over an open handle, to apply the `limit` bound before
@@ -658,7 +698,8 @@ def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) ->
     # stated reason. So the optimization turned an ordinary WebFetch of a URL the user had typed
     # into a hard deny resting on a false fact -- the one thing a gate must never do. Correctness
     # first: if the unbounded read has to go, it needs a form that splits on the same set.
-    for line in raw.splitlines()[:limit]:
+    lines = raw.splitlines()
+    for line in (lines[-limit:] if newest and limit > 0 else lines[:limit]):
         # `strip("\ufeff")` as well as whitespace. "utf-8-sig" removes a BOM only at BYTE ZERO, so
         # a transcript that is the concatenation of separately-written chunks -- which is how a
         # resumed or merged session is produced -- keeps a U+FEFF glued to the front of every
@@ -675,10 +716,8 @@ def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) ->
             continue
         if not isinstance(entry, dict):
             continue
-        text = _is_genuine_user_turn(entry)
-        if text:
-            texts.append((text, entry.get("timestamp")))
-    return texts
+        entries.append(entry)
+    return entries
 
 
 def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> list:
@@ -687,7 +726,7 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
 
 
 def last_operator_turn_ts(transcript_path: Optional[str], *, limit: int = 4000) -> Optional[str]:
-    """The timestamp of the most recent genuine operator turn, or None if there is none.
+    """The latest genuine operator message or exact host interruption marker timestamp.
 
     This is the boundary of the ATOM WINDOW. A canon fingerprint is a conjunction of atoms, and
     every atom is an existential over the calls it is given (`_canonAtoms._existing`). Given the
@@ -703,18 +742,57 @@ def last_operator_turn_ts(transcript_path: Optional[str], *, limit: int = 4000) 
     agent repeats the pattern after being told. No judgement is involved and nothing is asked of
     the human.
 
-    The agent cannot manufacture a reset, because it cannot produce a genuine user turn:
-    `_is_genuine_user_turn` requires role=user, no toolUseResult, and no synthetic marker, and it
-    is the same predicate the ack already trusts. One boundary, one owner.
+    User messages use the same provenance reader as acknowledgments. An exact host interrupt
+    also closes the window, but never enters the user-prose channel used for consent or URLs.
 
-    None when there is no transcript, no genuine turn, or no timestamp on it -- and None means
+    None when there is no transcript, no established boundary, or no timestamp on it -- and None means
     NO WINDOW, i.e. the whole session, which is the strict direction and the behaviour before
     this existed. A window we cannot establish must never widen what the gate lets through.
     """
-    for _, ts in reversed(_genuine_user_turns(transcript_path, limit=limit)):
-        if ts:
+    for entry in reversed(_transcript_entries(transcript_path, limit=limit, newest=True)):
+        ts = entry.get("timestamp")
+        msg = entry.get("message")
+        # This exact host event closes a turn but says nothing about approval, URLs, or acks.
+        # Keep it out of _is_genuine_user_turn / user_turn_texts for every prose consumer.
+        interrupt = (entry.get("type") == "user" and isinstance(msg, dict)
+                     and msg.get("role") == "user" and "toolUseResult" not in entry
+                     and _entry_text(entry).strip() == "[Request interrupted by user]"
+                     and not (isinstance(msg.get("content"), list) and any(
+                         isinstance(b, dict) and b.get("type") == "tool_result"
+                         for b in msg["content"])))
+        if ts and (_is_genuine_user_turn(entry) or interrupt):
             return str(ts)
     return None
+
+
+def _event_instant(value):
+    """An aware event timestamp, or None when the record cannot establish an instant."""
+    try:
+        parsed = datetime.fromisoformat(value)
+        return parsed if parsed.tzinfo is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def operator_window(history, transcript_path: Optional[str]) -> list:
+    """Raw events in the current operator window, shared by the two blocking Canon gates.
+
+    Claude's PostToolUseFailure.is_interrupt explicitly denotes a USER interruption:
+    https://code.claude.com/docs/en/hooks#posttoolusefailure-input. It closes the window
+    through that terminal, even without a transcript. Bash tool_response.interrupted also
+    means timeout/abort and must NOT be interpreted as operator intent. No tool text is read.
+    Unknown timestamps are retained; timestamp formats are compared as instants, not strings.
+    """
+    since = _event_instant(last_operator_turn_ts(transcript_path))
+    rows = list(history or ())
+    start = 0
+    for index, row in enumerate(rows):
+        event = decode_history_event(row)
+        if (isinstance(event, dict) and event.get("hook_event_name") == "PostToolUseFailure"
+                and event.get("is_interrupt") is True):
+            start = index + 1
+    return [row for row in rows[start:]
+            if since is None or (ts := _event_instant(_row_ts(row))) is None or ts >= since]
 
 
 def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
@@ -744,7 +822,7 @@ def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_f
 def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
                    gate_pattern_id: str = "gate.canon_fingerprints",
                    session_id: Optional[str] = None,
-                   root: Optional[Path] = None) -> Optional[dict]:
+                   root: Optional[Path] = None, history=None) -> Optional[dict]:
     """Scan the host-written transcript at `transcript_path` for a qualifying release.operator turn for
     `fingerprint_id` (fired under `gate_pattern_id`). Returns {"fingerprint_id", "reason", "ts"}
     for the FIRST qualifying turn found, or None. Never raises: an absent/unreadable transcript
@@ -757,6 +835,12 @@ def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
                                session_id=session_id, root=root)
     if since_ts is None:
         return None
+    # A release cannot pre-approve a future occurrence. The gate passes its current window;
+    # every dated call in that evidence must precede the acknowledgment. Undated legacy rows
+    # retain the original recorded-firing check, so the explicit override remains usable there.
+    evidence_ts = [_event_instant(since_ts)]
+    evidence_ts.extend(_event_instant(_row_ts(row)) for row in (history or ()))
+    latest_evidence = max((ts for ts in evidence_ts if ts is not None), default=None)
     p = Path(transcript_path)
     if not p.exists():
         return None
@@ -778,7 +862,8 @@ def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
         if text is None:
             continue
         ts = entry.get("timestamp", "")
-        if not ts or ts <= since_ts:
+        ack_time = _event_instant(ts)
+        if ack_time is None or latest_evidence is None or ack_time <= latest_evidence:
             continue
         for acked_id, reason in _unquoted_ack_matches(text):
             if acked_id != fingerprint_id:
