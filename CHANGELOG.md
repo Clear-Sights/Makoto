@@ -5,6 +5,11 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+## [2.8.1] — 2026-09-09
+
+### Fixed
+- gate texts now say the human operator releases in a user turn; an assistant reply cannot discharge (#64, closes #45's second half).
+
 ## [2.8.0] — 2026-09-09
 
 ### Added
