@@ -442,8 +442,10 @@ def _release_clause(cid: str) -> str:
     CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —
     the affordance is structural, not prose that the next author must remember to copy."""
     return (" If this finding is a genuinely unresolvable, already-reviewed block — or a "
-            f"misfire you have verified — say exactly `makoto release.operator {cid}: <reason>` "
-            "in a real (non-tool, non-quoted) reply; that is the only discharge other than "
+            "misfire you have verified — the human operator must say exactly "
+            f"`makoto release.operator {cid}: <reason>` in a user turn "
+            "(non-tool, non-quoted); an assistant reply cannot discharge this gate. "
+            "That is the only discharge other than "
             "changing what the detector actually reads.")
 
 

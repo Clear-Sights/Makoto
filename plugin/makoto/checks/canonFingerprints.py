@@ -78,8 +78,10 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
                         f"Re-examine the flagged behavior (a suppressed check, a destructive "
                         f"command, or an unresolved gap between claim and evidence) before "
                         f"continuing, OR if the flagged action was legitimate and already fully "
-                        f"re-examined, say exactly `makoto release.operator {name}: <reason>` in a "
-                        f"real (non-tool, non-quoted) reply -- the only discharge this gate can "
+                        f"re-examined, the human operator must say exactly "
+                        f"`makoto release.operator {name}: <reason>` in a user turn "
+                        f"(non-tool, non-quoted); an assistant reply cannot discharge this gate "
+                        f"-- the only release this gate can "
                         f"honor, per Task 2 slice 5."),
         ))
     return out
