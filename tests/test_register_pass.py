@@ -42,6 +42,41 @@ def test_merge_pass_reddens_when_a_witness_is_withdrawn(tmp_path, monkeypatch):
     assert merge_pass.main() == 2
 
 
+def test_merge_pass_reddens_on_a_witness_for_a_check_that_no_longer_exists(tmp_path, monkeypatch):
+    """An orphan witness row is never consulted, so it rots without complaining.
+
+    Found by planting every way this runner should redden rather than the one
+    way I first thought of: a single plant shows a runner is not vacuous, never
+    that it fires everywhere it should.
+    """
+    sys.path.insert(0, str(ROOT / "tools"))
+    import merge_pass
+
+    lines = merge_pass.WITNESSES.read_text(encoding="utf-8").splitlines()
+    planted = tmp_path / "orphan.tsv"
+    planted.write_text("\n".join(lines + ["gate.deleted\tgate.canon\tan input"]) + "\n",
+                       encoding="utf-8")
+    monkeypatch.setattr(merge_pass, "WITNESSES", planted)
+
+    assert merge_pass.main() == 2
+
+
+def test_merge_pass_reddens_when_a_row_names_a_survivor_that_is_gone(tmp_path, monkeypatch):
+    """A renamed survivor leaves the row asserting a refutation for nobody."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import merge_pass
+
+    lines = merge_pass.WITNESSES.read_text(encoding="utf-8").splitlines()
+    planted = tmp_path / "ghost.tsv"
+    planted.write_text(
+        "\n".join([lines[0]] + [ln.replace("gate.canon_fingerprints ",
+                                           "gate.canon_fingerprints gate.ghost ")
+                                for ln in lines[1:]]) + "\n", encoding="utf-8")
+    monkeypatch.setattr(merge_pass, "WITNESSES", planted)
+
+    assert merge_pass.main() == 2
+
+
 def test_register_map_carries_every_entry():
     r = _run("register_map.py")
     assert r.returncode == 0, r.stdout + r.stderr

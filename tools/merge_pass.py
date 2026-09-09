@@ -40,22 +40,40 @@ WITNESSES = ROOT / "docs" / "MERGE-WITNESSES.tsv"
 from makoto import registry  # noqa: E402
 
 
-def load_witnesses():
-    rows = {}
+def load_witnesses(live_ids):
+    """Read the witness table, and hold it to the live check set.
+
+    A witness names a dropped check and the survivors it refutes. Both are check
+    ids, so both can rot: a check is deleted and its witness row outlives it, or
+    a survivor is renamed and the row still names the old id. Neither rots
+    loudly on its own -- an orphan row is simply never consulted, and an unknown
+    survivor name simply never matches -- so the table would keep asserting
+    refutations for pairs that no longer exist. That is register entry F3, a
+    referent that moved since it was named, and D13, acting on a set nobody
+    re-listed. Both are checked here rather than trusted.
+    """
+    rows, errors = {}, []
     lines = WITNESSES.read_text(encoding="utf-8").splitlines()
-    for line in lines[1:]:
+    for n, line in enumerate(lines[1:], start=2):
         if not line.strip():
             continue
         dropped, survivors, witness = line.split("\t")
         if not witness.strip():
-            raise SystemExit(f"witness row for {dropped} has no input named")
+            errors.append(f"line {n}: witness row for {dropped} names no input")
+        if dropped in rows:
+            errors.append(f"line {n}: {dropped} has two witness rows")
+        if dropped not in live_ids:
+            errors.append(f"line {n}: witness names {dropped}, which the registry no longer carries")
+        for s in survivors.split():
+            if s not in live_ids:
+                errors.append(f"line {n}: {dropped}'s row names survivor {s}, which the registry does not carry")
         rows[dropped] = (survivors.split(), witness)
-    return rows
+    return rows, errors
 
 
 def main():
     checks = registry.discover()
-    witnesses = load_witnesses()
+    witnesses, stale = load_witnesses({c.id for c in checks})
     reads, vocab, by_witness, unrefuted = 0, 0, 0, []
 
     for survivor in checks:
@@ -82,10 +100,15 @@ def main():
     print(f"  refuted by READS   {reads}")
     print(f"  refuted by VOCAB   {vocab}")
     print(f"  refuted by WITNESS {by_witness}")
+    if stale:
+        print(f"  STALE WITNESSES    {len(stale)}")
+        for e in stale:
+            print(f"    {e}")
     if unrefuted:
         print(f"  NOT-EVALUABLE      {len(unrefuted)}")
         for s, d in unrefuted:
             print(f"    survivor={s} dropped={d}  -- no discriminant, no witness")
+    if stale or unrefuted:
         return 2
     print("MERGE PASS: every pair refuted; the check set is at a fixpoint.")
     return 0
