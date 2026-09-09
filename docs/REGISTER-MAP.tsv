@@ -1,0 +1,77 @@
+entry	verdict	runner	note
+A1	OUT-OF-SUBJECT	-	a sentinel choice inside code makoto does not execute
+A2	RUNNER	content.phantom_citation	membership judged on a folded citation string, both directions
+A3	OUT-OF-SUBJECT	-	pairing of two sequences inside code makoto does not execute
+A4	OUT-OF-SUBJECT	-	duplicate-key precedence inside code makoto does not execute
+A5	RUNNER	gate.canon_fingerprints	the atom is matched against the whole closing text, not an extracted inner value
+A6	OUT-OF-SUBJECT	-	threshold behaviour of a metric makoto does not compute
+A7	RUNNER	gate.named_test	a named test is graded per name, not against an aggregate pass count
+A11	RUNNER	gate.canon_fingerprints	atoms are existentials over distinct session calls, windowed at the operator turn
+A13	NOT-COUNTABLE	-	deciding configured-versus-inherent needs the layer that set it; makoto reads the record, not the platform
+B1	RUNNER	gate.self_wired	makoto's own wiring is read from disk rather than assumed
+B2	RUNNER	gate.hollow_test	an assertion that cannot fail is refused: no assert, tautology, swallowed failure, uncollectable
+B4	NOT-COUNTABLE	-	proxy-versus-target disagreement is a similarity judgement over two oracles
+B5	RUNNER	gate.hollow_test	a verifier whose verdict is constant is a hollowed body
+B6	NOT-COUNTABLE	-	requires the graded population, which the closing text does not carry
+B7	RUNNER	tools/merge_pass.py	every rule in this repo binds to a runner; this file is the MERGING protocol's
+B8	RUNNER	gate.undeclared_falsifiable	a claim must name what would falsify it before absence counts as evidence
+B9	NOT-COUNTABLE	-	an exemption's discharge is not a channel makoto reads
+B10	RUNNER	tests corpus-FP invariant	every blocking check is certified at zero false positives on the shipped corpus
+B11	NOT-COUNTABLE	-	a baseline run is not on any channel makoto reads
+B14	NOT-COUNTABLE	-	with-and-without measurement is outside a single turn's record
+B17	RUNNER	gate.canon_fingerprints	the check requires green before the plant; the pattern is not carried in the detector
+B18	OUT-OF-SUBJECT	-	held-out reporting is a property of the certification sets, not of a turn
+B20	RUNNER	gate.hollow_test	a test edited until it passes is a gutted test
+B21	RUNNER	tools/merge_pass.py	each pair is refuted by its own discriminant, never by a sibling's
+B23	OUT-OF-SUBJECT	-	a numeric bound inside code makoto does not execute
+B24	RUNNER	content.phantom_citation	the cited source must exist before the sentence resting on it stands
+B26	RUNNER	gate.self_wired	makoto's own liveness is an output; absence of its wiring fails loud
+B28	OUT-OF-SUBJECT	-	sequencing of test cases inside a suite makoto does not run
+B32	RUNNER	gate.undeclared_falsifiable	a claim whose falsifier is itself names nothing
+B34	RUNNER	tools/register_map.py	makoto's own law is run over makoto, and names every region it cannot reach: the NOT-COUNTABLE and OUT-OF-SUBJECT rows below
+C1	RUNNER	content.verifier_exit_masking	a computed nonzero exit that is silenced is the dropped status
+C2	RUNNER	gate.undeclared_falsifiable	a claim that cannot be evaluated is refused rather than passed
+C3	RUNNER	gate.named_test	each named test is evaluated on its own name
+C4	RUNNER	dispatch fail-closed	a check that raises resolves as a denial, never as permission
+C5	RUNNER	dispatch fail-closed	an unrecognised event shape ends in an error, not a fallthrough
+C6	RUNNER	content.verifier_predicate_weakened	a loose comparator where equality is meant records the wrong direction
+C7	RUNNER	gate.completion	a partial artifact is graded present-or-absent on disk, not by its prefix
+C8	RUNNER	gate.claimed_running	"it's up" is graded against what the run itself emitted
+C9	RUNNER	audit log	every gating decision is persisted, not held in the window
+C10	RUNNER	gate.claimed_shipped	the ship claim names every remote-mutating route; absence needs all of them
+D1	RUNNER	gate.completion	a write is graded by reading the artifact back, never by the write returning
+D2	RUNNER	gate.completion	the artifact is looked for where a consumer would find it, under cwd
+D3	RUNNER	content.fabricated_commit_sha	the commit is pinned by its own identity, not by the name pointing at it
+D4	RUNNER	gate.stale_pass	a derived pass older than its source is refused against the live record
+D8	OUT-OF-SUBJECT	-	magnitude of a system makoto does not execute
+D9	RUNNER	gate.self_wired	makoto excludes itself by identity from the set it judges
+D11	RUNNER	event.thrash_revert	a whole-artifact rewrite that lands back where it started is refused
+D12	OUT-OF-SUBJECT	-	durability of a copy across a boundary makoto does not cross
+D13	RUNNER	gate.dropped	the commitments are enumerated first; discharge is graded against exactly that list
+D14	NOT-COUNTABLE	-	an undo's provability is not a channel makoto reads
+E1	RUNNER	tests/test_stop_gate_level_invariant.py	every gate carries a scenario that selects it
+E3	RUNNER	content.illusory_authorship_trailer	an explicit intent marker is required; a bare product-name mention is not matched
+E4	RUNNER	dispatch fail-closed	posture is declared per check, never inherited from the platform
+E5	RUNNER	event.identical_retry	a byte-identical retry after the same deterministic failure is interdicted
+E7	NOT-COUNTABLE	-	ambient conditions of the host are not a channel makoto reads
+E8	OUT-OF-SUBJECT	-	setting combinations of a system makoto does not configure
+E9	OUT-OF-SUBJECT	-	a fallback's coverage of its own trigger, in code makoto does not execute
+E10	RUNNER	event.identical_retry	the retry is graded against the failure class it follows
+E11	OUT-OF-SUBJECT	-	nested limits of a host makoto does not allocate
+E12	RUNNER	content.self_mute_guard	the gate's own inspected attribute cannot be reworded away
+E13	NOT-COUNTABLE	-	a detached task's input channel is not on the record makoto reads
+F1	RUNNER	tests/test_gate_shape.py	every gate's registration points are enumerated and checked together
+F2	RUNNER	tests/test_gate_shape.py	one owner per gate declaration; every consumer reads the registry
+F3	RUNNER	gate.stale_establisher	a referent that moved since it was named is refused
+F4	RUNNER	content.unsourced_webfetch	the primary artifact must have been seen before it is cited
+F6	OUT-OF-SUBJECT	-	monotonicity of a state space makoto does not walk
+F7	RUNNER	gate.stale_pass	the record is re-read at the moment of the claim, not before it
+F8	RUNNER	gate.plan_item_drift	an unchanged open item is advisory, not a repeated block
+F10	RUNNER	gate.canon	the event is re-derived from the session's own record, never from a digest of it
+F12	NOT-COUNTABLE	-	a discriminating observation between mechanisms is a similarity judgement
+F14	RUNNER	content.verifier_body_hollowed	"no behaviour change" is graded on the body, not on the description
+F16	RUNNER	gate.stale_pass	the record's watermark is checked against the live lastfailed
+G1	NOT-COUNTABLE	-	needs the request set beside the result; that comparison is similarity
+G2	NOT-COUNTABLE	-	needs the question compared against what was derivable; that comparison is similarity
+G3	NOT-COUNTABLE	-	needs each party's span compared against the answer's; that comparison is similarity
+G5	RUNNER	gate.unexamined_wall	an epistemic "cannot" with zero calls since the operator's last turn
