@@ -374,8 +374,10 @@ def test_canon_timeout_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp
     p = _write_transcript(tmp_path, entries)
     blocked = canon_gate([row], transcript_path=str(p), session_id="s1", state_root=tmp_path)
     target = next(f for f in blocked if f.message.startswith("canon.timeout:"))
-    assert "the human operator must say exactly" in target.retry_hint
-    assert "in a user turn (non-tool, non-quoted)" in target.retry_hint
+    assert "the human operator must" not in target.retry_hint
+    assert "No release phrase is required" in target.retry_hint
+    assert "The optional override is" in target.retry_hint
+    assert "makoto release.operator timeout: <reason>" in target.retry_hint
     assert "an assistant reply cannot discharge this gate" in target.retry_hint
     assert not any(r.get("kind") == "release.operator" for r in ledger.read(root=tmp_path))
 

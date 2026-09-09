@@ -408,16 +408,10 @@ CANON_SEQ_PRIMITIVES: dict = {
         "A tool call ended in a direct error state — interrupted or a self-emitted error code — "
         "and the turn closed without resurfacing or resolving it; confidently transient, "
         "non-interrupted failures receive one retry opportunity.",
-        # Task 0b part (a): the OLD hint said "...or state explicitly why the error is acceptable"
-        # -- a discharge the detector cannot honor. timed_out_at_turn_end reads ONLY calls[-1]
-        # (purely structural); prose can never change it. The two REAL discharges: a later
-        # successful call (calls[-1] becomes non-error), or (Task 0b part b) a ledger-recorded
-        # release.operator for a genuinely unresolvable, operator-surfaced block -- the same mechanism
-        # gate.canon_fingerprints uses (makoto.state.ledger), not a third prose-only path.
         "A call errored (timeout / interrupted / error code) and the turn closed without "
         "resolving it. Re-run it (or the equivalent action) to a real successful result before "
-        "closing. Text alone cannot discharge this any other way; the detector reads only "
-        "whether the LAST call in the turn succeeded.",
+        "closing. The detector evaluates the last call in the current operator window; "
+        "an operator interrupt ends that window and does not require a retry.",
     ),
     "recur": (
         recur_stuck,
@@ -441,12 +435,11 @@ def _release_clause(cid: str) -> str:
     Generated per-id rather than written per-entry so a primitive cannot be added to
     CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —
     the affordance is structural, not prose that the next author must remember to copy."""
-    return (" If this finding is a genuinely unresolvable, already-reviewed block — or a "
-            "misfire you have verified — the human operator must say exactly "
+    return (" The next genuine user turn, whatever it says, or an operator interrupt "
+            "resets the window. No release phrase is required. The optional override is "
             f"`makoto release.operator {cid}: <reason>` in a user turn "
-            "(non-tool, non-quoted); an assistant reply cannot discharge this gate. "
-            "That is the only discharge other than "
-            "changing what the detector actually reads.")
+            "(including host-delivered mid-turn text); "
+            "an assistant reply cannot discharge this gate.")
 
 
 def fired_primitives(history) -> Iterable:
@@ -527,6 +520,11 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
             if not (isinstance(r, (tuple, list)) and len(r) >= 3
                     and r[2] == "PreToolUse" and r[0] in denied_pre_ids)
         ]
+    try:
+        import makoto.state.ledger as _ackblock
+        history = _ackblock.operator_window_history(history, transcript_path)
+    except Exception:
+        pass
     out: List[Finding] = []
     for cid, stop_text, retry_hint in fired_primitives(history):
         ack = None

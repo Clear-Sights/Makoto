@@ -595,12 +595,37 @@ def _entry_text(entry: dict) -> str:
 
 
 def _is_genuine_user_turn(entry: dict) -> Optional[str]:
-    """Return the entry's text iff it is a genuine, host-written, non-synthetic user turn (ack
-    contract points 1-3) -- else None. A tool result or a synthetic/system-injected turn can
-    never qualify, no matter what text it happens to contain."""
+    """Read user text, including host-delivered mid-turn text beside a tool result.
+
+    Never scan tool_result content: only the host's top-level text blocks qualify.
+    Ordinary synthetic reminders and arbitrary tool output remain excluded.
+    """
     msg = entry.get("message")
     if not isinstance(msg, dict) or msg.get("role") != "user":
         return None
+    content = msg.get("content")
+    blocks = content if isinstance(content, list) else [{"type": "text", "text": content}]
+    delivered = []
+    for block in blocks:
+        if not isinstance(block, dict) or block.get("type") != "text":
+            continue
+        value = block.get("text")
+        if not isinstance(value, str):
+            continue
+        value = value.strip()
+        if value in ("[Request interrupted by user]",
+                     "[Request interrupted by user for tool use]"):
+            delivered.append(value)
+            continue
+        if value.startswith("<system-reminder>") and value.endswith("</system-reminder>"):
+            value = value[len("<system-reminder>"):-len("</system-reminder>")].strip()
+        prefix = "The user sent a new message while you were working:"
+        if value.startswith(prefix):
+            user_text = value[len(prefix):].strip()
+            if user_text:
+                delivered.append(user_text)
+    if delivered:
+        return "\n".join(delivered)
     if "toolUseResult" in entry:
         return None
     text = _entry_text(entry)
@@ -608,6 +633,45 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
     if any(marker in low for marker in _SYNTHETIC_MARKERS):
         return None
     return text
+
+
+def operator_window_history(history, transcript_path=None) -> list:
+    """Calls in the current operator window; a host operator interrupt also ends it.
+
+    Preserve undated rows when only a transcript timestamp is available. An interrupt
+    terminal in the history supplies an exact boundary even without a transcript.
+    Generic tool_response.interrupted can mean a timeout and is not a human act.
+    """
+    from datetime import datetime
+
+    def timestamp(value):
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+        except (ValueError, TypeError, OverflowError):
+            return None
+
+    since = timestamp(last_operator_turn_ts(transcript_path))
+    rows = list(history or ())
+    start = 0
+    for i, row in enumerate(rows):
+        etype = row.get("event_type") if isinstance(row, dict) else (
+            row[2] if isinstance(row, (tuple, list)) and len(row) > 2 else None)
+        payload = row.get("payload", row) if isinstance(row, dict) else (
+            row[4] if isinstance(row, (tuple, list)) and len(row) > 4 else None)
+        try:
+            ev = json.loads(payload) if isinstance(payload, str) else payload
+        except (ValueError, TypeError):
+            continue
+        if (isinstance(ev, dict) and (ev.get("hook_event_name") or etype) == "PostToolUseFailure"
+                and ev.get("is_interrupt") is True):
+            start = i + 1
+    out = []
+    for row in rows[start:]:
+        ts = timestamp(row.get("ts") if isinstance(row, dict) else (
+            row[1] if isinstance(row, (tuple, list)) and len(row) > 1 else None))
+        if since is None or ts is None or ts >= since:
+            out.append(row)
+    return out
 
 
 def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) -> list:

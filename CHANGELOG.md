@@ -5,6 +5,12 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [Unreleased]
 
+### Fixed
+- Canon gates reset on the next genuine user turn, including host-delivered mid-turn
+  messages, whatever the operator says (#57). Operator interrupts also reset the window
+  and no longer fire `canon.timeout`. `release.operator` remains an optional override;
+  gate hints no longer require a human release phrase.
+
 ## [2.8.1] — 2026-09-09
 
 ### Fixed

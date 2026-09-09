@@ -20,37 +20,32 @@ from __future__ import annotations
 
 from typing import List
 
-from makoto.substrate._canonAtoms import calls_from_history, calls_since, fired_canon_fingerprints
+from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
 from makoto.vocab import Finding
 
 
 def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session_id=None,
                                  state_root=None) -> List[Finding]:
-    """One BLOCKING Finding per robust-core canon fingerprint that fires on this session's call
-    stream (see _canonAtoms.BLOCK_IDS) -- UNLESS a qualifying release.operator discharges it (Task 2
-    slice 5, DESIGN DECISION Option A): a session-level fingerprint over immutable recorded
-    history has no other legitimate discharge (narrowing the detector voids its 0-FP
-    certificate; self-disabling normalizes the one action Makoto must never normalize), so once
-    fired it would otherwise re-fire at every subsequent Stop for the rest of the session.
-    `makoto.state.ledger.find_ack_block` re-derives the discharge from the HOST-WRITTEN transcript
-    every time (never trusted from chain content) -- a found ack is chain-appended for the
-    audit/receipt trail via `record_ack_block_if_new`, but the discharge decision itself is
-    always freshly re-derived, never read back from that row. Silent (empty list) when no
-    fingerprint fires, or every fired one is acked."""
+    """Evaluate blocking fingerprints in the current operator window.
+
+    Any genuine user turn or operator interrupt resets the window. release.operator
+    remains an optional per-fingerprint override, freshly verified against the transcript
+    and recorded for audit; no particular human phrase is required.
+    """
     # THE ATOM WINDOW. Atoms are existentials, so over a whole session they are monotone: once a
     # fingerprint has matched it can never stop matching, whatever the agent does next, and the
     # typed phrase becomes its only exit. Evaluating over the calls since the operator last spoke
     # makes it fire once, inform them, and reset when they next speak -- whatever they say --
     # firing again only if the agent repeats the pattern after being told. The agent cannot force
     # a reset: it cannot produce a genuine user turn. AliceLJY, issue #45's secondary half; #57.
-    # No transcript, or no genuine turn in it, means NO window -- the whole session, which is the
-    # strict direction and the prior behaviour. `release.operator` remains the explicit override.
+    # With neither a genuine transcript turn nor a host operator interrupt, retain the whole
+    # session. `release.operator` remains the explicit override.
     try:
         import makoto.state.ledger as _ackblock
-        since = _ackblock.last_operator_turn_ts(transcript_path)
+        history = _ackblock.operator_window_history(history, transcript_path)
     except Exception:
-        since = None
-    calls = calls_since(history, since)
+        pass
+    calls = calls_from_history(history)
     out: List[Finding] = []
     for name, formula, is_block in fired_canon_fingerprints(calls, text or ""):
         if not is_block:
@@ -77,12 +72,12 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
             retry_hint=(f"This session's call stream matches a certified gaming-shaped fingerprint. "
                         f"Re-examine the flagged behavior (a suppressed check, a destructive "
                         f"command, or an unresolved gap between claim and evidence) before "
-                        f"continuing, OR if the flagged action was legitimate and already fully "
-                        f"re-examined, the human operator must say exactly "
+                        f"continuing. The fingerprint resets on the next genuine user turn, "
+                        f"whatever it says, or an operator interrupt. No release phrase is "
+                        f"required. The optional override is "
                         f"`makoto release.operator {name}: <reason>` in a user turn "
-                        f"(non-tool, non-quoted); an assistant reply cannot discharge this gate "
-                        f"-- the only release this gate can "
-                        f"honor, per Task 2 slice 5."),
+                        f"(including host-delivered mid-turn text); "
+                        f"an assistant reply cannot discharge this gate."),
         ))
     return out
 

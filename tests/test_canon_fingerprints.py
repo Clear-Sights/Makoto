@@ -6,6 +6,8 @@ own fixed Finding.level.
 """
 from __future__ import annotations
 
+import pytest
+
 from makoto.substrate._canonAtoms import (
     BLOCK_IDS,
     THE_CANON_17,
@@ -238,9 +240,7 @@ def test_gates_partition_the_17_by_block_ids():
 
 
 # ---- Task 2 slice 5: release.operator discharge (DESIGN DECISION Option A) --------------------------------
-# The LIVE bug this closes: notestedit_destruct (and any other session-level fingerprint) has no
-# other discharge -- once it fires on real recorded history it would otherwise re-fire at every
-# subsequent Stop for the rest of the session, even after a fully owner-sanctioned re-examination.
+# The override also works when undated history cannot be narrowed to an operator window.
 def _write_transcript(tmp_path, entries):
     import json
     p = tmp_path / "transcript.jsonl"
@@ -263,7 +263,8 @@ def test_first_firing_blocks_even_with_a_ready_ack_in_the_transcript(tmp_path):
     assert any(f.message.startswith("canon.notestedit_destruct:") for f in findings)
 
 
-def test_release_requires_a_human_turn_after_a_recorded_firing(tmp_path):
+@pytest.mark.parametrize("mid_turn", [False, True])
+def test_optional_release_after_a_recorded_firing(tmp_path, mid_turn):
     """PLANT the fault (first Stop fires and gets recorded), THEN a real ack turn -> the SECOND
     Stop's evaluation must be silent, and must chain-append a release.operator row."""
     from makoto.state import ledger
@@ -288,12 +289,21 @@ def test_release_requires_a_human_turn_after_a_recorded_firing(tmp_path):
     blocked = canon_fingerprint_block_gate(
         "", [_DESTRUCTIVE_ROW], transcript_path=str(p), session_id="s1", state_root=tmp_path)
     target = next(f for f in blocked if f.message.startswith("canon.notestedit_destruct:"))
-    assert "the human operator must say exactly" in target.retry_hint
-    assert "in a user turn (non-tool, non-quoted)" in target.retry_hint
+    assert "No release phrase is required" in target.retry_hint
+    assert "The optional override is" in target.retry_hint
     assert "an assistant reply cannot discharge this gate" in target.retry_hint
     assert not any(r.get("kind") == "release.operator" for r in ledger.read(root=tmp_path))
 
-    entries.append(_user_turn(release, "2026-07-08T01:00:00Z"))
+    user = _user_turn(release, "2026-07-08T01:00:00Z")
+    if mid_turn:
+        user["toolUseResult"] = {"stdout": "ok"}
+        user["message"]["content"] = [
+            {"type": "tool_result", "tool_use_id": "call-1", "content": "ok"},
+            {"type": "text", "text": "<system-reminder>\n"
+             "The user sent a new message while you were working:\n" + release
+             + "\n</system-reminder>"},
+        ]
+    entries.append(user)
     p = _write_transcript(tmp_path, entries)
     second = canon_fingerprint_block_gate(
         "", [_DESTRUCTIVE_ROW], transcript_path=str(p), session_id="s1", state_root=tmp_path)
