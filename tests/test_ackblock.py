@@ -198,10 +198,11 @@ def test_the_gates_own_hint_never_discharges(tmp_path):
     from makoto.checks import canonFingerprints
     _record_first_fired(tmp_path, "notestedit_destruct", "2026-07-07T01:00:00Z")
     name = "notestedit_destruct"
-    hint = (f"say exactly `makoto release.operator {name}: <reason>` in a "
-            f"real (non-tool, non-quoted) reply")
+    hint = (f"the human operator must say exactly "
+            f"`makoto release.operator {name}: <reason>` in a user turn "
+            f"(non-tool, non-quoted); an assistant reply cannot discharge this gate")
     src = (canonFingerprints.__file__ or "")
-    assert "say exactly `makoto release.operator {name}: <reason>` in a " in \
+    assert "`makoto release.operator {name}: <reason>` in a user turn " in \
         open(src, encoding="utf-8").read(), \
         "the hint's wording moved -- re-derive this test's `hint` from the shipped text"
     p = _write_transcript(tmp_path, [_user_turn("Stop hook feedback:\n" + hint,

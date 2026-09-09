@@ -263,7 +263,7 @@ def test_first_firing_blocks_even_with_a_ready_ack_in_the_transcript(tmp_path):
     assert any(f.message.startswith("canon.notestedit_destruct:") for f in findings)
 
 
-def test_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
+def test_release_requires_a_human_turn_after_a_recorded_firing(tmp_path):
     """PLANT the fault (first Stop fires and gets recorded), THEN a real ack turn -> the SECOND
     Stop's evaluation must be silent, and must chain-append a release.operator row."""
     from makoto.state import ledger
@@ -273,10 +273,28 @@ def test_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp_path):
                    "pattern_fires": ["gate.canon_fingerprints"],
                    "findings": [{"message": target_msg}]}, root=tmp_path)
 
-    p = _write_transcript(tmp_path, [
-        _user_turn("makoto release.operator notestedit_destruct: reviewed, the rm -rf was sanctioned",
-                  "2026-07-08T00:00:00Z"),
-    ])
+    release = (
+        "makoto release.operator notestedit_destruct: the destructive command removed an untracked stray draft\n"
+        "under keel/plugin/tests only; the committed test file is intact and the red it covered was fixed in\n"
+        "effects.py:418 and re-verified green (324 passed)."
+    )
+    entries = [
+        {"type": "system", "message": {"role": "system", "content": target_msg},
+         "timestamp": "2026-07-07T00:00:00Z"},
+        {"type": "assistant", "message": {"role": "assistant", "content": release},
+         "timestamp": "2026-07-08T00:00:00Z"},
+    ]
+    p = _write_transcript(tmp_path, entries)
+    blocked = canon_fingerprint_block_gate(
+        "", [_DESTRUCTIVE_ROW], transcript_path=str(p), session_id="s1", state_root=tmp_path)
+    target = next(f for f in blocked if f.message.startswith("canon.notestedit_destruct:"))
+    assert "the human operator must say exactly" in target.retry_hint
+    assert "in a user turn (non-tool, non-quoted)" in target.retry_hint
+    assert "an assistant reply cannot discharge this gate" in target.retry_hint
+    assert not any(r.get("kind") == "release.operator" for r in ledger.read(root=tmp_path))
+
+    entries.append(_user_turn(release, "2026-07-08T01:00:00Z"))
+    p = _write_transcript(tmp_path, entries)
     second = canon_fingerprint_block_gate(
         "", [_DESTRUCTIVE_ROW], transcript_path=str(p), session_id="s1", state_root=tmp_path)
     # _DESTRUCTIVE_ROW alone also fires nosrc_destruct (a bare destructive call with no source

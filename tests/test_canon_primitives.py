@@ -368,9 +368,19 @@ def test_canon_timeout_genuine_ack_after_a_recorded_firing_silences_the_gate(tmp
                    "pattern_fires": ["gate.canon"],
                    "findings": [{"message": target_msg}]}, root=tmp_path)
 
-    p = _write_transcript(tmp_path, [_user_turn(
-        "makoto release.operator timeout: reviewed, this permission block is correct and final",
-        "2026-07-08T00:00:00Z")])
+    release = "makoto release.operator timeout: reviewed, this permission block is correct and final"
+    entries = [{"type": "assistant", "message": {"role": "assistant", "content": release},
+                "timestamp": "2026-07-08T00:00:00Z"}]
+    p = _write_transcript(tmp_path, entries)
+    blocked = canon_gate([row], transcript_path=str(p), session_id="s1", state_root=tmp_path)
+    target = next(f for f in blocked if f.message.startswith("canon.timeout:"))
+    assert "the human operator must say exactly" in target.retry_hint
+    assert "in a user turn (non-tool, non-quoted)" in target.retry_hint
+    assert "an assistant reply cannot discharge this gate" in target.retry_hint
+    assert not any(r.get("kind") == "release.operator" for r in ledger.read(root=tmp_path))
+
+    entries.append(_user_turn(release, "2026-07-08T01:00:00Z"))
+    p = _write_transcript(tmp_path, entries)
     second = canon_gate([row], transcript_path=str(p), session_id="s1", state_root=tmp_path)
     assert second == []
     ack_rows = [r for r in ledger.read(root=tmp_path) if r.get("kind") == "release.operator"]
