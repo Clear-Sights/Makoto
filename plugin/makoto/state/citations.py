@@ -25,11 +25,7 @@ from pathlib import Path
 
 from makoto.vocab import _CITATION_RX, _CITATION_AUTHOR_STOPWORDS
 
-# Whitespace fold shared by BOTH sides of the canonical comparison (extraction here, the
-# canonical rebuild below, and checks/phantomCitation._fold_ws on lookup): `\s+` in
-# _CITATION_RX matches a newline or a double space, so a line-wrapped 'Knight-Leveson\n1986'
-# must normalize to the same bytes as the canonical 'Knight-Leveson 1986' — otherwise a real,
-# listed citation is DENIED as phantom purely for how the text happened to wrap.
+# Extraction and canonical rebuild share this whitespace normalization.
 _WS_RUN_RX = re.compile(r"\s+")
 
 

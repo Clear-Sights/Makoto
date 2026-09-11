@@ -86,11 +86,7 @@ EVENTS: dict[str, dict] = {
     # ── OUT — declared outside Makoto's writ, each with its reason ─────────────────────────────
     "UserPromptSubmit": {"status": "OUT", "reason": (
         "carries ORACLE-authored content (the human's own words); Makoto verifies the "
-        "ASSISTANT's claims against its own logged record, not the human's prompts. A claim can "
-        "certainly be indexed to what was asked ('I ran the tests you asked for' presumes a "
-        "specific ask) — but that indexing is resolved by reading the prompt back out of the "
-        "already-ingested events table at Stop-check time (_select_recent/history), not by a "
-        "dedicated UserPromptSubmit handler; nothing is lost by staying OUT here")},
+        "ASSISTANT's claims against its own logged record, not the human's prompts")},
     "UserPromptExpansion": {"status": "OUT", "reason": (
         "slash-command expansion provenance, not an assistant claim — Makoto checks what the "
         "assistant said and did, not how a command was expanded")},

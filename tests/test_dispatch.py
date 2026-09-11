@@ -40,7 +40,6 @@ def test_dispatch_clean_event_exits_0_empty_stdout(tmp_path):
         "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello"},
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out == ""
     assert _dispatch_facts(state_dir) == [], "happy path must write zero dispatch can't-evaluate facts"
 
@@ -50,7 +49,7 @@ def test_dispatch_loose_comparator_emits_block_json(tmp_path):
 
     SPEC-5 Task 8: a PreToolUse block now renders through wire.py's real Pre shape
     (hookSpecificOutput.permissionDecision == "deny"), not the old ad-hoc top-level
-    "decision" key -- see makoto/wire.py's _pre_deny.
+    "decision" key -- see makoto/verdict.py's _pre_permission.
     """
     state_dir = _setup_state(tmp_path)
     payload = {
@@ -63,7 +62,6 @@ def test_dispatch_loose_comparator_emits_block_json(tmp_path):
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0  # hook always exits 0; decision is in stdout
     assert out, "expected block JSON on stdout"
     decision = json.loads(out)
     assert decision["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
@@ -113,7 +111,6 @@ def test_dispatch_absent_chain_self_verify_silent_no_fact(tmp_path):
         "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello"},
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     facts = _dispatch_facts(state_dir)
     assert not any(f.get("pattern_id") == "dispatch.chain_tamper" for f in facts), facts
 
@@ -131,7 +128,6 @@ def test_dispatch_clean_appended_chain_self_verify_silent_no_fact(tmp_path, monk
         "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello"},
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     facts = _dispatch_facts(state_dir)
     assert not any(f.get("pattern_id") == "dispatch.chain_tamper" for f in facts), facts
 
@@ -158,7 +154,6 @@ def test_dispatch_tampered_chain_self_verify_advisory_fact_never_blocks(tmp_path
         "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello"},
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out == ""
     facts = _dispatch_facts(state_dir)
     assert any(f.get("pattern_id") == "dispatch.chain_tamper" for f in facts), facts
@@ -306,7 +301,6 @@ def test_dispatch_skips_audit_row_when_no_findings(tmp_path):
         "tool_input": {"file_path": "/tmp/unrelated.txt", "content": "hello world"},
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out == ""
     post_size = audit_path.stat().st_size if audit_path.exists() else 0
     assert post_size == pre_size, (
@@ -329,7 +323,6 @@ def test_dispatch_still_writes_audit_row_when_finding_fires(tmp_path):
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     # SPEC-5 Task 8: a PreToolUse block renders wire.py's real Pre shape (deny), not a literal
     # "block" substring -- see test_dispatch_loose_comparator_emits_block_json for the full shape.
     assert '"deny"' in out, f"content.verifier_predicate_weakened should still emit a deny decision; got {out!r}"
@@ -356,7 +349,6 @@ def test_dispatch_env_disable_silences_specific_pattern(tmp_path):
         },
     }
     rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_PATTERNS": "content.verifier_predicate_weakened"})
-    assert rc == 0
     assert out == "", f"disabled pattern must not emit block JSON; got {out!r}"
     audit_path = state_dir / "audit.jsonl"
     if audit_path.exists():
@@ -379,7 +371,6 @@ def test_dispatch_audit_row_records_tool_name(tmp_path):
         },
     }
     rc, _ = _run_dispatch(state_dir, payload)
-    assert rc == 0
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert len(rows) == 1
     assert rows[0].get("tool_name") == "Write", (
@@ -402,7 +393,6 @@ def test_dispatch_posttooluse_write_records_ledger_touch(tmp_path):
         "tool_response": {"filePath": "src/auth.py"},
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out == "", "PostToolUse must never emit a decision"
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     try:
@@ -461,7 +451,6 @@ def test_dispatch_posttooluse_bash_records_ledger_value(tmp_path):
         "tool_response": {"stdout": "120 tests/auth_test.py", "stderr": "", "exitCode": 0},
     }
     rc, _ = _run_dispatch(state_dir, payload)
-    assert rc == 0
     conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
     try:
         row = ledger.read_key(conn, "tests/auth_test.py")
@@ -535,7 +524,6 @@ def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
         "tool_response": {"stdout": "PASSED tests/x.py::test_a\n", "stderr": "", "exitCode": 0},
     }
     rc1, out1 = _run_dispatch(state_dir, first)
-    assert rc1 == 0
     assert out1 == "", "no PRIOR run to diff against yet -> nothing to say"
 
     second = {
@@ -544,7 +532,6 @@ def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
         "tool_response": {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1},
     }
     rc2, out2 = _run_dispatch(state_dir, second)
-    assert rc2 == 0
     body = _json.loads(out2)
     assert body["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
     assert "newly failing: test_a" in body["hookSpecificOutput"]["additionalContext"]
@@ -559,9 +546,7 @@ def test_dispatch_test_delta_redirect_silent_when_verdict_set_is_unchanged(tmp_p
         "tool_response": {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1},
     }
     rc1, _ = _run_dispatch(state_dir, payload)
-    assert rc1 == 0
     rc2, out2 = _run_dispatch(state_dir, payload)   # same verdict set, re-run
-    assert rc2 == 0
     assert out2 == ""
 
 
@@ -576,7 +561,6 @@ def test_dispatch_completion_gate_blocks_by_default(tmp_path):
         "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
     }
     rc, out = _run_dispatch(state_dir, payload)   # no env -> completion gate blocks live
-    assert rc == 0
     assert out, "completion gate must block by default after the flip"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -593,11 +577,9 @@ def test_dispatch_green_claim_gate_blocks_after_recorded_red_run(tmp_path):
             "tool_response": {"stdout": "=== 2 failed, 9 passed in 3.0s ===", "stderr": "",
                               "exitCode": 1}}
     rc, _ = _run_dispatch(state_dir, post)              # records the red run -> kind='testrun'
-    assert rc == 0
     stop = {"hook_event_name": "Stop", "session_id": "gc", "cwd": str(tmp_path),
             "last_assistant_message": "Done — all tests pass now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "green_claim gate must block on a green claim over a recorded red run"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -615,7 +597,6 @@ def test_dispatch_green_claim_silent_after_green_run(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "gc2", "cwd": str(tmp_path),
             "last_assistant_message": "Done — all tests pass now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "run was green -> green_claim gate must stay silent"
 
 
@@ -630,7 +611,6 @@ def test_dispatch_completion_gate_shadow_when_disabled(tmp_path):
         "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
     }
     rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    assert rc == 0
     assert out == "", "disabled completion gate must not block"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.completion" in r.get("pattern_fires", []) for r in rows), \
@@ -648,7 +628,6 @@ def test_dispatch_completion_gate_silent_on_mere_path_mention(tmp_path):
         "last_assistant_message": "Done reviewing. See src/nonexistent_zzz.py for the details.",
     }
     rc, out = _run_dispatch(state_dir, payload)   # gate live, but no production claim
-    assert rc == 0
     assert out == "", "a referenced (not produced) path must not false-block"
 
 
@@ -669,7 +648,6 @@ def test_dispatch_advance_gate_blocks_by_default(tmp_path):
     }
     _run_dispatch(state_dir, promise)
     rc, out = _run_dispatch(state_dir, advance)   # universal-completion claim + undischarged commitment
-    assert rc == 0
     assert out, "advance gate must block by default after the flip"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -693,7 +671,6 @@ def test_dispatch_advance_gate_shadow_when_disabled(tmp_path):
     }
     _run_dispatch(state_dir, promise, extra_env={"MAKOTO_DISABLE_GATES": "1"})
     rc, out = _run_dispatch(state_dir, advance, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    assert rc == 0
     assert out == "", "disabled advance gate must not block"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
@@ -714,7 +691,6 @@ def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
         "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
     }
     rc, out = _run_dispatch(state_dir, payload)   # no env -> dropped gate blocks live
-    assert rc == 0
     assert out, "dropped gate must block by default on an undischarged forward promise"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -742,7 +718,6 @@ def test_dispatch_contract_order_gate_blocks_on_open_remainder(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "contract_order gate must block by default on an unfinished plan"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -779,7 +754,6 @@ def test_dispatch_contract_order_gate_silent_after_locating_write_advances_the_p
     stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", f"contract_order must stay silent once the only declared node is advanced: {out}"
 
 
@@ -861,7 +835,6 @@ def test_dispatch_contract_order_gate_still_blocks_on_the_untouched_sibling_node
     stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "contract_order must still block on the untouched sibling node"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -896,7 +869,6 @@ def test_dispatch_contract_order_gate_blocks_after_a_live_mid_session_plan_write
     stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "contract_order must block on the live-declared plan's open node"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -934,7 +906,6 @@ def test_dispatch_contract_order_gate_silent_after_live_declare_then_advance(tmp
     stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", f"contract_order must stay silent after live declare + advance: {out}"
 
 
@@ -1014,7 +985,6 @@ def test_dispatch_dropped_gate_silent_when_discharged(tmp_path):
         "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out == "", "a discharged promise (symbol present on disk) must not block"
 
 
@@ -1029,7 +999,6 @@ def test_dispatch_dropped_gate_shadow_when_disabled(tmp_path):
         "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
     }
     rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    assert rc == 0
     assert out == "", "disabled dropped gate must not block"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.dropped" in r.get("pattern_fires", []) for r in rows), \
@@ -1061,7 +1030,6 @@ def test_dispatch_liveness_gate_blocks_on_illusory_code(tmp_path):
         "last_assistant_message": "Done — added the helper.",
     }
     rc, out = _run_dispatch(state_dir, stop)                # no env -> liveness gate blocks live
-    assert rc == 0
     assert out, "liveness gate must block by default on a touched file with illusory code"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1093,7 +1061,6 @@ def test_dispatch_liveness_gate_silent_when_code_is_material(tmp_path):
         "last_assistant_message": "Done — added the helper.",
     }
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "a material statement (its value reaches the return) must not block"
 
 
@@ -1118,7 +1085,6 @@ def test_dispatch_liveness_gate_shadow_when_disabled(tmp_path):
         "last_assistant_message": "Done — added the helper.",
     }
     rc, out = _run_dispatch(state_dir, stop, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    assert rc == 0
     assert out == "", "disabled liveness gate must not block"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.liveness" in r.get("pattern_fires", []) for r in rows), \
@@ -1151,7 +1117,6 @@ def test_dispatch_hollow_test_gate_blocks_on_hollow_test(tmp_path):
         "last_assistant_message": "Done — added the test.",
     }
     rc, out = _run_dispatch(state_dir, stop)                # no env -> hollow_test gate blocks live
-    assert rc == 0
     assert out, "hollow_test gate must block by default on a touched test file with no assertion"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1184,7 +1149,6 @@ def test_dispatch_hollow_test_gate_silent_when_test_has_a_real_assertion(tmp_pat
         "last_assistant_message": "Done — added the test.",
     }
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "a test with a real assertion must not block"
 
 
@@ -1204,7 +1168,6 @@ def test_dispatch_canon_gate_blocks_by_default(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "canon_block", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)              # no env -> canon gate blocks live
-    assert rc == 0
     assert out, "canon gate must block by default on an unresolved interrupted call at turn-end"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1225,7 +1188,6 @@ def test_dispatch_canon_fingerprints_gate_blocks(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "canon_fp_block", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "gate.canon_fingerprints must block by default on a robust-core fingerprint fire"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1248,7 +1210,6 @@ def test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fir
     stop = {"hook_event_name": "Stop", "session_id": "canon_fp_advise", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "gate.canon_fingerprints_advisory must NEVER block, even when it fires"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.canon_fingerprints_advisory" in r.get("pattern_fires", []) for r in rows), \
@@ -1273,7 +1234,6 @@ def test_dispatch_canon_gate_silent_when_resolved_before_turn_end(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "a resolved-then-fixed error must not block"
 
 
@@ -1289,7 +1249,6 @@ def test_dispatch_canon_gate_shadow_when_disabled(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "canon_off", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    assert rc == 0
     assert out == "", "disabled canon gate must not block"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.canon" in r.get("pattern_fires", []) for r in rows), \
@@ -1338,7 +1297,6 @@ def test_dispatch_fabricated_action_gate_blocks(tmp_path):
         "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed.",
     }
     rc, out = _run_dispatch(state_dir, payload)   # no prior command recorded -> fabricated -> blocks
-    assert rc == 0
     assert out, "fabricated_action gate must block a tool-action claim with no recorded command"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1361,7 +1319,6 @@ def test_dispatch_fabricated_action_silent_when_command_ran(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "fab_ok", "cwd": str(tmp_path),
             "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "a tool call this turn discharges the action claim -> must not block"
 
 
@@ -1377,11 +1334,9 @@ def test_dispatch_named_test_gate_blocks_after_recorded_named_red(tmp_path):
             "tool_response": {"stdout": "FAILED tests/x.py::test_foo - AssertionError\n1 failed in 0.1s",
                               "stderr": "", "exitCode": 1}}
     rc, _ = _run_dispatch(state_dir, post)              # records the per-test red into history
-    assert rc == 0
     stop = {"hook_event_name": "Stop", "session_id": "nt", "cwd": str(tmp_path),
             "last_assistant_message": "Good news — test_foo passes now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "named_test gate must block a named-test pass-claim over that test's recorded red"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1400,11 +1355,9 @@ def test_dispatch_claimed_running_gate_blocks_after_recorded_failed_launch(tmp_p
             "tool_input": {"command": "npm run dev &"},
             "tool_response": {"interrupted": True}}
     rc, _ = _run_dispatch(state_dir, post)              # records the failed launch into history
-    assert rc == 0
     stop = {"hook_event_name": "Stop", "session_id": "run_block", "cwd": str(tmp_path),
             "last_assistant_message": "I started the server. It is now running on port 3000."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "claimed_running gate must block a running claim over a recorded failed launch"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1428,7 +1381,6 @@ def test_dispatch_unexamined_wall_gate_blocks_when_no_act_followed_the_operator(
             "transcript_path": str(tp),
             "last_assistant_message": "There is no way to tell whether the suite passes."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "unexamined_wall must block an epistemic cannot stated with an empty act window"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1449,7 +1401,6 @@ def test_dispatch_unexamined_wall_is_silent_when_a_refusal_is_not_epistemic(tmp_
             "transcript_path": str(tp),
             "last_assistant_message": "I can't help with that request."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     if out:
         assert "gate.unexamined_wall" not in out
 
@@ -1471,7 +1422,6 @@ def test_dispatch_claimed_consent_absent_gate_blocks_when_the_operator_never_spo
             "transcript_path": str(tp),
             "last_assistant_message": "You approved this, so I went ahead and merged it."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "claimed_consent_absent must block a citation of operator approval with no operator turn"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1492,7 +1442,6 @@ def test_dispatch_claimed_consent_absent_is_silent_when_the_operator_has_spoken(
             "transcript_path": str(tp),
             "last_assistant_message": "You approved this, so I went ahead and merged it."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     if out:
         assert "gate.claimed_consent_absent" not in out
 
@@ -1505,7 +1454,6 @@ def test_dispatch_claimed_shipped_gate_blocks_on_unbacked_remote_claim(tmp_path)
     stop = {"hook_event_name": "Stop", "session_id": "ship_block", "cwd": str(tmp_path),
             "last_assistant_message": "I merged the PR."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "claimed_shipped gate must block an unbacked completed remote-action claim"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1531,7 +1479,6 @@ def test_dispatch_run_promised_gate_silent_on_the_very_turn_the_promise_is_made(
     stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
             "last_assistant_message": "I'll run the tests now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", f"a promise made THIS turn must never block THIS turn: {out}"
 
 
@@ -1554,7 +1501,6 @@ def test_dispatch_run_promised_gate_blocks_when_no_bash_call_follows_the_promise
     stop2 = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
              "last_assistant_message": "Here's a summary of what I found."}
     rc, out = _run_dispatch(state_dir, stop2)
-    assert rc == 0
     assert out, "run_promised gate must block turn 2: turn 1's promise has no Bash evidence since"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1587,7 +1533,6 @@ def test_dispatch_run_promised_gate_silent_when_a_bash_call_discharges_it(tmp_pa
     stop2 = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
              "last_assistant_message": "Tests passed."}
     rc, out = _run_dispatch(state_dir, stop2)
-    assert rc == 0
     assert out == "", f"a Bash call after the promise must discharge it: {out}"
 
 
@@ -1606,12 +1551,10 @@ def test_dispatch_named_test_gate_blocks_through_subagent_stop(tmp_path):
             "tool_response": {"stdout": "FAILED tests/x.py::test_foo - AssertionError\n1 failed in 0.1s",
                               "stderr": "", "exitCode": 1}}
     rc, _ = _run_dispatch(state_dir, post)              # records the per-test red into history
-    assert rc == 0
     subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "nt_sub", "cwd": str(tmp_path),
                      "agent_id": "named-test-agent",
                       "last_assistant_message": "Good news — test_foo passes now."}
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out, "named_test gate must block a named-test pass-claim through SubagentStop too"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1630,7 +1573,6 @@ def test_dispatch_subagent_stop_audit_row_labeled_live_subagent_stop(tmp_path):
         "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed.",
     }
     rc, out = _run_dispatch(state_dir, payload)   # no prior command recorded -> fabricated -> blocks
-    assert rc == 0
     assert out, "fabricated_action gate must fire through SubagentStop to produce an audit row"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert len(rows) == 1
@@ -1662,7 +1604,6 @@ def test_dispatch_completion_gate_blocks_through_subagent_stop(tmp_path):
         "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py",
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out, "completion gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1682,7 +1623,6 @@ def test_dispatch_advance_gate_blocks_through_subagent_stop(tmp_path):
     }
     _run_dispatch(state_dir, promise)
     rc, out = _run_dispatch(state_dir, advance)
-    assert rc == 0
     assert out, "advance gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1698,11 +1638,9 @@ def test_dispatch_green_claim_gate_blocks_through_subagent_stop(tmp_path):
             "tool_response": {"stdout": "=== 2 failed, 9 passed in 3.0s ===", "stderr": "",
                               "exitCode": 1}}
     rc, _ = _run_dispatch(state_dir, post)
-    assert rc == 0
     subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "gc_sub", "cwd": str(tmp_path),
                       "last_assistant_message": "Done — all tests pass now."}
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out, "green_claim gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1719,7 +1657,6 @@ def test_dispatch_dropped_gate_blocks_through_subagent_stop(tmp_path):
         "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out, "dropped gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1747,7 +1684,6 @@ def test_dispatch_liveness_gate_blocks_through_subagent_stop(tmp_path):
         "last_assistant_message": "Done — added the helper.",
     }
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out, "liveness gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1776,7 +1712,6 @@ def test_dispatch_hollow_test_gate_blocks_through_subagent_stop(tmp_path):
         "last_assistant_message": "Done — added the test.",
     }
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out, "hollow_test gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1797,7 +1732,6 @@ def test_dispatch_canon_gate_blocks_through_subagent_stop(tmp_path):
                      "agent_id": "canon-agent",
                       "cwd": str(tmp_path), "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out, "canon gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1815,7 +1749,6 @@ def test_dispatch_stale_pass_gate_blocks_through_subagent_stop(tmp_path):
     subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "sp_sub", "cwd": str(tmp_path),
                       "last_assistant_message": "Done — all tests pass."}
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out, "stale_pass gate must block through SubagentStop just as it does through Stop"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1837,7 +1770,6 @@ def test_dispatch_self_wired_gate_never_blocks_through_subagent_stop(tmp_path):
     subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "sw_sub", "cwd": str(tmp_path),
                       "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert rc == 0
     assert out == "", "gate.self_wired must NEVER block through SubagentStop, even when it fires"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.self_wired" in r.get("pattern_fires", []) for r in rows), \
@@ -1858,7 +1790,6 @@ def test_dispatch_stale_pass_gate_blocks_on_live_lastfailed(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "sp", "cwd": str(tmp_path),
             "last_assistant_message": "Done — all tests pass."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "stale_pass gate must block a whole-suite pass-claim over a live lastfailed record"
     decision = json.loads(out)
     assert decision["decision"] == "block"
@@ -1886,7 +1817,6 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "sw", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "gate.self_wired must NEVER block, even when its predicate fires"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.self_wired" in r.get("pattern_fires", []) for r in rows), \
@@ -1901,7 +1831,6 @@ def test_dispatch_relative_path_citation_gate_never_blocks_even_when_it_fires(tm
     stop = {"hook_event_name": "Stop", "session_id": "relpath", "cwd": str(tmp_path),
             "last_assistant_message": "see checks/hollowTest.py:146 for the detector"}
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out == "", "gate.relative_path_citation must NEVER block, even when it fires"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.relative_path_citation" in r.get("pattern_fires", []) for r in rows), \
@@ -1916,11 +1845,9 @@ def test_dispatch_plan_item_drift_gate_never_blocks_even_when_it_fires(tmp_path)
     first = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
              "last_assistant_message": "I'll finish §9.3 after this push."}
     rc, out = _run_dispatch(state_dir, first)
-    assert rc == 0
     second = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
               "last_assistant_message": "Moving on to other work for now."}
     rc, out = _run_dispatch(state_dir, second)
-    assert rc == 0
     assert out == "", "gate.plan_item_drift must NEVER block, even when it fires"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows), \
@@ -2242,7 +2169,6 @@ def test_dispatch_select_recent_returns_history_so_history_predicate_fires(tmp_p
         "last_assistant_message": "Committed the fix in abc1234. Done.",
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out, "content.fabricated_commit_sha (fabricated SHA) must fire on a real history slice -> block JSON"
     assert json.loads(out)["decision"] == "block"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
@@ -2255,7 +2181,7 @@ def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):
     decision JSON no longer has a separate top-level "retry_hint" key -- `_emit_decision` folds
     the JIT hint (the pattern's own retry_hint text + the makoto-allow hatch + the conventions
     pointer) into the finding's message as the wire Decision's `.detail`, which wire.py's
-    `_pre_deny` surfaces as `permissionDecisionReason`. Asserting the hint text is present there
+    `_pre_permission` surfaces as `permissionDecisionReason`. Asserting the hint text is present there
     pins that the fold still happens (a dropped hint would silently lose all retry guidance).
     """
     state_dir = _setup_state(tmp_path)
@@ -2270,7 +2196,6 @@ def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out, "content.verifier_predicate_weakened must emit a block decision"
     decision = json.loads(out)
     assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
@@ -2301,7 +2226,6 @@ def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
         },
     }
     rc, _ = _run_dispatch(state_dir, payload)
-    assert rc == 0
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert rows, "the error-level fire must record an audit row"
     fire_rows = [r for r in rows if "content.verifier_predicate_weakened" in r.get("pattern_fires", [])]

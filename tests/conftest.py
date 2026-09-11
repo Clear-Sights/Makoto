@@ -1,17 +1,4 @@
-"""shared pytest fixtures for makoto test suite.
-
-Scope: only the dedup-clear-win fixtures. Speculative history-builder fixtures
-(Read/Bash/TodoWrite entries) are intentionally NOT added here — they should be
-introduced when v1.1 predicate tests reveal their concrete shape, not pre-abstracted.
-
-Provides:
-  evt(file_path=None, content=None, event="PreToolUse", tool_name=None) -> dict
-  stop_evt(message="", session_id="s") -> dict
-  loaded_pattern(pid) -> PreCheck  (loads from real patterns.toml by id)
-  state_dir(tmp_path) -> Path  (a real makoto state dir + CITATIONS.md, ready for init_db callers)
-  run_dispatch(state_dir, payload, extra_env=None) -> (returncode, stdout)  (real `python -m
-    makoto.dispatch` subprocess invocation)
-"""
+"""Shared event, catalog, state and dispatcher fixtures."""
 from __future__ import annotations
 import json
 import os
@@ -116,10 +103,6 @@ def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tu
     )
     stdout = proc.stdout.decode("utf-8")
     stderr = proc.stderr.decode("utf-8", errors="replace")
-    # THIS HELPER ALREADY GUARDS THE EXIT CODE, so a caller's own `assert rc == 0` observes a
-    # value this line has already guaranteed and can never go red. Existing callers keep theirs
-    # -- removing them is a wide mechanical diff with no behavioural gain -- but a new test
-    # should assert on the DECISION rather than repeat this.
     assert proc.returncode == 0, (
         f"makoto.dispatch exited {proc.returncode}; stderr follows:\n{stderr}"
     )

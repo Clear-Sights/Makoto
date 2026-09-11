@@ -18,70 +18,8 @@ against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB`
 the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
 code* — and is not a second definition of this one.
 
-**Six words this page reuses. None has a single owner, so each is listed with every artifact
-that produces it.** *Blocking* is an outcome -- the act is stopped -- and these artifacts produce it. NO COUNT is
-stated for this list or the next: a number in prose that nothing checks drifts from the list
-beside it, which is how the *advisory* list came to say seven while naming eight, and how
-this list said five while the paragraph below names a sixth.
-`verdict.BLOCK` is the raw one a check returns; `verdict.apply` folds it by posture and
-`dispatch.py` turns the result into a Pre-edge `permissionDecision: "deny"` or a Stop-edge
-`{"decision": "block"}`. `registry.POSTURE_BLOCK` is a check's own declared tier, an input to
-that folding and not the same vocabulary. `registry.blocking_eligible` (Stop edge, `may_block`,
-posture BLOCK) decides which end-of-turn gates the count above calls blocking, and is False for
-every pre-check even though pre-checks deny. `configchange.py` emits a block of its own from
-outside the check registry, so no registry predicate is defined over it. And "blocking robust
-core" below counts canon fingerprints in `_canonAtoms.BLOCK_IDS`, a population of patterns.
-
-*Advisory* names these things. Two are columns of the catalog table: the Certification label, and
-the Fire column -- which is a two-valued TIER label reading `blocking` or `advisory`, not a print
-of `Finding.level`, whose values are `error` and `advisory`; that column is therefore also a
-producer of the word *blocking* above. Two are check tiers: `registry.POSTURE_ADVISE`, a
-check's declared tier, and membership of `registry._ADVISORY_ALLOWLIST` -- `blocking_eligible`
-consults the posture, not the allowlist, and `registry.py` warns in its own words that the two
-agree only because today's four happen to coincide. One is a raw outcome, `verdict.ADVISE`. One
-is `gate.configchange_advisory`, which fires without blocking from outside the registry, so it is
-in neither the allowlist nor the count. One is the canon "advisory remainder" of fingerprints
-resting on a soft or disqualified atom. The last is `Finding.level == "advisory"`, which the Fire
-column reports but is not -- checks emit it directly, and `dispatch.py`'s `_OUTCOME_FOR_LEVEL`
-maps it to `verdict.ADVISE`.
-
-*Silent* has five senses and they sit on different axes, which is why one of them looked like a
-contradiction. A fail-open is never silent: `dispatch.py` emits its notice whenever a check
-faulted, gated on the fault and never on posture. A check "staying silent" emitted no finding.
-`verdict.SILENT` is a configured posture that softens outcomes toward ALLOW -- but not
-unconditionally: a meta-layer BLOCK still floors at ASK, and it is `# record only`, so audit rows
-are written either way. A verifier "silently neutered" is the SUBJECT's code losing a check,
-which is what several patterns exist to catch. And a "silent bypass" is a fifth thing again -- an
-override that leaves no record, which is why an allow carries its rationale and why the oversight
-clamp is "never overridden SILENTLY".
-
-*A claim* is one of the three ledger row kinds named above (`verdict`, `certified-fact`,
-`testrun`); where this page says the agent "claims" something it means the utterance a row may
-later record; and where it says "the claim is", the page is asserting something itself. *A check*
-in a pattern description is one in the subject's code; a check of makoto's own is a
-`registry.Check`. *The record* has six referents: the session's recorded call stream; the RECORD
-step of the receipt chain, an appended `kind="audit"` row; the written logs `audit.jsonl` and
-`dispatch_errors.jsonl`, which outlive the session; a FOREIGN ledger, as in `gate.stale_pass`
-reading pytest's own `lastfailed`; and "on the record" for a `makoto-allow:` rationale left in
-the subject's source. The durable store the word is named after is `makoto.record.db`, the SQLite
-file under the state dir -- a sixth referent, and the one several of the others are checked
-against.
-
-It judges the agent against its _own_ utterances and record — never the world's truth. It holds no
-facts ("France doesn't exist to it"); it only checks that a claimed word is kept, whole, and honored
-in deed. A word it lets through becomes spendable: trustworthy tender a reviewer or another agent can
-accept without re-deriving it.
-
-Both of those words are literal here, and the thing they name ships. The **tender** is the receipt
-(`makoto.state.ledger.emit_receipt`, and the Receipt section below): a read-time view over the
-chain, never persisted, listing each claim with its own `row_index` and `row_hash`. A claim is
-**spendable** when it is `trace_bound` -- at or before `verified_through`'s cut, so the chain from
-the claim to that point verifies -- and only three row kinds are claims at all: `verdict`,
-`certified-fact` and `testrun`, the kinds that assert something about the world. Records of deeds
-and machinery (`audit`, `touched`, `release.operator`, `fetch`, `exemption`) are not claims and are
-counted separately. "Without re-deriving it" is what the row hash buys: the reviewer re-checks a
-citation instead of re-running the work. A claim after the first broken link is still listed,
-undisguised, and is not counted as trace-bound -- it is exactly the not-spendable case.
+Checks declare their inputs in `registry.Check.eats`. Runtime outcomes are folded by
+`verdict.apply`; receipt fields come from `state.ledger.emit_receipt`.
 
 ## What it catches
 
@@ -90,7 +28,7 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **15 pre-checks** (every one denies the tool call; `blocking_eligible` is about the Stop edge and is False for all of them)
+- **15 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **12**, `event`: **2**, `gate`: **1**
 - **23 Stop checks** (all checks registered at the Stop edge)
 - **21 end-of-turn gates** (`may_block=True`)
@@ -105,11 +43,6 @@ check registered at the Stop edge with `may_block=True`. The one pre-check carry
 `gate.contract_order`, is not an end-of-turn gate — it has a same-named Stop sibling that is, and
 the two are separate checks with separate predicates. Every count above is scoped by edge, so no
 check is counted twice within a line.
-
-Every pre-check and every non-advisory end-of-turn gate blocks; there is no silent "warning" tier
-for those (see [Fire level](#fire-level)) — the documented exceptions are
-`gate.self_wired`, `gate.canon_fingerprints_advisory`, `gate.relative_path_citation`, and
-`gate.plan_item_drift` (below), advisory-only checks that by design never block.
 
 **Verifier weakening** — a check silently neutered
 - `content.verifier_predicate_weakened` loose-comparator verifier (`startswith`/`endswith`/`re.match` where `==` is meant)
@@ -133,8 +66,7 @@ for those (see [Fire level](#fire-level)) — the documented exceptions are
 - `gate.contract_order` a result-producing call issued while a declared Plan's dependency for that step is still undischarged (its Stop-time sibling gate guards the remainder at turn end)
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
-The table below is the summary; the long-form description of every gate is in
-[docs/CATALOG.md](docs/CATALOG.md) (relocated from this section, word for word).
+[docs/CATALOG.md](docs/CATALOG.md) points to the registered checks and their implementations.
 
 The **certification** column uses the following labels, each naming its own denominator:
 
@@ -174,7 +106,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |
 | `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
 
-Inspect the live catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
+Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 
 <!-- BEGIN GENERATED: canon-split | source: makoto.substrate._canonAtoms | regenerate: python3 tools/render_checks.py --write -->
 
@@ -183,41 +115,27 @@ Inspect the live catalog with `makoto pattern list`; see one pattern in full wit
 
 <!-- END GENERATED: canon-split -->
 
-### Discharging a permanent session-level block
+### Releasing a canon block
 
-`gate.canon_fingerprints` (and `canon.timeout` within `gate.canon`) read the session's own recorded
-call stream. Once a fingerprint's atoms go true they stay true forever, so without a real discharge
-path a single sanctioned action (e.g. an owner-approved destructive command) would otherwise block
-every remaining Stop for the rest of the session. The only discharge is an **operator-attributed
-release**, re-derived from the host-written transcript at check time and never trusted from ledger
-content, so no tool call or file write can forge it. Say, as a real message in the conversation
-(never inside a tool call or file write):
+Follow the firing check's retry hint. Canon call windows restart on a genuine operator
+message or explicit operator interrupt. To explicitly release a reviewed finding, send:
 
 ```
 makoto release.operator <fingerprint-id>: <your reason>
 ```
 
-makoto verifies the turn is genuinely user-authored, non-synthetic, and
-timestamped after the finding first fired, then discharges that exact fingerprint for the rest of the
-session. The discharge is chain-appended (`kind="release.operator"`) for the audit trail; the block
-decision itself is always re-derived from the transcript, never read back from that row.
+The transcript acknowledgment must follow the finding and its current evidence;
+`state.ledger.find_ack_block` validates it and `record_ack_block_if_new` records the release.
 
 ### Legitimately writing a flagged shape?
 
-Annotate the line with `makoto-allow: <reason>` (any comment style, case-insensitive). makoto won't
-fire on it, and your rationale is on the record — an auditable note, not a silent bypass.
+Follow the finding's retry hint; exemption scope belongs to the check.
+See [Makoto conventions](plugin/makoto/docs/MAKOTO-CONVENTIONS.md) for the marker syntax.
 
 ```python
 if os.environ.get("ENABLE_AUDIT_TRAIL"):  # makoto-allow: app feature, gates user-facing audit logging
     write_audit_trail()
 ```
-
-The constitution every pattern derives from is 誠 (makoto): a word is real the way water is wet —
-a constitutive property, not an after-the-fact audit. (An internal design document elaborating
-this is not shipped in this repository, so it is deliberately not cited here; every normative
-statement a pattern rests on appears self-contained in this README, [docs/CATALOG.md](docs/CATALOG.md),
-or the pattern's own `makoto pattern show` output.)
-
 
 ## Install (plugin)
 
@@ -226,11 +144,8 @@ or the pattern's own `makoto pattern show` output.)
 /plugin install makoto@makoto
 ```
 
-Enabling the plugin is the whole install: `.claude-plugin/plugin.json` + `hooks/hooks.json`
-auto-wire dispatch on enable. Claude Code registers `PreToolUse`, `PostToolUse`, `Stop`,
-`SubagentStop`, and `SessionStart` hooks pointing at `${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh`
-automatically (which `exec`s `python -m makoto._dispatch`). `~/.claude/settings.json` is NOT
-modified — the plugin system manages its own hook registry.
+Enabling the plugin wires the events declared in [hooks.json](plugin/hooks/hooks.json).
+Its shim executes `python -m makoto.dispatch` from the plugin root.
 
 State dir + `makoto.record.db` are created lazily on the first hook invocation.
 
@@ -321,12 +236,9 @@ If you want to inspect or hand-wire what the plugin does, add to the `hooks.PreT
 ```json
 {
   "matcher": "*",
-  "hooks": [{"type": "command", "command": "python -m makoto._dispatch"}]
+  "hooks": [{"type": "command", "command": "python -m makoto.dispatch"}]
 }
 ```
-
-Bracket the additions with `# makoto-managed-begin` / `# makoto-managed-end` markers for idempotent
-removal.
 
 ## Dispatcher outcomes
 
@@ -346,69 +258,20 @@ the distinct process-error path.
 
 ## Fire level
 
-Every non-advisory live pattern blocks through the dispatcher mechanism measured above. makoto
-deliberately has **no non-blocking *tier***: no resting state a check can be assigned to, no
-`warning`/`disabled` level to demote a pattern into — witnessing a violation and letting the tool
-through as a matter of policy is itself an illusory word, the exact weakening shape makoto exists
-to catch. Four checks do fire without blocking, and they are named below; the claim is that no
-*category* admits them, not that the count is zero. There is no predicate that qualifies a check
-as advisory — each of the four carries its own dated argument, and a fifth would need its own.
-That is deliberate: a rule for admitting advisory checks is the tier, rebuilt. The
-earlier three-tier system was removed in the 2026-06-02 *warning-tier-elimination* (a pattern either
-blocks at proven zero corpus-FP, or it is cut — zero false positives on the shipped corpus and gold
-negative sets, the only sets the proof runs over; the live-session false-positive rate accumulates
-from field use and is not part of that measurement). This still governs every pre-check and every non-advisory
-end-of-turn gate. The invariant is enforced by the suite, not at load: `makoto.vocab` carries
-`fire_level` on its test-fixture `PreCheck` shape only -- "by convention -- no longer
-runtime-checked here", and not the home of this invariant; the level a live gate emits is
-`Finding.level`. The allowed set lives in
-`tests/_toml_pattern_fixture.py`, with `tests/test_stop_gate_level_invariant.py` firing every live
-gate and asserting the level it emits.
-
-**The narrow, explicitly-recorded exceptions:** `gate.self_wired` (2026-07-05),
-`gate.canon_fingerprints_advisory` (SPEC-5 Task 9, DESIGN DECISION 26), `gate.relative_path_citation`,
-and `gate.plan_item_drift` (both 2026-07-09) fire at `level="advisory"`, not `"error"`, so each is
-recorded to the audit log but never emitted as a block decision. None is a reintroduction of the cut
-`warning` tier — `gate.self_wired` is a single, named check whose entire subject is makoto's own hook
-wiring, shipped advisory-only by explicit DESIGN DECISION as partial-strip *detection*, not prevention
-(it cannot see, and does not claim to see, a simultaneous full strip of all three hook entries — see
-`docs/self-defense-asymmetry-followup.md`, which stays OPEN); `gate.canon_fingerprints_advisory`
-covers the measured advisory remainder of ported canon fingerprints that rest on a soft/claim atom or are explicitly disqualified
-against real-Claude gold, kept in the catalog at non-blocking advisory per SPEC-5's total-retention
-rule rather than dropped; `gate.relative_path_citation` flags a chat response citing a non-absolute
-(unclickable) path — a communication-quality signal, not an integrity violation; `gate.plan_item_drift`
-reminds of open plan/task-labeled commitments ("§9.3", "Task #19") sourced from chat prose — a
-textual-only signal with no corpus-measured false-positive rate yet, so it stays advisory pending
-that measurement. Every other check keeps the invariant above unconditionally.
+`dispatch._OUTCOME_FOR_LEVEL` maps findings to outcomes; `verdict.apply` applies
+`MAKOTO_MODE` and the oversight clamp. The wire tables determine which outcomes each hook emits.
+The local-verifier branch of `content.verifier_exit_masking` can emit an advisory finding.
 
 ## Retry hints
 
-Each pattern carries a one-line, imperative `retry_hint` telling the agent what to do instead. When a
-finding fires, the hint is printed on a second stderr line after the diagnostic:
-
-```
-[makoto ERROR] row content.verifier_predicate_weakened (verifier predicate weakened — loose-comparator shape): matched 'startswith('
-               retry: Use '==' for status comparison, not '.startswith()' / '.endswith()' / 're.match'. ...
-```
+Blocking findings carry their retry hints and conventions through `dispatch._emit_decision`
+into the JSON response.
 
 ## Audit log
 
-Every dispatch appends one structured JSON line to `$MAKOTO_STATE_DIR/audit.jsonl` (default
-`~/.claude/makoto_state/audit.jsonl`). It captures enough to triage true-positive vs. false-positive
-without leaking whole-file contents. It's plain JSONL — query it with `jq` or any tool.
-
-| Field | Description |
-|---|---|
-| `ts` | ISO-8601 UTC timestamp, microsecond precision |
-| `event` | `live.pre_tool_use` \| `live.stop` (the firing events; `PostToolUse` is consumed for history) |
-| `hook_kind` | Raw hook name from the harness |
-| `tool_name` | The tool the agent invoked (`Write`, `Bash`, …) |
-| `session_id` | Opaque session token |
-| `project_root` | Absolute project root at invocation time |
-| `pattern_fires` | List of pattern IDs that fired; `[]` if clean |
-| `exit_code` | Process status observed for the corresponding dispatcher outcome above |
-| `retry_hint_emitted` | Boolean — at least one fired pattern had a non-empty `retry_hint` |
-| `findings` | Per-finding `{pattern_id, level, file, line, snippet}` |
+Firings append to `$MAKOTO_STATE_DIR/audit.jsonl`; clean dispatches do not.
+The row schema is `state.audit.AuditRow`. Its `exit_code` records raw finding severity
+in `dispatch._record_audit`, independently of the dispatcher's process exit.
 
 ### The error log
 
@@ -426,15 +289,10 @@ that does not admit it was recovered is worse than no id.
 Row dispositions are `loud-allow` (a check did not run), `BLOCK`, `REPAIRED` (the envelope carried
 bytes that had to be fixed, and evaluation then continued normally), and `NOTE`.
 
-### A fail-open is never silent
+### Fail-open notices
 
-Hook stderr from an otherwise successful dispatch reaches the debug log only — not the transcript,
-not the user, not the model.
-So "loud-allow + a stderr line" was loud to nobody, and a skipped check looked exactly like a clean
-pass from every seat. Every fail-open now also emits a `systemMessage` saying the call was
-**allowed without being checked**. The direction is unchanged; only the visibility is. See
-[Courthouse docs/FAIL-DIRECTION.md](https://github.com/Clear-Sights/Courthouse/blob/main/docs/FAIL-DIRECTION.md)
-for the bench-wide policy.
+`dispatch._emit_notices` reports buffered carriage faults when the host wire permits.
+Check and audit failures retain their own reporting paths.
 
 ### Failure mode
 
@@ -444,30 +302,14 @@ mis-block or mis-allow a tool call — a fundamental separation-of-concerns inva
 
 ## ConfigChange watch (advisory + evidence-gated blocking)
 
-Separate from the generated check inventory above: an optional `ConfigChange` hook
-entry (`_dispatch_configchange.py`) watches `.claude/settings.json` edits for makoto's own hooks
-being stripped. Both tiers fail open on any unexpected fault:
-
-- **Advisory** (unconditional): a settings edit that looks stripped, but with no evidence this exact
-  path was ever genuinely wired, logs a stderr line + an audit row (`gate.configchange_advisory`) and
-  never blocks. The ambiguous "never wired vs. just stripped" case the underlying verdict predicate
-  cannot resolve on its own.
-- **Blocking** (`gate.configchange_transition`): fires ONLY on a genuinely evidenced transition,
-  either this exact settings path is in makoto's own install manifest (`configchange_manifest.json`,
-  written by `python -m makoto install`), or a PRIOR evaluation of this same path observed makoto's
-  hooks present (`configchange_snapshots.json`). A path with neither piece of evidence never blocks,
-  no matter how many times it evaluates as stripped: a project that never had makoto's hooks wired
-  must never be blocked from editing its own settings.
-
-Never fires for `policy_settings` (organization-managed policy is out of scope). Not yet part of the
-plugin-install path; wire it manually, the same way as the [manual wiring](#manual-wiring-fallback)
-below, via a `ConfigChange` hook entry pointing at `_dispatch_configchange.py`.
+The optional `ConfigChange` command is `python -m makoto.configchange`; it is not shipped in
+[hooks.json](plugin/hooks/hooks.json). It advises on missing wiring and blocks a strip only
+when an install manifest or prior snapshot establishes that the exact path was wired.
+`configchange._APPLICABLE_SOURCES` owns its source scope; unexpected faults fail open.
 
 ## Receipt: word → deed → record → receipt
 
-Makoto blocks the illusory word, but until this session's work, it never issued tender for the
-KEPT one. Here is the whole chain for one small, real, synthetic session
-(`docs/demo/`; regenerate instructions there):
+The synthetic session in `docs/demo/` demonstrates the receipt chain:
 
 1. **WORD**: the agent writes `src/auth.py`, then claims `"test_login passes now."` at Stop.
 2. **DEED**: the write lands (`kind="touched"`); a test run fails (`kind="testrun"`,
@@ -490,9 +332,7 @@ KEPT one. Here is the whole chain for one small, real, synthetic session
 }
 ```
 
-The claim `"test_login passes now."` is never re-derived by a human or a reviewer; it cites two
-specific rows anyone can independently re-verify with `verify_chain`. That is the whole pitch:
-chained, receipted claims, not a linter that yells and leaves no trace.
+The receipt cites the recorded test-run rows and their chain hashes.
 
 ### Reproduce it: corpus replay
 

@@ -22,10 +22,8 @@ self-annotated decision: the seal on the mint cannot be signed by the would-be f
 
 ## The `makoto-allow` convention
 
-**If you write a flagged shape legitimately, annotate it with `makoto-allow: <reason>`** on or
-near that line (any comment style; case-insensitive; the reason must be non-empty). Makoto then
-will NOT flag it. Use it honestly — the marker is an on-the-record, auditable rationale, not a
-way to disguise a real integrity violation.
+Where a finding's retry hint offers `makoto-allow: <reason>`, place the marker as directed
+with a non-empty rationale. The check owns its accepted location and exemption scope.
 
 ```toml
 cache_skip = true  # makoto-allow: disables a perf cache for this dev profile — not an integrity check
