@@ -109,18 +109,9 @@ def test_two_adjacent_dangling_pres_are_silent():
     assert recur_stuck(calls_from_history(history)) is False
 
 
-# ---- every fired primitive names a reachable discharge ----------------------------------------
-def test_every_fired_primitive_names_its_release_operator_discharge():
-    """`canon_gate` offers the ackblock discharge to EVERY fired primitive, but the affordance was
-    spelled out only in `timeout`'s hand-written hint. A fired `canon.recur` therefore named no
-    reachable way out, so a false positive re-fired at every subsequent Stop until the rows aged
-    out of the recency window. A mechanism that exists but is invisible reads exactly like a
-    mechanism that is missing, so the clause is generated per id rather than written per entry."""
-    history = [_row("PreToolUse", "Bash", {"command": "q"}),
-               _row("PostToolUse", "Bash", {"command": "q"}, error=True),
-               _row("PreToolUse", "Bash", {"command": "q"}),
-               _row("PostToolUse", "Bash", {"command": "q"}, error=True)]
-    fired = list(fired_primitives(history))
-    assert {cid for cid, _, _ in fired} == {"timeout", "recur"}
-    for cid, _stop_text, retry_hint in fired:
-        assert f"makoto release.operator {cid}:" in retry_hint, cid
+def test_every_fired_primitive_names_an_action():
+    history = [_row("PostToolUse", "Bash", {"command": "q"}, error=True)] * 2
+    hints = {cid: hint for cid, _, hint in fired_primitives(history)}
+    assert set(hints) == {"timeout", "recur"}
+    assert "Re-run it" in hints["timeout"]
+    assert "Change the input" in hints["recur"]

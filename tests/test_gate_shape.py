@@ -148,14 +148,7 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
                                                             # _stdlib_ast_helpers.py. 30->31, 2026-08-20:
                                                             # _imported_helper_names_that_assert (the shared
                                                             # plant-and-restore helper FP class)
-    "canonTimeoutRecur.py": 16,                            # engine + adapter merged (canon_gate lives here);
-                                                            # 15->17, 2026-08-16 (#17 port): _pairing_input
-                                                            # (dunder-insensitive Pre<->Post pairing identity)
-                                                            # + _release_clause (per-primitive release.operator
-                                                            # affordance, generated from the id)
-                                                            # 17->16, 2026-09-06: _canon_input moved to
-                                                            # kit.canon_input, the one owner shared with
-                                                            # identicalRetryInterdiction
+    "canonTimeoutRecur.py": 15,                            # sequence engine + Stop adapter
     "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
     "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
     "contractOrder.py": 5,

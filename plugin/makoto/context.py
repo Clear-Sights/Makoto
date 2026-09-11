@@ -58,9 +58,9 @@ class GateContext:
     session_id: Optional[str] = None        # raw hook payload's `session_id` (Task 2 slice 5).
     transcript_path: Optional[str] = None   # raw `transcript_path` (CONFIRMED real, top-level on
     #   every hook event -- Claude Code hooks reference, fetched 2026-07-07: "Path to conversation
-    #   JSONL file"). Read by canonFingerprints.py's release.operator discharge (makoto.state.ledger).
+    #   JSONL file"). Read by the operator-window boundary in makoto.state.ledger.
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
-    #   the release.operator discharge can read/append the chain at the SAME root the dispatcher itself
+    #   the fingerprint window can read the audit chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
     open_plan_items: Sequence = ()          # session/planItems.py's still-open label-shaped
     #   commitments ("§9.3", "Task #19"), synced once by run_stop_checks. Read by
@@ -275,7 +275,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             agent_type=payload.get("agent_type"),
             plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
-            state_root=root,   # Task 2 slice 5: canonFingerprints.py's release.operator discharge
+            state_root=root,   # canonFingerprints.py reads its audit firing boundary here
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
         )
         out = []

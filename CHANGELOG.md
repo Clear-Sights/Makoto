@@ -3,6 +3,16 @@
 All notable changes to makoto. Versions follow the live check inventory
 (`load_prechecks` / `load_checks(edge="Stop")`), which the README count is tested against.
 
+## [2.8.4] — 2026-09-11
+
+### Fixed
+- `gate.canon_fingerprints` stays BLOCK-tier and delivers one block and hint per occurrence.
+  Each fingerprint's call window starts after its latest session audit firing or at the
+  existing operator boundary, whichever is later; repeated behavior in new calls blocks again.
+- Retired `release.operator` and its human-only acknowledgment path. Retry hints now name
+  re-examination and the new firing window. Timeout/recur detection and the append-only audit
+  chain are unchanged.
+
 ## [2.8.3] — 2026-09-11
 
 ### Fixed

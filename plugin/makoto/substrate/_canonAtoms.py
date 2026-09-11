@@ -106,12 +106,6 @@ def _row_ts(row):
 def calls_since(history, since_ts) -> List[Call]:
     """The calls at or after `since_ts` -- the ATOM WINDOW.
 
-    Every atom below is `_existing(calls, pred)`, an existential. Over a whole session those are
-    monotone: once a predicate has been satisfied it stays satisfied, so a fingerprint that has
-    matched can never stop matching however the agent behaves afterwards, and the typed phrase
-    becomes its only exit. Evaluating over the calls since the operator last spoke is what makes
-    the fingerprint answerable by conduct instead of by utterance.
-
     `since_ts` of None means NO WINDOW: the whole session, which is both the prior behaviour and
     the strict direction. A window that cannot be established must never widen what passes.
 
