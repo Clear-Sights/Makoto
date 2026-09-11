@@ -1,26 +1,7 @@
-"""Pre<->Post pairing survives harness-injected `tool_input` keys; the verdicts do not widen.
-
-`canon.recur` fired a STUCK verdict on a retry that had actually SUCCEEDED. The primitive was
-behaving as designed -- the bug was upstream, in `calls_from_history`.
-
-A harness may add bookkeeping keys to `tool_input` BETWEEN a call's PreToolUse and its
-PostToolUse. Observed live on the `Artifact` tool: a 3-key Pre, then a 6-key Post carrying
-`__artifactPlanConsentAsk`, `__artifactPlanConsentDecisionCaps`, `__artifactPublishTarget`.
-Pairing keyed on the FULL canonical input, so those two rows never matched: every such call left
-a dangling Pre and synthesized a phantom mid-turn-abandonment failure for a call that succeeded.
-
-One phantom is harmless. Two back-to-back are a run of length 2, all-error, same key -> STUCK.
-The real success lands under a DIFFERENT key, so it cannot flip the phantom run's verdict, and
-the documented [ERR, ERR, OK] guard cannot help.
-
-The fix relaxes PAIRING ONLY (`_pairing_input`), never a verdict: `recur_stuck` and every other
-primitive keep keying on the full `canon_input`. The true-positive cases below are what hold
-that line -- a pairing relaxed until nothing dangles would discharge the gate while leaving its
-name in place.
-
-Not Artifact-specific: any tool whose PostToolUse carries injected `tool_input` keys degrades
-pairing for that tool everywhere `calls_from_history` is used.
-"""
+"""Only terminal rows are calls, and verdicts key on the full `canon_input`. A harness may add
+bookkeeping keys to `tool_input` between a call's PreToolUse and its PostToolUse; the Post is the
+call, with the keys it carries, and a Pre with no terminal is nothing. The true-positive cases
+below hold the line that this never discharges a genuine run of failures."""
 from __future__ import annotations
 
 import json
@@ -77,7 +58,7 @@ def test_the_reported_false_positive_no_longer_fires():
                _row("PreToolUse", "Read", {"file_path": "/y"}),
                _row("PostToolUse", "Read", {"file_path": "/y"})]
     calls = calls_from_history(history)
-    assert _stream(calls) == "Eoo", _stream(calls)
+    assert _stream(calls) == "oo", _stream(calls)
     assert recur_stuck(calls) is False
 
 
@@ -119,14 +100,13 @@ def test_a_command_failing_three_times_still_fires():
     assert recur_stuck(calls_from_history(history)) is True
 
 
-def test_two_adjacent_genuinely_dangling_pres_still_fire():
-    """The abandonment signal itself is untouched: two unresolved Pres with no Post at all are
-    still a stuck run -- what changed is only that a MATCHING Post now pairs."""
+def test_two_adjacent_dangling_pres_are_silent():
+    """A Pre with no terminal is not a call: declined, abandoned and running look alike."""
     history = [_row("PreToolUse", "Bash", {"command": "z"}),
                _row("PreToolUse", "Bash", {"command": "z"}),
                _row("PreToolUse", "Read", {"file_path": "/y"}),
                _row("PostToolUse", "Read", {"file_path": "/y"})]
-    assert recur_stuck(calls_from_history(history)) is True
+    assert recur_stuck(calls_from_history(history)) is False
 
 
 # ---- every fired primitive names a reachable discharge ----------------------------------------

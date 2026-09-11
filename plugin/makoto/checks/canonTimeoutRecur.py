@@ -31,31 +31,6 @@ Two primitives are installed:
     success for the same key silences it even when other, different calls happened in between.
     See docs/adr/0022-recur-stuck-latest-run-wins.md for the decision history.
 
-ADAPTATION NOTE (the substrate divergence from the ancestor, revised for FD14-A): the ancestor's
-`calls_from_history` turned every PreToolUse OR PostToolUse row into a Call. Live makoto's real
-events table (see `makoto/dispatch.py::_ingest_event` / `_select_recent`) stores EVERY hook
-payload verbatim, including a PreToolUse row fired BEFORE the tool runs (so its `tool_response`
-is always absent/empty) as a SEPARATE row from the PostToolUse row fired after (carrying the
-actually-resolved result) for the very same call. Decoding both naively would insert a spurious
-result={} Call ahead of every real result: two consecutive identical failing Bash calls would
-decode as [Pre(no-err), Post(err), Pre(no-err), Post(err)] — never a run of >=2 consecutive
-same-key ALL-err calls — silently defeating `recur_stuck` against the real substrate. So
-`calls_from_history` PAIRS each PostToolUse to the nearest preceding still-unpaired identical
-PreToolUse and keeps only the PostToolUse Call for a completed call — the paired Pre is dropped.
-
-FD14-A (scope narrowed by owner decision, see EXECUTION_PLAN.md / SPEC-4 Task 2 — MID-TURN
-ABANDONMENT ONLY): a leftover unpaired PreToolUse is a dangling Pre. NOT every dangling Pre is a
-failure signal — `test_dispatch_fabricated_action_silent_when_command_ran` (test_dispatch.py) pins
-that a SINGLE dangling Pre that is the LAST tool-related row before Stop must mean "presence of
-work, discharge the claim" and must stay silent, not fail. FD14-A's actual target is narrower:
-mid-turn abandonment, where a tool call was fired, never resolved, and the agent moved on to
-something else anyway (another Pre or Post, for any tool) before Stop. So a dangling Pre
-synthesizes a FAILURE Call (result `{"interrupted": True, "error": ...}`) at its original position
-ONLY IF some OTHER decoded row — Pre or Post, any tool — occurs at a LATER index in the decoded
-history than this dangling Pre. If the dangling Pre is the last decoded row overall, it is left
-out entirely, matching the pre-FD14-A/unmodified behavior for that shape (no Call is synthesized,
-so `timed_out_at_turn_end` reads whatever real call preceded it, exactly as before this ticket).
-
 PATTERN_ID CONVENTION (deliberate divergence from the read-only ancestor `makoto-dev`, found
 while porting): the ancestor's canon_gate emitted pattern_id=f"canon.{cid}" (e.g. "canon.timeout",
 "canon.recur") per fired sub-primitive. Live makoto's `dispatch._blocking_gate_ids()` derives the
@@ -322,10 +297,9 @@ def _decode_row(row):
     Raw decode + wrapper-event-type fallback is `kit.decode_history_event` -- the canonical
     step, shared with `identicalRetryInterdiction._most_recent_completed_bash_call`. This
     function keeps only what's specific to canon's OWN adapter shape: the tuple conversion, and
-    keeping PreToolUse plus both settled terminal events (unlike the pre-FD14-A cut which dropped
-    Pre at decode time) so `calls_from_history` can pair them and detect a dangling Pre.
-    PostToolUseFailure is normalized to PostToolUse with its real top-level error/is_interrupt
-    fields, so the existing pairing path treats it as the failed call's terminal."""
+    PostToolUseFailure normalized to PostToolUse with its real top-level error/is_interrupt
+    fields, so it is the failed call's terminal. PreToolUse rows decode too; `calls_from_history`
+    yields nothing for them."""
     ev = decode_history_event(row)
     if ev is None:
         return None
@@ -344,56 +318,11 @@ def _decode_row(row):
 
 
 def calls_from_history(history) -> list:
-    """Decode GateContext.history rows into agnostic Call dicts carrying the protocol fields the
-    terminals read. A completed call contributes a PreToolUse and either a PostToolUse or
-    PostToolUseFailure row; each terminal is normalized to Post and PAIRED to the nearest
-    preceding still-unpaired identical (tool name + `_pairing_input`) Pre, and only the terminal
-    becomes a Call (the Pre is dropped) — so `recur_stuck`'s consecutive-run judgment is not
-    corrupted by spurious result-less Calls (module docstring ADAPTATION NOTE).
-    Pairing uses `_pairing_input` (dunder-insensitive), NOT the full `canon_input` the verdicts
-    key on: a harness may inject bookkeeping keys between a call's Pre and its Post, and pairing
-    on those synthesized a phantom failure for a call that succeeded. See `_pairing_input`.
-
-    FD14-A, narrowed to MID-TURN ABANDONMENT ONLY (see module docstring): a leftover unpaired
-    PreToolUse (a dangling Pre) synthesizes a FAILURE Call — result `{"interrupted": True, ...}` —
-    at its original position ONLY IF some OTHER decoded row (Pre or Post, any tool) sits at a
-    LATER index in the decoded history than this dangling Pre, i.e. it is NOT the chronologically
-    last tool-related row. A dangling Pre that IS the last decoded row is left out entirely (no
-    Call synthesized), preserving `test_dispatch_fabricated_action_silent_when_command_ran`'s
-    presence-of-work discharge. Fail-open per row (a malformed row is skipped, via `_decode_row`)."""
-    decoded = [d for d in (_decode_row(r) for r in (history or ())) if d is not None]
-
-    # pair each PostToolUse to the nearest PRECEDING still-unpaired identical PreToolUse: one
-    # pass, keeping a per-key STACK of the Pre indices still waiting for a terminal. Popping that
-    # stack yields exactly the nearest preceding unpaired Pre a backward rescan would have found,
-    # while computing `_pairing_input` once per row instead of once per (Post, candidate) pair.
-    unpaired_pre: dict = {}
-    for i, (etype, name, ti, _tr) in enumerate(decoded):
-        key = (name, _pairing_input(ti))
-        if etype == "PreToolUse":
-            unpaired_pre.setdefault(key, []).append(i)
-        elif etype == "PostToolUse":
-            waiting = unpaired_pre.get(key)
-            if waiting:
-                waiting.pop()
-    dangling_pre = {i for waiting in unpaired_pre.values() for i in waiting}
-
-    last_index = len(decoded) - 1
-    out: list = []
-    for i, (etype, name, ti, tr) in enumerate(decoded):
-        if etype == "PostToolUse":
-            out.append({"name": name, "input": ti, "result": tr})
-        elif i in dangling_pre and i != last_index:
-            # dangling PreToolUse, NOT the last tool-related row before Stop -> mid-turn
-            # abandonment: something else happened afterward and this call was still never
-            # resolved. Synthesize the failure Call. (If i == last_index it is left silent —
-            # presence-of-work discharge, see docstring.)
-            out.append({"name": name, "input": ti, "result": {
-                "interrupted": True,
-                "error": "no PostToolUse for this PreToolUse (unresolved/failed tool call, "
-                         "mid-turn abandonment)",
-            }})
-    return out
+    """Every terminal row (PostToolUse, or PostToolUseFailure normalized to it by `_decode_row`)
+    is one Call; a PreToolUse row is not a call and yields nothing. A call the owner declined,
+    one that was abandoned, and one still running all leave the same trace, a Pre with no
+    terminal, and none of them is evidence of a failure."""
+    return [{"name": name, "input": ti, "result": tr} for etype, name, ti, tr in (d for d in (_decode_row(r) for r in (history or ())) if d is not None) if etype == "PostToolUse"]
 
 
 # ---- sequence-primitive catalog: {id -> (seq_predicate(calls)->bool, stop_text, retry_hint)} --
@@ -479,63 +408,12 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     block (a permission block the agent correctly declines to retry) -- text cannot change
     calls[-1], so without a real discharge it re-fires at every subsequent Stop. Reuses
     makoto.state.ledger's SAME transcript-re-derived, spoof-proof discharge (never trusted from
-    chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model".
-
-    PRE-DENIED CALLS ARE NOT EVIDENCE: dispatch ingests the PreToolUse row BEFORE the Pre
-    handler denies it, and a Pre-denied call never gets a terminal -- so it decoded as a
-    dangling Pre and FD14-A synthesized `{"interrupted": True, ...}` for a call that was never
-    interrupted, never even ran: a BLOCK resting on a fabricated result. The events table alone
-    cannot distinguish a denied Pre from an abandoned one, but makoto's OWN audit log can
-    (dispatch appends an AuditRow for every blocking Pre fire, its findings stamped with the
-    event's own `source_event_id`). This adapter reads the audit log for this session's blocked
-    PreToolUse event ids and drops those Pre rows from the history BEFORE decoding, so nothing
-    is synthesized for them; best-effort (no state_root / unreadable audit leaves history
-    untouched, exactly as before). Row-id matching only works for the events-table tuple shape
-    (id, ts, event_type, cwd, payload) -- dict-shaped test rows carry no id and are never
-    dropped."""
+    chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model"."""
     try:
         import makoto.state.ledger as _ackblock
         history = _ackblock.operator_window(history, transcript_path)
     except Exception:
         pass
-    denied_pre_ids: set = set()
-    if state_root is not None and session_id:
-        # Direct stdlib read of <state_root>/audit.jsonl, NOT `makoto.state.audit.read_rows`:
-        # the checks->state import firewall (tests/test_import_direction.py) admits only
-        # ledger/citations from a named check module, so this tiny line-per-JSON read is
-        # duplicated here on purpose (the same trade contractOrder makes with its plans SQL).
-        try:
-            audit_path = os.path.join(str(state_root), "audit.jsonl")
-            with open(audit_path, "r", encoding="utf-8") as fh:
-                audit_lines = fh.read().splitlines()
-            for line in audit_lines:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    arow = json.loads(line)
-                except ValueError:
-                    continue
-                if not isinstance(arow, dict):
-                    continue
-                if arow.get("session_id") != session_id:
-                    continue
-                if arow.get("hook_kind") != "PreToolUse":
-                    continue
-                for f in arow.get("findings") or ():
-                    if not isinstance(f, dict) or f.get("level") != "error":
-                        continue
-                    sid = f.get("source_event_id")
-                    if isinstance(sid, int) and sid:
-                        denied_pre_ids.add(sid)
-        except Exception:
-            denied_pre_ids = set()
-    if denied_pre_ids:
-        history = [
-            r for r in (history or ())
-            if not (isinstance(r, (tuple, list)) and len(r) >= 3
-                    and r[2] == "PreToolUse" and r[0] in denied_pre_ids)
-        ]
     out: List[Finding] = []
     for cid, stop_text, retry_hint in fired_primitives(history):
         ack = None
