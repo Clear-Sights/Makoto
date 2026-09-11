@@ -64,8 +64,8 @@ def _canon_recur(history, stop_payload):
 def _cross_agent_history(stopping_agent):
     repeated = {"command": "orphaned-call"}
     return [
-        _row(1, "PreToolUse", repeated, {}, "dangling-agent"),
-        _row(2, "PreToolUse", repeated, {}, "dangling-agent"),
+        _row(1, "PostToolUse", repeated, {"interrupted": True}, "dangling-agent"),
+        _row(2, "PostToolUse", repeated, {"interrupted": True}, "dangling-agent"),
         _row(3, "PostToolUse", {"command": "thread-finished"}, {"stdout": "ok"}, stopping_agent),
     ]
 
