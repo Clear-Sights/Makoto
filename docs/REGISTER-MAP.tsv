@@ -6,7 +6,7 @@ A4	OUT-OF-SUBJECT	-	duplicate-key precedence inside code makoto does not execute
 A5	RUNNER	gate.canon_fingerprints	the atom is matched against the whole closing text, not an extracted inner value
 A6	OUT-OF-SUBJECT	-	threshold behaviour of a metric makoto does not compute
 A7	RUNNER	gate.named_test	a named test is graded per name, not against an aggregate pass count
-A11	RUNNER	gate.canon_fingerprints	atoms are existentials over distinct session calls, windowed at the operator turn
+A11	RUNNER	gate.canon_fingerprints	atoms are existentials over distinct calls, windowed per fingerprint at its latest session firing or operator boundary
 A13	NOT-COUNTABLE	-	deciding configured-versus-inherent needs the layer that set it; makoto reads the record, not the platform
 B1	RUNNER	gate.self_wired	makoto's own wiring is read from disk rather than assumed
 B2	RUNNER	gate.hollow_test	an assertion that cannot fail is refused: no assert, tautology, swallowed failure, uncollectable

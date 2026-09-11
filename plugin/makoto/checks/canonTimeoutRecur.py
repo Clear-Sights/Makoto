@@ -337,12 +337,6 @@ CANON_SEQ_PRIMITIVES: dict = {
         "A tool call ended in a direct error state — interrupted or a self-emitted error code — "
         "and the turn closed without resurfacing or resolving it; confidently transient, "
         "non-interrupted failures receive one retry opportunity.",
-        # Task 0b part (a): the OLD hint said "...or state explicitly why the error is acceptable"
-        # -- a discharge the detector cannot honor. timed_out_at_turn_end reads ONLY calls[-1]
-        # (purely structural); prose can never change it. The two REAL discharges: a later
-        # successful call (calls[-1] becomes non-error), or (Task 0b part b) a ledger-recorded
-        # release.operator for a genuinely unresolvable, operator-surfaced block -- the same mechanism
-        # gate.canon_fingerprints uses (makoto.state.ledger), not a third prose-only path.
         "A call errored (timeout / interrupted / error code) and the turn closed without "
         "resolving it. Re-run it (or the equivalent action) to a real successful result before "
         "closing. Text alone cannot discharge this any other way; the detector reads only "
@@ -359,34 +353,14 @@ CANON_SEQ_PRIMITIVES: dict = {
 }
 
 
-def _release_clause(cid: str) -> str:
-    """The `release.operator` affordance sentence for ONE primitive, generated from its id.
-
-    `canon_gate` offers the ackblock discharge to EVERY fired primitive — the loop calls
-    `find_ack_block(cid, ...)` for whatever fired, not just `timeout` — so every hint must name
-    it: a mechanism that exists but is invisible reads exactly like a mechanism that is missing.
-    See docs/adr/0025-per-primitive-release-affordance.md for the decision history.
-
-    Generated per-id rather than written per-entry so a primitive cannot be added to
-    CANON_SEQ_PRIMITIVES without carrying the discharge it is already wired to honor —
-    the affordance is structural, not prose that the next author must remember to copy."""
-    return (" Any new genuine operator message or explicit operator interrupt starts a new "
-            "call window; repeating the failure there can block again. "
-            "For an optional explicit override of an already-reviewed finding, "
-            "the human operator must say exactly "
-            f"`makoto release.operator {cid}: <reason>` in a user turn "
-            "(non-tool, non-quoted); an assistant reply cannot discharge this gate.")
-
-
 def fired_primitives(history) -> Iterable:
     """Yield (canon_id, stop_text, retry_hint) for every installed primitive that fires on the
     session's call stream. Pure: no makoto import, no I/O beyond decoding the passed-in history
-    rows. Every yielded hint carries its own `release.operator` clause (`_release_clause`) —
-    `canon_gate` offers that discharge to every primitive, so every hint must name it."""
+    rows."""
     calls = calls_from_history(history)
     for cid, (seq_pred, stop_text, retry_hint) in CANON_SEQ_PRIMITIVES.items():
         if seq_pred(calls):
-            yield (cid, stop_text, retry_hint + _release_clause(cid))
+            yield (cid, stop_text, retry_hint)
 
 
 # =============================================================================================
@@ -403,33 +377,14 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     message or explicit host user-interruption closes the old window; a later error is still
     evaluated normally. Generic timeout/abort results do not establish operator intent.
 
-    Task 0b part (b): canon.timeout has the SAME no-clean-terminal-state gap as
-    gate.canon_fingerprints when the last error is a genuinely unresolvable, operator-surfaced
-    block (a permission block the agent correctly declines to retry) -- text cannot change
-    calls[-1], so without a real discharge it re-fires at every subsequent Stop. Reuses
-    makoto.state.ledger's SAME transcript-re-derived, spoof-proof discharge (never trusted from
-    chain content) -- one mechanism serving both gates, per SPEC-C's "one mercy model"."""
+    """
     try:
-        import makoto.state.ledger as _ackblock
-        history = _ackblock.operator_window(history, transcript_path)
+        import makoto.state.ledger as _ledger
+        history = _ledger.operator_window(history, transcript_path)
     except Exception:
         pass
     out: List[Finding] = []
     for cid, stop_text, retry_hint in fired_primitives(history):
-        ack = None
-        try:
-            import makoto.state.ledger as _ackblock
-            ack = _ackblock.find_ack_block(cid, transcript_path=transcript_path,
-                                           gate_pattern_id="gate.canon",
-                                           session_id=session_id, root=state_root, history=history)
-        except Exception:
-            ack = None
-        if ack is not None:
-            try:
-                _ackblock.record_ack_block_if_new(ack, session_id=session_id, root=state_root)
-            except Exception:
-                pass
-            continue
         out.append(Finding(
             pattern_id="gate.canon",
             file="",

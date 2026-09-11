@@ -470,40 +470,7 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
 
 
 # =============================================================================================
-# ackblock (merged from record/ackblock.py -- Stage 2 seam 1)
-_ACK_RX = re.compile(
-    r"^\s*makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
-# [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon
-# itself (id becomes "name:", never matching the real fingerprint id) -- found live by
-# test_genuine_ack_after_first_fired_discharges/test_ack_rejected_when_reason_is_empty, which
-# also caught the mirror bug (an id-only ack with nothing after the colon matching "" -> ":" as
-# a non-empty-looking "reason" via backtracking). Excluding ':' from the id group closes both.
-# Epoch reset (2026-07-10, owner decision): `release.operator` is the ONLY discharge phrase.
-# The former dual-phrase acceptance existed to keep pre-rename records/habits working; the owner
-# retired that guarantee outright -- state predating the reset is archived (zip) or wiped, so
-# there is no history left whose meaning depends on the old phrase."""
-# ---------------------------------------------------------------------------------------------
-# The ack line must be UNQUOTED, which the gate's own retry hint has always promised ("say
-# exactly `makoto release.operator {name}: <reason>` in a real (non-tool, non-quoted) reply")
-# and which nothing implemented. The two halves are one fix and must land together:
-#
-#   * `_ACK_RX` was compiled with re.I only and applied with `.search()` to the WHOLE user turn,
-#     so its `^` bound at offset 0 of the turn. When a Stop gate blocks, the host prepends its
-#     feedback to the operator's next turn, which pushed the operator's line off offset 0 and
-#     made the only discharge this gate honors unreachable exactly when it was needed. Reported
-#     by AliceLJY (issue #45); reproduced here before the change.
-#
-#   * Anchoring per line without the quoting rule opens the mirror defect: a fenced block, a
-#     4-space indented block, or the phrase quoted in prose then discharges the gate. Measured:
-#     all three match under a bare re.M. (The hint as shipped does NOT, because its backtick sits
-#     immediately before `makoto` -- but that is an accident of wording, not a guard, which is
-#     why `test_the_gates_own_hint_never_discharges` pins it.)
-#
-# Scanning line by line rather than with re.M keeps `^\s*` per line and makes each exclusion a
-# readable rule instead of a lookaround.
-_FENCE_RX = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
-_INDENTED_CODE_RX = re.compile(r"^(?: {4}|\t)")
-
+# Host-written operator turns and call-window boundaries.
 _SYNTHETIC_MARKERS = (
     "<system-reminder", "<user-prompt-submit-hook", "<task-notification",
     "<local-command-caveat", "[request interrupted by user]",
@@ -512,40 +479,6 @@ _SYNTHETIC_MARKERS = (
 _MIDTURN_MESSAGE_RX = re.compile(
     r"\A<system-reminder>\s*The user sent a new message while you were working:\s*\n"
     r"(?P<prompt>.*?)\s*</system-reminder>\Z", re.DOTALL)
-
-
-def _unquoted_ack_matches(text: str):
-    r"""Yield `(fingerprint_id, reason)` for every UNQUOTED release.operator line in `text`.
-
-    Quoted means any of: inside a ``` / ~~~ fenced block, inside a 4-space or tab indented code
-    block, or inside an inline backtick span (a leading backtick already blocks `_ACK_RX`; the
-    parity guard catches a span opened on an earlier line). A blockquote line is excluded for
-    free -- `>` is not whitespace, so `^\s*makoto` cannot reach past it.
-
-    A turn may carry several candidate lines (prepended hook feedback plus what the operator
-    typed), so every line is examined rather than only the first match in the turn."""
-    fence = None
-    for line in text.split("\n"):
-        opener = _FENCE_RX.match(line)
-        if fence is not None:
-            if opener and opener.group(1)[0] == fence:
-                fence = None
-            continue
-        if opener:
-            fence = opener.group(1)[0]
-            continue
-        if _INDENTED_CODE_RX.match(line):
-            continue
-        m = _ACK_RX.match(line)
-        if not m:
-            continue
-        # group(2) can capture a bare leftover separator (an id-only ack backtracks to ":"), so
-        # strip stray punctuation before the truthiness check rather than trusting the regex.
-        acked_id = m.group(1).strip()
-        reason = m.group(2).strip().lstrip(":- ").strip()
-        if not acked_id or not reason:
-            continue
-        yield acked_id, reason
 
 
 def _entry_text(entry: dict) -> str:
@@ -562,8 +495,7 @@ def _entry_text(entry: dict) -> str:
 
 
 def _is_genuine_user_turn(entry: dict) -> Optional[str]:
-    """Return the entry's text iff it is a genuine, host-written, non-synthetic user turn (ack
-    contract points 1-3) -- else None. A tool result or a synthetic/system-injected turn can
+    """Return the entry's text iff it is a genuine, host-written, non-synthetic user turn -- else None. A tool result or a synthetic/system-injected turn can
     never qualify, no matter what text it happens to contain."""
     # Claude records queued prompts as their own attachment, even when the rendered message
     # appears beside tool output (anthropics/claude-code#49625, captured 2.1.112 transcript).
@@ -604,15 +536,7 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
 def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) -> list:
     """Every genuine, host-written, non-synthetic user turn as (text, timestamp), oldest first.
 
-    The ORACLE channel, exposed for readers other than the ack scanner. `find_ack_block` has always
-    needed "what did the human actually type, as opposed to what could the agent have produced" --
-    contract points 1-3 of the ack rules, enforced by `_is_genuine_user_turn`. That question is not
-    specific to acks: any check that wants to distinguish a fact the human supplied from a fact the
-    agent supplied needs exactly this list, and needs it to have the same spoof-resistance.
-
-    Sharing the primitive rather than re-deriving it is the point. A second, looser reader of the
-    transcript would be a second definition of "the user said so", and the looser one would win any
-    disagreement -- which is how an agent-writable channel becomes an oracle by accident.
+    Shared provenance reader for checks that distinguish operator input from tool output.
 
     Never raises: an absent, unreadable or malformed transcript reads as "no user turns". Callers
     must treat that as absence of evidence, never as evidence of absence.
@@ -689,31 +613,13 @@ def user_turn_texts(transcript_path: Optional[str], *, limit: int = 4000) -> lis
 def last_operator_turn_ts(transcript_path: Optional[str], *, limit: int = 4000) -> Optional[str]:
     """The latest genuine operator message or exact host interruption marker timestamp.
 
-    This is the boundary of the ATOM WINDOW. A canon fingerprint is a conjunction of atoms, and
-    every atom is an existential over the calls it is given (`_canonAtoms._existing`). Given the
-    whole session, those existentials are monotone: once a green test run and a timeout have each
-    happened, both are permanently true and the fingerprint can never stop matching, whatever the
-    agent does next. The typed `release.operator` phrase is then the ONLY exit, which is what
-    forces a human -- on a gate whose whole premise is that a claim is held against the record and
-    not against an utterance. Reported by AliceLJY as the secondary half of issue #45; it is the
-    primary defect.
-
-    Windowing the atoms at the last operator turn makes the fingerprint fire once, inform the
-    operator, and reset when they next speak -- whatever they say. It fires again only if the
-    agent repeats the pattern after being told. No judgement is involved and nothing is asked of
-    the human.
-
-    User messages use the same provenance reader as acknowledgments. An exact host interrupt
-    also closes the window, but never enters the user-prose channel used for consent or URLs.
-
-    None when there is no transcript, no established boundary, or no timestamp on it -- and None means
-    NO WINDOW, i.e. the whole session, which is the strict direction and the behaviour before
-    this existed. A window we cannot establish must never widen what the gate lets through.
+    An exact host interrupt also closes the window, but never enters the user-prose
+    channel used for consent or URLs. None means no established operator boundary.
     """
     for entry in reversed(_transcript_entries(transcript_path, limit=limit, newest=True)):
         ts = entry.get("timestamp")
         msg = entry.get("message")
-        # This exact host event closes a turn but says nothing about approval, URLs, or acks.
+        # This exact host event closes a turn but says nothing about approval or URLs.
         # Keep it out of _is_genuine_user_turn / user_turn_texts for every prose consumer.
         interrupt = (entry.get("type") == "user" and isinstance(msg, dict)
                      and msg.get("role") == "user" and "toolUseResult" not in entry
@@ -756,95 +662,25 @@ def operator_window(history, transcript_path: Optional[str]) -> list:
             if since is None or (ts := _event_instant(_row_ts(row))) is None or ts >= since]
 
 
-def _first_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
-                    session_id: Optional[str] = None,
-                    root: Optional[Path] = None) -> Optional[str]:
-    """The earliest chain-recorded ts at which `gate_pattern_id` fired NAMING fingerprint_id,
-    read from the unified audit trail (slice 3b -- every dispatch audit row is chain-appended).
-    None if it has never fired in this chain. Chronological order is the chain's own append
-    order, so the first match IS the earliest. `gate_pattern_id` generalizes this beyond
-    gate.canon_fingerprints (Task 0b: gate.canon's canon.timeout has the SAME no-discharge shape
-    when the last error is a genuinely unresolvable, operator-surfaced block -- one mechanism,
-    two gates, per SPEC-C's "one mercy model")."""
+def last_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fingerprints",
+                  session_id: Optional[str] = None,
+                  root: Optional[Path] = None) -> Optional[str]:
+    """Latest timestamp of a chain-recorded audit firing naming this fingerprint and session."""
     needle = f"canon.{fingerprint_id}:"
+    latest = None
+    latest_instant = None
     for row in read(root=root):
-        if row.get("kind") != "audit":
-            continue
-        if session_id is not None and row.get("session_id") != session_id:
+        if row.get("kind") != "audit" or row.get("session_id") != session_id:
             continue
         if gate_pattern_id not in (row.get("pattern_fires") or []):
             continue
-        for finding in row.get("findings") or ():
-            if needle in (finding.get("message") or ""):
-                return row.get("ts")
-    return None
-
-
-def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
-                   gate_pattern_id: str = "gate.canon_fingerprints",
-                   session_id: Optional[str] = None,
-                   root: Optional[Path] = None, history=None) -> Optional[dict]:
-    """Scan the host-written transcript at `transcript_path` for a qualifying release.operator turn for
-    `fingerprint_id` (fired under `gate_pattern_id`). Returns {"fingerprint_id", "reason", "ts"}
-    for the FIRST qualifying turn found, or None. Never raises: an absent/unreadable transcript
-    or an unfired fingerprint (no first-fired ts to compare against) both read as "no ack" --
-    fail-closed on the BLOCK side, which is the safe direction (a discharge must be earned, never
-    assumed)."""
-    if not transcript_path:
-        return None
-    since_ts = _first_fired_ts(fingerprint_id, gate_pattern_id=gate_pattern_id,
-                               session_id=session_id, root=root)
-    if since_ts is None:
-        return None
-    # A release cannot pre-approve a future occurrence. The gate passes its current window;
-    # every dated call in that evidence must precede the acknowledgment. Undated legacy rows
-    # retain the original recorded-firing check, so the explicit override remains usable there.
-    evidence_ts = [_event_instant(since_ts)]
-    evidence_ts.extend(_event_instant(_row_ts(row)) for row in (history or ()))
-    latest_evidence = max((ts for ts in evidence_ts if ts is not None), default=None)
-    for entry in _transcript_entries(transcript_path, limit=None):
-        text = _is_genuine_user_turn(entry)
-        if text is None:
+        if not any(needle in (finding.get("message") or "")
+                   for finding in row.get("findings") or ()):
             continue
-        ts = entry.get("timestamp", "")
-        ack_time = _event_instant(ts)
-        if ack_time is None or latest_evidence is None or ack_time <= latest_evidence:
-            continue
-        for acked_id, reason in _unquoted_ack_matches(text):
-            if acked_id != fingerprint_id:
-                continue
-            return {"fingerprint_id": fingerprint_id, "reason": reason, "ts": ts}
-    return None
-
-
-# Epoch reset (2026-07-10): exactly one chain kind means "an operator-attributed release".
-_RELEASE_OPERATOR_KINDS = frozenset({"release.operator"})
-
-
-def record_ack_block_if_new(ack: dict, *, session_id: Optional[str] = None,
-                            root: Optional[Path] = None) -> bool:
-    """Chain-append a `release.operator` row for `ack` (kind="release.operator") UNLESS this
-    exact (fingerprint_id, session_id) pair is already recorded -- avoids flooding the chain with a duplicate row on every
-    subsequent Stop for the rest of the session (the ack is re-derived from the transcript every
-    time regardless; this is purely the audit/receipt trail, never the discharge decision
-    itself). Returns True iff a new row was appended. Never raises: a chain fault must not block
-    the Stop-gate evaluation it accompanies."""
-    try:
-        for row in read(root=root):
-            if (row.get("kind") in _RELEASE_OPERATOR_KINDS
-                    and row.get("fingerprint_id") == ack["fingerprint_id"]
-                    and row.get("session_id") == session_id):
-                return False
-        append({
-            "kind": "release.operator",
-            "fingerprint_id": ack["fingerprint_id"],
-            "reason": ack["reason"],
-            "acked_at": ack["ts"],
-            "session_id": session_id,
-        }, root=root)
-        return True
-    except Exception:
-        return False
+        instant = _event_instant(row.get("ts"))
+        if instant is not None and (latest_instant is None or instant > latest_instant):
+            latest, latest_instant = row["ts"], instant
+    return latest
 
 
 # =============================================================================================

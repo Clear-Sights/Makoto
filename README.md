@@ -115,18 +115,6 @@ Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full
 
 <!-- END GENERATED: canon-split -->
 
-### Releasing a canon block
-
-Follow the firing check's retry hint. Canon call windows restart on a genuine operator
-message or explicit operator interrupt. To explicitly release a reviewed finding, send:
-
-```
-makoto release.operator <fingerprint-id>: <your reason>
-```
-
-The transcript acknowledgment must follow the finding and its current evidence;
-`state.ledger.find_ack_block` validates it and `record_ack_block_if_new` records the release.
-
 ### Legitimately writing a flagged shape?
 
 Follow the finding's retry hint; exemption scope belongs to the check.

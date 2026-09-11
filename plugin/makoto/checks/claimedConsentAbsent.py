@@ -23,8 +23,7 @@ chosen. So a legitimate paraphrase of a real instruction can never fire this: a 
 means a real turn exists, and one turn is enough to silence it.
 
 Spoof-resistance is inherited, not re-derived: `user_turn_texts` admits only host-written,
-non-synthetic, non-tool-result entries via `_is_genuine_user_turn` -- the same predicate the
-`release.operator` discharge trusts. The agent cannot write itself a user turn, so it cannot
+non-synthetic, non-tool-result entries via `_is_genuine_user_turn`. The agent cannot write itself a user turn, so it cannot
 manufacture the consent OR the record of it.
 
 STATED LIMIT: a session where the operator has spoken once and the agent then invents a second,
