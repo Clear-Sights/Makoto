@@ -3,6 +3,14 @@
 All notable changes to makoto. Versions follow the live check inventory
 (`load_prechecks` / `load_checks(edge="Stop")`), which the README count is tested against.
 
+## [2.8.3] — 2026-09-11
+
+### Fixed
+- An owner-declined call is no call. A PreToolUse row with no terminal is left alike by a call
+  the operator declined, one that was abandoned, and one still running, and none is evidence of
+  a failure: `calls_from_history` now yields one Call per terminal row and nothing for a Pre, so
+  `canon.timeout` and `canon.recur` no longer fire on calls the operator refused (#67).
+
 ## [2.8.2] — 2026-09-09
 
 ### Fixed
