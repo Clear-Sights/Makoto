@@ -226,6 +226,7 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
 # recognize renders ``{}`` (no objection) rather than raising.
 
 
+from functools import partial
 from typing import Callable
 
 # --- the Claude Code hook-event names (the edge the native feed tags each event with) -----------
@@ -264,37 +265,21 @@ def _detail(posture_value, fallback: str) -> str:
     return f"makoto: {text}" if text else fallback
 
 
-def _pre_deny(posture_value) -> dict:
-    """Intent: Render the PreToolUse ``deny`` response — a blocking preventive finding, carrying
-    the exact coordinates (the unmet commitments / forbidden target) when the check named them."""
+def _pre_permission(posture_value, *, decision: str, reason: str) -> dict:
     return {
         "hookSpecificOutput": {
             "hookEventName": _PRE_TOOL_USE,
-            "permissionDecision": "deny",
-            "permissionDecisionReason": _detail(posture_value, _DENY_REASON),
+            "permissionDecision": decision,
+            "permissionDecisionReason": _detail(posture_value, reason),
         }
     }
 
 
-def _pre_ask(posture_value) -> dict:
-    """Intent: Render the PreToolUse ``ask`` response — an abstention escalated to the human."""
+def _advise(posture_value, *, hook_name: str, reason: str) -> dict:
     return {
         "hookSpecificOutput": {
-            "hookEventName": _PRE_TOOL_USE,
-            "permissionDecision": "ask",
-            "permissionDecisionReason": _detail(posture_value, _ASK_REASON),
-        }
-    }
-
-
-def _pre_advise(posture_value) -> dict:
-    """Intent: Render the PreToolUse advisory — allow, but inject the prior-location context IN THE
-    BACKGROUND with its EXACT coordinates: the call proceeds, the prior location is named so it
-    cannot be silently forgotten, nothing is denied."""
-    return {
-        "hookSpecificOutput": {
-            "hookEventName": _PRE_TOOL_USE,
-            "additionalContext": _detail(posture_value, _ADVISE_REASON),
+            "hookEventName": hook_name,
+            "additionalContext": _detail(posture_value, reason),
         }
     }
 
@@ -305,9 +290,9 @@ def _pre_advise(posture_value) -> dict:
 # receives the posture so a ``Decision``'s coordinates reach the wire without the table inspecting
 # anything.
 _PRE_WIRE: dict[str, Callable] = {
-    BLOCK: _pre_deny,
-    ASK: _pre_ask,
-    ADVISE: _pre_advise,
+    BLOCK: partial(_pre_permission, decision="deny", reason=_DENY_REASON),
+    ASK: partial(_pre_permission, decision="ask", reason=_ASK_REASON),
+    ADVISE: partial(_advise, hook_name=_PRE_TOOL_USE, reason=_ADVISE_REASON),
 }
 
 
@@ -333,22 +318,10 @@ _STOP_WIRE: dict[str, Callable] = {
 }
 
 
-def _post_advise(posture_value) -> dict:
-    """Intent: Render the PostToolUse advisory — allow, but surface the detective finding (drift /
-    stuck) as background ``additionalContext`` carrying its exact coordinates. The audit edge never
-    denies; it informs."""
-    return {
-        "hookSpecificOutput": {
-            "hookEventName": _POST_TOOL_USE,
-            "additionalContext": _detail(posture_value, _POST_ADVISE_REASON),
-        }
-    }
-
-
 # PostToolUse: ADVISE -> allow + context (a fired detective surfaced in the background); everything
 # else -> {} (the audit edge is otherwise silent — it records, advances, and never objects).
 _POST_WIRE: dict[str, Callable] = {
-    ADVISE: _post_advise,
+    ADVISE: partial(_advise, hook_name=_POST_TOOL_USE, reason=_POST_ADVISE_REASON),
 }
 
 # --- the edge -> table map (``dispatch_posture``'s own zero-inspection lookup) -------------------

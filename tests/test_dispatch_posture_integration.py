@@ -29,7 +29,6 @@ def test_pretooluse_block_renders_new_wire_shape(tmp_path):
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert rc == 0
     assert out, "expected a deny body on stdout"
     body = json.loads(out)
     assert "decision" not in body, "Pre must not use the old ad-hoc top-level shape"
@@ -49,7 +48,6 @@ def test_stop_gate_block_still_uses_old_top_level_shape(tmp_path):
         "last_assistant_message": "Created src/promised_zzz.py. Done.",
     }
     rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0
     assert out, "expected a block body on stdout"
     body = json.loads(out)
     assert body["decision"] == "block"

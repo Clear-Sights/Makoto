@@ -16,9 +16,6 @@ import ast
 from makoto.vocab import Finding, _MAKOTO_ALLOW_RX
 from makoto.substrate._stdlib_ast_helpers import iter_touched_python_sources
 
-_PURE_BUILTINS = frozenset(
-    "len str int float bool tuple list dict set frozenset abs min max sum "
-    "ord chr hash round isinstance type sorted reversed".split())
 _PURE_BINOP = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
                ast.LShift, ast.RShift, ast.BitOr, ast.BitXor, ast.BitAnd)
 _PURE_UNARY = (ast.UAdd, ast.USub, ast.Invert, ast.Not)
@@ -31,6 +28,7 @@ _TRY_STMTS = (ast.Try, ast.TryStar) if hasattr(ast, "TryStar") else (ast.Try,)
 _BUILTIN_FNS = {f.__name__: f for f in (
     len, str, int, float, bool, tuple, list, dict, set, frozenset, abs, min, max, sum,
     ord, chr, hash, round, isinstance, type, sorted, reversed)}
+_PURE_BUILTINS = frozenset(_BUILTIN_FNS)
 
 
 def _builtin_typed(node, typed_locals=frozenset()) -> bool:

@@ -471,45 +471,6 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
 
 # =============================================================================================
 # ackblock (merged from record/ackblock.py -- Stage 2 seam 1)
-_ACKBLOCK_DOC = """ackblock: Task 2 slice 5 -- the discharge mechanism for session-level canon fingerprints
-(DESIGN DECISION 2026-07-07, recorded verbatim in the plan). A SESSION-LEVEL fingerprint
-(gate.canon_fingerprints) matches over the whole recorded call stream; once its atoms go true
-they stay true forever (recorded history is immutable), so without a real discharge path it
-becomes a PERMANENT block for the rest of the session after any one matching action -- even a
-fully owner-sanctioned one. Rejected discharges: narrowing the detector (voids the 0-FP
-certificate + teaches a gaming recipe), and operator self-disable (normalizes the one action
-Makoto must never normalize). The decided discharge: an OPERATOR-ATTRIBUTABLE
-`release.operator` record, never prose, never atom-narrowing.
-
-D8a (docs/DEFERRED.md, DESIGN DECISION 2026-07-08, rename-only, owner-authorized 2026-07-08):
-this mechanism is the `release.operator` tier of Makoto's `release` family (`release.green` --
-world-verified, agent-earnable -- is a distinct, not-yet-built future item; this module
-implements ONLY the host-transcript-attributed tier). Epoch reset (2026-07-10, owner
-decision): the phrase a human types and the chain `kind` are EXACTLY `release.operator` -- the
-former accept-the-original-forever guarantee (and the alias-table discipline it mirrored) was
-retired outright; state predating the reset is archived (zip) or wiped by the operator, so no
-record remains whose meaning depends on the old forms.
-
-SPOOF-PROOF ATTRIBUTION (the load-bearing part): the ack is NEVER trusted from ledger/chain
-content -- at CHECK TIME Makoto re-derives it from the HOST-WRITTEN transcript file every time.
-A transcript entry is a valid ack iff it:
-  1. has top-level role "user" (`entry["message"]["role"] == "user"`, real transcript shape --
-     confirmed against this session's own transcript JSONL, 2026-07-07);
-  2. carries NO `toolUseResult` field (excludes tool-result turns -- the only agent-producible
-     user-role entries; a tool call cannot write a top-level `toolUseResult`-free user turn);
-  3. is not synthetic/system-injected -- no `<system-reminder`/hook-output/task-notification
-     marker, and not the harness's own "[Request interrupted by user]" synthetic text;
-  4. is timestamped AFTER the fingerprint's first-fired ts in THIS session (derived from the
-     chain's own unified audit trail -- slice 3b -- never from prose);
-  5. contains the literal token `makoto release.operator <fingerprint-id>` plus a nonempty
-     reason naming that exact id.
-No agent tool call, subagent output, or file write can forge such an entry -- the transcript is
-host-written, never model-written. A found ack is chain-appended (kind="release.operator")
-for the receipt/audit trail, but the DISCHARGE
-decision itself is re-derived from the transcript on every evaluation, never read back from that
-row (`record_ack_block_if_new` only avoids duplicate chain rows across repeated Stops -- see its
-own docstring).
-"""
 _ACK_RX = re.compile(
     r"^\s*makoto\s+release\.operator\s+([^\s:]+)\s*[:\-]?\s*(.+)", re.I)
 # [^\s:]+ (not \S+) for the id group: \S+ is greedy enough to swallow the separating colon
@@ -666,8 +627,8 @@ def _genuine_user_turns(transcript_path: Optional[str], *, limit: int = 4000) ->
     return turns
 
 
-def _transcript_entries(transcript_path: Optional[str], *, limit: int, newest=False) -> list:
-    """Read bounded host records; boundary callers need the tail, provenance readers the head."""
+def _transcript_entries(transcript_path: Optional[str], *, limit: int | None, newest=False) -> list:
+    """Read host records from the head or tail; limit=None reads all records."""
     if not transcript_path:
         return []
     p = Path(transcript_path)
@@ -682,7 +643,7 @@ def _transcript_entries(transcript_path: Optional[str], *, limit: int, newest=Fa
         # on a false fact that the `splitlines` note below is about. "utf-8-sig" strips the BOM
         # when present and is byte-for-byte the same decode when it is not.
         raw = p.read_text(encoding="utf-8-sig", errors="replace")
-    except OSError:
+    except (OSError, ValueError):
         return []
     entries = []
     # `splitlines()`, NOT iteration over the file handle, and the difference is a live false deny.
@@ -699,7 +660,7 @@ def _transcript_entries(transcript_path: Optional[str], *, limit: int, newest=Fa
     # into a hard deny resting on a false fact -- the one thing a gate must never do. Correctness
     # first: if the unbounded read has to go, it needs a form that splits on the same set.
     lines = raw.splitlines()
-    for line in (lines[-limit:] if newest and limit > 0 else lines[:limit]):
+    for line in (lines[-limit:] if newest and limit is not None and limit > 0 else lines[:limit]):
         # `strip("\ufeff")` as well as whitespace. "utf-8-sig" removes a BOM only at BYTE ZERO, so
         # a transcript that is the concatenation of separately-written chunks -- which is how a
         # resumed or merged session is produced -- keeps a U+FEFF glued to the front of every
@@ -841,23 +802,7 @@ def find_ack_block(fingerprint_id: str, *, transcript_path: Optional[str],
     evidence_ts = [_event_instant(since_ts)]
     evidence_ts.extend(_event_instant(_row_ts(row)) for row in (history or ()))
     latest_evidence = max((ts for ts in evidence_ts if ts is not None), default=None)
-    p = Path(transcript_path)
-    if not p.exists():
-        return None
-    try:
-        lines = p.read_text(encoding="utf-8-sig", errors="replace").splitlines()
-    except (OSError, ValueError):
-        return None
-    for line in lines:
-        line = line.strip().strip("\ufeff").strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(entry, dict):
-            continue
+    for entry in _transcript_entries(transcript_path, limit=None):
         text = _is_genuine_user_turn(entry)
         if text is None:
             continue
@@ -904,30 +849,6 @@ def record_ack_block_if_new(ack: dict, *, session_id: Optional[str] = None,
 
 # =============================================================================================
 # receipt (merged from record/receipt.py -- Stage 2 seam 1)
-_RECEIPT_DOC = """The receipt emitter (Task 2 slice 4) -- Makoto blocks the illusory word but, until now,
-issued no tender for the kept one; the README promises "trustworthy tender... without
-re-deriving it" and nothing emitted it. This closes that gap.
-
-DESIGN DECISION 2026-07-07 (curated brief: claim kinds, shape, persistence):
-  1. Only `verdict`/`certified-fact`/`testrun` chain rows count as CLAIMS -- kinds that assert
-     something about the world (the ancestor canon/mint.py's "spendable if backed by a real
-     deed" test -- cited for WHY these three kinds and not the others, not as a second test of
-     spendability: in this package `spendable` means `trace_bound`, defined at the foot of this
-     docstring, and nothing here re-checks that a deed was performed). `audit`/`touched`/`release.operator`/`fetch`/`exemption` are records of deeds and
-     machinery, not claims, and folding them in would blur exactly the distinction the receipt
-     exists to expose.
-  2. One dict per call: {ts, session_id, chain_name, verified_through, claims, claim_count,
-     trace_bound_count, exemption_count} -- a list of citations plus PARALLEL counts, never
-     combined into one score (HOURGLASS: a measure you optimize for stops measuring). Every
-     claim cites its own row_index/row_hash, independently re-checkable against `verify_chain`.
-  3. A PURE READ-TIME VIEW -- nothing persisted. A 4th file to keep in sync, or a chain row that
-     could only attest to a chain it is itself inside, both cut against this project's own "one
-     stream, everything else a view" goal (SPEC-C item 1).
-
-`trace_bound` = at or before `verified_through`'s cut (or every row, if the whole chain is
-intact) -- a claim AFTER the first broken link can no longer be trusted to be what it claims to
-be, so it is excluded from trace_bound_count (though still listed in `claims`, undisguised).
-"""
 _CLAIM_KINDS = frozenset({"verdict", "certified-fact", "testrun"})
 _EXEMPTION_KIND = "exemption"
 

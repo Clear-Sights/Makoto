@@ -17,17 +17,6 @@ from makoto.state.citations import extract_citations
 
 _TARGET_RX = re.compile(r"\.md$")
 
-# Membership is judged on the whitespace-FOLDED citation string: _CITATION_RX's `\s+` matches a
-# newline or a run of spaces, so "Kahneman  2011" / a line-wrapped "Kahneman\n2011" is the SAME
-# canonical citation as "Kahneman 2011" — byte-equality against the single-space canonical row
-# denied those variants on a false fact.
-_WS_RUN_RX = re.compile(r"\s+")
-
-
-def _fold_ws(cite: str) -> str:
-    return _WS_RUN_RX.sub(" ", cite)
-
-
 def _canonical_path(conn) -> Optional[str]:
     """The configured canonical_citations_path, or None when unknown (missing config table/row)."""
     try:
@@ -118,15 +107,14 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     # must not block agent work by denying every citation on a false fact).
     if conn.execute("SELECT 1 FROM canonical_citations LIMIT 1").fetchone() is None:
         return None
-    # One parameterized lookup against canonical_citations, on the whitespace-folded strings
-    # (see _fold_ws: a canonical citation's whitespace variant is still canonical).
+    # extract_citations supplies the canonical whitespace form.
     placeholders = ", ".join(["?"] * len(cites))
     canonical_rows = conn.execute(
         f"SELECT cite FROM canonical_citations WHERE cite IN ({placeholders})",
-        [_fold_ws(c[0]) for c in cites]
+        [c[0] for c in cites]
     ).fetchall()
     canonical_set = {row[0] for row in canonical_rows}
-    phantom = next((c for c in cites if _fold_ws(c[0]) not in canonical_set), None)
+    phantom = next((c for c in cites if c[0] not in canonical_set), None)
     if phantom is None:
         return None
     if makoto_allowed(content):

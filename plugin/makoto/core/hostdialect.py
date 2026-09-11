@@ -62,17 +62,9 @@ from __future__ import annotations
 
 import json
 
-# Host tool-name spellings -> the protocol tool name makoto's atoms key on, each admitted ONLY on
-# positive evidence that it is the same tool (see `_TOOL_EVIDENCE`), never on the name alone. A
-# rename on faith would route an unrelated tool into the command-reading atoms.
+# Host tool spelling -> (protocol tool, input key proving the alias applies).
 _TOOL_ALIASES = {
-    "Shell": "Bash",          # Cursor's shell tool; carries tool_input.command like Bash
-}
-# The input key whose presence proves the aliased tool really is the protocol tool. `Shell` only
-# becomes `Bash` if it actually carries a command to read -- otherwise the atoms would key on a
-# tool whose shape they cannot parse, and read nothing while reporting they ran.
-_TOOL_EVIDENCE = {
-    "Shell": "command",
+    "Shell": ("Bash", "command"),
 }
 
 # Host field spellings -> the protocol field, filled ONLY when the protocol field is absent.
@@ -176,10 +168,10 @@ def normalize_payload(payload: dict, known_events) -> tuple:
             break
 
     tool = out.get("tool_name")
-    target = _TOOL_ALIASES.get(tool) if isinstance(tool, str) else None
-    if target is not None:
+    alias = _TOOL_ALIASES.get(tool) if isinstance(tool, str) else None
+    if alias is not None:
+        target, evidence = alias
         ti = out.get("tool_input")
-        evidence = _TOOL_EVIDENCE.get(tool)
         if isinstance(ti, dict) and (evidence is None or _present(ti.get(evidence))):
             notes["tool_name"] = tool
             out["tool_name"] = target

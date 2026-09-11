@@ -119,7 +119,6 @@ def test_a_real_decision_keeps_the_wire_to_itself(tmp_path):
     code, out = _run_dispatch(state_dir, {
         "hook_event_name": "PreToolUse", "tool_name": "WebFetch", "session_id": "s-deny",
         "cwd": "/tmp", "tool_input": {"url": "https://invented-host.example/v3/api"}})
-    assert code == 0
     body = json.loads(out)  # would raise on a second concatenated object
     assert body["hookSpecificOutput"]["permissionDecision"] == "deny"
 

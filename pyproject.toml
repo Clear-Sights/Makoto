@@ -36,9 +36,6 @@ include-package-data = true
 where = ["plugin"]
 include = ["makoto*"]
 
-[tool.setuptools.package-data]
-makoto = ["config/*.toml"]
-
 [tool.setuptools.exclude-package-data]
 makoto = ["tests/*", "docs/*", "*.bak"]
 
