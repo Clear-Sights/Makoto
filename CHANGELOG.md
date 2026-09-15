@@ -3,6 +3,22 @@
 All notable changes to makoto. Versions follow the live check inventory
 (`load_prechecks` / `load_checks(edge="Stop")`), which the README count is tested against.
 
+## [2.8.5] — 2026-09-15
+
+### Fixed
+- `gate.claimed_shipped` false-blocked a TRUE "merged"/"pushed" claim shipped through the GitHub
+  MCP tools (`merge_pull_request`, `push_files`), measured directly against this repo's own
+  session transcript. `_REMOTE_MUTATING_TOOL_NAMES` already named the right tools, but
+  `_response_succeeded`/`_merged_true` both required a dict, and a settled MCP `tool_response`
+  is delivered as `toolUseResult` verbatim -- a BARE LIST of content blocks, `[{"type": "text",
+  "text": "<json>"}]`, never a dict and never wrapped in a `{"content": [...]}` envelope. The
+  vocabulary matched, the merge genuinely landed, and the evidence was still unreadable. A new
+  `_first_json_object_in_content_blocks` decodes that real wire shape the same way a dict-wrapped
+  content list was already decoded; `_as_dict` now reads it too. `create_or_update_file` is added
+  to the closed remote-mutation set alongside it: it commits straight to a branch on origin via
+  the REST Contents API and was previously excluded on the mistaken premise that it is "closer to
+  gate.completion" (local file production) -- it never touches a local file at all.
+
 ## [2.8.4] — 2026-09-11
 
 ### Fixed

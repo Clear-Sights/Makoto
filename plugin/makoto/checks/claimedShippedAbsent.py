@@ -98,17 +98,27 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
 # never accepted as a proxy while the world is observable. Like gate.run_promised, the non-push evidence deliberately does not attempt semantic
 # coreference between "it"/"#42" and a command's owner/repo/ref fields.
 #
-# CLOSED NON-BASH SET: GitHub's merge_pull_request and push_files are actual shipping actions.
-# create_pull_request is intentionally excluded: opening a PR establishes review intent but does
-# not substantiate "merged", "pushed", or "live". create_or_update_file is excluded for the same
-# reason and remains closer to gate.completion. Both the bare MCP action names recorded by tests
-# and Claude Code's fully-qualified `mcp__github__...` names are enumerated explicitly; no suffix
-# or substring heuristic can silently admit a read-only tool.
+# CLOSED NON-BASH SET: GitHub's merge_pull_request, push_files AND create_or_update_file are
+# actual shipping actions -- each one lands a real commit on a real ref via the REST Contents/
+# Pulls API the moment it returns success, with no local git object touched at all.
+# create_or_update_file was excluded here through 2.8.4 on the reasoning that it "remains closer
+# to gate.completion" (local file production) -- that reasoning was simply wrong: gate.completion
+# reads Write/Edit rows against the LOCAL filesystem, and this tool never touches one. It commits
+# straight to the target branch on origin, which is exactly the class of remote mutation this
+# gate exists to recognize; excluding it left a true "I pushed/updated X" claim made over this
+# tool with no vocabulary that could ever discharge it. create_pull_request remains the one
+# deliberate exclusion: opening a PR establishes review intent but does not substantiate "merged",
+# "pushed", or "live" -- no ref moves and nothing merges until a separate call succeeds. Both the
+# bare MCP action names recorded by tests and Claude Code's fully-qualified `mcp__github__...`
+# names are enumerated explicitly; no suffix or substring heuristic can silently admit a
+# read-only tool.
 _REMOTE_MUTATING_TOOL_NAMES = frozenset({
     "merge_pull_request",
     "push_files",
+    "create_or_update_file",
     "mcp__github__merge_pull_request",
     "mcp__github__push_files",
+    "mcp__github__create_or_update_file",
 })
 
 
@@ -168,6 +178,35 @@ def _response_succeeded(response) -> bool:
     return True
 
 
+def _first_json_object_in_content_blocks(content) -> Optional[dict]:
+    """The first JSON *object* decoded out of a list of MCP content blocks, else None.
+
+    Claude Code's PostToolUse `tool_response` for a settled MCP tool call is delivered as
+    `toolUseResult` VERBATIM, not normalized to a typed dict the way a Bash terminal's
+    stdout/stderr/exitCode envelope is. For every MCP call this module has direct evidence for —
+    a real, successful `mcp__github__merge_pull_request` recorded mid-session, and
+    `mcp__Claude_Code_Remote__add_repo` beside it — that shape is a BARE LIST of content blocks,
+    `[{"type": "text", "text": "<json-or-plain-text>"}]`, with no enclosing `{"content": [...]}`
+    dict. This one function is the single unwrap both `_merged_true` (called on an
+    already-dict-wrapped content list) and `_as_dict` (called on this bare-list top-level shape)
+    read from, so the two entry points can't drift into re-parsing the same wire shape two
+    different ways. Text that is not valid JSON — a plain error string, prose — is left alone:
+    inventing a dict out of it would let an unstructured failure message read as evidence of a
+    settled mutation, exactly backwards for a gate whose whole job is not doing that."""
+    if not isinstance(content, list):
+        return None
+    for item in content:
+        if not (isinstance(item, dict) and item.get("type") == "text"):
+            continue
+        try:
+            payload = json.loads(item.get("text") or "")
+        except ValueError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
 def _successful_remote_mutation(history) -> Optional[bool]:
     """Three-valued pooled-history evidence for a completed remote mutation.
 
@@ -180,13 +219,29 @@ def _successful_remote_mutation(history) -> Optional[bool]:
               never be spent as a positive assertion of absence.
 
     WHY None EXISTS (the sibling defect, gate.claimed_running / `_latest_process_call_failed`):
-    this module's remote-mutation vocabulary is CLOSED — `_REMOTE_MUTATING_TOOL_NAMES` (four
+    this module's remote-mutation vocabulary is CLOSED — `_REMOTE_MUTATING_TOOL_NAMES` (six
     exact MCP names) plus `_command_pushes_git` (an argv parse that recognizes `git push`, and
     nothing else). This estate ships by many other shapes: `gh pr merge`, `gh release create`,
     `npm publish`, `docker push`, `flyctl deploy`, `./deploy.sh`, `scp`, `rsync`. Every one of
     them is a vocabulary MISS. Returning False there told an agent that had genuinely shipped
     that "no recorded mutation evidence backs it" — a false block in the expensive direction,
     the exact shape just repaired in gate.claimed_running.
+
+    A SECOND, SHAPE-LEVEL false block lived beside the vocabulary gap and is closed by this same
+    change: being IN `_REMOTE_MUTATING_TOOL_NAMES` was not enough, because `_response_succeeded`
+    and `_merged_true` both require a dict, and this session's own transcript shows a settled
+    `mcp__github__merge_pull_request` call's `tool_response` (Claude Code's `toolUseResult`,
+    verbatim) is a BARE LIST of content blocks — `[{"type": "text", "text":
+    "{\"sha\":\"...\",\"merged\":true,\"message\":\"Pull Request successfully
+    merged\"}"}]` — never a dict and never wrapped in a `{"content": [...]}` envelope. A row
+    already correctly named in the closed set was therefore silently unreadable on every real
+    merge/push/file-commit done through the GitHub MCP tools: the vocabulary matched, the tool
+    genuinely shipped, and `_as_dict` still hasn't produced a dict, so `_response_succeeded`
+    read it as not-a-success and the row fell through to "attempted, never settled" — a false
+    `gate.claimed_shipped` fire on a TRUE "merged" claim, which is what sent this fix looking
+    for the gap in the first place. `_as_dict` below now decodes that list shape the same way
+    `_merged_true` already decoded a dict-wrapped one; the two are the same JSON-in-text-block
+    unwrap applied at two different entry shapes.
 
     So a recorded Bash terminal whose command is NOT a recognized push makes the window
     undecidable: any Bash command could be a shipping action this net cannot read. Likewise an
@@ -209,8 +264,14 @@ def _successful_remote_mutation(history) -> Optional[bool]:
     saw_attempt = False
 
     def _as_dict(response):
-        # The live harness can deliver an MCP result as a JSON string; parse it so real
-        # evidence is not rejected on shape alone.
+        # The live harness can deliver a settled MCP result as a JSON STRING (parse it so real
+        # evidence is not rejected on shape alone) or — the shape this arm did not handle before,
+        # and the one a real `mcp__github__merge_pull_request` success is recorded in — a BARE
+        # LIST of content blocks, `[{"type": "text", "text": "<json-or-plain>"}]`, with no
+        # enclosing dict at all. Decode either into the dict `_response_succeeded`/`_merged_true`
+        # need; a content block whose text is not JSON (a plain error string, prose) is left
+        # unparsed on purpose — fabricating a dict out of prose would let a vague failure message
+        # read as shipping evidence, the opposite of this gate's job.
         if isinstance(response, str):
             try:
                 parsed = json.loads(response)
@@ -218,6 +279,11 @@ def _successful_remote_mutation(history) -> Optional[bool]:
                 return response
             if isinstance(parsed, dict):
                 return parsed
+            response = parsed              # a JSON list/scalar embedded in a string
+        if isinstance(response, list):
+            payload = _first_json_object_in_content_blocks(response)
+            if payload is not None:
+                return payload
         return response
 
     def _merged_true(response) -> bool:

@@ -156,7 +156,13 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "planItemDrift.py": 1,
     "claimedRunningAbsent.py": 4,
     "runIntentUnfulfilled.py": 4,
-    "claimedShippedAbsent.py": 5,
+    "claimedShippedAbsent.py": 6,                          # 5->6, 2026-09-15: _first_json_object_
+                                                            # in_content_blocks extracted -- the one
+                                                            # decode for a bare-list MCP tool_response
+                                                            # (Claude Code's real toolUseResult shape,
+                                                            # not a dict), shared by _as_dict and
+                                                            # available to _merged_true's own
+                                                            # dict-wrapped-content-list arm
 }
 # Stage 2 seam 7: the gate-side import firewall (the former ALLOWED_IMPORT_ROOTS curated
 # allowlist + sibling-gate scan) now lives in tests/test_import_direction.py — "the layer
