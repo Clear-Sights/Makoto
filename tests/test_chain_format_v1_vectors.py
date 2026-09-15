@@ -45,3 +45,23 @@ def test_tampered_vector_rows_before_the_break_still_read_correctly(tmp_path):
     rows = ledger.read(root=tmp_path)
     assert rows[0]["key"] == "tests/x.py"
     assert rows[1]["value"] == "TAMPERED"
+
+
+def test_legacy_u2028_vector_verifies_fully(tmp_path):
+    """issue #70: row 1 of this vector is a genuine pre-2.4.0 row -- hashed with the OLD
+    norm_sha256(prev_hash + canonical(row)) construction, and its `value` carries the one
+    character (U+2028) that made that construction disagree with the current `_row_hash`. The
+    chain must still verify clean; a row authentic under the construction it was actually
+    written with is not tamper."""
+    _load_into(tmp_path, "legacy_u2028.jsonl")
+    assert ledger.verify_chain(root=tmp_path) is None
+
+
+def test_legacy_u2028_vector_flags_exactly_row_index_1_as_legacy(tmp_path):
+    """The legacy row is a distinct, non-clean state (`legacy_hits`), not merely invisible --
+    dispatch's issue #70 fix reports it under its own classification rather than folding it
+    into an ordinary silent-clean pass."""
+    _load_into(tmp_path, "legacy_u2028.jsonl")
+    hits: list = []
+    assert ledger.verify_chain(root=tmp_path, legacy_hits=hits) is None
+    assert hits == [1]

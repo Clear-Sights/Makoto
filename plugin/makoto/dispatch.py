@@ -275,20 +275,59 @@ def _note_host_dialect(state_dir: Path, session_id, notes: dict, host_event) -> 
     return True
 
 
+def _note_legacy_row_hash(state_dir: Path, session_id, legacy_rows: list) -> bool:
+    """Record ONCE PER SESSION that the chain carries row(s) written under the pre-2.4.0 hash
+    construction (`ledger._legacy_row_hash`) -- authentic, not tampered, but distinct enough from
+    an ordinary clean chain to be worth a line. Returns whether this call was the one that
+    recorded it.
+
+    Same rationale and marker shape as `_note_host_dialect` (issue #70, direction 3): a chain
+    with such a row would otherwise get this fact on EVERY dispatch for the rest of the chain's
+    life -- ~12,000 rows on the reporting install alone -- crowding dispatch_errors.jsonl and the
+    stderr floor with a fact that adds nothing after the first. Best-effort by construction: an
+    unwritable marker degrades to re-noting (noisy but correct), never to crashing the hot path."""
+    try:
+        marker_dir = state_dir / "legacy_row_hash"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        key = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(session_id or "nosession"))[:96]
+        marker = marker_dir / f"{key}.json"
+        if marker.exists():
+            return False
+        marker.write_text(json.dumps({"legacy_rows": legacy_rows}) + "\n", encoding="utf-8")
+    except Exception:
+        pass
+    _dispatch_fact(state_dir, "legacy_row_hash",
+                   f"chain row(s) at index {legacy_rows!r} verified under the pre-2.4.0 hash "
+                   f"construction (authentic, not tampered -- see ledger._legacy_row_hash); "
+                   f"noted once for this session", blocked=False, disposition="NOTE",
+                   ids={"session_id": str(session_id or "")})
+    return True
+
+
 def _self_verify_chain(state_dir: Path, ids: dict | None = None) -> None:
     """Re-derive the chain's tamper evidence at every dispatch, advisory-only. A clean or
     absent/empty chain is silent. Never raises. See docs/adr/0005-chain-verification-rollout.md.
 
     `ids` is the caller's session/tool attribution, threaded through for the same reason every
     other fact carries it: a tamper report nobody can tie to a session is a report nobody can
-    act on."""
+    act on.
+
+    A row genuinely written before a80fa32 verifies under a different construction
+    (`ledger._legacy_row_hash`) and is authentic, never `chain_tamper` -- `ledger.verify_chain`
+    already tells the two apart and keeps walking past a legacy row so a REAL edit further down
+    still surfaces below. That distinct, non-tamper state gets its own once-per-session note
+    (`_note_legacy_row_hash`), not the every-dispatch `chain_tamper` cadence this function's own
+    ADR-0005 history deliberately kept for genuine tamper (issue #70)."""
     try:
         from makoto.state import ledger as _ledger
-        broken_at = _ledger.verify_chain()
+        legacy_hits: list = []
+        broken_at = _ledger.verify_chain(legacy_hits=legacy_hits)
     except Exception as exc:
         _dispatch_fact(state_dir, "chain_verify_error", f"{type(exc).__name__}: {exc}",
                        blocked=False, ids=ids)
         return
+    if legacy_hits:
+        _note_legacy_row_hash(state_dir, ids.get("session_id") if ids else None, legacy_hits)
     if broken_at is not None:
         _dispatch_fact(state_dir, "chain_tamper",
                        f"chain integrity broken at row index {broken_at}", blocked=False, ids=ids)

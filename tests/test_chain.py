@@ -123,3 +123,52 @@ def test_verify_chain_detects_non_dict_row_never_crashes(chain, tmp_path):
     p = tmp_path / "chain.jsonl"
     p.write_text(p.read_text() + "[1, 2, 3]\n")               # a valid-JSON non-dict row
     assert chain.verify_chain() == 1
+
+
+def _append_legacy_row(chain, p, prev_hash, value):
+    """A genuine pre-2.4.0 write: hashed with the OLD norm_sha256(prev_hash + canonical(row))
+    construction (issue #70), never chain.append() -- append() only ever writes the current
+    construction, so a legacy row can only be produced by reproducing the retired one here.
+
+    Splits/joins on a literal "\\n", NOT str.splitlines() -- a row containing U+2028 (this
+    helper's whole reason to exist) would otherwise get sliced into two lines by the exact bug
+    under test, corrupting every OTHER row's line count for every caller that follows."""
+    row = {"kind": "value", "key": "bash", "value": value, "prev_hash": prev_hash, "status": "open"}
+    row["row_hash"] = chain._legacy_row_hash(prev_hash, row)
+    lines = p.read_text().split("\n")
+    lines = [ln for ln in lines if ln.strip()]
+    lines.append(json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":")))
+    p.write_text("\n".join(lines) + "\n")
+    return row
+
+
+def test_verify_chain_accepts_legacy_hashed_row_containing_line_separator(chain, tmp_path):
+    """The one case the two constructions disagree on (issue #70): a row containing U+2028,
+    hashed the pre-2.4.0 way. It is authentic, not chain_tamper -- verify_chain must accept it,
+    and legacy_hits must name it distinctly rather than swallowing it into a silent clean pass."""
+    chain.append({"k": "genesis"})
+    p = tmp_path / "chain.jsonl"
+    genesis = json.loads(p.read_text().split("\n")[0])
+    _append_legacy_row(chain, p, genesis["row_hash"], "ok" + chr(0x2028) + "next")
+    hits: list = []
+    assert chain.verify_chain(legacy_hits=hits) is None
+    assert hits == [1]
+
+
+def test_verify_chain_continues_past_legacy_row_to_catch_real_tamper_after_it(chain, tmp_path):
+    """Accepting a legacy row must not blind verify_chain to a REAL edit further down the chain
+    -- the exact masking issue #70 reported (chain_tamper pinned at the spurious legacy break,
+    hiding every genuine tamper after it)."""
+    chain.append({"k": "genesis"})
+    p = tmp_path / "chain.jsonl"
+    genesis = json.loads(p.read_text().split("\n")[0])
+    _append_legacy_row(chain, p, genesis["row_hash"], "ok" + chr(0x2028) + "next")
+    chain.append({"k": "c"})                                  # a real, exact-hash row after it
+    # split on literal "\n" here too -- str.splitlines() would cut the legacy row's U+2028 in
+    # half and misalign every index that follows it, the same trap _append_legacy_row avoids.
+    lines = [ln for ln in p.read_text().split("\n") if ln.strip()]
+    row2 = json.loads(lines[2])
+    row2["k"] = "TAMPERED"                                     # edit it, leaving its row_hash stale
+    lines[2] = json.dumps(row2, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    p.write_text("\n".join(lines) + "\n")
+    assert chain.verify_chain() == 2                          # the real break, not row 1
