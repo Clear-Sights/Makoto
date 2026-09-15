@@ -148,6 +148,65 @@ def test_successful_push_files_is_evidence():
     assert _successful_remote_mutation([ev]) is True
 
 
+# Regression: the real Claude Code wire shape for a settled MCP tool_response is a BARE LIST of
+# content blocks (`toolUseResult` verbatim), never a dict and never wrapped in a `{"content":
+# [...]}` envelope. Measured directly against this repo's own session transcript for a genuine,
+# successful `mcp__github__merge_pull_request` call: `tool_response` was recorded as exactly
+# `[{"type": "text", "text": "{\"sha\":\"...\",\"merged\":true,\"message\":\"Pull Request
+# successfully merged\"}"}]`. Before this fix, `_response_succeeded`/`_merged_true` required a
+# dict, so a row already correctly named in `_REMOTE_MUTATING_TOOL_NAMES` was silently unreadable
+# on every real merge/push/file-commit shipped through the GitHub MCP tools -- the claim was TRUE
+# and gate.claimed_shipped fired anyway, because the evidence arrived in a shape nothing read.
+def _mcp_content_blocks(payload: dict):
+    """The exact wire shape Claude Code records for a settled MCP tool_response: a bare list of
+    content blocks, JSON-stringified in the one `text` block -- not a dict, and not a dict
+    wrapping a `content` list."""
+    return [{"type": "text", "text": json.dumps(payload)}]
+
+
+def test_successful_merge_pull_request_is_evidence_as_bare_content_block_list():
+    ev = _event("mcp__github__merge_pull_request", {"pullNumber": 72},
+                _mcp_content_blocks({"sha": "960533b", "merged": True,
+                                      "message": "Pull Request successfully merged"}))
+    assert _successful_remote_mutation([ev]) is True
+
+
+def test_successful_push_files_is_evidence_as_bare_content_block_list():
+    ev = _event("push_files", {"branch": "main"},
+                _mcp_content_blocks({"commit": {"sha": "abc"}}))
+    assert _successful_remote_mutation([ev]) is True
+
+
+def test_successful_create_or_update_file_is_evidence():
+    ev = _event("mcp__github__create_or_update_file", {"path": "README.md", "branch": "main"},
+                _mcp_content_blocks({"commit": {"sha": "def"}, "content": {"sha": "ghi"}}))
+    assert _successful_remote_mutation([ev]) is True
+
+
+def test_failed_merge_as_bare_content_block_list_is_not_evidence():
+    # merged: false arrives the same wire way a success does; the false must still read as false.
+    ev = _event("mcp__github__merge_pull_request", {"pullNumber": 72},
+                _mcp_content_blocks({"merged": False, "message": "Pull Request is not mergeable"}))
+    assert _successful_remote_mutation([ev]) is False
+
+
+def test_non_json_content_block_text_is_not_evidence():
+    # A content block whose text is prose, not JSON, must not be treated as a settled dict --
+    # that would let a vague error message read as shipping evidence.
+    ev = _event("mcp__github__merge_pull_request", {"pullNumber": 72},
+                [{"type": "text", "text": "Pull request is not mergeable"}])
+    assert _successful_remote_mutation([ev]) is False
+
+
+def test_gate_silent_on_true_merge_claim_backed_by_real_mcp_wire_shape():
+    """End-to-end reproduction of the measured false block: a genuinely merged PR, evidenced
+    exactly the way Claude Code records it, must not fire gate.claimed_shipped."""
+    history = [_event("mcp__github__merge_pull_request", {"pullNumber": 72},
+                       _mcp_content_blocks({"sha": "960533b", "merged": True,
+                                             "message": "Pull Request successfully merged"}))]
+    assert claimed_shipped_gate("I merged the PR.", history=history) is None
+
+
 def test_failed_or_ambiguous_remote_tool_response_is_not_evidence():
     histories = (
         [_event("merge_pull_request", {}, {"error": "conflict"})],
