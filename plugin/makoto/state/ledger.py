@@ -281,6 +281,33 @@ def _row_hash(prev_hash: str, row: dict) -> str:
     return hashlib.sha256((prev_hash + canonical(row)).encode("utf-8")).hexdigest()
 
 
+# Every splitlines()-only separator that _dumps can still emit literally: json.dumps escapes
+# every OTHER control character it meets (\n, \r, and the rest of 0x00-0x1F all come out as a
+# backslash-escape), but these three code points sit above that escaped range, so with
+# ensure_ascii=False they pass through byte-for-byte. They are therefore the ONLY characters
+# that can make a pre-2.4.0 row's legacy digest (below) diverge from `_row_hash`'s exact-byte
+# one (issue #70). Built via chr() of the code points rather than written as literal characters
+# here, so this source file itself stays plain ASCII.
+_LEGACY_SPLIT_SEPARATORS = tuple(chr(cp) for cp in (0x2028, 0x2029, 0x85))
+
+
+def _legacy_row_hash(prev_hash: str, row: dict) -> str:
+    """VERIFICATION-ONLY reconstruction of pre-2.4.0's norm_sha256(prev_hash + canonical(row)) --
+    never call this from append(); it exists solely so verify_chain can recognize a row written
+    before a80fa32 as authentic under the DIFFERENT construction it was actually hashed with,
+    rather than as tampered.
+
+    Reproduces the old per-line-rstripped hash exactly: split the link bytes on every boundary
+    str.splitlines() recognizes (the wider set that is _row_hash's whole complaint about the
+    old construction), rstrip each line, rejoin on a plain newline, then sha256 the result. This
+    is the identical ambiguous operation _row_hash replaced; keeping one copy around, named and
+    commented as read-only and dead for writers, beats leaving a verifier no way to open a lock
+    it did not choose the shape of."""
+    linked = prev_hash + canonical(row)
+    normalized = "\n".join(line.rstrip() for line in linked.splitlines())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def store_root(*, root: Optional[Path] = None) -> Path:
     """Makoto's resolved state home (`state._state_dir()`) — the one root writer and reader share.
     `root`, when given, overrides env-var resolution entirely (additive -- every existing zero-arg
@@ -431,16 +458,27 @@ def append(row: dict, *, name: str = _DEFAULT_STREAM, root: Optional[Path] = Non
     return stored
 
 
-def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) -> Optional[int]:
+def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None,
+                 legacy_hits: Optional[list] = None) -> Optional[int]:
     """Re-walk the whole stream, recomputing each row's expected `prev_hash`/`row_hash`. Returns
     None when every link verifies (including the vacuously-intact absent/empty stream), else the
     0-based index of the FIRST row that fails to parse, is not a dict, or whose link does not
-    match — the exact point an edit, deletion, reorder, or truncation broke the chain. NEVER
-    RAISES: an unreadable store reads as None, and a NON-UTF-8 line is a broken row (its
-    index is returned) rather than a raised UnicodeDecodeError — the bytes are read raw and
-    decoded per line for exactly that reason. `root` overrides env-var resolution (see
-    `store_root`) -- a caller verifying a chain it appended via an explicit root must pass the
-    SAME root here, or it will resolve the wrong stream."""
+    match under EITHER construction it could genuinely have been written with — the exact point
+    an edit, deletion, reorder, or truncation broke the chain. NEVER RAISES: an unreadable store
+    reads as None, and a NON-UTF-8 line is a broken row (its index is returned) rather than a
+    raised UnicodeDecodeError — the bytes are read raw and decoded per line for exactly that
+    reason. `root` overrides env-var resolution (see `store_root`) -- a caller verifying a chain
+    it appended via an explicit root must pass the SAME root here, or it will resolve the wrong
+    stream.
+
+    `legacy_hits`, when passed a list, gets the index of every row that verified ONLY under
+    `_legacy_row_hash` -- a row genuinely written before a80fa32 (issue #70). Such a row is
+    authentic, not tampered, so it must not become this function's return value; but it is not
+    silently indistinguishable from an ordinary clean row either, so a caller that wants to know
+    (dispatch's `_self_verify_chain`) can. Either way the walk CONTINUES past it with the same
+    `expected_prev` chaining as any other row -- accepting a legacy row must never blind this
+    function to a REAL tamper later in the chain, which is the exact failure #70 reported
+    (`chain_tamper` pinned at the first, spurious break, masking everything after it)."""
     target = store_root(root=root) / f"{name}.jsonl"
     if not target.exists():
         return None
@@ -463,7 +501,18 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None) ->
         if row.get("prev_hash", "") != expected_prev:
             return idx
         if row.get("row_hash") != _row_hash(expected_prev, row):
-            return idx
+            # The exact-byte (2.4.0+) digest failed. That is tamper UNLESS this row could only
+            # ever have been written pre-2.4.0: the legacy construction agrees with _row_hash for
+            # every row free of the three splitlines()-only separators (_row_hash's own
+            # docstring), so a row without one has nothing left to explain a mismatch and stays
+            # tamper. A row that DOES carry one gets exactly one more chance, under the
+            # construction it would actually have been hashed with back then.
+            canon_text = canonical(row)
+            legacy_shaped = any(sep in canon_text for sep in _LEGACY_SPLIT_SEPARATORS)
+            if not (legacy_shaped and row.get("row_hash") == _legacy_row_hash(expected_prev, row)):
+                return idx
+            if legacy_hits is not None:
+                legacy_hits.append(idx)
         expected_prev = row.get("row_hash", "")
         idx += 1
     return None
