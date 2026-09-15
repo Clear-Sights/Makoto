@@ -35,7 +35,7 @@ finding is what mattered, and closing the PR does not discard it.
 ## Acknowledgements
 
 People outside this repository whose reports changed the code, every one of them, oldest first.
-Nine reports from two people, and every closed one of them landed a fix.
+Ten reports from two people, and every closed one of them landed a fix.
 
 <!-- Add a row when the fix lands, never when the report arrives: the credit names a change.
      Retroactive: every outside report that changed this code is listed, not only recent ones. -->
@@ -51,6 +51,7 @@ Nine reports from two people, and every closed one of them landed a fix.
 | [#20](https://github.com/Clear-Sights/Makoto/issues/20) | [@tkulczy2](https://github.com/tkulczy2) | `makoto uninstall` reported `"unwired": true` unconditionally, and silently removed nothing. |
 | [#28](https://github.com/Clear-Sights/Makoto/issues/28) | [@AliceLJY](https://github.com/AliceLJY) | `canon.recur` fired on transient failures and re-fired every Stop, because failed calls carry no PostToolUse. |
 | [#45](https://github.com/Clear-Sights/Makoto/issues/45) | [@AliceLJY](https://github.com/AliceLJY) | `_ACK_RX` anchored at offset 0 of the whole user turn, so prepended Stop-hook feedback made the typed human release -- the only discharge that gate honored -- unreachable exactly when it was needed. And the deeper one they filed as secondary: every canon atom is an existential over the whole session, so a fingerprint that has matched can never stop matching, which is what forces a human. Closed in 2.8.4: the window restarts at each firing and the human release is gone. |
+| [#70](https://github.com/Clear-Sights/Makoto/issues/70) | [@AliceLJY](https://github.com/AliceLJY) | A pre-2.4.0 row containing U+2028 could never verify under the exact-byte `_row_hash`, because the old construction rstripped a `splitlines()` copy and `splitlines()` breaks on that separator -- so `chain_tamper` fired on every dispatch. And the half that mattered more: `verify_chain` returns the first failing index, so that one row masked every genuine tamper after it. |
 
 ## Checking something yourself
 
