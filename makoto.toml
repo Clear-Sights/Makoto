@@ -1,0 +1,17 @@
+# Programs this repository verifies itself with -- recognition by DECLARATION, not by
+# filename. `checks/verifierExitMasking.py` reads this: masking one of these programs'
+# exit codes is a hidden failure and is blocked, where a guess at the same name could only
+# ever be surfaced. See plugin/makoto/core/_declaredverifiers.py for the format and why the
+# declaration may block while the naming heuristic behind it may not.
+#
+# `eval/replay.py` is the case that motivated the tier: a real verifier whose name says
+# nothing, named as residue in verifierExitMasking.py's own docstring and pinned as residue
+# by tests/predicates/test_verifierExitMasking.py.
+#
+# ONE entry, deliberately. `tools/render_checks.py` is a verifier too, but the naming
+# heuristic already reaches it at advisory, so declaring it would upgrade a tier that works
+# rather than close a hole -- and it would contradict that command's advisory-level pin in
+# the check's own tests. A declaration earns its line by making something true.
+verifiers = [
+    "eval/replay.py",
+]

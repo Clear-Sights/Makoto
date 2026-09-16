@@ -45,7 +45,10 @@ verifier whose name carries no verification word — `python3 eval/replay.py`, `
 not know it was a verifier. The wide tier is itself a closed list; the difference is that its
 residue costs a missing advisory, never a false block.
 
-Knight-Leveson: stdlib re only.
+Knight-Leveson: stdlib `re` and `functools.lru_cache` only, plus two L0 package leaves
+(`core._shell` for the tokenizer, `core._declaredverifiers` for the declaration tier). The
+only I/O anywhere near this check is that reader's one memoised `makoto.toml` probe; the
+detection itself still reads nothing but the command string it was handed.
 """
 # See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
 # against illusoryAuthorshipTrailer.py was verified and dismissed (only shared span is the
@@ -53,11 +56,13 @@ Knight-Leveson: stdlib re only.
 # tests/test_no_alpha_duplicate_functions.py is the package's real duplicate-logic gate.
 from __future__ import annotations
 import re
+from functools import lru_cache
 from typing import Optional
 from makoto.vocab import Finding
 from makoto.registry import Check
 from makoto.core._shell import (_NESTED_SHELL_PROGRAMS, _basename, _effective_argv,
                                 _shell_segments)
+from makoto.core._declaredverifiers import declares_anything, is_declared_verifier
 
 # Anchored at the (post-wrapper) START of a statement: the runner is INVOKED, not an argument.
 _LEAD_RUNNER_RX = re.compile(
@@ -89,6 +94,18 @@ _LEAD_RUNNER_RX = re.compile(
 # THIS TIER IS ALSO A CLOSED LIST, and says so. Its residue — an unlisted local verifier — costs
 # an ADVISORY that never appears, never a false block. That is why widening here is affordable
 # and widening _LEAD_RUNNER_RX would not be.
+#
+# --- the THIRD tier: RECOGNITION BY DECLARATION (blocking) ------------------------------------
+# Both tiers above read NAMES, and a name is not an interface: the narrow one cannot see
+# `python3 eval/replay.py` (this repository's own corpus replay) and the wide one matches
+# `check-deploy.sh`, which may be a deploy step. `makoto.core._declaredverifiers` asks the
+# repository instead — a `makoto.toml` at the event's `cwd` listing the programs it verifies
+# itself with. That is a statement by the only party that knows, not a guess about spelling, so
+# it is unambiguous in the sense `_is_runner_command` demands and may spend a deny.
+# It is consulted BEFORE the naming heuristic and can only ADD a tier: a declaration cannot turn
+# the heuristic off, because a declaration that could suppress findings would be a self-mute
+# lever an agent pulls by declaring one harmless program (see checks/selfMuteGuard.py). Absent
+# the file, every behaviour below is byte-for-byte what it was.
 _LOCAL_SCRIPT_VERIFIER_RX = re.compile(
     r"(?:^|[/\\_.-])(?:gate|gates|test|tests|check|checks|lint|verify|ci|preflight|smoke)"
     r"(?:[._-][A-Za-z0-9_.-]*)?\.(?:sh|bash|py)$"
@@ -111,15 +128,22 @@ def _skip_assignments(toks: list, i: int) -> int:
     return i
 
 
-def _leading_tokens(c: str) -> list:
+@lru_cache(maxsize=256)
+def _leading_tokens(c: str) -> tuple:
     """The statement's tokens from its LEADING command onward, after stripping leading `VAR=`
     assignments, `_WRAPPERS`, and ONE launcher prefix that delegates to a real runner
     (`python -m X`, `npx X`, `poetry|uv|pdm|hatch|pipenv run X`, `pnpm exec|dlx X`).
 
-    Extracted so BOTH runner tiers normalize identically: the narrow blocking tier
-    (`_is_runner_command`) and the wide advisory tier (`_is_local_runner_command`) must agree on
-    which token is "leading", or `sudo ./gates.sh || true` would be read one way by one tier and
-    another way by the other."""
+    Extracted so ALL THREE runner tiers normalize identically: the narrow blocking tier
+    (`_is_runner_command`), the declaration tier (`_declares_this_verifier`) and the wide advisory
+    tier (`_is_local_runner_command`) must agree on which token is "leading", or
+    `sudo ./gates.sh || true` would be read one way by one tier and another by the next.
+
+    MEMOISED, and returning a TUPLE so the shared value cannot be mutated by one caller under
+    another. Each tier asks about the SAME statement text, so the tokenising pass is O(n) in the
+    statement once and O(1) for every tier that repeats the question -- which also halves what
+    the two pre-existing tiers were already paying. Bounded at 256 statements; the dispatcher
+    forks per event, so the cache lives exactly as long as one hook invocation."""
     toks = c.strip().split()
     i = _skip_assignments(toks, 0)
     while i < len(toks) and toks[i] in _WRAPPERS:
@@ -133,7 +157,7 @@ def _leading_tokens(c: str) -> list:
             i += 1
         elif nxt is not None and nxt in _LAUNCHER_SUBCOMMANDS.get(t, ()):
             i += 2
-    return toks[i:]
+    return tuple(toks[i:])
 
 
 def _is_runner_command(c: str) -> bool:
@@ -147,6 +171,31 @@ def _is_runner_command(c: str) -> bool:
     FP-SAFE: `python -m pip install` / `poetry run python app.py` keep a NON-runner leading -> never fire.
     """
     return bool(_LEAD_RUNNER_RX.match(" ".join(_leading_tokens(c))))
+
+
+def _declares_this_verifier(lead_text: str, root) -> bool:
+    """True iff this statement's leading program is one `root`'s `makoto.toml` declares.
+
+    Normalises with the SAME `_leading_tokens` both other tiers use, so `sudo ./gates.sh` and
+    `python3 gates.py` are read identically by all three — a tier that disagreed about which
+    token leads would attribute one statement's mask to another statement's program.
+
+    Callers gate this on `declares_anything(root)` BEFORE the statement loop, so a repository
+    with no declaration never reaches the tokenisation below at all.
+    """
+    if not lead_text or not root:
+        return False
+    toks = _leading_tokens(lead_text)
+    if not toks:
+        return False
+    # `python3 eval/replay.py`: the interpreter is not the verifier, the script is. Mirrors
+    # `_is_local_runner_command`'s own interpreter walk, over declared names instead of a regex.
+    if _PYTHON_RX.fullmatch(_basename(toks[0])) or _basename(toks[0]) in ("bash", "sh", "zsh"):
+        for arg in toks[1:]:
+            if arg.startswith("-"):
+                continue
+            return is_declared_verifier(arg, root)
+    return is_declared_verifier(toks[0], root)
 
 
 def _is_local_runner_command(c: str) -> bool:
@@ -297,6 +346,12 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
     if current_event.get("tool_name") != "Bash":
         return None
     raw = current_event.get("tool_input", {}).get("command", "")
+    # The repository root the host reported, for the declaration tier. Read once here rather
+    # than per segment; a payload without it simply declares nothing.
+    declared_root = current_event.get("cwd") or ""
+    # ONE memoised probe for the whole invocation. Without it the tier would ask per shell
+    # statement, and a twelve-segment pipeline would pay twelve lookups to learn the same fact.
+    declares = declares_anything(declared_root)
     segments = _normalized_segments(raw)
 
     reason = None
@@ -326,6 +381,8 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
         lead_text = " ".join(lead)
         if _is_runner_command(lead_text):
             here = "block"
+        elif declares and _declares_this_verifier(lead_text, declared_root):
+            here = "block"                   # the repository named it; that is not a guess
         elif _is_local_runner_command(lead_text):
             here = "advise"
         else:

@@ -54,6 +54,49 @@ def test_check_clean_when_establisher_still_open():
     assert staleEstablisher.check(plan) is None
 
 
+def test_run_adapter_is_witnessed_firing_and_silent(tmp_path):
+    """The LIVE entry point, both ways. Everything above drives `check(plan)`; `run_stop_checks`
+    calls `CHECK.run(ctx)`, and `run` is a `live_query_finding` adapter around `check` -- a
+    separate piece of code with its own way of going wrong (it reads `ctx.plan`, and a gate that
+    read the wrong field would be silent forever while `check` stayed green).
+
+    A full-suite run with every check's entry point instrumented observed this adapter 241 times
+    and never once saw it produce a Finding: its positive half was missing, because
+    tests/test_stop_gate_level_invariant.py fires every gate through its real `.run(ctx)` but
+    selects on `may_block`, and this gate is `may_block=False` by design. Both halves here.
+    """
+    from makoto.context import GateContext
+
+    def ctx(plan):
+        return GateContext(text="", touched=frozenset(), empty=frozenset(), opens=(),
+                           testrun_output="", cwd="", fs_exists=lambda p: False,
+                           fs_size=lambda p: None, fs_read=lambda p: None, history=(),
+                           plan=plan)
+
+    missing = tmp_path / "gone.py"   # never created
+    stale = Plan()
+    stale.add_node("Write", "gone.py", str(missing), id="establisher")
+    stale.mark_done("establisher")
+    stale.add_node("Edit", "gone.py", str(tmp_path / "other.py"), id="dependent")
+    fired = staleEstablisher.run(ctx(stale))
+    assert fired is not None, "the live .run adapter never reaches check()'s finding"
+    findings = list(fired) if isinstance(fired, (list, tuple)) else [fired]
+    assert [f.pattern_id for f in findings] == ["gate.stale_establisher"]
+    assert [f.level for f in findings] == ["advisory"]
+
+    # THE SILENT HALF, through the same adapter: the establisher's file is on disk, so there is
+    # nothing stale. Without this the assertion above would pass for an adapter that fired on
+    # every plan it was handed.
+    present = tmp_path / "here.py"
+    present.write_text("x = 1\n", encoding="utf-8")
+    fresh = Plan()
+    fresh.add_node("Write", "here.py", str(present), id="establisher")
+    fresh.mark_done("establisher")
+    fresh.add_node("Edit", "here.py", str(tmp_path / "other.py"), id="dependent")
+    assert staleEstablisher.run(ctx(fresh)) is None
+    assert staleEstablisher.run(ctx(None)) is None
+
+
 def test_never_discovered_as_a_blocking_stop_gate():
     """Structural proof of the never-BLOCK guarantee: staleEstablisher's CHECK stays
     may_block=False, so it never enters dispatch._blocking_gate_ids() (load_checks(edge="Stop")-

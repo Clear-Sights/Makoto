@@ -288,3 +288,140 @@ def test_live_catalog_registration_is_reachable_in_dispatch():
         "content.verifier_exit_masking is unreachable in dispatch")
     f = predicate(current_event=evt, history=[], pattern=check)
     assert f is not None and f.pattern_id == "content.verifier_exit_masking"
+
+
+# --- THE THIRD TIER: RECOGNITION BY DECLARATION (blocking) -------------------------------------
+# Both tiers above read NAMES. This one asks the repository, via a `makoto.toml` at the event's
+# `cwd` listing the programs it verifies itself with. Every test below is a WITNESS PAIR: the
+# thing it must flag and the thing it must not, because a blocking tier nobody has watched stay
+# silent is the expensive kind of unproven.
+
+def _bash_in(command: str, cwd: str) -> dict:
+    event = _bash(command)
+    event["cwd"] = cwd
+    return event
+
+
+def _declare(tmp_path, *verifiers: str) -> str:
+    from makoto.core._declaredverifiers import declared_verifiers
+    body = ", ".join(f'"{v}"' for v in verifiers)
+    (tmp_path / "makoto.toml").write_text(f"verifiers = [{body}]\n", encoding="utf-8")
+    declared_verifiers.cache_clear()          # this process may already have asked about tmp_path
+    return str(tmp_path)
+
+
+def test_declared_verifier_mask_blocks(tmp_path):
+    """THE POSITIVE HALF, and the residue it closes: `python3 eval/replay.py` is a real verifier
+    (this repository's own corpus replay) whose FILE NAME says nothing, so both name-shaped tiers
+    are blind to it — pinned as residue by test_the_wide_tier_residue_is_stated_and_real below.
+    Declared, it is recognized, and at level="error": a declaration is the repository's own
+    statement, not a guess about spelling, so it meets _is_runner_command's own bar for a deny."""
+    root = _declare(tmp_path, "eval/replay.py")
+    f = predicate(current_event=_bash_in("python3 eval/replay.py || true", root),
+                  history=[], pattern=_PAT)
+    assert f is not None, "a declared verifier's mask is still unseen"
+    assert f.level == "error", (
+        f"a declaration is unambiguous evidence and must reach the blocking tier, got {f.level!r}")
+
+
+def test_declared_verifier_unmasked_is_silent(tmp_path):
+    """THE NEGATIVE HALF. Declaring a program does not make running it suspicious; only masking
+    its exit code does. Without this, the test above would pass just as well for a tier that
+    fired on every declared name."""
+    root = _declare(tmp_path, "eval/replay.py", "gates.sh")
+    for command in ("python3 eval/replay.py", "./gates.sh", "python3 eval/replay.py && echo ok",
+                    "./gates.sh || exit 1"):
+        assert predicate(current_event=_bash_in(command, root), history=[],
+                         pattern=_PAT) is None, command
+
+
+def test_undeclared_program_in_a_declaring_repo_is_untouched(tmp_path):
+    """The declaration answers about the programs it NAMES and about nothing else. A repository
+    that declares one verifier has not thereby declared every script it owns, and it has not
+    turned the naming heuristic off either: `check-deploy.sh` still gets the heuristic's
+    ADVISORY, `deploy.sh` still gets nothing."""
+    root = _declare(tmp_path, "eval/replay.py")
+    assert predicate(current_event=_bash_in("./deploy.sh || true", root),
+                     history=[], pattern=_PAT) is None
+    heuristic = predicate(current_event=_bash_in("./check-deploy.sh || true", root),
+                          history=[], pattern=_PAT)
+    assert heuristic is not None and heuristic.level == "advisory", (
+        "a declaration must not be able to switch the naming heuristic off -- that would be a "
+        "self-mute lever an agent pulls by declaring one harmless program")
+
+
+def test_no_declaration_changes_nothing(tmp_path):
+    """The whole tier is inert without the file. Same commands, same repo root, no makoto.toml:
+    byte-for-byte the pre-declaration behaviour (residue silent, heuristic advisory, narrow tier
+    blocking)."""
+    from makoto.core._declaredverifiers import declared_verifiers
+    declared_verifiers.cache_clear()
+    root = str(tmp_path)
+    assert not (tmp_path / "makoto.toml").exists()
+    assert predicate(current_event=_bash_in("python3 eval/replay.py || true", root),
+                     history=[], pattern=_PAT) is None
+    heuristic = predicate(current_event=_bash_in("./gates.sh || true", root),
+                          history=[], pattern=_PAT)
+    assert heuristic is not None and heuristic.level == "advisory"
+    narrow = predicate(current_event=_bash_in("pytest -q || true", root), history=[], pattern=_PAT)
+    assert narrow is not None and narrow.level == "error"
+
+
+def test_a_malformed_declaration_declares_nothing(tmp_path):
+    """FAIL-OPEN ON THE PARSE, in the only safe direction. A declaration that cannot be read must
+    not invent a block; it degrades to "nothing is declared", so the masked declared verifier goes
+    back to being residue rather than becoming a deny resting on a guess about broken TOML."""
+    from makoto.core._declaredverifiers import declared_verifiers
+    for body in ('verifiers = [', 'verifiers = "eval/replay.py"', 'other = ["eval/replay.py"]', ''):
+        (tmp_path / "makoto.toml").write_text(body, encoding="utf-8")
+        declared_verifiers.cache_clear()
+        assert predicate(current_event=_bash_in("python3 eval/replay.py || true", str(tmp_path)),
+                         history=[], pattern=_PAT) is None, body
+
+
+def test_declaration_matches_exactly_and_never_by_pattern(tmp_path):
+    """The point of a declaration is to stop guessing at names, so it must not smuggle in a
+    smaller guess. `replay.py` declared matches `replay.py` and `eval/replay.py` (same trailing
+    component, which is how a host spells the same program from a different cwd) and matches
+    NOTHING else -- not a prefix, not a substring, not a stem."""
+    root = _declare(tmp_path, "replay.py")
+    for hit in ("python3 replay.py || true", "python3 eval/replay.py || true",
+                "python3 /abs/eval/replay.py || true"):
+        f = predicate(current_event=_bash_in(hit, root), history=[], pattern=_PAT)
+        assert f is not None and f.level == "error", hit
+    for miss in ("python3 replay.pyc || true", "python3 myreplay.py || true",
+                 "python3 replay || true", "python3 eval/replay2.py || true"):
+        assert predicate(current_event=_bash_in(miss, root), history=[],
+                         pattern=_PAT) is None, miss
+
+
+def test_declared_tier_agrees_with_the_others_on_which_token_leads(tmp_path):
+    """All three tiers normalize through `_leading_tokens`. A tier that disagreed about which
+    token is leading would attribute one statement's mask to another statement's program."""
+    root = _declare(tmp_path, "gates.sh")
+    for command in ("sudo ./gates.sh || true", "env FOO=1 ./gates.sh || true",
+                    "bash gates.sh || true", "VAR=1 ./gates.sh || true"):
+        f = predicate(current_event=_bash_in(command, root), history=[], pattern=_PAT)
+        assert f is not None and f.level == "error", command
+    # ...and the mirror: the declared name as a mere ARGUMENT is not an invocation of it.
+    assert predicate(current_event=_bash_in("find / -name gates.sh || true", root),
+                     history=[], pattern=_PAT) is None
+
+
+def test_this_repository_declares_its_own_verifiers():
+    """MAKOTO EATS ITS OWN DOG FOOD. The residue this tier exists to close was named with THIS
+    repository's own programs, so this repository declares them -- and a declaration nothing
+    reads is a claim about nothing, so the live predicate is driven against the real root."""
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent.parent
+    from makoto.core._declaredverifiers import declared_verifiers
+    declared_verifiers.cache_clear()
+    tokens, _tails = declared_verifiers(str(root))
+    assert "eval/replay.py" in tokens, (
+        f"{root}/makoto.toml does not declare the corpus replay as a verifier")
+    f = predicate(current_event=_bash_in("python3 eval/replay.py || true", str(root)),
+                  history=[], pattern=_PAT)
+    assert f is not None and f.level == "error", (
+        "this repository's own declaration does not reach the live predicate")
+    assert predicate(current_event=_bash_in("python3 eval/replay.py", str(root)),
+                     history=[], pattern=_PAT) is None

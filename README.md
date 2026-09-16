@@ -250,6 +250,28 @@ the distinct process-error path.
 `MAKOTO_MODE` and the oversight clamp. The wire tables determine which outcomes each hook emits.
 The local-verifier branch of `content.verifier_exit_masking` can emit an advisory finding.
 
+### Declaring your verifiers (`makoto.toml`)
+
+`content.verifier_exit_masking` recognises a verifier three ways, and only the first two guess
+at names. `_LEAD_RUNNER_RX` is a closed vocabulary of ecosystem runners (`pytest`, `go test`,
+`npm test`) — unambiguous, so it blocks. `_LOCAL_SCRIPT_VERIFIER_RX` is a heuristic over file
+naming (`gates.sh`, `ci-check.sh`) — it cannot see a verifier whose name says nothing, and it
+matches `check-deploy.sh`, which may be a deploy step, so it only ever advises.
+
+The third way is to tell makoto. A `makoto.toml` at your repository root:
+
+```toml
+# Programs this repository verifies itself with.
+verifiers = ["eval/replay.py", "bin/verify-everything", "go"]
+```
+
+A declared program's masked exit code is **blocked**, not merely surfaced: a declaration is a
+statement by the only party that knows, not a guess about spelling. Entries match exactly — the
+token as written, or its trailing path component — never by glob, substring or stem. The
+declaration is additive only: it cannot switch the naming heuristic off, because a file that
+could suppress findings would be a self-mute lever (`content.self_mute_guard`'s subject). With no
+`makoto.toml`, behaviour is unchanged. See `plugin/makoto/core/_declaredverifiers.py`.
+
 ## Retry hints
 
 Blocking findings carry their retry hints and conventions through `dispatch._emit_decision`
