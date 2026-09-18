@@ -102,4 +102,7 @@ DECLARED_IDS: dict[str, str] = {
     # 2026-09-18: H6 FUNCTION DRAWN FROM NO CLAIM -- a top-level unit the session added
     # that no operator turn names, nothing it wrote reaches, and no decorator registered.
     "gate.unclaimed_unit": "unclaimedUnit",
+    # 2026-09-18: H3 FIX DRAWN FROM FIXES -- one repair's text reaching a second file with
+    # no verifier run between the two landings, so the second site was never checked.
+    "gate.pasted_fix": "pastedFix",
 }

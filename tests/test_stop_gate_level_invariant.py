@@ -265,8 +265,24 @@ def _scenario_unclaimed_unit(tmp_path):
                                       "tool_response": {}}}])
 
 
+def _scenario_pasted_fix(tmp_path):
+    # fires: tests/test_pasted_fix.py::test_fires_when_the_same_repair_reaches_a_second_file
+    _REPAIR = ("if timeout is None:\n"
+               "    timeout = DEFAULT_TIMEOUT\n"
+               "if timeout < 0:\n"
+               "    raise ValueError(timeout)\n")
+
+    def row(path):
+        return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Edit",
+                            "tool_input": {"file_path": path, "old_string": "pass",
+                                           "new_string": _REPAIR},
+                            "tool_response": {}}}
+    return _ctx(history=[row("src/reader.py"), row("src/writer.py")])
+
+
 _SCENARIOS = {
     "gate.unclaimed_unit": _scenario_unclaimed_unit,
+    "gate.pasted_fix": _scenario_pasted_fix,
     "gate.report_before_run": _scenario_report_before_run,
     "gate.unnamed_failure": _scenario_unnamed_failure,
     "gate.undischarged_waiver": _scenario_undischarged_waiver,
