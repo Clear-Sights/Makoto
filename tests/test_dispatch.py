@@ -1746,6 +1746,25 @@ def test_dispatch_report_before_run_gate_never_blocks_even_when_it_fires(tmp_pat
         "the advisory fire must still be audited so it leaves a forensic trail"
 
 
+def test_dispatch_unclaimed_unit_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unclaimed_unit (2026-09-18,
+    register H6) fires (audited) but never blocks, even when its own condition holds -- a
+    top-level function written that nothing reaches and no decorator registered."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, {"hook_event_name": "PostToolUse", "session_id": "unclaimed",
+                              "cwd": str(tmp_path), "tool_name": "Write",
+                              "tool_input": {"file_path": "src/helpers.py",
+                                             "content": "def helper(a):\n    return a + 1\n"},
+                              "tool_response": {}})
+    stop = {"hook_event_name": "Stop", "session_id": "unclaimed", "cwd": str(tmp_path),
+            "last_assistant_message": "Added a helper."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unclaimed_unit must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unclaimed_unit" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
 def test_no_shadow_gate_every_gate_blocks():
     """Warning-tier-elimination invariant, STRUCTURAL after the gates/ package cutover: may_block
     <=> reaches the decision pipeline. The pipeline-eligible set DERIVES from
@@ -1786,7 +1805,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.relaunched_unchanged",
                           "gate.undischarged_waiver",  # register B9's runner, same tier
                           "gate.unnamed_failure",      # register C12's runner, same tier
-                          "gate.report_before_run"}    # register C11's runner, same tier
+                          "gate.report_before_run",    # register C11's runner, same tier
+                          "gate.unclaimed_unit"}       # register H6's runner, same tier
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the
@@ -1840,7 +1860,8 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
                         "gate.relaunched_unchanged",
                         "gate.undischarged_waiver",
                         "gate.unnamed_failure",
-                        "gate.report_before_run"}
+                        "gate.report_before_run",
+                        "gate.unclaimed_unit"}
     # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
     # so an empty function with the right name -- or one that asserts nothing, or never reaches
     # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is

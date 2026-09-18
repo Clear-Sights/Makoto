@@ -138,7 +138,3 @@ def test_a_parametrized_id_is_matched_on_its_bare_name():
                         "tests/test_billing.py::test_charge[eur] FAILED\n1 failed in 1.0s")]
     assert unnamed_failure_gate("1 failed: test_charge.", history=history) is None
     assert unnamed_failure_gate("1 test failed.", history=history) is not None
-
-
-def test_an_undecodable_history_row_is_no_recorded_verdict():
-    assert unnamed_failure_gate("2 failed.", history=[object(), None, "not a row"]) is None

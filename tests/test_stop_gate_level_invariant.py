@@ -257,7 +257,16 @@ def _scenario_report_before_run(tmp_path):
                                       "tool_response": {}}}])
 
 
+def _scenario_unclaimed_unit(tmp_path):
+    # fires: tests/test_unclaimed_unit.py::test_fires_on_a_unit_nothing_reaches
+    return _ctx(history=[{"payload": {"hook_event_name": "PostToolUse", "tool_name": "Write",
+                                      "tool_input": {"file_path": "src/helpers.py",
+                                                     "content": "def helper(a):\n    return a + 1\n"},
+                                      "tool_response": {}}}])
+
+
 _SCENARIOS = {
+    "gate.unclaimed_unit": _scenario_unclaimed_unit,
     "gate.report_before_run": _scenario_report_before_run,
     "gate.unnamed_failure": _scenario_unnamed_failure,
     "gate.undischarged_waiver": _scenario_undischarged_waiver,
@@ -298,6 +307,37 @@ def _findings_for(gate, tmp_path):
     if isinstance(result, (list, tuple)):
         return list(result)
     return [result]
+
+
+def test_every_history_eating_gate_fails_open_on_malformed_rows():
+    """ONE home for what four new test modules were each restating in 2026-09-18.
+
+    `gate.undischarged_waiver`, `gate.unnamed_failure`, `gate.report_before_run` and
+    `gate.unclaimed_unit` each shipped a `test_an_undecodable_row_...` asserting the same thing
+    about its own gate. The claim is not per-gate -- a malformed event is no evidence for ANY of
+    them, and a raise here is a check-evaluation fault that fails the call open without being
+    checked (dispatch records it in dispatch_errors.jsonl). So it is asserted over the whole set,
+    where a gate added without the tolerance reddens, rather than four times where only the four
+    are covered.
+
+    The rows below are every shape a decoder can meet: a non-row object, None, a bare string, an
+    empty dict, and a dict whose payload is not a mapping.
+    """
+    rows = [object(), None, "not a row", {}, {"payload": "nope"}, {"payload": {}}]
+    for gate in _live_gates():
+        if "history" not in (gate.eats or frozenset()):
+            continue
+        ctx = _ctx(history=rows)
+        try:
+            result = gate.run(ctx)
+        except Exception as exc:                       # pragma: no cover - the failure path
+            raise AssertionError(
+                f"{gate.id} raised on a malformed history row ({exc!r}); a Stop gate must treat "
+                f"an undecodable event as no evidence, never as a fault") from exc
+        findings = result if isinstance(result, list) else ([result] if result else [])
+        assert not findings, (
+            f"{gate.id} produced {len(findings)} finding(s) from rows that carry no evidence at "
+            f"all: {[f.pattern_id for f in findings]}")
 
 
 def test_every_scenario_covers_a_discovered_gate():
