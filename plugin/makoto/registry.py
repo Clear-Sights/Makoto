@@ -68,6 +68,9 @@ _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_adv
                                   # C12's runner: the benign case (the runner's own summary
                                   # pasted, names visible in it) looks identical.
                                   "gate.unnamed_failure",
+                                  # C11's runner: DOCUMENTING a command's output in a
+                                  # session that never ran it looks identical.
+                                  "gate.report_before_run",
                                   })  # FD6, FD26, 2026-07-09
 
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called

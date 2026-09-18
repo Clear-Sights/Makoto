@@ -96,4 +96,7 @@ DECLARED_IDS: dict[str, str] = {
     # 2026-09-18: the first of the five entries no tool ran. C12 VERDICT WITHOUT ITS
     # SUBJECT -- a counted failure whose identity the record held and the turn dropped.
     "gate.unnamed_failure": "unnamedFailure",
+    # 2026-09-18: C11 REPORT BEFORE DECIDE -- a run's success written into prose before any
+    # verifier ran. Same ACT_VS_GUARD factory as the seven Keel-shaped obligations.
+    "gate.report_before_run": "reportBeforeRun",
 }

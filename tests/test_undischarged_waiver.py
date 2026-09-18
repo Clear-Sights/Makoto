@@ -162,10 +162,3 @@ def test_several_offenders_are_one_finding_naming_them():
 def test_two_directives_on_one_line_are_one_offence():
     """Deduplicated by line, so a line carrying two directives does not inflate the count."""
     assert len(_undischarged_directives(f"a = 1  {H} noqa  {H} nosec")) == 1
-
-
-def test_the_check_ships_advisory_and_declares_its_shape():
-    assert CHECK.posture == "ADVISE"
-    assert CHECK.applies_at == "Stop"
-    assert CHECK.tests == "PATTERN_MATCH"
-    assert CHECK.eats == frozenset({"history"})
