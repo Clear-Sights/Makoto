@@ -98,7 +98,7 @@ def test_register_map_reddens_on_an_entry_with_no_row(tmp_path, monkeypatch):
 
 # Digest of docs/REGISTER.md as vendored from measure-zero-dev. Re-pin deliberately
 # when the register is re-vendored; that edit is the record that a copy moved.
-REGISTER_DIGEST = "f262b53bcb839927ec045402522cff1ba64b6e9665cadf0d4734c858fd71ee69"
+REGISTER_DIGEST = "f64fdf7c6c1d8b574952bc409f067bf138f04db5f3da05b7e34c4402a61d3929"
 
 
 def test_vendored_register_matches_its_pinned_digest():

@@ -8,6 +8,8 @@ docs/REGISTER-MAP.tsv gives every entry in it one of three verdicts:
   NOT-COUNTABLE   the entry is in makoto's subject -- a statement graded against
                   the record -- but its test would be a similarity judgement, and
                   makoto refuses those. The note says which comparison it needs.
+  UNCOVERED       the entry is in makoto's subject and countable, and no check enforces
+                  it yet. The note says what it would take.
   OUT-OF-SUBJECT  the entry governs code makoto does not execute or a system it
                   does not configure. Not a gap in makoto; a gap in nothing.
 
@@ -24,8 +26,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "plugin"))
 REGISTER = ROOT / "docs" / "REGISTER.md"
 MAP = ROOT / "docs" / "REGISTER-MAP.tsv"
-VERDICTS = {"RUNNER", "NOT-COUNTABLE", "OUT-OF-SUBJECT"}
-ENTRY_RX = re.compile(r"^([A-G]\d+)\s+[A-Z]")
+VERDICTS = {"RUNNER", "NOT-COUNTABLE", "UNCOVERED", "OUT-OF-SUBJECT"}
+ENTRY_RX = re.compile(r"^([A-H]\d+)\s+[A-Z]")
 
 from makoto import registry  # noqa: E402
 
