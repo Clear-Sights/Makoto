@@ -93,4 +93,7 @@ DECLARED_IDS: dict[str, str] = {
     # PATTERN_MATCH over introduced text rather than an obligation -- the register's rule
     # is that a waiver NAMES a checkable end, which is a property of its own text.
     "gate.undischarged_waiver": "undischargedWaiver",
+    # 2026-09-18: the first of the five entries no tool ran. C12 VERDICT WITHOUT ITS
+    # SUBJECT -- a counted failure whose identity the record held and the turn dropped.
+    "gate.unnamed_failure": "unnamedFailure",
 }

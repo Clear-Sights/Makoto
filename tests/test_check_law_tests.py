@@ -51,6 +51,13 @@ ACT_GUARD_PRIMITIVES = frozenset({"unmet_obligation_gate"})
 TESTRUN_PRIMITIVES = frozenset({
     "classify_failure", "compute_delta", "recorded_failed_names", "is_failing_testrun",
     "_bash_call_after",
+    # `current_named_verdicts` is the same family at the grain a per-test verdict needs: it
+    # builds {exact_id: FAIL|PASS} out of the responses of RECOGNIZED runner invocations only,
+    # over the same `recorded_failed_names`/`recorded_passed_names` parsers the others use. A
+    # gate reaching it has consulted a test run, which is what this shape's evidence means --
+    # and reaching it is the only sound way to do so, because it is what keeps a `FAILED` line
+    # the agent merely displayed (`cat old.log`) from grounding a verdict.
+    "current_named_verdicts",
 })
 INTRODUCED_PRIMITIVES = frozenset({
     "_gated_content", "scan_target_content", "introduced_text",

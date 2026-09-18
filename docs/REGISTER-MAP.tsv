@@ -16,7 +16,7 @@ C2	RUNNER	gate.undeclared_falsifiable	a claim that cannot be evaluated is refuse
 C6	RUNNER	content.verifier_predicate_weakened	a loose comparator where equality is meant records the wrong direction
 C7	RUNNER	gate.completion	a partial artifact is graded present-or-absent on disk, not by its prefix
 C10	RUNNER	gate.claimed_shipped	the ship claim names every remote-mutating route; absence needs all of them
-C12	UNCOVERED	-	in subject: a turn that counts a failure and never names the failing identity. Needs the count and the name paired in one row
+C12	RUNNER	gate.unnamed_failure	the counted failure is paired with the identities the run itself recorded, and the turn must name one of them; ADVISE tier. Three-valued by design: a count with no recorded identity is NOT-EVALUABLE, never a fire, because makoto cannot ask for a name nobody has
 D13	RUNNER	gate.dropped	the commitments are enumerated first; discharge is graded against exactly that list
 E3	RUNNER	content.illusory_authorship_trailer	an explicit intent marker is required; a bare product-name mention is not matched; also content.illusory_interruption_claim: an "interrupted by user" excuse needs the interruption on the record
 E5	RUNNER	event.identical_retry	a byte-identical retry after the same deterministic failure is interdicted

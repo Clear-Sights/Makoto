@@ -111,3 +111,28 @@ def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():
     assert "audit" in lexicons._INTEG_VOCAB and "provenance" in lexicons._INTEG_VOCAB
     assert integritySuppressionFlag._INTEG is lexicons._INTEG_VOCAB        # p14._INTEG stays the L0 object
     assert envGatedAudit._INTEG_VOCAB is lexicons._INTEG_VOCAB  # content.env_gated_audit consumes the same source, no second copy
+
+
+def test_the_recorded_verdict_parsers_are_one_object_under_every_spelling():
+    """The EVIDENCE side of a named-test claim moved to its reachable home 2026-09-18 -- the
+    recorded-marker parsers to `vocab` (rank 0) and the history walk over them to `kit` (rank 1)
+    -- so three consumers reach them without a lateral check-to-check import and
+    `kit.compute_delta` no longer needs a call-time back-edge into a named check module.
+
+    `namedTestTeeth` still SPELLS them, because its own tests and this file address them there.
+    That spelling must stay a re-export and never become a second copy: a plant that rebinds
+    `recorded_failed_names` in the check module to a stub is exactly the drift the move exists to
+    prevent, and nothing reddened on it until this pin existed. Identity, not equality -- two
+    parsers that agree today are still two parsers.
+    """
+    from makoto import vocab as lexicons, kit
+    from makoto.checks import namedTestTeeth as ntt
+    for name in ("_TESTNAME_RX", "_REC_FAIL_LEAD_RX", "_REC_FAIL_TRAIL_RX", "_REC_PASS_LEAD_RX",
+                 "_REC_PASS_TRAIL_RX", "_recorded_names", "recorded_failed_names",
+                 "recorded_passed_names"):
+        assert getattr(ntt, name) is getattr(lexicons, name), f"{name} is no longer one object"
+    assert ntt.current_named_verdicts is kit.current_named_verdicts
+    # ...and the new C12 gate reads the same objects rather than its own pair.
+    from makoto.checks import unnamedFailure as uf
+    assert uf._TESTNAME_RX is lexicons._TESTNAME_RX
+    assert uf.current_named_verdicts is kit.current_named_verdicts
