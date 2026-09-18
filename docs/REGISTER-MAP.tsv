@@ -1,6 +1,6 @@
 entry	verdict	runner	note
 A2	RUNNER	content.phantom_citation	membership judged on a folded citation string, both directions
-A3	OUT-OF-SUBJECT	-	pairing of two sequences inside code makoto does not execute
+A3	RUNNER	gate.unread_structure	a traversal of structured data that printed `null` needs a structure read before it, so the positions are read rather than assumed; ADVISE tier, ported by shape from Keel's clause U10 (the previous OUT-OF-SUBJECT note was right about a zip() in code makoto does not execute, and wrong that makoto sees no traversal -- a jq printing null is one, on its own record)
 A4	OUT-OF-SUBJECT	-	duplicate-key precedence inside code makoto does not execute
 A5	RUNNER	gate.canon_fingerprints	the atom is matched against the whole closing text, not an extracted inner value
 A7	RUNNER	gate.named_test	a named test is graded per name, not against an aggregate pass count
@@ -23,12 +23,12 @@ E5	RUNNER	event.identical_retry	a byte-identical retry after the same determinis
 E10	RUNNER	event.identical_retry	the retry is graded against the failure class it follows
 E11	OUT-OF-SUBJECT	-	nested limits of a host makoto does not allocate
 E12	RUNNER	content.self_mute_guard	the gate's own inspected attribute cannot be reworded away; also gate.claimed_consent_absent: rewording cannot grant the operator's approval, so the cited approval must be a genuine user turn
-E13	NOT-COUNTABLE	-	a detached task's input channel is not on the record makoto reads
+E13	RUNNER	gate.relaunched_unchanged	a second worker launch needs a verifier report before it, or it inherits the first launch's channel; ADVISE tier, ported by shape from Keel's clause U02 (the previous NOT-COUNTABLE note was right that the worker's own input channel is off makoto's record, and the REPEAT is two dispatch events on it)
 G2	RUNNER	gate.unasked_plan	a plan presented with no question asked this session settled its ambiguity by guessing; ADVISE tier, ported by shape from Keel's clause P02 (the previous NOT-COUNTABLE note was right that grading WHICH question was owed is a similarity judgement, and whether ANY was asked is not)
 G3	NOT-COUNTABLE	-	needs each party's span compared against the answer's; that comparison is similarity
 G5	RUNNER	gate.unexamined_wall	an epistemic "cannot" with zero calls since the operator's last turn
 A14	OUT-OF-SUBJECT	-	a normalization inside code makoto does not execute; its own canon() is graded by tests/test_canon_fingerprints.py
-B4	NOT-COUNTABLE	-	proxy-versus-target disagreement is a similarity judgement over two oracles
+B4	RUNNER	gate.unwitnessed_verifier	a verifier reporting clean needs to have been seen reporting a failure, or the clean report is evidence of nothing; ADVISE tier, ported by shape from Keel's clause U25 (the previous NOT-COUNTABLE note was right that proxy-versus-target agreement is a similarity judgement, and whether the oracle has ever fired is not)
 B11	RUNNER	gate.unprobed_fanout	a dispatch to a subagent needs a read, glob or grep before it, so the brief describes what is there rather than what was assumed; ADVISE tier, ported by shape from Keel's clause D01 (the previous NOT-COUNTABLE note read the entry as a with-and-without MEASUREMENT, which is not on any channel makoto reads -- the baseline the clause means is a read of the ground, which is)
 B14	NOT-COUNTABLE	-	with-and-without measurement is outside a single turn's record
 B18	OUT-OF-SUBJECT	-	held-out reporting is a property of the certification sets, not of a turn
@@ -38,8 +38,8 @@ D1	RUNNER	gate.completion	a write is graded by reading the artifact back, never 
 D4	RUNNER	gate.stale_pass	a derived pass older than its source is refused against the live record
 D8	OUT-OF-SUBJECT	-	magnitude of a system makoto does not execute
 D11	RUNNER	event.thrash_revert	a whole-artifact rewrite that lands back where it started is refused
-D12	OUT-OF-SUBJECT	-	durability of a copy across a boundary makoto does not cross
-D14	NOT-COUNTABLE	-	an undo's provability is not a channel makoto reads
+D12	RUNNER	gate.unknown_ref_switch	moving HEAD to a ref needs the ref printed first, so what must survive the boundary is named; ADVISE tier, ported by shape from Keel's clause U09 (the previous OUT-OF-SUBJECT note was right about a copy into volatile storage, and wrong that makoto crosses no boundary -- a git checkout in its own Bash record is one)
+D14	RUNNER	gate.unobserved_destruction	destroying content needs a verifier report before it, or there is no pre-image an undo could be proven against; ADVISE tier, ported by shape from Keel's clause U20, over the one destructive classifier substrate/_canonAtoms already owns (the previous NOT-COUNTABLE note graded proving the undo, which is not countable; whether anything was observed first is)
 E7	RUNNER	dispatch fail-closed	posture is declared per check, never inherited from the platform (carried from E4, folded into E7)
 F2	RUNNER	tests/test_gate_shape.py	one owner per gate declaration; every consumer reads the registry; also tests/test_gate_shape.py: every gate's registration points are enumerated and checked together (from F1)
 F7	RUNNER	gate.stale_pass	the record is re-read at the moment of the claim, not before it

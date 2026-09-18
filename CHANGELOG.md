@@ -6,6 +6,55 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [2.9.0] — 2026-09-18
 
 ### Added
+- **Five more `ACT_VS_GUARD` obligations** — one register entry each, all ported by shape from
+  Keel's clause table, all ADVISE tier. The map goes 46 RUNNER -> **51 of 74**; the live
+  inventory goes 13 pre-checks / 20 Stop gates -> 13 / 25.
+
+  | check | entry | Keel clause | the obligation |
+  |---|---|---|---|
+  | `gate.unread_structure` | A3 POSITIONAL PAIRING | U10 | a traversal that printed `null` needs a structure read before it |
+  | `gate.unwitnessed_verifier` | B4 WRONG ORACLE | U25 | a verifier reporting clean needs to have been seen reporting a failure |
+  | `gate.unknown_ref_switch` | D12 PRESERVE TO VOLATILE | U09 | moving HEAD needs the ref printed first |
+  | `gate.unobserved_destruction` | D14 UNDO UNPROVEN | U20 | destroying content needs a verifier report before it |
+  | `gate.relaunched_unchanged` | E13 PARKED ON AN INHERITED CHANNEL | U02 | a second worker launch needs a verifier report before it |
+
+  Every one of the five map notes it replaces was wrong in the same instructive way: right about
+  a stronger question, wrong that the weaker countable one was off makoto's channels. A3's said
+  "pairing of two sequences inside code makoto does not execute" -- true of a `zip()` in
+  someone else's source, and a `jq` printing `null` is the same pairing failing on makoto's own
+  record. B4's said proxy-versus-target agreement is a similarity judgement -- true, and whether
+  the oracle has EVER fired is not. D12's said "a boundary makoto does not cross" -- a
+  `git checkout` in its own Bash record is one. D14's graded proving the undo -- not countable;
+  whether anything was observed first is. E13's said the worker's input channel is off the
+  record -- true, and the REPEAT is two dispatch events on it.
+
+  Each note now carries the correction beside the runner, so the next reader sees what changed
+  rather than a verdict that flipped for no stated reason.
+
+  ONE HOME for everything shared: destruction is `substrate._canonAtoms._is_destructive_argv`,
+  the same classifier `gate.canon_fingerprints`' `destructive_command` atom uses, so its
+  documented scope cut is inherited rather than re-litigated; "a verifier ran" is
+  `kit.ran_a_verifier`, one definition for the two gates that mean it; "the command matches a
+  regex" is `kit.command_matches`. Those last two exist because
+  `tests/test_no_alpha_duplicate_functions.py` caught four copies of the body the moment this
+  batch landed, and `ran_a_verifier` is spelled as a `command_matches` application rather than
+  its own `def` because the law then caught THAT as alpha-equivalent to the factory's body.
+
+  A named recall bound, stated in each module rather than discovered later: `B4`'s vocabulary is
+  exactly `vocab._TEST_RUNNER_RX`, which is a TEST-runner list. A linter or security scanner
+  (`ruff`, `mypy`, `eslint`, `semgrep`) is not in it, so this gate does not see one. Adding a
+  second "what a verifier is" list would be `F2 TWO SOURCES OF TRUTH`; widening belongs in
+  `_TEST_RUNNER_RX` itself, once, if it is ever worth it.
+
+  A bug this batch had for one draft, kept as a test: `re.I` over `\bFAILED\b` matches the WORD
+  "failed", so `58 passed, 0 failed` read as the verifier FIRING and `gate.unwitnessed_verifier`
+  went quiet on exactly the report it exists for. The counted form is anchored to a non-zero
+  count; the bare report tokens are case-sensitive.
+
+  Ten plants, each red then green with the control green.
+
+
+### Added
 - **A new result shape, `ACT_VS_GUARD`, and the first two checks of it** — so register entries
   `B11 BASELINE UNTAKEN` and `G2 DETERMINED ASKED AS OPEN` have a runner. The live inventory goes
   13 pre-checks / 18 Stop gates -> 13 / 20; the register map goes 44 RUNNER -> 46.

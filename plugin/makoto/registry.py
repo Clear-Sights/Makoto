@@ -53,7 +53,16 @@ TESTS_SHAPES = frozenset({
 # to BLOCK needs that measurement, not a preference. Each module's docstring says so.
 _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
                                   "gate.relative_path_citation", "gate.plan_item_drift",
-                                  "gate.unprobed_fanout", "gate.unasked_plan"})  # FD6, FD26, 2026-07-09
+                                  "gate.unprobed_fanout", "gate.unasked_plan",
+                                  # the second obligation batch, same reasoning: each has a
+                                  # named benign class in its own module docstring and no
+                                  # corpus-measured FP rate yet.
+                                  "gate.unread_structure",
+                                  "gate.unwitnessed_verifier",
+                                  "gate.unknown_ref_switch",
+                                  "gate.unobserved_destruction",
+                                  "gate.relaunched_unchanged",
+                                  })  # FD6, FD26, 2026-07-09
 
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called
 # "posture" and they are three different vocabularies: a CHECK's native tier is `BLOCK`/`ADVISE`

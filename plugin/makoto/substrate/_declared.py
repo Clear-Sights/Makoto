@@ -82,4 +82,11 @@ DECLARED_IDS: dict[str, str] = {
     # table so the register entries B11 and G2 have a runner. See kit.unmet_obligation_gate.
     "gate.unprobed_fanout": "unprobedFanout",
     "gate.unasked_plan": "unaskedPlan",
+    # 2026-09-18, second batch: five more ACT_VS_GUARD obligations, one per register entry that
+    # Keel's clause table covered and makoto did not -- A3, B4, D12, D14, E13.
+    "gate.unread_structure": "unreadStructure",
+    "gate.unwitnessed_verifier": "unwitnessedScanner",
+    "gate.unknown_ref_switch": "unknownRefSwitch",
+    "gate.unobserved_destruction": "unobservedDestruction",
+    "gate.relaunched_unchanged": "relaunchedUnchanged",
 }

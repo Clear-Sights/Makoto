@@ -200,7 +200,45 @@ def _scenario_unasked_plan(tmp_path):
     return _ctx(history=[row])
 
 
+def _bash_row(command, stdout="", tool_name="Bash"):
+    return {"payload": {"hook_event_name": "PostToolUse", "tool_name": tool_name,
+                        "tool_input": {"command": command},
+                        "tool_response": {"stdout": stdout, "exitCode": 0}}}
+
+
+def _scenario_unread_structure(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unread_structure_fires_on_a_null_traversal
+    return _ctx(history=[_bash_row("jq '.a.b' config.json", "null")])
+
+
+def _scenario_unwitnessed_verifier(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unwitnessed_verifier_fires_on_a_first_clean_run
+    return _ctx(history=[_bash_row("pytest -q", "58 passed in 2.0s")])
+
+
+def _scenario_unknown_ref_switch(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unknown_ref_switch_fires_on_an_unprinted_ref
+    return _ctx(history=[_bash_row("git checkout feature-x")])
+
+
+def _scenario_unobserved_destruction(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unobserved_destruction_fires_with_no_verifier
+    return _ctx(history=[_bash_row("rm -rf build/")])
+
+
+def _scenario_relaunched_unchanged(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_relaunched_unchanged_fires_on_the_second_launch
+    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Task",
+                       "tool_input": {"description": "go"}, "tool_response": {}}}
+    return _ctx(history=[row, row])
+
+
 _SCENARIOS = {
+    "gate.unread_structure": _scenario_unread_structure,
+    "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,
+    "gate.unknown_ref_switch": _scenario_unknown_ref_switch,
+    "gate.unobserved_destruction": _scenario_unobserved_destruction,
+    "gate.relaunched_unchanged": _scenario_relaunched_unchanged,
     "gate.unprobed_fanout": _scenario_unprobed_fanout,
     "gate.unasked_plan": _scenario_unasked_plan,
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
