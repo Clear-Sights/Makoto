@@ -89,4 +89,8 @@ DECLARED_IDS: dict[str, str] = {
     "gate.unknown_ref_switch": "unknownRefSwitch",
     "gate.unobserved_destruction": "unobservedDestruction",
     "gate.relaunched_unchanged": "relaunchedUnchanged",
+    # 2026-09-18, third batch: the waiver-discharge gate, register entry B9. A
+    # PATTERN_MATCH over introduced text rather than an obligation -- the register's rule
+    # is that a waiver NAMES a checkable end, which is a property of its own text.
+    "gate.undischarged_waiver": "undischargedWaiver",
 }

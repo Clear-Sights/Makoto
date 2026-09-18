@@ -1691,6 +1691,25 @@ def test_dispatch_relaunched_unchanged_gate_never_blocks_even_when_it_fires(tmp_
         "the advisory fire must still be audited so it leaves a forensic trail"
 
 
+def test_dispatch_undischarged_waiver_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.undischarged_waiver (2026-09-18,
+    register B9) fires (audited) but never blocks, even when its own condition holds -- an Edit
+    that introduces a lint-silencing directive with no checkable end named on or above it."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, {"hook_event_name": "PostToolUse", "session_id": "waiver",
+                              "cwd": str(tmp_path), "tool_name": "Edit",
+                              "tool_input": {"file_path": "src/parser.py", "old_string": "a",
+                                             "new_string": "value = parse(raw)  # noqa"},
+                              "tool_response": {}})
+    stop = {"hook_event_name": "Stop", "session_id": "waiver", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.undischarged_waiver must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.undischarged_waiver" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
 def test_no_shadow_gate_every_gate_blocks():
     """Warning-tier-elimination invariant, STRUCTURAL after the gates/ package cutover: may_block
     <=> reaches the decision pipeline. The pipeline-eligible set DERIVES from
@@ -1728,7 +1747,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.unwitnessed_verifier",
                           "gate.unknown_ref_switch",
                           "gate.unobserved_destruction",
-                          "gate.relaunched_unchanged"}
+                          "gate.relaunched_unchanged",
+                          "gate.undischarged_waiver"}  # register B9's runner, same tier
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the
@@ -1779,7 +1799,8 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
                         "gate.unwitnessed_verifier",
                         "gate.unknown_ref_switch",
                         "gate.unobserved_destruction",
-                        "gate.relaunched_unchanged"}
+                        "gate.relaunched_unchanged",
+                        "gate.undischarged_waiver"}
     # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
     # so an empty function with the right name -- or one that asserts nothing, or never reaches
     # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is

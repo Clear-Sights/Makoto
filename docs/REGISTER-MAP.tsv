@@ -8,7 +8,7 @@ A11	RUNNER	gate.canon_fingerprints	atoms are existentials over distinct calls, w
 A13	NOT-COUNTABLE	-	deciding configured-versus-inherent needs the layer that set it; makoto reads the record, not the platform
 B2	RUNNER	gate.hollow_test	an assertion that cannot fail is refused: no assert, tautology, swallowed failure, uncollectable; also gate.undeclared_falsifiable: a claim must name what would falsify it before absence counts as evidence (from B8); also gate.green_claim: a green claim needs a passing run on the record, never absence of a red one
 B7	RUNNER	tools/merge_pass.py	every rule in this repo binds to a runner; this file is the MERGING protocol's
-B9	NOT-COUNTABLE	-	an exemption's discharge is not a channel makoto reads
+B9	RUNNER	gate.undischarged_waiver	a silencing directive introduced with no checkable end named on or above it; ADVISE tier. The previous NOT-COUNTABLE note was right that makoto cannot tell whether the discharge HAPPENED -- whether an issue closed or a date passed -- and wrong that the entry needs that: the rule is that the waiver NAMES a checkable end, which is a property of its own introduced text. The forms the instrument discharges itself (@ts-expect-error, xfail, skipif) are excluded by design
 B23	OUT-OF-SUBJECT	-	a numeric bound inside code makoto does not execute
 B35	RUNNER	content.integrity_suppression_flag	an integrity-suppression flag must cite an ADR that declares the exemption, or it is undeclared; also content.env_gated_audit: an audit reached only when an env var is set is an exemption the rule never mentions
 B36	NOT-COUNTABLE	-	needs the recognizer's own miss count; a turn carries what matched, never the residue it did not
