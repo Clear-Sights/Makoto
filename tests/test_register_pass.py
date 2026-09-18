@@ -96,6 +96,73 @@ def test_register_map_reddens_on_an_entry_with_no_row(tmp_path, monkeypatch):
     assert register_map.main() == 2
 
 
+def test_register_map_reddens_on_a_check_the_map_names_nowhere(tmp_path, monkeypatch):
+    """A live check with no register home is refused.
+
+    This is the audit's own subject: `B7 RULE WITH NO RUNNER` pointed inward. The plant
+    strips every mention of one cited check from the map, so it becomes a runner bound to
+    no rule, and the run must stop. Before 2026-09-18 nothing checked this direction and
+    eleven checks were named nowhere.
+    """
+    sys.path.insert(0, str(ROOT / "tools"))
+    import register_map
+
+    text = register_map.MAP.read_text(encoding="utf-8")
+    assert "gate.unexamined_wall" in text
+    planted = tmp_path / "REGISTER-MAP.tsv"
+    planted.write_text(text.replace("gate.unexamined_wall", "gate.stale_pass"), encoding="utf-8")
+    monkeypatch.setattr(register_map, "MAP", planted)
+
+    assert register_map.main() == 2
+
+
+def test_register_map_reddens_when_a_longer_id_is_only_prefix_matched(tmp_path, monkeypatch):
+    """A cited id must not satisfy a LONGER id that starts with it.
+
+    `gate.canon` is cited for F10 and `gate.canon_fingerprints` for A5/A11. A substring
+    test would let the short one home the long one silently, which is exactly `A2
+    SURFACE-FORM IDENTITY`. The plant cites only the short form and requires the refusal.
+    """
+    sys.path.insert(0, str(ROOT / "tools"))
+    import register_map
+
+    text = register_map.MAP.read_text(encoding="utf-8")
+    planted = tmp_path / "REGISTER-MAP.tsv"
+    planted.write_text(text.replace("gate.canon_fingerprints_advisory", "gate.canon")
+                           .replace("gate.canon_fingerprints", "gate.canon"), encoding="utf-8")
+    monkeypatch.setattr(register_map, "MAP", planted)
+
+    assert register_map.main() == 2
+
+
+def test_register_map_reddens_on_a_declared_exemption_that_is_not_a_live_check(monkeypatch):
+    """A name declared outside the register must be a check that exists."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import register_map
+
+    monkeypatch.setitem(register_map.OUTSIDE_THE_REGISTER, "gate.ghost", "a reason")
+    assert register_map.main() == 2
+
+
+def test_register_map_reddens_on_a_check_both_cited_and_declared_outside(monkeypatch):
+    """A check is in the register's subject or declared outside it, never both."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import register_map
+
+    monkeypatch.setitem(register_map.OUTSIDE_THE_REGISTER, "gate.hollow_test", "a reason")
+    assert register_map.main() == 2
+
+
+def test_register_map_reddens_on_a_declared_exemption_with_no_reason(monkeypatch):
+    """`B35 UNDECLARED EXEMPTION` applied to this tool's own exemptions: a blank reason is
+    an undeclared one."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import register_map
+
+    monkeypatch.setitem(register_map.OUTSIDE_THE_REGISTER, "gate.relative_path_citation", "   ")
+    assert register_map.main() == 2
+
+
 # Digest of docs/REGISTER.md as vendored from measure-zero-dev. Re-pin deliberately
 # when the register is re-vendored; that edit is the record that a copy moved.
 REGISTER_DIGEST = "f64fdf7c6c1d8b574952bc409f067bf138f04db5f3da05b7e34c4402a61d3929"

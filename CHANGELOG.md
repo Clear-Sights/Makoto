@@ -5,6 +5,38 @@ All notable changes to makoto. Versions follow the live check inventory
 
 ## [2.9.0] — 2026-09-18
 
+### Added
+- `tools/register_map.py` grades the OTHER direction, which nothing graded until now: **every
+  live check must have a register home.** A check the map names nowhere -- not in a runner
+  column, not in a note -- is a runner bound to no rule, which is `B7 RULE WITH NO RUNNER`
+  pointed inward, and it is how a check accumulates with no reason to exist. Eleven of the 33
+  were in that state. The audit found a twelfth on its first run:
+  `gate.canon_fingerprints_advisory`, which the map named nowhere at all.
+
+  Settling the eleven did not produce a cut, and that is the measurement rather than a
+  preference. `tools/merge_pass.py` already refutes every ordered same-edge pair at a
+  fixpoint, so none of them was redundant with a survivor; each is a working check certified
+  at zero false positives. Ten turned out to serve an entry the map cites a different runner
+  for -- three the map's notes already said so (`verifier_exit_masking`->D1,
+  `fabricated_commit_sha`->H5, `stale_establisher`->H2) and seven now do: `green_claim`->B2,
+  `env_gated_audit`->B35, `illusory_interruption_claim`->E3, `claimed_consent_absent`->E12,
+  `fabricated_action`->G1, `liveness`->E1, `canon_fingerprints_advisory`->A11.
+
+  The eleventh, `gate.relative_path_citation`, serves no entry and is **declared** in
+  `OUTSIDE_THE_REGISTER` with the reason: an unclickable relative path costs the reader a step
+  and misstates nothing, which is why it is ADVISE tier. Declaring it rather than leaving it
+  silent is `B35 UNDECLARED EXEMPTION` applied to this tool's own exemptions, so the table
+  grades its own rows -- a name must be a live check, its reason must be non-empty, and a name
+  the map also cites is refused, since a check is in the register's subject or outside it and
+  never both.
+
+  Five plants, each a fault in the audit's own subject: a cited check's every mention stripped
+  from the map; only `gate.canon` cited where `gate.canon_fingerprints` is meant (a substring
+  test would let the short id home the long one, which is `A2 SURFACE-FORM IDENTITY`, so the
+  match is word-boundaried); a declared name that is not a live check; a check both cited and
+  declared outside; a declared name with a blank reason.
+
+
 ### Removed
 - `GateContext.opens` and the whole commitments store under it: `state/commitments.py` (473
   lines), the `commitments` sqlite table, `run_stop_checks`'s commitment-sourcing -> retraction
