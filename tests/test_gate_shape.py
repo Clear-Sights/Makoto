@@ -74,6 +74,10 @@ GATE_MODULE_STEMS = {
                              # evidence, mirroring claimedProduceAbsent's claim-vs-ledger shape.
     "claimedShippedAbsent", # completed remote mutation claim checked against successful Bash
                              # git-push and closed-set GitHub mutation evidence across all agents.
+    "unprobedFanout",       # 2026-09-18: register B11's runner, the first ACT_VS_GUARD
+                             # obligation -- a dispatch with no read before it. ADVISE tier.
+    "unaskedPlan",          # 2026-09-18: register G2's runner, the second -- a plan presented
+                             # with no question asked. ADVISE tier.
 }
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
@@ -89,7 +93,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.relative_path_citation", "gate.plan_item_drift",
                           "gate.claimed_running", "gate.claimed_shipped",
                           "gate.claimed_consent_absent",
-                          "gate.unexamined_wall"}
+                          "gate.unexamined_wall",
+                          "gate.unprobed_fanout", "gate.unasked_plan"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -107,7 +112,10 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "testrun_output",
                            "history_all_agents"}   # 2026-07-23: gate.claimed_running's
                            # cross-agent-pooled Bash evidence twin of `history` (see GateContext's
                            # own field doc)
-EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
+EXPECTED_FUNCTION_COUNTS = {
+    "unprobedFanout.py": 2,                                  # 2026-09-18: ACT_VS_GUARD obligation
+    "unaskedPlan.py": 2,                                  # 2026-09-18: ACT_VS_GUARD obligation
+                               # top-level def count per module, verified
     "claimedProduceAbsent.py": 2,
     "falseGreenClaim.py": 2,
     "silentlyDroppedCommitment.py": 6,                     # 7->6, 2026-08-20: _drop_def_or_class
@@ -265,11 +273,12 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 18                # 6 ledger-gates + liveness + self_wired +
+    assert len(GATE_MODULE_FILES & present) == 20                # 6 ledger-gates + liveness + self_wired +
     # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
     # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
     # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
-    # runIntentUnfulfilled cut -- no register entry named any of them.
+    # runIntentUnfulfilled cut -- no register entry named any of them. 18->20, 2026-09-18:
+    # unprobedFanout / unaskedPlan added -- register B11 and G2, which had no runner.
 
 
 def test_module_function_counts_match_the_design():

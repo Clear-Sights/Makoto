@@ -78,4 +78,8 @@ DECLARED_IDS: dict[str, str] = {
     # for these four; keeping this manifest complete remains a hand-maintenance duty.
     "gate.plan_item_drift": "planItemDrift",
     "gate.relative_path_citation": "relativePathCitation",
+    # 2026-09-18: the first two ACT_VS_GUARD obligations, ported by shape from Keel's clause
+    # table so the register entries B11 and G2 have a runner. See kit.unmet_obligation_gate.
+    "gate.unprobed_fanout": "unprobedFanout",
+    "gate.unasked_plan": "unaskedPlan",
 }

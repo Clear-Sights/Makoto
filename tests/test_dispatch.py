@@ -1557,6 +1557,42 @@ def test_dispatch_plan_item_drift_gate_never_blocks_even_when_it_fires(tmp_path)
         "the advisory fire must still be audited so it leaves a forensic trail"
 
 
+def test_dispatch_unprobed_fanout_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unprobed_fanout (2026-09-18, register
+    B11) fires (audited) but never blocks, even when its own condition holds -- a Task dispatch
+    recorded with no Read, Glob or Grep before it."""
+    state_dir = _setup_state(tmp_path)
+    dispatch_ev = {"hook_event_name": "PostToolUse", "session_id": "fanout", "cwd": str(tmp_path),
+                   "tool_name": "Task", "tool_input": {"description": "refactor the parser"},
+                   "tool_response": {"stdout": "done", "exitCode": 0}}
+    _run_dispatch(state_dir, dispatch_ev)
+    stop = {"hook_event_name": "Stop", "session_id": "fanout", "cwd": str(tmp_path),
+            "last_assistant_message": "Handed that off."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unprobed_fanout must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unprobed_fanout" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
+def test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unasked_plan (2026-09-18, register
+    G2) fires (audited) but never blocks, even when its own condition holds -- an ExitPlanMode
+    recorded with no AskUserQuestion before it."""
+    state_dir = _setup_state(tmp_path)
+    plan_ev = {"hook_event_name": "PostToolUse", "session_id": "unasked", "cwd": str(tmp_path),
+               "tool_name": "ExitPlanMode", "tool_input": {"plan": "step 1, step 2"},
+               "tool_response": {"stdout": "", "exitCode": 0}}
+    _run_dispatch(state_dir, plan_ev)
+    stop = {"hook_event_name": "Stop", "session_id": "unasked", "cwd": str(tmp_path),
+            "last_assistant_message": "Plan is up."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unasked_plan must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unasked_plan" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
 def test_no_shadow_gate_every_gate_blocks():
     """Warning-tier-elimination invariant, STRUCTURAL after the gates/ package cutover: may_block
     <=> reaches the decision pipeline. The pipeline-eligible set DERIVES from
@@ -1585,7 +1621,10 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
                           "gate.claimed_consent_absent",
-                          "gate.unexamined_wall"}   # register G5\'s runner
+                          "gate.unexamined_wall",   # register G5\'s runner
+                          "gate.unprobed_fanout",  # advisory-tier (2026-09-18): register B11's
+                                                   # runner, the first ACT_VS_GUARD obligation
+                          "gate.unasked_plan"}     # advisory-tier (2026-09-18): register G2's
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the
@@ -1625,8 +1664,13 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     # exception, same shape as gate.self_wired: discovered (so it appears in _blocking_gate_ids())
     # but ships at level="advisory" only, never "error" -- structurally cannot block. Its behavioral
     # pin is test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fires below.
+    # gate.unprobed_fanout and gate.unasked_plan (2026-09-18) are the fifth and sixth, same
+    # shape: both ACT_VS_GUARD obligations shipped ADVISE-only with no measured FP rate yet.
+    # Pinned by test_dispatch_unprobed_fanout_gate_never_blocks_even_when_it_fires and
+    # test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires above.
     _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
-                        "gate.relative_path_citation", "gate.plan_item_drift"}
+                        "gate.relative_path_citation", "gate.plan_item_drift",
+                        "gate.unprobed_fanout", "gate.unasked_plan"}
     # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
     # so an empty function with the right name -- or one that asserts nothing, or never reaches
     # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is

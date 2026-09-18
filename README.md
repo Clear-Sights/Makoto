@@ -30,10 +30,10 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **13 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **11**, `event`: **2**
-- **20 Stop checks** (all checks registered at the Stop edge)
-- **18 end-of-turn gates** (`may_block=True`)
+- **22 Stop checks** (all checks registered at the Stop edge)
+- **20 end-of-turn gates** (`may_block=True`)
 - **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **4 advisory end-of-turn gates** (advisory-allowlisted)
+- **6 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
 
@@ -99,6 +99,8 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.canon_fingerprints_advisory` | the advisory remainder (soft/claim atoms or gold-disqualified) | advisory | advisory |
 | `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |
 | `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
+| `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | advisory | advisory |
+| `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | advisory | advisory |
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 

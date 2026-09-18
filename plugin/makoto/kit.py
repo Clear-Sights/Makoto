@@ -775,6 +775,58 @@ def introduced_regex_predicate(
     return _predicate
 
 
+def unmet_obligation_gate(*, act, guard, message, retry_hint, pattern_id,
+                          level="advisory", min_acts=1) -> Callable[..., Optional[Finding]]:
+    """Build a Stop-edge OBLIGATION gate: a costly act ran this session and no qualifying guard
+    preceded it.
+
+    This is a result shape makoto had no mechanism for, and the blindspot register names it.
+    Every other check in this catalog holds the assistant's STATEMENT against the record. An
+    obligation holds an ACT against a guard that had to come first: no statement is needed and
+    none is read, so a turn that says nothing at all can still owe. Ported BY SHAPE from Keel's
+    clause table (`clear-sights/keel`, `plugin/keel/clauses.json`), where a row is
+    (occasion, costly, guard, deny_reason) with `subject=session_id` and `window=session`.
+
+    `act` and `guard` are predicates over ONE decoded history event -- the full dict, not
+    `iter_tool_events`' (name, command, response) triple, so a caller can read the `tool_input`
+    keys that triple drops. ORDER IS THE WHOLE CHECK: a guard seen before the act pays it for
+    the rest of the session, and a guard seen after does not, because the act already ran on
+    unknown ground. `min_acts` fires only from the Nth unguarded act onward, for a clause whose
+    costly thing is the REPEAT rather than the first one.
+
+    One O(history) pass and no store: the obligation is a pure function of the event sequence,
+    so it cannot go stale and has no write path to get wrong. That is deliberate -- makoto HAD a
+    persisted obligation store (`state/commitments.py`) and it was cut on 2026-09-18 once
+    nothing read it; a derived obligation needs neither the table nor the reconcile.
+
+    NAMED RECALL BOUND: history is `_select_recent`'s rolling window, so an act older than the
+    window reads as never having happened. Same bound `claimedRunningAbsent` documents for its
+    own evidence, and it fails OPEN -- the gate goes quiet, never louder.
+    """
+    def _run(history) -> Optional[Finding]:
+        seen_guard = False
+        unguarded = 0
+        offender = None
+        for row in history or ():
+            ev = decode_history_event(row)
+            if not isinstance(ev, dict):
+                continue                   # fail open: an undecodable row could be the guard
+            if guard(ev):
+                seen_guard = True
+                continue
+            if act(ev) and not seen_guard:
+                unguarded += 1
+                offender = ev
+        if unguarded < min_acts or offender is None:
+            return None
+        return Finding(
+            pattern_id=pattern_id, file="", line=0, level=level,
+            message=message, retry_hint=retry_hint,
+            snippet=str(offender.get("tool_name", ""))[:200],
+        )
+    return _run
+
+
 def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Finding]]:
     """Build a Stop check whose live query result is itself the evidence."""
     input_name = query.__code__.co_varnames[0] if query.__code__.co_argcount else ""

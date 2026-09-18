@@ -6,6 +6,48 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [2.9.0] — 2026-09-18
 
 ### Added
+- **A new result shape, `ACT_VS_GUARD`, and the first two checks of it** — so register entries
+  `B11 BASELINE UNTAKEN` and `G2 DETERMINED ASKED AS OPEN` have a runner. The live inventory goes
+  13 pre-checks / 18 Stop gates -> 13 / 20; the register map goes 44 RUNNER -> 46.
+
+  Every other check in this catalog holds the assistant's STATEMENT against the record. An
+  obligation holds an ACT against a guard that had to come first: no statement is read, so a turn
+  that says nothing at all can still owe. That is a mechanism makoto did not have, and the
+  blindspot register names it. Ported BY SHAPE from Keel's clause table
+  (`clear-sights/keel`, `plugin/keel/clauses.json`), where a row is
+  (occasion, costly, guard, deny_reason) with `subject=session_id` and `window=session`.
+
+  `kit.unmet_obligation_gate` is the engine and the only way to reach the order rule: a module
+  that declares `ACT_VS_GUARD` and hand-rolls the loop fails the result-shape law, because the
+  order IS the check. One O(history) pass, no store and no new table -- the obligation is a pure
+  function of the event sequence, so it cannot go stale and has no write path to get wrong. That
+  is deliberate: makoto HAD a persisted obligation store (`state/commitments.py`), cut earlier in
+  this same release once nothing read it, and a derived obligation needs neither the table nor
+  the reconcile.
+
+  - `gate.unprobed_fanout` (B11): work dispatched to a subagent with no Read, Glob or Grep
+    earlier in the session. The map's previous `NOT-COUNTABLE` note read the entry as a
+    with-and-without MEASUREMENT, which is genuinely not on any channel makoto reads; the
+    baseline the entry means is a read of the ground before work is dispatched onto it, and that
+    is two events makoto already records.
+  - `gate.unasked_plan` (G2): a plan presented with no question asked this session. The previous
+    note was right that grading WHICH question was owed is a similarity judgement. Grading
+    whether ANY was asked is not, and that is the weaker, countable question this gate asks.
+
+  Both ship **ADVISE tier, never BLOCK**, and are named in `_ADVISORY_ALLOWLIST`: each has a real
+  benign class (a dispatch that IS the exploration; a plan for a request that carried no
+  ambiguity) and no corpus-measured false-positive rate yet. Promoting either needs that
+  measurement, not a preference.
+
+- `tests/test_check_law_tests.py::test_no_dead_result_shape_in_the_closed_vocabulary`, found by a
+  plant. `TESTS_SHAPES` is a closed vocabulary and nothing checked the other direction, so a
+  shape nobody declares sat in it undetectably -- `B7 RULE WITH NO RUNNER` applied to a
+  vocabulary. Adding a bogus member left the whole suite green. Every member must now be
+  declared by a live check or reserved with a reason, and `FACTORY_SHAPES` cannot map a factory
+  to a shape the vocabulary lacks.
+
+
+### Added
 - `tools/register_map.py` grades the OTHER direction, which nothing graded until now: **every
   live check must have a register home.** A check the map names nowhere -- not in a runner
   column, not in a note -- is a runner bound to no rule, which is `B7 RULE WITH NO RUNNER`
