@@ -93,6 +93,8 @@ GATE_MODULE_STEMS = {
                             # into prose before any verifier ran
     "unclaimedUnit",        # register H6 FUNCTION DRAWN FROM NO CLAIM: a top-level unit
                             # answering to nothing on the record
+    "pastedFix",            # register H3 FIX DRAWN FROM FIXES: one repair's text reaching a
+                            # second file with no verifier run between the two landings
 }
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
@@ -118,7 +120,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.undischarged_waiver",
                           "gate.unnamed_failure",
                           "gate.report_before_run",
-                          "gate.unclaimed_unit"}
+                          "gate.unclaimed_unit",
+                          "gate.pasted_fix"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -162,6 +165,7 @@ EXPECTED_FUNCTION_COUNTS = {
     "unnamedFailure.py": 1,                                # 2026-09-18, register C12
     "reportBeforeRun.py": 1,                               # 2026-09-18, register C11
     "unclaimedUnit.py": 5,                                 # 2026-09-18, register H6
+    "pastedFix.py": 4,                                     # 2026-09-18, register H3
     "stalePytestCache.py": 1,
     "deadPureStatement.py": 15,                            # engine + adapter merged (_run lives here);
                                                             # 19->15, 2026-07-09: _scratch_roots/_under/
@@ -311,7 +315,7 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 29                # 6 ledger-gates + liveness + self_wired +
+    assert len(GATE_MODULE_FILES & present) == 30                # 6 ledger-gates + liveness + self_wired +
     # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
     # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
     # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
