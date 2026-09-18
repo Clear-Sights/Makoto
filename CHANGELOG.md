@@ -6,6 +6,29 @@ All notable changes to makoto. Versions follow the live check inventory
 ## [2.9.0] — 2026-09-18
 
 ### Removed
+- `GateContext.opens` and the whole commitments store under it: `state/commitments.py` (473
+  lines), the `commitments` sqlite table, `run_stop_checks`'s commitment-sourcing -> retraction
+  -> `open_commitments` prologue, and the 76-line retraction vocabulary in `vocab.py` plus
+  `_ENUM_BEFORE_HEAD_RX`. `gate.advance` was the only reader of `opens`; it was cut above, and
+  no other check read the field, so the store fed nothing. Each of the seven vocabulary symbols
+  was verified live on 4bb8da7 and dead only because of these two cuts, rather than assumed
+  dead.
+
+  What stayed, and why: `gate.dropped` (register D13) keeps its forward-claim detection intact
+  -- it reads `text`, never the store -- and the plan-item promise store (`plan_item_commitments`,
+  a promise to a LABEL rather than a path) is a separate table that nothing here touched.
+  `state/plan.py` keeps the fence and offer-conditional regexes as the single-source `vocab`
+  objects it already consumed; `substrate/claims.py` is now `_FENCE_SPAN_RX`'s remaining
+  consumer alongside `gate.dropped`.
+
+  A defect found while planting this: `tests/test_lexicons.py`'s single-source pins were NOT
+  falsifiable. Every one asserted object identity (`module._RX is vocab._RX`), and `re.compile`
+  memoizes on `(pattern, flags)` -- so a check module re-inlining the pattern byte-identically
+  gets the same object back and every `is` assertion stays green. A plant that re-inlined
+  `substrate/claims.py`'s fence regex stayed green for exactly that reason. The pins now also
+  assert, by AST over the module's own source, that the name is never assigned at module level,
+  so it can only have arrived by import. Five pins were re-armed this way.
+
 - Four checks, and the plan-obligation surface that was only theirs: `gate.contract_order` (both
   its Pre and its Stop surface), `gate.advance`, `gate.run_promised` and
   `content.deferred_checkbox_theater`. The criterion is the blindspot register

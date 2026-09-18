@@ -1,7 +1,7 @@
 """makoto.checks.planItemDrift -- ADVISORY reminder of open PLAN/TASK-LABELED commitments
 ("§9.3", "Task #19") a real session hit: a forward promise phrased as a section/task reference,
 never a file path, was silently dropped and never appeared in ANY commitment store because
-`state/commitments.py`'s sourcer requires a file-shaped location and found none.
+`gate.dropped`'s sourcer requires a file-shaped location and found none.
 
 `state/plan.py` sources/discharges these purely textually (no filesystem ground truth
 exists for a label); this check surfaces whatever is still open at Stop time as a reminder, ADVISORY

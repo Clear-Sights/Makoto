@@ -37,7 +37,7 @@ def _live_gates() -> list:
     return [c for c in load_checks(edge="Stop") if c.may_block]
 
 def _ctx(**over):
-    base = dict(text="", touched=frozenset(), empty=frozenset(), opens=(), testrun_output="",
+    base = dict(text="", touched=frozenset(), empty=frozenset(), testrun_output="",
                 cwd="", fs_exists=lambda p: False, fs_size=lambda p: None, fs_read=lambda p: None,
                 history=())
     base.update(over)

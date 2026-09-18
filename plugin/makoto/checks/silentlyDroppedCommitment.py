@@ -57,7 +57,7 @@ def _drop_extract_forward_claims(text):
     consumed by the first match. Negated forward frames are dropped. A frame inside a
     ```code fence``` is QUOTED text (a shell command, a demo, someone else's words), never the
     assistant's own commitment -- the L0 single-source `vocab._FENCE_SPAN_RX` decides what a
-    fence is, the same object `substrate/claims.py` and `state/commitments.py` consume; before
+    fence is, the same object `substrate/claims.py` consumes; before
     this exclusion a count claim pasted verbatim inside a fence fired a BLOCK the turn could
     not discharge, because nothing was promised."""
     if not text:

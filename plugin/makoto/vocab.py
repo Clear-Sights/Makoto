@@ -263,15 +263,16 @@ _PRODUCE_VERB_RX = re.compile(
 # A passive/copular auxiliary right before the verb ⇒ "was written / is wired" — a
 # description of state or of another subject's action, NOT a first-person production claim.
 _BE_AUX_RX = re.compile(r"(?:\b(?:was|were|is|are|been|being|be|am)\s*$)|(?:['’](?:s|re)\s*$)", re.IGNORECASE)
-# A conditional/hypothetical OFFER governing a promise -> not a firm commitment. Byte-identical
-# in `state/commitments.py` and `state/plan.py`; plan.py's own comment already said it "mirrors
-# commitments.py's hardened guards" without the dedup actually happening -- the same class of
-# drift risk `_BE_AUX_RX` above was already hoisted for.
+# A conditional/hypothetical OFFER governing a promise -> not a firm commitment. Hoisted here
+# when it was byte-identical in the file-path commitment store and `state/plan.py`, the same
+# class of drift risk `_BE_AUX_RX` above was hoisted for; that store was cut 2026-09-18, so
+# `state/plan.py` is the one consumer now.
 _OFFER_COND_RX = re.compile(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
                             re.IGNORECASE)
 # Makoto watches the AI's OWN promises: a commitment needs a FIRST-PERSON subject ("I'll add X",
 # "we need to write X") OR a clause-initial imperative ("Add X to Y"). A THIRD-PERSON or
-# adverbial subject is NOT a promise the AI made. Byte-identical in both files, same reason.
+# adverbial subject is NOT a promise the AI made. Hoisted with `_OFFER_COND_RX` above, same
+# reason, and likewise down to one consumer.
 _FIRST_PERSON_RX = re.compile(
     r"\b(?:i|we|i'?ll|we'?ll|i'?m|we'?re|i'?ve|we'?ve|i'?d|we'?d|let'?s|my|our)\b", re.IGNORECASE)
 # A clause boundary between the verb and the path ⇒ the verb governs a different clause.
@@ -280,11 +281,11 @@ _CLAUSE_BREAK_RX = re.compile(r"[.;:\n—]")
 # command, so a --message/path body that merely MENTIONS a keyword can't masquerade as the command itself.
 _QUOTED_RX = re.compile(r'"[^"]*"|\'[^\']*\'')
 # A full ```fenced``` code block (DOTALL: the span crosses newlines). L0 SINGLE SOURCE for fenced-span
-# extraction — substrate.claims._code_spans (fences + inline backticks) and
-# state.commitments._fenced_spans both consume this exact object, so the fence regex lives in one
-# place. Distinct from the `_FENCE_RX` line-anchored parity marker (a different algorithm,
-# correctly not shared) -- which is itself duplicated byte-identically in state.commitments and
-# checks.relativePathCitation, so an edit to one still has to be mirrored to the other.
+# extraction — substrate.claims._code_spans (fences + inline backticks) consumes this exact
+# object, so the fence regex lives in one place. It had a second consumer,
+# state.commitments._fenced_spans, until that store was cut 2026-09-18. Distinct from the
+# `_FENCE_RX` line-anchored parity marker (a different algorithm, correctly not shared), which
+# now lives in checks.relativePathCitation alone.
 _FENCE_SPAN_RX = re.compile(r"```.*?```", re.DOTALL)
 
 # UNAMBIGUOUS integrity / verification / audit vocabulary (a raw alternation STRING, not a compiled
@@ -346,12 +347,6 @@ _PY_FILE_RX = re.compile(r"\.py$")
 _ADV_FORWARD_RX = re.compile(
     r"\b(will|going to|gonna|i'?ll|plan to|once|after|when|until|unless|if|hope to|aim to|"
     r"expect to|about to|to be)\b", re.IGNORECASE)
-# An explicit item-range/list ENDING right before the head scopes it ("A-F all built",
-# "B.1+B.2+B.3 all complete") — the enumeration shows the bounded set, so the claim is not the
-# unbounded "the whole task is done" (real-corpus soft-FPs). A lone number ("Round 5 all done")
-# is NOT a list, so it still fires.
-_ENUM_BEFORE_HEAD_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9.]*(?:[-+/][A-Za-z0-9.]+)+\s*$")
-
 # gate.green_claim — a universal/whole-suite test-SUCCESS claim. The SUBJECT must be a whole-suite
 # head (tests | suite | CI | build) bound to a success predicate (pass/green). A SUBSET subject
 # ('parser tests', 'these tests', 'unit tests') fails open — only a word in _GREEN_UNIVERSAL_PREMOD
@@ -480,81 +475,3 @@ _SHIPPED_STATE_CLAIM_RX = re.compile(
 # intentionally narrower than canon's destructive classifier (any real `git push` mutates a remote,
 # not only a forced push), and checks.claimedShippedAbsent gets it from
 # core._shell._command_pushes_git, which parses the argv and vetoes `-n`/`--dry-run`.
-
-
-# --- Retraction vocabulary (relocated from engine.py, §3b/§6 — L0) ---
-
-# A commitment is cleared (status='retracted') only when the assistant DELIBERATELY drops it
-# WITH a surfaced reason/scope — mirroring reconcile() (a valid retraction needs a verifiable
-# reason) and detect_hidden_retraction() (a drop with NO reason is HIDDEN, not excused, so the
-# advance gate still fires). REASON-BOUND on purpose: a bare "dropping X" does NOT clear; an
-# unexplained drop is exactly what the advance gate should still catch. Legitimate, explained
-# re-prioritization clears -> the advance gate's FP stays low without excusing silent drops.
-#
-# Hardened against the design-audit's false-clear vectors: negation ("not skipping X"), wrong
-# subject ("you won't touch X", "the linter skipped X"), interrogative ("Should I skip X?"),
-# conditional ("if tests fail we drop X"), accidental loss ("I accidentally dropped X"),
-# recommit ("going to skip X but will add it"), code-fence output, and domain homonyms (SQL
-# "drop the temp rows", lazy "defer init to X") — the homonyms fall out of the REASON
-# requirement (they carry no retraction scope/reason). The caller clears a commitment only on
-# NORMALIZED-EQUALITY membership (the fakeexcuse firewall): retracting cache.py never clears
-# auth.py.
-_RETRACT_VERB_RX = re.compile(
-    r"\b(?:skip(?:s|ped|ping)?|drop(?:s|ped|ping)?|defer(?:s|red|ring)?|"
-    r"deprioriti[sz](?:e|es|ed|ing|ation)?|descope(?:s|d|ing)?|"
-    r"postpone(?:s|d|ing)?|shelve(?:s|d|ing)?|sideline(?:s|d|ing)?|"
-    r"backlog(?:s|ged|ging)?|punt(?:s|ed|ing)?|park(?:s|ed|ing)?|"
-    r"table(?:s|d|ing)?|pull(?:s|ed)?)\b"
-    r"|\bleav(?:e|ing)\b|\bcut\b|\bhold(?:ing)?\s+off\b"
-    r"|\bno longer (?:add|need|includ|requir|plan|go)\w*",
-    re.IGNORECASE)
-# A NEGATED production = a retraction ("do not add X", "won't implement X", "not going to add
-# X"). Distinct from negating a retraction verb ("not skipping X" = KEPT) — that stays vetoed.
-_RETRACT_NEGPROMISE_RX = re.compile(
-    r"\b(?:do not|don'?t|won'?t|will not|not going to|never going to|not planning to)\s+"
-    r"(?:add|implement|build|create|writ|includ|wire|introduc|need|do)\w*",
-    re.IGNORECASE)
-# Post-positive predicate: the retraction sits AFTER the path ("X is out of scope",
-# "X can wait", "X was dropped this sprint"). Self-justifying (carries its own scope reason).
-_RETRACT_POST_RX = re.compile(
-    r"^[\s,]*(?:'?s\b|is|was|are|were|be(?:ing)?)?\s*(?:now|currently|being|already)?\s*"
-    r"(?:out of scope|off the table|on (?:the )?back[\s-]?burner|on hold|"
-    r"dropped|deprioriti[sz]ed|descoped|shelved|parked|postponed|deferred|tabled|sidelined|"
-    r"can wait|punted)\b",
-    re.IGNORECASE)
-# A reason/scope cue that legitimizes a retraction (reconcile's reason requirement).
-_RETRACT_REASON_RX = re.compile(
-    r"\bfor (?:now|later|the (?:moment|time being)|a (?:later|future|follow[\s-]?up))\b"
-    r"|\bfor (?:this|next|the next|a future) (?:sprint|cycle|release|milestone|pass|pr|round|"
-    r"iteration|quarter|version|launch)\b"
-    r"|\b(?:next|another|a future|a later) (?:sprint|cycle|release|milestone|pass|pr|round|"
-    r"time|iteration)\b"
-    r"|\bout of scope\b|\boff the table\b|\bon (?:the )?back[\s-]?burner\b|\bon hold\b"
-    r"|\bper your (?:request|note|ask|instruction|call|guidance)\b"
-    r"|\byou (?:asked|wanted|requested)\b"
-    r"|\bas (?:you )?(?:requested|asked|agreed|wanted)\b|\bwe agreed\b|\bagreed to\b"
-    r"|\bdeprioriti[sz]\w*|\buntil \w+|\bfollow[\s-]?up\b|\blater\b|\bcan wait\b"
-    r"|\bwe'?ll revisit\b|\brevisit\b|\bdown the line\b|\bback[\s-]?burner\b"
-    r"|\bfrom (?:this|the) (?:sprint|milestone|release|pr|cycle|round)\b"
-    r"|\bout of (?:this|the) (?:pr|sprint|release|milestone)\b"
-    r"|\bnot (?:this|in this) (?:round|sprint|pr|milestone|release)\b"
-    r"|\b(?:this|next|the next) (?:sprint|cycle|release|milestone|pass|round|iteration|"
-    r"quarter|version)\b",
-    re.IGNORECASE)
-# Comma/semicolon/colon/newline/em-dash always break a clause; a period breaks ONLY when
-# followed by whitespace/end (a sentence stop) — NOT the '.' inside a path like 'cache.py',
-# so a coordination list ("dropping a.py and b.py") still binds the verb to both paths.
-_RETRACT_CLAUSE_BREAK_RX = re.compile(r"[,;:\n—]|\.(?:\s|$)")
-_WRONG_SUBJECT_RX = re.compile(
-    r"(?:\byou\b|\bthey\b|\bthe\s+\w+|\b[A-Z][a-z]+)\s*$")
-_ACCIDENTAL_RX = re.compile(r"\baccident\w*|\bby mistake\b|\boops\b|\binadvertent\w*", re.I)
-# A path explicitly KEPT right after it ("X is still needed", "X stays", "X remains in scope",
-# "X is still on the list") is NOT retracted — even if a sibling path was dropped in the same
-# breath ("dropping A for now but X is still needed"). Guards the coordination false-clear.
-_RETRACT_KEPT_RX = re.compile(
-    r"^\s*(?:,?\s*(?:but|however|though|yet))?\s*"
-    r"(?:is|are)?\s*(?:still\b|stays?\b|remains?\b|kept\b|(?:is\s+)?needed\b|required\b|"
-    r"on (?:the|our) (?:list|board|radar|roadmap)\b|in scope\b)", re.IGNORECASE)
-# An adversative between the verb and the path ("dropping A ... but X") contrasts X away from
-# the drop — the verb governs the earlier clause, not X.
-_RETRACT_ADVERSATIVE_RX = re.compile(r"\b(?:but|however|though|whereas|yet|while)\b", re.IGNORECASE)

@@ -1,7 +1,7 @@
 """tests for makoto.record.db — single init_db public API (SQLite(WAL) backend).
 
 Covers all five tables (events, canonical_citations, config, ledger,
-commitments), WAL mode, idempotency, the mtime sentinel, and config upsert.
+plans), WAL mode, idempotency, the mtime sentinel, and config upsert.
 Stdlib sqlite3 only — no importorskip (sqlite3 is always available).
 """
 import sqlite3
@@ -14,7 +14,7 @@ def _connect(db_file):
 
 
 def test_init_db_creates_all_tables_and_wal(tmp_path):
-    """init_db creates every table + sets WAL; ledger + commitments are net-new."""
+    """init_db creates every table + sets WAL; ledger + plans are net-new."""
     from makoto.state.store import init_db
     state_dir = tmp_path / "makoto_state"
     citations_path = tmp_path / "CITATIONS.md"
@@ -25,7 +25,7 @@ def test_init_db_creates_all_tables_and_wal(tmp_path):
     conn = _connect(db_file)
     names = {r[0] for r in conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-    assert {"events", "canonical_citations", "config", "ledger", "commitments"} <= names
+    assert {"events", "canonical_citations", "config", "ledger", "plans"} <= names
     assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
     rows = dict(conn.execute("SELECT key, value FROM config").fetchall())
     assert "canonical_citations_path" in rows

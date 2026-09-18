@@ -18,7 +18,7 @@ from makoto.context import GateContext
 
 # ---- GateContext itself: additive fields, safe defaults ---------------------------------------
 def test_gate_context_permission_agent_fields_default_none_and_not_subagent():
-    ctx = GateContext(text="x", touched=frozenset(), empty=frozenset(), opens=[],
+    ctx = GateContext(text="x", touched=frozenset(), empty=frozenset(),
                        testrun_output="", cwd="/tmp",
                        fs_exists=lambda p: False, fs_size=lambda p: None, fs_read=lambda p: None)
     assert ctx.permission_mode is None
@@ -28,7 +28,7 @@ def test_gate_context_permission_agent_fields_default_none_and_not_subagent():
 
 
 def test_gate_context_carries_permission_agent_fields_when_set():
-    ctx = GateContext(text="x", touched=frozenset(), empty=frozenset(), opens=[],
+    ctx = GateContext(text="x", touched=frozenset(), empty=frozenset(),
                        testrun_output="", cwd="/tmp",
                        fs_exists=lambda p: False, fs_size=lambda p: None, fs_read=lambda p: None,
                        permission_mode="plan", agent_id="agent-123", agent_type="Explore")

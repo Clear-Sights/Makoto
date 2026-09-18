@@ -15,7 +15,7 @@ The names re-exported below are the deterministic path/quantity/location primiti
 from `makoto.kit` — their home since the substrate merge (they were `substrate/_primitives.py`
 before that, and the top-level `makoto/checks.py` module before this package claimed the name).
 The re-export keeps every `from makoto.checks import normalize_path`-shaped call site working
-unchanged: `state/ledger.py`, `state/plan.py`, `state/commitments.py`, `context.py`, several
+unchanged: `state/ledger.py`, `state/plan.py`, `context.py`, several
 detector modules in this directory, and `tests/test_checks.py`. It adds nothing to hook-event
 import cost — `makoto.kit` is stdlib-only and `dispatch.py` already imports it at module level.
 """

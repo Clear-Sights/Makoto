@@ -62,11 +62,10 @@ def test_failure_terminal_result_is_one_shared_normalizer():
 
 # ---- dd5c436: shared lexicon + pushed-branch extraction ---------------------------------------
 def test_offer_and_first_person_regexes_are_the_one_vocab_object():
+    # state/commitments.py was the second consumer until 2026-09-18; it went with the store.
     from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
-    from makoto.state import commitments, plan
-    assert commitments._OFFER_COND_RX is _OFFER_COND_RX
+    from makoto.state import plan
     assert plan._OFFER_COND_RX is _OFFER_COND_RX
-    assert commitments._FIRST_PERSON_RX is _FIRST_PERSON_RX
     assert plan._FIRST_PERSON_RX is _FIRST_PERSON_RX
 
 
