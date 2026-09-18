@@ -41,8 +41,9 @@ _CALL_TIME_OK = {  # documented lazy imports, each breaking a cycle at call time
     ("makoto.verdict", "makoto.dispatch"),            # recheck certificate's lazy fold hooks
 }
 # named checks may reach into state/ ONLY for these two read surfaces (the old curated
-# allowlist's survivors) — never plan/commitments/store (contractOrder duplicates its 12 lines
-# of plans SQL on purpose; see test_no_alpha_duplicate_functions._EXEMPT_PAIRS).
+# allowlist's survivors) — never plan/commitments/store. No check needs plans SQL today:
+# contractOrder, which duplicated 12 lines of it to stay the right side of this firewall, was
+# cut 2026-09-18.
 _CHECKS_STATE_OK = {"makoto.state.ledger", "makoto.state.citations"}
 
 
@@ -92,8 +93,8 @@ def test_package_root_membership_is_explicit():
 def test_TEETH_direction_checker_rejects_planted_backward_edges():
     assert not _edge_ok("makoto.kit", "makoto.dispatch")                      # low -> high
     assert not _edge_ok("makoto.checks.namedTestTeeth",
-                        "makoto.checks.undischargedCommitment")               # sibling gate
-    assert not _edge_ok("makoto.checks.contractOrder", "makoto.state.plan")   # curated state slice
+                        "makoto.checks.hollowTest")                           # sibling gate
+    assert not _edge_ok("makoto.checks.staleEstablisher", "makoto.state.plan")  # curated state slice
     assert not _edge_ok("makoto.checks.selfMuteGuard", "makoto.context")      # gate -> orchestrator
     assert _edge_ok("makoto.state.ledger", "makoto.state.store")              # sibling store: fine
     assert _edge_ok("makoto.checks.falseGreenClaim", "makoto.kit")            # downward: fine

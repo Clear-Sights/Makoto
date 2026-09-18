@@ -4,8 +4,9 @@
 assembles the Stop substrate (commitment sourcing -> retraction reconcile -> THEN read
 open_commitments -> touched/empty keys -> fs closures) and evaluates every discovered Stop
 check over it. Moved VERBATIM out of `dispatch.py`/`_shared.py`: the internal statement
-order of `run_stop_checks` is behavior-bearing for gate.advance (validated 0-FP against the
-1,335-session honest corpus) and must never be reordered "for clarity".
+order of `run_stop_checks` is behavior-bearing (commitment sourcing must precede the retraction
+reconcile, which must precede the `open_commitments` read) and must never be reordered "for
+clarity".
 
 Knight-Leveson: stdlib only. NO LLM, NO HTTP. Called from `makoto.dispatch` (which re-imports
 `run_stop_checks` under its own name for its Stop/SubagentStop handlers and for every existing
@@ -54,7 +55,7 @@ class GateContext:
     #   agent_id, present when the session uses --agent or the hook fires inside a subagent.
     plan: Optional[Plan] = None             # the declared contract Plan (SPEC-5) for this
     #   session, loaded once by run_stop_checks via makoto.state.plan.load_plan; None when no plan is
-    #   declared. Read by contractOrder's Stop GATE and staleEstablisher's advisory check.
+    #   declared. Read by staleEstablisher's advisory check.
     session_id: Optional[str] = None        # raw hook payload's `session_id` (Task 2 slice 5).
     transcript_path: Optional[str] = None   # raw `transcript_path` (CONFIRMED real, top-level on
     #   every hook event -- Claude Code hooks reference, fetched 2026-07-07: "Path to conversation
@@ -144,8 +145,8 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         # risk this firewall exists to stop (see GateContext.history_all_agents).
         history_all_agents = history
         history = _history_for_agent(history, payload)
-        # NO early return on empty text: five BLOCK gates (gate.canon, gate.contract_order,
-        # gate.hollow_test, gate.liveness, gate.run_promised) never read `text` and must still
+        # NO early return on empty text: three BLOCK gates (gate.canon, gate.hollow_test,
+        # gate.liveness) never read `text` and must still
         # evaluate — skipping the whole catalog because `last_assistant_message` is absent made
         # absence read as green. Text-reading gates see "" and are naturally silent (no claim,
         # no finding), so this widens nothing for them.
@@ -273,7 +274,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             permission_mode=payload.get("permission_mode"),
             agent_id=payload.get("agent_id"),
             agent_type=payload.get("agent_type"),
-            plan=plan,   # SPEC-5: read by contractOrder's Stop GATE (below) + staleEstablisher (below)
+            plan=plan,   # SPEC-5: read by staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # canonFingerprints.py reads its audit firing boundary here
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder

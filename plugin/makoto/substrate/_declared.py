@@ -36,7 +36,6 @@ DECLARED_IDS: dict[str, str] = {
     "content.integrity_suppression_flag": "integritySuppressionFlag",
     "content.verifier_exit_masking": "verifierExitMasking",
     "content.verifier_body_hollowed": "verifierBodyHollowed",
-    "content.deferred_checkbox_theater": "deferredCheckboxTheater",
     "content.phantom_citation": "phantomCitation",
     "content.unsourced_webfetch": "unsourcedWebfetch",
     "content.fabricated_commit_sha": "fabricatedCommitSha",
@@ -51,7 +50,6 @@ DECLARED_IDS: dict[str, str] = {
     "gate.hollow_test": "hollowTest",
     "gate.liveness": "deadPureStatement",
     "gate.completion": "claimedProduceAbsent",
-    "gate.advance": "undischargedCommitment",
     "gate.dropped": "silentlyDroppedCommitment",
     "gate.green_claim": "falseGreenClaim",
     "gate.stale_pass": "stalePytestCache",
@@ -65,16 +63,12 @@ DECLARED_IDS: dict[str, str] = {
     # docstring for the scope cut and canonFingerprints.py's for the two-module split rationale).
     "gate.canon_fingerprints": "canonFingerprints",
     "gate.canon_fingerprints_advisory": "canonFingerprintsAdvisory",
-    # SPEC-5 (Makoto absorbs Assay): the declared-Plan / contract-dependency subsystem, ported
-    # by shape from Assay's plan/gaps.py + patterns/{contract_order,stale_establisher}.py.
-    "gate.contract_order": "contractOrder",
+    # SPEC-5 (Makoto absorbs Assay): the declared-Plan establisher check, ported by shape from
+    # Assay's patterns/stale_establisher.py.
     "gate.stale_establisher": "staleEstablisher",
     # An agnostic (gate.canon-sense) claimed-running-but-nothing-runs check, mirroring
     # gate.completion's claim-vs-ledger shape but for ongoing process/service liveness.
     "gate.claimed_running": "claimedRunningAbsent",
-    # The forward-looking sibling of gate.claimed_running: a first-person run-intent promise
-    # ("I'll run the tests") left with no Bash evidence anywhere in history by the next turn.
-    "gate.run_promised": "runIntentUnfulfilled",
     # Immediate completed-remote-action sibling: a pushed/merged/live claim must be backed by a
     # successful Bash git-push or an explicitly recognized remote-mutating tool call.
     "gate.claimed_shipped": "claimedShippedAbsent",

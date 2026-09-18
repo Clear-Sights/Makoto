@@ -5,7 +5,7 @@ never a file path, was silently dropped and never appeared in ANY commitment sto
 
 `state/plan.py` sources/discharges these purely textually (no filesystem ground truth
 exists for a label); this check surfaces whatever is still open at Stop time as a reminder, ADVISORY
-tier ONLY -- unlike `gate.advance` (which blocks on a verifiable file-vs-filesystem contradiction),
+tier ONLY -- unlike `gate.completion` (which blocks on a verifiable file-vs-filesystem contradiction),
 a label's "still open" state here is a weaker, textual-only signal with no corpus-measured FP rate
 yet, so it must never block (same "advisory over blocking" policy `selfWiredCheck.py`/
 `staleEstablisher.py` already follow, and the same caution the design review flagged for any

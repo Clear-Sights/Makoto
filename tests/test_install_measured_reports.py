@@ -116,14 +116,15 @@ def test_install_absorbs_hand_wired_dispatch_but_not_user_cli(fake_home, capsys)
 
 
 def test_status_separates_requested_vs_effective_mutes(fake_home, capsys, monkeypatch):
-    """8fec86e's status fix: an id registered on the Stop edge too (gate.contract_order) cannot
-    be fully muted by MAKOTO_DISABLE_PATTERNS (the Stop half never consults it) -- status must
-    say so instead of claiming a complete mute."""
+    """8fec86e's status fix: a Stop-edge id cannot be muted by MAKOTO_DISABLE_PATTERNS (the Stop
+    tier never consults it) -- status must say so instead of claiming a complete mute. The
+    fixture id was gate.contract_order, the one check on BOTH edges, until it was cut 2026-09-18;
+    a live Stop-edge id makes the same point and keeps the assertion falsifiable."""
     monkeypatch.setenv("MAKOTO_DISABLE_PATTERNS",
-                       "gate.contract_order,content.self_mute_guard")
+                       "gate.completion,content.self_mute_guard")
     assert inst.cmd_status() == 0
     report = json.loads(capsys.readouterr().out)
-    assert report["patterns_disable_requested"] == ["gate.contract_order",
+    assert report["patterns_disable_requested"] == ["gate.completion",
                                                     "content.self_mute_guard"]
-    assert "gate.contract_order" in report["patterns_disable_ineffective"]
+    assert "gate.completion" in report["patterns_disable_ineffective"]
     assert report["patterns_disabled"] == ["content.self_mute_guard"]

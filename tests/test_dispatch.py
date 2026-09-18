@@ -631,52 +631,6 @@ def test_dispatch_completion_gate_silent_on_mere_path_mention(tmp_path):
     assert out == "", "a referenced (not produced) path must not false-block"
 
 
-def test_dispatch_advance_gate_blocks_by_default(tmp_path):
-    """2026-06-01 flip: the advance gate BLOCKS live by default — no env var needed. Record an
-    open commitment (Stop 1), then claim UNIVERSAL completion while it is undischarged (Stop 2):
-    the advance gate fires AND blocks. Validated FP-clean (0 fires across 1335 corpus sessions
-    after the proposal-menu / code-fence sourcing guards); the reason-bound retraction path
-    (next test) clears legitimately-dropped promises so honest re-prioritization never blocks."""
-    state_dir = _setup_state(tmp_path)
-    promise = {
-        "hook_event_name": "Stop", "session_id": "adv", "cwd": str(tmp_path),
-        "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py.",
-    }
-    advance = {
-        "hook_event_name": "Stop", "session_id": "adv", "cwd": str(tmp_path),
-        "last_assistant_message": "Everything is done — all complete.",
-    }
-    _run_dispatch(state_dir, promise)
-    rc, out = _run_dispatch(state_dir, advance)   # universal-completion claim + undischarged commitment
-    assert out, "advance gate must block by default after the flip"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "src/promised_zzz.py" in decision["reason"]
-    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
-        "the advance fire must still be audited"
-
-
-def test_dispatch_advance_gate_shadow_when_disabled(tmp_path):
-    """MAKOTO_DISABLE_GATES=1 returns the advance gate to shadow: still audited, no block —
-    the single escape valve, shared with the completion gate."""
-    state_dir = _setup_state(tmp_path)
-    promise = {
-        "hook_event_name": "Stop", "session_id": "adv_off", "cwd": str(tmp_path),
-        "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py.",
-    }
-    advance = {
-        "hook_event_name": "Stop", "session_id": "adv_off", "cwd": str(tmp_path),
-        "last_assistant_message": "Everything is done — all complete.",
-    }
-    _run_dispatch(state_dir, promise, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    rc, out = _run_dispatch(state_dir, advance, extra_env={"MAKOTO_DISABLE_GATES": "1"})
-    assert out == "", "disabled advance gate must not block"
-    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
-        "the shadow advance fire must still be audited so its FP rate can be mined"
-
-
 def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
     """Behavioral blocking pin for gate.dropped THROUGH the real dispatch — the falsifiability gap
     its 3 sibling gates each closed but it landed without. A forward promise carrying identifying
@@ -700,40 +654,16 @@ def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
         "the dropped fire must still be audited"
 
 
-def test_dispatch_contract_order_gate_blocks_on_open_remainder(tmp_path):
-    """Behavioral blocking pin for makoto.contract_order's Stop remainder guard (SPEC-5), driven
-    through the real dispatch end-to-end: a SessionStart admits a declared plan from the on-disk
-    artifact, then a Stop with the plan still unfinished BLOCKS live by default."""
-    state_dir = _setup_state(tmp_path)
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text(
-        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
-    )
-    session = "contract_order_default"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out, "contract_order gate must block by default on an unfinished plan"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "n1" in decision["reason"]
-    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.contract_order" in r.get("pattern_fires", []) for r in rows), \
-        "the contract_order fire must still be audited"
+def test_dispatch_locating_write_advances_the_declared_plan_node(tmp_path):
+    """The live-advance-wiring fix (2026-07-23): before this, Plan.mark_done/plan.persist_plan had
+    zero live callers -- a declared plan could NEVER close (see makoto/events.py's PostToolUse
+    entry). Here a PostToolUse Write at the node's own `where` advances it to DONE. The observable
+    is the plan store itself: gate.contract_order used to carry this claim as a Stop block, and it
+    was cut 2026-09-18, so the assertion reads the store the lifecycle actually writes -- which is
+    also what gate.stale_establisher (register H2) and gate.plan_item_drift (F8) stand on."""
+    import sqlite3
+    from makoto.state import plan as plan_store
 
-
-def test_dispatch_contract_order_gate_silent_after_locating_write_advances_the_plan(tmp_path):
-    """The live-advance-wiring fix (2026-07-23): before this, Plan.mark_done/plan.persist_plan
-    had zero live callers -- a declared plan could NEVER close, so gate.contract_order's Stop
-    remainder blocked every turn for the rest of the session, forever, once any plan existed (see
-    makoto/events.py's PostToolUse entry). Here a PostToolUse Write at the node's own `where`
-    advances it to DONE, and the SAME Stop shape that blocks in the sibling test above (the plan
-    left untouched) now passes clean."""
     state_dir = _setup_state(tmp_path)
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
@@ -751,10 +681,13 @@ def test_dispatch_contract_order_gate_silent_after_locating_write_advances_the_p
              "tool_response": {}}
     rc, out = _run_dispatch(state_dir, write)
     assert rc == 0 and out == "", "PostToolUse accumulation must never itself block"
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", f"contract_order must stay silent once the only declared node is advanced: {out}"
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        stored = plan_store.load_plan(conn, session)
+    finally:
+        conn.close()
+    assert stored is not None
+    assert stored.open_nodes() == set(), "the locating write must advance the only declared node"
 
 
 def test_dispatch_failed_locating_write_leaves_plan_node_open(tmp_path):
@@ -793,120 +726,7 @@ def test_dispatch_failed_locating_write_leaves_plan_node_open(tmp_path):
     finally:
         conn.close()
     assert stored is not None
-    assert stored.open_nodes() == {"n1"}
-
-    stop = {
-        "hook_event_name": "Stop",
-        "session_id": session,
-        "cwd": str(tmp_path),
-        "last_assistant_message": "Done for now.",
-    }
-    rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0 and out
-    rows = [json.loads(line) for line in (state_dir / "audit.jsonl").read_text().splitlines()]
-    contract_fires = [row for row in rows if "gate.contract_order" in row.get("pattern_fires", [])]
-    assert contract_fires
-    assert any("n1" in finding["message"] for finding in contract_fires[-1]["findings"]
-               if finding["pattern_id"] == "gate.contract_order")
-
-
-def test_dispatch_contract_order_gate_still_blocks_on_the_untouched_sibling_node(tmp_path):
-    """Precision guard on the fix above: advancing ONE node of a two-node plan must not silently
-    satisfy the OTHER (a resolve()-scoping regression would defeat the gate's whole purpose) --
-    Stop still blocks, naming only the still-open sibling."""
-    state_dir = _setup_state(tmp_path)
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text(
-        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
-        '{"what":"Write","passthrough":"db.py","where":"db.py","id":"n2"}\n'
-    )
-    session = "contract_order_partial"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    write = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-             "tool_name": "Write",
-             "tool_input": {"file_path": "auth.py", "content": "def login(): ...\n"},
-             "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, write)
-    assert rc == 0 and out == ""
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out, "contract_order must still block on the untouched sibling node"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "n2" in decision["reason"]
-    assert "n1" not in decision["reason"]
-
-
-def test_dispatch_contract_order_gate_blocks_after_a_live_mid_session_plan_write(tmp_path):
-    """The live-declare-path fix (2026-07-23): before this, NOTHING let Claude declare a plan
-    mid-session -- the only admission path was a `.claude/makoto-plan.jsonl` already sitting on
-    disk BEFORE SessionStart fired. Here NO artifact exists at SessionStart at all; the plan is
-    declared entirely via a live PostToolUse Write to the artifact path itself, and the same
-    Stop remainder guard still blocks on its unfinished node."""
-    state_dir = _setup_state(tmp_path)
-    session = "contract_order_live_declare"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text(
-        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
-    )
-    declare = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-               "tool_name": "Write",
-               "tool_input": {"file_path": str(claude_dir / "makoto-plan.jsonl"),
-                              "content": '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'},
-               "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, declare)
-    assert rc == 0 and out == "", "declaring a plan must never itself block"
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out, "contract_order must block on the live-declared plan's open node"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "n1" in decision["reason"]
-
-
-def test_dispatch_contract_order_gate_silent_after_live_declare_then_advance(tmp_path):
-    """Full live lifecycle, no on-disk artifact ever needed before SessionStart: declare a plan
-    via a mid-session Write to the artifact, advance its node via a Write to the node's own
-    `where`, and Stop passes clean."""
-    state_dir = _setup_state(tmp_path)
-    session = "contract_order_live_full"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text(
-        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
-    )
-    declare = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-               "tool_name": "Write",
-               "tool_input": {"file_path": str(claude_dir / "makoto-plan.jsonl"),
-                              "content": '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'},
-               "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, declare)
-    assert rc == 0 and out == ""
-    write = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-             "tool_name": "Write",
-             "tool_input": {"file_path": "auth.py", "content": "def login(): ...\n"},
-             "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, write)
-    assert rc == 0 and out == ""
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", f"contract_order must stay silent after live declare + advance: {out}"
+    assert stored.open_nodes() == {"n1"}, "a FAILED locating write is not plan progress"
 
 
 def test_dispatch_live_plan_write_malformed_content_fails_open_no_crash_no_block(tmp_path):
@@ -963,13 +783,15 @@ def test_dispatch_live_plan_write_latest_wins_replaces_the_whole_plan(tmp_path):
               "tool_response": {}}
     rc, out = _run_dispatch(state_dir, second)
     assert rc == 0 and out == ""
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0 and out, "must block on the second (latest-wins) plan's node"
-    decision = json.loads(out)
-    assert "n2" in decision["reason"]
-    assert "n1" not in decision["reason"]
+    import sqlite3
+    from makoto.state import plan as plan_store
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        stored = plan_store.load_plan(conn, session)
+    finally:
+        conn.close()
+    assert stored is not None
+    assert stored.open_nodes() == {"n2"}, "latest-wins: the second plan replaces the first whole"
 
 
 def test_dispatch_dropped_gate_silent_when_discharged(tmp_path):
@@ -1255,32 +1077,37 @@ def test_dispatch_canon_gate_shadow_when_disabled(tmp_path):
         "the shadow canon fire must still be audited so its FP rate can be mined"
 
 
-def test_dispatch_reason_bound_retraction_clears_so_advance_does_not_fire(tmp_path):
-    """The reconcile wiring end-to-end: promise (Stop 1), then RETRACT it with a surfaced
-    reason (Stop 2), then claim universal completion (Stop 3). The commitment is cleared
-    (status='retracted'), so the advance gate does NOT fire even in the audit log — the
-    legitimately-dropped promise is not held against the AI. Contrast with the test above,
-    where the SAME promise + universal-completion (no retraction) DOES fire advance."""
+def test_dispatch_reason_bound_retraction_clears_the_open_commitment(tmp_path):
+    """The reconcile wiring end-to-end: promise (Stop 1), then RETRACT it with a surfaced reason
+    (Stop 2). The commitment is cleared (status='retracted') in the store — a legitimately-dropped
+    promise is not held against the AI.
+
+    The observable is the commitments store. It used to be "gate.advance does not fire", and that
+    gate was cut 2026-09-18 (register-unbound), which would have left this assertion unable to
+    fail. No check reads `GateContext.opens` any more; the store path is measured as unread and
+    queued for its own step, and until then it keeps this witness."""
     state_dir = _setup_state(tmp_path)
     sid = "adv_retract"
     promise = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
                "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py."}
     retract = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
                "last_assistant_message": "Skipping src/promised_zzz.py for this sprint per your note."}
-    advance = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
-               "last_assistant_message": "Everything is done — all complete."}
-    _run_dispatch(state_dir, promise)
-    _run_dispatch(state_dir, retract)
-    rc, out = _run_dispatch(state_dir, advance)
-    assert rc == 0 and out == ""
-    # only-fires audit policy: a missing audit.jsonl means ZERO patterns fired across all three
-    # Stop dispatches — which already proves advance did not fire. A regression that fired advance
-    # would recreate the file with a gate.advance row, flipping the any(...) below to True.
-    audit_path = state_dir / "audit.jsonl"
-    rows = ([json.loads(l) for l in audit_path.read_text().splitlines() if l.strip()]
-            if audit_path.exists() else [])
-    assert not any("gate.advance" in r.get("pattern_fires", []) for r in rows), \
-        "a reason-bound retraction must clear the commitment so advance never fires on it"
+    import sqlite3
+    from makoto.state import commitments as C
+    assert _run_dispatch(state_dir, promise) == (0, "")
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        assert [c["location"] for c in C.open_commitments(conn, sid)] == ["src/promised_zzz.py"], \
+            "the promise must be recorded as an open commitment"
+    finally:
+        conn.close()
+    assert _run_dispatch(state_dir, retract) == (0, "")
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    try:
+        assert C.open_commitments(conn, sid) == [], \
+            "a reason-bound retraction must clear the commitment it names"
+    finally:
+        conn.close()
 
 
 def test_dispatch_fabricated_action_gate_blocks(tmp_path):
@@ -1464,78 +1291,6 @@ def test_dispatch_claimed_shipped_gate_blocks_on_unbacked_remote_claim(tmp_path)
         "the claimed_shipped fire must be audited"
 
 
-def test_dispatch_run_promised_gate_silent_on_the_very_turn_the_promise_is_made(tmp_path):
-    """Grace-period proof for gate.claimed_running's forward-looking sibling, gate.run_promised:
-    a run-intent promise must never block the SAME Stop it was made in. `history` structurally
-    never contains the row for the Stop currently being evaluated, so there is nothing yet for
-    this gate to read at the moment the promise is first made -- the earliest it can possibly fire
-    is the NEXT Stop."""
-    state_dir = _setup_state(tmp_path)
-    session = "run_promise_grace"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "I'll run the tests now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", f"a promise made THIS turn must never block THIS turn: {out}"
-
-
-def test_dispatch_run_promised_gate_blocks_when_no_bash_call_follows_the_promise(tmp_path):
-    """Behavioral blocking pin for gate.run_promised THROUGH the real dispatch. Turn 1 promises a
-    run ("I'll run the tests now."); turn 2 ends with NO Bash call anywhere in between -> the gate
-    reads the prior turn's own Stop row from ctx.history and BLOCKS live by default. Breaking
-    _blocking_gate_ids() or the history wiring reddens THIS, proving an unfulfilled forward
-    promise stops the agent end-to-end at the next turn, not merely emits a finding."""
-    state_dir = _setup_state(tmp_path)
-    session = "run_promise_block"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    stop1 = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-             "last_assistant_message": "I'll run the tests now."}
-    rc, out = _run_dispatch(state_dir, stop1)
-    assert rc == 0 and out == ""                     # grace period: turn 1 itself never blocks
-    stop2 = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-             "last_assistant_message": "Here's a summary of what I found."}
-    rc, out = _run_dispatch(state_dir, stop2)
-    assert out, "run_promised gate must block turn 2: turn 1's promise has no Bash evidence since"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "run" in decision["reason"].lower()
-    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.run_promised" in r.get("pattern_fires", []) for r in rows), \
-        "the run_promised fire must be audited"
-
-
-def test_dispatch_run_promised_gate_silent_when_a_bash_call_discharges_it(tmp_path):
-    """Control proving the gate DISCRIMINATES end-to-end (not fire-on-everything): the SAME
-    forward promise, but a real Bash call happens before the next Stop -> discharged -> no
-    block, regardless of whether the command's content matches the promised text (see the
-    gate module's own docstring on why content-matching is deliberately out of scope)."""
-    state_dir = _setup_state(tmp_path)
-    session = "run_promise_discharged"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    stop1 = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-             "last_assistant_message": "I'll run the tests now."}
-    rc, out = _run_dispatch(state_dir, stop1)
-    assert rc == 0 and out == ""
-    bash = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": session,
-            "cwd": str(tmp_path), "tool_input": {"command": "pytest -q"},
-            "tool_response": {"exitCode": 0}}
-    rc, out = _run_dispatch(state_dir, bash)
-    assert rc == 0 and out == ""
-    stop2 = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-             "last_assistant_message": "Tests passed."}
-    rc, out = _run_dispatch(state_dir, stop2)
-    assert out == "", f"a Bash call after the promise must discharge it: {out}"
-
-
 def test_dispatch_named_test_gate_blocks_through_subagent_stop(tmp_path):
     """SubagentStop falsifier: the same fabricated named-test pass-claim that blocks through Stop
     (test_dispatch_named_test_gate_blocks_after_recorded_named_red above) must block IDENTICALLY
@@ -1608,25 +1363,6 @@ def test_dispatch_completion_gate_blocks_through_subagent_stop(tmp_path):
     decision = json.loads(out)
     assert decision["decision"] == "block"
     assert "src/nonexistent_zzz.py" in decision["reason"]
-
-
-def test_dispatch_advance_gate_blocks_through_subagent_stop(tmp_path):
-    """SubagentStop mirror of test_dispatch_advance_gate_blocks_by_default."""
-    state_dir = _setup_state(tmp_path)
-    promise = {
-        "hook_event_name": "SubagentStop", "session_id": "adv_sub", "cwd": str(tmp_path),
-        "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py.",
-    }
-    advance = {
-        "hook_event_name": "SubagentStop", "session_id": "adv_sub", "cwd": str(tmp_path),
-        "last_assistant_message": "Everything is done — all complete.",
-    }
-    _run_dispatch(state_dir, promise)
-    rc, out = _run_dispatch(state_dir, advance)
-    assert out, "advance gate must block through SubagentStop just as it does through Stop"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "src/promised_zzz.py" in decision["reason"]
 
 
 def test_dispatch_green_claim_gate_blocks_through_subagent_stop(tmp_path):
@@ -1867,22 +1603,19 @@ def test_no_shadow_gate_every_gate_blocks():
     from makoto.dispatch import _blocking_gate_ids
     live = [c for c in load_checks(edge="Stop") if c.may_block]
     discovered = {c.id for c in live}
-    assert discovered == {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
+    assert discovered == {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass",
                           "gate.liveness",     # liveness folded in from the collapsed close-check tier
                           "gate.hollow_test",  # HOLLOWED-class detector (SPIRIT.md §4), same split as liveness
                           "gate.canon",        # ported agnostic Stop primitives canon.timeout/canon.recur
                           "gate.canon_fingerprints",            # SPEC-5 Task 9: BLOCK-tier canon fingerprints
                           "gate.canon_fingerprints_advisory",    # SPEC-5 Task 9: ADVISE-tier sibling
-                          "gate.contract_order",   # SPEC-5 (Makoto absorbs Assay): the plan's Stop
-                                                      # remainder guard
                           "gate.self_wired",   # advisory-tier exception (2026-07-05); still
                                                # discovered <=> in _blocking_gate_ids(), just never
                                                # emits level="error" so never actually blocks
                           "gate.relative_path_citation",  # advisory-tier (2026-07-09): same shape
                           "gate.plan_item_drift",         # advisory-tier (2026-07-09): same shape
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
-                          "gate.run_promised",  # claimed_running's forward-looking sibling (2026-07-23)
                           "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
                           "gate.claimed_consent_absent",
                           "gate.unexamined_wall"}   # register G5\'s runner

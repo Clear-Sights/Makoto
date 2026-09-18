@@ -49,11 +49,6 @@ def _scenario_completion(tmp_path):
     return _ctx(text="I wrote config.yaml")
 
 
-def _scenario_advance(tmp_path):
-    # fires: tests/test_advance_signal.py::test_genuinely_dropped_commitment_still_fires
-    return _ctx(text="Everything is wired up now.", opens=[{"location": "src/missing.py"}])
-
-
 def _scenario_green_claim(tmp_path):
     # fires: tests/test_stale_pass_gate.py sibling test_gate_fires_green_claim_over_red_run
     return _ctx(text="All tests pass now.", testrun_output="=== 3 failed, 678 passed in 12.3s ===")
@@ -133,14 +128,6 @@ def _scenario_canon_fingerprints_advisory(tmp_path):
     return _ctx(history=[row])
 
 
-def _scenario_contract_order(tmp_path):
-    # fires: makoto.checks.contractOrder's Stop remainder guard -- a declared node still open.
-    from makoto.substrate._planNode import Plan
-    plan = Plan()
-    plan.add_node("Write", "auth.py", "/repo/auth.py", id="n1")
-    return _ctx(plan=plan)
-
-
 def _scenario_self_wired(tmp_path):
     # fires: tests/test_self_wired_check.py (partial strip: Stop entry missing)
     wired = json.dumps({"hooks": {
@@ -163,14 +150,6 @@ def _scenario_plan_item_drift(tmp_path):
 def _scenario_claimed_running(tmp_path):
     # fires: tests/test_claimed_running_gate.py::test_fires_when_claim_has_no_grounding_evidence
     return _ctx(text="I started the server. It is now running on port 3000.", history=[])
-
-
-def _scenario_run_promised(tmp_path):
-    # fires: tests/test_run_intent_gate.py::test_fires_when_promise_has_no_bash_evidence_since --
-    # the PRIOR turn's own Stop row promised a run, and no Bash PostToolUse row follows it.
-    row = {"payload": {"hook_event_name": "Stop", "session_id": "s1",
-                        "last_assistant_message": "I'll run the tests now."}}
-    return _ctx(history=[row])
 
 
 def _scenario_claimed_shipped(tmp_path):
@@ -209,7 +188,6 @@ _SCENARIOS = {
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
     "gate.unexamined_wall": _scenario_unexamined_wall,
     "gate.completion": _scenario_completion,
-    "gate.advance": _scenario_advance,
     "gate.green_claim": _scenario_green_claim,
     "gate.dropped": _scenario_dropped,
     "gate.fabricated_action": _scenario_fabricated_action,
@@ -221,11 +199,9 @@ _SCENARIOS = {
     "gate.canon_fingerprints": _scenario_canon_fingerprints,
     "gate.canon_fingerprints_advisory": _scenario_canon_fingerprints_advisory,
     "gate.self_wired": _scenario_self_wired,
-    "gate.contract_order": _scenario_contract_order,
     "gate.relative_path_citation": _scenario_relative_path_citation,
     "gate.plan_item_drift": _scenario_plan_item_drift,
     "gate.claimed_running": _scenario_claimed_running,
-    "gate.run_promised": _scenario_run_promised,
     "gate.claimed_shipped": _scenario_claimed_shipped,
 }
 

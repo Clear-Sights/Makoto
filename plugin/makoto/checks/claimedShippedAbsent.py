@@ -95,7 +95,7 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
 # EVIDENCE is existential across the session's recorded PostToolUse history for merge/publish-like
 # claims. A push claim is different: it is decided by comparing the local `refs/heads/<branch>`
 # tip with `git ls-remote origin refs/heads/<branch>`, so a successful-looking push transcript is
-# never accepted as a proxy while the world is observable. Like gate.run_promised, the non-push evidence deliberately does not attempt semantic
+# never accepted as a proxy while the world is observable. Like gate.claimed_running, the non-push evidence deliberately does not attempt semantic
 # coreference between "it"/"#42" and a command's owner/repo/ref fields.
 #
 # CLOSED NON-BASH SET: GitHub's merge_pull_request, push_files AND create_or_update_file are

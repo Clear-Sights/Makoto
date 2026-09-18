@@ -448,53 +448,6 @@ _PROCESS_LIFECYCLE_CMD_RX = re.compile(
     re.IGNORECASE)
 
 
-# --- gate.run_promised vocabulary (a first-person FORWARD run-intent promise) ---
-# The forward-looking sibling of gate.claimed_running's vocabulary above: mirrors
-# _PROCESS_START_VERB_RX's own closed process-lifecycle verb set, base/infinitive form instead of
-# past-tense, bound to a first-person FORWARD auxiliary instead of "I ...ed". Closed subject
-# (always first-person here) plus closed verb by construction -- the same precision trade every
-# closed-lexicon gate in this file makes: "it's going to rain today" cannot match (wrong subject,
-# and 'rain' is nowhere in the verb set).
-_RUN_INTENT_AUX_RX_SRC = (
-    r"(?:I(?:['’]m|\s+am)\s+(?:going\s+to|about\s+to)|I(?:['’]ll|\s+will)|"
-    r"let\s+me|I\s+plan\s+to)"
-)
-# At most ONE filler adverb between the auxiliary and the verb ("I'll now run ...", "I'm going to
-# quickly restart ..."). Deliberately a CLOSED set, not `\w+`: a hedge ("probably", "maybe") or a
-# negation ("never", "not") sitting in this slot must break the match outright rather than being
-# silently swallowed as filler -- "I'll probably run ..." is not a firm commitment, and a match
-# that had to be vetoed post-hoc is a weaker guarantee than one that never fires in the first place.
-_RUN_INTENT_GAP_RX_SRC = r"(?:\s+(?:just|now|right\s+now|quickly|immediately|also|then))?\s+"
-# Bare "start" is EXCLUDED from the shared verb set below -- unlike run/launch/deploy/..., "start"
-# is heavily overloaded for beginning any activity at all ("I'm going to start writing the
-# tests"), not specifically a process/command. It only qualifies paired with a closed
-# process-object noun (mirrors _RUNNING_SUBJECT's own object list) -- a forward promise needs a
-# concrete named object, unlike a state-claim which can lean on discourse anaphora (it/this/that)
-# for something already introduced.
-_RUN_INTENT_START_OBJECT_RX_SRC = (
-    r"start\s+(?:up\s+)?(?:the\s+(?:dev(?:elopment)?\s+)?server|the\s+app(?:lication)?|"
-    r"the\s+service|the\s+api|the\s+backend|the\s+frontend|the\s+process|the\s+container|"
-    r"the\s+daemon|the\s+worker|the\s+job|the\s+bot|the\s+site|the\s+database|the\s+program)"
-)
-_RUN_INTENT_VERB_RX_SRC = (
-    r"(?:run|launch|spin\s+up|bring\s+up|boot(?:\s+up)?|kick\s+off|fire\s+up|re-?start|deploy|"
-    r"stand\s+up)"
-)
-_RUN_INTENT_CLAIM_RX = re.compile(
-    rf"\b{_RUN_INTENT_AUX_RX_SRC}\b{_RUN_INTENT_GAP_RX_SRC}"
-    rf"(?:{_RUN_INTENT_VERB_RX_SRC}|{_RUN_INTENT_START_OBJECT_RX_SRC})\b",
-    re.IGNORECASE)
-# Narrow, targeted idiom vetoes for the verb "run" specifically -- checked by the caller against
-# the text IMMEDIATELY following the match (checks.runIntentUnfulfilled._run_intent_claim): "run X
-# BY Y" is the approval idiom ("I'll run this by you first"), "run THROUGH X" is a walkthrough/
-# review idiom, "run the/some numbers" is a mental-math idiom -- none of them is execution intent.
-_RUN_INTENT_IDIOM_VETO_RX = re.compile(
-    r"^\s*(?:\w+\s+){0,12}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
-    r"|^\s*through\b"
-    r"|^\s*(?:the\s+|some\s+)?numbers\b",
-    re.IGNORECASE)
-
-
 # --- gate.claimed_shipped vocabulary (a completed remote/external mutation claim) ---
 # Two deliberately CLOSED claim families. The action family binds a first-person subject to a
 # past/perfective shipping verb; the second alternative permits the conventional subject-less
