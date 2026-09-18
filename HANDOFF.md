@@ -46,11 +46,12 @@ verdict parsers moved from `checks/namedTestTeeth.py` to `vocab.py`/`kit.py`, th
 home, which deleted a documented lazy-import exception from
 `tests/test_import_direction.py`'s `_CALL_TIME_OK`.
 
-## What is left: H4 alone
+## What is left: nothing, for Makoto alone
 
-H4 is the last entry the register maps as UNCOVERED and in subject. Nothing else is
-buildable — the honest ceiling for Makoto alone is 57, and the remaining entries are
-OUT-OF-SUBJECT or NOT-COUNTABLE with the reason written in their map row.
+H4 was the last entry the register mapped as UNCOVERED and in subject, and it closed as a
+measured refusal rather than a runner. Nothing else is buildable: the remaining entries are
+OUT-OF-SUBJECT or NOT-COUNTABLE with the reason written in their map row. The two sections
+below are what shaped the last two verdicts, kept so neither is re-derived.
 
 ### H3 FIX DRAWN FROM FIXES — done, and the measurement that shaped it
 
@@ -76,23 +77,38 @@ commit standing in for one session's introduced text.
 
 Thirteen plants, thirteen red, no holes, on a copy with the control green first.
 
-### H4 SWEEP DRAWN FROM MEMORY
+### H4 SWEEP DRAWN FROM MEMORY — closed as a measured refusal
 
-*"each item read through prior conclusions"* > *"judge once up front; each read a token"*.
+The handoff before this one named H4 the weakest of the five and said it may legitimately close
+as a measured refusal rather than a runner, with the map row as its home. It did. Do not
+re-derive this; the row carries it, and the short form is:
 
-The weakest of the five, and **it may close as a measured refusal rather than a runner** —
-that is a legitimate outcome, and the map row is where it goes, with the numbers that refused
-it. Readings tried on paper:
+* The reading named as closest — a verdict naming N members of a set against a record showing
+  reads of fewer than N distinct members — was built as a probe and run against a real Claude
+  Code ledger, 29 turns carrying a claim. The counted-universal trigger matched 2. One fires,
+  and it is a FALSE POSITIVE: `All 1086 ordered same-edge pairs refuted` was established by
+  running `tools/merge_pass.py`, one command that checked all 1086, so the record holds 0
+  distinct file reads.
+* That is the fault's shape, not a threshold: in real work a claim over N items is discharged by
+  a TOOL that examines the N items, so counting distinct reads against N is wrong by
+  construction. The bulk-read discharge the previous handoff asked for does not save it, because
+  `merge_pass.py`'s output names no paths at all.
+* Repairing it means judging whether a tool's output COVERS a prose-named set: `F12`'s declined
+  judgement, and the `gate.unnamed_failure` / `gate.named_test` overlap that handoff flagged.
+* Outside the tree the fault is documented and not visible in a trace — the anchoring-in-LLM-
+  judges measurement needs token log-probabilities a hook does not have, and published
+  trace-audit tooling leaves quantified claims unaudited.
 
-- read-count against claim-count: FP-prone by construction, a bulk `grep -r` legitimately
-  reads hundreds of files without claiming anything about them
-- a verdict sentence naming N members of a set where the record shows reads of fewer than N
-  distinct members: closest to the entry, and the one worth measuring first. Its risk is
-  `gate.unnamed_failure` and `gate.named_test`, which already read a claim against the
-  record — establish the READS or VOCAB difference before building, not after
+Reopen H4 if a corpus of real ledgers large enough to measure a rate becomes available. One
+session cannot produce one, and that — not a preference — is what the row rests on.
 
-Measure a rate on real ledgers first. A probe firing on every sweep points at nothing in
-particular.
+## What a later run should know
+
+No entry reads UNCOVERED. Every remaining one carries a verdict with its reason in its own map
+row: RUNNER, OUT-OF-SUBJECT, or NOT-COUNTABLE. That is a real ceiling for Makoto alone rather
+than a stopping point — the OUT-OF-SUBJECT rows name faults outside what a hook on one session's
+record can see, and the NOT-COUNTABLE rows name faults that are in subject and that no countable
+reading decides. Read the rows before assuming otherwise.
 
 ## How a runner lands
 
@@ -101,7 +117,8 @@ control must be green before any plant is believed, and a plant that stays green
 the suite, not a pass. Report the measured numbers in the commit: plants red/holes, suite,
 register map, merge pass, python lines before/after, and
 `python3 -m scour . --register <measure-zero>/zero/resources/REGISTER.md --changed HEAD
---detail <a path OUTSIDE this tree>`.
+--detail <a path OUTSIDE this tree>`. If a tool that report names is not available where you are
+working, say so and report no number for it rather than an invented one.
 
 A new gate touches more than its own module, and the suite names each one when you miss it:
 `registry.py` (row and shape), `substrate/_declared.py`, `registry._ADVISORY_ALLOWLIST` if it
@@ -111,5 +128,7 @@ scenario), `docs/REGISTER-MAP.tsv`, `docs/MERGE-WITNESSES.tsv`, `README.md`, and
 plugin manifests. Pre-tier ADVISE is illegal (`kit.py` states it): an advisory check is a
 Stop-tier gate.
 
-The 22,835 lines under `tests/` are the zero-false-positive certification record. They are
-the product, not overhead; nothing here cuts them.
+The tree under `tests/` is the zero-false-positive certification record. It is the product,
+not overhead; nothing here cuts it. (That line carried a line count until 2026-09-18, by which
+point it had drifted 1,668 lines out of date — this page's own first rule is that numbers are
+read off the tools, and a count written here is a number written here.)
