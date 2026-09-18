@@ -30,10 +30,10 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **13 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **11**, `event`: **2**
-- **27 Stop checks** (all checks registered at the Stop edge)
-- **25 end-of-turn gates** (`may_block=True`)
+- **28 Stop checks** (all checks registered at the Stop edge)
+- **26 end-of-turn gates** (`may_block=True`)
 - **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **11 advisory end-of-turn gates** (advisory-allowlisted)
+- **12 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
 
@@ -106,6 +106,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.unknown_ref_switch` | HEAD moved to a ref nothing in the session had printed | advisory | advisory |
 | `gate.unobserved_destruction` | content destroyed with no verifier report before it | advisory | advisory |
 | `gate.relaunched_unchanged` | a second worker launch with no verifier report anywhere before it | advisory | advisory |
+| `gate.undischarged_waiver` | a checker-silencing directive introduced with no checkable end named beside it | advisory | advisory |
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 

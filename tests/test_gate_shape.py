@@ -85,6 +85,8 @@ GATE_MODULE_STEMS = {
     "unknownRefSwitch",     # register D12 PRESERVE TO VOLATILE
     "unobservedDestruction", # register D14 UNDO UNPROVEN
     "relaunchedUnchanged",  # register E13 PARKED ON AN INHERITED CHANNEL
+    "undischargedWaiver",   # register B9 WAIVER NEVER EXPIRES: a silencing directive
+                            # introduced with no checkable end named beside it
 }
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
@@ -106,7 +108,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.unwitnessed_verifier",
                           "gate.unknown_ref_switch",
                           "gate.unobserved_destruction",
-                          "gate.relaunched_unchanged"}
+                          "gate.relaunched_unchanged",
+                          "gate.undischarged_waiver"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -290,13 +293,15 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 25                # 6 ledger-gates + liveness + self_wired +
+    assert len(GATE_MODULE_FILES & present) == 26                # 6 ledger-gates + liveness + self_wired +
     # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
     # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
     # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
     # runIntentUnfulfilled cut -- no register entry named any of them. 18->20, 2026-09-18:
     # unprobedFanout / unaskedPlan added -- register B11 and G2, which had no runner. 20->25,
-    # same day: the second obligation batch, register A3 / B4 / D12 / D14 / E13.
+    # same day: the second obligation batch, register A3 / B4 / D12 / D14 / E13. 25->26,
+    # same day: undischargedWaiver -- register B9, whose row read NOT-COUNTABLE because it
+    # was answering whether the discharge HAPPENED rather than whether one is NAMED.
 
 
 def test_module_function_counts_match_the_design():

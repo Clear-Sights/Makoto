@@ -233,7 +233,17 @@ def _scenario_relaunched_unchanged(tmp_path):
     return _ctx(history=[row, row])
 
 
+def _scenario_undischarged_waiver(tmp_path):
+    # fires: tests/test_undischarged_waiver.py::test_fires_on_a_bare_lint_directive
+    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Edit",
+                       "tool_input": {"file_path": "src/parser.py", "old_string": "a",
+                                      "new_string": "value = parse(raw)  # noqa"},
+                       "tool_response": {}}}
+    return _ctx(history=[row])
+
+
 _SCENARIOS = {
+    "gate.undischarged_waiver": _scenario_undischarged_waiver,
     "gate.unread_structure": _scenario_unread_structure,
     "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,
     "gate.unknown_ref_switch": _scenario_unknown_ref_switch,
