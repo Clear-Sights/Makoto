@@ -275,3 +275,50 @@ def test_result_shape_law_catches_an_underdeclared_fixture():
     tree = ast.parse("def run(c):\n    return None\n")
     assert fixture.tests in TESTS_SHAPES
     assert not _has_required_evidence(fixture.tests, tree)
+
+
+def test_every_advisory_gate_declares_the_four_fields_its_tier_rests_on():
+    """ONE home for what three new test modules were each restating in 2026-09-18.
+
+    `gate.undischarged_waiver`, `gate.unnamed_failure` and `gate.report_before_run` each shipped
+    with a `test_the_check_ships_advisory_and_declares_its_shape` asserting posture, edge, shape
+    and eats for its own check -- the same four lines, three times, which is what
+    `F2 TWO SOURCES OF TRUTH` names. The four properties are each already held by a law
+    (`registry._ADVISORY_ALLOWLIST` with test_stop_gate_level_invariant's level pin, this file's
+    shape law, and test_check_law_eats), so what was actually missing was a single statement that
+    the allowlist and the declared posture agree. That is here, over the whole set, where adding
+    a check to one and not the other reddens it.
+
+    Precedent for the subtraction: tests/test_gate_shape.py dropped its own `may_block is True`
+    assertion for the same reason -- `_live_gates()` is defined by it, so the assertion was the
+    selection restated and could not fail.
+    """
+    from makoto.registry import _ADVISORY_ALLOWLIST, POSTURE_ADVISE, POSTURE_BLOCK
+    catalog = _catalog()
+    stop = {cid: c for (cid, edge), c in catalog.items() if edge == "Stop"}
+    # The allowlist's subject is the checks that REACH the decision pipeline: `may_block=True`
+    # puts a check in `dispatch._blocking_gate_ids()`, and the allowlist is what then keeps
+    # `tools/render_checks.py` from publishing it as blocking. Writing this law as "every
+    # ADVISE check is allowlisted" reddened on gate.stale_establisher and
+    # gate.undeclared_falsifiable, which are ADVISE with `may_block=False` -- they never reach
+    # the pipeline, so there is nothing for an allowlist entry to correct, and their absence is
+    # the design rather than drift. `blocking_eligible`'s own docstring says the allowlist
+    # "happens to name exactly the four checks whose posture is ADVISE", and that sentence was
+    # already wrong about these two when it was written.
+    pipeline = {cid: c for cid, c in stop.items() if getattr(c, "may_block", False)}
+    advisory_by_posture = {cid for cid, c in pipeline.items() if c.posture == POSTURE_ADVISE}
+    assert advisory_by_posture == set(_ADVISORY_ALLOWLIST), (
+        "a Stop check's declared posture and the advisory allowlist disagree; the README's "
+        "blocking/advisory counts are published off the allowlist and its posture off the check, "
+        f"so the two must name the same set. only-posture={sorted(advisory_by_posture - set(_ADVISORY_ALLOWLIST))} "
+        f"only-allowlist={sorted(set(_ADVISORY_ALLOWLIST) - advisory_by_posture)}")
+    for cid, c in stop.items():
+        assert c.posture in (POSTURE_ADVISE, POSTURE_BLOCK), cid
+        assert c.tests or cid in ONE_OFF, f"{cid} declares no result shape and is not a ONE_OFF"
+        # eats is required of a check that declares a SHAPE, because a shape's evidence arrives
+        # through a channel. gate.undeclared_falsifiable declares neither, and correctly: its
+        # subject is the registry itself, not the Stop substrate, so it reads no channel for
+        # test_check_law_eats to hold it to. That is why the condition is `c.tests` rather than
+        # a blanket requirement -- written blanket first, it reddened on exactly that check.
+        if c.tests:
+            assert c.eats, f"{cid} declares a shape but no eats, so test_check_law_eats has nothing to hold it to"

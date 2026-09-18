@@ -142,10 +142,3 @@ def test_a_parametrized_id_is_matched_on_its_bare_name():
 
 def test_an_undecodable_history_row_is_no_recorded_verdict():
     assert unnamed_failure_gate("2 failed.", history=[object(), None, "not a row"]) is None
-
-
-def test_the_check_ships_advisory_and_declares_its_shape():
-    assert CHECK.posture == "ADVISE"
-    assert CHECK.applies_at == "Stop"
-    assert CHECK.tests == "TESTRUN_DELTA"
-    assert CHECK.eats == frozenset({"text", "history"})

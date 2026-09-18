@@ -249,7 +249,16 @@ def _scenario_unnamed_failure(tmp_path):
                                    "tests/test_a.py::test_charge FAILED\n1 failed in 1.0s")])
 
 
+def _scenario_report_before_run(tmp_path):
+    # fires: tests/test_report_before_run.py::test_fires_on_a_report_with_no_run_before_it
+    return _ctx(history=[{"payload": {"hook_event_name": "PostToolUse", "tool_name": "Write",
+                                      "tool_input": {"file_path": "HANDOFF.md",
+                                                     "content": "The suite passes."},
+                                      "tool_response": {}}}])
+
+
 _SCENARIOS = {
+    "gate.report_before_run": _scenario_report_before_run,
     "gate.unnamed_failure": _scenario_unnamed_failure,
     "gate.undischarged_waiver": _scenario_undischarged_waiver,
     "gate.unread_structure": _scenario_unread_structure,
