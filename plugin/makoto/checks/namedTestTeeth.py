@@ -3,8 +3,18 @@ import re
 from typing import Optional
 
 from makoto.vocab import Finding
-from makoto.vocab import _ANSI_SGR_RX, _TEETH_FRAME_RX, _SENTENCE_SPLIT_RX
-from makoto.kit import is_test_runner, iter_tool_events
+from makoto.vocab import _SENTENCE_SPLIT_RX
+# The EVIDENCE side moved to its reachable home 2026-09-18 (see vocab.py's own note): the
+# recorded-marker parsers to vocab (rank 0) and the history walk over them to kit (rank 1),
+# so gate.unnamed_failure can read them without a lateral check-to-check import and
+# kit.compute_delta no longer needs a call-time back-edge. Re-exported under the same names
+# because this module's own tests and tests/test_lexicons.py address them here; ONE home,
+# two spellings, never two copies.
+from makoto.vocab import (_TESTNAME_RX, _TEST_ID, _REC_FAIL_LEAD_RX, _REC_FAIL_TRAIL_RX,
+                          _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX, _TEETH_SCOPE_BEFORE,
+                          _TEETH_SCOPE_AFTER, _recorded_names, recorded_failed_names,
+                          recorded_passed_names)
+from makoto.kit import current_named_verdicts
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -31,8 +41,6 @@ from makoto.kit import is_test_runner, iter_tool_events
 
 # ---- lexicon (gate-specific, local — like gate.fabricated_action) -----------------------
 
-# A bare pytest-style test identifier. Exact token; coreference is by exact string equality.
-_TESTNAME_RX = re.compile(r"\btest_[A-Za-z0-9_]+")
 # A success predicate that can bind to a named-test subject in PROSE (the claim side).
 _PASS_PRED_RX = re.compile(r"\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?)\b", re.IGNORECASE)
 # Negation / forward-framing in the immediate claim clause -> not an assertion of present success.
@@ -47,25 +55,6 @@ _QUOTE_SPAN_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”')
 # Sentence split reuses vocab._SENTENCE_SPLIT_RX -- this file held the repo's last
 # byte-identical private copy; every other consumer already imports the vocab object.
 
-# Recorded per-test FAILED / PASSED markers (the evidence side). Case-SENSITIVE runner tokens so
-# prose like "failed to connect" never matches. Both orderings (verdict leads / trails the id).
-# The lead forms tolerate a line PREFIX before the verdict token (pytest-xdist emits
-# "[gw0] [100%] PASSED tests/…::test_x"; the old ^-anchor recorded that runner's FAILED via the
-# short-summary line but never its PASSED, so a real red became undischargeable). The id captures
-# the MODULE PATH (the header's "exact test id" pin — a bare-name key let tests/a's failure deny a
-# claim about tests/b's same-named green test) and any PARAMETRIZATION suffix (stripping it let a
-# green test_charge[eur] discharge a red test_charge[usd]).
-_TEST_ID = r"(?P<path>\S*?)::(?P<name>test_[A-Za-z0-9_]+(?:\[[^\]\n]*\])?)"
-_REC_FAIL_LEAD_RX = re.compile(r"^[^\n]*?\b(?:FAILED|ERROR)\s+" + _TEST_ID, re.MULTILINE)
-_REC_FAIL_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
-_REC_PASS_LEAD_RX = re.compile(r"^[^\n]*?\bPASSED\s+" + _TEST_ID, re.MULTILINE)
-_REC_PASS_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\bPASSED\b", re.MULTILINE)
-# (#1)/(#2) teeth-frame SCOPE: the frame voids only verdict records in its own vicinity (this
-# many chars around the record), never the whole response — one incidental teeth word in a
-# traceback must not discard every recorded failure in the run, and symmetrically a PASSED
-# recorded inside deliberately-induced-failure framing is no material discharge either.
-_TEETH_SCOPE_BEFORE = 200
-_TEETH_SCOPE_AFTER = 120
 
 # (#1) DELIBERATELY-INDUCED failure framing (a FAILED produced by mutation/teeth testing is not a
 # material failure): _TEETH_FRAME_RX LIFTED to lexicons (consolidation T2.2, byte-identical) —
@@ -144,63 +133,8 @@ def claimed_passing_names(text: str) -> set:
     return out
 
 
-def _recorded_names(text: str, lead_rx, trail_rx) -> set:
-    """Shared shape of recorded_failed_names/recorded_passed_names (found alpha-equivalent by AST
-    canonicalization, 2026-07-09) -- same extraction, different verdict regex pair."""
-    if not text:
-        return set()
-    return ({m.group("name") for m in lead_rx.finditer(text)}
-            | {m.group("name") for m in trail_rx.finditer(text)})
 
 
-def recorded_failed_names(text: str) -> set:
-    """Exact test names recorded as FAILED/ERROR in a tool output (both verdict orderings)."""
-    return _recorded_names(text, _REC_FAIL_LEAD_RX, _REC_FAIL_TRAIL_RX)
-
-
-def recorded_passed_names(text: str) -> set:
-    """Exact test names recorded as PASSED (the discharge evidence; both verdict orderings)."""
-    return _recorded_names(text, _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX)
-
-
-def current_named_verdicts(history) -> dict:
-    """{full_test_id: 'FAIL'|'PASS'} from the recorded TEST-RUNNER outputs in `history`, in
-    order. The key is the exact recorded id — `path::name[param]` — matching the header's
-    "exact test id" pin (a bare-name key let tests/a's failure shadow tests/b's same-named
-    test, and let one parametrized case discharge another). Only responses of a recognized
-    test-runner invocation are read (`kit.is_test_runner` on the recorded command): a FAILED
-    line the agent merely DISPLAYED — `cat old.log` — is not a run and must never ground a
-    DENY. Within one response, records apply in TEXTUAL ORDER and the last verdict wins (a
-    run-fix-rerun sequence captured in one Bash call ends on its true final verdict), exactly
-    as the last verdict wins across responses (a fix-and-rerun-green discharges an earlier
-    red; a re-fail re-opens). ANSI is stripped first (vitest/jest colorize verdict lines). A
-    verdict recorded inside mutation/teeth framing (#1) is not material — scoped to the
-    record's own vicinity (`_TEETH_SCOPE_*`), never the whole response, and applied
-    SYMMETRICALLY: a framed FAILED is no material failure, and a framed PASSED (a pass under
-    deliberately-induced-failure framing is evidence the test cannot fail) is no material
-    discharge either."""
-    verdict = {}
-    for _tool, cmd, resp in iter_tool_events(history):
-        if not resp or not is_test_runner(cmd or ""):
-            continue
-        resp = _ANSI_SGR_RX.sub("", resp)
-        # Short-circuit through the shared per-name parsers (the same evidence primitives
-        # kit.compute_delta reuses) before the positioned scan below: most runner responses
-        # carry no per-test verdict lines at all.
-        if not (recorded_failed_names(resp) or recorded_passed_names(resp)):
-            continue
-        records = []
-        for rx, v in ((_REC_FAIL_LEAD_RX, "FAIL"), (_REC_FAIL_TRAIL_RX, "FAIL"),
-                      (_REC_PASS_LEAD_RX, "PASS"), (_REC_PASS_TRAIL_RX, "PASS")):
-            for m in rx.finditer(resp):
-                records.append(
-                    (m.start(), m.end(), f'{m.group("path")}::{m.group("name")}', v))
-        for start, end, tid, v in sorted(records):
-            window = resp[max(0, start - _TEETH_SCOPE_BEFORE):end + _TEETH_SCOPE_AFTER]
-            if _TEETH_FRAME_RX.search(window):
-                continue                              # deliberately-induced -> not material
-            verdict[tid] = v
-    return verdict
 
 
 def named_test_gate(text, *, history=()) -> Optional[Finding]:

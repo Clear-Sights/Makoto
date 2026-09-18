@@ -65,6 +65,9 @@ _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_adv
                                   # B9's runner: a deliberately permanent waiver is a real
                                   # and common thing and looks identical to an oversight.
                                   "gate.undischarged_waiver",
+                                  # C12's runner: the benign case (the runner's own summary
+                                  # pasted, names visible in it) looks identical.
+                                  "gate.unnamed_failure",
                                   })  # FD6, FD26, 2026-07-09
 
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called

@@ -37,7 +37,10 @@ _RANK = {  # the layout order: an import may only point at a strictly lower rank
 }
 _SIBLING_OK = {"makoto.substrate", "makoto.state"}
 _CALL_TIME_OK = {  # documented lazy imports, each breaking a cycle at call time
-    ("makoto.kit", "makoto.checks.namedTestTeeth"),   # kit.compute_delta's parser reuse
+    # ("makoto.kit", "makoto.checks.namedTestTeeth") was here for kit.compute_delta's parser
+    # reuse, and is GONE: 2026-09-18 the recorded-marker parsers moved to vocab (rank 0) and the
+    # history walk over them to kit itself, so there is no back-edge left to except. An exception
+    # removed is worth more than an exception documented.
     ("makoto.verdict", "makoto.dispatch"),            # recheck certificate's lazy fold hooks
 }
 # named checks may reach into state/ ONLY for these two read surfaces (the old curated

@@ -364,6 +364,56 @@ _GREEN_CLAIM_RX = re.compile(
 _GREEN_UNIVERSAL_PREMOD = frozenset(
     {"the", "all", "every", "our", "my", "full", "entire", "whole", "complete", "test"})
 
+# ---- recorded per-test verdicts: the EVIDENCE side of a named-test claim ----------------------
+# Relocated here 2026-09-18 from checks/namedTestTeeth.py, unchanged. It sat in a NAMED check
+# module, so the two other consumers could not reach it: tests/test_import_direction.py firewalls
+# check siblings from each other, and `kit.compute_delta` needed a documented call-time back-edge
+# (`_CALL_TIME_OK`) to import it at all -- an exception this move DELETES. A parser is lexicon,
+# and lexicon is rank 0, where every layer above can reach it.
+
+# A bare pytest-style test identifier. Exact token; coreference is by exact string equality.
+_TESTNAME_RX = re.compile(r"\btest_[A-Za-z0-9_]+")
+
+# Recorded per-test FAILED / PASSED markers (the evidence side). Case-SENSITIVE runner tokens so
+# prose like "failed to connect" never matches. Both orderings (verdict leads / trails the id).
+# The lead forms tolerate a line PREFIX before the verdict token (pytest-xdist emits
+# "[gw0] [100%] PASSED tests/…::test_x"; the old ^-anchor recorded that runner's FAILED via the
+# short-summary line but never its PASSED, so a real red became undischargeable). The id captures
+# the MODULE PATH (the header's "exact test id" pin — a bare-name key let tests/a's failure deny a
+# claim about tests/b's same-named green test) and any PARAMETRIZATION suffix (stripping it let a
+# green test_charge[eur] discharge a red test_charge[usd]).
+_TEST_ID = r"(?P<path>\S*?)::(?P<name>test_[A-Za-z0-9_]+(?:\[[^\]\n]*\])?)"
+_REC_FAIL_LEAD_RX = re.compile(r"^[^\n]*?\b(?:FAILED|ERROR)\s+" + _TEST_ID, re.MULTILINE)
+_REC_FAIL_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
+_REC_PASS_LEAD_RX = re.compile(r"^[^\n]*?\bPASSED\s+" + _TEST_ID, re.MULTILINE)
+_REC_PASS_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\bPASSED\b", re.MULTILINE)
+# (#1)/(#2) teeth-frame SCOPE: the frame voids only verdict records in its own vicinity (this
+# many chars around the record), never the whole response — one incidental teeth word in a
+# traceback must not discard every recorded failure in the run, and symmetrically a PASSED
+# recorded inside deliberately-induced-failure framing is no material discharge either.
+_TEETH_SCOPE_BEFORE = 200
+_TEETH_SCOPE_AFTER = 120
+
+
+def _recorded_names(text: str, lead_rx, trail_rx) -> set:
+    """Shared shape of recorded_failed_names/recorded_passed_names (found alpha-equivalent by AST
+    canonicalization, 2026-07-09) -- same extraction, different verdict regex pair."""
+    if not text:
+        return set()
+    return ({m.group("name") for m in lead_rx.finditer(text)}
+            | {m.group("name") for m in trail_rx.finditer(text)})
+
+
+def recorded_failed_names(text: str) -> set:
+    """Exact test names recorded as FAILED/ERROR in a tool output (both verdict orderings)."""
+    return _recorded_names(text, _REC_FAIL_LEAD_RX, _REC_FAIL_TRAIL_RX)
+
+
+def recorded_passed_names(text: str) -> set:
+    """Exact test names recorded as PASSED (the discharge evidence; both verdict orderings)."""
+    return _recorded_names(text, _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX)
+
+
 # DELIBERATELY-INDUCED failure framing (lifted from the named-test check 2026-06-09, two consumers:
 # checks.namedTestTeeth's #1 firewall + checks.stalePytestCache's claim window): a FAILED produced
 # by mutation/teeth testing is

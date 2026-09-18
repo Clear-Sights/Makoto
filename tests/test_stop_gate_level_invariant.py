@@ -242,7 +242,15 @@ def _scenario_undischarged_waiver(tmp_path):
     return _ctx(history=[row])
 
 
+def _scenario_unnamed_failure(tmp_path):
+    # fires: tests/test_unnamed_failure.py::test_fires_on_a_count_with_no_name
+    return _ctx(text="1 test failed; looking into it.",
+                history=[_bash_row("python3 -m pytest -q",
+                                   "tests/test_a.py::test_charge FAILED\n1 failed in 1.0s")])
+
+
 _SCENARIOS = {
+    "gate.unnamed_failure": _scenario_unnamed_failure,
     "gate.undischarged_waiver": _scenario_undischarged_waiver,
     "gate.unread_structure": _scenario_unread_structure,
     "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,

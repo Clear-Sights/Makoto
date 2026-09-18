@@ -35,6 +35,18 @@ from makoto.vocab import (
     _PATH_EXT,
     Finding,
     JWT_CALLEE_RX,
+    # the recorded per-test verdict parsers, which vocab now owns (2026-09-18). `compute_delta`
+    # and `current_named_verdicts` below read them; they used to arrive through a call-time
+    # import of a NAMED check module, which the layout order excepted by name.
+    _TEETH_FRAME_RX,
+    _TEETH_SCOPE_AFTER,
+    _TEETH_SCOPE_BEFORE,
+    _REC_FAIL_LEAD_RX,
+    _REC_FAIL_TRAIL_RX,
+    _REC_PASS_LEAD_RX,
+    _REC_PASS_TRAIL_RX,
+    recorded_failed_names,
+    recorded_passed_names,
 )
 
 # `pattern:` arguments below are typed `Check` (registry.Check) only in a docstring/
@@ -975,13 +987,52 @@ def classify_failure(text: str) -> Optional[bool]:
 # `dispatch.py` consumer's already was) so this kit module never carries an import-time edge into
 # a named check module.
 
+def current_named_verdicts(history) -> dict:
+    """{full_test_id: 'FAIL'|'PASS'} from the recorded TEST-RUNNER outputs in `history`, in
+    order. The key is the exact recorded id — `path::name[param]` — matching the header's
+    "exact test id" pin (a bare-name key let tests/a's failure shadow tests/b's same-named
+    test, and let one parametrized case discharge another). Only responses of a recognized
+    test-runner invocation are read (`kit.is_test_runner` on the recorded command): a FAILED
+    line the agent merely DISPLAYED — `cat old.log` — is not a run and must never ground a
+    DENY. Within one response, records apply in TEXTUAL ORDER and the last verdict wins (a
+    run-fix-rerun sequence captured in one Bash call ends on its true final verdict), exactly
+    as the last verdict wins across responses (a fix-and-rerun-green discharges an earlier
+    red; a re-fail re-opens). ANSI is stripped first (vitest/jest colorize verdict lines). A
+    verdict recorded inside mutation/teeth framing (#1) is not material — scoped to the
+    record's own vicinity (`_TEETH_SCOPE_*`), never the whole response, and applied
+    SYMMETRICALLY: a framed FAILED is no material failure, and a framed PASSED (a pass under
+    deliberately-induced-failure framing is evidence the test cannot fail) is no material
+    discharge either."""
+    verdict = {}
+    for _tool, cmd, resp in iter_tool_events(history):
+        if not resp or not is_test_runner(cmd or ""):
+            continue
+        resp = _ANSI_SGR_RX.sub("", resp)
+        # Short-circuit through the shared per-name parsers (the same evidence primitives
+        # kit.compute_delta reuses) before the positioned scan below: most runner responses
+        # carry no per-test verdict lines at all.
+        if not (recorded_failed_names(resp) or recorded_passed_names(resp)):
+            continue
+        records = []
+        for rx, v in ((_REC_FAIL_LEAD_RX, "FAIL"), (_REC_FAIL_TRAIL_RX, "FAIL"),
+                      (_REC_PASS_LEAD_RX, "PASS"), (_REC_PASS_TRAIL_RX, "PASS")):
+            for m in rx.finditer(resp):
+                records.append(
+                    (m.start(), m.end(), f'{m.group("path")}::{m.group("name")}', v))
+        for start, end, tid, v in sorted(records):
+            window = resp[max(0, start - _TEETH_SCOPE_BEFORE):end + _TEETH_SCOPE_AFTER]
+            if _TEETH_FRAME_RX.search(window):
+                continue                              # deliberately-induced -> not material
+            verdict[tid] = v
+    return verdict
+
+
 def compute_delta(prior_output: str, new_output: str) -> Optional[str]:
     """None when there's nothing to say: no prior run to diff against, or no verdict flipped.
     "Newly failing" = named tests failing now that were NOT already failing in the prior run;
     "newly passing" = named tests passing now that WERE failing in the prior run (a genuine
     fix). A test that was already failing and is STILL failing is neither -- not new information,
     so it stays out of the delta (grounding on what CHANGED, not the whole persistent state)."""
-    from makoto.checks.namedTestTeeth import recorded_failed_names, recorded_passed_names
     if not prior_output or not new_output:
         return None
     prior_failed = recorded_failed_names(prior_output)

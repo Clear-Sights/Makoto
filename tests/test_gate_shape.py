@@ -87,6 +87,8 @@ GATE_MODULE_STEMS = {
     "relaunchedUnchanged",  # register E13 PARKED ON AN INHERITED CHANNEL
     "undischargedWaiver",   # register B9 WAIVER NEVER EXPIRES: a silencing directive
                             # introduced with no checkable end named beside it
+    "unnamedFailure",       # register C12 VERDICT WITHOUT ITS SUBJECT: a counted failure
+                            # whose identity the run recorded and the turn dropped
 }
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
@@ -109,7 +111,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.unknown_ref_switch",
                           "gate.unobserved_destruction",
                           "gate.relaunched_unchanged",
-                          "gate.undischarged_waiver"}
+                          "gate.undischarged_waiver",
+                          "gate.unnamed_failure"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -141,9 +144,16 @@ EXPECTED_FUNCTION_COUNTS = {
     "silentlyDroppedCommitment.py": 6,                     # 7->6, 2026-08-20: _drop_def_or_class
                                                             # inlined into its single call site
     "fabricatedToolAction.py": 3,
-    "namedTestTeeth.py": 7,                                # 6->7, 2026-07-09: recorded_failed_names/
+    "namedTestTeeth.py": 3,                                # 6->7, 2026-07-09: recorded_failed_names/
                                                             # recorded_passed_names now share one
-                                                            # extracted _recorded_names helper
+                                                            # extracted _recorded_names helper.
+                                                            # 7->3, 2026-09-18: the EVIDENCE side
+                                                            # (those two, _recorded_names and
+                                                            # current_named_verdicts) moved to
+                                                            # vocab/kit, its reachable home; the
+                                                            # CLAIM side stays. See the module's
+                                                            # own note and tests/test_import_direction.py
+    "unnamedFailure.py": 1,                                # 2026-09-18, register C12
     "stalePytestCache.py": 1,
     "deadPureStatement.py": 15,                            # engine + adapter merged (_run lives here);
                                                             # 19->15, 2026-07-09: _scratch_roots/_under/
@@ -293,7 +303,7 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 26                # 6 ledger-gates + liveness + self_wired +
+    assert len(GATE_MODULE_FILES & present) == 27                # 6 ledger-gates + liveness + self_wired +
     # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
     # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
     # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
@@ -301,7 +311,8 @@ def test_package_file_shape_matches_the_design():
     # unprobedFanout / unaskedPlan added -- register B11 and G2, which had no runner. 20->25,
     # same day: the second obligation batch, register A3 / B4 / D12 / D14 / E13. 25->26,
     # same day: undischargedWaiver -- register B9, whose row read NOT-COUNTABLE because it
-    # was answering whether the discharge HAPPENED rather than whether one is NAMED.
+    # was answering whether the discharge HAPPENED rather than whether one is NAMED. 26->27,
+    # same day: unnamedFailure -- register C12, the first of the five entries no tool ran.
 
 
 def test_module_function_counts_match_the_design():
