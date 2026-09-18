@@ -181,7 +181,12 @@ def _has_required_evidence(shape: str, tree: ast.Module) -> bool:
         )
     if shape == "PATTERN_MATCH":
         match_call = any(
-            name in {"re.search", "re.match", "ast.walk"}
+            # `ast.iter_child_nodes` joins `ast.walk` as a matching act: a TOP-LEVEL-only
+            # analyzer (gate.unclaimed_unit judges module-level defs and classes, because a
+            # method answers to its class) applies its pattern to the module's own children and
+            # must not descend. Requiring `ast.walk` of it would mean walking the whole tree to
+            # throw most of it away, so the law would be paid in a worse analyzer.
+            name in {"re.search", "re.match", "ast.walk", "ast.iter_child_nodes"}
             or name.endswith((".search", ".match", ".finditer"))
             for name in calls
         )

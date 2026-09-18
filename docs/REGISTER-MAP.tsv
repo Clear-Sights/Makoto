@@ -72,4 +72,4 @@ H2	RUNNER	gate.stale_pass	the record's watermark is checked against the live las
 H3	UNCOVERED	-	in subject: a change reasoned from other changes in the same session. Needs the session's change order, which the ledger already holds
 H4	UNCOVERED	-	in subject: items in a sweep judged through prior conclusions. Needs each read marked as a token, not a verdict
 H5	RUNNER	audit log	every gating decision is persisted, not held in the window (carried from C9, folded into H5); also content.fabricated_commit_sha: the commit is pinned by its own identity, not by the name pointing at it (from D3)
-H6	UNCOVERED	-	in subject over content the agent writes: a unit answering to no claim in the source. Needs the written unit paired against the claims in the same turn
+H6	RUNNER	gate.unclaimed_unit	a top-level def or class the session introduced that no genuine operator turn names, nothing it wrote reaches, and no decorator registered; ADVISE tier. A decorator IS a claim (the framework calling it is the source that asks for it) and a test_-prefixed def is claimed by collection, which is what makes the probe material rather than firing on every unit written

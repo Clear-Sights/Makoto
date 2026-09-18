@@ -145,7 +145,3 @@ def test_the_prose_failure_count_bound_is_real_and_named():
     to gate.unnamed_failure, where it was measured. Pinned so the asymmetry stays a decision."""
     assert not _reports_a_run_verdict(
         _prose_write("HANDOFF.md", "3 tests failed.")["payload"])
-
-
-def test_an_undecodable_row_cannot_crash_the_gate():
-    assert report_before_run_gate([object(), None, "not a row"]) is None

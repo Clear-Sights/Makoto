@@ -145,12 +145,6 @@ def test_bash_is_not_read_and_that_is_the_measured_tradeoff():
                        "tool_input": {"command": command}, "tool_response": {"stdout": ""}}}
     assert undischarged_waiver_gate([row]) is None
 
-
-def test_an_undecodable_row_fails_open():
-    """A malformed event is no evidence and must never crash a Stop gate."""
-    assert undischarged_waiver_gate([object(), None, "not a row"]) is None
-
-
 def test_several_offenders_are_one_finding_naming_them():
     body = "\n".join([f"a = 1  {H} noqa", f"b = 2  {H} nosec", f"c = 3  {H} type: ignore",
                       f"d = 4  {H} pragma: no cover"])

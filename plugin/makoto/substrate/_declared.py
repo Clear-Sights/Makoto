@@ -99,4 +99,7 @@ DECLARED_IDS: dict[str, str] = {
     # 2026-09-18: C11 REPORT BEFORE DECIDE -- a run's success written into prose before any
     # verifier ran. Same ACT_VS_GUARD factory as the seven Keel-shaped obligations.
     "gate.report_before_run": "reportBeforeRun",
+    # 2026-09-18: H6 FUNCTION DRAWN FROM NO CLAIM -- a top-level unit the session added
+    # that no operator turn names, nothing it wrote reaches, and no decorator registered.
+    "gate.unclaimed_unit": "unclaimedUnit",
 }
