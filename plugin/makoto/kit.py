@@ -775,6 +775,53 @@ def introduced_regex_predicate(
     return _predicate
 
 
+def response_text(ev: dict) -> str:
+    """The text a settled tool call PRINTED, from one decoded event. The obligation gates need
+    this beside `tool_input`, which `iter_tool_events` drops -- same normalization that iterator
+    applies to `tool_response` (stdout + stderr + output joined, a bare string taken as-is), kept
+    here as ONE definition rather than re-derived per gate. Empty string for anything else, so a
+    caller never has to test the shape."""
+    tr = ev.get("tool_response")
+    if isinstance(tr, str):
+        return tr.strip()
+    if isinstance(tr, dict):
+        return " ".join(str(tr.get(k, "") or "") for k in ("stdout", "stderr", "output")).strip()
+    return ""
+
+
+def command_of(ev: dict) -> str:
+    """The Bash command a decoded event carries, or "" -- one definition, for the same reason."""
+    ti = ev.get("tool_input")
+    if not isinstance(ti, dict):
+        return ""
+    return str(ti.get("command", "") or "")
+
+
+def command_matches(rx: re.Pattern):
+    """An act/guard predicate for `unmet_obligation_gate`: this event's Bash command matches `rx`.
+
+    Hoisted because `tests/test_no_alpha_duplicate_functions.py` caught four copies of the body
+    across the obligation gates the moment the second batch landed -- the law working as
+    intended. A gate that needs more than "the command matches" still writes its own predicate
+    (`unreadStructure` reads the RESPONSE too, `unobservedDestruction` splits shell segments).
+    """
+    def _predicate(ev: dict) -> bool:
+        cmd = command_of(ev)
+        return bool(cmd and rx.search(cmd))
+    return _predicate
+
+
+# A verifier RAN in this event, whatever it reported. ONE definition, shared by every obligation
+# whose guard is "something observed behaviour": `gate.unobserved_destruction` and
+# `gate.relaunched_unchanged` both mean exactly this, and two copies would be
+# `F2 TWO SOURCES OF TRUTH`. The vocabulary is `vocab._TEST_RUNNER_RX`, unchanged. The verdict is
+# deliberately not read: a report either way is the observation, and only the absence of both
+# leaves the act resting on nothing. Spelled as a `command_matches` application rather than its
+# own def, because a def with that body is alpha-equivalent to the factory's -- which
+# tests/test_no_alpha_duplicate_functions.py said when it was written the other way.
+ran_a_verifier = command_matches(_TEST_RUNNER_RX)
+
+
 def unmet_obligation_gate(*, act, guard, message, retry_hint, pattern_id,
                           level="advisory", min_acts=1) -> Callable[..., Optional[Finding]]:
     """Build a Stop-edge OBLIGATION gate: a costly act ran this session and no qualifying guard

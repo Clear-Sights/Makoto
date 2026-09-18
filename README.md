@@ -30,10 +30,10 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **13 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **11**, `event`: **2**
-- **22 Stop checks** (all checks registered at the Stop edge)
-- **20 end-of-turn gates** (`may_block=True`)
+- **27 Stop checks** (all checks registered at the Stop edge)
+- **25 end-of-turn gates** (`may_block=True`)
 - **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **6 advisory end-of-turn gates** (advisory-allowlisted)
+- **11 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
 
@@ -101,6 +101,11 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
 | `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | advisory | advisory |
 | `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | advisory | advisory |
+| `gate.unread_structure` | a traversal of structured data that printed `null` with no structure read before it | advisory | advisory |
+| `gate.unwitnessed_verifier` | a verifier reporting clean that has never been seen reporting a failure | advisory | advisory |
+| `gate.unknown_ref_switch` | HEAD moved to a ref nothing in the session had printed | advisory | advisory |
+| `gate.unobserved_destruction` | content destroyed with no verifier report before it | advisory | advisory |
+| `gate.relaunched_unchanged` | a second worker launch with no verifier report anywhere before it | advisory | advisory |
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 

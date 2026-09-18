@@ -1593,6 +1593,104 @@ def test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires(tmp_path):
         "the advisory fire must still be audited so it leaves a forensic trail"
 
 
+def _post_bash(tmp_path, session, command, stdout=""):
+    return {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
+            "tool_name": "Bash", "tool_input": {"command": command},
+            "tool_response": {"stdout": stdout, "exitCode": 0}}
+
+
+def test_dispatch_unread_structure_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unread_structure (2026-09-18) fires
+    (audited) but never blocks, even when its own condition holds -- a jq traversal that printed `null` with no structure read before it."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_bash(tmp_path, "unread_struct", "jq '.a.b' config.json", "null"))
+    stop = {"hook_event_name": "Stop", "session_id": "unread_struct", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unread_structure must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unread_structure" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
+def test_dispatch_unwitnessed_verifier_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unwitnessed_verifier (2026-09-18) fires
+    (audited) but never blocks, even when its own condition holds -- a first clean verifier run with no red run ever seen."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_bash(tmp_path, "unwitnessed", "pytest -q", "58 passed in 2.0s"))
+    stop = {"hook_event_name": "Stop", "session_id": "unwitnessed", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unwitnessed_verifier must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unwitnessed_verifier" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
+def test_dispatch_unknown_ref_switch_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unknown_ref_switch (2026-09-18) fires
+    (audited) but never blocks, even when its own condition holds -- a git checkout with no ref ever printed."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_bash(tmp_path, "unknown_ref", "git checkout feature-x"))
+    stop = {"hook_event_name": "Stop", "session_id": "unknown_ref", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unknown_ref_switch must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unknown_ref_switch" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
+def test_dispatch_unobserved_destruction_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unobserved_destruction (2026-09-18)
+    fires (audited) but never blocks, even when its own condition holds -- an rm -rf with no
+    verifier run before it.
+
+    The history carries a SOURCE EDIT before the destruction, and that is load-bearing rather
+    than scene-setting: `rm -rf` on its own also fires gate.canon_fingerprints'
+    `nosrc_destruct` fingerprint, which BLOCKS, so a bare destruction would make this pin
+    assert something false about a different gate. `nosrc_destruct` is
+    `NOT_edit_test_after_red AND NOT_source_edited AND destructive_command`, so one source edit
+    silences it -- and `notestedit_destruct` (`NOT_edit_test_after_red AND NOT_test_edited AND
+    destructive_command`) needs a TEST edit to silence, so the history carries one of each. With
+    both present the only destructive fingerprint left is `destruct_src_testedit`, which is in
+    the ADVISE half and cannot block. That combination is also this gate's merge witness against
+    gate.canon_fingerprints: destruction after a source AND test edit, with no verifier report,
+    is caught here and blocks nowhere else."""
+    state_dir = _setup_state(tmp_path)
+    for fp in ("src/parser.py", "tests/test_parser.py"):
+        _run_dispatch(state_dir, {"hook_event_name": "PostToolUse", "session_id": "unobserved",
+                                  "cwd": str(tmp_path), "tool_name": "Edit",
+                                  "tool_input": {"file_path": fp,
+                                                 "old_string": "a", "new_string": "b"},
+                                  "tool_response": {}})
+    _run_dispatch(state_dir, _post_bash(tmp_path, "unobserved", "rm -rf build/"))
+    stop = {"hook_event_name": "Stop", "session_id": "unobserved", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.unobserved_destruction must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unobserved_destruction" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
+def test_dispatch_relaunched_unchanged_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.relaunched_unchanged (2026-09-18) fires
+    (audited) but never blocks, even when its own condition holds -- a second Task dispatch with no verifier run anywhere before it."""
+    state_dir = _setup_state(tmp_path)
+    ev = {"hook_event_name": "PostToolUse", "session_id": "relaunched", "cwd": str(tmp_path),
+          "tool_name": "Task", "tool_input": {"description": "go"}, "tool_response": {}}
+    _run_dispatch(state_dir, ev)
+    _run_dispatch(state_dir, ev)
+    stop = {"hook_event_name": "Stop", "session_id": "relaunched", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out == "", "gate.relaunched_unchanged must NEVER block, even when it fires"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.relaunched_unchanged" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
+
+
 def test_no_shadow_gate_every_gate_blocks():
     """Warning-tier-elimination invariant, STRUCTURAL after the gates/ package cutover: may_block
     <=> reaches the decision pipeline. The pipeline-eligible set DERIVES from
@@ -1624,7 +1722,13 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.unexamined_wall",   # register G5\'s runner
                           "gate.unprobed_fanout",  # advisory-tier (2026-09-18): register B11's
                                                    # runner, the first ACT_VS_GUARD obligation
-                          "gate.unasked_plan"}     # advisory-tier (2026-09-18): register G2's
+                          "gate.unasked_plan",     # advisory-tier (2026-09-18): register G2's
+                          # the second obligation batch, same day and same tier
+                          "gate.unread_structure",
+                          "gate.unwitnessed_verifier",
+                          "gate.unknown_ref_switch",
+                          "gate.unobserved_destruction",
+                          "gate.relaunched_unchanged"}
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the
@@ -1670,7 +1774,12 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     # test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires above.
     _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
                         "gate.relative_path_citation", "gate.plan_item_drift",
-                        "gate.unprobed_fanout", "gate.unasked_plan"}
+                        "gate.unprobed_fanout", "gate.unasked_plan",
+                        "gate.unread_structure",
+                        "gate.unwitnessed_verifier",
+                        "gate.unknown_ref_switch",
+                        "gate.unobserved_destruction",
+                        "gate.relaunched_unchanged"}
     # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
     # so an empty function with the right name -- or one that asserts nothing, or never reaches
     # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is

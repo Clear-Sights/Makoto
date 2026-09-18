@@ -78,6 +78,13 @@ GATE_MODULE_STEMS = {
                              # obligation -- a dispatch with no read before it. ADVISE tier.
     "unaskedPlan",          # 2026-09-18: register G2's runner, the second -- a plan presented
                              # with no question asked. ADVISE tier.
+    # 2026-09-18, second batch: the five obligations Keel's clause table covered and makoto did
+    # not. All ADVISE tier, all ACT_VS_GUARD, one register entry each.
+    "unreadStructure",      # register A3 POSITIONAL PAIRING
+    "unwitnessedScanner",   # register B4 WRONG ORACLE
+    "unknownRefSwitch",     # register D12 PRESERVE TO VOLATILE
+    "unobservedDestruction", # register D14 UNDO UNPROVEN
+    "relaunchedUnchanged",  # register E13 PARKED ON AN INHERITED CHANNEL
 }
 GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
@@ -94,7 +101,12 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.claimed_running", "gate.claimed_shipped",
                           "gate.claimed_consent_absent",
                           "gate.unexamined_wall",
-                          "gate.unprobed_fanout", "gate.unasked_plan"}
+                          "gate.unprobed_fanout", "gate.unasked_plan",
+                          "gate.unread_structure",
+                          "gate.unwitnessed_verifier",
+                          "gate.unknown_ref_switch",
+                          "gate.unobserved_destruction",
+                          "gate.relaunched_unchanged"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -113,6 +125,11 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "testrun_output",
                            # cross-agent-pooled Bash evidence twin of `history` (see GateContext's
                            # own field doc)
 EXPECTED_FUNCTION_COUNTS = {
+    "unreadStructure.py": 2,  # 2026-09-18 obligation, register A3
+    "unwitnessedScanner.py": 2,  # 2026-09-18 obligation, register B4
+    "unknownRefSwitch.py": 0,  # 2026-09-18 obligation, register D12
+    "unobservedDestruction.py": 1,  # 2026-09-18 obligation, register D14
+    "relaunchedUnchanged.py": 1,  # 2026-09-18 obligation, register E13
     "unprobedFanout.py": 2,                                  # 2026-09-18: ACT_VS_GUARD obligation
     "unaskedPlan.py": 2,                                  # 2026-09-18: ACT_VS_GUARD obligation
                                # top-level def count per module, verified
@@ -273,12 +290,13 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 20                # 6 ledger-gates + liveness + self_wired +
+    assert len(GATE_MODULE_FILES & present) == 25                # 6 ledger-gates + liveness + self_wired +
     # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
     # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
     # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
     # runIntentUnfulfilled cut -- no register entry named any of them. 18->20, 2026-09-18:
-    # unprobedFanout / unaskedPlan added -- register B11 and G2, which had no runner.
+    # unprobedFanout / unaskedPlan added -- register B11 and G2, which had no runner. 20->25,
+    # same day: the second obligation batch, register A3 / B4 / D12 / D14 / E13.
 
 
 def test_module_function_counts_match_the_design():
