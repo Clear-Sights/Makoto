@@ -34,6 +34,7 @@ and ported by shape from Keel's `plugin/keel/clauses.json`.
 | C12 | `gate.unnamed_failure` | #82 |
 | C11 | `gate.report_before_run` | #83 |
 | H6 | `gate.unclaimed_unit` | #84 |
+| H3 | `gate.pasted_fix` | #85 |
 
 Two consolidations came out of scour's duplicate-name probe, both net subtractions: three
 per-module advisory-posture tests became one whole-set law in `tests/test_check_law_tests.py`
@@ -45,38 +46,35 @@ verdict parsers moved from `checks/namedTestTeeth.py` to `vocab.py`/`kit.py`, th
 home, which deleted a documented lazy-import exception from
 `tests/test_import_direction.py`'s `_CALL_TIME_OK`.
 
-## What is left: H3 and H4
+## What is left: H4 alone
 
-These are the last two the register maps as UNCOVERED and in subject. Nothing else is
+H4 is the last entry the register maps as UNCOVERED and in subject. Nothing else is
 buildable — the honest ceiling for Makoto alone is 57, and the remaining entries are
 OUT-OF-SUBJECT or NOT-COUNTABLE with the reason written in their map row.
 
-### H3 FIX DRAWN FROM FIXES
+### H3 FIX DRAWN FROM FIXES — done, and the measurement that shaped it
 
-*"a change reasoned from other changes"* > *"order by dependence; one change per pass"*.
+`gate.pasted_fix` (Stop, ADVISE, PATTERN_MATCH, eats `history`): the same normalized block of
+introduced text reaching a SECOND file with no verifier run between the two landings. Do not
+re-derive the readings below; each was measured over this tree's own 185 non-merge commits, a
+commit standing in for one session's introduced text.
 
-The candidate reading, which the ledger can decide: **the same introduced text landing in
-two or more distinct files with no verifier run between them** — one fix pasted across
-sites, each site's correctness inferred from the first rather than checked. The naive
-reading (N edits with no run between them) is indiscriminate and must not be built; measure
-its rate on this tree's own ledgers before writing a line.
+* The NAIVE reading — two or more edits with no run between them — fires on 136 of 185, 73.5%.
+  That is what writing code looks like, and it is why the candidate reading exists.
+* Three narrowings, each with the rate it bought: the same text in two DISTINCT files
+  (73.5 → 9.2%); `Edit`/`MultiEdit` only, because a fix changes what exists while a WRITTEN file
+  carries the house import header (9.2 → 3.8%); and a block carrying a line that is not a
+  comment, an import or a decorator (3.8 → 3.2%).
+* The grain of four substantial lines is the same measurement: one line fires on 21.1%, eight on
+  nothing at all. The recall bound follows — a repair shorter than four substantial lines is not
+  a finding, and it fails quiet.
+* It is NOT `kit.unmet_obligation_gate`: that factory's guard, once seen, pays for the rest of
+  the session, and here the run must fall BETWEEN the two landings. `kit.ran_a_verifier` is the
+  vocabulary, unchanged.
+* `docs/MERGE-WITNESSES.tsv` carries the pair against `gate.unwitnessed_verifier` both ways; the
+  witness input was measured rather than asserted, by running all thirty live Stop gates over it.
 
-Plant rows it needs, each red on a copy with the control green:
-
-- the distinct-file requirement dropped, so two edits to one file fire
-- the verifier-run discharge dropped, so a run between the two edits no longer clears it
-- the identical-text requirement widened to any two edits, so the gate is indiscriminate
-- whatever normalization is chosen (whitespace, indentation) removed, so a reindented paste escapes
-- the gate silenced entirely
-- the advisory allowlist entry removed, so an ADVISE gate is published as blocking
-- malformed-row tolerance removed — caught by the whole-set law, not a per-module copy
-
-The merge pass compares same-edge pairs, so the survivor to refute is
-`gate.unwitnessed_verifier`, which also discharges on a verifier run; the answer belongs in
-`docs/MERGE-WITNESSES.tsv` as a row per survivor, or the pair is unrefuted and
-`merge_pass.py` exits 2. The nearest prose neighbour, `event.thrash_revert`, is a pre-tier
-check on a different edge and is never paired with it, so the distinction has to be written
-down rather than left to the tool.
+Thirteen plants, thirteen red, no holes, on a copy with the control green first.
 
 ### H4 SWEEP DRAWN FROM MEMORY
 
