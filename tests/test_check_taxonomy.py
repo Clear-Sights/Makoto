@@ -96,15 +96,12 @@ def test_run_stop_checks_includes_liveness_findings(tmp_path, monkeypatch):
         def fetchone(self):
             return None
 
-    # Stub the ledger/commitment reads so the only substrate is the touched file.
+    # Stub the ledger reads so the only substrate is the touched file.
     monkeypatch.setattr(D, "GateContext", D.GateContext)
     import makoto.state.ledger as L
-    import makoto.state.commitments as C
     monkeypatch.setattr(L, "touched_keys", lambda conn, sid: frozenset({"m.py"}))
     monkeypatch.setattr(L, "empty_write_keys", lambda conn, sid: frozenset())
     monkeypatch.setattr(L, "latest_testrun", lambda conn, sid: "")
-    monkeypatch.setattr(C, "source_commitment", lambda text: None)
-    monkeypatch.setattr(C, "open_commitments", lambda conn, sid: [])
 
     payload = {"last_assistant_message": "done", "session_id": "s", "cwd": str(tmp_path)}
     out = D.run_stop_checks(FakeC(), payload)

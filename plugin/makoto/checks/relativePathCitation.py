@@ -18,13 +18,13 @@ Detection is DELIBERATELY narrow and syntactic (never a judgment call about whet
     documented convention: "include the pattern file_path:line_number").
   - Already-absolute ('/...') tokens are not flagged -- they ARE clickable.
   - A token inside a fenced code block (```...```) is code being shown, not a citation being
-    made, so it is excluded (same fence-parity discipline `state/commitments.py` uses).
+    made, so it is excluded (same fence-parity discipline `substrate/claims.py` uses).
   - A token immediately preceded by a URL scheme (http://, https://, ftp://) is excluded -- a URL
     path segment is not a filesystem citation.
   - A dotted CODE IDENTIFIER (`Finding.source_event_id`, `obj.method`) or a version/pattern id
     ("v1.2", "1.4.1") is excluded by requiring the post-dot segment to be a plausible lowercase
     file extension, never purely digits and never capitalized (same firewall
-    `state/commitments.py::_is_file_shaped` already uses for exactly this false-positive
+    `checks/silentlyDroppedCommitment.py`'s own location sourcer uses for exactly this false-positive
     class).
 """
 from __future__ import annotations
@@ -36,7 +36,7 @@ from typing import Optional
 from makoto.vocab import Finding
 
 # A plausible file EXTENSION: short, lowercase, alphanumeric, not purely numeric -- the same
-# firewall state/commitments.py::_is_file_shaped uses to separate a real filename from a
+# firewall checks/silentlyDroppedCommitment.py uses to separate a real filename from a
 # dotted code identifier or a version/pattern id.
 _EXT_RX = r"[a-z][a-z0-9]{0,4}"
 # A directory-qualified path: at least one '<segment>/' before a dotted basename. NOTE the two
@@ -58,7 +58,7 @@ _FENCE_RX = re.compile(r"(?m)^\s{0,3}```")
 
 def _in_fence(fence_ends: list, offset: int) -> bool:
     """True iff `offset` sits inside a ```fenced code block``` -- an ODD count of ``` fences
-    before it means so (same parity trick `state/commitments.py::_promise_match` uses).
+    before it means so (same parity trick `state/plan.py::source_plan_item_promise` uses).
     Identical to `len(_FENCE_RX.findall(text[:offset])) % 2 == 1`: a marker is counted by that
     prefix scan exactly when it ends at or before `offset`, i.e. when it fits wholly inside the
     prefix, which is what `bisect_right` over the marker END offsets counts."""

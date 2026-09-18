@@ -41,8 +41,8 @@ from typing import Optional
 from makoto.checks import normalize_path
 from makoto.substrate._planNode import Plan
 # _OFFER_COND_RX / _FIRST_PERSON_RX: L0 shared lexicon (makoto.vocab -- dedup: was a
-# byte-identical local copy of the exact regexes commitments.py hoisted; the plan-item section
-# below already said it "mirrors commitments.py's hardened guards" without the dedup happening).
+# byte-identical local copy of the exact regexes the since-cut state/commitments.py hoisted;
+# this store is their one consumer now).
 from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 
 # SessionStart only declares from the artifact on a genuinely-new session (mirrors Assay's own
@@ -246,15 +246,16 @@ def declare_from_live_write(cwd: str, session_id: str, conn) -> Optional[Plan]:
 # "next I need to close out Task #19") from the assistant's own text, and read them back
 # un-windowed by session.
 #
-# Distinct from `session/commitments.py` (which sources a promise to a FILE PATH and discharges
+# Distinct from the file-path commitment store (cut 2026-09-18; it sourced a promise to a FILE
+# PATH and discharged
 # it by checking the filesystem/touched-keys): a plan/task label ("§9.3", "Task #19") has no
 # filesystem location at all, so discharge here is PURELY TEXTUAL -- a later first-person
 # completion statement naming the same label, or an explicit retraction. This closes the gap a
 # real session hit: a forward commitment phrased as a section/task reference, never a file path,
-# was silently dropped and never appeared in ANY commitment store because `commitments.py`'s
+# was silently dropped and never appeared in ANY commitment store because that store's
 # sourcer requires a file-shaped location and found none.
 #
-# Sourcing discipline mirrors `commitments.py`'s hardened guards (first-person, active, non-past,
+# Sourcing discipline mirrors the cut store's hardened guards (first-person, active, non-past,
 # non-negated, non-conditional) at the same rigor tier, scoped down for this narrower label-shaped
 # surface rather than re-deriving from a real-session FP corpus this module has not been measured
 # against yet -- see the module docstring's own caveat below.
@@ -288,7 +289,7 @@ _NEG_BEFORE_VERB_RX = re.compile(
     r"(?:\s+(?:been|yet|quite|fully|completely|entirely|actually|really))*\s+$",
     re.IGNORECASE)
 # The verb is line-initial after at most a bullet/number marker -> an imperative plan bullet
-# ("- start §9.3", "1. finish §9.3"). Same convention as commitments.py's _LINE_INITIAL_RX.
+# ("- start §9.3", "1. finish §9.3"). Same line-initial convention the cut store used.
 _LINE_INITIAL_RX = re.compile(r"^[\s\-*•>\d.)\]]*$")
 # First sentence terminator after the label -- a '?' there marks an interrogative ("Should I
 # start §9.3?"), which is an offer for approval, never a firm promise.
@@ -308,7 +309,7 @@ def _normalize_label(raw: str) -> str:
 def _first_person_governs(text: str, verb_start: int, line_start: int) -> bool:
     """True iff the clause containing the verb has a first-person subject, or the verb sits at
     the start of its line after at most a bullet/number marker (an imperative plan bullet, same
-    convention as commitments.py's _LINE_INITIAL_RX)."""
+    line-initial convention the cut store used)."""
     if verb_start < line_start:
         # The verb sits on a PREVIOUS line (the label's line_start is past it): judge the verb
         # against ITS OWN line, never a reversed/empty slice -- an empty prefix here used to
@@ -322,7 +323,7 @@ def _first_person_governs(text: str, verb_start: int, line_start: int) -> bool:
 
 def source_plan_item_promise(text: str) -> Optional[dict]:
     """First plan/task label that is the object of a first-person, active, non-past, non-negated,
-    non-conditional FORWARD promise, else None. Mirrors `commitments.py::_promise_match`'s
+    non-conditional FORWARD promise, else None. Mirrors the cut store's `_promise_match`
     clause discipline scoped to this label-shaped surface (not yet corpus-measured for FPs --
     named honestly in the module docstring)."""
     if not text:

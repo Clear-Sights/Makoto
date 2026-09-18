@@ -1,10 +1,38 @@
-"""lexicons.py (L0) is the sole home for makoto's regexes + word-sets. Pins IDENTITY (each RX is
-the SAME compiled object gates/retraction/citations use) and L0 purity (no in-package imports). The
-identity assertions on the high-escape patterns (_TEST_RUNNER_RX, _ADMIT_CORE_RX, etc.) catch a
-transcription drift as a unit failure, not only via corpus-FP after the fact."""
+"""lexicons.py (L0) is the sole home for makoto's regexes + word-sets. Pins single-sourcing (each
+RX reaches its consumer by import, never by a private re-compile) and L0 purity (no in-package
+imports). The pins on the high-escape patterns (_TEST_RUNNER_RX, _ADMIT_CORE_RX, etc.) catch a
+transcription drift as a unit failure, not only via corpus-FP after the fact.
+
+`is` ALONE CANNOT CARRY THAT CLAIM, measured 2026-09-18 and the reason `_no_local_rebind` exists:
+`re.compile` memoizes on (pattern, flags), so a consumer that re-inlines the identical
+`re.compile(r"```.*?```", re.DOTALL)` gets back the very object vocab.py compiled and every `is`
+assertion here stays green. A plant that gave substrate/claims.py its own byte-identical copy of
+_FENCE_SPAN_RX passed this file untouched. `is` still catches a DRIFTED copy, so it is kept; the
+AST check below catches the byte-identical one, which is what the dedup campaign was about. The
+cache is also bounded and `re.purge()`-able, so identity here was never load-bearing in either
+direction."""
 import ast
 import re
 from pathlib import Path
+
+
+def _no_local_rebind(module, *names):
+    """Assert `module`'s own source never assigns `names` at module level -- so the symbol can
+    only have reached it by import. This is the half `is` cannot check: see this file's docstring
+    on re.compile's memoization."""
+    src = Path(module.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    assigned = set()
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else (
+            [node.target] if isinstance(node, ast.AnnAssign) else [])
+        for t in targets:
+            if isinstance(t, ast.Name):
+                assigned.add(t.id)
+    for name in names:
+        assert name not in assigned, (
+            f"{module.__name__} assigns {name} itself -- it must import it from makoto.vocab, "
+            f"and `is` cannot catch a byte-identical re-compile")
 
 
 def test_lexicons_exports_all_regex_symbols():
@@ -42,34 +70,34 @@ def test_primitives_reuse_the_same_lexicon_objects():
     assert io._TEST_RUNNER_RX is lexicons._TEST_RUNNER_RX
     assert citations._CITATION_AUTHOR_STOPWORDS is lexicons._CITATION_AUTHOR_STOPWORDS
     assert citations._CITATION_RX is lexicons._CITATION_RX
+    _no_local_rebind(claims, "_NEGATION_RX")
+    _no_local_rebind(io, "_TEST_RUNNER_RX")
+    _no_local_rebind(citations, "_CITATION_AUTHOR_STOPWORDS", "_CITATION_RX")
 
 
-def test_gate_and_retraction_lexicons_live_in_lexicons():
-    """StopCheck + retraction regexes/word-sets are L0 vocabulary in lexicons.py (spec §3b row 5)."""
-    import re
+def test_gate_lexicons_live_in_lexicons():
+    """StopCheck regexes/word-sets are L0 vocabulary in lexicons.py (spec §3b row 5). The
+    retraction half of this test went with the retraction vocabulary itself (2026-09-18): its
+    only reader was state/commitments.py, which was cut once nothing read GateContext.opens."""
     from makoto import vocab as L
     assert L._PRODUCE_VERB_RX.search("I wrote the file")
     assert L._UNIVERSAL_DONE_RX.search("everything is done.")
     assert L._GREEN_CLAIM_RX.search("tests pass")
     assert "the" in L._GREEN_UNIVERSAL_PREMOD and "__init__.py" in L._EMPTY_OK
-    assert L._RETRACT_VERB_RX.search("skipping it")
-    assert L._RETRACT_REASON_RX.search("for now")
-    assert isinstance(L._RETRACT_POST_RX, re.Pattern)
 
 
 def test_fence_span_rx_is_the_single_source_for_fenced_spans():
-    # dedup U2: the ```fenced``` span regex (DOTALL triple-backtick block) lives in exactly ONE place;
-    # substrate.claims._code_spans and retraction._fenced_spans both consume THIS object (identity), so the
-    # byte-identical `re.finditer(r"```.*?```", ..., re.DOTALL)` re-inline at lib/claims.py + retraction.py:63
-    # is gone. Identity (not equality) is the re-checkable single-source artifact.
+    # dedup U2: the ```fenced``` span regex (DOTALL triple-backtick block) lives in exactly ONE
+    # place; substrate.claims._code_spans consumes it by import, so the byte-identical
+    # `re.finditer(r"```.*?```", ..., re.DOTALL)` re-inline at lib/claims.py is gone. It had a
+    # second consumer, state/commitments.py::_fenced_spans, until that store was cut 2026-09-18.
     from makoto import vocab as lexicons
-    from makoto.state import commitments as retraction
     from makoto.substrate import claims
     text = "before ```done\ncode``` mid ```x``` end"
     spans = [(m.start(), m.end()) for m in lexicons._FENCE_SPAN_RX.finditer(text)]
     assert [text[a:b] for a, b in spans] == ["```done\ncode```", "```x```"]   # DOTALL: span crosses newline
     assert claims._FENCE_SPAN_RX is lexicons._FENCE_SPAN_RX
-    assert retraction._FENCE_SPAN_RX is lexicons._FENCE_SPAN_RX
+    _no_local_rebind(claims, "_FENCE_SPAN_RX")
 
 
 def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():

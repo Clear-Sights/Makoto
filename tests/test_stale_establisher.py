@@ -68,7 +68,7 @@ def test_run_adapter_is_witnessed_firing_and_silent(tmp_path):
     from makoto.context import GateContext
 
     def ctx(plan):
-        return GateContext(text="", touched=frozenset(), empty=frozenset(), opens=(),
+        return GateContext(text="", touched=frozenset(), empty=frozenset(),
                            testrun_output="", cwd="", fs_exists=lambda p: False,
                            fs_size=lambda p: None, fs_read=lambda p: None, history=(),
                            plan=plan)

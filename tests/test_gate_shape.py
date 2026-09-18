@@ -68,7 +68,7 @@ GATE_MODULE_STEMS = {
     "planItemDrift",        # 2026-07-09: advisory-only reminder of open plan/task-labeled
                              # commitments ("§9.3", "Task #19") sourced from chat prose by
                              # session/planItems.py -- see that module for why this can't reuse
-                             # session/commitments.py's file-path-only sourcing.
+                             # the cut store's file-path-only sourcing.
     "claimedRunningAbsent", # 2026-07-23: an agnostic (gate.canon-sense) claimed-running-but-
                              # nothing-runs gate -- claim vs this session's own recorded Bash
                              # evidence, mirroring claimedProduceAbsent's claim-vs-ledger shape.
@@ -94,7 +94,7 @@ EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
                                    # content.self_mute_guard / gate.self_wired are "meta" today
-EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output",
+EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "testrun_output",
                            "testrun_exit",   # the exit STATUS of the row `testrun_output` came
                            # from. gate.green_claim reads the NUMBER, closing the half of its
                            # absence-reads-as-green edge a token scan structurally cannot: a red
@@ -288,7 +288,7 @@ def test_each_gate_module_follows_the_house_style():
 
 # ---- teeth: every shape predicate must go RED on a planted violation --------------------------
 # (the import-firewall predicates + their TEETH moved to tests/test_import_direction.py, seam 7;
-#  both planted edges — a sibling named gate and gate->state.commitments — are still asserted
+#  both planted edges — a sibling named gate and gate->state.plan — are still asserted
 #  RED there, in test_TEETH_direction_checker_rejects_planted_backward_edges.)
 
 

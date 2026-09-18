@@ -17,7 +17,6 @@ Tables (all idempotent via IF NOT EXISTS):
   canonical_citations — Author-Year lookup populated by citations.refresh_if_stale
   config              — key/value seed (canonical_citations_path + _mtime)
   ledger              — results/touches keyed by normalized location, latest-wins
-  commitments         — open located commitments the advance gate reads (un-windowed)
   plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
   plan_item_commitments — forward promises to plan/task LABELS, discharged purely textually
 
@@ -100,20 +99,6 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
-        # commitments — open located commitments the advance gate reads (un-windowed)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS commitments (
-                commitment_key  TEXT PRIMARY KEY,
-                session_id      TEXT,
-                location        TEXT,
-                qty_min         INTEGER,
-                qty_max         INTEGER,
-                status          TEXT NOT NULL DEFAULT 'open',
-                retract_param   TEXT,
-                created_event_id INTEGER,
-                ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-            )
-        """)
         # plans — one declared contract Plan (SPEC-5 Makoto-absorbs-Assay merge) per session,
         # latest-wins on the WHOLE plan (mirrors Assay's declare/_persist semantics: declare
         # replaces the whole plan, mark_done+resync persists the whole plan again). `rows` is
@@ -126,11 +111,11 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
             )
         """)
         # plan_item_commitments -- a forward promise to a PLAN/TASK-LABELED item ("§9.3",
-        # "Task #19"), never a file path -- so it cannot reuse `commitments`' filesystem-touch
-        # discharge (_discharged reads touched_keys/fs_exists, meaningless for a label). Sourced
+        # "Task #19"), never a file path, so filesystem-touch discharge (_discharged reads
+        # touched_keys/fs_exists) is meaningless for it. Sourced
         # and discharged PURELY TEXTUALLY (a later first-person completion/retraction statement
-        # naming the same label); un-windowed by session, same "a promise doesn't expire because
-        # an hour passed" rule `commitments` follows. See state/plan.py.
+        # naming the same label); un-windowed by session, because a promise does not expire
+        # because an hour passed. See state/plan.py.
         conn.execute("""
             CREATE TABLE IF NOT EXISTS plan_item_commitments (
                 commitment_key  TEXT PRIMARY KEY,

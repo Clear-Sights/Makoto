@@ -1077,39 +1077,6 @@ def test_dispatch_canon_gate_shadow_when_disabled(tmp_path):
         "the shadow canon fire must still be audited so its FP rate can be mined"
 
 
-def test_dispatch_reason_bound_retraction_clears_the_open_commitment(tmp_path):
-    """The reconcile wiring end-to-end: promise (Stop 1), then RETRACT it with a surfaced reason
-    (Stop 2). The commitment is cleared (status='retracted') in the store — a legitimately-dropped
-    promise is not held against the AI.
-
-    The observable is the commitments store. It used to be "gate.advance does not fire", and that
-    gate was cut 2026-09-18 (register-unbound), which would have left this assertion unable to
-    fail. No check reads `GateContext.opens` any more; the store path is measured as unread and
-    queued for its own step, and until then it keeps this witness."""
-    state_dir = _setup_state(tmp_path)
-    sid = "adv_retract"
-    promise = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
-               "last_assistant_message": "Next I will add rate limiting to src/promised_zzz.py."}
-    retract = {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
-               "last_assistant_message": "Skipping src/promised_zzz.py for this sprint per your note."}
-    import sqlite3
-    from makoto.state import commitments as C
-    assert _run_dispatch(state_dir, promise) == (0, "")
-    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
-    try:
-        assert [c["location"] for c in C.open_commitments(conn, sid)] == ["src/promised_zzz.py"], \
-            "the promise must be recorded as an open commitment"
-    finally:
-        conn.close()
-    assert _run_dispatch(state_dir, retract) == (0, "")
-    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
-    try:
-        assert C.open_commitments(conn, sid) == [], \
-            "a reason-bound retraction must clear the commitment it names"
-    finally:
-        conn.close()
-
-
 def test_dispatch_fabricated_action_gate_blocks(tmp_path):
     """Behavioral blocking pin for gate.fabricated_action THROUGH the real dispatch. A Stop message
     claims a completed tool action with a distinctive (backticked) object whose command NO recorded

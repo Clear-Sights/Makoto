@@ -1,12 +1,12 @@
 """makoto.context — the Stop-edge evaluation context (Stage 2 seam 4, final cut): the
 `GateContext` schema (formerly `substrate/_shared.py`, ex-`stopchecks/_types.py`), the
 `_history_for_agent` thread-boundary firewall, and `run_stop_checks` — the function that
-assembles the Stop substrate (commitment sourcing -> retraction reconcile -> THEN read
-open_commitments -> touched/empty keys -> fs closures) and evaluates every discovered Stop
-check over it. Moved VERBATIM out of `dispatch.py`/`_shared.py`: the internal statement
-order of `run_stop_checks` is behavior-bearing (commitment sourcing must precede the retraction
-reconcile, which must precede the `open_commitments` read) and must never be reordered "for
-clarity".
+assembles the Stop substrate (touched/empty keys -> the declared Plan -> fs closures) and
+evaluates every discovered Stop check over it. Moved VERBATIM out of
+`dispatch.py`/`_shared.py`. Until 2026-09-18 this function also sourced commitments and ran the
+retraction reconcile before reading `open_commitments`, an order that was behavior-bearing for
+gate.advance; that gate was cut (register-unbound) and nothing read `GateContext.opens`
+afterwards, so the whole path went with it.
 
 Knight-Leveson: stdlib only. NO LLM, NO HTTP. Called from `makoto.dispatch` (which re-imports
 `run_stop_checks` under its own name for its Stop/SubagentStop handlers and for every existing
@@ -29,7 +29,6 @@ class GateContext:
     text: str
     touched: frozenset
     empty: frozenset
-    opens: Sequence
     testrun_output: str
     cwd: str
     fs_exists: Callable
@@ -153,30 +152,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         text = payload.get("last_assistant_message") or ""
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
-        from makoto.state import commitments as _C
         from makoto.state import ledger as _ledger
-        from makoto.checks import normalize_path
-        from makoto.state.commitments import surfaced_retraction_locations
-        commit = _C.source_commitment(text)
-        if commit:
-            try:
-                _C.record_commitment(conn, sid, commit, created_event_id=None)
-            except Exception:
-                pass
-        # Reconcile: clear any open commitment the assistant EXPLICITLY + reason-bound retracts
-        # (status='retracted') so the advance gate does not false-fire on a legitimately-dropped
-        # promise. Firewall: NORMALIZED-EQUALITY membership only (retracting cache.py never
-        # clears auth.py). Fail-open — a detector error must not crash the hook or mass-clear.
-        try:
-            retracted = surfaced_retraction_locations(text)
-            if retracted:
-                for c in _C.open_commitments(conn, sid):
-                    if normalize_path(c["location"]) in retracted:
-                        _C.set_status(conn, c["commitment_key"], "retracted",
-                                      retract_param="surfaced-reason")
-        except Exception:
-            pass
-        opens = _C.open_commitments(conn, sid)
         touched = _ledger.touched_keys(conn, sid)
         empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
         from makoto.state import plan as _plan
@@ -262,7 +238,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         # B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history is the
         # recovery path.
         ctx = GateContext(
-            text=text, touched=touched, empty=empty, opens=opens,
+            text=text, touched=touched, empty=empty,
             testrun_output=_ledger.latest_testrun(conn, sid),
             testrun_exit=_ledger.latest_testrun_exit(conn, sid),
             cwd=cwd, fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
