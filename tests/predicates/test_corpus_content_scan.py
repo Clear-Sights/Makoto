@@ -14,7 +14,6 @@ History (2026-05-29, ids as of that date): these corpora existed but NOTHING exe
 this runner activated them and immediately found pattern bugs (the corpora are CORRECT; the
 patterns disagreed) — marked xfail(strict) so a future fix turns xfail→xpass and FORCES
 removing the marker:
-  - TP_deferredCheckboxTheater (FN): misses `[x] <task> DEFERRED` (regex needs `[x]`+ws+`DEFERRED`
     contiguous) — the FN may be the CORRECT no-FP-vs-FN choice (a widen reintroduces a prose-FP;
     see ledger).
   FIXED 2026-05-29 (xfail removed): TN_integritySuppressionFlag + the env-gated-audit TN — both
@@ -35,7 +34,6 @@ from makoto.registry import load_precheck_catalog
 _PATH = {
     "content.verifier_predicate_weakened": "constitution/integrity/checks/sample.py",
     "content.integrity_suppression_flag": "sample.toml",
-    "content.deferred_checkbox_theater": "docs/pristine-baseline.md",
 }
 # checks whose corpora need infrastructure this runner does not build — each MUST name where
 # it IS tested, so a skip is never silent coverage loss.
@@ -44,7 +42,6 @@ _OUT_OF_SCOPE = {
 }
 # corpus filename -> xfail reason (check disagrees with its own corpus; fix is FP/FN-precision work)
 _KNOWN_BUGS = {
-    "TP_deferredCheckboxTheater_deferred_checkbox.md": "deferredCheckboxTheater FN: misses '[x] <task> DEFERRED' (needs contiguous [x]+ws+DEFERRED); the FN may be the CORRECT no-FP-vs-FN choice (any widen reintroduces a prose-FP) — ADVERSARY-FINDINGS, repo history",
 }
 _CDIR = os.path.join(os.path.dirname(__file__), "..", "corpora")
 

@@ -95,25 +95,25 @@ def test_load_checks_does_not_import_modules_irrelevant_to_the_requested_edge():
     # check module in makoto/checks/ regardless of which edge was requested -- ~35 modules,
     # ~600KB of code, on every single call). This scans the REAL package -- unlike the rest of
     # this file -- because the point is specifically that a Pre-only real module never lands in
-    # `sys.modules` for a Stop-edge request, and vice versa. `contractOrder.py` (the one
-    # dual Pre+Stop surface via EXTRA_CHECKS) legitimately belongs on both sides, so it is
-    # excluded from the "must not appear" sets below.
+    # `sys.modules` for a Stop-edge request, and vice versa. No module declares a dual Pre+Stop
+    # surface via EXTRA_CHECKS today (contractOrder.py, the only one that did, was cut
+    # 2026-09-18), so nothing needs excluding from the "must not appear" sets below.
     import sys
 
     from makoto.registry import ALLOWED_EDGES, scan
 
     def _reset_check_modules():
         for mod in list(sys.modules):
-            if mod.startswith("makoto.checks.") and mod != "makoto.checks.contractOrder":
+            if mod.startswith("makoto.checks."):
                 del sys.modules[mod]
 
     # Ground truth for "which edge does each real module's own CHECK belong to" (stem -> CHECK,
     # from an unfiltered scan() so this test never hardcodes the real catalog by hand). This
-    # only sees each module's PRIMARY CHECK, not EXTRA_CHECKS -- fine, since contractOrder.py
-    # (the sole EXTRA_CHECKS user) is excluded from both sides below anyway.
+    # only sees each module's PRIMARY CHECK, not EXTRA_CHECKS -- fine, since no module exports
+    # EXTRA_CHECKS today.
     stems_by_edge = {edge: set() for edge in ALLOWED_EDGES}
     for stem, chk in scan().items():
-        if chk is not None and stem != "contractOrder":
+        if chk is not None:
             stems_by_edge[chk.applies_at].add(stem)
 
     pre_only_stems = stems_by_edge["Pre"] - stems_by_edge["Stop"]

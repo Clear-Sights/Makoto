@@ -24,7 +24,7 @@ from __future__ import annotations
 # would promise seven moves its handler never runs, a no-op event reading as fully accumulating.
 _POST_ACCUMULATION_MOVES = (
     "_accumulate", "_ledger.record_update", "compute_delta", "_plan_items.record_task_event",
-    "_event_location", "_plan.persist_plan", "_plan.declare_from_live_write",
+    "_plan.event_location", "_plan.persist_plan", "_plan.declare_from_live_write",
     # the test-delta ADVISE finding actually reaches the wire and the audit log from this
     # event: _accumulate calls both (the row's own reason text says so).
     "_emit_decision", "_record_audit")
@@ -41,7 +41,7 @@ EVENTS: dict[str, dict] = {
         "accumulation only, never a blocking decision — the ledger update, the declared-Plan "
         "advance (a Write/Edit/MultiEdit/NotebookEdit at an open node's `where` resolves + marks "
         "it DONE, 2026-07-23 -- previously dead: mark_done/persist_plan had zero live callers, so "
-        "a declared plan could never close, see gate.contract_order's Stop remainder), the "
+        "a declared plan could never close, which gate.stale_establisher reads), the "
         "declared-Plan LIVE DECLARE (a locating call that writes the artifact path itself, "
         "`.claude/makoto-plan.jsonl`, mid-session, 2026-07-23 -- previously the ONLY admission "
         "path was an artifact already on disk BEFORE SessionStart; nothing let Claude declare or "

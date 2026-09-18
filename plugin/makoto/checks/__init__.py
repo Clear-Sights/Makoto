@@ -5,7 +5,7 @@ category sub-folders. Discovery is by convention and lives in `makoto.registry`
 (`scan`/`discover`/`load_checks`/`load_precheck_catalog`), NOT in this file: that scan globs
 `checks/*.py` and imports each module exporting a `CHECK` object that duck-types `.id` /
 `.applies_at` (one of "Pre"/"Post"/"Stop"/"SubagentStop"/"SessionStart") / `.posture`, plus an
-optional `EXTRA_CHECKS` list for a module with more than one surface (e.g. `contractOrder.py`'s
+optional `EXTRA_CHECKS` list for a module with more than one surface (no module declares one
 dual Pre+Stop pair). Nothing here enumerates the catalog: dropping a file into this directory is
 the whole of registering a check, and there is no hand-maintained list that a new file can fall
 out of sync with. Files whose name starts with `_` (this `__init__.py`, `_worldpaths.py`) are

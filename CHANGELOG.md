@@ -3,6 +3,51 @@
 All notable changes to makoto. Versions follow the live check inventory
 (`load_prechecks` / `load_checks(edge="Stop")`), which the README count is tested against.
 
+## [2.9.0] — 2026-09-18
+
+### Removed
+- Four checks, and the plan-obligation surface that was only theirs: `gate.contract_order` (both
+  its Pre and its Stop surface), `gate.advance`, `gate.run_promised` and
+  `content.deferred_checkbox_theater`. The criterion is the blindspot register
+  (`docs/REGISTER.md`, mapped in `docs/REGISTER-MAP.tsv`): no entry named any of them, and the
+  register map's verdicts are unchanged by the cut -- still 44 of 74 entries with a runner, 0
+  uncovered-and-countable added. The live inventory goes 15 pre-checks / 21 end-of-turn gates ->
+  13 / 18.
+
+  What went with them, because nothing else read it: `kit.claim_vs_ledger_predicate` (its one
+  caller was `gate.advance`), the `gate.run_promised` run-intent vocabulary in `vocab.py` (47
+  lines, named nowhere outside its own file once the gate was gone), and
+  `tests/test_no_alpha_duplicate_functions`'s exemption for `contractOrder._load_plan` against
+  `state/plan.load_plan` -- the duplicate the exemption excused is gone, so the exemption is too.
+
+  What stayed, and why: the declared-Plan store, its live lifecycle in `dispatch._accumulate`
+  (ADR 0014) and `substrate/_planNode.py` all remain, because `gate.stale_establisher` (register
+  H2), `gate.plan_item_drift` (F8) and `gate.dropped` (D13) stand on them. `contractOrder`'s
+  locating-call reader (`_LOCATING_TOOLS` / `_event_location`) was the lifecycle's, not the
+  gate's, so it moved to `state/plan.py` as `event_location` rather than being deleted;
+  `events.py`'s `PostToolUse` MOVE row names its new home.
+
+  This removes detection, and says so rather than claiming otherwise: `tools/merge_pass.py`
+  refutes every remaining pair, so none of the four was redundant with a survivor. Two of them,
+  `gate.contract_order` and `gate.run_promised`, carried hand-written step-1 witnesses in
+  `docs/MERGE-WITNESSES.tsv`; those rows are removed with the checks, and
+  `gate.stale_establisher`'s row went with them because `gate.contract_order` was the only
+  survivor it refuted. The check set is at a fixpoint again at 33 checks.
+
+  Three tests that observed the plan lifecycle through `gate.contract_order`'s block now read the
+  plan store directly, which is what the surviving checks read; the retraction-reconcile test
+  reads the commitments store for the same reason. Without that, each would have been left
+  asserting something that can no longer fail.
+
+    before   943 Scour findings, 235 F2, 184 unregistered; 6481 statements, 791 unreached (88%)
+    after    914 Scour findings, 222 F2, 174 unregistered; 6281 statements, 784 unreached (88%)
+    code     42010 -> 40094 lines of Python; prose 3661 -> 3630
+    suite    2021 passed -> 1882 passed, green; merge pass and register map both green
+
+  Only 7 of the 200 statements removed were unreached by the suite, so this was live, tested
+  code, not dead code. `GateContext.opens` now has no reader at all -- measured, not assumed --
+  and the commitments source/reconcile path behind it is a separate step.
+
 ## [2.8.5] — 2026-09-15
 
 ### Fixed

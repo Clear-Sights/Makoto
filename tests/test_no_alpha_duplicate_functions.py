@@ -5,7 +5,7 @@ the same notion of equivalence compilers use, not a token-similarity heuristic.
 
 Scan set widened 2026-07-09 from checks/+substrate/ to every domain package plus root modules:
 the original narrow set was a real coverage gap in the gate itself -- record/audit.py carried a
-self-clone, and contractOrder/plan + selfWiredCheck/install carried whole-function duplicates,
+self-clone, and selfWiredCheck/install carried whole-function duplicates,
 none of which the old scan could ever have seen. A gate that scans a subset silently certifies
 the rest; the scan set is now the package, minus tests/ (test files legitimately repeat shapes).
 
@@ -29,13 +29,6 @@ _EXEMPT_PAIRS = {
         "hollowTest.py keep their import-graph isolation (enforced by "
         "test_detector_engines_are_stdlib_isolated.py) -- importing substrate.factories here would break "
         "the property the duplication exists to protect.",
-    frozenset({("checks/contractOrder.py", "_load_plan"), ("state/plan.py", "load_plan")}):
-        "deliberate: contractOrder is a discovered Stop gate, and the gate-side layering firewall "
-        "(tests/test_import_direction.py, the pipeline-order firewall -- an ENFORCED check, "
-        "not a docstring claim) bars it from importing makoto.state.plan, the L2 store. Its PRE "
-        "predicate therefore reads the plans table inline via its own conn -- 12 lines of SQL "
-        "duplicated on purpose, per the repo's own boundary law ('shapes are copied, never "
-        "imported'). Merging would require widening the firewall, an owner-level design change.",
 }
 
 

@@ -71,7 +71,7 @@ def test_zero_failed_is_not_a_failure():
 
 def test_benchmark_noise_is_not_a_failure():
     """a benchmark line ('Outliers: 1 Standard Deviation ...') is not a test failure -> False."""
-    assert not is_failing_testrun("Outliers: 1 Standard Deviation from Mean; content.deferred_checkbox_theater IQR")
+    assert not is_failing_testrun("Outliers: 1 Standard Deviation from Mean; content.phantom_citation IQR")
     assert not is_failing_testrun("Mean 2.0 ops/sec; 2 samples collected; no anomalies")
 
 

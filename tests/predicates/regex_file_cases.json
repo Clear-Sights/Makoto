@@ -14,13 +14,5 @@
     "body_match": "audit_skip = true\n",
     "body_clean": "cache_skip = true\n",
     "wrong_path": "/tmp/config.py"
-  },
-  {
-    "id": "content.deferred_checkbox_theater",
-    "module": "makoto.checks.deferredCheckboxTheater",
-    "target_path": "docs/pristine-baseline.md",
-    "body_match": "- [x] DEFERRED rewrite of subsystem X\n",
-    "body_clean": "- [ ] DEFERRED rewrite of subsystem X\n",
-    "wrong_path": "docs/other.md"
   }
 ]

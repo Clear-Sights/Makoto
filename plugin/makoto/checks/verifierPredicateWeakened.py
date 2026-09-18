@@ -30,7 +30,7 @@ as the regex_file_predicate / ast_introduced_predicate factory scaffolds do.
 Knight-Leveson: stdlib ast/re + the shared makoto.kit scaffold only.
 """
 # See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
-# against deferredCheckboxTheater.py was verified and dismissed (call-site syntax, not shared
+# against the (since-cut) deferredCheckboxTheater.py was verified and dismissed (call-site syntax, not shared
 # logic). tests/test_no_alpha_duplicate_functions.py is the package's real duplicate-logic gate.
 from __future__ import annotations
 import ast

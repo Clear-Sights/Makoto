@@ -28,21 +28,20 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **15 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **12**, `event`: **2**, `gate`: **1**
-- **23 Stop checks** (all checks registered at the Stop edge)
-- **21 end-of-turn gates** (`may_block=True`)
-- **17 blocking end-of-turn gates** (`registry.blocking_eligible`)
+- **13 pre-checks**
+- Pre-check ids grouped by dotted prefix — `content`: **11**, `event`: **2**
+- **20 Stop checks** (all checks registered at the Stop edge)
+- **18 end-of-turn gates** (`may_block=True`)
+- **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
 - **4 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
 
 Two different things are called a *gate* in that list, and the counts are not comparable. The
 `gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is a
-check registered at the Stop edge with `may_block=True`. The one pre-check carrying the prefix,
-`gate.contract_order`, is not an end-of-turn gate — it has a same-named Stop sibling that is, and
-the two are separate checks with separate predicates. Every count above is scoped by edge, so no
-check is counted twice within a line.
+check registered at the Stop edge with `may_block=True`. No pre-check carries the prefix today —
+`gate.contract_order`, the one that did, was cut 2026-09-18 along with its Stop sibling. Every
+count above is scoped by edge, so no check is counted twice within a line.
 
 **Verifier weakening** — a check silently neutered
 - `content.verifier_predicate_weakened` loose-comparator verifier (`startswith`/`endswith`/`re.match` where `==` is meant)
@@ -54,7 +53,6 @@ check is counted twice within a line.
 - `content.phantom_citation` phantom citation (Author-Year not in `makoto/docs/CITATIONS.md`)
 - `content.unsourced_webfetch` WebFetch of a URL never seen in any prior tool result this session
 - `content.fabricated_commit_sha` fabricated commit SHA/tag presented as proof of a commit
-- `content.deferred_checkbox_theater` `DEFERRED`-style checkbox theater on an open to-do item
 - `content.illusory_authorship_trailer` an illusory Claude/Anthropic authorship or generation attribution (trailer, session link, routing address, or "Generated with/by Claude" footer) — a plain "Claude Code" product-name mention is not matched
 - `content.illusory_interruption_claim` a fabricated "interrupted by user" claim with no genuine harness-set interruption anywhere in this session's recorded history
 
@@ -63,7 +61,6 @@ check is counted twice within a line.
 
 **Scope & contract discipline** — illusory progress and out-of-contract action (SPEC-5, ported by shape from Assay)
 - `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
-- `gate.contract_order` a result-producing call issued while a declared Plan's dependency for that step is still undischarged (its Stop-time sibling gate guards the remainder at turn end)
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
 [docs/CATALOG.md](docs/CATALOG.md) points to the registered checks and their implementations.
@@ -85,14 +82,12 @@ The **certification** column uses the following labels, each naming its own deno
 | Check id | One-line trigger | Fire | Certification |
 |---|---|---|---|
 | `gate.completion` | "done / created `X`" but the artifact isn't on disk | blocking | established |
-| `gate.advance` | advancing a phase whose precondition isn't recorded as met | blocking | established |
 | `gate.green_claim` | "suite green" against a recorded test failure | blocking | established |
 | `gate.dropped` | an identifying forward promise left undischarged at turn-end | blocking | established |
 | `gate.fabricated_action` | "I ran `X`" in a turn with no tool call at all | blocking | established |
 | `gate.named_test` | "`test_foo` passes" against a recorded `FAILED` of that named test | blocking | established |
 | `gate.stale_pass` | "all tests pass" against pytest's own live `lastfailed` record | blocking | established |
 | `gate.claimed_running` | "it's running/up" contradicted by this session's own Bash record | blocking | established |
-| `gate.run_promised` | last turn promised a run ("I'll run the tests") and no Bash call followed | blocking | established |
 | `gate.claimed_shipped` | "merged/pushed/live" with no successful remote-mutating call on record | blocking | established |
 | `gate.claimed_consent_absent` | cites the operator's approval, instruction or word in a session whose transcript carries no genuine operator turn at all | blocking | new |
 | `gate.unexamined_wall` | states that a fact cannot be determined when no action at all has been taken since the operator's last turn | blocking | new |
@@ -100,7 +95,6 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |
 | `gate.canon` | last call ended in an unresolved direct error, or a byte-identical stuck retry loop | blocking | replayed |
 | `gate.canon_fingerprints` | ported canon fingerprints in the robust core established by gold-oracle certification | blocking | established |
-| `gate.contract_order` | turn ends with a declared Plan's dependency remainder non-empty | blocking | established |
 | `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | advisory | advisory |
 | `gate.canon_fingerprints_advisory` | the advisory remainder (soft/claim atoms or gold-disqualified) | advisory | advisory |
 | `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |

@@ -14,7 +14,6 @@ FACTORY_SHAPES = {
     "ast_introduced_predicate": "PATTERN_MATCH",
     "regex_file_predicate": "PATTERN_MATCH",
     "claim_vs_history_predicate": "CLAIM_VS_HISTORY",
-    "claim_vs_ledger_predicate": "CLAIM_VS_LEDGER",
     "live_query_finding": "LIVE_QUERY",
     # "introduced_regex_predicate" is NOT listed here: it serves both PATTERN_MATCH and
     # CLAIM_VS_HISTORY callers (illusoryAuthorshipTrailer.py / illusoryInterruptionClaim.py),
@@ -26,7 +25,6 @@ FACTORY_SHAPES = {
 
 ONE_OFF = {
     "content.self_mute_guard": "hardcoded makoto-allow immunity cannot use universal routing",
-    "gate.contract_order": "one module owns both its Pre and Stop surfaces",
     "gate.undeclared_falsifiable": "meta-level audit over registry/loader completeness",
     "gate.green_claim": "genuine CLAIM_VS_HISTORY / TESTRUN_DELTA straddle",
 }

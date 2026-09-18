@@ -406,8 +406,9 @@ def cmd_status() -> int:
     # blocking them — the report asserting an effect the decision path never applies, the same
     # defect as an uninstall that reports `unwired` without measuring. Requested vs effective
     # are separate fields, and an id that cannot fully take effect is named rather than
-    # silently implied. An id present on BOTH edges (gate.contract_order, the one dual-edge
-    # check) keeps its Stop half firing regardless of the env var, so it is ineffective too.
+    # silently implied. A Stop-edge id keeps firing regardless of the env var, so requesting a
+    # mute for one is ineffective too. (Until 2026-09-18 gate.contract_order was a check on BOTH
+    # edges and only its Pre half could be muted; no id is dual-edge today.)
     requested = [p.strip() for p in os.environ.get("MAKOTO_DISABLE_PATTERNS", "").split(",") if p.strip()]
     stop_ids = {c.id for c in load_checks(edge="Stop")}
     muteable = {p.id for p in catalog} - stop_ids

@@ -22,6 +22,11 @@ directory (the same directory Makoto's control-plane files already live under, p
 `checks/forbiddenLocation.py`'s self-guard) rather than inventing a new `.makoto/` segment
 Makoto has never used anywhere else.
 
+The locating-call reader (`_LOCATING_TOOLS` / `event_location`) lives here too. It was
+`checks/contractOrder.py`'s until that gate was cut (2026-09-18, register-unbound); its
+remaining consumer is the live plan lifecycle in `dispatch._accumulate` (ADR 0014), which is
+this store's own job, so it moved to the store rather than to another detector.
+
 Stdlib only; no LLM, no HTTP.
 """
 from __future__ import annotations
@@ -44,6 +49,25 @@ from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 # STARTUP-gated `declare_from_artifact`) -- a resume/clear/compact must never re-declare.
 STARTUP = "startup"
 _PLAN_ARTIFACT = ".claude/makoto-plan.jsonl"
+
+# The tools whose call carries a location, and the input keys that hold it.
+_LOCATING_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+_LOCATION_KEYS = ("file_path", "notebook_path")
+
+
+def event_location(tool_name: str, tool_input: dict) -> Optional[str]:
+    """The normalized WHERE a locating call targets, or `None` when the call is not a
+    locating advance -- reads `file_path`/`notebook_path` off the tool input, never
+    argument meaning."""
+    if tool_name not in _LOCATING_TOOLS:
+        return None
+    if not isinstance(tool_input, dict):
+        return None
+    for key in _LOCATION_KEYS:
+        value = tool_input.get(key)
+        if isinstance(value, str) and value:
+            return normalize_path(value)
+    return None
 
 
 def _is_falsifiable(what: str, passthrough: str, where: str) -> bool:

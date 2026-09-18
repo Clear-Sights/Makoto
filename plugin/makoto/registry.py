@@ -133,8 +133,7 @@ def _candidate_edges(path: Path) -> frozenset[str]:
     """Every `applies_at` edge value that appears as a string literal in `path`'s source text --
     read as plain text, WITHOUT importing the module. Used only as a cheap pre-filter so
     `scan()`/`discover()` can skip importing a file that provably cannot contribute to a
-    requested `edge`: a module's CHECK (and any EXTRA_CHECKS, e.g. `contractOrder.py`'s dual
-    Pre+Stop surface) always spells its `applies_at` as a literal string at the call site --
+    requested `edge`: a module's CHECK (and any EXTRA_CHECKS) always spells its `applies_at` as a literal string at the call site --
     verified repo-wide, see this module's own docstring update -- so grepping the source text
     for that pattern yields the exact same edge-set `_valid_check` would see after a real
     import, just without paying the import cost.
@@ -233,11 +232,10 @@ def scan(*, package_dir: Optional[Path] = None, edge: Optional[str] = None) -> d
 def discover(*, package_dir: Optional[Path] = None, edge: Optional[str] = None) -> list:
     """Every valid `CHECK` found directly in `package_dir` (defaults to the real `checks/`
     package), in file-stem order. A module MAY additionally export `EXTRA_CHECKS: list` for a
-    second (or more) firing surface sharing the same file/id at a DIFFERENT `applies_at` edge --
-    `contractOrder.py`'s Stop-side surface, which shares the id "gate.contract_order" with that
-    same module's Pre-side CHECK/predicate, is the only module in the catalog with two firing
-    surfaces under one id (ported from public Clear-Sights/Makoto's identical mechanism, SPEC-C
-    item 2). Each `EXTRA_CHECKS` entry is validated the same way as a primary CHECK
+    second (or more) firing surface sharing the same file/id at a DIFFERENT `applies_at` edge.
+    No module in the catalog declares one today: `contractOrder.py` was the only two-surface
+    module and it was cut 2026-09-18 (no register entry named it), so the mechanism is live and
+    unused. Each `EXTRA_CHECKS` entry is validated the same way as a primary CHECK
     (`_valid_check`) and silently skipped (not fatal) if malformed -- consistent with every other
     loader failure mode in this module.
 
@@ -257,7 +255,7 @@ def discover(*, package_dir: Optional[Path] = None, edge: Optional[str] = None) 
     # entry (tests/test_gate_shape.py accepts either placement, so nothing upstream rejects
     # listing both) must not get that one check evaluated twice in a single verdict -- the
     # same finding would be emitted twice for one event. Distinct objects sharing an id (the
-    # documented dual-surface shape, e.g. contractOrder.py) are untouched.
+    # documented dual-surface shape) are untouched.
     out, seen = [], set()
     for chk in primary + extra:
         if id(chk) in seen:

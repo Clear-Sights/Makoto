@@ -960,7 +960,8 @@ def _discharge_kwargs(c) -> dict:
     GateContext `c`. Single-sources the "these are the discharge-relevant fields" convention so a
     gate's `run=lambda c: ...` wiring doesn't hand-repeat `touched_keys=c.touched,
     fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size` at every call site (found
-    duplicated by jscpd, 2026-07-09, between gate.completion and gate.advance's own `run=` lambdas)."""
+    duplicated by jscpd, 2026-07-09, between gate.completion's and its sibling's own `run=`
+    lambdas)."""
     return dict(touched_keys=c.touched, fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size)
 
 
@@ -1012,30 +1013,6 @@ def _default_veto(claim, _c, *, touched_keys, fs_exists, empty_keys=None, fs_siz
     location = claim.get("location", "") if isinstance(claim, dict) else claim
     return _discharged(location, touched_keys, fs_exists,
                        empty_keys=empty_keys, fs_size=fs_size)
-
-
-def claim_vs_ledger_predicate(
-    *, extract_claims, veto=_default_veto, message,
-) -> Callable[..., Optional[Finding]]:
-    """Build a Stop check comparing extracted claims with the discharge ledger."""
-    def _run(c):
-        claims = extract_claims(c.text, c.opens)
-        for claim in claims:
-            if veto(
-                claim, c,
-                touched_keys=c.touched, fs_exists=c.fs_exists,
-                empty_keys=c.empty, fs_size=c.fs_size,
-            ):
-                continue
-            result = message(claim, c) if callable(message) else message.format(claim=claim)
-            if isinstance(result, Finding):
-                return result
-            return Finding(
-                pattern_id="", file="", line=0, level="error", message=result,
-            )
-        return None
-    _run.__module__ = extract_claims.__module__
-    return _run
 
 
 class _CarriageFault(str):

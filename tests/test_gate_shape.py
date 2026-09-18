@@ -13,8 +13,7 @@ adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py
 as a thin compat shim (`load_stopchecks()` re-exported, still memoized); that shim was removed
 2026-07-09 (no backwards-compat shims policy). Then, 2026-07-10, `load_stopchecks()`/`GATE`/
 `StopCheck` themselves were retired entirely: every gate module now expresses its Stop-edge
-surface as a plain `CHECK` (or, for `contractOrder.py`'s dual Pre+Stop surface, an `EXTRA_CHECKS`
-entry) discovered by the SAME unified `checks._loader.load_checks(edge="Stop")` every Pre-tier
+surface as a plain `CHECK` discovered by the SAME unified `checks._loader.load_checks(edge="Stop")` every Pre-tier
 check already used, with a new `Check.may_block` field marking exactly the checks that used to
 export a `GATE` -- the structural "reaches the decision pipeline at all" signal, independent of
 `.posture`/`.level` (see `_loader.py`'s `Check.may_block` docstring and `dispatch.py`'s
@@ -47,14 +46,14 @@ def _live_gates() -> list:
 GATES_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 
 # ---- the declared design (single source; the package must MATCH it) --------------------------
-# The 11 named Stop-gate modules — each is its adapter AND its own engine merged into one file
+# The named Stop-gate modules — each is its adapter AND its own engine merged into one file
 # (SPEC-5 Task 4 folded what used to be a separate `stopcheck_X.py` + `X.py` engine pair together).
 GATE_MODULE_STEMS = {
     "unexaminedWall",        # register G5's runner: an epistemic "cannot" with no act in the
                              # window since the operator last spoke
     "claimedConsentAbsent",  # the agent cites the operator's word in a session with no operator
                              # turn at all -- the ORACLE channel as record, never as subject
-    "claimedProduceAbsent", "undischargedCommitment", "falseGreenClaim", "silentlyDroppedCommitment",
+    "claimedProduceAbsent", "falseGreenClaim", "silentlyDroppedCommitment",
     "fabricatedToolAction", "namedTestTeeth", "stalePytestCache",
     "deadPureStatement",    # liveness gate: adapter + its own AST analyzer engine, one file
     "selfWiredCheck",       # the ONE advisory-tier exception to "discovered<=>live<=>blocking"
@@ -64,13 +63,6 @@ GATE_MODULE_STEMS = {
     "canonTimeoutRecur",    # canon gate: adapter + its own pure engine (canon.timeout/canon.recur)
     "canonFingerprints",           # SPEC-5 Task 9: BLOCK-tier half of the 17 canon fingerprints
     "canonFingerprintsAdvisory",   # SPEC-5 Task 9: ADVISE-tier half (shares _canonAtoms.py)
-    "contractOrder",        # SPEC-5 (Makoto absorbs Assay): the plan's Stop remainder guard.
-                             # staleEstablisher.py is its DETECTIVE/advisory sibling but is
-                             # DELIBERATELY NOT a discovered GATE (no GATE export) -- it is
-                             # invoked directly by run_stop_checks so its finding can never enter
-                             # _blocking_gate_ids(), rather than needing a cited DESIGN-DECISION
-                             # _ADVISORY_ALLOWLIST entry (makoto.registry) this
-                             # worker has no standing to mint.
     "relativePathCitation", # 2026-07-09: advisory-only, flags a chat response citing a non-
                              # absolute (unclickable) path. Discovered normally, like selfWiredCheck.
     "planItemDrift",        # 2026-07-09: advisory-only reminder of open plan/task-labeled
@@ -80,12 +72,6 @@ GATE_MODULE_STEMS = {
     "claimedRunningAbsent", # 2026-07-23: an agnostic (gate.canon-sense) claimed-running-but-
                              # nothing-runs gate -- claim vs this session's own recorded Bash
                              # evidence, mirroring claimedProduceAbsent's claim-vs-ledger shape.
-    "runIntentUnfulfilled", # 2026-07-23: claimedRunningAbsent's forward-looking sibling -- a
-                             # first-person run-intent PROMISE ("I'll run the tests") left with no
-                             # Bash evidence anywhere in history by the next turn. Stateless
-                             # (no new persistence): the one-turn grace period falls out of
-                             # `history` structurally never containing the row for the Stop
-                             # currently being evaluated (see the module's own docstring).
     "claimedShippedAbsent", # completed remote mutation claim checked against successful Bash
                              # git-push and closed-set GitHub mutation evidence across all agents.
 }
@@ -95,14 +81,13 @@ GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
 # with the gate catalog but are not gates. _canonAtoms.py is the same kind of shared substrate,
 # scoped to the two canonFingerprints* gates (SPEC-5 Task 9).
 EXPECTED_SHARED_FILES = set()  # 2026-07-09: all former checks/ plumbing moved to substrate/
-EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # 14 files, the gate subset of checks/
-EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.advance", "gate.green_claim", "gate.dropped",
+EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # the gate subset of checks/
+EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
                           "gate.self_wired", "gate.hollow_test", "gate.canon",
                           "gate.canon_fingerprints", "gate.canon_fingerprints_advisory",
-                          "gate.contract_order",
                           "gate.relative_path_citation", "gate.plan_item_drift",
-                          "gate.claimed_running", "gate.run_promised", "gate.claimed_shipped",
+                          "gate.claimed_running", "gate.claimed_shipped",
                           "gate.claimed_consent_absent",
                           "gate.unexamined_wall"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
@@ -124,7 +109,6 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "opens", "testrun_output"
                            # own field doc)
 EXPECTED_FUNCTION_COUNTS = {                               # top-level def count per module, verified
     "claimedProduceAbsent.py": 2,
-    "undischargedCommitment.py": 7,
     "falseGreenClaim.py": 2,
     "silentlyDroppedCommitment.py": 6,                     # 7->6, 2026-08-20: _drop_def_or_class
                                                             # inlined into its single call site
@@ -151,11 +135,9 @@ EXPECTED_FUNCTION_COUNTS = {                               # top-level def count
     "canonTimeoutRecur.py": 15,                            # sequence engine + Stop adapter
     "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
     "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
-    "contractOrder.py": 5,
     "relativePathCitation.py": 4,
     "planItemDrift.py": 1,
     "claimedRunningAbsent.py": 4,
-    "runIntentUnfulfilled.py": 4,
     "claimedShippedAbsent.py": 6,                          # 5->6, 2026-09-15: _first_json_object_
                                                             # in_content_blocks extracted -- the one
                                                             # decode for a bare-list MCP tool_response
@@ -211,8 +193,8 @@ def test_each_live_gate_exports_a_well_formed_CHECK():
         assert home.startswith("makoto.checks.")
         assert home.rsplit(".", 1)[-1] in GATE_MODULE_STEMS
         mod = importlib.import_module(home)
-        # the module's own CHECK export IS the gate, EXCEPT contractOrder's dual Pre+Stop surface,
-        # whose Stop-side lives in EXTRA_CHECKS instead (its CHECK is the Pre-side, applies_at=Pre).
+        # the module's own CHECK export IS the gate; EXTRA_CHECKS remains the second home a
+        # module may declare a further edge from (no module uses it today).
         assert getattr(mod, "CHECK", None) is g or g in (getattr(mod, "EXTRA_CHECKS", None) or [])
 
 
@@ -283,10 +265,11 @@ def test_package_file_shape_matches_the_design():
     present = {p.name for p in GATES_DIR.glob("*.py")}
     assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
     assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 21                # 7 ledger-gates + liveness + self_wired +
-    # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + contractOrder (SPEC-5,
-    # Makoto absorbs Assay) + relativePathCitation + planItemDrift (2026-07-09) + claimedRunningAbsent
-    # (2026-07-23) + runIntentUnfulfilled (2026-07-23) + claimedConsentAbsent (2026-09-08)
+    assert len(GATE_MODULE_FILES & present) == 18                # 6 ledger-gates + liveness + self_wired +
+    # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
+    # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
+    # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
+    # runIntentUnfulfilled cut -- no register entry named any of them.
 
 
 def test_module_function_counts_match_the_design():
@@ -353,4 +336,4 @@ def test_TEETH_function_count_check_catches_a_drift():
 def test_TEETH_discovery_count_is_load_bearing():
     # planting a 5th discovered id (or dropping one) would move this equality — the design count bites.
     assert len(_live_gates()) == len(EXPECTED_LIVE_GATE_IDS)
-    assert {"gate.completion", "gate.advance"} < EXPECTED_LIVE_GATE_IDS    # proper subset: set is real
+    assert {"gate.completion", "gate.dropped"} < EXPECTED_LIVE_GATE_IDS    # proper subset: set is real

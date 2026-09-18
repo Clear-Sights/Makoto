@@ -1,4 +1,4 @@
-"""tests for the three gates + reconcile (retraction) and the commitments store.
+"""tests for the completion gate + reconcile (retraction) and the commitments store.
 
 Real-payload shapes (a located done-claim in last_assistant_message, an open
 commitment un-windowed by session). Every blocking case has a matching silent case,
@@ -8,7 +8,6 @@ fails open against the live filesystem so a real edit never false-blocks.
 import sqlite3
 
 from makoto.state import commitments as C
-from makoto.checks.undischargedCommitment import advance_gate
 from makoto.checks.claimedProduceAbsent import completion_gate
 from makoto.kit import _discharged, _path_components, _suffix_match
 from makoto.state.commitments import reconcile, detect_hidden_retraction
@@ -81,60 +80,6 @@ def test_completion_fails_open_when_filesystem_shows_it():
 
 def test_completion_not_a_doneclaim_is_silent():
     assert completion_gate("I will add to src/auth.py next", touched_keys=set()) is None
-
-
-# --- advance gate --------------------------------------------------------------
-_OPEN = [{"location": "src/auth.py", "qty_min": None, "qty_max": None}]
-
-
-def test_advance_no_signal_is_silent():
-    assert advance_gate("still working on the parser", _OPEN, touched_keys=set()) is None
-
-
-def test_advance_blocks_on_undischarged_commitment():
-    # the TP: a UNIVERSAL completion claim ("everything is done") contradicted by a promised
-    # path with no trace. This is the verifiable contradiction the gate exists to catch.
-    f = advance_gate("Everything is done — all complete.", _OPEN, touched_keys=set())
-    assert f is not None and f.file == "src/auth.py"
-
-
-def test_advance_self_heals_from_filesystem():
-    assert advance_gate("Everything is done — all complete.", _OPEN, touched_keys=set(),
-                        fs_exists=lambda p: p == "src/auth.py") is None
-
-
-def test_advance_discharged_by_ledger_is_silent():
-    assert advance_gate("Everything is done — all complete.", _OPEN,
-                        touched_keys={"src/auth.py"}) is None
-
-
-# advance gate FP guards: the verifiable-contradiction fix. The advance signal is now an
-# UNENUMERATED universal completion claim, NOT a bare phase-transition. These three near-
-# misses are the FP surface that kept the gate FP-prone — each must stay inert even with an
-# undischarged commitment open, because advancing past it there is legitimate triage, not a
-# contradiction. Paired with the TP above, they pin the gate against both failure modes
-# (suppress-to-zero turns the TP red; fire-on-everything turns these red).
-
-def test_advance_bare_moving_on_is_inert():
-    # a bare phase-transition makes NO completeness claim -> no contradiction (the removed FP)
-    assert advance_gate("Moving on to the next phase.", _OPEN, touched_keys=set()) is None
-
-
-def test_advance_scoped_done_is_inert():
-    # "done with the parser" is SCOPED -> it does not claim the open auth commitment is done
-    assert advance_gate("Done with the parser refactor.", _OPEN, touched_keys=set()) is None
-
-
-def test_advance_negated_completion_is_inert():
-    # honest admission of incompleteness must never fire (negation-guarded)
-    assert advance_gate("Not everything is done yet, moving on.", _OPEN,
-                        touched_keys=set()) is None
-
-
-def test_advance_enumerated_completion_is_inert():
-    # an ENUMERATED claim shows its scope ("all 5 of 5") -> bounded, not an unbounded
-    # "everything"; advancing past an unrelated open commitment is not a contradiction
-    assert advance_gate("All 5 of 5 tasks done.", _OPEN, touched_keys=set()) is None
 
 
 # --- reconcile -----------------------------------------------------------------

@@ -540,7 +540,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
 # marker — the seal on the mint cannot be signed by the would-be forger; gate.* check claims
 # against the ledger, where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
-    "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.deferred_checkbox_theater", "content.phantom_citation", "content.verifier_body_hollowed",
+    "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.phantom_citation", "content.verifier_body_hollowed",
     "content.illusory_authorship_trailer", "content.illusory_interruption_claim"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
@@ -846,7 +846,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         from makoto.state import ledger as _ledger
         from makoto.kit import (_path_components, bash_output_text, compute_delta,
                                 is_test_runner)
-        from makoto.checks.contractOrder import _LOCATING_TOOLS, _event_location
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
         delta_finding = None
@@ -868,9 +867,9 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                               session_id=sid, root=state_dir)
         # Locating tools declare or advance the live plan through the shared Plan.resolve contract.
         # See docs/adr/0014-live-plan-lifecycle.md for why.
-        if payload.get("tool_name") in _LOCATING_TOOLS:
-            from makoto.state import plan as _plan
-            loc = _event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
+        from makoto.state import plan as _plan
+        if payload.get("tool_name") in _plan._LOCATING_TOOLS:
+            loc = _plan.event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
             if loc is not None:
                 if _path_components(loc)[-2:] == [".claude", "makoto-plan.jsonl"]:
                     # DECLARE: a locating call wrote the artifact itself -- (re-)admit it live,
