@@ -28,6 +28,11 @@ from typing import Callable, Optional
 ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"})
 TESTS_SHAPES = frozenset({
     "PATTERN_MATCH", "CLAIM_VS_HISTORY", "CLAIM_VS_LEDGER", "LIVE_QUERY", "TESTRUN_DELTA",
+    # An OBLIGATION: a costly act ran and no qualifying guard preceded it. Distinct from
+    # CLAIM_VS_HISTORY because no claim is read -- a turn that says nothing at all can still
+    # owe. `kit.unmet_obligation_gate` is its only factory; see that docstring for the port from
+    # Keel's clause table and for the window bound.
+    "ACT_VS_GUARD",
 })
 
 # The ONLY documented exception to "every Stop-gate finding blocks" (2026-07-05, DESIGN DECISION 6):
@@ -42,8 +47,13 @@ TESTS_SHAPES = frozenset({
 # SPEC-5's own total-retention rule keeps them in the catalog, evaluated and recorded, but never
 # blocking. Its sibling gate.canon_fingerprints (the 4 robust-core, blocking-capable fingerprints)
 # is intentionally NOT here — it always emits level="error" (see canonFingerprints.py).
+# gate.unprobed_fanout and gate.unasked_plan (2026-09-18) are the third and fourth: both are
+# ACT_VS_GUARD obligations with a real benign class (a dispatch that IS the exploration; a plan
+# for a request that carried no ambiguity) and no corpus-measured FP rate yet. Promoting either
+# to BLOCK needs that measurement, not a preference. Each module's docstring says so.
 _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
-                                  "gate.relative_path_citation", "gate.plan_item_drift"})  # FD6, FD26, 2026-07-09
+                                  "gate.relative_path_citation", "gate.plan_item_drift",
+                                  "gate.unprobed_fanout", "gate.unasked_plan"})  # FD6, FD26, 2026-07-09
 
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called
 # "posture" and they are three different vocabularies: a CHECK's native tier is `BLOCK`/`ADVISE`

@@ -15,6 +15,7 @@ FACTORY_SHAPES = {
     "regex_file_predicate": "PATTERN_MATCH",
     "claim_vs_history_predicate": "CLAIM_VS_HISTORY",
     "live_query_finding": "LIVE_QUERY",
+    "unmet_obligation_gate": "ACT_VS_GUARD",
     # "introduced_regex_predicate" is NOT listed here: it serves both PATTERN_MATCH and
     # CLAIM_VS_HISTORY callers (illusoryAuthorshipTrailer.py / illusoryInterruptionClaim.py),
     # so its shape isn't derivable from factory NAME alone — see _factory_shape's special case
@@ -42,6 +43,11 @@ HISTORY_PRIMITIVES = frozenset({
     "user_turn_texts",
 })
 LEDGER_PRIMITIVES = frozenset({"_discharged", "_discharge_kwargs", "_drop_discharged"})
+# An obligation's evidence is the ORDERED event sequence, so its primitive is the factory that
+# walks it. The factory is the only way to reach that walk: a module that declares ACT_VS_GUARD
+# and hand-rolls the loop instead fails this law, which is the point -- one home for the order
+# rule, since the order IS the check.
+ACT_GUARD_PRIMITIVES = frozenset({"unmet_obligation_gate"})
 TESTRUN_PRIMITIVES = frozenset({
     "classify_failure", "compute_delta", "recorded_failed_names", "is_failing_testrun",
     "_bash_call_after",
@@ -157,6 +163,8 @@ def _has_required_evidence(shape: str, tree: ast.Module) -> bool:
             and node.args[1].value == "open_plan_items"
             for node in ast.walk(tree)
         )
+    if shape == "ACT_VS_GUARD":
+        return bool(calls & ACT_GUARD_PRIMITIVES)
     if shape == "TESTRUN_DELTA":
         return bool(calls & TESTRUN_PRIMITIVES)
     if shape == "LIVE_QUERY":
@@ -176,6 +184,27 @@ def _has_required_evidence(shape: str, tree: ast.Module) -> bool:
         )
         return match_call and gated
     return False
+
+
+def test_no_dead_result_shape_in_the_closed_vocabulary():
+    """`TESTS_SHAPES` is a CLOSED vocabulary, and nothing checked the other direction: a shape
+    nobody declares sits in it undetectably. That is `B7 RULE WITH NO RUNNER` applied to a
+    vocabulary rather than to a rule, and a plant on 2026-09-18 -- adding a bogus shape --
+    left the whole suite green.
+
+    Every member must be declared by at least one live check, or be named in `RESERVED_SHAPES`
+    with the reason. `FACTORY_SHAPES`' values must also all be real members, so a factory cannot
+    be mapped to a shape the vocabulary does not carry.
+    """
+    RESERVED_SHAPES: dict[str, str] = {}      # none reserved today; a member here needs a reason
+    declared = {c.tests for c in _catalog().values() if c.tests}
+    dead = sorted(TESTS_SHAPES - declared - set(RESERVED_SHAPES))
+    assert not dead, (
+        f"result shape(s) in TESTS_SHAPES that no live check declares: {dead}. Either a check "
+        f"should declare one, or the member is dead vocabulary and comes out.")
+    invented = sorted(set(FACTORY_SHAPES.values()) - TESTS_SHAPES)
+    assert not invented, f"FACTORY_SHAPES maps a factory to shape(s) the vocabulary lacks: {invented}"
+    assert not (declared - TESTS_SHAPES), "a live check declares a shape outside the vocabulary"
 
 
 def _catalog() -> dict[tuple[str, str], Check]:

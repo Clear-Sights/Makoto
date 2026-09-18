@@ -24,12 +24,12 @@ E10	RUNNER	event.identical_retry	the retry is graded against the failure class i
 E11	OUT-OF-SUBJECT	-	nested limits of a host makoto does not allocate
 E12	RUNNER	content.self_mute_guard	the gate's own inspected attribute cannot be reworded away; also gate.claimed_consent_absent: rewording cannot grant the operator's approval, so the cited approval must be a genuine user turn
 E13	NOT-COUNTABLE	-	a detached task's input channel is not on the record makoto reads
-G2	NOT-COUNTABLE	-	needs the question compared against what was derivable; that comparison is similarity
+G2	RUNNER	gate.unasked_plan	a plan presented with no question asked this session settled its ambiguity by guessing; ADVISE tier, ported by shape from Keel's clause P02 (the previous NOT-COUNTABLE note was right that grading WHICH question was owed is a similarity judgement, and whether ANY was asked is not)
 G3	NOT-COUNTABLE	-	needs each party's span compared against the answer's; that comparison is similarity
 G5	RUNNER	gate.unexamined_wall	an epistemic "cannot" with zero calls since the operator's last turn
 A14	OUT-OF-SUBJECT	-	a normalization inside code makoto does not execute; its own canon() is graded by tests/test_canon_fingerprints.py
 B4	NOT-COUNTABLE	-	proxy-versus-target disagreement is a similarity judgement over two oracles
-B11	NOT-COUNTABLE	-	a baseline run is not on any channel makoto reads
+B11	RUNNER	gate.unprobed_fanout	a dispatch to a subagent needs a read, glob or grep before it, so the brief describes what is there rather than what was assumed; ADVISE tier, ported by shape from Keel's clause D01 (the previous NOT-COUNTABLE note read the entry as a with-and-without MEASUREMENT, which is not on any channel makoto reads -- the baseline the clause means is a read of the ground, which is)
 B14	NOT-COUNTABLE	-	with-and-without measurement is outside a single turn's record
 B18	OUT-OF-SUBJECT	-	held-out reporting is a property of the certification sets, not of a turn
 B26	RUNNER	gate.self_wired	makoto's own liveness is an output; absence of its wiring fails loud

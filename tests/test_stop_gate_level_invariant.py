@@ -184,7 +184,25 @@ def _scenario_claimed_consent_absent(tmp_path):
     return _ctx(text="You approved this, so I merged it.", transcript_path=str(tp))
 
 
+def _scenario_unprobed_fanout(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unprobed_fanout_fires_on_a_dispatch_with_no_read
+    # A dispatch with no Read/Glob/Grep anywhere earlier in the session.
+    row = {"payload": {"hook_event_name": "PreToolUse", "tool_name": "Task",
+                       "tool_input": {"description": "go and refactor the parser"}}}
+    return _ctx(history=[row])
+
+
+def _scenario_unasked_plan(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unasked_plan_fires_on_a_plan_with_no_question
+    # A plan presented with no AskUserQuestion anywhere earlier in the session.
+    row = {"payload": {"hook_event_name": "PreToolUse", "tool_name": "ExitPlanMode",
+                       "tool_input": {"plan": "step 1, step 2"}}}
+    return _ctx(history=[row])
+
+
 _SCENARIOS = {
+    "gate.unprobed_fanout": _scenario_unprobed_fanout,
+    "gate.unasked_plan": _scenario_unasked_plan,
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
     "gate.unexamined_wall": _scenario_unexamined_wall,
     "gate.completion": _scenario_completion,
