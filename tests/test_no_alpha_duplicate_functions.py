@@ -39,14 +39,19 @@ def _canonicalize(node: ast.AST, names: dict) -> ast.AST:
     if isinstance(node, ast.arg):
         names.setdefault(node.arg, f"_v{len(names)}")
         return ast.arg(arg=names[node.arg], annotation=None)
-    new = type(node)()
+    # Fields are collected first and handed to the constructor. `type(node)()` then
+    # setattr was equivalent and quieter to read, but Python 3.13 deprecates constructing
+    # an AST node without its required fields -- 48,952 DeprecationWarnings per suite run
+    # on a matrix row we support -- and 3.15 makes it an error.
+    fields = {}
     for field, value in ast.iter_fields(node):
         if isinstance(value, list):
-            setattr(new, field, [_canonicalize(v, names) if isinstance(v, ast.AST) else v for v in value])
+            fields[field] = [_canonicalize(v, names) if isinstance(v, ast.AST) else v for v in value]
         elif isinstance(value, ast.AST):
-            setattr(new, field, _canonicalize(value, names))
+            fields[field] = _canonicalize(value, names)
         else:
-            setattr(new, field, value)
+            fields[field] = value
+    new = type(node)(**fields)
     for attr in ("lineno", "col_offset", "end_lineno", "end_col_offset"):
         if hasattr(node, attr):
             setattr(new, attr, 0)
