@@ -287,18 +287,157 @@ Each is reproducible with the commands in §3 and named with a file and a line.
 
 ## 7. What to do next, in order
 
-1. Port the twelve checks in §6.1, with `kit.unmet_obligation_gate` first since seven of
-   them need it. One pull request per register entry. Then update the map rows they cover.
-2. Add the reverse audit (§6.3) and home or declare the four checks it flags.
-3. Shape-gate the Stop edge (§5.2).
-4. Take on `B36` (§5.3, §6.4) — it is the one that replaces an argument about coverage
-   with a number.
-5. Re-argue `B37` and `A13` (§6.4).
-6. Fix the duplicate id in §6.2.
+**What finished looks like.** Every register entry carries a verdict that a runner can
+falsify, or a written refusal that says what was measured and why the reading does not pay;
+`register_map.py` reports `UNCOVERED 0` in **both** trees and refuses the run when a live
+check is named nowhere; `merge_pass.py` reaches a fixpoint across edges, not only within
+one; and no check that depends on the wording of a claim is shipped with its miss rate
+unmeasured. The public tree reports `UNCOVERED 0` today and is **not** finished by this
+definition — §5 says exactly which parts of it are not.
+
+Each step below gives the action, why it comes where it does, and the observation that tells
+you it worked. Steps 1 and 2 are ordered; 3, 4, 5 and 6 are independent of each other and of
+1–2, so they can be taken in any order or in parallel by separate agents.
+
+1. **Port the twelve checks in §6.1 into `makoto-dev`**, `kit.unmet_obligation_gate` first
+   since seven of them need it. One pull request per register entry.
+   *Why first:* every other dev-side number is misleading while dev is eight checks behind
+   the tree it generates, and §6.3's reverse audit cannot be judged against a check set that
+   is still moving.
+   *Done when:* `python3 -c "from makoto import registry; print(len({x.id for x in registry.load_checks()}))"`
+   reads the same in both trees, and the map rows for C11, C12, H3 and H6 move off
+   `UNCOVERED`.
+
+2. **Update the map rows the ported checks cover**, and re-run `register_map.py` in both
+   trees.
+   *Why here:* a ported check with no map row is invisible to the only tool that grades
+   coverage, so step 1 is not actually banked until this lands.
+   *Done when:* `UNCOVERED` falls in dev and neither tree gains a `stale` or `orphan` row.
+
+3. **Add the reverse audit to `makoto-dev`** (§6.3) and home or declare the four checks it
+   flags: `content.deferred_checkbox_theater`, `gate.advance`, `gate.contract_order`,
+   `gate.run_promised`.
+   *Why it is not a mechanical port:* the audit will flag all four immediately, and each one
+   is a separate judgement — does it serve an entry that has no row yet, or does it serve no
+   entry at all and belong in `OUTSIDE_THE_REGISTER` as `gate.relative_path_citation`
+   already does?
+   *Done when:* the audit runs and reports zero unhomed checks, with each of the four either
+   carrying a map row or declared outside.
+
+4. **Take on `B36`** (§5.3, §6.4).
+   *Why it is the expensive one and worth it:* fourteen checks must recognise a claim in
+   prose before they fire, and nothing measures how often they miss. Until that number
+   exists, "covered in spirit" is an argument. `B36` is the register's own entry for exactly
+   this fault and is currently marked `NOT-COUNTABLE`.
+   *Done when:* a miss rate is measured on real ledgers and either the recognisers are
+   improved or `B36`'s verdict is rewritten around the number.
+
+5. **Re-argue `B37` and `A13`** (§6.4). Both may end as refusals again — that is a
+   legitimate outcome — but the reasons currently written do not answer the questions the
+   register's own fix lines ask.
+   *Done when:* each row's reason addresses its fix line, whatever verdict it lands on.
+
+6. **Fix the duplicate `gate.contract_order` id** (§6.2).
+   *Why last:* it is small and isolated, and the public tree already cut the module, so
+   nothing else waits on it.
+   *Done when:* the reproduction in §6.2 prints `{}`.
+
+Two things are **not** on this list and should not be added to it without the owner saying
+so: shape-gating the Stop edge (§5.2), which is a design change large enough to be its own
+decision, and running the publish script (§9).
 
 ---
 
-## 8. Rules that bind any change
+## 8. Possibilities, and what has already been tried and refused
+
+**Do not re-derive these.** Each was measured or decided in a previous round. Reopening one
+is allowed; starting it over from scratch as if it were new is the waste this section exists
+to prevent.
+
+**Refused, with the reason:**
+
+* **A second runner for a register entry that already has one.** Two sessions built `H3` in
+  parallel; the other merged first as `gate.pasted_fix`. The whole second gate, its tests and
+  its plants were dropped rather than shipped, because the project's rule is one runner per
+  entry. If an entry already has a runner and you think it is weak, the move is to *harden
+  that runner*, never to add a second.
+* **Mechanically porting the public tree's reverse audit.** See §7.3 — the port is two lines,
+  the four judgements it forces are the actual work.
+* **"Fixing" the public register to match dev's.** Dev's `docs/REGISTER.md` was the stale
+  copy (76 entries, no `H` family). The published copy, `measure-zero`'s copy and the
+  vendored copy were byte-identical and correct. The direction of the repair is always dev
+  ← public for the register, and dev → public for everything else.
+* **Closing `H4` with a runner.** It closed as a *measured refusal* instead: the map row
+  carries the numbers. A refusal with a measurement in it is a real verdict here, not a
+  failure to finish, and several rows already are one.
+
+**Possibilities not yet taken, each with what it would cost:**
+
+* **Shape-gate the Stop edge** (§5.2). The Pre edge already does this — all its checks
+  declare `keywords` and only run when one hits the payload. At Stop, `context.run_stop_checks`
+  runs every check on every Stop event and only two declare keywords at all. Closing it means
+  giving ~21 checks a shape and proving each still fires on its own. This is the single
+  largest gap between what the tool does and the stated intent that it is passive and
+  per-shape.
+* **Prove the check set minimal across edges, not only within one.** `merge_pass.py` refutes
+  every ordered pair *within* an edge. `D1`, `E12` and `G1` are covered at both Pre and Stop
+  and that overlap has never been tested. Extending the pass to cross-edge pairs is a change
+  to one tool, not to any check.
+* **Give the 18 no-runner rows a second look.** They are the not-countable and
+  out-of-subject rows. Some are genuinely out of subject; the `B36`/`A13`/`B37` re-argument
+  in §7.4–5 may show the classification is looser than it reads.
+* **Harden the merged `gate.pasted_fix`.** Open question, never answered — see §9.
+* **Carry the whole thing back to `measure-zero`'s register.** Makoto vendors
+  `docs/REGISTER.md` byte-for-byte from `measure-zero`. A verdict changed here that implies
+  the register's own text is wrong is a change to that repository, not this one.
+
+---
+
+## 9. Decisions only the owner can make
+
+Do not take these on your own initiative, whatever a task description seems to imply.
+
+1. **Running `scripts/publish_public.sh`.** It is an `rsync -a --delete` from a staged copy
+   of `makoto-dev` onto a checkout of the public repository, and it is the only irreversible
+   action in this project. "Push and merge" is pull-request language and does **not**
+   authorise it. `divergence_guard` will abort it and name every path that would be lost —
+   read that list rather than overriding it. The owner has to name this sync specifically.
+2. **Whether to harden `gate.pasted_fix`** or leave it as merged. Asked, not yet answered.
+3. **Whether the Stop edge gets shape-gated** (§8), and whether the resulting behaviour
+   change is acceptable.
+4. **Whether a prose-dependent check may ship at all** once `B36` puts a number on the miss
+   rate. That is a standard, not a measurement.
+
+---
+
+## 10. What this environment does not have
+
+Stated because each one costs a session an hour to rediscover, and because every one of them
+reads as something other than "the tool is missing".
+
+* **A fresh container is not provisioned.** Assume nothing is installed until you have
+  checked. `pyproject.toml` declares `dependencies = []` and continuous integration installs
+  pytest ad hoc.
+* **Create the virtualenv OUTSIDE the checkout.** If pytest lands in a `.venv` inside the
+  tree, `tests/test_rename_completeness.py::test_no_residual_old_taxonomy_names` fails —
+  it greps every `*.py` under the repository root and matches third-party site-packages. The
+  failure looks exactly like a real regression in the certification record. Run
+  `git checkout uv.lock` afterwards; `uv pip install` dirties it.
+* **`scour` is not installed and is in no repository you can reach.** Older notes cite it.
+  If something asks you for a scour number, say it could not be run and report no number.
+  Inventing one is worse than the gap.
+* **`makoto-dev`'s continuous integration has been red since 2026-08-16** for reasons no diff
+  can fix: jobs finish in three to five seconds and their logs return HTTP 404, meaning they
+  were never assigned a runner. The same is true on `main`. The public repository's
+  continuous integration is real and does run. Never re-run a `makoto-dev` job to "see if it
+  passes" — a job that is never assigned a runner tells you nothing on the second attempt
+  either.
+* **Nothing in a checkout tells you which repository you are standing in.** Run
+  `git remote -v` first, every time. See §2.
+
+---
+
+## 11. Rules that bind any change
 
 * **One pull request per register entry.** A change that touches two entries is two
   changes.
