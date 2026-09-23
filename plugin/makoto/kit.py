@@ -710,6 +710,26 @@ def claim_vs_history_predicate(
     return _predicate
 
 
+# The fields a GitHub MCP call publishes as text. Without them a PR body or comment carrying an
+# attribution footer read as clean: measured 2026-09-23, create_pull_request with the harness
+# footer was allowed. Search `query` strings are left out, so an audit that searches for the
+# footer is not refused for naming it.
+_PUBLISHED_KEYS = ("title", "body", "message", "commit_title", "commit_message")
+
+
+def published_text(tool_name: str, tool_input: dict) -> str:
+    """The text a GitHub MCP call would publish: its body/title/message fields and every
+    `files[].content` of a push_files."""
+    if not tool_name.startswith("mcp__github__") or not isinstance(tool_input, dict):
+        return ""
+    parts = [tool_input[k] for k in _PUBLISHED_KEYS if isinstance(tool_input.get(k), str)]
+    files = tool_input.get("files")
+    if isinstance(files, list):
+        parts += [f["content"] for f in files
+                  if isinstance(f, dict) and isinstance(f.get("content"), str)]
+    return "\n".join(parts)
+
+
 def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
     """Shared scan step behind `introduced_regex_predicate`: scan ANY tool's INTRODUCED text (via
     `introduced_text` — Write/Edit/MultiEdit content OR a Bash command, not just a file-path-gated
@@ -722,7 +742,8 @@ def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
         return None
     tool_name = current_event.get("tool_name", "") or ""
     tool_input = current_event.get("tool_input", {}) or {}
-    text = introduced_text(tool_name, tool_input)
+    text = "\n".join(t for t in (introduced_text(tool_name, tool_input),
+                                  published_text(tool_name, tool_input)) if t)
     if not text:
         return None
     m = body_rx.search(text)
