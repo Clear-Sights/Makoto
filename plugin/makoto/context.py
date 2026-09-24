@@ -71,12 +71,6 @@ class GateContext:
     def roots(self):
         return [self.cwd]
 
-    @property
-    def is_subagent(self) -> bool:
-        """derived convenience: True iff this Stop substrate was built from a subagent-context
-        payload (agent_id present) rather than the main agent."""
-        return bool(self.agent_id)
-
 
 def _history_for_agent(history, stop_payload: dict) -> list:
     """Return only history positively attributable to the thread ending in ``stop_payload``.
