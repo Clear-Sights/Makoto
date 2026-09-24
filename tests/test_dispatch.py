@@ -1338,6 +1338,43 @@ def test_dispatch_stale_pass_gate_blocks_on_live_lastfailed(tmp_path):
     assert "tests/t.py::test_red" in decision["reason"]
 
 
+def test_dispatch_unpaid_acceptance_gate_blocks_when_acceptance_never_ran(tmp_path):
+    """Behavioral blocking pin for gate.unpaid_acceptance through the real dispatch: a dispatch's
+    ACCEPTANCE never ran, the dispatch is from BEFORE the operator's current turn (a transcript
+    user turn after it establishes that boundary — see the gate's own in-flight exclusion), and
+    the tree opts in via makoto.toml `dispatch = true` -> BLOCK."""
+    state_dir = _setup_state(tmp_path)
+    (tmp_path / "makoto.toml").write_text("dispatch = true\n")
+    dispatch = {
+        "hook_event_name": "PreToolUse", "tool_name": "Agent", "session_id": "unpaid",
+        "cwd": str(tmp_path),
+        "tool_input": {
+            "description": "fix",
+            "prompt": ("READ: plugin/makoto/kit.py@3f2a9c1e0b7d\n"
+                       "WRITE: plugin/makoto/kit.py\n"
+                       "ACCEPTANCE: python3 -m pytest -q tests/test_kit.py\n"
+                       "Fix the off-by-one in unwitnessed."),
+        },
+    }
+    rc, out = _run_dispatch(state_dir, dispatch)
+    assert rc == 0
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(json.dumps({
+        "type": "user", "timestamp": now,
+        "message": {"role": "user", "content": "status?"},
+    }) + "\n")
+    stop = {"hook_event_name": "Stop", "session_id": "unpaid", "cwd": str(tmp_path),
+            "transcript_path": str(transcript),
+            "last_assistant_message": "Done: the off-by-one is fixed."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out, "unpaid_acceptance gate must block a dispatch whose ACCEPTANCE never ran"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "ACCEPTANCE" in decision["reason"]
+
+
 def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
     """Behavioral pin for gate.self_wired's ONE deliberate exception to discovered<=>live<=>blocking
     (2026-07-05, DESIGN DECISION): it IS discovered (reaching the decision pipeline like every other
@@ -1699,8 +1736,10 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.report_before_run",    # register C11's runner, same tier
                           "gate.unclaimed_unit",       # register H6's runner, same tier
                           "gate.pasted_fix",           # register H3's runner, same tier
-                          "gate.undeclared_falsifiable"}  # catalog-completeness auditor;
+                          "gate.undeclared_falsifiable",  # catalog-completeness auditor;
                                                # now reaches the agent like every other ADVISE gate
+                          "gate.unpaid_acceptance"}    # PROPOSED-REGISTER-ROWS.md I3's runner,
+                                               # opt-in (makoto.toml `dispatch = true`)
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
     # references it, and the package exposes no such callable (re-adding it as a gate turns this
     # red). No separate `.fn` attribute anymore (GATE/StopCheck retired) -- introspect the actual

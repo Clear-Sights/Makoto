@@ -264,6 +264,27 @@ def _scenario_unclaimed_unit(tmp_path):
                                       "tool_response": {}}}])
 
 
+def _scenario_unpaid_acceptance(tmp_path):
+    # fires: tests/test_dispatch.py::test_dispatch_unpaid_acceptance_gate_blocks_when_acceptance_never_ran
+    (tmp_path / "makoto.toml").write_text("dispatch = true\n")
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(json.dumps({
+        "type": "user", "timestamp": "2026-01-01T00:00:05.000000Z",
+        "message": {"role": "user", "content": "status?"},
+    }) + "\n")
+    dispatch_row = {
+        "ts": "2026-01-01T00:00:00.000000Z",
+        "payload": {"hook_event_name": "PreToolUse", "tool_name": "Agent",
+                    "tool_input": {"description": "fix",
+                                   "prompt": ("READ: plugin/makoto/kit.py@3f2a9c1e0b7d\n"
+                                              "WRITE: plugin/makoto/kit.py\n"
+                                              "ACCEPTANCE: python3 -m pytest -q tests/test_kit.py\n"
+                                              "Fix it.")}},
+    }
+    return _ctx(text="Done: the off-by-one is fixed.", cwd=str(tmp_path),
+               transcript_path=str(transcript), history=[dispatch_row])
+
+
 def _scenario_pasted_fix(tmp_path):
     # fires: tests/test_pasted_fix.py::test_fires_when_the_same_repair_reaches_a_second_file
     _REPAIR = ("if timeout is None:\n"
@@ -309,6 +330,7 @@ _SCENARIOS = {
     "gate.plan_item_drift": _scenario_plan_item_drift,
     "gate.claimed_running": _scenario_claimed_running,
     "gate.claimed_shipped": _scenario_claimed_shipped,
+    "gate.unpaid_acceptance": _scenario_unpaid_acceptance,
 }
 
 

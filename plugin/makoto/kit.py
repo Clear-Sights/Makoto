@@ -701,6 +701,22 @@ def command_of(ev: dict) -> str:
     return str(ti.get("command", "") or "")
 
 
+# Dispatch-brief grammar: the READ:/WRITE:/ACCEPTANCE: labels a worker prompt carries. Shared by
+# event.unbriefed_dispatch, event.unpinned_input and gate.unpaid_acceptance.
+_BRIEF_LABELS = ("READ", "WRITE", "ACCEPTANCE")
+_BRIEF_LINE_RX = re.compile(r"(?m)^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$")
+# The two dispatch-tool names the register names literally.
+DISPATCH_TOOL_NAMES = frozenset({"Agent", "Task"})
+
+
+def dispatch_brief_lines(prompt: str) -> dict:
+    """Every line-start label's value in `prompt`, in order, stripped; a missing label is []."""
+    out = {label: [] for label in _BRIEF_LABELS}
+    for label, value in _BRIEF_LINE_RX.findall(prompt or ""):
+        out[label].append(value.strip())
+    return out
+
+
 def command_matches(rx: re.Pattern):
     """An act/guard predicate for `unmet_obligation_gate`: this event's Bash command matches `rx`.
 
