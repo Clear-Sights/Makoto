@@ -56,6 +56,9 @@ def test_commit_as_claude_fires(repo, cmd):
 def test_config_layer_is_named(repo, monkeypatch):
     work, env = repo
     _run("git config --global user.email noreply" + "@anthropic.com", work, env)
+    # A name too: without one git takes it from the OS account, and where that is empty (the
+    # CI runner's) `git var` fails, the commit would fail with it, and nothing fires.
+    _run("git config --global user.name Someone", work, env)
     f = _fires(f"{UNSET} git commit -m x", work)
     assert f is not None and ".gitconfig" in f.message
 
