@@ -39,7 +39,6 @@ DECLARED_IDS: frozenset[str] = frozenset({
     "gate.relaunched_unchanged",
     "gate.report_before_run",
     "gate.self_wired",
-    "gate.stale_establisher",
     "gate.stale_pass",
     "gate.unasked_plan",
     "gate.unclaimed_unit",

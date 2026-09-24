@@ -19,7 +19,7 @@ from pathlib import Path
 PKG = Path(__file__).resolve().parents[1] / "plugin" / "makoto"
 _ROOT_FILES = {
     "__init__.py", "__main__.py", "_dispatch_shim.sh", "configchange.py", "context.py",
-    "dispatch.py", "events.py", "install.py", "kit.py", "registry.py", "verdict.py", "vocab.py",
+    "dispatch.py", "install.py", "kit.py", "registry.py", "verdict.py", "vocab.py",
 }
 
 _RANK = {  # the layout order: an import may only point at a strictly lower rank
@@ -32,7 +32,7 @@ _RANK = {  # the layout order: an import may only point at a strictly lower rank
     "makoto.context": 6,
     "makoto.dispatch": 7,
     "makoto.configchange": 8,
-    "makoto.install": 9, "makoto.events": 9,
+    "makoto.install": 9,
     "makoto.__main__": 10,        # the CLI entrypoint drives install + everything below
 }
 _SIBLING_OK = {"makoto.substrate", "makoto.state"}

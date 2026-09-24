@@ -809,42 +809,23 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
     audit.append_row(state_dir, row)
 
 
-def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
-    """SessionStart: admit a declared Plan from the on-disk artifact. SessionStart never blocks —
-    it is an admission step, not a gate — so this always completes silently regardless of
-    whether a plan was actually declared."""
-    try:
-        from makoto.state import plan as _plan
-        _plan.declare_from_session_artifact(
-            payload.get("cwd") or os.getcwd(),
-            payload.get("session_id", ""),
-            conn,
-            source=payload.get("source", ""),
-        )
-    except Exception as exc:
-        print(f"makoto.dispatch: plan declare failed (non-fatal): {exc}",
-              file=sys.stderr)
-
-
 def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     """Settled-tool accumulation, with failure evidence kept out of success-shaped state.
 
     Both PostToolUse terminals have already been stored by ``_ingest_event`` before this handler
     runs, so history-walking decoders can see successes and failures alike.  Only a successful
-    PostToolUse may mutate the update ledger, advance a plan, record a task event, or emit a test
-    delta.  PostToolUseFailure is evidence that the operation did *not* land; retaining it in
-    history while returning here prevents a failed Write/Bash from discharging gates or
-    latest-wins clobbering an earlier real result.
+    PostToolUse may mutate the update ledger, record a task event, or emit a test delta.
+    PostToolUseFailure is evidence that the operation did *not* land; retaining it in history
+    while returning here prevents a failed Write/Bash from discharging gates or latest-wins
+    clobbering an earlier real result.
 
     No predicate evaluation and no block — settled tool events accumulate evidence, never decide."""
     if payload.get("hook_event_name") == "PostToolUseFailure":
         return
     try:
         from makoto.state import ledger as _ledger
-        from makoto.kit import (_path_components, bash_output_text, compute_delta,
-                                is_test_runner)
+        from makoto.kit import bash_output_text, compute_delta, is_test_runner
         sid = payload.get("session_id", "")
-        cwd = payload.get("cwd") or os.getcwd()
         delta_finding = None
         # Compute test delta before record_update overwrites the prior run; surface it as ADVISE.
         if payload.get("tool_name") == "Bash":
@@ -861,23 +842,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                         retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # Locating tools declare or advance the live plan through the shared Plan.resolve contract.
-        from makoto.state import plan as _plan
-        if payload.get("tool_name") in _plan._LOCATING_TOOLS:
-            loc = _plan.event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
-            if loc is not None:
-                if _path_components(loc)[-2:] == [".claude", "makoto-plan.jsonl"]:
-                    # DECLARE: a locating call wrote the artifact itself -- (re-)admit it live,
-                    # LATEST-WINS, the same falsifiability gate declare_plan always enforces.
-                    _plan.declare_from_live_write(cwd, sid, conn)
-                else:
-                    # ADVANCE: a locating call at an OPEN node's own `where` marks it DONE.
-                    plan_obj = _plan.load_plan(conn, sid)
-                    if plan_obj is not None:
-                        nid = plan_obj.resolve(loc, payload.get("tool_name", ""))
-                        if nid is not None and nid in plan_obj.open_nodes():
-                            plan_obj.mark_done(nid)
-                            _plan.persist_plan(conn, sid, plan_obj)
         # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
             from makoto.state import plan as _plan_items
@@ -921,9 +885,10 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     _record_audit(state_dir, findings + gate_findings, payload)
 
 
-# The table maps hook_event_name to its pipeline; unknown events use the evaluation pipeline.
+# The table maps hook_event_name to its pipeline; unknown events (including SessionStart, which
+# has no dedicated handler now that the declared-Plan admission step is gone) use the wildcard
+# evaluation pipeline.
 HANDLERS: dict[str, Any] = {
-    "SessionStart": _admit_plan,
     "PostToolUse": _accumulate,
     "PostToolUseFailure": _accumulate,
     "PreToolUse": _evaluate_and_gate,

@@ -847,105 +847,6 @@ dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", ma
                eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
                run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))
 
-# makoto.checks.staleEstablisher -- the ground-truth staleness detector (ADVISORY tier,
-# NEVER BLOCK; inert until a project declares a plan), built on Makoto's own
-# `substrate._planNode.Plan`.
-#
-# Fires when a plan node's establisher is recorded DONE but the artifact it named no longer
-# exists on disk -- the one gap `substrate._planNode.Plan`'s pure name->status scan cannot see,
-# because a node's `status` is a claim about history, never a live filesystem read. This is the
-# ONE deliberate departure from every other check's content-blind, filesystem-blind design (an
-# `os.path.exists` call); the only thing gating it is the declared plan itself -- given one it
-# runs on EVERY Stop, with no per-check enable/disable switch. DETECTIVE tier: a fired verdict
-# is an ADVISORY, never a deny -- escalating this to a blocking tier is a product decision left
-# to the caller, not made here.
-#
-# WIRING: discovery is the ORDINARY one -- `registry.load_checks(edge="Stop")` finds this
-# module's `CHECK` like every other Stop check, and `context.run_stop_checks` appends its Finding
-# to the audited-but-never-blocking list. What keeps it out of the blocking tier is `may_block`
-# staying at its `False` default: `dispatch._blocking_gate_ids()` is `load_checks(edge="Stop")`
-# FILTERED on `may_block`, so this pattern_id can never enter it whatever `.level` its own Finding
-# carries -- STRUCTURALLY incapable of blocking, not merely labeled advisory (pinned by
-# `tests/test_stale_establisher.py::test_never_discovered_as_a_blocking_stop_gate`); the
-# never-blocks guarantee rests on `may_block=False` alone. Being an ordinarily discovered named
-# check module, this file IS subject to the same L2 import firewall as its siblings
-# (tests/test_import_direction.py -- notably, no reaching into the sibling `makoto.state.plan`
-# store).
-#
-# Reads: the declared Plan (never mutated) and the existence/size of each DONE node's `where`.
-# An empty artifact is not an establisher: it supplies none of the work a dependent needs.
-from makoto.registry import Check
-from makoto.kit import live_query_finding, unwitnessed
-from makoto.substrate._planNode import DONE, Plan
-from makoto.registry import POSTURE_ADVISE
-
-
-def established_check(plan: Optional[Plan], *, cwd: str = "") -> Optional[Finding]:
-    """Fire iff a DONE node's `where` is missing from disk AND a later node shares its
-    passthrough (a real dependent whose gap-check would wrongly read as satisfied) -- else
-    `None`. `plan=None` (no declared plan) is inert.
-
-    A relative `where` (the plan artifact stores paths relative to the session's own project
-    root) is resolved against `cwd` -- the session's payload cwd, never the process's own
-    working directory. Without `cwd`, a relative `where` was checked against wherever the
-    dispatcher process happened to be running FROM (the plugin root, in the installed case),
-    so an establisher that genuinely exists in the session's project read as stale.
-
-    Walks the plan in declared order; for each DONE node, checks whether any LATER node shares
-    its passthrough (per the same recurrence rule `substrate._planNode` reads) and, only then,
-    whether the establisher's `where` still exists on disk (the expensive/impure check runs
-    last, only when a dependent makes it matter). The first such contradiction fires; a plan
-    with none is an affirmative clean pass (`None`)."""
-    if plan is None:
-        return None
-    nodes = plan.nodes()
-    # Last plan-index at which each passthrough-name occurs. Later entries overwrite earlier
-    # ones, so `last_use[p] > i` is exactly "some LATER node shares this name" -- the same
-    # answer as rescanning `nodes[i + 1:]` per DONE node, without that scan's O(n) slice COPY
-    # on the Stop hot path.
-    last_use = {node.passthrough: i for i, node in enumerate(nodes)}
-    # Owed: a DONE node some LATER node depends on (no dependent -- nobody would misread the gap
-    # as satisfied). A missing locator is malformed stored state, not evidence about the empty
-    # path, so it owes nothing. Paid: the artifact on disk, non-empty -- every other
-    # artifact-backed commitment treats zero bytes as undelivered.
-    owed = (node for i, node in enumerate(nodes)
-            if node.status == DONE and last_use[node.passthrough] > i and node.where)
-    def _resolved(where: str) -> str:
-        return os.path.join(cwd, where) if cwd and not os.path.isabs(where) else where
-
-    for node, _ in unwitnessed(
-            owed, owes=lambda n: (n,), pays=lambda _n: None,
-            paid=(lambda n: os.path.exists(_resolved(n.where))
-                  and os.path.getsize(_resolved(n.where)) > 0,)):
-        return Finding(
-            pattern_id="gate.stale_establisher",
-            file=node.where,
-            line=0,
-            level="advisory",
-            message=(
-                f"establisher {node.id!r} is recorded DONE but {node.where!r} no longer "
-                f"exists on disk -- a dependent on passthrough {node.passthrough!r} would "
-                f"read this gap as satisfied; re-establish it before trusting that dependency"
-            ),
-        )
-    return None
-
-
-def established_run(c):
-    """Not built on `live_query_finding`: that helper reads a single named context field, and
-    this check needs two -- the declared plan AND the cwd a relative `where` resolves against."""
-    return established_check(c.plan, cwd=c.cwd)
-
-
-established_CHECK = Check(
-    id="gate.stale_establisher",
-    applies_at="Stop",
-    posture=POSTURE_ADVISE,
-    eats=frozenset({"plan", "cwd"}),
-    run=established_run,
-    tests="OTHER_POINT",
-)
-
 # The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
 # rather than mirrored here.
@@ -1186,6 +1087,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
 # `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
 # were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
 # guarantee still rests on posture=="ADVISE", same as always.
+from makoto.kit import live_query_finding
 wired_run = live_query_finding(
     query=lambda fs_read: self_wired_gate(fs_read), posture_label="gate.self_wired"
 )
@@ -1440,11 +1342,12 @@ def thrash_predicate(*, current_event: dict, history: list,
 thrash_RETRY_HINT = 'Decide which content is correct and write it once; do not revert to an earlier whole-file version after changing it.'
 thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 
+from makoto.registry import Check
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
 
 # the OTHER_POINT shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, established_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK,)
+_ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {thrash_CHECK.id: thrash_predicate}

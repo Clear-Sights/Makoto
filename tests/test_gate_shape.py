@@ -78,7 +78,7 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "testrun_output",
                            # run whose 500-char tail kept no failure token read as green.
                            # Defaulted to None, so an unrecorded status behaves as before.
                            "cwd", "fs_exists", "fs_size", "fs_read", "history",
-                           "permission_mode", "agent_id", "agent_type", "plan",
+                           "permission_mode", "agent_id", "agent_type",
                            "session_id", "transcript_path", "state_root",
                            "open_plan_items",   # Task 2 slice 5 / 2026-07-09 planItemDrift
                            "history_all_agents"}   # 2026-07-23: gate.claimed_running's
