@@ -2169,6 +2169,27 @@ def test_dispatch_fabricated_commit_sha_catches_shipped_reword(tmp_path):
         "the content.fabricated_commit_sha fire must be recorded for the 'shipped' reword"
 
 
+def test_dispatch_unsourced_webfetch_catches_mcp_fetch_tool(tmp_path):
+    """Same fabricated-url defect as a bare WebFetch, but fetched by a differently-named MCP
+    tool (`mcp__browser__fetch`). The check must recognize a fetch-shaped tool by its `url`
+    input, not only the literal tool name "WebFetch"."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__browser__fetch",
+        "session_id": "webfetch_mcp",
+        "cwd": str(tmp_path),
+        "tool_input": {"url": "https://docs-internal-vendorzzz.example.net/api/reference"},
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert out, "content.unsourced_webfetch must fire on an unsourced url fetched via an MCP fetch tool"
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("content.unsourced_webfetch" in r.get("pattern_fires", []) for r in rows), \
+        "the content.unsourced_webfetch fire must be recorded for the MCP fetch tool"
+
+
 def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):
     """PreCheck content.verifier_predicate_weakened produces a truthy retry_hint (via `_jit_hint`). SPEC-5 Task 8: the live
     decision JSON no longer has a separate top-level "retry_hint" key -- `_emit_decision` folds

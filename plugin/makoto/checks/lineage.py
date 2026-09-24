@@ -471,15 +471,27 @@ def _user_supplied(url: str, current_event: dict) -> bool:
     return any(_ends_url(turn, url) for turn in turns)
 
 
+def _is_fetch_shaped(tool_name: str, tool_input: dict) -> bool:
+    """True for the built-in WebFetch, and for an MCP fetch tool under any other name: the
+    url INPUT is the signal that a tool is being used as a WebFetch, not the literal string
+    "WebFetch" -- an MCP tool whose own name says it fetches (e.g. `mcp__browser__fetch`) and
+    that actually carries a url is the same fabricated-evidence surface under a different name."""
+    if tool_name == "WebFetch":
+        return True
+    return (tool_name.startswith("mcp__") and "fetch" in tool_name.lower()
+            and isinstance(tool_input.get("url"), str) and bool(tool_input.get("url")))
+
+
 def _webfetch_url(current_event: dict) -> Optional[str]:
-    """The url a WebFetch commits to, or None when the event never owes one at all: not a
-    WebFetch, no url, or a TRUSTED host. The user-typed oracle is a real witness and lives in
-    `pays`/`paid`, not here."""
+    """The url a WebFetch-shaped tool commits to, or None when the event never owes one at
+    all: not fetch-shaped, no url, or a TRUSTED host. The user-typed oracle is a real witness
+    and lives in `pays`/`paid`, not here."""
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
-    if current_event.get("tool_name") != "WebFetch":
+    tool_input = current_event.get("tool_input") or {}
+    if not _is_fetch_shaped(current_event.get("tool_name") or "", tool_input):
         return None
-    url = current_event.get("tool_input", {}).get("url", "")
+    url = tool_input.get("url", "")
     if not url:
         return None
     # Trusted-host short-circuit
