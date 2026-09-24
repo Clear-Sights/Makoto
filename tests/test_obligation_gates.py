@@ -235,6 +235,18 @@ def test_unknown_ref_switch_does_not_accept_status_or_log_as_the_print():
     assert unknown_ref_switch_gate([_bash("git log --oneline"), _bash("git checkout x")]) is not None
 
 
+def test_unknown_ref_switch_fires_on_a_reset_hard_to_an_unprinted_ref():
+    """`git reset --hard <ref>` moves HEAD to a ref the same way a checkout/switch does -- the
+    same boundary under a third verb, not just checkout/switch."""
+    f = unknown_ref_switch_gate([_bash("git reset --hard origin/some-unprinted-ref")])
+    assert f is not None and f.level == "advisory"
+
+
+def test_unknown_ref_switch_ignores_a_bare_reset_hard():
+    """`git reset --hard` with no ref discards edits in place and names no boundary to cross."""
+    assert unknown_ref_switch_gate([_bash("git reset --hard")]) is None
+
+
 # gate.unobserved_destruction (register D14 UNDO UNPROVEN)
 
 def test_unobserved_destruction_fires_with_no_verifier():

@@ -665,8 +665,11 @@ from makoto.kit import unmet_obligation_gate, command_matches
 
 # Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms; `git checkout --`
 # and `git checkout -- <path>` restore a FILE and move nothing, so they are excluded by
-# requiring the argument not to start with a dash.
-_REF_SWITCH_RX = re.compile(r"\bgit\s+(?:checkout|switch)\s+(?!-)")
+# requiring the argument not to start with a dash. `git reset --hard <ref>` moves HEAD (and the
+# working tree) to a ref the same way; `git reset --hard` with no ref just discards edits in
+# place and names no boundary to cross, so a ref argument is required there too.
+_REF_SWITCH_RX = re.compile(
+    r"\bgit\s+(?:checkout|switch)\s+(?!-)|\bgit\s+reset\s+--hard\s+(?!-)\S")
 # Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
 # switched TO.
 _REF_PRINT_RX = re.compile(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
