@@ -273,10 +273,13 @@ def _test_verdict(c: Call):
     result = c["result"]
     out = bash_output_text(result)
     exit_code = result.get("exitCode", result.get("exit"))
-    if exit_code is not None:
-        if exit_code != 0:
-            return "red"
-    elif is_failing_testrun(out if out.strip() else str(result.get("error") or "")):
+    if exit_code is not None and exit_code != 0:
+        return "red"
+    # THE TAIL, always -- not only when exit_code is absent: a masked exit (`pytest -k x ||
+    # true`, a trailing pipe eating the real status) still leaves the runner's own "N failed"
+    # in the text, and a swallowed failure must not read as green just because the shell's own
+    # exit code was laundered on the way out.
+    if is_failing_testrun(out if out.strip() else str(result.get("error") or "")):
         return "red"
     return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
 

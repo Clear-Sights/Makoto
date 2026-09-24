@@ -99,6 +99,11 @@ _PAIRS = [
     ("cat_pytest_ini", _green,
      ("cat pytest.ini", {"stdout": "1 passed", "exitCode": 0}),
      ("pytest", {"stdout": "1 passed", "exitCode": 0})),
+    ("green_masked_failure_exit0", _green,
+     # a swallowed failure (`|| true`) still says "1 failed" in its own output -- a laundered
+     # exit code must not make a real red run read as green.
+     ("pytest -k slow_case || true", {"stdout": "1 failed, 3 passed", "exitCode": 0}),
+     ("pytest -q", {"stdout": "3 passed in 0.1s", "exitCode": 0})),
     ("neuter_path_gate", _neutered,
      _call("Edit", {"file_path": "README.md", "old_string": "Run the test first.",
                     "new_string": ""}),
