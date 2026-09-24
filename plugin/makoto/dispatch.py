@@ -653,6 +653,9 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         hint = _jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
+    if hook_event in ("Stop", "SubagentStop"):
+        # A stop gets one bounce, so every finding rides it; the worst alone hid its siblings.
+        detail = "\n".join([detail] + [_named(f) for f in findings if f is not finding])
     # The fold itself is DECISION machinery: a raise out of `posture`/`_finding_layer`/`apply`
     # (e.g. a malformed host value, or `_meta_check_ids` -> `load_checks` failing on the
     # LOOSE/SILENT+BLOCK branch) used to unwind through this function into `_dispatch`'s
