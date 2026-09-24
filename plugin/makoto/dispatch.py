@@ -562,12 +562,6 @@ _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post",
 # Both settled tool terminals use the Post wire edge.
 
 
-def _recheck_certificate_enabled() -> bool:
-    """Whether MAKOTO_RECHECK_CERTIFICATE enables pre-wire verdict verification. A mismatch
-    raises."""
-    return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def _named(finding) -> str:
     """The finding's message, guaranteed to name the check that produced it.
 
@@ -617,8 +611,7 @@ def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -
     raw BLOCK under LOOSE/SILENT with no oversight clamp). Everywhere else it returns \"object\",
     which is fold-equivalent to the true layer by `apply`'s own rule (the floor only acts on
     exactly that branch) -- so the catalog import in `_meta_check_ids` is never paid on the
-    default-STRICT hot path. Shared verbatim by `verdict.recheck_certificate` so the F4
-    certificate reconstruction folds identically."""
+    default-STRICT hot path."""
     if (outcome == verdict.BLOCK
             and mode in (verdict.LOOSE, verdict.SILENT)
             and not verdict.is_oversight_clamped(permission_mode)
@@ -675,35 +668,6 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             f"{detail}\n[makoto: verdict fold failed and fails closed on the raw outcome: "
             f"{type(exc).__name__}: {exc}]",
         )
-    if _recheck_certificate_enabled():
-        # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
-        # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
-        # a fold mismatch never reaches stdout. recheck_certificate raises on mismatch by
-        # design (see makoto.verdict's recheck section); that raise is unreachable unless
-        # MAKOTO_RECHECK_CERTIFICATE is explicitly set.
-        from makoto.verdict import VerdictCertificate, recheck_certificate
-        try:
-            recheck_certificate(VerdictCertificate(
-                findings=tuple(findings),
-                mode=mode,
-                permission_mode=permission_mode,
-                claimed_outcome=str(folded),
-                claimed_detail=getattr(folded, "detail", ""),
-            ))
-        except Exception as exc:
-            # CAUGHT, and the direction matters more than the catch. Letting the raise fly was the
-            # whole defect: it unwound past this wire write into `_dispatch`'s carriage handler,
-            # which records a fact and returns 0 -- so the one mechanism built to catch a corrupted
-            # fold produced NO verdict at all and the call was allowed. Detecting tampering in the
-            # verdict machinery and then failing OPEN on the detection is worse than not checking.
-            # A fold mismatch is a DECISION fault, not a carriage fault, and this repo's rule is
-            # open on carriage, closed on decision -- so the mismatch becomes the verdict, at BLOCK,
-            # bypassing `apply` entirely (the fold is exactly what is not to be trusted here).
-            folded = verdict.Decision(
-                verdict.BLOCK,
-                "makoto could not certify its own verdict fold and is failing closed: "
-                f"{type(exc).__name__}: {exc}",
-            )
     # Meta-floor teeth at the Stop edges: `apply` floors a meta BLOCK to ASK under a softening
     # posture, but `_STOP_WIRE` deliberately has no ASK entry ("ASK never blocks the agent from
     # stopping" — pinned by tests/test_posture_wire.py), so at Stop/SubagentStop that floored

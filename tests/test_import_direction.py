@@ -35,13 +35,12 @@ _RANK = {  # the layout order: an import may only point at a strictly lower rank
     "makoto.__main__": 9,        # the CLI entrypoint drives install + everything below
 }
 _SIBLING_OK = {"makoto.substrate", "makoto.state"}
-_CALL_TIME_OK = {  # documented lazy imports, each breaking a cycle at call time
-    # ("makoto.kit", "makoto.checks.switch") was here for kit.compute_delta's parser
-    # reuse, and is GONE: 2026-09-18 the recorded-marker parsers moved to vocab (rank 0) and the
-    # history walk over them to kit itself, so there is no back-edge left to except. An exception
-    # removed is worth more than an exception documented.
-    ("makoto.verdict", "makoto.dispatch"),            # recheck certificate's lazy fold hooks
-}
+_CALL_TIME_OK = set()  # documented lazy imports, each breaking a cycle at call time; empty now --
+# ("makoto.kit", "makoto.checks.switch") was here for kit.compute_delta's parser reuse, and is
+# GONE: 2026-09-18 the recorded-marker parsers moved to vocab (rank 0) and the history walk over
+# them to kit itself. ("makoto.verdict", "makoto.dispatch") was here for recheck_certificate's
+# lazy fold hooks, removed with that feature. An exception removed is worth more than an
+# exception documented.
 # named checks may reach into state/ ONLY for these two read surfaces (the old curated
 # allowlist's survivors) — never plan/commitments/store. No check needs plans SQL today:
 # contractOrder, which duplicated 12 lines of it to stay the right side of this firewall, was
