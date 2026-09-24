@@ -26,7 +26,8 @@ _PREMOD_RUN_RX = re.compile(r"(?:\w+[ \t]+)+\Z")
 # whole-suite green claim.
 _PRED_TRAIL_RX = re.compile(
     r"(?=[^\S\n]*(?:$|\n|[^\w\s]|"
-    r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also|again)\b))",
+    r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also|again|"
+    r"across\s+the\s+board)\b))",
     re.IGNORECASE)
 # Post-match negation window terminator: the claim's own clause only.
 _POST_CLAUSE_RX = re.compile(r"[,;.!?\n]|—|–")
