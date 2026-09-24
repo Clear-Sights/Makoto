@@ -230,7 +230,10 @@ action_SHAPE = "SWITCH"
 
 # closed lexicon of TOOL-shaped past-tense actions (NOT reasoning verbs)
 _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed|launched)"
-_ACTION_RX = re.compile(rf"\bI\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
+# "I've/I'd deployed" is the same first-person completed-action claim as "I deployed" -- the
+# contraction must not defeat the \bI\s+VERB shape (mirrors _PROCESS_START_VERB_RX's own
+# contraction handling for the sibling gate.claimed_running).
+_ACTION_RX = re.compile(rf"\bI(?:['’]ve|['’]d)?\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
 _NEG = re.compile(r"\b(?:not|never|without)\b|n't", re.I)
 _FUTURE = re.compile(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
 # PRIOR-TURN frame: the claim is a truthful RECAP of work done in an earlier turn/session, not an
@@ -742,10 +745,30 @@ def _pairing_input(inp) -> str:
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
     cannot collapse two genuinely distinct calls — for pairing or for a verdict. Primitives in
-    OTHER modules (`identical_retry`) still key on their own folds."""
+    OTHER modules (`identical_retry`) still key on their own folds.
+
+    String leaves are also stripped of leading/trailing whitespace before folding: a retry whose
+    command differs only by incidental surrounding whitespace ("flaky-tool --check " vs
+    "flaky-tool --check") is the SAME call for verdict/pairing purposes, and treating it as a
+    distinct key would let a genuinely stuck retry loop escape `recur_stuck`/the transient budget
+    by accumulating one stray space per attempt."""
+    return canon_input(_strip_leaves(_drop_dunders(inp)))
+
+
+def _drop_dunders(inp):
     if isinstance(inp, dict):
-        return canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
-    return canon_input(inp)
+        return {k: v for k, v in inp.items() if not str(k).startswith("__")}
+    return inp
+
+
+def _strip_leaves(v):
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, dict):
+        return {k: _strip_leaves(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_strip_leaves(x) for x in v]
+    return v
 
 
 # ---- the history -> Call adapter (protocol-field decode; fail-open per row) -------------------
