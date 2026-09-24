@@ -5,7 +5,7 @@ while settings.json otherwise parses; never blocks (level='advisory', not 'error
 blind spot: an edit that strips ALL THREE from BOTH sources simultaneously disables this check in
 the same instant it would have fired for the settings.json-only case (Claude Code reloads
 hooks.json live, not once at session start), so it provides ZERO coverage against that canonical
-full-strip attack — see docs/self-defense-asymmetry-followup.md.
+full-strip attack.
 """
 import json
 

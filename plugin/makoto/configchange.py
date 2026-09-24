@@ -5,8 +5,8 @@ real entry point a `.claude/settings.json` `ConfigChange` hook entry invokes via
 
 **WIRED, 2026-07-08 (owner, identifying as Makoto's creator, gave direct, specifically-named
 authorization).** `.claude/settings.json` carries a live `ConfigChange` entry pointing at this
-module via `dispatch_configchange.sh`. See `docs/self-defense-asymmetry-followup.md`'s
-"2026-07-05 followup" sections for the design history; the pure predicate this module's adapter
+module via `dispatch_configchange.sh`.
+The pure predicate this module's adapter
 calls (`configchange_verdict`, below) is unit-tested against constructed payloads.
 
 **TWO TIERS, both owner-authorized (D5, docs/DEFERRED.md):**
@@ -50,7 +50,7 @@ from makoto.state.store import _state_dir
 
 # ---- The pure predicate (formerly makoto/verdict/configchange_verdict.py, verbatim) -----------
 #
-# Background (see `docs/self-defense-asymmetry-followup.md`, "2026-07-05 followup" section):
+# Background:
 # Makoto's Stop-time `gate.self_wired` (`checks/otherPoint.py`) can only ever see a PARTIAL
 # strip of its own PreToolUse/PostToolUse/Stop hook entries in `.claude/settings.json` — a single
 # edit that removes all three simultaneously also removes the Stop entry that would have reported

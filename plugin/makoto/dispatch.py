@@ -13,8 +13,7 @@ main() is the thin orchestrator. Each stage is a small helper:
   _select_recent, _run_predicates, _emit_decision, _record_audit.
 
 Knight-Leveson: stdlib only (sqlite3). NO LLM, NO HTTP. The validator hot
-path's imports are deliberately narrow.
-"""
+path's imports are deliberately narrow."""
 from __future__ import annotations
 import importlib
 import json
@@ -306,7 +305,7 @@ def _note_legacy_row_hash(state_dir: Path, session_id, legacy_rows: list) -> boo
 
 def _self_verify_chain(state_dir: Path, ids: dict | None = None) -> None:
     """Re-derive the chain's tamper evidence at every dispatch, advisory-only. A clean or
-    absent/empty chain is silent. Never raises. See docs/adr/0005-chain-verification-rollout.md.
+    absent/empty chain is silent. Never raises.
 
     `ids` is the caller's session/tool attribution, threaded through for the same reason every
     other fact carries it: a tamper report nobody can tie to a session is a report nobody can
@@ -317,7 +316,7 @@ def _self_verify_chain(state_dir: Path, ids: dict | None = None) -> None:
     already tells the two apart and keeps walking past a legacy row so a REAL edit further down
     still surfaces below. That distinct, non-tamper state gets its own once-per-session note
     (`_note_legacy_row_hash`), not the every-dispatch `chain_tamper` cadence this function's own
-    ADR-0005 history deliberately kept for genuine tamper (issue #70)."""
+    history deliberately kept for genuine tamper (issue #70)."""
     try:
         from makoto.state import ledger as _ledger
         legacy_hits: list = []
@@ -443,23 +442,20 @@ def _keyword_hit(pattern, raw_payload: str) -> bool:
 
 
 def _disabled_pattern_ids() -> frozenset[str]:
-    """Parse MAKOTO_DISABLE_PATTERNS=<id>,<id>,... as canonical family.name ids.
-    See docs/adr/0006-canonical-pattern-ids.md for the epoch-reset history."""
+    """Parse MAKOTO_DISABLE_PATTERNS=<id>,<id>,... as canonical family.name ids."""
     raw = os.environ.get("MAKOTO_DISABLE_PATTERNS", "")
     return frozenset(p.strip() for p in raw.split(",") if p.strip())
 
 
 def _gates_enabled() -> bool:
-    """Whether Stop gates block live; MAKOTO_DISABLE_GATES=1 returns them to audited shadow.
-    See docs/adr/0007-stop-gates-live-rollout.md for rollout evidence."""
+    """Whether Stop gates block live; MAKOTO_DISABLE_GATES=1 returns them to audited shadow."""
     return os.environ.get("MAKOTO_DISABLE_GATES", "").strip().lower() not in ("1", "true", "yes", "on")
 
 
 @lru_cache(maxsize=1)
 def _blocking_gate_ids() -> frozenset:
     """Stop-check ids eligible to reach `_emit_decision`, derived from `Check.may_block`.
-    Lazy and memoized to avoid catalog imports outside Stop dispatch. See
-    docs/adr/0002-may-block-field.md for the structural-eligibility history."""
+    Lazy and memoized to avoid catalog imports outside Stop dispatch."""
     return frozenset(c.id for c in load_checks(edge="Stop") if c.may_block)
 
 
@@ -473,7 +469,7 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
     Predicate exceptions are captured to dispatch_errors.jsonl (audit.append_error)
     and skipped — they must never block agent work.
     """
-    # Source directly from the unified checks catalog. See docs/adr/0001-unified-check-discovery.md.
+    # Source directly from the unified checks catalog.
     disabled = _disabled_pattern_ids()
     # ONE pass, two buckets. The admission test (`has a predicate` AND `its keyword hit THIS
     # payload`) is what decides both lists, so it is written once: a second copy of it in a
@@ -566,13 +562,12 @@ _OUTCOME_RANK = {verdict.BLOCK: 3, verdict.ASK: 2, verdict.ADVISE: 1, verdict.AL
 _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post",
                  "PostToolUseFailure": "Post", "Stop": "Stop",
                  "SubagentStop": "SubagentStop"}
-# Both settled tool terminals use the Post wire edge; see
-# docs/adr/0010-posttooluse-wire-edge.md for why Post has its own edge.
+# Both settled tool terminals use the Post wire edge.
 
 
 def _recheck_certificate_enabled() -> bool:
     """Whether MAKOTO_RECHECK_CERTIFICATE enables pre-wire verdict verification. A mismatch
-    raises. See docs/adr/0011-opt-in-verdict-recheck.md for why this remains opt-in."""
+    raises."""
     return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
 
 
@@ -643,8 +638,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
 
     A BLOCK outcome carries the finding's message plus its JIT hint as the Decision detail.
     An ADVISE/ASK outcome at an edge whose table has no entry for it (e.g. ADVISE at Stop/
-    SubagentStop) and no findings both produce no output. See
-    docs/adr/0012-posture-pipeline-migration.md for the migration history.
+    SubagentStop) and no findings both produce no output.
 
     `permission_mode` (D6, additive): threaded into `verdict.apply` so a session running
     bypassPermissions/dontAsk is clamped to STRICT regardless of the operator's configured
@@ -838,8 +832,7 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     history while returning here prevents a failed Write/Bash from discharging gates or
     latest-wins clobbering an earlier real result.
 
-    No predicate evaluation and no block — settled tool events accumulate evidence, never decide.
-    See docs/adr/0013-posttooluse-accumulation.md for the migration history."""
+    No predicate evaluation and no block — settled tool events accumulate evidence, never decide."""
     if payload.get("hook_event_name") == "PostToolUseFailure":
         return
     try:
@@ -850,7 +843,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         cwd = payload.get("cwd") or os.getcwd()
         delta_finding = None
         # Compute test delta before record_update overwrites the prior run; surface it as ADVISE.
-        # See docs/adr/0019-test-delta-domain-correction.md for why.
         if payload.get("tool_name") == "Bash":
             cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
             if is_test_runner(cmd):
@@ -866,7 +858,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
         # Locating tools declare or advance the live plan through the shared Plan.resolve contract.
-        # See docs/adr/0014-live-plan-lifecycle.md for why.
         from makoto.state import plan as _plan
         if payload.get("tool_name") in _plan._LOCATING_TOOLS:
             loc = _plan.event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
@@ -884,7 +875,6 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                             plan_obj.mark_done(nid)
                             _plan.persist_plan(conn, sid, plan_obj)
         # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
-        # See docs/adr/0015-plan-item-event-source.md for why.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
             from makoto.state import plan as _plan_items
             _plan_items.record_task_event(conn, sid, payload)
@@ -892,7 +882,7 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
             delta_finding = replace(delta_finding, source_event_id=event_id)
             _emit_decision([delta_finding], payload.get("hook_event_name", ""),
                            permission_mode=payload.get("permission_mode"))
-            # Persist the delta redirect finding; see docs/adr/0016-delta-finding-audit.md for why.
+            # Persist the delta redirect finding
             _record_audit(state_dir, [delta_finding], payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
@@ -907,8 +897,7 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     completion claim. Gates evaluate on Stop AND SubagentStop (real last_assistant_message) —
     a SubagentStop payload carries the same shape (last_assistant_message, session_id, cwd,
     etc.) as a main-thread Stop, so a sub-agent's own completion claim is checked by the same
-    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless.
-    See docs/adr/0007-stop-gates-live-rollout.md for rollout evidence."""
+    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless."""
     hook_event = payload.get("hook_event_name", "")
     history = _select_recent(conn, payload.get("session_id", ""), event_id)
     findings = _run_predicates(conn, payload, history, event_id,
@@ -928,7 +917,6 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
 
 
 # The table maps hook_event_name to its pipeline; unknown events use the evaluation pipeline.
-# See docs/adr/0017-table-driven-event-routing.md for the design history.
 HANDLERS: dict[str, Any] = {
     "SessionStart": _admit_plan,
     "PostToolUse": _accumulate,

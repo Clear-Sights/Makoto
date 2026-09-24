@@ -77,8 +77,7 @@ _SHA_RX = r"(?<![0-9a-zA-Z])([0-9a-f]{7,40})(?![0-9a-zA-Z])"
 # REJECTS any match whose SHA sits in a negated or referential window ("have NOT committed",
 # "haven't committed", "without committing", "the commit <sha> you mentioned", "asked about
 # commit <sha>"). Co-occurrence of a SHA with a commit keyword never fires on its own — an
-# assertion is required. See docs/adr/0033-commit-sha-positive-claim-requirement.md for the
-# decision history.
+# assertion is required.
 # ---------------------------------------------------------------------------
 
 # Positive commit/tag-completion verbs. "committed"/"tagged"/"landed"/"pushed"
@@ -250,7 +249,7 @@ _GLOBAL_DENIAL_RX = re.compile(
 # worktree / `git -C <dir>` / a cd'd directory, then a truthful Stop SHA claim, must NOT
 # fire. Any run of git GLOBAL OPTION tokens (each a `-x`/`--x` token plus an optional value
 # token that is not itself another option) is allowed between `git` and the `commit`/`tag`
-# subcommand. See docs/adr/0034-git-invocation-form-widening.md for the decision history. Non-commit subcommands stay un-matched: `git -C <wt> log`,
+# subcommand. Non-commit subcommands stay un-matched: `git -C <wt> log`,
 # `git show`, `git rev-parse`, `git diff` all carry a non-commit/tag subcommand
 # word, so they do not match — the widening adds commit/tag FORMS only, never
 # new subcommands. (Quotes are stripped first so a --message body that mentions
@@ -343,8 +342,6 @@ def _real_commit_in_history(history: list) -> bool:
     return False
 
 
-# See docs/adr/0035-jscpd-clone-flag-verifications.md for why this module's jscpd clone flag
-# against phantomCitation.py was verified and dismissed.
 def _claim_subject(current_event: dict) -> Optional[str]:
     if current_event.get("hook_event_name") != "Stop":
         return None

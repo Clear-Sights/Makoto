@@ -118,13 +118,16 @@ def _wire_claude_hooks(settings_path: Path) -> None:
     data = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
     hooks = data.setdefault("hooks", {})
     dispatch_path = _state_dir_path() / "dispatch.sh"
+    # A settings.json hook gets no CLAUDE_PLUGIN_ROOT, and the shim fails open without it, so
+    # the command names the root this package lives under.
+    root = Path(__file__).resolve().parent.parent.as_posix()
     for event in _WIRED_EVENTS:
         entries = hooks.setdefault(event, [])
         entries[:] = [h for h in entries if not _entry_owned_by_makoto(h)]
         entries.append({
             _MAKOTO_CLAUDE_FLAG: True,
             "matcher": "*",
-            "hooks": [{"type": "command", "command": f'sh "{dispatch_path.as_posix()}"'}],
+            "hooks": [{"type": "command", "command": f'CLAUDE_PLUGIN_ROOT="{root}" sh "{dispatch_path.as_posix()}"'}],
         })
     settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 

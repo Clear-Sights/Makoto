@@ -24,7 +24,7 @@ Makoto has never used anywhere else.
 
 The locating-call reader (`_LOCATING_TOOLS` / `event_location`) lives here too. It was
 `checks/contractOrder.py`'s until that gate was cut (2026-09-18, register-unbound); its
-remaining consumer is the live plan lifecycle in `dispatch._accumulate` (ADR 0014), which is
+remaining consumer is the live plan lifecycle in `dispatch._accumulate`, which is
 this store's own job, so it moved to the store rather than to another detector.
 
 Stdlib only; no LLM, no HTTP.

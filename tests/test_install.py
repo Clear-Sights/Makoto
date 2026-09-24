@@ -250,3 +250,27 @@ def test_cmd_status_reports_no_chain_file_key(tmp_path, monkeypatch, capsys):
     assert cmd_status() == 0
     status = json.loads(capsys.readouterr().out)
     assert "last_chain_files" not in status
+
+
+def test_the_wired_command_reaches_the_dispatcher(tmp_path, monkeypatch):
+    """The command install writes must RUN makoto, not only name it: a settings.json hook gets
+    no CLAUDE_PLUGIN_ROOT, and the shim fails open without one. Run it the way the host does,
+    through sh, and require the record database dispatch leaves behind."""
+    import os
+    import shutil
+    import subprocess
+    from makoto.install import _install_bash_scripts, _state_dir_path
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    _install_bash_scripts(_state_dir_path())
+    settings_path = tmp_path / "settings.json"
+    _wire_claude_hooks(settings_path)
+    command = json.loads(settings_path.read_text(encoding="utf-8"))["hooks"]["Stop"][0]["hooks"][0]["command"]
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "PYTHONPATH")}
+    env["MAKOTO_STATE_DIR"] = str(tmp_path / "state")
+    event = {"hook_event_name": "Stop", "session_id": "install-test", "transcript_path": ""}
+    done = subprocess.run([shutil.which("sh") or "sh", "-c", command], input=json.dumps(event),
+                          text=True, capture_output=True, cwd=tmp_path, env=env, timeout=60)
+    assert done.returncode == 0, done.stderr
+    assert "failing open" not in done.stderr, done.stderr
+    assert (tmp_path / "state" / "makoto.record.db").is_file(), done.stderr[-300:]

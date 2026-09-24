@@ -32,12 +32,10 @@ zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.
                            condition at all) is explicitly NOT this pattern — that is an honest,
                            transparently-labeled skip (SPIRIT.md §4 INCOMPLETE), not a disguised one.
 
-The analyzer engine and its Stop-hook adapter live in this ONE flat file (see
-docs/adr/0036-hollow-test-single-file-layout.md for the layout history). The analyzer
+The analyzer engine and its Stop-hook adapter live in this ONE flat file. The analyzer
 itself is self-contained (zero imports beyond stdlib `ast`); the `makoto-allow` exemption and the
 GateContext plumbing live in the adapter half below — this discipline is unchanged from the split
-layout, only the file boundary moved.
-"""
+layout, only the file boundary moved."""
 from __future__ import annotations
 import ast
 import os
@@ -118,8 +116,7 @@ def _iter_own_scope(stmts):
 
 # ---- the assertion recognizer (generous by design: an FN here only suppresses a fire) -----------
 # _callee_chain is imported at module top from _stdlib_ast_helpers, the stdlib-isolated shared
-# helper home (see tests/test_detector_engines_are_stdlib_isolated.py, and
-# docs/adr/0038-stdlib-ast-helper-extraction.md for the extraction history).
+# helper home (see tests/test_detector_engines_are_stdlib_isolated.py).
 def _is_assertion_call(node) -> bool:
     """Generous recognizer: any Call whose dotted callee has a component (case-insensitive)
     starting with `assert` (`self.assertTrue`, `assert_that(...)`, `mock.assert_called_with`), OR
@@ -541,8 +538,7 @@ def analyze_file(src: str, path: str) -> list:
 # Stop-hook adapter (formerly stopchecks/stopcheck_hollow_test.py)
 # =============================================================================================
 # _is_scratch/_read (imported at module top from _stdlib_ast_helpers) are shared verbatim with
-# deadPureStatement.py -- see tests/test_detector_engines_are_stdlib_isolated.py, and
-# docs/adr/0038-stdlib-ast-helper-extraction.md for the extraction history.
+# deadPureStatement.py -- see tests/test_detector_engines_are_stdlib_isolated.py.
 
 
 _KIND_MESSAGE = {
@@ -574,8 +570,7 @@ def _allowed(lineno, lines) -> bool:
     disguise"). One concept, one predicate: the marker means the same thing everywhere it is
     honored, so an exemption asserting an audit trail can never be accepted without one.
     (`makoto.vocab` is already on this engine's isolation allowlist — see
-    tests/test_detector_engines_are_stdlib_isolated.py.)
-    See docs/adr/0037-hollow-test-makoto-allow-predicate.md for the decision history."""
+    tests/test_detector_engines_are_stdlib_isolated.py.)"""
     return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
 
 

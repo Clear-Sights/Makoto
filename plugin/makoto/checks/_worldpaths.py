@@ -2,7 +2,7 @@
 
 gate.completion verifies a production claim against the results ledger and a cwd-relative
 os.path.exists. That observation window alone misses a file that lives under a synced repo root
-rather than under cwd. See docs/adr/0050-synced-repo-world-resolution.md for the decision history.
+rather than under cwd.
 
 This module WIDENS THE OBSERVATION, never the verdict:
 
@@ -36,8 +36,7 @@ resolver so callers have one world-resolution facade.
 Deliberate non-goal: commands inside an `ssh <host> '...'` string can match the cd-form and
 yield a REMOTE path. Harmless by construction — the path only survives if it is ALSO a local
 git work-tree holding a tracked, existing file, which in the dual-machine mirror layout is
-exactly the synced-clone case this patch exists to recognize.
-"""
+exactly the synced-clone case this patch exists to recognize."""
 from __future__ import annotations
 import os
 import re

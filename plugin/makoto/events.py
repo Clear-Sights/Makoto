@@ -79,7 +79,7 @@ EVENTS: dict[str, dict] = {
         "but wired only in an operator's own local, uncommitted .claude/settings.json for "
         "self-hosted dogfooding, never in this repo's shipped hooks/hooks.json or "
         ".claude-plugin manifest. A live-fire probe during that dogfooding session was recorded "
-        "as inconclusive, not confirmed-working (docs/self-defense-asymmetry-followup.md). "
+        "as inconclusive, not confirmed-working. "
         "Unblock: ship the hooks.json entry once live delivery is actually confirmed, same "
         "rule-4 sign-off as the others")},
 

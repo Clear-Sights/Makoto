@@ -481,7 +481,7 @@ wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK
 #     deterministic and uncertain failures keep the two-call bar. Verdict is judged per KEY at the
 #     END of each maximal consecutive run, and the LAST judgment for each key wins — so a later
 #     success for the same key silences it even when other, different calls happened in between.
-#     See docs/adr/0022-recur-stuck-latest-run-wins.md for the decision history.
+#
 #
 # PATTERN_ID CONVENTION (deliberate divergence from the read-only ancestor `makoto-dev`, found
 # while porting): the ancestor's canon_gate emitted pattern_id=f"canon.{cid}" (e.g. "canon.timeout",
@@ -550,8 +550,7 @@ def exit_code(c: Call):
     non-zero exit on an idempotent call is not itself an error state).
 
     The key read is the real substrate's camelCase `"exitCode"`, matching every other reader of a
-    Bash tool_response in this repo. See docs/adr/0023-canon-exit-code-terminal-key.md for the
-    decision history."""
+    Bash tool_response in this repo."""
     return _result(c).get("exitCode")
 
 
@@ -620,8 +619,7 @@ def recur_stuck(calls: list) -> bool:
     stuck loop by the time the turn ends — only a key whose MOST RECENT run is itself still bad
     fires. Every run is judged as it closes, per key, and the LAST judgment for each key wins; a
     fresh success (even a lone one, not itself part of a run>=2) for a key overwrites an earlier
-    bad verdict for that same key and resets its transient budget. See
-    docs/adr/0022-recur-stuck-latest-run-wins.md for the decision history."""
+    bad verdict for that same key and resets its transient budget."""
     def _run_is_bad(key, length, all_err, all_transient) -> bool:
         if length < 2 or not all_err:
             return False
@@ -637,9 +635,9 @@ def recur_stuck(calls: list) -> bool:
         # Dunder-insensitive verdict identity (`_pairing_input`, like the Pre<->Post pairing):
         # a harness bookkeeping key that VARIES per call (`__seq`) split a byte-identical retry
         # loop into distinct keys, so recur never saw a run of length >= 2 — the injection
-        # class ADR 0024 documents, previously guarded on the pairing side only. A leading
+        # class the pairing fold exists for, previously guarded on the pairing side only. A leading
         # `__` is transport bookkeeping, never call semantics, so folding it cannot collapse
-        # two genuinely distinct calls (the same argument ADR 0024 makes for pairing).
+        # two genuinely distinct calls (the same argument as for pairing).
         key = (c.get("name", ""), _pairing_input(c.get("input")))
         call_err = timed_out(c)          # the same direct-error-state terminal the gate installs
         error = self_error_code(c)
@@ -767,13 +765,13 @@ timeout_pays = lambda _call: None
 
 def _pairing_input(inp) -> str:
     """`canon_input` with leading-dunder keys dropped — the call-identity fold used to pair a
-    PostToolUse back to its own PreToolUse AND (since the ADR 0024 follow-up) as the per-key
+    PostToolUse back to its own PreToolUse AND as the per-key
     verdict identity inside this module's own sequence primitives (`recur_stuck`,
     `timed_out_at_turn_end`'s transient budget).
 
     A harness may add bookkeeping keys to `tool_input` BETWEEN a call's Pre and its Post, so
     pairing on the FULL canonical input would leave a dangling Pre for a call that in fact
-    succeeded. See docs/adr/0024-dunder-insensitive-call-pairing.md for the decision history.
+    succeeded.
     The SAME injection class also broke the verdict side while it keyed on the full
     `canon_input`: a bookkeeping key that VARIES per call (`__seq`) split a byte-identical
     retry loop into distinct keys, so recur never saw a run of length >= 2.
@@ -967,8 +965,7 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
     step, shared with `canonTimeoutRecur._decode_row`. Sharing it is what keeps this predicate
     and its sibling gate (canon.timeout/canon.recur) reading the SAME rows from the same table
-    for the same concept -- including rows whose event type lives only on the WRAPPER column.
-    See docs/adr/0039-identical-retry-shared-row-decoder.md for the decision history."""
+    for the same concept -- including rows whose event type lives only on the WRAPPER column."""
     rows = list(history or ())
     if not rows:
         return None
@@ -1406,7 +1403,7 @@ green_SHAPE = "SWITCH"
 
 # The prose half (the whole-suite green-claim signal) lives in substrate.claims.whole_suite_pass_claim,
 # shared with gate.stale_pass (which additionally uses the returned Match's POSITION for its teeth
-# window). See docs/adr/0032-green-claim-signal-relocation.md for the relocation history.
+# window).
 def green_claim_gate(text, *, testrun_output, testrun_exit=None) -> Optional[Finding]:
     """Fire iff the assistant claims UNIVERSAL test success ('tests pass', 'the suite is green',
     'CI is green') while the MOST RECENT recorded test-runner output shows a REAL failure — a

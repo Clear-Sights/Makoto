@@ -24,8 +24,7 @@ from __future__ import annotations
 # prefilter is the raw substrings ``getenv``/``environ`` — a superset of every env-read spelling
 # this module implements (``os.getenv``, bare imported ``getenv(``, ``os.environ.get``,
 # ``environ.get``, ``os.environ[``, ``environ[``, spaced ``os.environ [``), so a form the
-# predicate would catch can never be silently dropped before the predicate runs. See
-# docs/adr/0031-env-gated-audit-ast-rewrite.md for the migration history.
+# predicate would catch can never be silently dropped before the predicate runs.
 #
 # NAME-AGNOSTIC: the integrity signal comes from the env-var KEY *or* a body code identifier, so it
 # is not tied to the literal substring ``AUDIT``. A bare feature flag
@@ -602,8 +601,7 @@ _GLOBAL_DISABLE_RX = re.compile(r'"disableAllHooks"\s*:\s*true\b', re.IGNORECASE
 # `install`/`entry_dispatches_to_makoto` do, including the plugin-manifest shim form
 # (`${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh`), and nothing more (an unrelated
 # `/usr/local/bin/dispatch.sh` must never false-BLOCK -- this check asserts a zero-FP
-# admissibility bar). See docs/adr/0040-self-mute-invocation-token-source.md for the decision
-# history. If the REMOVED text carried it but the introduced text no longer
+# admissibility bar). If the REMOVED text carried it but the introduced text no longer
 # does, the makoto command was gutted to a no-op while the wiring/seal may remain — a self-mute
 # the un-wire branch (which keys on `_makoto_managed`) misses because the marker stays in both.
 
@@ -787,8 +785,7 @@ undeclared_CHECK = Check(
 # SCOPED to exit-code masking ONLY. Stream redirection (`2>/dev/null` / `&>/dev/null`) is deliberately
 # OUT of scope: it does NOT alter `$?` (`sys.exit(7) 2>/dev/null` still exits 7) — every runner in
 # _LEAD_RUNNER_RX signals failure via a nonzero exit, so silencing stderr cannot turn a real failure
-# into a green. See docs/adr/0049-verifier-exit-masking-devnull-branch-removal.md for the decision
-# history.
+# into a green.
 #
 # FP-SAFE BY SHELL COMMAND POSITION: this check tokenizes the Bash command and only treats a runner,
 # mask, or `set +e` as evidence when it is an executed command/operator, not prose in a comment,
@@ -1926,8 +1923,7 @@ def _within_governed_tree(fp: str, cwd: str, root: Optional[Path]) -> bool:
 
 # jscpd flags this as a clone against fabricatedCommitSha.py; the shared span is the fixed
 # dispatcher entrypoint signature (a structural contract, not extractable logic), and the two
-# bodies do unrelated things. Not to be "deduped" -- see
-# docs/adr/0042-phantom-citation-jscpd-clone-flag.md for the verification record.
+# bodies do unrelated things. Not to be "deduped".
 def citation_predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     """fire on first Author-Year string not present in canonical_citations."""

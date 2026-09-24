@@ -13,7 +13,7 @@ to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently s
 of silence.
 
 This module is the sole discovery path for both edges; `load_precheck_catalog()` is the Pre-tier
-convenience wrapper. See docs/adr/0001-unified-check-discovery.md for the migration history."""
+convenience wrapper."""
 from __future__ import annotations
 
 import importlib
@@ -120,25 +120,24 @@ class Check:
 
     `may_block`: a Stop-edge check is blocking-eligible only when BOTH `may_block is True` AND
     `posture == BLOCK` -- two independent signals, not one. A Pre-tier CHECK leaves it False.
-    See docs/adr/0002-may-block-field.md for the migration history.
+
 
     `keywords`/`retry_hint`/`description`/`predicate_module` are Pre-tier fields; Stop-tier checks
-    leave their safe empty defaults. See docs/adr/0003-pre-tier-check-fields.md for history.
+    leave their safe empty defaults.
 
     `eats` is the check's exact declared input signature. Stop checks name GateContext fields or
     derived properties; Pre checks use the flat predicate vocabulary current_event/history/
     pattern/conn. tests/test_check_law_eats.py derives the reachable reads and rejects either an
-    undeclared read or a dead declaration. See docs/adr/0020-check-eats-law.md for history.
+    undeclared read or a dead declaration.
 
     `tests` declares the check's result/evidence shape (one of `TESTS_SHAPES`). The sibling
     tests/test_check_law_tests.py rejects both an undeclared shape and a declaration whose
     module/factory does not use that shape's required evidence primitive. Genuine one-offs keep
-    the empty default only when their id and reason are registered explicitly in that law. See
-    docs/adr/0021-check-tests-result-shape-law.md for history.
+    the empty default only when their id and reason are registered explicitly in that law.
 
     `layer` is "object" or "meta" (default "object"); "meta" means the check can trigger only on
     tampering with Makoto's own audit/enforcement machinery. A meta BLOCK cannot soften below ASK
-    under LOOSE/SILENT. See docs/adr/0004-check-layer-field.md for the decision history."""
+    under LOOSE/SILENT."""
     id: str
     applies_at: str
     posture: str
@@ -256,6 +255,5 @@ def load_precheck_catalog(*, package_dir: Optional[Path] = None) -> list:
     """Every live Pre-tier `CHECK` with a `predicate_module` set -- the keyword-prefiltered
     detector catalog `dispatch._run_predicates` (and `install.py`/`__main__.py`'s catalog
     inspection commands) consume. The BLOCK-only invariant is pinned by
-    `tests/test_pre_tier_block_invariant.py`; see docs/adr/0001-unified-check-discovery.md for
-    the migration history."""
+    `tests/test_pre_tier_block_invariant.py`"""
     return [c for c in load_checks(edge="Pre", package_dir=package_dir) if c.predicate_module]

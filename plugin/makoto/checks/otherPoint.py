@@ -977,8 +977,7 @@ established_CHECK = Check(
 # ==============================================================================================
 # The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
-# rather than mirrored here. See docs/adr/0041-wiring-predicate-hoist.md for the decision
-# history.
+# rather than mirrored here.
 from makoto.substrate.wiring import (
     PLUGIN_MANIFEST_RELPATH as _PLUGIN_MANIFEST_RELPATH,
     entry_dispatches_to_makoto as _entry_dispatches_to_makoto,
@@ -1076,9 +1075,8 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
     another; an edit that strips wiring from ALL sources for ALL events simultaneously disables
     this check itself in the same instant (Claude Code reloads hooks.json live, not cached once
     at session start — verified against code.claude.com/docs/en/settings.md, "When edits take
-    effect"), so it still provides ZERO coverage against that canonical full-strip attack. See
-    docs/self-defense-asymmetry-followup.md for the fuller writeup; this check is recorded
-    there as mitigation, not closure.
+    effect"), so it still provides ZERO coverage against that canonical full-strip attack. This check is
+    mitigation, not closure.
 
     THREE wiring sources, checked with IDENTICAL rigor: the project `.claude/settings.json`'s
     own "hooks" key (repo-root-relative, read via `fs_read`), the HOME `~/.claude/settings.json`
@@ -1202,8 +1200,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
         message=(f"makoto's hook wiring is missing an entry for: {named} in every consultable "
                  f"wiring source ({'; '.join(consulted)}). "
                  "This is a PARTIAL-STRIP signal only — it cannot see a simultaneous strip of "
-                 "all events from every source at once (see this check's own docstring / "
-                 "docs/self-defense-asymmetry-followup.md)."),
+                 "all events from every source at once (see gate.self_wired's docstring)."),
         retry_hint=("Advisory only, never blocking: confirm this was an intentional change, or "
                     "restore the missing hook entry — `makoto install` re-wires "
                     "~/.claude/settings.json; a plugin-packaged install needs its "

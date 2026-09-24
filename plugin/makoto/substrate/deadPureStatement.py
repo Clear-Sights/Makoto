@@ -8,8 +8,7 @@ The analyzer detects ILLUSORY statements: provably pure computations whose resul
 I/O or a live binding (dead code shaped like work). Import-isolated like `hollowTest.py`: stdlib
 `ast` plus the whitelisted makoto substrate only (`makoto.vocab`,
 `makoto.substrate._stdlib_ast_helpers`, `makoto.registry` — the exact contract
-tests/test_detector_engines_are_stdlib_isolated.py enforces).
-"""
+tests/test_detector_engines_are_stdlib_isolated.py enforces)."""
 from __future__ import annotations
 import ast
 
@@ -532,7 +531,6 @@ def analyze_file(src: str, path: str) -> list:
         # without a rationale accepts the assertion unmeasured. The marker is honored on ANY
         # line of the statement's own span, so a multi-line statement's closing-line annotation
         # (`)  # makoto-allow: ...`) exempts exactly like a single-line one.
-        # See docs/adr/0026-liveness-allow-marker-strictness.md for the decision history.
         a = getattr(stmt, "lineno", 0)
         b = getattr(stmt, "end_lineno", None) or a
         return any(1 <= li <= len(redacted)
