@@ -151,46 +151,6 @@ def empty_write_keys(conn, session_id: str) -> set:
         return set()
 
 
-class LedgerView:
-    """Thin read-surface FACADE over one (conn, session_id) pair — every check module reads its
-    ledger state through this (`ledger.view_for`), rather than hand-rolling its own SQL.
-    Delegates to this module's existing module-level functions verbatim; it adds no new SQL and
-    changes no existing behavior.
-
-    Built once per (conn, session_id) and handed to a check the same way GateContext is: a
-    small bag of already-resolved facts, not a live query object a check pokes ad hoc."""
-
-    def __init__(self, conn, session_id: str):
-        self._conn = conn
-        self._session_id = session_id
-
-    def touched_keys(self) -> set:
-        return touched_keys(self._conn, self._session_id)
-
-    def empty_write_keys(self) -> set:
-        return empty_write_keys(self._conn, self._session_id)
-
-    def latest_testrun(self) -> str:
-        return latest_testrun(self._conn, self._session_id)
-
-    def read_key(self, key: str):
-        return read_key(self._conn, key)
-
-
-def view_for(conn, session) -> "LedgerView":
-    """Build the unified ledger read-surface for one session.
-
-    `session` is either a bare session_id string, or an event/hook-payload dict carrying one
-    under `"session_id"` (the same two shapes `dispatch.py` already juggles: a raw payload at
-    the hook boundary, a bare `sid` once unpacked) — so a check can pass through whichever it
-    already has in hand. A dict with no `session_id` key resolves to `""` (matches every
-    existing ledger read function's fail-open-to-empty behavior for an unknown session), never
-    raises.
-    """
-    session_id = session.get("session_id", "") if isinstance(session, dict) else (session or "")
-    return LedgerView(conn, session_id)
-
-
 def latest_testrun(conn, session_id: str) -> str:
     """The MOST RECENT recorded test-runner output for this session (the latest kind='testrun'
     ledger row's value), or '' if no test runner ran. Ordered by source_event_id (the monotonic,
