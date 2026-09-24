@@ -63,6 +63,16 @@ def test_unprobed_fanout_treats_agent_as_the_same_act_as_task():
     assert unprobed_fanout_gate([_row("Agent", description="x")]) is not None
 
 
+def test_unprobed_fanout_catches_a_dispatch_tool_named_neither_task_nor_agent():
+    """Same unprobed dispatch, but through an MCP tool named neither Task nor Agent
+    (`mcp__subagents__dispatch`) -- recognized by its `prompt` input, the one thing every
+    dispatch tool hands to the subagent, not by a closed name list."""
+    f = unprobed_fanout_gate([_row("mcp__subagents__dispatch",
+                                   prompt="Refactor the auth module for clarity")])
+    assert f is not None
+    assert f.pattern_id == "gate.unprobed_fanout"
+
+
 # ---- gate.unasked_plan (register G2 DETERMINED ASKED AS OPEN) ---------------------------------
 
 def test_unasked_plan_fires_on_a_plan_with_no_question():

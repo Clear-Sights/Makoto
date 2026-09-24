@@ -709,16 +709,25 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADV
 from makoto.kit import unmet_obligation_gate
 
 # The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
-# the name this harness reports, and both are accepted rather than guessed between -- a closed
-# vocabulary whose miss is a RECALL bound (a dispatch under some third name reads as no dispatch
-# and the gate goes quiet), never a false block.
+# the name this harness reports, and both are accepted by name alone. An MCP tool that dispatches
+# a subagent under a third name (`mcp__subagents__dispatch`) is the same act, recognized by its
+# `prompt` input rather than guessed by name -- the brief a dispatch hands off is the one input
+# common to every dispatch tool, named or not.
 _DISPATCH_TOOLS = frozenset({"Task", "Agent"})
 # The reads that pay the obligation.
 _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
 
 
 def _is_dispatch(ev: dict) -> bool:
-    return ev.get("tool_name") in _DISPATCH_TOOLS
+    name = ev.get("tool_name") or ""
+    if name in _DISPATCH_TOOLS:
+        return True
+    if not name.startswith("mcp__"):
+        return False
+    lname = name.lower()
+    if "agent" not in lname and "dispatch" not in lname:
+        return False
+    return isinstance((ev.get("tool_input") or {}).get("prompt"), str)
 
 
 def _is_probe(ev: dict) -> bool:
