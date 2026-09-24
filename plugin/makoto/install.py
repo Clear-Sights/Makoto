@@ -210,23 +210,6 @@ def _uninstall_claude_conventions(claude_md_path: Path) -> bool:
     return True
 
 
-def _record_configchange_manifest(settings_path: Path, *, state_dir: Path) -> None:
-    """Record that the installer wired Makoto's hooks into `settings_path`, so
-    `configchange.py`'s blocking tier can treat a LATER full-strip of this exact path as a
-    genuine strip rather than the ambiguous "never wired" case. Fail-open: a write failure here
-    must never break install."""
-    manifest_path = state_dir / "configchange_manifest.json"
-    try:
-        paths = set(json.loads(manifest_path.read_text(encoding="utf-8"))) if manifest_path.exists() else set()
-    except Exception:
-        paths = set()
-    paths.add(str(settings_path.resolve()))
-    try:
-        manifest_path.write_text(json.dumps(sorted(paths), indent=2) + "\n", encoding="utf-8")
-    except Exception:
-        pass  # observability must never break install
-
-
 def cmd_install() -> int:
     """state-dir setup + ~/.claude/settings.json hook wiring. Idempotent.
 
@@ -244,7 +227,6 @@ def cmd_install() -> int:
     if not settings.exists():
         settings.write_text("{}\n", encoding="utf-8")
     _wire_claude_hooks(settings)
-    _record_configchange_manifest(settings, state_dir=state_dir)
     claude_md = _claude_md_path()
     _install_claude_conventions(claude_md)
     settings_wired = _hooks_wired_on_disk(settings, on_unreadable=False)

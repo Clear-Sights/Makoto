@@ -562,12 +562,6 @@ _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post",
 # Both settled tool terminals use the Post wire edge.
 
 
-def _recheck_certificate_enabled() -> bool:
-    """Whether MAKOTO_RECHECK_CERTIFICATE enables pre-wire verdict verification. A mismatch
-    raises."""
-    return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def _named(finding) -> str:
     """The finding's message, guaranteed to name the check that produced it.
 
@@ -617,8 +611,7 @@ def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -
     raw BLOCK under LOOSE/SILENT with no oversight clamp). Everywhere else it returns \"object\",
     which is fold-equivalent to the true layer by `apply`'s own rule (the floor only acts on
     exactly that branch) -- so the catalog import in `_meta_check_ids` is never paid on the
-    default-STRICT hot path. Shared verbatim by `verdict.recheck_certificate` so the F4
-    certificate reconstruction folds identically."""
+    default-STRICT hot path."""
     if (outcome == verdict.BLOCK
             and mode in (verdict.LOOSE, verdict.SILENT)
             and not verdict.is_oversight_clamped(permission_mode)
@@ -675,35 +668,6 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             f"{detail}\n[makoto: verdict fold failed and fails closed on the raw outcome: "
             f"{type(exc).__name__}: {exc}]",
         )
-    if _recheck_certificate_enabled():
-        # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
-        # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
-        # a fold mismatch never reaches stdout. recheck_certificate raises on mismatch by
-        # design (see makoto.verdict's recheck section); that raise is unreachable unless
-        # MAKOTO_RECHECK_CERTIFICATE is explicitly set.
-        from makoto.verdict import VerdictCertificate, recheck_certificate
-        try:
-            recheck_certificate(VerdictCertificate(
-                findings=tuple(findings),
-                mode=mode,
-                permission_mode=permission_mode,
-                claimed_outcome=str(folded),
-                claimed_detail=getattr(folded, "detail", ""),
-            ))
-        except Exception as exc:
-            # CAUGHT, and the direction matters more than the catch. Letting the raise fly was the
-            # whole defect: it unwound past this wire write into `_dispatch`'s carriage handler,
-            # which records a fact and returns 0 -- so the one mechanism built to catch a corrupted
-            # fold produced NO verdict at all and the call was allowed. Detecting tampering in the
-            # verdict machinery and then failing OPEN on the detection is worse than not checking.
-            # A fold mismatch is a DECISION fault, not a carriage fault, and this repo's rule is
-            # open on carriage, closed on decision -- so the mismatch becomes the verdict, at BLOCK,
-            # bypassing `apply` entirely (the fold is exactly what is not to be trusted here).
-            folded = verdict.Decision(
-                verdict.BLOCK,
-                "makoto could not certify its own verdict fold and is failing closed: "
-                f"{type(exc).__name__}: {exc}",
-            )
     # Meta-floor teeth at the Stop edges: `apply` floors a meta BLOCK to ASK under a softening
     # posture, but `_STOP_WIRE` deliberately has no ASK entry ("ASK never blocks the agent from
     # stopping" — pinned by tests/test_posture_wire.py), so at Stop/SubagentStop that floored
@@ -809,85 +773,28 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
     audit.append_row(state_dir, row)
 
 
-def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
-    """SessionStart: admit a declared Plan from the on-disk artifact. SessionStart never blocks —
-    it is an admission step, not a gate — so this always completes silently regardless of
-    whether a plan was actually declared."""
-    try:
-        from makoto.state import plan as _plan
-        _plan.declare_from_session_artifact(
-            payload.get("cwd") or os.getcwd(),
-            payload.get("session_id", ""),
-            conn,
-            source=payload.get("source", ""),
-        )
-    except Exception as exc:
-        print(f"makoto.dispatch: plan declare failed (non-fatal): {exc}",
-              file=sys.stderr)
-
-
 def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     """Settled-tool accumulation, with failure evidence kept out of success-shaped state.
 
     Both PostToolUse terminals have already been stored by ``_ingest_event`` before this handler
     runs, so history-walking decoders can see successes and failures alike.  Only a successful
-    PostToolUse may mutate the update ledger, advance a plan, record a task event, or emit a test
-    delta.  PostToolUseFailure is evidence that the operation did *not* land; retaining it in
-    history while returning here prevents a failed Write/Bash from discharging gates or
-    latest-wins clobbering an earlier real result.
+    PostToolUse may mutate the update ledger or record a task event. PostToolUseFailure is
+    evidence that the operation did *not* land; retaining it in history while returning here
+    prevents a failed Write/Bash from discharging gates or latest-wins clobbering an earlier
+    real result.
 
     No predicate evaluation and no block — settled tool events accumulate evidence, never decide."""
     if payload.get("hook_event_name") == "PostToolUseFailure":
         return
     try:
         from makoto.state import ledger as _ledger
-        from makoto.kit import (_path_components, bash_output_text, compute_delta,
-                                is_test_runner)
         sid = payload.get("session_id", "")
-        cwd = payload.get("cwd") or os.getcwd()
-        delta_finding = None
-        # Compute test delta before record_update overwrites the prior run; surface it as ADVISE.
-        if payload.get("tool_name") == "Bash":
-            cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
-            if is_test_runner(cmd):
-                prior_output = _ledger.latest_testrun(conn, sid)
-                tr = payload.get("tool_response", {})
-                new_output = bash_output_text(tr) if isinstance(tr, dict) else ""
-                delta = compute_delta(prior_output, new_output)
-                if delta:
-                    delta_finding = Finding(
-                        pattern_id="makoto.test_delta", file="", line=0, level="advisory",
-                        message=f"Test delta vs the prior recorded run: {delta}",
-                        retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # Locating tools declare or advance the live plan through the shared Plan.resolve contract.
-        from makoto.state import plan as _plan
-        if payload.get("tool_name") in _plan._LOCATING_TOOLS:
-            loc = _plan.event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
-            if loc is not None:
-                if _path_components(loc)[-2:] == [".claude", "makoto-plan.jsonl"]:
-                    # DECLARE: a locating call wrote the artifact itself -- (re-)admit it live,
-                    # LATEST-WINS, the same falsifiability gate declare_plan always enforces.
-                    _plan.declare_from_live_write(cwd, sid, conn)
-                else:
-                    # ADVANCE: a locating call at an OPEN node's own `where` marks it DONE.
-                    plan_obj = _plan.load_plan(conn, sid)
-                    if plan_obj is not None:
-                        nid = plan_obj.resolve(loc, payload.get("tool_name", ""))
-                        if nid is not None and nid in plan_obj.open_nodes():
-                            plan_obj.mark_done(nid)
-                            _plan.persist_plan(conn, sid, plan_obj)
         # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
             from makoto.state import plan as _plan_items
             _plan_items.record_task_event(conn, sid, payload)
-        if delta_finding is not None:
-            delta_finding = replace(delta_finding, source_event_id=event_id)
-            _emit_decision([delta_finding], payload.get("hook_event_name", ""),
-                           permission_mode=payload.get("permission_mode"))
-            # Persist the delta redirect finding
-            _record_audit(state_dir, [delta_finding], payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)
@@ -921,9 +828,10 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     _record_audit(state_dir, findings + gate_findings, payload)
 
 
-# The table maps hook_event_name to its pipeline; unknown events use the evaluation pipeline.
+# The table maps hook_event_name to its pipeline; unknown events (including SessionStart, which
+# has no dedicated handler now that the declared-Plan admission step is gone) use the wildcard
+# evaluation pipeline.
 HANDLERS: dict[str, Any] = {
-    "SessionStart": _admit_plan,
     "PostToolUse": _accumulate,
     "PostToolUseFailure": _accumulate,
     "PreToolUse": _evaluate_and_gate,

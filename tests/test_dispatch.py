@@ -510,46 +510,6 @@ def test_dispatch_failed_terminal_does_not_clobber_prior_failing_testrun(tmp_pat
     assert event_types == ["PostToolUse", "PostToolUseFailure"]
 
 
-def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
-    """Task 3's test-delta redirect: a test run whose verdict set changed vs the PRIOR recorded
-    run emits an ADVISE-tier additionalContext on the CORRECT (Post) edge -- never blocks, never
-    denies the call, and never claims a PreToolUse-shaped hookEventName for a PostToolUse event
-    (the _HOOK_TO_EDGE gap this task also found and fixed)."""
-    import json as _json
-    state_dir = _setup_state(tmp_path)
-    sid = "delta_s1"
-    first = {
-        "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"command": "pytest -q"},
-        "tool_response": {"stdout": "PASSED tests/x.py::test_a\n", "stderr": "", "exitCode": 0},
-    }
-    rc1, out1 = _run_dispatch(state_dir, first)
-    assert out1 == "", "no PRIOR run to diff against yet -> nothing to say"
-
-    second = {
-        "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"command": "pytest -q"},
-        "tool_response": {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1},
-    }
-    rc2, out2 = _run_dispatch(state_dir, second)
-    body = _json.loads(out2)
-    assert body["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
-    assert "newly failing: test_a" in body["hookSpecificOutput"]["additionalContext"]
-
-
-def test_dispatch_test_delta_redirect_silent_when_verdict_set_is_unchanged(tmp_path):
-    state_dir = _setup_state(tmp_path)
-    sid = "delta_s2"
-    payload = {
-        "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"command": "pytest -q"},
-        "tool_response": {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1},
-    }
-    rc1, _ = _run_dispatch(state_dir, payload)
-    rc2, out2 = _run_dispatch(state_dir, payload)   # same verdict set, re-run
-    assert out2 == ""
-
-
 def test_dispatch_completion_gate_blocks_by_default(tmp_path):
     """2026-06-01 flip: an unbacked PRODUCTION claim (a produce verb governs an absent path)
     BLOCKS live by default — no env var needed. This is the validated completion gate."""
@@ -652,146 +612,6 @@ def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.dropped" in r.get("pattern_fires", []) for r in rows), \
         "the dropped fire must still be audited"
-
-
-def test_dispatch_locating_write_advances_the_declared_plan_node(tmp_path):
-    """The live-advance-wiring fix (2026-07-23): before this, Plan.mark_done/plan.persist_plan had
-    zero live callers -- a declared plan could NEVER close (see makoto/events.py's PostToolUse
-    entry). Here a PostToolUse Write at the node's own `where` advances it to DONE. The observable
-    is the plan store itself: gate.contract_order used to carry this claim as a Stop block, and it
-    was cut 2026-09-18, so the assertion reads the store the lifecycle actually writes -- which is
-    also what gate.stale_establisher (register H2) and gate.plan_item_drift (F8) stand on."""
-    import sqlite3
-    from makoto.state import plan as plan_store
-
-    state_dir = _setup_state(tmp_path)
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text(
-        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
-    )
-    session = "contract_order_advance"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    write = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-             "tool_name": "Write",
-             "tool_input": {"file_path": "auth.py", "content": "def login(): ...\n"},
-             "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, write)
-    assert rc == 0 and out == "", "PostToolUse accumulation must never itself block"
-    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
-    try:
-        stored = plan_store.load_plan(conn, session)
-    finally:
-        conn.close()
-    assert stored is not None
-    assert stored.open_nodes() == set(), "the locating write must advance the only declared node"
-
-
-def test_dispatch_failed_locating_write_leaves_plan_node_open(tmp_path):
-    """A failed Write at a node's ``where`` is not plan progress; the Stop remainder stays."""
-    import sqlite3
-    from makoto.state import plan as plan_store
-
-    state_dir = _setup_state(tmp_path)
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text(
-        '{"what":"Write","passthrough":"auth.py","where":"auth.py","id":"n1"}\n'
-    )
-    session = "contract_order_failed_advance"
-    start = {
-        "hook_event_name": "SessionStart",
-        "session_id": session,
-        "cwd": str(tmp_path),
-        "source": "startup",
-    }
-    assert _run_dispatch(state_dir, start) == (0, "")
-    failed_write = {
-        "hook_event_name": "PostToolUseFailure",
-        "session_id": session,
-        "cwd": str(tmp_path),
-        "tool_name": "Write",
-        "tool_input": {"file_path": "auth.py", "content": "def login(): ...\n"},
-        "error": "permission denied",
-        "is_interrupt": False,
-    }
-    assert _run_dispatch(state_dir, failed_write) == (0, "")
-
-    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
-    try:
-        stored = plan_store.load_plan(conn, session)
-    finally:
-        conn.close()
-    assert stored is not None
-    assert stored.open_nodes() == {"n1"}, "a FAILED locating write is not plan progress"
-
-
-def test_dispatch_live_plan_write_malformed_content_fails_open_no_crash_no_block(tmp_path):
-    """A malformed/non-falsifiable live plan write must declare NOTHING (fail-open) -- never
-    crash the hook, never spuriously block on garbage content."""
-    state_dir = _setup_state(tmp_path)
-    session = "contract_order_live_malformed"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    (claude_dir / "makoto-plan.jsonl").write_text("not json at all")
-    declare = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-               "tool_name": "Write",
-               "tool_input": {"file_path": str(claude_dir / "makoto-plan.jsonl"),
-                              "content": "not json at all"},
-               "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, declare)
-    assert rc == 0 and out == ""
-    stop = {"hook_event_name": "Stop", "session_id": session, "cwd": str(tmp_path),
-            "last_assistant_message": "Done for now."}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert rc == 0 and out == "", "malformed live plan content must never manufacture a block"
-
-
-def test_dispatch_live_plan_write_latest_wins_replaces_the_whole_plan(tmp_path):
-    """A second live plan write REPLACES the whole plan (latest-wins, matching declare_plan's
-    documented semantics) -- Stop blocks on the SECOND plan's node, not the first's."""
-    state_dir = _setup_state(tmp_path)
-    session = "contract_order_live_latest_wins"
-    start = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(tmp_path),
-             "source": "startup"}
-    rc, out = _run_dispatch(state_dir, start)
-    assert rc == 0 and out == ""
-    claude_dir = tmp_path / ".claude"
-    claude_dir.mkdir()
-    artifact = claude_dir / "makoto-plan.jsonl"
-    artifact_path = str(artifact)
-    artifact.write_text('{"what":"Write","passthrough":"a.py","where":"a.py","id":"n1"}\n')
-    first = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-             "tool_name": "Write",
-             "tool_input": {"file_path": artifact_path,
-                            "content": '{"what":"Write","passthrough":"a.py","where":"a.py","id":"n1"}\n'},
-             "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, first)
-    assert rc == 0 and out == ""
-    artifact.write_text('{"what":"Write","passthrough":"b.py","where":"b.py","id":"n2"}\n')
-    second = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
-              "tool_name": "Write",
-              "tool_input": {"file_path": artifact_path,
-                             "content": '{"what":"Write","passthrough":"b.py","where":"b.py","id":"n2"}\n'},
-              "tool_response": {}}
-    rc, out = _run_dispatch(state_dir, second)
-    assert rc == 0 and out == ""
-    import sqlite3
-    from makoto.state import plan as plan_store
-    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
-    try:
-        stored = plan_store.load_plan(conn, session)
-    finally:
-        conn.close()
-    assert stored is not None
-    assert stored.open_nodes() == {"n2"}, "latest-wins: the second plan replaces the first whole"
 
 
 def test_dispatch_dropped_gate_silent_when_discharged(tmp_path):
@@ -1548,23 +1368,6 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
         "the advisory self_wired fire must still be audited so a partial strip leaves a forensic trail"
 
 
-def test_dispatch_relative_path_citation_gate_never_blocks_even_when_it_fires(tmp_path):
-    """Behavioral pin, same shape as gate.self_wired's: gate.relative_path_citation (2026-07-09)
-    fires (audited) but never blocks, even when its own condition holds -- a Stop turn whose
-    last_assistant_message cites a non-absolute path."""
-    state_dir = _setup_state(tmp_path)
-    stop = {"hook_event_name": "Stop", "session_id": "relpath", "cwd": str(tmp_path),
-            "last_assistant_message": "see substrate/hollowTest.py:146 for the detector"}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out, "gate.relative_path_citation (ADVISE) must reach the agent as a Stop block when it fires"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "gate.relative_path_citation" in decision["reason"]
-    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.relative_path_citation" in r.get("pattern_fires", []) for r in rows), \
-        "the advisory fire must still be audited so it leaves a forensic trail"
-
-
 def test_dispatch_plan_item_drift_gate_never_blocks_even_when_it_fires(tmp_path):
     """Behavioral pin, same shape as gate.self_wired's: gate.plan_item_drift (2026-07-09) fires
     (audited) but never blocks, even when a plan/task-labeled commitment is left open across
@@ -1880,7 +1683,6 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.self_wired",   # advisory-tier exception (2026-07-05); still
                                                # discovered <=> in _blocking_gate_ids(), just never
                                                # emits level="error" so never actually blocks
-                          "gate.relative_path_citation",  # advisory-tier (2026-07-09): same shape
                           "gate.plan_item_drift",         # advisory-tier (2026-07-09): same shape
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
@@ -1944,7 +1746,7 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     # Pinned by test_dispatch_unprobed_fanout_gate_never_blocks_even_when_it_fires and
     # test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires above.
     _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
-                        "gate.relative_path_citation", "gate.plan_item_drift",
+                        "gate.plan_item_drift",
                         "gate.unprobed_fanout", "gate.unasked_plan",
                         "gate.unread_structure",
                         "gate.unwitnessed_verifier",

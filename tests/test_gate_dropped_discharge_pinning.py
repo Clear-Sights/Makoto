@@ -29,7 +29,7 @@ audit_lines convention, line 143 "or document as equivalent/dead"):
     overlapping span cannot change fire-vs-silent, so no input distinguishes the mutant.
 """
 from makoto.checks.otherPoint import dropped_gate
-from makoto.checks import normalize_path
+from makoto.kit import normalize_path
 
 
 def _call(text, *, touched=(), empty=(), reads=None, exists=(), sizes=None):

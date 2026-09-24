@@ -18,8 +18,8 @@ import pytest
 def chain(monkeypatch, tmp_path):
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
     # no reload needed: store_root() -> state._state_dir() reads the env var LIVE on every call,
-    # and a reload would corrupt class identity (LedgerView) for every other already-imported
-    # consumer in the same pytest process — a real pollution bug this fixture had at first.
+    # and a reload would corrupt class identity for every other already-imported consumer in the
+    # same pytest process — a real pollution bug this fixture had at first.
     import makoto.state.ledger as c
     return c
 

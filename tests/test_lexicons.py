@@ -1,6 +1,6 @@
 """lexicons.py (L0) is the sole home for makoto's regexes + word-sets. Pins single-sourcing (each
 RX reaches its consumer by import, never by a private re-compile) and L0 purity (no in-package
-imports). The pins on the high-escape patterns (_TEST_RUNNER_RX, _ADMIT_CORE_RX, etc.) catch a
+imports). The pins on the high-escape patterns (_TEST_RUNNER_RX, _FAILURE_MARKER_RX, etc.) catch a
 transcription drift as a unit failure, not only via corpus-FP after the fact.
 
 `is` ALONE CANNOT CARRY THAT CLAIM, measured 2026-09-18 and the reason `_no_local_rebind` exists:
@@ -38,11 +38,9 @@ def _no_local_rebind(module, *names):
 def test_lexicons_exports_all_regex_symbols():
     from makoto import vocab as lexicons
     for name in (
-        "_NEGATION_RX", "_MAKOTO_ALLOW_RX", "JWT_CALLEE_RX",
+        "_NEGATION_RX", "_MAKOTO_ALLOW_RX",
         "_TEST_RUNNER_RX", "_FAILURE_SUMMARY_RX", "_SUCCESS_SUMMARY_RX", "_FAILURE_MARKER_RX",
-        "_ADMIT_CORE_RX", "_FORWARD_YET_RX", "_FORWARD_FUTURE_RX", "_ASIDE_RX",
-        "_USER_CONCESSION_RX", "_UNIVERSAL_RX",
-        "_ENUMERATION_RX", "_CITATION_RX",
+        "_CITATION_RX",
     ):
         assert isinstance(getattr(lexicons, name), re.Pattern), name
     assert isinstance(lexicons._CITATION_AUTHOR_STOPWORDS, frozenset)
@@ -81,7 +79,6 @@ def test_gate_lexicons_live_in_lexicons():
     only reader was state/commitments.py, which was cut once nothing read GateContext.opens."""
     from makoto import vocab as L
     assert L._PRODUCE_VERB_RX.search("I wrote the file")
-    assert L._UNIVERSAL_DONE_RX.search("everything is done.")
     assert L._GREEN_CLAIM_RX.search("tests pass")
     assert "the" in L._GREEN_UNIVERSAL_PREMOD and "__init__.py" in L._EMPTY_OK
 
@@ -117,8 +114,8 @@ def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():
 def test_the_recorded_verdict_parsers_are_one_object_under_every_spelling():
     """The EVIDENCE side of a named-test claim moved to its reachable home 2026-09-18 -- the
     recorded-marker parsers to `vocab` (rank 0) and the history walk over them to `kit` (rank 1)
-    -- so three consumers reach them without a lateral check-to-check import and
-    `kit.compute_delta` no longer needs a call-time back-edge into a named check module.
+    -- so three consumers reach them without a lateral check-to-check import and no call-time
+    back-edge into a named check module is needed at all.
 
     `namedTestTeeth` still SPELLS them, because its own tests and this file address them there.
     That spelling must stay a re-export and never become a second copy: a plant that rebinds

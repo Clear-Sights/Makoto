@@ -6,7 +6,7 @@ namedTestTeeth edge — is now enforced by tests/test_import_direction.py, seam 
 def test_factories_exports_all_symbols():
     from makoto import kit as factories
     for name in ("regex_file_predicate", "ast_introduced_predicate", "scan_target_content",
-                 "parse_introduced", "is_false_const", "is_cert_none", "callee_chain",
+                 "parse_introduced", "callee_chain",
                  "makoto_allowed"):
         assert callable(getattr(factories, name)), name
 
@@ -223,17 +223,6 @@ def test_ast_introduced_predicate_snippet_is_actual_line():
     f = pred(current_event=evt, history=[], pattern=_pat(), conn=None)
     assert f is not None
     assert f.snippet == "x = 1"
-
-
-def test_is_false_const_only_matches_literal_false():
-    """is_false_const is True ONLY for the literal `False` constant — not True, not 0, not a Name."""
-    import ast
-    from makoto.kit import is_false_const
-    expr = lambda s: ast.parse(s, mode="eval").body
-    assert is_false_const(expr("False")) is True
-    assert is_false_const(expr("True")) is False
-    assert is_false_const(expr("0")) is False           # 0 is falsy but not the False constant
-    assert is_false_const(expr("x")) is False
 
 
 def test_callee_chain_descends_intermediate_call():

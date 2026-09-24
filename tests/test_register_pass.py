@@ -34,7 +34,7 @@ def test_merge_pass_reddens_when_a_witness_is_withdrawn(tmp_path, monkeypatch):
     original = merge_pass.WITNESSES.read_text(encoding="utf-8")
     lines = original.splitlines()
     kept = [lines[0]] + [ln for ln in lines[1:]
-                         if not ln.startswith("gate.relative_path_citation\t")]
+                         if not ln.startswith("gate.self_wired\t")]
     planted = tmp_path / "MERGE-WITNESSES.tsv"
     planted.write_text("\n".join(kept) + "\n", encoding="utf-8")
     monkeypatch.setattr(merge_pass, "WITNESSES", planted)
@@ -159,7 +159,7 @@ def test_register_map_reddens_on_a_declared_exemption_with_no_reason(monkeypatch
     sys.path.insert(0, str(ROOT / "tools"))
     import register_map
 
-    monkeypatch.setitem(register_map.OUTSIDE_THE_REGISTER, "gate.relative_path_citation", "   ")
+    monkeypatch.setitem(register_map.OUTSIDE_THE_REGISTER, "gate.self_wired", "   ")
     assert register_map.main() == 2
 
 

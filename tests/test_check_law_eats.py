@@ -14,7 +14,7 @@ from tests._rows import rows
 
 
 STOP_CONTEXT_FIELDS = frozenset(
-    {field.name for field in dataclasses.fields(GateContext)} | {"roots", "is_subagent"}
+    {field.name for field in dataclasses.fields(GateContext)} | {"roots"}
 )
 PRE_CONTEXT_FIELDS = frozenset({"current_event", "history", "pattern", "conn"})
 

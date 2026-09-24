@@ -553,15 +553,6 @@ def webfetch_owes(ev: dict):
     return (url,) if (url := _webfetch_url(ev)) is not None else ()
 
 
-def webfetch_pays(ev: dict):
-    """OTHER_POINT: the witnesses are seeded whole via `paid` (a prior tool response, or the
-    user's own transcript turn) -- no per-event witness inside this one-event stream."""
-    return None
-
-
-webfetch_SHAPE = "OTHER_POINT"
-
-
 def webfetch_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     """The Pre predicate. Fires iff the WebFetch url passes no short-circuit (`_webfetch_url`:
     trusted host) and is witnessed by neither a prior tool RESPONSE (`_url_grounded_in_history`)
@@ -569,7 +560,7 @@ def webfetch_predicate(*, current_event: dict, history: list, pattern, conn=None
     actually checked: the user-typed clause is asserted only when a transcript was available to
     consult (`_oracle_consulted`)."""
     for _ev, url in unwitnessed(
-            (current_event,), owes=webfetch_owes, pays=webfetch_pays,
+            (current_event,), owes=webfetch_owes,
             paid=(lambda u: _url_grounded_in_history(u, history),
                   lambda u: _user_supplied(u, current_event))):
         if _oracle_consulted(current_event.get("transcript_path")):
@@ -1013,14 +1004,6 @@ def unclaimed_owes(ev: dict):
     return tuple((name, fp) for name in _introduced_units(text))
 
 
-def unclaimed_pays(ev: dict):
-    """OTHER_POINT: the witnesses (the session's own introduced-text blob, the operator-turn
-    ledger) are seeded whole via `paid` -- no per-event witness inside this loop."""
-    return None
-
-
-unclaimed_SHAPE = "OTHER_POINT"
-
 
 def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
     """Fire iff this session introduced a top-level unit whose name answers to nothing: no
@@ -1044,7 +1027,7 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
     # line. One occurrence is the definition itself; a second is a use.
     blob = "\n".join(introduced)
     unclaimed = [subject for _ev, subject in unwitnessed(
-        events, owes=unclaimed_owes, pays=unclaimed_pays,
+        events, owes=unclaimed_owes,
         paid=(lambda s: sum(1 for tok in _TOKEN_RX.findall(blob or "") if tok == s[0])
                         >= _REACHED_AT,
               lambda s: _named_by_operator(s[0], transcript_path)))]

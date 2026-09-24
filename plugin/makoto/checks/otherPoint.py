@@ -25,7 +25,6 @@ from makoto.core._shell import _command_pushes_git
 # Declared as the dominant shape (SWITCH covers non-push claims outright, and is also the
 # fallback a push claim reaches once its own tip comparison is NOT_EVALUABLE); see the return
 # report's SPLIT annotation for the other half.
-shipped_SHAPE = "SWITCH"
 
 
 class PushTipStatus(Enum):
@@ -52,15 +51,13 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
     accepted as a proxy for this world fact. Git output and failures are deliberately treated as
     bounded evidence, so unusual ref output (including MORE than one answering ref line) or a
     timeout also remains NOT_EVALUABLE. A claim naming no branch falls back to the checked-out
-    branch via `git symbolic-ref --short HEAD` — the same fallback `kit.pushed_ref_matches_world`
-    uses — so a bare "I pushed it" is still evaluable. The LOCAL side is the branch ref, never
-    bare HEAD: a true push to a branch that is not currently checked out must not read as a
-    mismatch, and the compared branch is carried in the result so a DENY can name it.
+    branch via `git symbolic-ref --short HEAD` -- so a bare "I pushed it" is still evaluable.
+    The LOCAL side is the branch ref, never bare HEAD: a true push to a branch that is not
+    currently checked out must not read as a mismatch, and the compared branch is carried in the
+    result so a DENY can name it.
     """
     if not text or not cwd:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="missing claim text or cwd")
-    # Pushed-branch extraction: kit.extract_pushed_branch, shared with
-    # kit.pushed_ref_matches_world's own call site -- one definition, not two copies.
     branch = extract_pushed_branch(text)
     try:
         if branch is None:
@@ -460,7 +457,7 @@ shipped_CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BL
 
 import os
 import re
-from makoto.checks import detect_locations, normalize_path
+from makoto.kit import detect_locations, normalize_path
 from makoto.vocab import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
@@ -469,7 +466,6 @@ from makoto.kit import (_BIND_BEFORE, CARRIAGE_FAULT, DISCHARGE_EATS, _discharge
 
 # gate.completion's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): OTHER_POINT -- the witness
 # is a second reading of the same subject (the results ledger, or the filesystem itself).
-completion_SHAPE = "OTHER_POINT"
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -558,7 +554,7 @@ def completion_gate(
       - a bare done-word with no location              (nothing to verify)
       - a path with no governing produce verb           (a heading, a reference, a code
                                                           listing, a subagent's deliverable)
-      - a non-path token (version/SHA/duration/task-id) (detect_location no longer matches it)
+      - a non-path token (version/SHA/duration/task-id) (the location regex no longer matches it)
       - a forward/negated frame                          ("will add X", "didn't add X")
     A produced-claim that IS touched, or that the filesystem confirms, is silent (fail-open).
     Only an unbacked production claim bites.
@@ -611,13 +607,12 @@ completion_CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOC
                eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
                run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
 
-from makoto.checks import normalize_path
+from makoto.kit import normalize_path
 from makoto.vocab import _EMPTY_OK, _FENCE_SPAN_RX
 from makoto.kit import _path_components, _suffix_match, unwitnessed
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject on the assistant's own
 # ledger/filesystem (`touched_keys`, `fs_exists`, `fs_read`) -- never an act exercised here.
-dropped_SHAPE = "OTHER_POINT"
 
 
 _DROP_FORWARD = r"(?:I['’]?ll|I\s+will|I['’]?m\s+going\s+to|I\s+am\s+going\s+to|let\s+me|let['’]s|let\s+us|going\s+to|i\s+plan\s+to|next\s+i\s+will|we['’]?ll|we\s+will|i\s+need\s+to|i\s+should|i\s+want\s+to)"
@@ -803,13 +798,6 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
     return True                                          # unknown kind -> fail open
 
 
-def dropped_pays(_text):
-    """No event here pays a claim directly: the witness is seeded once per claim, in `paid`, from
-    the assistant's OWN end-of-turn ledger/filesystem (see `dropped_gate`) -- a second reading of
-    the same subject, not a fresh event in this stream."""
-    return None
-
-
 def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
                  fs_read=None, empty_keys=None) -> Optional[Finding]:
     """Fire iff a FORWARD claim carrying identifying info (a count / line-range / named symbol
@@ -824,7 +812,7 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
         return _drop_discharged(kind, info, raw, path, touched_keys=touched_keys, empty_keys=empty_keys,
                                 fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read)
 
-    for _ev, claim in unwitnessed((text,), owes=dropped_owes, pays=dropped_pays, paid=(_discharged,)):
+    for _ev, claim in unwitnessed((text,), owes=dropped_owes, paid=(_discharged,)):
         kind, loc, info, raw = claim
         path = _drop_resolve_location(loc, touched_keys) or loc
         loc_n = normalize_path(path)
@@ -848,105 +836,6 @@ dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", ma
                tests="OTHER_POINT",
                eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
                run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))
-
-# makoto.checks.staleEstablisher -- the ground-truth staleness detector (ADVISORY tier,
-# NEVER BLOCK; inert until a project declares a plan), built on Makoto's own
-# `substrate._planNode.Plan`.
-#
-# Fires when a plan node's establisher is recorded DONE but the artifact it named no longer
-# exists on disk -- the one gap `substrate._planNode.Plan`'s pure name->status scan cannot see,
-# because a node's `status` is a claim about history, never a live filesystem read. This is the
-# ONE deliberate departure from every other check's content-blind, filesystem-blind design (an
-# `os.path.exists` call); the only thing gating it is the declared plan itself -- given one it
-# runs on EVERY Stop, with no per-check enable/disable switch. DETECTIVE tier: a fired verdict
-# is an ADVISORY, never a deny -- escalating this to a blocking tier is a product decision left
-# to the caller, not made here.
-#
-# WIRING: discovery is the ORDINARY one -- `registry.load_checks(edge="Stop")` finds this
-# module's `CHECK` like every other Stop check, and `context.run_stop_checks` appends its Finding
-# to the audited-but-never-blocking list. What keeps it out of the blocking tier is `may_block`
-# staying at its `False` default: `dispatch._blocking_gate_ids()` is `load_checks(edge="Stop")`
-# FILTERED on `may_block`, so this pattern_id can never enter it whatever `.level` its own Finding
-# carries -- STRUCTURALLY incapable of blocking, not merely labeled advisory (pinned by
-# `tests/test_stale_establisher.py::test_never_discovered_as_a_blocking_stop_gate`); the
-# never-blocks guarantee rests on `may_block=False` alone. Being an ordinarily discovered named
-# check module, this file IS subject to the same L2 import firewall as its siblings
-# (tests/test_import_direction.py -- notably, no reaching into the sibling `makoto.state.plan`
-# store).
-#
-# Reads: the declared Plan (never mutated) and the existence/size of each DONE node's `where`.
-# An empty artifact is not an establisher: it supplies none of the work a dependent needs.
-from makoto.registry import Check
-from makoto.kit import live_query_finding, unwitnessed
-from makoto.substrate._planNode import DONE, Plan
-from makoto.registry import POSTURE_ADVISE
-
-
-def established_check(plan: Optional[Plan], *, cwd: str = "") -> Optional[Finding]:
-    """Fire iff a DONE node's `where` is missing from disk AND a later node shares its
-    passthrough (a real dependent whose gap-check would wrongly read as satisfied) -- else
-    `None`. `plan=None` (no declared plan) is inert.
-
-    A relative `where` (the plan artifact stores paths relative to the session's own project
-    root) is resolved against `cwd` -- the session's payload cwd, never the process's own
-    working directory. Without `cwd`, a relative `where` was checked against wherever the
-    dispatcher process happened to be running FROM (the plugin root, in the installed case),
-    so an establisher that genuinely exists in the session's project read as stale.
-
-    Walks the plan in declared order; for each DONE node, checks whether any LATER node shares
-    its passthrough (per the same recurrence rule `substrate._planNode` reads) and, only then,
-    whether the establisher's `where` still exists on disk (the expensive/impure check runs
-    last, only when a dependent makes it matter). The first such contradiction fires; a plan
-    with none is an affirmative clean pass (`None`)."""
-    if plan is None:
-        return None
-    nodes = plan.nodes()
-    # Last plan-index at which each passthrough-name occurs. Later entries overwrite earlier
-    # ones, so `last_use[p] > i` is exactly "some LATER node shares this name" -- the same
-    # answer as rescanning `nodes[i + 1:]` per DONE node, without that scan's O(n) slice COPY
-    # on the Stop hot path.
-    last_use = {node.passthrough: i for i, node in enumerate(nodes)}
-    # Owed: a DONE node some LATER node depends on (no dependent -- nobody would misread the gap
-    # as satisfied). A missing locator is malformed stored state, not evidence about the empty
-    # path, so it owes nothing. Paid: the artifact on disk, non-empty -- every other
-    # artifact-backed commitment treats zero bytes as undelivered.
-    owed = (node for i, node in enumerate(nodes)
-            if node.status == DONE and last_use[node.passthrough] > i and node.where)
-    def _resolved(where: str) -> str:
-        return os.path.join(cwd, where) if cwd and not os.path.isabs(where) else where
-
-    for node, _ in unwitnessed(
-            owed, owes=lambda n: (n,), pays=lambda _n: None,
-            paid=(lambda n: os.path.exists(_resolved(n.where))
-                  and os.path.getsize(_resolved(n.where)) > 0,)):
-        return Finding(
-            pattern_id="gate.stale_establisher",
-            file=node.where,
-            line=0,
-            level="advisory",
-            message=(
-                f"establisher {node.id!r} is recorded DONE but {node.where!r} no longer "
-                f"exists on disk -- a dependent on passthrough {node.passthrough!r} would "
-                f"read this gap as satisfied; re-establish it before trusting that dependency"
-            ),
-        )
-    return None
-
-
-def established_run(c):
-    """Not built on `live_query_finding`: that helper reads a single named context field, and
-    this check needs two -- the declared plan AND the cwd a relative `where` resolves against."""
-    return established_check(c.plan, cwd=c.cwd)
-
-
-established_CHECK = Check(
-    id="gate.stale_establisher",
-    applies_at="Stop",
-    posture=POSTURE_ADVISE,
-    eats=frozenset({"plan", "cwd"}),
-    run=established_run,
-    tests="OTHER_POINT",
-)
 
 # The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
@@ -1036,7 +925,7 @@ def _missing_makoto_events(hooks, *, plugin_root=None, plugin_fs_read=None,
 
     # Owed: every event makoto must be wired on. Paid: a source that wires it, cheapest first.
     return [event for _events, event in unwitnessed(
-        (events,), owes=lambda es: es, pays=lambda _es: None,
+        (events,), owes=lambda es: es,
         paid=(lambda e: _event_wired(settings_hooks, e), lambda e: _event_wired(home, e),
               _plugin_wired))]
 
@@ -1128,8 +1017,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
     env_root = None
     if plugin_root is None:
         # Env-derived root: identity-checked against _OWN_PLUGIN_ROOT (see its comment) so a
-        # decoy $CLAUDE_PLUGIN_ROOT can never CONFIRM wiring; mirrored in
-        # _missing_makoto_events's own default path for its direct callers (configchange.py).
+        # decoy $CLAUDE_PLUGIN_ROOT can never CONFIRM wiring.
         env_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
         if env_root:
             try:
@@ -1188,6 +1076,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
 # `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
 # were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
 # guarantee still rests on posture=="ADVISE", same as always.
+from makoto.kit import live_query_finding
 wired_run = live_query_finding(
     query=lambda fs_read: self_wired_gate(fs_read), posture_label="gate.self_wired"
 )
@@ -1231,7 +1120,6 @@ wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", 
 # gate.claimed_consent_absent's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): OTHER_POINT --
 # the witness is a second reading of the same subject (the operator's own turns, read from the
 # transcript) against the agent's claim of what the operator said.
-consent_SHAPE = "OTHER_POINT"
 
 # The claim side: the agent attributing a position to the operator. Read on the ASSISTANT's own
 # words, which is what every check here does -- the non-agnostic surface in this package is the
@@ -1258,10 +1146,6 @@ def consent_owes(text):
     """The one subject a consent claim commits to: itself. Cheap and pure -- the witness (a
     second, independent reading of the operator's own turns) lives in `paid`, below."""
     return (m,) if (m := _CONSENT_RX.search(text or "")) else ()
-
-
-def consent_pays(_text):
-    return None
 
 
 def _oracle_channel_paid(transcript_path) -> bool:
@@ -1296,7 +1180,7 @@ def claimed_consent_absent_gate(text, *, transcript_path=None):
     """One BLOCKING Finding when the claim cites the operator and the oracle channel is
     confirmed empty."""
     for _ev, claim in unwitnessed(
-            (text,), owes=consent_owes, pays=consent_pays,
+            (text,), owes=consent_owes,
             paid=(lambda _c: _oracle_channel_paid(transcript_path),)):
         return Finding(
             pattern_id="gate.claimed_consent_absent",
@@ -1343,7 +1227,6 @@ from makoto.kit import decode_history_row, unwitnessed
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- an earlier
 # whole-file Write of the SAME path, a history row -- never a live-exercised act or a source read.
-thrash_SHAPE = "OTHER_POINT"
 
 
 def thrash_owes(ev):
@@ -1362,13 +1245,6 @@ def thrash_owes(ev):
         elif seen_earlier_a:
             return (now,)
     return ()
-
-
-def thrash_pays(_ev):
-    """Nothing pays this obligation: the A->B->A pattern is either present in `prior` or it is
-    not, and `owes` has already read the whole of `prior` to decide that -- there is no further
-    witness this check reads."""
-    return None
 
 
 def _prior_whole_file_writes(history, path: str) -> list:
@@ -1422,7 +1298,7 @@ def thrash_predicate(*, current_event: dict, history: list,
     # Write of DIFFERENT content (a B) lies AFTER that earlier A. A bare A->A repeat (no intervening
     # different content) is a no-op rewrite, not a revert. The walk itself lives in `owes` now; see
     # its docstring for why one left-to-right pass over `prior` decides it.
-    for _ev, _subject in unwitnessed(((now, prior),), owes=thrash_owes, pays=thrash_pays):
+    for _ev, _subject in unwitnessed(((now, prior),), owes=thrash_owes):
         return Finding(
             pattern_id=pattern.id,
             file=path,
@@ -1442,11 +1318,12 @@ def thrash_predicate(*, current_event: dict, history: list,
 thrash_RETRY_HINT = 'Decide which content is correct and write it once; do not revert to an earlier whole-file version after changing it.'
 thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 
+from makoto.registry import Check
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
 
 # the OTHER_POINT shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, established_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK,)
+_ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {thrash_CHECK.id: thrash_predicate}

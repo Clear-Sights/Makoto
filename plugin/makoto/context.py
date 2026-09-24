@@ -14,7 +14,6 @@ from typing import Callable, Optional, Sequence
 
 from makoto.kit import decode_history_row
 from makoto.registry import load_checks
-from makoto.substrate._planNode import Plan
 
 
 # ---- schemas ------------------------------------------------------------------------------------
@@ -47,9 +46,6 @@ class GateContext:
     #   field exists in the documented schema, so this is the grounded substitute, not a guess.
     agent_type: Optional[str] = None        # raw `agent_type` (e.g. "Explore") — companion to
     #   agent_id, present when the session uses --agent or the hook fires inside a subagent.
-    plan: Optional[Plan] = None             # the declared contract Plan for this
-    #   session, loaded once by run_stop_checks via makoto.state.plan.load_plan; None when no plan is
-    #   declared. Read by staleEstablisher's advisory check.
     session_id: Optional[str] = None        # raw hook payload's `session_id`.
     transcript_path: Optional[str] = None   # raw `transcript_path` (CONFIRMED real, top-level on
     #   every hook event -- Claude Code hooks reference: "Path to conversation
@@ -74,12 +70,6 @@ class GateContext:
     @property
     def roots(self):
         return [self.cwd]
-
-    @property
-    def is_subagent(self) -> bool:
-        """derived convenience: True iff this Stop substrate was built from a subagent-context
-        payload (agent_id present) rather than the main agent."""
-        return bool(self.agent_id)
 
 
 def _history_for_agent(history, stop_payload: dict) -> list:
@@ -152,10 +142,6 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
         from makoto.state import plan as _plan
         try:
-            plan = _plan.load_plan(conn, sid)                # the declared contract Plan
-        except Exception:
-            plan = None                                      # fail-open per-store, like every other read above
-        try:
             _plan.sync_plan_items(conn, sid, text)           # source/discharge label-shaped commitments
             open_plan_items = _plan.open_plan_items(conn, sid)
         except Exception:
@@ -220,13 +206,12 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             return None
 
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
-        # edge via checks._loader.load_checks -- this includes staleEstablisher and
-        # undeclaredFalsifiable, since neither exports a GATE; `may_block=False` on both keeps
-        # their pattern_id structurally out of `_blocking_gate_ids()`. Each gate module owns its
-        # own adapter (GateContext -> the gate's heterogeneous signature), so this loop never
-        # names a gate. gate.dropped resolves against the agent's OWN ledger (touched_keys) +
-        # cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an unbounded os.walk (a
-        # Stop-hot-path landmine).
+        # edge via checks._loader.load_checks -- this includes undeclaredFalsifiable, since it
+        # exports no GATE; `may_block=False` keeps its pattern_id structurally out of
+        # `_blocking_gate_ids()`. Each gate module owns its own adapter (GateContext -> the
+        # gate's heterogeneous signature), so this loop never names a gate. gate.dropped resolves
+        # against the agent's OWN ledger (touched_keys) + cwd-relative fs_exists/fs_read via
+        # ctx.roots=[cwd] — NOT an unbounded os.walk (a Stop-hot-path landmine).
         ctx = GateContext(
             text=text, touched=touched, empty=empty,
             testrun_output=_ledger.latest_testrun(conn, sid),
@@ -240,7 +225,6 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             permission_mode=payload.get("permission_mode"),
             agent_id=payload.get("agent_id"),
             agent_type=payload.get("agent_type"),
-            plan=plan,   # read by staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # canonFingerprints.py reads its audit firing boundary here
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
