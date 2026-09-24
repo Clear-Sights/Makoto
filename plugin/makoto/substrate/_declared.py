@@ -3,11 +3,13 @@ catalog against. A row deleted, or a family module that fails to import, leaves 
 with nothing live behind them, and that is the finding.
 """
 DECLARED_IDS: frozenset[str] = frozenset({
+    "content.bound_as_count",
     "content.env_gated_audit",
     "content.fabricated_commit_sha",
     "content.illusory_authorship_trailer",
     "content.illusory_interruption_claim",
     "content.integrity_suppression_flag",
+    "content.last_wins",
     "content.phantom_citation",
     "content.self_mute_guard",
     "content.unsourced_webfetch",
@@ -15,6 +17,7 @@ DECLARED_IDS: frozenset[str] = frozenset({
     "content.verifier_exit_masking",
     "content.verifier_predicate_weakened",
     "event.identical_retry",
+    "event.nested_budget",
     "event.thrash_revert",
     "gate.canon",
     "gate.canon_fingerprints",

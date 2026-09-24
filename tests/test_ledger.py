@@ -124,7 +124,7 @@ def test_testrun_stores_verdict_tail_not_head():
     row = read_key(c, "bash")                                    # no path token -> 'bash' key
     assert row is not None and row["kind"] == "testrun"
     assert "2 failed" in (row["value"] or "")                    # tail kept the verdict
-    assert len(row["value"]) <= 500
+    assert len(row["value"]) == 500
 
 
 def test_record_update_no_root_never_chain_appends(tmp_path, monkeypatch):

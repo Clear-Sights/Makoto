@@ -533,7 +533,8 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
 # where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
     "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.phantom_citation", "content.verifier_body_hollowed",
-    "content.illusory_authorship_trailer", "content.illusory_interruption_claim"})
+    "content.illusory_authorship_trailer", "content.illusory_interruption_claim", "content.last_wins",
+    "content.bound_as_count"})
 _CONVENTIONS_PATH = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
 _HATCH_LINE = ("Legitimate instance? Annotate it `makoto-allow: <reason>` on or near the line "
                "(any comment style) — an on-the-record, auditable rationale, never a disguise.")

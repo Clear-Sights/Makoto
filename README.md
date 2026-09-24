@@ -28,8 +28,8 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **14 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **11**, `event`: **2**, `gate`: **1**
+- **17 pre-checks**
+- Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **3**, `gate`: **1**
 - **32 Stop checks** (all checks registered at the Stop edge)
 - **30 end-of-turn gates** (`may_block=True`)
 - **14 blocking end-of-turn gates** (`registry.blocking_eligible`)

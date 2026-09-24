@@ -1736,10 +1736,124 @@ liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", 
                eats=frozenset({"touched", "cwd", "fs_read"}), tests="SPEC")
 
 # the SPEC shape: its rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, relpath_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK,)
+# content.last_wins (register A4 LAST-WINS): a dict literal, or a JSON object, that repeats a key
+# with a different value. The later value silently wins and nothing states that it should. A key
+# repeated with the SAME value leaves no winner to state and stays silent (pyflakes F601's rule).
+# JSON parses as a Python expression, so one AST walk reads both.
+lastwins__TARGET_RX = re.compile(r"\.(py|json)$")
+
+
+def _repeated_key(node: ast.AST) -> Optional[str]:
+    if not isinstance(node, ast.Dict):
+        return None
+    seen = {}
+    for k, v in zip(node.keys, node.values):
+        if isinstance(k, ast.Constant):
+            value = ast.dump(v)
+            if seen.setdefault(k.value, value) != value:
+                return f"key {k.value!r} given two values"
+    return None
+
+
+lastwins_predicate = ast_introduced_predicate(target_rx=lastwins__TARGET_RX, node_match=_repeated_key)
+lastwins_RETRY_HINT = "Give each key one value. If the later value is the one meant, delete the earlier; if both are meant, they are two keys."
+lastwins_DESCRIPTION = "a dict or JSON object repeats a key with a different value, so the last one silently wins"
+lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('{',), retry_hint=lastwins_RETRY_HINT, description=lastwins_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+
+# content.bound_as_count (register B23 BOUND AS COUNT): a test asserts a count stays under a literal
+# ceiling. A test's fixture fixes the count, so the exact value is available, and a ceiling with
+# slack keeps passing when the count moves.
+bound__TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
+
+
+def _slack_ceiling(node: ast.AST) -> Optional[str]:
+    if not (isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare)
+            and len(node.test.ops) == 1 and isinstance(node.test.ops[0], (ast.Lt, ast.LtE))):
+        return None
+    left, right = node.test.left, node.test.comparators[0]
+    counted = isinstance(left, ast.Call) and (
+        getattr(left.func, "id", None) == "len" or getattr(left.func, "attr", None) == "count")
+    if counted and isinstance(right, ast.Constant) and type(right.value) is int:
+        return ast.unparse(node.test)
+    return None
+
+
+bound_predicate = ast_introduced_predicate(target_rx=bound__TARGET_RX, node_match=_slack_ceiling)
+bound_RETRY_HINT = "Assert the exact count the fixture produces (`== N`). A ceiling only fails when the count grows past it."
+bound_DESCRIPTION = "a test asserts a count under a literal ceiling instead of its exact value"
+bound_CHECK = _Check(id='content.bound_as_count', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('assert',), retry_hint=bound_RETRY_HINT, description=bound_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+
+# event.nested_budget (register E11 NESTED BUDGET SHADOWED): a `timeout N` inside a Bash call whose
+# own limit is shorter. The Bash tool kills the command at its limit, so the inner budget can never
+# be reached. The limit is the call's `timeout` (else BASH_DEFAULT_TIMEOUT_MS, 120000), capped at
+# the larger of BASH_MAX_TIMEOUT_MS (600000) and the default; a background call has none.
+_BUDGET_UNITS = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}
+from makoto.core._shell import _ASSIGNMENT_RX, _LAUNCH_WRAPPERS
+
+_TIMEOUT_VALUED_OPTIONS = frozenset({"-s", "--signal", "-k", "--kill-after"})
+
+
+def _env_ms(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except ValueError:
+        return default
+
+
+def _inner_budgets(command: str):
+    """Seconds each `timeout` in the command allows, from the argv the shell would run."""
+    for argv, _op in _shell_segments(command):
+        argv = list(argv)
+        while argv:
+            word = argv.pop(0)
+            if _ASSIGNMENT_RX.fullmatch(word):
+                continue
+            word = _basename(word)
+            if word in _LAUNCH_WRAPPERS and word != "timeout":
+                while argv and argv[0].startswith("-"):
+                    argv.pop(0)
+                continue
+            if word != "timeout":
+                break
+            while argv and argv[0].startswith("-"):
+                if argv.pop(0) in _TIMEOUT_VALUED_OPTIONS and argv:
+                    argv.pop(0)
+            m = re.fullmatch(r"(\d+(?:\.\d+)?)([smhd]?)", argv[0]) if argv else None
+            if m:
+                yield float(m.group(1)) * _BUDGET_UNITS[m.group(2)]
+            break
+
+
+def budget_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse" or current_event.get("tool_name") != "Bash":
+        return None
+    ti = current_event.get("tool_input") or {}
+    if not isinstance(ti, dict) or ti.get("run_in_background"):
+        return None
+    default = _env_ms("BASH_DEFAULT_TIMEOUT_MS", 120000)
+    try:
+        asked = int(ti.get("timeout") or default)
+    except (TypeError, ValueError):
+        asked = default
+    outer = min(asked, max(_env_ms("BASH_MAX_TIMEOUT_MS", 600000), default)) / 1000
+    inner = max(_inner_budgets(ti.get("command") or ""), default=0)
+    if inner <= outer:
+        return None
+    return Finding(
+        pattern_id=pattern.id, file="", line=0, level="error",
+        message=(f"row {pattern.id} ({pattern.description}): `timeout {inner:g}` sits inside a Bash "
+                 f"call the tool stops at {outer:g}s, so the inner budget is never reached."))
+
+
+budget_RETRY_HINT = "Make the Bash call's own limit at least the inner timeout (the `timeout` parameter, at most the tool's ceiling), run it in the background, or lower the inner timeout."
+budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
+budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+
+_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, relpath_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate}
+_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):
