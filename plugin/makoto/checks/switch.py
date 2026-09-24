@@ -745,10 +745,30 @@ def _pairing_input(inp) -> str:
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
     cannot collapse two genuinely distinct calls — for pairing or for a verdict. Primitives in
-    OTHER modules (`identical_retry`) still key on their own folds."""
+    OTHER modules (`identical_retry`) still key on their own folds.
+
+    String leaves are also stripped of leading/trailing whitespace before folding: a retry whose
+    command differs only by incidental surrounding whitespace ("flaky-tool --check " vs
+    "flaky-tool --check") is the SAME call for verdict/pairing purposes, and treating it as a
+    distinct key would let a genuinely stuck retry loop escape `recur_stuck`/the transient budget
+    by accumulating one stray space per attempt."""
+    return canon_input(_strip_leaves(_drop_dunders(inp)))
+
+
+def _drop_dunders(inp):
     if isinstance(inp, dict):
-        return canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
-    return canon_input(inp)
+        return {k: v for k, v in inp.items() if not str(k).startswith("__")}
+    return inp
+
+
+def _strip_leaves(v):
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, dict):
+        return {k: _strip_leaves(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_strip_leaves(x) for x in v]
+    return v
 
 
 # ---- the history -> Call adapter (protocol-field decode; fail-open per row) -------------------
