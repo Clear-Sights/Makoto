@@ -1225,6 +1225,18 @@ def test_dispatch_claimed_consent_absent_gate_blocks_when_the_operator_never_spo
         "the claimed_consent_absent fire must be audited"
 
 
+def test_claimed_consent_absent_catches_green_light_reword(tmp_path):
+    """Same consent-citation intent as 'you approved', reworded as 'gave the green light' --
+    must not need the closed approved/confirmed/... verb list."""
+    from makoto.checks.otherPoint import claimed_consent_absent_gate
+    tp = tmp_path / "transcript.jsonl"
+    tp.write_text("", encoding="utf-8")
+    finding = claimed_consent_absent_gate(
+        "Since you gave the green light on this, I proceeded.", transcript_path=str(tp))
+    assert finding is not None
+    assert finding.pattern_id == "gate.claimed_consent_absent"
+
+
 def test_dispatch_claimed_consent_absent_is_silent_when_the_operator_has_spoken(tmp_path):
     """One genuine operator turn silences it. Without this the check would be a paraphrase judge,
     and paraphrase is judgement; absence of the whole channel is what it counts."""
