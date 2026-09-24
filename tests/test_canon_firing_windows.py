@@ -135,14 +135,14 @@ def test_dispatch_records_firing_and_next_stop_does_not_repeat(state_dir, run_di
     assert ledger.verify_chain(root=state_dir) is None
 
 
-def test_retired_human_phrase_is_absent_from_tree_except_history():
+def test_retired_human_phrase_is_absent_from_tree():
     # Scan every source (including multiline or dynamically constructed hint templates).
     root = Path(__file__).resolve().parents[1]
     phrase = "release" + ".operator"
     for path in root.rglob("*"):
         if set(path.relative_to(root).parts) & {".git", "__pycache__", ".pytest_cache"}:
             continue
-        if not path.is_file() or path.name == "CHANGELOG.md":
+        if not path.is_file():
             continue
         try:
             source = path.read_text(encoding="utf-8")

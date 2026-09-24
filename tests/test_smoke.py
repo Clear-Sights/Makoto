@@ -88,8 +88,7 @@ def test_clean_stop_passes_silently(tmp_path):
 def test_readme_references_exist():
     """Every relative path the README embeds or links must exist in this tree — a landing page
     that shows broken images or dead links is a said-but-not-shipped artifact (the exact shape
-    this suite exists to block). Regression: docs/demo/ was referenced for weeks while never
-    committed."""
+    this suite exists to block)."""
     import re
     root = Path(__file__).resolve().parent.parent
     readme = (root / "README.md").read_text()
@@ -99,10 +98,7 @@ def test_readme_references_exist():
     missing = [r for r in refs if not (root / r.split("#")[0]).exists()]
     # Population guard: refs is an existence-filtered, regex-derived collection, so an empty refs
     # makes `missing == []` vacuously — a README restructure that stops both regexes matching
-    # (single-quoted src, reference-style links) would pass while checking zero links. The suite's
-    # own docstring records that exact regression shipping once (docs/demo/), so the collection
-    # must be proven populated, embedded images included, before its emptiness can mean "clean".
+    # (single-quoted src, reference-style links) would pass while checking zero links, so the
+    # collection must be proven populated before its emptiness can mean "clean".
     assert refs, "README yielded no scannable references -- extraction regexes matched nothing (vacuous pass)"
-    assert any(r.endswith((".svg", ".png", ".gif", ".jpg", ".jpeg")) for r in refs), \
-        "no embedded image refs extracted from README -- the docs/demo regression class is unguarded"
     assert not missing, f"README references missing files: {missing}"

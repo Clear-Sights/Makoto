@@ -63,7 +63,6 @@ count above is scoped by edge, so no check is counted twice within a line.
 - `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
-[docs/CATALOG.md](docs/CATALOG.md) points to the registered checks and their implementations.
 
 The **certification** column uses the following labels, each naming its own denominator:
 
@@ -169,11 +168,6 @@ means the old entries are present. Migrate cleanly:
 python -m makoto uninstall                   # removes old settings.json entries
 /plugin install https://github.com/Clear-Sights/Makoto  # installs the plugin
 ```
-
-## Contributing
-
-Reports are welcome and are credited by name; pull requests from outside this repository are not
-merged. See [CONTRIBUTING.md](CONTRIBUTING.md) for why, and for what to send instead.
 
 ## Siblings
 
@@ -325,30 +319,9 @@ when an install manifest or prior snapshot establishes that the exact path was w
 
 ## Receipt: word → deed → record → receipt
 
-The synthetic session in `docs/demo/` demonstrates the receipt chain:
-
-1. **WORD**: the agent writes `src/auth.py`, then claims `"test_login passes now."` at Stop.
-2. **DEED**: the write lands (`kind="touched"`); a test run fails (`kind="testrun"`,
-   `FAILED tests/test_auth.py::test_login`); a fix lands; a second test run passes
-   (`kind="testrun"`, `PASSED tests/test_auth.py::test_login`): three tamper-evident,
-   hash-chained rows, each linked to the one before it.
-3. **RECORD**: the test-delta redirect (Task 3) fires on the pass/fail flip and is ITSELF
-   chain-appended (`kind="audit"`); the redirect's own firing is part of the permanent record,
-   not just a line on someone's terminal.
-4. **RECEIPT**: `makoto receipt --session demo-session-001` reports the measured claims and
-   exemptions below; every claim is trace-bound to a `verify_chain`-checkable row:
-
-```json
-{
-  "session_id": "demo-session-001",
-  "verified_through": null,
-  "claim_count": 2,
-  "trace_bound_count": 2,
-  "exemption_count": 0
-}
-```
-
-The receipt cites the recorded test-run rows and their chain hashes.
+Every touched file, test run and redirect is a hash-chained row in the record, and
+`makoto receipt --session <id>` reports the session's claims and exemptions, each claim bound
+to a `verify_chain`-checkable row.
 
 ### Reproduce it: corpus replay
 
@@ -356,25 +329,8 @@ The receipt cites the recorded test-run rows and their chain hashes.
 dispatcher. The executable summary below measures its derailment fixtures, total result, and
 success contract.
 
-### Live demo: real terminal sessions
-
-`docs/demo/render_demo.py` drives the measured REAL scenarios through the actual dispatchers (not
-the frozen corpus above) against a fresh, throwaway state dir each, and captures genuine stdout/stderr.
-
-<!-- BEGIN GENERATED: demo-measurements | source: eval/replay.py + docs/demo | regenerate: python3 tools/render_checks.py --write -->
+<!-- BEGIN GENERATED: replay | source: eval/replay.py | regenerate: python3 tools/render_checks.py --write -->
 
 - corpus replay: **4 derailments**, **5/5** sessions pass; the command exits successfully only when every expectation holds
-- live demo: **3 REAL scenarios**
-- receipt demo: **2 claims**, **0 exemptions**
 
-<!-- END GENERATED: demo-measurements -->
-
-<img src="docs/demo/screenshots/block.svg" alt="a genuine PreToolUse block"><br>
-<img src="docs/demo/screenshots/receipt.svg" alt="word -> deed -> record -> receipt, end to end"><br>
-<img src="docs/demo/screenshots/configchange.svg" alt="a ConfigChange advisory fire">
-
-Each SVG is rendered directly from that scenario's real logged stdout/stderr, not hand-written.
-
-Regenerate: `python docs/demo/render_demo.py && python docs/demo/render_svg.py` (the latter needs
-`humanize`, `pip install humanize`, for demo-only friendlier byte counts; never a core-package
-dependency, see that script's own docstring).
+<!-- END GENERATED: replay -->

@@ -30,21 +30,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "releasing v$VERSION"
 
-      - name: Extract release notes from CHANGELOG.md
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          awk -v ver="$VERSION" '
-            $0 ~ ("^## \\[" ver "\\]") {flag=1; next}
-            flag && /^## \[/ {flag=0}
-            flag {print}
-          ' CHANGELOG.md > release_notes.md
-          if [ ! -s release_notes.md ]; then
-            echo "No CHANGELOG.md section found for version $VERSION (expected a '## [$VERSION]' heading)" >&2
-            exit 1
-          fi
-          echo "--- extracted notes ---"
-          cat release_notes.md
-
       - name: Create tag and GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,8 +38,8 @@ jobs:
           TAG="v$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -F release_notes.md
+          git tag -a "$TAG" -m "Makoto $TAG"
           git push origin "$TAG"
           gh release create "$TAG" \
             --title "$TAG" \
-            --notes-file release_notes.md
+            --generate-notes
