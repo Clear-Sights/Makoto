@@ -38,9 +38,10 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 Two different things are called a *gate* in that list, and the counts are not comparable. The
 `gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is a
-check registered at the Stop edge with `may_block=True`. No pre-check carries the prefix today —
-`gate.contract_order`, the one that did, was cut 2026-09-18 along with its Stop sibling. Every
-count above is scoped by edge, so no check is counted twice within a line.
+check registered at the Stop edge with `may_block=True`. One pre-check carries the prefix today —
+`gate.claude_identity` (Pre-tier, self-defense) — the same naming convention `gate.contract_order`
+used before it was cut 2026-09-18 along with its Stop sibling. Every count above is scoped by
+edge, so no check is counted twice within a line.
 
 **Verifier weakening** — a check silently neutered
 - `content.verifier_predicate_weakened` loose-comparator verifier (`startswith`/`endswith`/`re.match` where `==` is meant)
@@ -57,9 +58,16 @@ count above is scoped by edge, so no check is counted twice within a line.
 
 **Self-defense**
 - `content.self_mute_guard` makoto self-mute (disabling or un-wiring makoto via `settings.json`)
+- `gate.claude_identity` a commit or push that records Claude as author or committer from the git layer
 
 **Scope & contract discipline** — illusory progress and out-of-contract action (SPEC-5, ported by shape from Assay)
 - `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
+- `event.nested_budget` an inner `timeout` longer than the Bash call's own limit
+- `event.identical_retry` byte-identical Bash retry immediately following that same call's deterministic failure, with no intervening state change
+
+**Overdefinition** — a claim shaped wider than what was actually measured
+- `content.last_wins` a dict or JSON object repeats a key with a different value, so the last one silently wins
+- `content.bound_as_count` a test asserts a count under a literal ceiling instead of its exact value
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
 

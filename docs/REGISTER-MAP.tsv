@@ -56,7 +56,7 @@ B28	NOT-COUNTABLE	-	argued, not probed. The fault is an absence: no case replays
 B34	RUNNER	tools/register_map.py	makoto's own law is run over makoto, and names every region it cannot reach: the NOT-COUNTABLE and OUT-OF-SUBJECT rows below
 B37	NOT-COUNTABLE	-	the witness is that two differently-worded predicates are equal. Equality of two predicates is undecidable in general (Rice's theorem); the register's own cure is an act, a run over both, but no event marks two predicates as meant to be equal
 C3	RUNNER	gate.named_test	each named test is evaluated on its own name
-C4	RUNNER	dispatch fail-closed	a check that raises resolves as a denial, never as permission
+C4	RUNNER	dispatch loud-allow on predicate error	a check that raises is logged (audit.append_error) and skipped, never silently -- the remaining checks still run and the raise is never mistaken for a clean pass
 C5	RUNNER	dispatch fail-closed	an unrecognised event shape ends in an error, not a fallthrough
 C11	RUNNER	gate.report_before_run	a run's success written into a prose document with no verifier run anywhere before it, so the report precedes the outcome it reports; ADVISE tier, on the same ACT_VS_GUARD factory as the Keel-shaped obligations. Prose documents only: a verdict inside a .py file is a fixture, not a report, which is integritySuppressionFlag's .md decision mirrored for the mirrored reason
 D9	RUNNER	gate.self_wired	makoto excludes itself by identity from the set it judges; also gate.canon_fingerprints: the check requires green before the plant; the pattern is not carried in the detector (from B17)
