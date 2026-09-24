@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 
-# ==============================================================================================
-# claimedShippedAbsent
-# ==============================================================================================
 from dataclasses import dataclass
 from enum import Enum
 import json
@@ -62,8 +59,8 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
     """
     if not text or not cwd:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="missing claim text or cwd")
-    # Pushed-branch extraction: kit.extract_pushed_branch (dedup: was a byte-identical
-    # regex-search + rstrip pair with kit.pushed_ref_matches_world's own call site).
+    # Pushed-branch extraction: kit.extract_pushed_branch, shared with
+    # kit.pushed_ref_matches_world's own call site -- one definition, not two copies.
     branch = extract_pushed_branch(text)
     try:
         if branch is None:
@@ -116,17 +113,13 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
 # CLOSED NON-BASH SET: GitHub's merge_pull_request, push_files AND create_or_update_file are
 # actual shipping actions -- each one lands a real commit on a real ref via the REST Contents/
 # Pulls API the moment it returns success, with no local git object touched at all.
-# create_or_update_file was excluded here through 2.8.4 on the reasoning that it "remains closer
-# to gate.completion" (local file production) -- that reasoning was simply wrong: gate.completion
-# reads Write/Edit rows against the LOCAL filesystem, and this tool never touches one. It commits
-# straight to the target branch on origin, which is exactly the class of remote mutation this
-# gate exists to recognize; excluding it left a true "I pushed/updated X" claim made over this
-# tool with no vocabulary that could ever discharge it. create_pull_request remains the one
-# deliberate exclusion: opening a PR establishes review intent but does not substantiate "merged",
-# "pushed", or "live" -- no ref moves and nothing merges until a separate call succeeds. Both the
-# bare MCP action names recorded by tests and Claude Code's fully-qualified `mcp__github__...`
-# names are enumerated explicitly; no suffix or substring heuristic can silently admit a
-# read-only tool.
+# create_or_update_file belongs here, not with gate.completion: that gate reads Write/Edit rows
+# against the LOCAL filesystem, and this tool never touches one -- it commits straight to the
+# target branch on origin. create_pull_request remains the one deliberate exclusion: opening a PR
+# establishes review intent but does not substantiate "merged", "pushed", or "live" -- no ref
+# moves and nothing merges until a separate call succeeds. Both the bare MCP action names and
+# Claude Code's fully-qualified `mcp__github__...` names are enumerated explicitly; no suffix or
+# substring heuristic can silently admit a read-only tool.
 _REMOTE_MUTATING_TOOL_NAMES = frozenset({
     "merge_pull_request",
     "push_files",
@@ -233,34 +226,22 @@ def _successful_remote_mutation(history) -> Optional[bool]:
       None  — NOT-EVALUABLE, and therefore SILENT. The gate could not decide, and a miss must
               never be spent as a positive assertion of absence.
 
-    WHY None EXISTS (the sibling defect, gate.claimed_running / `_latest_process_call_failed`):
-    this module's remote-mutation vocabulary is CLOSED — `_REMOTE_MUTATING_TOOL_NAMES` (six
+    This module's remote-mutation vocabulary is CLOSED — `_REMOTE_MUTATING_TOOL_NAMES` (six
     exact MCP names) plus `_command_pushes_git` (an argv parse that recognizes `git push`, and
-    nothing else). This estate ships by many other shapes: `gh pr merge`, `gh release create`,
-    `npm publish`, `docker push`, `flyctl deploy`, `./deploy.sh`, `scp`, `rsync`. Every one of
-    them is a vocabulary MISS. Returning False there told an agent that had genuinely shipped
-    that "no recorded mutation evidence backs it" — a false block in the expensive direction,
-    the exact shape just repaired in gate.claimed_running.
+    nothing else). Real shipping happens by many other shapes too: `gh pr merge`, `gh release
+    create`, `npm publish`, `docker push`, `flyctl deploy`, `./deploy.sh`, `scp`, `rsync`. Each
+    is a vocabulary MISS, so a recorded Bash terminal whose command is NOT a recognized push
+    makes the window undecidable rather than negative — any Bash command could be a shipping
+    action this net cannot read. Likewise an UNDECODABLE row — the dropped row could be the very
+    mutation the claim cites.
 
-    A SECOND, SHAPE-LEVEL false block lived beside the vocabulary gap and is closed by this same
-    change: being IN `_REMOTE_MUTATING_TOOL_NAMES` was not enough, because `_response_succeeded`
-    and `_merged_true` both require a dict, and this session's own transcript shows a settled
-    `mcp__github__merge_pull_request` call's `tool_response` (Claude Code's `toolUseResult`,
-    verbatim) is a BARE LIST of content blocks — `[{"type": "text", "text":
-    "{\"sha\":\"...\",\"merged\":true,\"message\":\"Pull Request successfully
-    merged\"}"}]` — never a dict and never wrapped in a `{"content": [...]}` envelope. A row
-    already correctly named in the closed set was therefore silently unreadable on every real
-    merge/push/file-commit done through the GitHub MCP tools: the vocabulary matched, the tool
-    genuinely shipped, and `_as_dict` still hasn't produced a dict, so `_response_succeeded`
-    read it as not-a-success and the row fell through to "attempted, never settled" — a false
-    `gate.claimed_shipped` fire on a TRUE "merged" claim, which is what sent this fix looking
-    for the gap in the first place. `_as_dict` below now decodes that list shape the same way
-    `_merged_true` already decoded a dict-wrapped one; the two are the same JSON-in-text-block
-    unwrap applied at two different entry shapes.
-
-    So a recorded Bash terminal whose command is NOT a recognized push makes the window
-    undecidable: any Bash command could be a shipping action this net cannot read. Likewise an
-    UNDECODABLE row — the dropped row could be the very mutation the claim cites.
+    Settled-success evidence must also survive the WIRE SHAPE: a settled MCP call's
+    `tool_response` (Claude Code's `toolUseResult`, verbatim) can arrive as a BARE LIST of
+    content blocks — `[{"type": "text", "text": "<json>"}]` — rather than a dict, which
+    `_response_succeeded`/`_merged_true` both require. `_as_dict` below decodes that list shape
+    the same way `_merged_true` decodes a dict-wrapped one, the same JSON-in-text-block unwrap
+    applied at two entry points, so a genuinely successful merge/push/commit through the GitHub
+    MCP tools is never read as an unsettled attempt merely because the truth arrived wrapped.
 
     The doubt flags apply ONLY when nothing matched. Once a real attempt IS recorded the gate is
     grounded and an unrelated `ls` in the same window cannot buy the claim silence.
@@ -279,14 +260,12 @@ def _successful_remote_mutation(history) -> Optional[bool]:
     saw_attempt = False
 
     def _as_dict(response):
-        # The live harness can deliver a settled MCP result as a JSON STRING (parse it so real
-        # evidence is not rejected on shape alone) or — the shape this arm did not handle before,
-        # and the one a real `mcp__github__merge_pull_request` success is recorded in — a BARE
-        # LIST of content blocks, `[{"type": "text", "text": "<json-or-plain>"}]`, with no
-        # enclosing dict at all. Decode either into the dict `_response_succeeded`/`_merged_true`
-        # need; a content block whose text is not JSON (a plain error string, prose) is left
-        # unparsed on purpose — fabricating a dict out of prose would let a vague failure message
-        # read as shipping evidence, the opposite of this gate's job.
+        # The live harness can deliver a settled MCP result as a JSON STRING, or as a BARE LIST
+        # of content blocks (`[{"type": "text", "text": "<json-or-plain>"}]`) with no enclosing
+        # dict at all. Decode either into the dict `_response_succeeded`/`_merged_true` need; a
+        # content block whose text is not JSON (a plain error string, prose) is left unparsed on
+        # purpose — fabricating a dict out of prose would let a vague failure message read as
+        # shipping evidence, the opposite of this gate's job.
         if isinstance(response, str):
             try:
                 parsed = json.loads(response)
@@ -367,9 +346,8 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
     """Fire an unbacked shipping claim; pushes use the remote tip, not a tool signature.
 
     EVERY active claim in the message is examined in order — the first that fails its check
-    fires — so an unevaluable push claim can no longer shadow a later, fully checkable claim
-    (previously only the FIRST claim was ever looked at). See `_claim_grounded` for the
-    push-vs-non-push routing this reduces to.
+    fires — so an unevaluable push claim can never shadow a later, fully checkable claim. See
+    `_claim_grounded` for the push-vs-non-push routing this reduces to.
     """
     def _attempted_remote_mutation(rows) -> bool:
         # An ATTEMPT at a remote mutation, settled or not: any phase of a real push command or
@@ -480,9 +458,6 @@ shipped_CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BL
                run=lambda c: claimed_shipped_gate(
                    c.text, history=c.history_all_agents, cwd=c.cwd))
 
-# ==============================================================================================
-# claimedProduceAbsent
-# ==============================================================================================
 import os
 import re
 from makoto.checks import detect_locations, normalize_path
@@ -510,7 +485,7 @@ completion_SHAPE = "OTHER_POINT"
 # 0007.sql" are real production claims, not references. Their referencing uses are caught by the
 # fuller frame instead: `read(s) from` (the read FP), `so` / `matches` / `requires` (the
 # subordinate-clause FP). Including bare `to`/`from` over-narrowed and silenced live TPs
-# (FP remediation 2026-06-25; tests/test_gates.py + tests/test_substrate_teeth.py pin the TPs).
+# (tests/test_gates.py + tests/test_substrate_teeth.py pin the TPs).
 # How far back before the produce verb a forward/negation frame is looked for, to disarm the
 # claim ("will add `X`", "didn't add `X`"). Deliberately narrower than the verb->path bind
 # (_BIND_BEFORE) so a stray "not"/"next" far upstream cannot silence a live claim, AND trimmed
@@ -636,9 +611,6 @@ completion_CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOC
                eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
                run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
 
-# ==============================================================================================
-# silentlyDroppedCommitment
-# ==============================================================================================
 from makoto.checks import normalize_path
 from makoto.vocab import _EMPTY_OK, _FENCE_SPAN_RX
 from makoto.kit import _path_components, _suffix_match, unwitnessed
@@ -762,8 +734,7 @@ def _drop_resolve_location(L, touched_keys):
     resolving a claimed title against the whole filesystem invites cross-project FPs. Discharge
     against a pre-existing on-disk file still works via the caller's cwd-relative fs_exists/
     fs_read on the unresolved surface (path=loc); genuinely-dropped work (never touched, never
-    on disk) correctly fails to resolve and fires. (The dead `roots` param — kept while the dark
-    meaning_gate still walked — died with that gate, io-purge P5.)"""
+    on disk) correctly fails to resolve and fires."""
     Lc = _path_components(L)
     for k in (touched_keys or ()):
         if _suffix_match(Lc, _path_components(k)):
@@ -774,17 +745,15 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
     needs it (symbol/count read the file via fs_read); artifact/line discharge on a non-empty
     touch or a non-empty file.
 
-    Follows completion_gate's content-deep discharge, with a DELIBERATE and bounded difference,
-    stated here because the docstring used to claim it "mirrors" the ledger's `_discharged` and
-    does not: `_discharged` applies the `_EMPTY_OK` conventional-empty carve-out globally, while
-    this applies `conventional` on the `named_artifact` and `line_range` branches only.
+    Follows completion_gate's content-deep discharge, with a DELIBERATE and bounded difference
+    from the ledger's `_discharged`: that applies the `_EMPTY_OK` conventional-empty carve-out
+    globally, while this applies `conventional` on the `named_artifact` and `line_range` branches
+    only.
     `named_symbol` and `count` ask a question emptiness cannot answer -- a claim to add 2 exports
     to `pkg/__init__.py` is not discharged by that file being empty, however conventional its
     emptiness is in general. So on a zero-byte conventional file with a count/symbol claim,
-    `gate.completion` discharges and `gate.dropped` fires, on identical ledger state. That is the
-    intended reading of two different questions, not an oversight -- but it IS a divergence, and
-    an unstated divergence behind a claim of mirroring is how the next reader "fixes" one of them
-    into agreement and silently deletes a gate."""
+    `gate.completion` discharges and `gate.dropped` fires, on identical ledger state -- the
+    intended reading of two different questions, not a bug to reconcile away."""
     def _drop_touched(path, touched_keys, empty_keys) -> bool:
         """A recorded NON-empty touch (Edit/Write/MultiEdit) backs this location (suffix
         match). Nested here (its only caller) once `owes`/`pays` claimed the two top-level
@@ -880,12 +849,8 @@ dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", ma
                eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
                run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))
 
-# ==============================================================================================
-# staleEstablisher
-# ==============================================================================================
 # makoto.checks.staleEstablisher -- the ground-truth staleness detector (ADVISORY tier,
-# NEVER BLOCK; inert until a project declares a plan). Ported BY SHAPE (rule 5) from
-# `assay/assay/patterns/stale_establisher.py`, re-homed onto Makoto's own
+# NEVER BLOCK; inert until a project declares a plan), built on Makoto's own
 # `substrate._planNode.Plan`.
 #
 # Fires when a plan node's establisher is recorded DONE but the artifact it named no longer
@@ -903,14 +868,11 @@ dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", ma
 # staying at its `False` default: `dispatch._blocking_gate_ids()` is `load_checks(edge="Stop")`
 # FILTERED on `may_block`, so this pattern_id can never enter it whatever `.level` its own Finding
 # carries -- STRUCTURALLY incapable of blocking, not merely labeled advisory (pinned by
-# `tests/test_stale_establisher.py::test_never_discovered_as_a_blocking_stop_gate`). Before the
-# 2026-07-10 discovery unification this module was instead a direct-call carve-out, because the
-# then-current `load_stopchecks()` GATE discovery made every id it found auto-BLOCK by
-# construction ("discovered<=>live<=>blocking") -- exactly the tier this check must never enter.
-# That mechanism is gone and the carve-out with it; the never-blocks guarantee now rests on
-# `may_block=False` alone. Being an ordinarily discovered named check module, this file IS subject
-# to the same L2 import firewall as its siblings (tests/test_import_direction.py -- notably, no
-# reaching into the sibling `makoto.state.plan` store).
+# `tests/test_stale_establisher.py::test_never_discovered_as_a_blocking_stop_gate`); the
+# never-blocks guarantee rests on `may_block=False` alone. Being an ordinarily discovered named
+# check module, this file IS subject to the same L2 import firewall as its siblings
+# (tests/test_import_direction.py -- notably, no reaching into the sibling `makoto.state.plan`
+# store).
 #
 # Reads: the declared Plan (never mutated) and the existence/size of each DONE node's `where`.
 # An empty artifact is not an establisher: it supplies none of the work a dependent needs.
@@ -972,9 +934,6 @@ established_CHECK = Check(
     tests="OTHER_POINT",
 )
 
-# ==============================================================================================
-# selfWiredCheck
-# ==============================================================================================
 # The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
 # rather than mirrored here.
@@ -1026,10 +985,10 @@ def _missing_makoto_events(hooks, *, plugin_root=None, plugin_fs_read=None,
                            home_hooks=None, events=_MAKOTO_EVENTS) -> list:
     """[event, ...] for each event in `events` confirmed by NONE of: settings.json's own "hooks"
     key, the home `~/.claude/settings.json` hooks passed as `home_hooks` (the file
-    `makoto install` actually writes), or the plugin manifest (2026-07-22 two-source fix: a
-    plugin-packaged install legitimately wires makoto via hooks/hooks.json alone, and
-    settings.json is never expected to duplicate it — this predicate checks every source before
-    calling an event missing). Empty list means fully wired. `plugin_root` defaults to the live
+    `makoto install` actually writes), or the plugin manifest (a plugin-packaged install
+    legitimately wires makoto via hooks/hooks.json alone, and settings.json is never expected to
+    duplicate it — this predicate checks every source before calling an event missing). Empty
+    list means fully wired. `plugin_root` defaults to the live
     $CLAUDE_PLUGIN_ROOT — identity-checked against the running package's own plugin root, so a
     decoy root can never confirm wiring — and `plugin_fs_read` to an isfile-guarded real file
     read when not supplied, so this stays pure/injectable for tests exactly like the
@@ -1087,12 +1046,11 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
     plugin root the RUNNING package lives under so a decoy/forged root can never confirm wiring
     — the concrete meaning of "never a guessed/cached path") and read via `plugin_fs_read`
     (defaults to the same isfile-guarded read). Fires iff an event is confirmed by NO source; an
-    absent/empty project settings.json no longer short-circuits the other sources (it used to
-    return None before the manifest was ever consulted, leaving the whole check inert in any
-    repo without a project settings file — including a plugin-packaged install, the main way
-    makoto ships). When NO source is even consultable (no project settings, no home hooks
-    table, no trusted plugin root), there is no fact to assert either way, so the gate stays
-    silent. The message names exactly which event(s) lost their entry and which sources were
+    absent/empty project settings.json does not short-circuit the other sources -- a
+    plugin-packaged install (the main way makoto ships) has no project settings file at all, and
+    must still be checked against the home hooks table and the plugin manifest. When NO source is
+    even consultable (no project settings, no home hooks table, no trusted plugin root), there is
+    no fact to assert either way, so the gate stays silent. The message names exactly which event(s) lost their entry and which sources were
     consulted; the Finding's `file` points at a source that was actually consulted, never
     unconditionally at a project settings file that may not exist.
 
@@ -1208,10 +1166,10 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
     )
 
 
-# NOTE (owner-revised deviation, logged): this CHECK's posture is "ADVISE", not "BLOCK" like every
-# sibling Stop gate. gate.self_wired's own Finding.level is documented and behaviorally pinned
+# NOTE: this CHECK's posture is "ADVISE", not "BLOCK" like every sibling Stop gate.
+# gate.self_wired's own Finding.level is documented and behaviorally pinned
 # (tests/test_stop_gate_level_invariant.py) as ALWAYS "advisory", never "error" (the one
-# DESIGN-DECISION-cited advisory exception among the Stop gates, FD6 2026-07-05) -- declaring it
+# DESIGN-DECISION-cited advisory exception among the Stop gates, FD6) -- declaring it
 # CHECK.posture="BLOCK" here would misrepresent that in the flat checks/ catalog's own metadata.
 # `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
 # were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
@@ -1223,9 +1181,6 @@ wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", 
                eats=frozenset({"fs_read"}),
                run=wired_run, layer="meta", tests="OTHER_POINT")
 
-# ==============================================================================================
-# claimedConsentAbsent
-# ==============================================================================================
 # gate.claimed_consent_absent -- the agent cites the operator's word, and the operator has none.
 #
 # Makoto's subject is the assistant's statement held against the record. Usually the record is the
@@ -1348,10 +1303,7 @@ consent_CHECK = _Check(id="gate.claimed_consent_absent", applies_at="Stop", post
                run=lambda c: claimed_consent_absent_gate(c.text,
                                                          transcript_path=c.transcript_path))
 
-# ==============================================================================================
-# writeThrashRevert
-# ==============================================================================================
-# PREVENTIVE-at-PreToolUse precheck event.thrash_revert (CANON-PORT-1) — flag a Write that REVERTS
+# PREVENTIVE-at-PreToolUse precheck event.thrash_revert — flag a Write that REVERTS
 # a file back to a byte-identical copy of an earlier whole-file content this session (an A->B->A
 # oscillation) at PreToolUse time.
 #
@@ -1367,11 +1319,10 @@ consent_CHECK = _Check(id="gate.claimed_consent_absent", applies_at="Stop", post
 # NotebookEdit is SILENT, and a PRIOR Edit/MultiEdit/NotebookEdit is not counted as a content unit
 # (only whole-file Writes are). The compared unit is whole-file `Write.content` exclusively.
 #
-# Copy-by-shape from the makoto-dev ancestor (rule 5 / FD11), re-homed onto live Makoto: it carries
-# its OWN whole-file-Write history walker so a PreToolUse precheck does not import the Stop-gate
-# engine. The ONLY content read is through ByteIdentity (==/len/hash only), so this body CANNOT read
-# content MEANING — only content IDENTITY. Stdlib only; the only imports are makoto.substrate,
-# makoto.kit, makoto.vocab and makoto.registry.
+# Carries its OWN whole-file-Write history walker so a PreToolUse precheck does not import the
+# Stop-gate engine. The ONLY content read is through ByteIdentity (==/len/hash only), so this
+# body CANNOT read content MEANING — only content IDENTITY. Stdlib only; the only imports are
+# makoto.substrate, makoto.kit, makoto.vocab and makoto.registry.
 from makoto.substrate.byte_identity import ByteIdentity
 from makoto.kit import decode_history_row, unwitnessed
 
@@ -1412,9 +1363,9 @@ def _prior_whole_file_writes(history, path: str) -> list:
     (id, ts, event_type, cwd, raw_payload_json) tuples _select_recent returns OR dicts with a
     'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped.
 
-    Row-decode step shared via makoto.kit.decode_history_row (2026-07-09 dedup: this function and
-    substrate._canonAtoms._decode_row each re-derived the same tuple/dict-payload sniff + json.loads
-    by hand -- found duplicated by jscpd). Only this function's own Write/content filter stays local."""
+    Row-decode step shared via makoto.kit.decode_history_row, the same one substrate._canonAtoms.
+    _decode_row uses -- one definition of the tuple/dict-payload sniff + json.loads, not two. Only
+    this function's own Write/content filter stays local."""
     out: list = []
     for row in history or ():
         ev = decode_history_row(row)
@@ -1479,9 +1430,7 @@ thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
 
-# ==============================================================================================
-# the OTHER_POINT shape: its rows, and the one Pre entry dispatch calls for any of them
-# ==============================================================================================
+# the OTHER_POINT shape's rows, and the one Pre entry dispatch calls for any of them
 _ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, established_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS

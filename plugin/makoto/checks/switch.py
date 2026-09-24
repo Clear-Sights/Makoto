@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 
-# ==============================================================================================
-# claimedRunningAbsent
-# ==============================================================================================
 from typing import Optional
 
 from makoto.vocab import Finding
@@ -49,7 +46,7 @@ running_SHAPE = "SWITCH"
 # silence, never as positive proof of liveness -- only a DIRECT error/interrupted state on the
 # most recently recorded relevant call is treated as a contradiction.
 #
-# CROSS-AGENT EVIDENCE (2026-07-23): unlike every other gate, this one reads
+# CROSS-AGENT EVIDENCE: unlike every other gate, this one reads
 # `ctx.history_all_agents` -- every agent-thread's settled PostToolUse/PostToolUseFailure Bash
 # rows pooled, not narrowed to the calling thread by `_history_for_agent`. A subagent dispatched
 # to start/verify a process is real session evidence the main thread's own claim must see; the
@@ -213,9 +210,6 @@ running_CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BL
                eats=frozenset({"text", "history_all_agents"}),
                run=lambda c: claimed_running_gate(c.text, history=c.history_all_agents))
 
-# ==============================================================================================
-# fabricatedToolAction
-# ==============================================================================================
 import re
 
 from makoto.kit import turn_tool_calls, unwitnessed
@@ -317,9 +311,6 @@ action_CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="B
                eats=frozenset({"text", "history"}),
                run=lambda c: fabricated_action_gate(c.text, history=c.history))
 
-# ==============================================================================================
-# unexaminedWall
-# ==============================================================================================
 # gate.unexamined_wall -- the agent says a thing cannot be known, having done nothing to find out.
 #
 # Register entry G5, WALL WITHOUT INVENTORY: "cannot" declared with the means already held; the
@@ -447,20 +438,10 @@ wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK
                run=lambda c: unexamined_wall_gate(c.text, history=c.history,
                                                   transcript_path=c.transcript_path))
 
-# ==============================================================================================
-# canonTimeoutRecur
-# ==============================================================================================
-# canon's Stop-gate engine + adapter (SPEC-5 Task 4, owner-revised layout: formerly
-# `stopchecks/canon.py` + `stopchecks/stopcheck_canon.py`, combined into one flat file here — same
-# single-file choice as `hollowTest.py`/`deadPureStatement.py`; see `hollowTest.py`'s module
-# docstring for the rationale).
-#
-# Ported from the read-only ancestor `makoto-dev` (canon/agnostic_gate.py) to live makoto's own
-# file layout. The engine half (primitives + the history->Call adapter) is PURE: stdlib only
-# (json/dataclasses/typing/__future__) — no makoto import at all — so the gate-shape import
-# firewall (tests/test_import_direction.py, the pipeline-order firewall) is satisfied by construction for that
-# half; the adapter half below (`canon_gate`/`GATE`/`CHECK`) is what actually imports
-# `makoto.vocab`/`makoto.context`.
+# The engine half (primitives + the history->Call adapter) is PURE stdlib (json/dataclasses/
+# typing/__future__), no makoto import at all, so the gate-shape import firewall
+# (tests/test_import_direction.py) is satisfied by construction; the adapter half below
+# (`canon_gate`/`CHECK`) is what imports `makoto.vocab`/`makoto.context`.
 #
 # A primitive here reads the closed agnostic terminal set: {tool_name, tool_input identity,
 # interrupted, self_error_code}. No language- or test-runner-specific regex appears. `canon.recur`
@@ -482,32 +463,21 @@ wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK
 #     END of each maximal consecutive run, and the LAST judgment for each key wins — so a later
 #     success for the same key silences it even when other, different calls happened in between.
 #
-#
-# PATTERN_ID CONVENTION (deliberate divergence from the read-only ancestor `makoto-dev`, found
-# while porting): the ancestor's canon_gate emitted pattern_id=f"canon.{cid}" (e.g. "canon.timeout",
-# "canon.recur") per fired sub-primitive. Live makoto's `dispatch._blocking_gate_ids()` derives the
-# blocking set from `{c.id for c in load_checks(edge="Stop") if c.may_block and c.posture == BLOCK}`
-# — i.e. the CHECK's OWN id ("gate.canon") — and filters gate_findings by `finding.pattern_id in
-# _blocking_gate_ids()`. EVERY other live gate (gate.dropped, gate.liveness, gate.hollow_test,
-# gate.self_wired, ...) always stamps `pattern_id == its own CHECK id`, one shape per gate, even when
-# a gate can yield several findings (gate.liveness/gate.hollow_test can fire more than once per turn,
-# always under their own single pattern_id). Keeping the ancestor's per-primitive pattern_id here
-# would make `canon.timeout` / `canon.recur` findings silently INVISIBLE to `_blocking_gate_ids()` —
-# discovered, audited, but never actually blocking, defeating the whole point of this being a
-# blocking gate. So this port stamps `pattern_id="gate.canon"` (matching the CHECK id, like every
-# sibling gate) and keeps the
-# sub-primitive identity in the MESSAGE instead, prefixed `"canon.<id>: "` — callers/tests that need
-# to know which sub-primitive fired read the message, exactly as the ticket anticipated ("a
-# `gate.canon` finding whose message reflects the timeout primitive").
+# PATTERN_ID CONVENTION: `dispatch._blocking_gate_ids()` derives the blocking set from
+# `{c.id for c in load_checks(edge="Stop") if c.may_block and c.posture == BLOCK}` — the CHECK's
+# OWN id ("gate.canon") — and filters gate_findings by `finding.pattern_id in
+# _blocking_gate_ids()`. Every other live gate stamps `pattern_id == its own CHECK id`, so a
+# per-primitive pattern_id here would make `canon.timeout`/`canon.recur` findings silently
+# invisible to `_blocking_gate_ids()` — discovered but never actually blocking. This stamps
+# `pattern_id="gate.canon"` instead and keeps the firing sub-primitive's identity in the MESSAGE,
+# prefixed `"canon.<id>: "`.
 #
 # LEVEL: "error" — the ONLY blocking level in live makoto (makoto.vocab._ALLOWED_FIRE_LEVELS ==
-# {"error"}; dispatch._emit_decision maps level=="error" to posture.BLOCK, the only outcome that
-# renders as a block). This is an ORDINARY blocking gate, NOT the one advisory exception
+# {"error"}). This is an ORDINARY blocking gate, NOT the one advisory exception
 # `gate.self_wired` uses.
 #
 # IMPORT FIREWALL (tests/test_gate_shape.py::test_no_gate_module_imports_a_sibling_or_cross_l2):
-# imports ONLY makoto.vocab, makoto.context, and the pure primitives below (intra-module,
-# no cross-module import needed post-merge — see the layout note above).
+# imports ONLY makoto.vocab, makoto.context, and the pure primitives below.
 import json
 import os
 from typing import Iterable, List
@@ -557,9 +527,8 @@ def exit_code(c: Call):
 def self_error_code(c: Call):
     """agnostic terminal `self_error_code`: a harness-emitted error code/object on the result.
     PRESENCE-based for the `error` field: a present, non-None `error` — even a falsy one such
-    as `""` — is a self-reported error state (the old `or`-chain collapsed `{"error": "",
-    "error_code": 0}` to None, so a turn closing on that terminal read green). `error_code`
-    keeps the truthy requirement: `0` is the conventional success code, not an error."""
+    as `""` — is a self-reported error state. `error_code` keeps the truthy requirement: `0` is
+    the conventional success code, not an error."""
     r = _result(c)
     if "error" in r and r["error"] is not None:
         return r["error"]
@@ -577,12 +546,9 @@ def stale_read_hint(c: Call):
 
 def sandbox_bypassed(c: Call) -> bool:
     """agnostic terminal `sandbox_bypassed`: True iff the call's own tool_input requested the
-    sandbox-bypass escape hatch. Reads `input.dangerouslyDisableSandbox` — confirmed as a real
-    tool_input schema key by this repo's own signal-miner corpus decoder (`REF-lever-graded-
-    primitives/signalminer/peeler/agnostic.py` SCHEMA_KEYS, grouped with known Bash/Read
-    tool_input fields it has actually observed in real sessions), not a guessed name. Absence
-    (the overwhelmingly common case) returns False, never crashes. Observability-only: no
-    primitive reads it yet."""
+    sandbox-bypass escape hatch. Reads `input.dangerouslyDisableSandbox`, a real tool_input schema
+    key, not a guessed name. Absence (the overwhelmingly common case) returns False, never
+    crashes. Observability-only: no primitive reads it yet."""
     return _input(c).get("dangerouslyDisableSandbox") is True
 
 
@@ -632,12 +598,11 @@ def recur_stuck(calls: list) -> bool:
     run_all_transient = False  # every call in the current run is a confidently transient error
     run_len = 0
     for c in calls or ():
-        # Dunder-insensitive verdict identity (`_pairing_input`, like the Pre<->Post pairing):
-        # a harness bookkeeping key that VARIES per call (`__seq`) split a byte-identical retry
-        # loop into distinct keys, so recur never saw a run of length >= 2 — the injection
-        # class the pairing fold exists for, previously guarded on the pairing side only. A leading
-        # `__` is transport bookkeeping, never call semantics, so folding it cannot collapse
-        # two genuinely distinct calls (the same argument as for pairing).
+        # Dunder-insensitive verdict identity (`_pairing_input`, like the Pre<->Post pairing): a
+        # harness bookkeeping key that VARIES per call (`__seq`) would split a byte-identical
+        # retry loop into distinct keys, so recur would never see a run of length >= 2. A leading
+        # `__` is transport bookkeeping, never call semantics, so folding it cannot collapse two
+        # genuinely distinct calls (the same argument as for pairing).
         key = (c.get("name", ""), _pairing_input(c.get("input")))
         call_err = timed_out(c)          # the same direct-error-state terminal the gate installs
         error = self_error_code(c)
@@ -771,10 +736,9 @@ def _pairing_input(inp) -> str:
 
     A harness may add bookkeeping keys to `tool_input` BETWEEN a call's Pre and its Post, so
     pairing on the FULL canonical input would leave a dangling Pre for a call that in fact
-    succeeded.
-    The SAME injection class also broke the verdict side while it keyed on the full
-    `canon_input`: a bookkeeping key that VARIES per call (`__seq`) split a byte-identical
-    retry loop into distinct keys, so recur never saw a run of length >= 2.
+    succeeded. The same holds for verdict identity: a bookkeeping key that VARIES per call
+    (`__seq`) would split a byte-identical retry loop into distinct keys, hiding a run of length
+    >= 2 from `recur_stuck`.
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
     cannot collapse two genuinely distinct calls — for pairing or for a verdict. Primitives in
@@ -857,9 +821,6 @@ def fired_primitives(history) -> Iterable:
             yield (cid, stop_text, retry_hint)
 
 
-# =============================================================================================
-# Stop-hook adapter (formerly stopchecks/stopcheck_canon.py)
-# =============================================================================================
 def canon_gate(history, *, transcript_path=None, session_id=None, state_root=None) -> List[Finding]:
     """Fire one BLOCKING Finding per agnostic Canon primitive that matches the call stream, each
     stamped pattern_id="gate.canon" (so it actually blocks — see the module docstring's
@@ -896,9 +857,6 @@ canon_CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", may_bl
                run=lambda c: canon_gate(c.history, transcript_path=c.transcript_path,
                                          session_id=c.session_id, state_root=c.state_root))
 
-# ==============================================================================================
-# identicalRetryInterdiction
-# ==============================================================================================
 # makoto.checks.identicalRetryInterdiction -- D1 (docs/DEFERRED.md): PreToolUse interdiction of
 # a byte-identical Bash retry immediately following a DETERMINISTIC failure of the SAME call --
 # "kills the loop at length 1," the PROACTIVE twin of canon.recur (canonTimeoutRecur.py, which is
@@ -1023,16 +981,9 @@ retry_DESCRIPTION = "byte-identical Bash retry immediately following that SAME c
 
 retry_CHECK = Check(id="event.identical_retry", applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Bash',), retry_hint=retry_RETRY_HINT, description=retry_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="SWITCH")
 
-# ==============================================================================================
-# namedTestTeeth
-# ==============================================================================================
 from makoto.vocab import _SENTENCE_SPLIT_RX
-# The EVIDENCE side moved to its reachable home 2026-09-18 (see vocab.py's own note): the
-# recorded-marker parsers to vocab (rank 0) and the history walk over them to kit (rank 1),
-# so gate.unnamed_failure can read them without a lateral check-to-check import and
-# kit.compute_delta no longer needs a call-time back-edge. Re-exported under the same names
-# because this module's own tests and tests/test_lexicons.py address them here; ONE home,
-# two spellings, never two copies.
+# Re-exported here, not duplicated, because this module's own tests and tests/test_lexicons.py
+# address them under these names -- one home, two spellings, never two copies.
 from makoto.vocab import (_TESTNAME_RX, _TEST_ID, _REC_FAIL_LEAD_RX, _REC_FAIL_TRAIL_RX,
                           _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX, _TEETH_SCOPE_BEFORE,
                           _TEETH_SCOPE_AFTER, _recorded_names, recorded_failed_names,
@@ -1252,9 +1203,6 @@ named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", m
                eats=frozenset({"text", "history"}),
                run=lambda c: named_test_gate(c.text, history=c.history))
 
-# ==============================================================================================
-# unnamedFailure
-# ==============================================================================================
 # makoto.checks.unnamedFailure -- gate.unnamed_failure, register entry
 # `C12 VERDICT WITHOUT ITS SUBJECT`.
 #
@@ -1390,9 +1338,6 @@ unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="AD
                eats=frozenset({"text", "history"}),
                run=lambda c: unnamed_failure_gate(c.text, history=c.history))
 
-# ==============================================================================================
-# falseGreenClaim
-# ==============================================================================================
 from makoto.kit import is_failing_testrun, unwitnessed
 from makoto.substrate.claims import whole_suite_pass_claim
 
@@ -1472,9 +1417,6 @@ green_CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", 
                run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output,
                                              testrun_exit=c.testrun_exit))
 
-# ==============================================================================================
-# stalePytestCache
-# ==============================================================================================
 from makoto.vocab import _ADV_FORWARD_RX, _NEGATION_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
 from makoto.substrate.pytest_cache import stale_failing_node
 
@@ -1494,7 +1436,7 @@ stale_SHAPE = "OTHER_POINT"
 # evidence, not a live failure, and the gate stays silent (fail-open).
 #
 # WHEN: the pass-claim only exists in the final assistant message, so dispatch is the Stop hook.
-# LATENCY CONTRACT (post-check-class, user-directed 2026-06-09): the gate's WORK is budgeted at
+# LATENCY CONTRACT (post-check-class): the gate's WORK is budgeted at
 # the proposed post-check tier — a hard 200-300ms ceiling, target single-digit ms warm — NOT the
 # permissive Stop tier it dispatches in. The evidence side is a literal direct-pointer lookup
 # (one lastfailed read + at most 50 capped file reads; lib/pytest_cache pins the bounds), and the
@@ -1513,7 +1455,7 @@ _TEETH_WINDOW = 160
 # teeth-framed (deliberately-induced-failure) window around it, each mean nothing is claimed here
 # in the first place. One expression by construction (module-level lambda, not `def`: the design
 # pins this module's top-level function count at 1, `stale_pass_gate` alone), built with `:=` so
-# `m`/`lead` are each computed once, same as the old stepwise-`if`/`return ()` body:
+# `m`/`lead` are each computed once:
 #   Sentence-prefix guard, GATE-LOCAL (sentinel c): the shared signal's forward/negation window
 #   stops at the last comma — right for green_claim (its conjunct is a recorded red RUN), wrong
 #   here, where "Once I fix the import, the tests pass" (and "It is not the case that, as of this
@@ -1564,9 +1506,6 @@ stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK", m
                eats=frozenset({"text", "cwd"}),
                run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))
 
-# ==============================================================================================
-# relaunchedUnchanged
-# ==============================================================================================
 # makoto.checks.relaunchedUnchanged -- gate.relaunched_unchanged, register entry
 # `E13 PARKED ON AN INHERITED CHANNEL`.
 #
@@ -1623,9 +1562,6 @@ relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Stop", postu
                eats=frozenset({"history"}),
                run=lambda c: relaunched_unchanged_gate(c.history))
 
-# ==============================================================================================
-# unobservedDestruction
-# ==============================================================================================
 # makoto.checks.unobservedDestruction -- gate.unobserved_destruction, register entry
 # `D14 UNDO UNPROVEN`.
 #
@@ -1687,9 +1623,6 @@ destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", 
                eats=frozenset({"history"}),
                run=lambda c: unobserved_destruction_gate(c.history))
 
-# ==============================================================================================
-# unwitnessedScanner
-# ==============================================================================================
 # makoto.checks.unwitnessedScanner -- gate.unwitnessed_verifier, register entry
 # `B4 WRONG ORACLE`.
 #
@@ -1730,12 +1663,11 @@ _CLEAN_REPORT_RX = re.compile(
     re.I)
 # A report WITH failures -- the witness that this verifier can fire.
 #
-# NOT case-insensitive as a whole, and the reason is a bug this regex had for one draft:
-# `re.I` over `\bFAILED\b` matches the WORD "failed", so "58 passed, 0 failed" read as a
-# verifier firing and the gate went quiet on exactly the report it exists for. The counted form
-# is case-insensitive and anchored to a NON-ZERO count (`[1-9]`); the bare report tokens are
-# case-SENSITIVE, because `FAILED`/`FAIL` in capitals are what a runner prints as a verdict
-# while "failed" in prose is not.
+# NOT case-insensitive as a whole: the counted form is case-insensitive and anchored to a
+# NON-ZERO count (`[1-9]`); the bare report tokens are case-SENSITIVE, because `FAILED`/`FAIL`
+# in capitals are what a runner prints as a verdict while "failed" in prose is not -- a
+# case-insensitive `\bFAILED\b` would match the word in "58 passed, 0 failed" and silence the
+# gate on exactly the report it exists for.
 _FAILING_REPORT_RX = re.compile(
     r"(?i:\b[1-9]\d*\s+(?:failed|failures?|errors?)\b)|\bFAILED\b|\bFAIL\b"
     r"|\bAssertionError\b")
@@ -1774,9 +1706,6 @@ verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", postu
                eats=frozenset({"history"}),
                run=lambda c: unwitnessed_verifier_gate(c.history))
 
-# ==============================================================================================
-# reportBeforeRun
-# ==============================================================================================
 # makoto.checks.reportBeforeRun -- gate.report_before_run, register entry
 # `C11 REPORT BEFORE DECIDE`.
 #
@@ -1878,9 +1807,6 @@ report_CHECK = _Check(id="gate.report_before_run", applies_at="Stop", posture="A
                eats=frozenset({"history"}),
                run=lambda c: report_before_run_gate(c.history))
 
-# ==============================================================================================
-# unaskedPlan
-# ==============================================================================================
 # makoto.checks.unasked_plan -- gate.unasked_plan, register entry
 # `G2 DETERMINED ASKED AS OPEN`.
 #
@@ -1934,9 +1860,7 @@ plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE",
                run=lambda c: unasked_plan_gate(c.history))
 
 
-# ==============================================================================================
-# the SWITCH shape: its rows, and the one Pre entry dispatch calls for any of them
-# ==============================================================================================
+# the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
 _ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
