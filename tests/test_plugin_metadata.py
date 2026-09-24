@@ -78,17 +78,18 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
             assert entry["hooks"], f"{evt} matcher must register at least one hook"
             for h in entry["hooks"]:
                 assert h["type"] == "command"
-                assert "_dispatch_shim.sh" in h["command"]
-                assert "CLAUDE_PLUGIN_ROOT" in h["command"]
+                # sh runs it, so no exec bit is needed, and the placeholder is quoted, so a
+                # plugin root with a space (a Windows user profile) stays one argument.
+                assert h["command"] == 'sh "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"'
 
 
-def test_dispatch_shim_exists_and_executable():
+
+def test_dispatch_shim_exists_and_is_posix_sh():
     """_dispatch_shim.sh exists inside the package, is a POSIX sh script."""
     shim = PLUGIN / "makoto" / "_dispatch_shim.sh"
     assert shim.is_file(), "missing _dispatch_shim.sh"
     first_line = shim.read_text().splitlines()[0]
     assert first_line == "#!/bin/sh", f"shim must use #!/bin/sh; got: {first_line!r}"
-    assert shim.stat().st_mode & 0o100, "shim must be executable"
 
 
 def test_dispatch_shim_invokes_makoto_dispatch():

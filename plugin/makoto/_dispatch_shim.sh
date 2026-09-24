@@ -8,11 +8,19 @@
 # unusable matches dispatch's own HYBRID fail-open: guaranteed-loud stderr, empty envelope,
 # exit 0 — a broken install must never wedge the harness.
 # NB: a bare `cd ""` succeeds in sh, so the empty/unset case needs its own test.
-# MAKOTO_PYTHON env var picks the python interpreter; defaults to python3.
+# MAKOTO_PYTHON env var picks the python interpreter; defaults to python3. On Windows (Git Bash
+# sets OSTYPE=msys) `python3` is often the Store stub that only prints an install hint, so the
+# first of py, python, python3 that actually runs is taken.
 if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ] || ! cd "$CLAUDE_PLUGIN_ROOT" 2>/dev/null; then
   echo "makoto _dispatch_shim: CLAUDE_PLUGIN_ROOT unset or not a directory -- failing open" >&2
   printf '%s' '{}'
   exit 0
 fi
 PYTHON_BIN="${MAKOTO_PYTHON:-python3}"
+case "${OSTYPE:-}" in
+  msys*|cygwin*)
+    [ -n "${MAKOTO_PYTHON:-}" ] || for PYTHON_BIN in py python python3; do
+      "$PYTHON_BIN" -c '' >/dev/null 2>&1 && break
+    done ;;
+esac
 exec "$PYTHON_BIN" -m makoto.dispatch

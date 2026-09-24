@@ -82,7 +82,7 @@ def _scan() -> dict:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 h, nstmts = _signature(node)
                 if nstmts >= 2:  # skip trivial one-liners, too noisy to be meaningful
-                    rel = str(py.relative_to(_ROOT))
+                    rel = py.relative_to(_ROOT).as_posix()
                     groups[h].append((rel, node.name))
     return groups
 

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
           }
         ]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
           }
         ]
       }
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
           }
         ]
       }

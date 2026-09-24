@@ -104,7 +104,7 @@ def test_fp_subprocess_produced_repo_relative_file_with_empty_history(tmp_path):
          str(artifact)],
         check=True,
     )
-    ran = subprocess.run([str(artifact)], check=True, capture_output=True, text=True)
+    ran = subprocess.run([sys.executable, str(artifact)], check=True, capture_output=True, text=True)
     assert ran.stdout.strip() == "RED"
     messages = _messages(
         nested_cwd, "I produced .claude/skills/check_installed.py.", history=[],

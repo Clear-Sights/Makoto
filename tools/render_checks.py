@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -64,7 +65,7 @@ def render_canon() -> list[str]:
 
 def _run_shim(payload: object, state: str) -> tuple[int, dict]:
     env = dict(os.environ, CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=state)
-    proc = subprocess.run([str(PLUGIN / "makoto" / "_dispatch_shim.sh")],
+    proc = subprocess.run([shutil.which("sh") or "sh", str(PLUGIN / "makoto" / "_dispatch_shim.sh")],
                           input=json.dumps(payload), text=True, capture_output=True,
                           env=env, cwd=REPO)
     try:

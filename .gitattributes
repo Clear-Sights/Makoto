@@ -1,0 +1,2 @@
+# LF everywhere: the hook shim is run by sh (CRLF breaks it) and docs/REGISTER.md is pinned by digest.
+* text=auto eol=lf

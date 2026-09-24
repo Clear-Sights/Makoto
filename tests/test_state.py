@@ -11,8 +11,8 @@ def test_state_dir_defaults_to_claude_home(monkeypatch):
     assert _state_dir() == Path("/fake/home/.claude/makoto_state")
 
 
-def test_state_dir_honors_env_var(monkeypatch):
+def test_state_dir_honors_env_var(monkeypatch, tmp_path):
     """MAKOTO_STATE_DIR env var overrides default."""
     from makoto.state.store import _state_dir
-    monkeypatch.setenv("MAKOTO_STATE_DIR", "/custom/state/dir")
-    assert _state_dir() == Path("/custom/state/dir")
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path / "custom"))
+    assert _state_dir() == tmp_path / "custom"

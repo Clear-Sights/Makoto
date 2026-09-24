@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import venv
@@ -23,6 +24,8 @@ REPO = Path(__file__).resolve().parent.parent
 # is the installed subtree -- plugin/, not the repository root.
 PLUGIN = REPO / "plugin"
 SHIM = PLUGIN / "makoto" / "_dispatch_shim.sh"
+# The hook runs `sh "<shim>"`; on Windows that sh is Git Bash's, found on PATH.
+SH = shutil.which("sh") or "sh"
 
 EVENT = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
          "tool_input": {"command": "ls"}, "session_id": "shim-test",
@@ -41,26 +44,8 @@ def _run_shim(cwd: Path, env_overrides: dict, state_dir: Path) -> subprocess.Com
     env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_PLUGIN_ROOT", "PYTHONPATH")}
     env["MAKOTO_STATE_DIR"] = str(state_dir)
     env.update(env_overrides)
-    return subprocess.run([str(SHIM)], input=json.dumps(EVENT), text=True,
+    return subprocess.run([SH, str(SHIM)], input=json.dumps(EVENT), text=True,
                           capture_output=True, cwd=cwd, env=env, timeout=30)
-
-
-def test_shim_is_executable():
-    """The bit GIT records, not the one this checkout happens to have.
-
-    `os.access(SHIM, os.X_OK)` reads the working tree, and git's mode is what an installing user
-    receives: a local `chmod +x` passes this over an index recording 100644. Both are checked --
-    the index because it ships, the working tree because the tests below have to run it.
-    """
-    done = subprocess.run(["git", "ls-files", "-s", "--", str(SHIM.relative_to(REPO))],
-                          cwd=REPO, capture_output=True, text=True, timeout=60)
-    assert done.returncode == 0 and done.stdout.strip(), (
-        f"git does not track {SHIM}; its recorded mode cannot be read, and absence is not a pass")
-    mode = done.stdout.split()[0]
-    assert mode == "100755", (
-        f"git records mode {mode} for the shim; it must be 100755, because that is the bit an "
-        f"installing user receives. A local chmod does not change it.")
-    assert os.access(SHIM, os.X_OK), "the shim is not executable in this checkout"
 
 
 def test_decoy_package_in_cwd_cannot_shadow_the_plugin(tmp_path, bare_python_dir):
@@ -87,3 +72,21 @@ def test_unusable_plugin_root_fails_open_loudly(tmp_path):
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout == "{}"
     assert "failing open" in proc.stderr
+
+
+def test_windows_takes_the_first_interpreter_that_runs(tmp_path, bare_python_dir):
+    """Under Git Bash (OSTYPE=msys) `python3` may be the Store stub that only prints an install
+    hint. Stubs named py and python3 that fail sit first on PATH; the shim must pass over both
+    and reach the real `python`, which leaves the record database behind."""
+    stubs = tmp_path / "stubs"
+    stubs.mkdir()
+    for name in ("py", "python3"):
+        stub = stubs / name
+        stub.write_text("#!/bin/sh\necho 'Python was not found' >&2\nexit 9009\n")
+        stub.chmod(0o755)
+    proc = _run_shim(cwd=tmp_path, state_dir=tmp_path / "state", env_overrides={
+        "CLAUDE_PLUGIN_ROOT": str(PLUGIN), "OSTYPE": "msys",
+        "PATH": os.pathsep.join([str(stubs), str(bare_python_dir), os.environ["PATH"]]),
+    })
+    assert proc.returncode == 0, proc.stderr
+    assert (tmp_path / "state" / "makoto.record.db").is_file(), proc.stderr[-300:]

@@ -101,11 +101,12 @@ def test_hooks_json_wired_events_point_at_the_real_dispatcher():
         commands = [h["command"] for matcher in hooks[name] for h in matcher["hooks"]]
         # A SUBSTRING IS NOT A ROUTE. `echo makoto.dispatch` contains the name and dispatches
         # nothing; so does a command that mentions the shim in an argument to something else.
-        # The command's own executable -- its first shell word, with ${CLAUDE_PLUGIN_ROOT}
-        # resolved -- has to BE the shim, and that file has to exist.
+        # The script the command runs -- `sh <script>`, with ${CLAUDE_PLUGIN_ROOT} resolved --
+        # has to BE the shim, and that file has to exist.
         routed = []
         for command in commands:
-            executable = shlex.split(command)[0] if command.strip() else ""
+            argv = shlex.split(command) if command.strip() else [""]
+            executable = argv[1] if argv[0] == "sh" and len(argv) == 2 else argv[0]
             resolved = executable.replace("${CLAUDE_PLUGIN_ROOT}", str(PLUGIN)) \
                                  .replace("$CLAUDE_PLUGIN_ROOT", str(PLUGIN))
             if Path(resolved).name == "_dispatch_shim.sh" and Path(resolved).is_file():

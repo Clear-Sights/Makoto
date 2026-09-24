@@ -5,6 +5,9 @@ contamination vector) is skipped. This realizes the user's "a block counts only 
 closed" criterion at the unit-closure layer WITHOUT weakening the analyzer: detection logic is
 unchanged, only the firing scope narrows to closed work. Suppression is limited to known scratch
 roots — never a blanket skip — so the gate keeps its teeth on all real code."""
+import os
+import tempfile
+
 from makoto.substrate import deadPureStatement as CL
 
 DEAD = "def fn():\n d = 1 + 1\n return 0\n"   # exactly one genuinely-illusory statement
@@ -22,7 +25,8 @@ class _Ctx:
 
 def test_scratch_py_outside_cwd_is_skipped(tmp_path):
     # cwd is a real project; the touched file is stray /tmp scratch OUTSIDE it -> not a closed unit.
-    ctx = _Ctx(cwd=str(tmp_path), touched=["/tmp/mining/dropped_ask_miner.py"])
+    stray = os.path.join(tempfile.gettempdir(), "mining", "dropped_ask_miner.py")
+    ctx = _Ctx(cwd=str(tmp_path), touched=[stray])
     assert CL._run(ctx) == [], "stray /tmp scratch outside the working dir must not fire"
 
 
@@ -39,5 +43,5 @@ def test_dead_code_inside_cwd_fires_even_under_tmp(tmp_path):
 def test_suppression_is_scratch_only_not_a_blanket(tmp_path):
     # Invariant: only KNOWN scratch roots are ever suppressed. A non-temp path with no cwd still
     # fires -> the scope filter can never silently swallow real code.
-    ctx = _Ctx(cwd=None, touched=["/home/dev/project/dead.py"])
+    ctx = _Ctx(cwd=None, touched=[os.path.abspath("/home/dev/project/dead.py")])
     assert len(CL._run(ctx)) == 1, "a non-scratch path must fire; suppression is scratch-root-only"

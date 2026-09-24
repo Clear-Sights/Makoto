@@ -124,7 +124,7 @@ def _wire_claude_hooks(settings_path: Path) -> None:
         entries.append({
             _MAKOTO_CLAUDE_FLAG: True,
             "matcher": "*",
-            "hooks": [{"type": "command", "command": str(dispatch_path)}],
+            "hooks": [{"type": "command", "command": f'sh "{dispatch_path.as_posix()}"'}],
         })
     settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 

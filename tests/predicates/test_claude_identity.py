@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 
 import pytest
@@ -86,7 +87,7 @@ def test_push_of_claude_commit_fires_and_clean_push_is_silent(repo):
     assert _fires("git push -u origin HEAD", work) is None       # everything already on origin
     _run("git commit -q --allow-empty -m two", work, env)          # made where no hook looked
     for cmd, cwd in (("git push", work), ("git push origin HEAD:main", work),
-                     (f"git -C {work} push --all", "/")):
+                     (f"git -C {shlex.quote(str(work))} push --all", "/")):
         f = _fires(cmd, cwd)
         assert f is not None and "1 commit" in f.message, cmd
     assert _fires("git push origin :stale", work) is None          # a deletion publishes nothing
@@ -98,4 +99,4 @@ def test_not_a_repo_fails_open(tmp_path):
 
 def test_cd_moves_the_reading_into_the_repo(repo):
     work, _ = repo
-    assert _fires(f"cd {work} && git commit -m x", "/") is not None
+    assert _fires(f"cd {shlex.quote(str(work))} && git commit -m x", "/") is not None
