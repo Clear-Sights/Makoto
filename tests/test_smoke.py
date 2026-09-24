@@ -48,8 +48,6 @@ def test_install_wires_hooks_and_records_manifest(tmp_path, monkeypatch):
     from makoto.checks.otherPoint import _missing_makoto_events
     assert _missing_makoto_events(settings.get("hooks", {})) == [], \
         "install must wire every required event to makoto dispatch"
-    manifest = fake_home / ".claude" / "makoto_state" / "configchange_manifest.json"
-    assert manifest.exists(), "install must record the ConfigChange manifest"
 
 
 def test_env_gated_audit_is_denied_on_the_wire(tmp_path):

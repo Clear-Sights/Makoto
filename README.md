@@ -310,13 +310,6 @@ Audit writes are best-effort. If the append fails (disk full, permission denied)
 stderr line and continues with its original exit code. The audit subsystem cannot cause makoto to
 mis-block or mis-allow a tool call — a fundamental separation-of-concerns invariant.
 
-## ConfigChange watch (advisory + evidence-gated blocking)
-
-The optional `ConfigChange` command is `python -m makoto.configchange`; it is not shipped in
-[hooks.json](plugin/hooks/hooks.json). It advises on missing wiring and blocks a strip only
-when an install manifest or prior snapshot establishes that the exact path was wired.
-`configchange._APPLICABLE_SOURCES` owns its source scope; unexpected faults fail open.
-
 ## Receipt: word → deed → record → receipt
 
 Every touched file, test run and redirect is a hash-chained row in the record, and

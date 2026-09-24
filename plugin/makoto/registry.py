@@ -90,8 +90,8 @@ ALLOWED_POSTURES = frozenset({POSTURE_BLOCK, POSTURE_ADVISE})
 def blocking_eligible(check) -> bool:
     """Which end-of-turn gates the catalog counts as blocking. ONE owner OF THAT COUNT,
     called by every consumer of it -- not the one owner of the word: a pre-check denies
-    without being Stop-edge, `configchange` emits a block from outside this registry, and
-    `_canonAtoms.BLOCK_IDS` counts patterns rather than checks. README lists all of them.
+    without being Stop-edge, and `_canonAtoms.BLOCK_IDS` counts patterns rather than checks.
+    README lists all of them.
 
     The Check docstring below has always defined this as BOTH signals: `may_block is True`
     AND `posture == BLOCK`. `tools/render_checks.py` implemented a different rule -- Stop

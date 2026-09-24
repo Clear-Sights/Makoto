@@ -1027,8 +1027,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
     env_root = None
     if plugin_root is None:
         # Env-derived root: identity-checked against _OWN_PLUGIN_ROOT (see its comment) so a
-        # decoy $CLAUDE_PLUGIN_ROOT can never CONFIRM wiring; mirrored in
-        # _missing_makoto_events's own default path for its direct callers (configchange.py).
+        # decoy $CLAUDE_PLUGIN_ROOT can never CONFIRM wiring.
         env_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
         if env_root:
             try:
