@@ -503,25 +503,9 @@ def _result(c: Call) -> dict:
     return r if isinstance(r, dict) else {}
 
 
-def _input(c: Call) -> dict:
-    i = c.get("input")
-    return i if isinstance(i, dict) else {}
-
-
 def interrupted(c: Call) -> bool:
     """agnostic terminal `interrupted`: the harness set result.interrupted True (timeout/abort)."""
     return _result(c).get("interrupted") is True
-
-
-def exit_code(c: Call):
-    """agnostic terminal `exit_code`: the recorded process exit code, or None if absent. Kept as
-    a terminal helper for any future primitive that needs it; `timed_out` deliberately does not
-    read it (see its own docstring — the real substrate carries no exit_code on tool calls, and a
-    non-zero exit on an idempotent call is not itself an error state).
-
-    The key read is the real substrate's camelCase `"exitCode"`, matching every other reader of a
-    Bash tool_response in this repo."""
-    return _result(c).get("exitCode")
 
 
 def self_error_code(c: Call):
@@ -533,23 +517,6 @@ def self_error_code(c: Call):
     if "error" in r and r["error"] is not None:
         return r["error"]
     return r.get("error_code") or None
-
-
-def stale_read_hint(c: Call):
-    """agnostic terminal `stale_read_hint`: the harness's own stale-read-state warning on the
-    result, read verbatim (string/dict/whatever shape the harness emits, or None if absent).
-    Maps to the real substrate's `tool_response.staleReadFileStateHint` (the terminal's `result`
-    IS the raw tool_response dict passed through in full by `calls_from_history`, so this is a
-    plain key lookup, not a new decode step). Observability-only: no primitive reads it yet."""
-    return _result(c).get("staleReadFileStateHint")
-
-
-def sandbox_bypassed(c: Call) -> bool:
-    """agnostic terminal `sandbox_bypassed`: True iff the call's own tool_input requested the
-    sandbox-bypass escape hatch. Reads `input.dangerouslyDisableSandbox`, a real tool_input schema
-    key, not a guessed name. Absence (the overwhelmingly common case) returns False, never
-    crashes. Observability-only: no primitive reads it yet."""
-    return _input(c).get("dangerouslyDisableSandbox") is True
 
 
 # ---- the installed per-call primitive (type-2, direct error state) ---------------------------
