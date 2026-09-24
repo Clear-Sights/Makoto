@@ -230,7 +230,10 @@ action_SHAPE = "SWITCH"
 
 # closed lexicon of TOOL-shaped past-tense actions (NOT reasoning verbs)
 _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed|launched)"
-_ACTION_RX = re.compile(rf"\bI\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
+# "I've/I'd deployed" is the same first-person completed-action claim as "I deployed" -- the
+# contraction must not defeat the \bI\s+VERB shape (mirrors _PROCESS_START_VERB_RX's own
+# contraction handling for the sibling gate.claimed_running).
+_ACTION_RX = re.compile(rf"\bI(?:['’]ve|['’]d)?\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
 _NEG = re.compile(r"\b(?:not|never|without)\b|n't", re.I)
 _FUTURE = re.compile(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
 # PRIOR-TURN frame: the claim is a truthful RECAP of work done in an earlier turn/session, not an

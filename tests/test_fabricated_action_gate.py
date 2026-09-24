@@ -73,6 +73,19 @@ def test_tp_ran_backticked_command():
     assert _action_signal("I ran `pytest tests/ -q`.") == "pytest tests/ -q"
 
 
+def test_tp_contraction_ive_deployed():
+    # "I've deployed X" is the same first-person completed-action claim as "I deployed X" -- the
+    # contraction must not defeat the \bI\s+VERB shape.
+    assert _action_signal("I've deployed `infra/terraform/main.tf` to production.") \
+        == "infra/terraform/main.tf"
+
+
+def test_tp_contraction_fires_with_zero_tool_calls():
+    f = fabricated_action_gate(
+        "I've deployed `infra/terraform/main.tf` to production.", history=[])
+    assert f is not None and f.pattern_id == "gate.fabricated_action"
+
+
 def test_tp_ran_path():
     assert _action_signal("I executed scripts/deploy.sh against staging.") == "scripts/deploy.sh"
 
