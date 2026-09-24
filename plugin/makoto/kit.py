@@ -523,7 +523,7 @@ def regex_file_predicate(
     return _predicate
 
 
-def unwitnessed(events, *, owes, pays, paid=()):
+def unwitnessed(events, *, owes, pays=None, paid=()):
     """The one shape: an event owes a witness, and only an earlier event can pay it.
 
     `owes(ev)` gives the subjects `ev` commits to; `pays(ev)` gives a predicate over subjects
@@ -533,13 +533,17 @@ def unwitnessed(events, *, owes, pays, paid=()):
     later one, never an earlier one. One pass; a predicate that pays everything
     short-circuits, so an obligation stays O(events).
 
+    `pays` defaults to None -- no per-event witness at all -- for the callers whose witnesses are
+    seeded whole via `paid` (a prior tool response, the whole session's own record, the operator-
+    turn ledger). A caller with nothing to add here need not write its own always-None function.
+
     The register's families differ only in what counts as the witness: none can pay a held
     wrong form (SPEC), a second reading of the subject (THE OTHER POINT), an act that selected
     the branch (THE SWITCH), a read of the source before the write (THE LINEAGE).
     """
     paid = list(paid)
     for ev in events:
-        p = pays(ev)
+        p = pays(ev) if pays is not None else None
         if p is not None:
             paid.append(p)
         for subject in owes(ev) or ():
@@ -577,7 +581,7 @@ def claim_vs_history_predicate(
                     # matched" — a non-participating optional group yielded claims=[None].
                     claims.append(match.group(1) if match.lastindex else match.group(0))
         for _ev, claimed in unwitnessed(
-                (subject,), owes=lambda _s: claims, pays=lambda _s: None,
+                (subject,), owes=lambda _s: claims,
                 paid=(lambda c: grounded_in_history(c, history),)):
             rendered = message(claimed, subject, pattern) if callable(message) else message.format(
                 claimed=claimed, id=pattern.id, description=pattern.description

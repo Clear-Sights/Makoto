@@ -801,13 +801,6 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
     return True                                          # unknown kind -> fail open
 
 
-def dropped_pays(_text):
-    """No event here pays a claim directly: the witness is seeded once per claim, in `paid`, from
-    the assistant's OWN end-of-turn ledger/filesystem (see `dropped_gate`) -- a second reading of
-    the same subject, not a fresh event in this stream."""
-    return None
-
-
 def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
                  fs_read=None, empty_keys=None) -> Optional[Finding]:
     """Fire iff a FORWARD claim carrying identifying info (a count / line-range / named symbol
@@ -822,7 +815,7 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
         return _drop_discharged(kind, info, raw, path, touched_keys=touched_keys, empty_keys=empty_keys,
                                 fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read)
 
-    for _ev, claim in unwitnessed((text,), owes=dropped_owes, pays=dropped_pays, paid=(_discharged,)):
+    for _ev, claim in unwitnessed((text,), owes=dropped_owes, paid=(_discharged,)):
         kind, loc, info, raw = claim
         path = _drop_resolve_location(loc, touched_keys) or loc
         loc_n = normalize_path(path)
@@ -935,7 +928,7 @@ def _missing_makoto_events(hooks, *, plugin_root=None, plugin_fs_read=None,
 
     # Owed: every event makoto must be wired on. Paid: a source that wires it, cheapest first.
     return [event for _events, event in unwitnessed(
-        (events,), owes=lambda es: es, pays=lambda _es: None,
+        (events,), owes=lambda es: es,
         paid=(lambda e: _event_wired(settings_hooks, e), lambda e: _event_wired(home, e),
               _plugin_wired))]
 
@@ -1159,10 +1152,6 @@ def consent_owes(text):
     return (m,) if (m := _CONSENT_RX.search(text or "")) else ()
 
 
-def consent_pays(_text):
-    return None
-
-
 def _oracle_channel_paid(transcript_path) -> bool:
     """True (silent) unless the oracle channel is CONFIRMED both readable and empty -- the one
     case that discharges nothing. Never raises: an unreadable or absent transcript reads as NO
@@ -1195,7 +1184,7 @@ def claimed_consent_absent_gate(text, *, transcript_path=None):
     """One BLOCKING Finding when the claim cites the operator and the oracle channel is
     confirmed empty."""
     for _ev, claim in unwitnessed(
-            (text,), owes=consent_owes, pays=consent_pays,
+            (text,), owes=consent_owes,
             paid=(lambda _c: _oracle_channel_paid(transcript_path),)):
         return Finding(
             pattern_id="gate.claimed_consent_absent",
@@ -1263,13 +1252,6 @@ def thrash_owes(ev):
     return ()
 
 
-def thrash_pays(_ev):
-    """Nothing pays this obligation: the A->B->A pattern is either present in `prior` or it is
-    not, and `owes` has already read the whole of `prior` to decide that -- there is no further
-    witness this check reads."""
-    return None
-
-
 def _prior_whole_file_writes(history, path: str) -> list:
     """Ordered ByteIdentity-wrapped whole-file Write contents to `path` in the session history.
     ONLY tool_name=='Write' rows carrying a `content` key are counted — Edit/MultiEdit/NotebookEdit
@@ -1321,7 +1303,7 @@ def thrash_predicate(*, current_event: dict, history: list,
     # Write of DIFFERENT content (a B) lies AFTER that earlier A. A bare A->A repeat (no intervening
     # different content) is a no-op rewrite, not a revert. The walk itself lives in `owes` now; see
     # its docstring for why one left-to-right pass over `prior` decides it.
-    for _ev, _subject in unwitnessed(((now, prior),), owes=thrash_owes, pays=thrash_pays):
+    for _ev, _subject in unwitnessed(((now, prior),), owes=thrash_owes):
         return Finding(
             pattern_id=pattern.id,
             file=path,
