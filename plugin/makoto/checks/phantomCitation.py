@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 from makoto.vocab import Finding
 from makoto.registry import Check
-from makoto.kit import _record_exemption, makoto_allow_reason, makoto_allowed, scan_target_content
+from makoto.kit import _record_exemption, makoto_allow_reason, makoto_allowed, scan_target_content, unwitnessed
 from makoto.state.citations import extract_citations
 
 
@@ -114,7 +114,9 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
         [c[0] for c in cites]
     ).fetchall()
     canonical_set = {row[0] for row in canonical_rows}
-    phantom = next((c for c in cites if c[0] not in canonical_set), None)
+    phantom = next((c for _content, c in unwitnessed(
+        (content,), owes=extract_citations, pays=lambda _content: None,
+        paid=(lambda c: c[0] in canonical_set,))), None)
     if phantom is None:
         return None
     if makoto_allowed(content):

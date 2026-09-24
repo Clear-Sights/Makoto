@@ -36,7 +36,7 @@ import os
 from typing import Optional
 
 from makoto.registry import Check
-from makoto.kit import live_query_finding
+from makoto.kit import live_query_finding, unwitnessed
 from makoto.substrate._planNode import DONE, Plan
 from makoto.registry import POSTURE_ADVISE
 from makoto.vocab import Finding
@@ -60,18 +60,15 @@ def check(plan: Optional[Plan]) -> Optional[Finding]:
     # answer as rescanning `nodes[i + 1:]` per DONE node, without that scan's O(n) slice COPY
     # on the Stop hot path.
     last_use = {node.passthrough: i for i, node in enumerate(nodes)}
-    for i, node in enumerate(nodes):
-        if node.status != DONE:
-            continue
-        if last_use[node.passthrough] <= i:
-            continue          # no dependent -- nobody would misread this gap as satisfied
-        # A missing locator is malformed stored state, not evidence about the empty path. An
-        # empty artifact is likewise not an established dependency: every other artifact-backed
-        # commitment treats zero bytes as undelivered.
-        if not node.where:
-            continue
-        if os.path.exists(node.where) and os.path.getsize(node.where) > 0:
-            continue
+    # Owed: a DONE node some LATER node depends on (no dependent -- nobody would misread the gap
+    # as satisfied). A missing locator is malformed stored state, not evidence about the empty
+    # path, so it owes nothing. Paid: the artifact on disk, non-empty -- every other
+    # artifact-backed commitment treats zero bytes as undelivered.
+    owed = (node for i, node in enumerate(nodes)
+            if node.status == DONE and last_use[node.passthrough] > i and node.where)
+    for node, _ in unwitnessed(
+            owed, owes=lambda n: (n,), pays=lambda _n: None,
+            paid=(lambda n: os.path.exists(n.where) and os.path.getsize(n.where) > 0,)):
         return Finding(
             pattern_id="gate.stale_establisher",
             file=node.where,

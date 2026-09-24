@@ -3,7 +3,7 @@ import json
 import os
 from typing import Optional
 from makoto.vocab import Finding
-from makoto.kit import live_query_finding
+from makoto.kit import live_query_finding, unwitnessed
 # The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
 # rather than mirrored here. See docs/adr/0041-wiring-predicate-hoist.md for the decision
@@ -71,25 +71,31 @@ def _missing_makoto_events(hooks, *, plugin_root=None, plugin_fs_read=None,
     `test_hooks_key_not_a_dict_fails_open_to_missing_all`; do not drop it."""
     settings_hooks = hooks if isinstance(hooks, dict) else {}
     home = home_hooks if isinstance(home_hooks, dict) else {}
-    still_missing = [event for event in events
-                     if not _event_wired(settings_hooks, event)
-                     and not _event_wired(home, event)]
-    if not still_missing:
-        return []
-    root = plugin_root
-    if root is None:
-        # Env-derived root: identity-checked against _OWN_PLUGIN_ROOT (see its comment) so a
-        # decoy $CLAUDE_PLUGIN_ROOT can never CONFIRM wiring; mirrored in self_wired_gate.
-        root = os.environ.get("CLAUDE_PLUGIN_ROOT")
-        if root:
-            try:
-                if os.path.realpath(root) != os.path.realpath(_OWN_PLUGIN_ROOT):
-                    root = None
-            except OSError:
-                root = None
-    reader = plugin_fs_read if plugin_fs_read is not None else _default_plugin_fs_read
-    plugin_hooks = _read_plugin_manifest_hooks(root, reader)
-    return [event for event in still_missing if not _event_wired(plugin_hooks, event)]
+    plugin = []   # the manifest, read once and only when an event reaches it unwired
+
+    def _plugin_wired(event):
+        if not plugin:
+            root = plugin_root
+            if root is None:
+                # Env-derived root: identity-checked against _OWN_PLUGIN_ROOT (see its comment)
+                # so a decoy $CLAUDE_PLUGIN_ROOT can never CONFIRM wiring; mirrored in
+                # self_wired_gate.
+                root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+                if root:
+                    try:
+                        if os.path.realpath(root) != os.path.realpath(_OWN_PLUGIN_ROOT):
+                            root = None
+                    except OSError:
+                        root = None
+            reader = plugin_fs_read if plugin_fs_read is not None else _default_plugin_fs_read
+            plugin.append(_read_plugin_manifest_hooks(root, reader))
+        return _event_wired(plugin[0], event)
+
+    # Owed: every event makoto must be wired on. Paid: a source that wires it, cheapest first.
+    return [event for _events, event in unwitnessed(
+        (events,), owes=lambda es: es, pays=lambda _es: None,
+        paid=(lambda e: _event_wired(settings_hooks, e), lambda e: _event_wired(home, e),
+              _plugin_wired))]
 
 
 def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
