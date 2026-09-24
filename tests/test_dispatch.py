@@ -2149,6 +2149,26 @@ def test_dispatch_select_recent_returns_history_so_history_predicate_fires(tmp_p
         "the content.fabricated_commit_sha fire must be recorded (history slice was actually returned)"
 
 
+def test_dispatch_fabricated_commit_sha_catches_shipped_reword(tmp_path):
+    """Same fabricated-evidence claim as "committed as <sha>", reworded with "shipped" -- a
+    completion verb outside the check's own committed/tag/landed/pushed/merged/created/made
+    vocabulary must still fire content.fabricated_commit_sha itself, not just the sibling
+    gate.claimed_shipped."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "fab_sha_shipped",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Shipped it at a1b2c3d4e5f6 on main.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert out, "content.fabricated_commit_sha must fire on the 'shipped' reword"
+    assert json.loads(out)["decision"] == "block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("content.fabricated_commit_sha" in r.get("pattern_fires", []) for r in rows), \
+        "the content.fabricated_commit_sha fire must be recorded for the 'shipped' reword"
+
+
 def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):
     """PreCheck content.verifier_predicate_weakened produces a truthy retry_hint (via `_jit_hint`). SPEC-5 Task 8: the live
     decision JSON no longer has a separate top-level "retry_hint" key -- `_emit_decision` folds

@@ -73,9 +73,9 @@ _CLAIM_RXS = (
         re.IGNORECASE,
     ),
     # strong completion verb directly citing a SHA, no "commit" noun needed: "pushed e5d6c7b",
-    # "merged as e5d6c7b" — a completion assertion, not co-occurrence.
+    # "merged as e5d6c7b", "shipped it at e5d6c7b" — a completion assertion, not co-occurrence.
     re.compile(
-        r"\b(?:landed|pushed|merged)\b\s*[:#]?\s*(?:as\s+|at\s+|in\s+|to\s+\S+\s+as\s+)?"
+        r"\b(?:landed|pushed|merged|shipped)\b\s*(?:it\s+)?[:#]?\s*(?:as\s+|at\s+|in\s+|to\s+\S+\s+as\s+)?"
         + _SHA_RX,
         re.IGNORECASE,
     ),
@@ -309,7 +309,7 @@ sha_predicate = claim_vs_history_predicate(
 sha_RETRY_HINT = 'Cite a real `git commit`/`git tag` run (or the SHA echoed in its tool output) before claiming a commit/tag landed. A SHA presented as proof with no commit/tag tool_use behind it this session is fabricated evidence (CLAUDE.md commandment 1, tool-call-diff canary).'
 sha_DESCRIPTION = 'fabricated commit SHA/tag presented as proof of a commit (no git commit/tag ran)'
 
-sha_CHECK = Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made'), retry_hint=sha_RETRY_HINT, description=sha_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
+sha_CHECK = Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made', 'shipped', 'Shipped'), retry_hint=sha_RETRY_HINT, description=sha_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
 # content.illusory_interruption_claim predicate — a fabricated "interrupted by user" excuse
 # (same genre as content.illusory_authorship_trailer).
 #
