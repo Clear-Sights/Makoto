@@ -597,7 +597,7 @@ def test_dispatch_green_claim_silent_after_green_run(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "gc2", "cwd": str(tmp_path),
             "last_assistant_message": "Done — all tests pass now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "run was green -> green_claim gate must stay silent"
+    assert "gate.green_claim" not in out, "run was green -> green_claim gate must stay silent"
 
 
 def test_dispatch_completion_gate_shadow_when_disabled(tmp_path):
@@ -628,7 +628,7 @@ def test_dispatch_completion_gate_silent_on_mere_path_mention(tmp_path):
         "last_assistant_message": "Done reviewing. See src/nonexistent_zzz.py for the details.",
     }
     rc, out = _run_dispatch(state_dir, payload)   # gate live, but no production claim
-    assert out == "", "a referenced (not produced) path must not false-block"
+    assert "gate.completion" not in out, "a referenced (not produced) path must not false-block"
 
 
 def test_dispatch_dropped_gate_blocks_by_default(tmp_path):
@@ -807,7 +807,7 @@ def test_dispatch_dropped_gate_silent_when_discharged(tmp_path):
         "last_assistant_message": "I'll add def validate_seal_zzz to src/gates_zzz.py next.",
     }
     rc, out = _run_dispatch(state_dir, payload)
-    assert out == "", "a discharged promise (symbol present on disk) must not block"
+    assert "gate.dropped" not in out, "a discharged promise (symbol present on disk) must not block"
 
 
 def test_dispatch_dropped_gate_shadow_when_disabled(tmp_path):
@@ -883,7 +883,7 @@ def test_dispatch_liveness_gate_silent_when_code_is_material(tmp_path):
         "last_assistant_message": "Done — added the helper.",
     }
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "a material statement (its value reaches the return) must not block"
+    assert "gate.liveness" not in out, "a material statement (its value reaches the return) must not block"
 
 
 def test_dispatch_liveness_gate_shadow_when_disabled(tmp_path):
@@ -971,7 +971,7 @@ def test_dispatch_hollow_test_gate_silent_when_test_has_a_real_assertion(tmp_pat
         "last_assistant_message": "Done — added the test.",
     }
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "a test with a real assertion must not block"
+    assert "gate.hollow_test" not in out, "a test with a real assertion must not block"
 
 
 def test_dispatch_canon_gate_blocks_by_default(tmp_path):
@@ -1032,7 +1032,10 @@ def test_dispatch_canon_fingerprints_advisory_gate_never_blocks_even_when_it_fir
     stop = {"hook_event_name": "Stop", "session_id": "canon_fp_advise", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.canon_fingerprints_advisory must NEVER block, even when it fires"
+    assert out, "gate.canon_fingerprints_advisory (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.canon_fingerprints_advisory" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.canon_fingerprints_advisory" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1113,7 +1116,8 @@ def test_dispatch_fabricated_action_silent_when_command_ran(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "fab_ok", "cwd": str(tmp_path),
             "last_assistant_message": "I ran `pytest tests/zzz_unrun.py -q` and it all passed."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "a tool call this turn discharges the action claim -> must not block"
+    assert "gate.fabricated_action" not in out, \
+        "a tool call this turn discharges the action claim -> must not block"
 
 
 def test_dispatch_named_test_gate_blocks_after_recorded_named_red(tmp_path):
@@ -1473,7 +1477,10 @@ def test_dispatch_self_wired_gate_never_blocks_through_subagent_stop(tmp_path):
     subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "sw_sub", "cwd": str(tmp_path),
                       "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, subagent_stop)
-    assert out == "", "gate.self_wired must NEVER block through SubagentStop, even when it fires"
+    assert out, "gate.self_wired (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.self_wired" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.self_wired" in r.get("pattern_fires", []) for r in rows), \
         "the advisory self_wired fire must still be audited through SubagentStop too"
@@ -1520,7 +1527,10 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "sw", "cwd": str(tmp_path),
             "last_assistant_message": "Done for now."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.self_wired must NEVER block, even when its predicate fires"
+    assert out, "gate.self_wired (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.self_wired" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.self_wired" in r.get("pattern_fires", []) for r in rows), \
         "the advisory self_wired fire must still be audited so a partial strip leaves a forensic trail"
@@ -1534,7 +1544,10 @@ def test_dispatch_relative_path_citation_gate_never_blocks_even_when_it_fires(tm
     stop = {"hook_event_name": "Stop", "session_id": "relpath", "cwd": str(tmp_path),
             "last_assistant_message": "see substrate/hollowTest.py:146 for the detector"}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.relative_path_citation must NEVER block, even when it fires"
+    assert out, "gate.relative_path_citation (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.relative_path_citation" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.relative_path_citation" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1551,7 +1564,10 @@ def test_dispatch_plan_item_drift_gate_never_blocks_even_when_it_fires(tmp_path)
     second = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
               "last_assistant_message": "Moving on to other work for now."}
     rc, out = _run_dispatch(state_dir, second)
-    assert out == "", "gate.plan_item_drift must NEVER block, even when it fires"
+    assert out, "gate.plan_item_drift (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.plan_item_drift" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1569,7 +1585,10 @@ def test_dispatch_unprobed_fanout_gate_never_blocks_even_when_it_fires(tmp_path)
     stop = {"hook_event_name": "Stop", "session_id": "fanout", "cwd": str(tmp_path),
             "last_assistant_message": "Handed that off."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unprobed_fanout must NEVER block, even when it fires"
+    assert out, "gate.unprobed_fanout (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unprobed_fanout" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unprobed_fanout" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1587,7 +1606,10 @@ def test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "unasked", "cwd": str(tmp_path),
             "last_assistant_message": "Plan is up."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unasked_plan must NEVER block, even when it fires"
+    assert out, "gate.unasked_plan (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unasked_plan" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unasked_plan" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1607,7 +1629,10 @@ def test_dispatch_unread_structure_gate_never_blocks_even_when_it_fires(tmp_path
     stop = {"hook_event_name": "Stop", "session_id": "unread_struct", "cwd": str(tmp_path),
             "last_assistant_message": "Done."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unread_structure must NEVER block, even when it fires"
+    assert out, "gate.unread_structure (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unread_structure" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unread_structure" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1621,7 +1646,10 @@ def test_dispatch_unwitnessed_verifier_gate_never_blocks_even_when_it_fires(tmp_
     stop = {"hook_event_name": "Stop", "session_id": "unwitnessed", "cwd": str(tmp_path),
             "last_assistant_message": "Done."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unwitnessed_verifier must NEVER block, even when it fires"
+    assert out, "gate.unwitnessed_verifier (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unwitnessed_verifier" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unwitnessed_verifier" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1635,7 +1663,10 @@ def test_dispatch_unknown_ref_switch_gate_never_blocks_even_when_it_fires(tmp_pa
     stop = {"hook_event_name": "Stop", "session_id": "unknown_ref", "cwd": str(tmp_path),
             "last_assistant_message": "Done."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unknown_ref_switch must NEVER block, even when it fires"
+    assert out, "gate.unknown_ref_switch (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unknown_ref_switch" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unknown_ref_switch" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1668,7 +1699,14 @@ def test_dispatch_unobserved_destruction_gate_never_blocks_even_when_it_fires(tm
     stop = {"hook_event_name": "Stop", "session_id": "unobserved", "cwd": str(tmp_path),
             "last_assistant_message": "Done."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unobserved_destruction must NEVER block, even when it fires"
+    assert out, "gate.unobserved_destruction (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    # A sibling ADVISE fingerprint (gate.canon_fingerprints_advisory) also fires on this exact
+    # input (see docstring) and _worst_finding may surface either one on the wire -- the
+    # audit.jsonl check below is what actually pins gate.unobserved_destruction firing.
+    assert ("gate.unobserved_destruction" in decision["reason"]
+            or "gate.canon_fingerprints_advisory" in decision["reason"])
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unobserved_destruction" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1685,7 +1723,10 @@ def test_dispatch_relaunched_unchanged_gate_never_blocks_even_when_it_fires(tmp_
     stop = {"hook_event_name": "Stop", "session_id": "relaunched", "cwd": str(tmp_path),
             "last_assistant_message": "Done."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.relaunched_unchanged must NEVER block, even when it fires"
+    assert out, "gate.relaunched_unchanged (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.relaunched_unchanged" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.relaunched_unchanged" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1704,7 +1745,10 @@ def test_dispatch_undischarged_waiver_gate_never_blocks_even_when_it_fires(tmp_p
     stop = {"hook_event_name": "Stop", "session_id": "waiver", "cwd": str(tmp_path),
             "last_assistant_message": "Done."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.undischarged_waiver must NEVER block, even when it fires"
+    assert out, "gate.undischarged_waiver (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.undischarged_waiver" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.undischarged_waiver" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1721,7 +1765,10 @@ def test_dispatch_unnamed_failure_gate_never_blocks_even_when_it_fires(tmp_path)
     stop = {"hook_event_name": "Stop", "session_id": "unnamed", "cwd": str(tmp_path),
             "last_assistant_message": "1 test failed; looking into it."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unnamed_failure must NEVER block, even when it fires"
+    assert out, "gate.unnamed_failure (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unnamed_failure" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unnamed_failure" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1740,7 +1787,10 @@ def test_dispatch_report_before_run_gate_never_blocks_even_when_it_fires(tmp_pat
     stop = {"hook_event_name": "Stop", "session_id": "reportfirst", "cwd": str(tmp_path),
             "last_assistant_message": "Handoff written."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.report_before_run must NEVER block, even when it fires"
+    assert out, "gate.report_before_run (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.report_before_run" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.report_before_run" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1759,7 +1809,10 @@ def test_dispatch_unclaimed_unit_gate_never_blocks_even_when_it_fires(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "unclaimed", "cwd": str(tmp_path),
             "last_assistant_message": "Added a helper."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.unclaimed_unit must NEVER block, even when it fires"
+    assert out, "gate.unclaimed_unit (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unclaimed_unit" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unclaimed_unit" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"
@@ -1783,7 +1836,10 @@ def test_dispatch_pasted_fix_gate_never_blocks_even_when_it_fires(tmp_path):
     stop = {"hook_event_name": "Stop", "session_id": "pasted", "cwd": str(tmp_path),
             "last_assistant_message": "Fixed both readers."}
     rc, out = _run_dispatch(state_dir, stop)
-    assert out == "", "gate.pasted_fix must NEVER block, even when it fires"
+    assert out, "gate.pasted_fix (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.pasted_fix" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.pasted_fix" in r.get("pattern_fires", []) for r in rows), \
         "the advisory fire must still be audited so it leaves a forensic trail"

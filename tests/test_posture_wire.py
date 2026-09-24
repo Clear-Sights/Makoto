@@ -114,10 +114,36 @@ def test_subagent_stop_block_echoes_subagent_stop_hook_name():
     assert body["hookEventName"] == "SubagentStop"
 
 
-def test_stop_non_block_postures_never_block():
-    for outcome in (posture.ASK, posture.ADVISE, posture.ALLOW):
+def test_stop_ask_and_allow_never_block():
+    for outcome in (posture.ASK, posture.ALLOW):
         assert dispatch_posture("Stop", outcome, "Stop") == {}
         assert dispatch_posture("SubagentStop", outcome, "SubagentStop") == {}
+
+
+def test_stop_advise_renders_as_block_worded_advice_when_not_reactivated():
+    """An ADVISE at Stop reaches the agent inside the turn — rendered as a Stop block (never {}) —
+    as long as the host has not already bounced this Stop once (stop_hook_active not true)."""
+    body = dispatch_posture("Stop", posture.ADVISE, "Stop")
+    assert body["decision"] == "block"
+    assert body["hookEventName"] == "Stop"
+    assert "reason" in body
+    body = dispatch_posture("SubagentStop", posture.ADVISE, "SubagentStop", stop_hook_active=False)
+    assert body["decision"] == "block"
+    assert body["hookEventName"] == "SubagentStop"
+
+
+def test_stop_advise_renders_nothing_once_already_reactivated():
+    """stop_hook_active True means the host already bounced this Stop once this turn; a second
+    ADVISE block would trap the turn rather than advise it, so it renders {}."""
+    assert dispatch_posture("Stop", posture.ADVISE, "Stop", stop_hook_active=True) == {}
+    assert dispatch_posture("SubagentStop", posture.ADVISE, "SubagentStop",
+                            stop_hook_active=True) == {}
+
+
+def test_stop_advise_detail_overrides_constant_reason():
+    d = posture.Decision(posture.ADVISE, detail="row gate.unread_structure: no prior read")
+    body = dispatch_posture("Stop", d, "Stop")
+    assert "gate.unread_structure" in body["reason"]
 
 
 # --- Post edge: structurally can never deny/block, only ADVISE or {} ----------------------------

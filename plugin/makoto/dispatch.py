@@ -628,7 +628,7 @@ def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -
 
 
 def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
-                   permission_mode=None) -> None:
+                   permission_mode=None, stop_hook_active: bool = False) -> None:
     """Fold the worst fired outcome through the configured MAKOTO_MODE posture (makoto.verdict) and
     render it via verdict.dispatch_posture's per-edge table, writing the body to stdout iff non-empty.
 
@@ -639,6 +639,10 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     `permission_mode` (D6, additive): threaded into `verdict.apply` so a session running
     bypassPermissions/dontAsk is clamped to STRICT regardless of the operator's configured
     MAKOTO_MODE — see `verdict.is_oversight_clamped`'s own docstring for why.
+
+    `stop_hook_active` (additive): the host payload's own flag, threaded to
+    `verdict.dispatch_posture` unchanged. It only gates the Stop-edge ADVISE rendering (a BLOCK
+    is never suppressed by it) — see `verdict._stop_advise`'s own docstring for why.
     """
     worst = _worst_finding(findings)
     if worst is None:
@@ -724,7 +728,8 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     # this drops a mislabelled body, never the record of the fire.
     edge = _HOOK_TO_EDGE.get(hook_event, hook_event)
     try:
-        body = verdict.dispatch_posture(edge, folded, hook_event)
+        body = verdict.dispatch_posture(edge, folded, hook_event,
+                                        stop_hook_active=stop_hook_active)
     except Exception as exc:
         # Same fail-closed rule as the fold above: a raise while RENDERING the verdict must not
         # become an exit-0 allow. Re-render what the fold already concluded with minimal
@@ -908,7 +913,8 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     if _gates_enabled():
         blocking += [gf for gf in gate_findings
                      if gf.pattern_id in _blocking_gate_ids()]
-    _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"))
+    _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"),
+                  stop_hook_active=payload.get("stop_hook_active") is True)
     _record_audit(state_dir, findings + gate_findings, payload)
 
 
