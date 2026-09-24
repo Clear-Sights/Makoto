@@ -13,22 +13,10 @@ working. `makoto.kit` is stdlib-only, so this adds no import cost to hook events
 """
 from makoto.kit import (
     normalize_path,
-    location_match,
-    quantity_match,
-    subject_binds,
-    detect_location,
     detect_locations,
-    detect_quantity,
-    bash_nonempty_violation,
 )
 
 __all__ = [
     "normalize_path",
-    "location_match",
-    "quantity_match",
-    "subject_binds",
-    "detect_location",
     "detect_locations",
-    "detect_quantity",
-    "bash_nonempty_violation",
 ]

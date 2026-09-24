@@ -558,7 +558,7 @@ def completion_gate(
       - a bare done-word with no location              (nothing to verify)
       - a path with no governing produce verb           (a heading, a reference, a code
                                                           listing, a subagent's deliverable)
-      - a non-path token (version/SHA/duration/task-id) (detect_location no longer matches it)
+      - a non-path token (version/SHA/duration/task-id) (the location regex no longer matches it)
       - a forward/negated frame                          ("will add X", "didn't add X")
     A produced-claim that IS touched, or that the filesystem confirms, is silent (fail-open).
     Only an unbacked production claim bites.
