@@ -1203,10 +1203,11 @@ from bisect import bisect_right
 # real filename from a dotted code identifier or version/pattern id.
 _EXT_RX = r"[a-z][a-z0-9]{0,4}"
 # A directory-qualified path: at least one '<segment>/' before a dotted basename. The `~/` branch
-# admits only a dotted basename DIRECTLY under the home root -- '~/.claude/foo.py' is not matched
-# today, and the leading-'/' lookbehind blocks re-entry at the inner '.claude/foo.py'.
+# also admits any number of further segments under the home root -- '~/project/helper.py' matches
+# the same as '~/foo.py'; the leading-'/' lookbehind still blocks re-entry at a bare inner segment
+# ('.claude/foo.py' alone, with no '~/' before it, is not a home-relative citation).
 _DIR_QUALIFIED_RX = re.compile(
-    rf"(?<![\w/.~-])((?:~/|(?:[\w.-]+/)+)[\w.-]*\.{_EXT_RX}(?::\d+)?)(?![\w/])"
+    rf"(?<![\w/.~-])((?:~/(?:[\w.-]+/)*|(?:[\w.-]+/)+)[\w.-]*\.{_EXT_RX}(?::\d+)?)(?![\w/])"
 )
 # A bare `name.ext:NNN` line-citation with no directory at all -- still a citation, still
 # unclickable without an absolute root.

@@ -15,6 +15,13 @@ def test_silent_on_absolute_path():
     assert find_relative_citations("see /home/user/makoto-dev/substrate/hollowTest.py") == []
 
 
+def test_fires_on_nested_home_relative_path():
+    """reword2: a home-relative path is still unclickable even with segments under it, not just
+    a bare basename directly under `~/`."""
+    hits = find_relative_citations("see ~/project/helper.py for the detector")
+    assert hits == [("~/project/helper.py", 4)]
+
+
 def test_silent_on_url():
     assert find_relative_citations("docs at https://example.com/guide.html for more") == []
 
