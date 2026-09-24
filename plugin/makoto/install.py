@@ -3,18 +3,12 @@
 Hook entries in ~/.claude/settings.json are tagged with _makoto_managed=True
 so unwire can find and remove them without touching user-authored entries.
 
-Env-aware behavior (1.0.4):
-- MAKOTO_DISABLE_PATTERNS=id1,id2  -> dispatcher skips listed patterns
-  status reports the current value under "patterns_disabled".
+MAKOTO_DISABLE_PATTERNS=id1,id2 makes the dispatcher skip listed patterns; status
+reports the current value under "patterns_disabled".
 
-cmd_install handles BOTH state-dir setup and settings.json wiring — useful
-when /plugin install is unavailable. Plugin-capable environments can just
-run `/plugin install <path>`; lazy init in dispatch covers state-dir
-bootstrap automatically, so `cmd_install` is the only makoto command they
-ever need to run (and only once, for the settings.json fallback path).
-
-The 1.0.3 collapse pass removed cmd_init (vestigial post-5.4 — lazy init
-covers it) and the audit subcommand routing.
+cmd_install handles BOTH state-dir setup and settings.json wiring, for when
+/plugin install is unavailable; lazy init in dispatch covers state-dir bootstrap
+automatically, so cmd_install is the only makoto command needed otherwise.
 """
 from __future__ import annotations
 import json
@@ -23,8 +17,8 @@ import re
 import sys
 from pathlib import Path
 from makoto.registry import load_checks, load_precheck_catalog
-# Hoisted 2026-07-09 to makoto.substrate.wiring (shared with checks/otherPoint.py, which the
-# gate-side layering firewall bars from importing this lifecycle module directly).
+# Shared with checks/otherPoint.py, which the gate-side layering firewall bars from importing
+# this lifecycle module directly.
 from makoto.substrate.wiring import (
     MAKOTO_CLAUDE_FLAG as _MAKOTO_CLAUDE_FLAG,
     entry_dispatches_to_makoto as _entry_dispatches_to_makoto,
@@ -34,16 +28,14 @@ from makoto.substrate.wiring import (
 )
 
 
-# The three settings.json events makoto wires and reports on. ONE tuple: `_wire_claude_hooks`
-# (the writer) and `_hooks_wired` (the reporter) have to agree about which events count as
-# wired, and two separate literals answering that question were free to drift apart.
+# The three settings.json events makoto wires and reports on. ONE tuple so the writer
+# (`_wire_claude_hooks`) and the reporter (`_hooks_wired`) can't drift apart on which events count.
 _WIRED_EVENTS = ("PreToolUse", "PostToolUse", "Stop")
 
 
 def _state_dir_path() -> Path:
-    """`~/.claude/makoto_state`. Resolved per call, never cached at import: the hook command
-    `_wire_claude_hooks` writes and the directory `cmd_install`/`cmd_status` measure must be the
-    same path, and one shared derivation is what makes that checkable rather than hopeful."""
+    """`~/.claude/makoto_state`. Resolved per call, never cached, so the writer and the reporter
+    always agree on the path."""
     return Path.home() / ".claude" / "makoto_state"
 
 
@@ -60,13 +52,10 @@ def _claude_md_path() -> Path:
 def _validate_predicate_modules() -> None:
     """install-time gate: every active pattern's predicate_module imports + has callable + has >=1 keyword.
 
-    Fails loud (exit 1) on import error, missing predicate, or empty keywords.
-    Skips rows with empty predicate_module (transitional state).
-
-    SPEC-C item 2 (Pre-tier cutover): sources the live catalog via load_precheck_catalog()'s DEFAULT
-    (loader-backed) path, not an explicit read of data/patterns.toml -- that file is no longer
-    the runtime source of truth, so gating this validation on its presence would make the gate
-    silently vacuous the moment the file is removed (item 2 step 3).
+    Fails loud (exit 1) on import error, missing predicate, or empty keywords. Skips rows with
+    empty predicate_module (transitional state). Sources the live catalog via
+    load_precheck_catalog(), never an explicit read of data/patterns.toml -- that file is not the
+    runtime source of truth, so gating on its presence would make this silently vacuous if removed.
     """
     import importlib
     for p in load_precheck_catalog():
@@ -93,9 +82,8 @@ def _validate_predicate_modules() -> None:
 def _install_bash_scripts(state_dir: Path) -> bool:
     """copy _dispatch_shim.sh into <state_dir>/dispatch.sh for settings.json hook wiring.
 
-    Returns whether the shim is on disk afterwards. A missing source silently produced an
-    install that reported success with no dispatch.sh — every wired hook then pointing at a
-    file that does not exist, i.e. makoto reporting itself installed while unable to fire."""
+    Returns whether the shim is on disk afterwards, so a missing source can't silently report
+    a successful install whose wired hooks point at a file that doesn't exist."""
     state_dir.mkdir(parents=True, exist_ok=True)
     shim_src = Path(__file__).parent / "_dispatch_shim.sh"
     if not shim_src.exists():
@@ -110,16 +98,13 @@ def _wire_claude_hooks(settings_path: Path) -> None:
     """add Makoto-managed PreToolUse + Stop hook entries pointing at dispatch.sh; idempotent.
 
     Idempotency is FUNCTIONAL: any entry already dispatching to makoto (managed, hand-wired, or
-    one of makoto's own installed forms — see `wiring.entry_dispatches_to_makoto`) is absorbed
-    into the single managed entry, never duplicated. Absorbing on the SAME predicate uninstall
-    removes with (`entry_owned_by_makoto`, an alias of the same function) keeps install and
-    uninstall inverses of each other — and its anchored invocation regex keeps a user's OWN
-    makoto-CLI hook (`python3 -m makoto.status`) out of both."""
+    one of makoto's own installed forms) is absorbed into the single managed entry, never
+    duplicated. Absorbing on the same predicate uninstall removes with keeps install/uninstall
+    inverses of each other, and keeps a user's own makoto-CLI hook out of both."""
     data = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
     hooks = data.setdefault("hooks", {})
     dispatch_path = _state_dir_path() / "dispatch.sh"
-    # A settings.json hook gets no CLAUDE_PLUGIN_ROOT, and the shim fails open without it, so
-    # the command names the root this package lives under.
+    # A settings.json hook gets no CLAUDE_PLUGIN_ROOT, and the shim fails open without it.
     root = Path(__file__).resolve().parent.parent.as_posix()
     for event in _WIRED_EVENTS:
         entries = hooks.setdefault(event, [])
@@ -134,27 +119,18 @@ def _wire_claude_hooks(settings_path: Path) -> None:
 
 def _unwire_claude_hooks(settings_path: Path) -> tuple[int, list[str]]:
     """Remove every hook entry makoto OWNS; preserve user entries. Returns `(entries_removed,
-    commands_removed)` — an ENTRY count (what was deleted from the file) alongside the inner
-    command strings (what to show the user), kept separate because one entry may carry several
-    commands and conflating the two counts is silently wrong in both directions.
+    commands_removed)` — an entry count alongside the inner command strings, kept separate
+    because one entry may carry several commands.
 
-    Keyed on `entry_owned_by_makoto` (an alias of `entry_dispatches_to_makoto` — see
-    `wiring.py`: the same predicate answers both "does this reach makoto" and "may makoto
-    delete this"). It used to key on the `_makoto_managed` flag ALONE, which broke twice over:
+    Keyed on `entry_owned_by_makoto` (an alias of `entry_dispatches_to_makoto`), not on the
+    `_makoto_managed` flag alone: the flag can decay (Claude Code's settings.json
+    re-serialization drops unknown keys while keeping hook entries) while the entry keeps
+    firing, and install absorbs any functionally-dispatching entry regardless of the flag, so
+    uninstall must key on the same predicate to stay its inverse.
 
-    1. The flag decays (#20). Claude Code re-serializes settings.json from a schema-parsed
-       representation that drops unknown keys — including `_makoto_managed` — while KEEPING the
-       hook entries. One `claude plugin marketplace add` is enough. After that the filter matched
-       nothing, so uninstall removed zero hook entries, forever, while still reporting success.
-    2. Install and uninstall were not inverses. `_wire_claude_hooks` absorbs any functionally
-       dispatching entry (flagged or hand-wired), so `install` would swallow a hand-wired
-       `python -m makoto.dispatch` entry, but `uninstall` left that same entry firing.
-
-    Reporting used functional truth while removal trusted the flag — the asymmetry
-    `_hooks_wired`'s own docstring warns about, applied to the other half of the contract.
-    A malformed settings.json fails LOUD (JSONDecodeError propagates) rather than silently:
-    this is the command whose whole job is un-wiring, and a settings file broken enough to
-    reject `json.loads` needs the user's attention, not a report that nothing was removed."""
+    A malformed settings.json fails LOUD (JSONDecodeError propagates): this command's whole job
+    is un-wiring, so a file broken enough to reject `json.loads` needs the user's attention, not
+    a report that nothing was removed."""
     if not settings_path.exists():
         return 0, []
     data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -182,24 +158,20 @@ def _unwire_claude_hooks(settings_path: Path) -> tuple[int, list[str]]:
 _CONV_START = "<!-- makoto-managed:conventions:start -->"
 _CONV_END = "<!-- makoto-managed:conventions:end -->"
 
-# The managed block, start marker through end marker. Compiled once and shared by both halves:
-# two copies of this pattern are two chances for the writer and the remover to stop matching the
-# same text, which is how a "removed" block survives a `makoto uninstall`.
+# The managed block, start through end marker. Shared by both halves so the writer and the
+# remover can't drift apart on what text counts as the block.
 _CONV_BLOCK_RX = re.compile(re.escape(_CONV_START) + r".*?" + re.escape(_CONV_END), re.S)
 
 
 def _strip_conventions_block(text: str) -> str:
-    """`text` with any makoto-managed conventions block removed, right-stripped — the shared
-    basis for refreshing the block (install) and for removing it (uninstall)."""
+    """`text` with any makoto-managed conventions block removed, right-stripped."""
     return _CONV_BLOCK_RX.sub("", text).rstrip()
 
 
 def _conventions_block_body() -> str:
     """the 3-line law installed into CLAUDE.md: the monotonicity invariant, the makoto-allow
-    convention, a pointer to the full conventions. The flagged-shapes catalog + examples are
-    deliberately NOT installed — each check delivers its convention just-in-time when it fires
-    (dispatch._jit_hint), so guidance lands at the moment it binds and costs zero adherence
-    budget when it doesn't."""
+    convention, a pointer to the full conventions. The flagged-shapes catalog is deliberately
+    NOT installed here -- each check delivers its own just-in-time when it fires."""
     conv = Path(__file__).resolve().parent / "docs" / "MAKOTO-CONVENTIONS.md"
     return (
         "**Makoto monotonicity invariant — falsifiability-preservation:** a word's meaning may "
@@ -213,8 +185,6 @@ def _conventions_block_body() -> str:
 def _install_claude_conventions(claude_md_path: Path) -> None:
     """write/refresh the makoto-managed conventions block in CLAUDE.md, idempotently.
 
-    Installs only the 3-line law (_conventions_block_body); the full shapes catalog stays in
-    docs/MAKOTO-CONVENTIONS.md and is delivered just-in-time by the hook at fire time.
     Only the text BETWEEN the managed markers is ever touched — user content is preserved.
     """
     block = f"{_CONV_START}\n{_conventions_block_body()}\n{_CONV_END}"
@@ -228,9 +198,8 @@ def _install_claude_conventions(claude_md_path: Path) -> None:
 def _uninstall_claude_conventions(claude_md_path: Path) -> bool:
     """Remove the makoto-managed conventions block; preserve all user content.
 
-    Returns whether a managed block was actually PRESENT and stripped — an absent CLAUDE.md and a
-    CLAUDE.md that never carried the block both removed nothing, and reporting those as
-    `conventions_removed: true` describes work that did not happen."""
+    Returns whether a managed block was actually PRESENT and stripped, so an absent CLAUDE.md
+    or one that never carried the block is never reported as `conventions_removed: true`."""
     if not claude_md_path.exists():
         return False
     existing = claude_md_path.read_text(encoding="utf-8")
@@ -242,13 +211,10 @@ def _uninstall_claude_conventions(claude_md_path: Path) -> bool:
 
 
 def _record_configchange_manifest(settings_path: Path, *, state_dir: Path) -> None:
-    """D5 (docs/DEFERRED.md, owner-authorized blocking flip, 2026-07-08): record that the
-    installer wired Makoto's hooks into `settings_path`, so `configchange.py`'s
-    blocking tier can treat a LATER full-strip of this exact path as a genuine strip (not the
-    ambiguous "never wired" case `configchange_verdict` cannot distinguish on its own) -- ground
-    truth from the one place that actually knows what it wired, complementary to (not a
-    replacement for) the transition-snapshot half of the same detector. Fail-open: a write
-    failure here must never break install."""
+    """Record that the installer wired Makoto's hooks into `settings_path`, so
+    `configchange.py`'s blocking tier can treat a LATER full-strip of this exact path as a
+    genuine strip rather than the ambiguous "never wired" case. Fail-open: a write failure here
+    must never break install."""
     manifest_path = state_dir / "configchange_manifest.json"
     try:
         paths = set(json.loads(manifest_path.read_text(encoding="utf-8"))) if manifest_path.exists() else set()
@@ -264,11 +230,9 @@ def _record_configchange_manifest(settings_path: Path, *, state_dir: Path) -> No
 def cmd_install() -> int:
     """state-dir setup + ~/.claude/settings.json hook wiring. Idempotent.
 
-    Every reported field is measured after the fact, for the same reason `cmd_uninstall`'s is:
-    `makoto_db_initialized` and `settings_wired` were printed as literal `True` regardless of
-    outcome, so an install that wired nothing — or wired hooks pointing at a dispatch.sh that
-    was never copied — still reported success. `cmd_status` already derived exactly these values
-    honestly; install asserted them."""
+    Every reported field is measured after the fact rather than asserted, so an install that
+    wired nothing -- or wired hooks pointing at a dispatch.sh never copied -- can't still report
+    success."""
     _validate_predicate_modules()
     state_dir = _state_dir_path()
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -283,7 +247,6 @@ def cmd_install() -> int:
     _record_configchange_manifest(settings, state_dir=state_dir)
     claude_md = _claude_md_path()
     _install_claude_conventions(claude_md)
-    # post-conditions, re-read from disk
     settings_wired = _hooks_wired_on_disk(settings, on_unreadable=False)
     try:
         conventions_written = _CONV_START in claude_md.read_text(encoding="utf-8")
@@ -307,10 +270,9 @@ def _plugin_wiring_report() -> dict:
 
     Unwiring settings.json does not disable an enabled `makoto@makoto` plugin — its manifest
     wires the same dispatch independently, so an uninstall can look clean in settings.json while
-    plugin hooks still fire on every event. Claude Code's plugin-enablement store is not
-    something makoto reads, so this reports what it can observe ($CLAUDE_PLUGIN_ROOT and the
-    manifest there) and says plainly when it cannot observe the rest. An unknown reported as
-    unknown is the point: the previous output implied a completeness it never checked."""
+    plugin hooks still fire. Claude Code's plugin-enablement store is not something makoto reads,
+    so this reports only what it can observe ($CLAUDE_PLUGIN_ROOT and the manifest there) and
+    says plainly when it cannot observe the rest."""
     root = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if not root:
         return {"plugin_hooks_declared": None,
@@ -337,20 +299,12 @@ def cmd_uninstall() -> int:
 
     Every field printed is MEASURED. `unwired` is a post-condition: settings.json is RE-READ from
     disk after the write and put through `_hooks_wired`, the same predicate `cmd_status` reports
-    with — so the two commands can no longer contradict each other (they did, #20: uninstall
-    printed `unwired: true` while status, run immediately after, printed `hooks_wired: true`).
-
-    This output used to be the literal `{"unwired": True, "conventions_removed": True,
-    "state_dir_kept": True}` — printed unconditionally, measuring nothing, with the removal
-    itself silently no-opping whenever the `_makoto_managed` flags had decayed. An integrity
-    tool whose own success report is a claim rather than a measurement fails the standard it
-    enforces."""
+    with, so the two commands can never contradict each other."""
     settings = _settings_path()
     state_dir = _state_dir_path()
     entries_removed, commands_removed = _unwire_claude_hooks(settings)
     conventions_removed = _uninstall_claude_conventions(_claude_md_path())
-    # post-condition, re-read from disk: what the file SAYS now, not what we believe we wrote.
-    # No file at all -> nothing left to fire; a file we cannot read -> we cannot claim unwired.
+    # Re-read from disk: no file -> nothing left to fire; unreadable -> can't claim unwired.
     still_wired = settings.exists() and _hooks_wired_on_disk(settings, on_unreadable=True)
     print(json.dumps({
         "hook_entries_removed": entries_removed,
@@ -367,22 +321,19 @@ def cmd_uninstall() -> int:
 def _hooks_wired(data: dict) -> bool:
     """True iff settings.json carries at least one hook entry that DISPATCHES to makoto.
 
-    Recognizes BOTH forms: the managed-flag entry cmd_install writes (`_makoto_managed`), AND a
-    flag-less entry whose command points at makoto's dispatch (a hand-wired / shim install:
-    `…/makoto_state/dispatch.sh`, `python -m makoto.dispatch`). The flag exists for idempotent
-    UNINSTALL; reporting WIRING must use the functional truth — does a hook reach makoto — or status
-    lies (hooks_wired=false) on a device where makoto is in fact firing."""
+    Recognizes both the managed-flag entry cmd_install writes and a flag-less hand-wired/shim
+    entry whose command points at makoto's dispatch. Reporting WIRING must use functional truth
+    — does a hook reach makoto — or status lies on a device where makoto is in fact firing."""
     hooks = data.get("hooks", {})
     return any(_entry_dispatches_to_makoto(h)
                for evt in _WIRED_EVENTS for h in hooks.get(evt, []))
 
 
 def _hooks_wired_on_disk(settings_path: Path, *, on_unreadable: bool) -> bool:
-    """`_hooks_wired` against what `settings_path` SAYS right now — the post-condition both
-    `cmd_install` and `cmd_uninstall` report with, re-read from disk rather than assumed from
-    the write. `on_unreadable` is the answer when the file cannot be read or parsed, and the two
-    callers deliberately differ: install cannot claim `settings_wired` (False), uninstall cannot
-    claim `unwired` (True). Reporting-only — the loud-failure path belongs to the writers."""
+    """`_hooks_wired` against what `settings_path` SAYS right now, re-read from disk rather than
+    assumed from the write. `on_unreadable` is the answer when the file can't be read or parsed;
+    install and uninstall deliberately differ (False vs True) since each must fail toward its
+    own honest claim."""
     try:
         return _hooks_wired(json.loads(settings_path.read_text(encoding="utf-8")))
     except Exception:
@@ -392,9 +343,8 @@ def _hooks_wired_on_disk(settings_path: Path, *, on_unreadable: bool) -> bool:
 def cmd_status() -> int:
     """report patterns_count, hooks_wired, state_dir."""
     state_dir = _state_dir_path()
-    # SPEC-C item 2 (Pre-tier cutover): the live catalog count, not a literal patterns.toml read.
-    # Loaded ONCE and reused for the mute-eligibility set below — each call re-globs checks/ and
-    # re-imports every candidate module, and a second load could only ever agree with the first.
+    # Loaded ONCE and reused for the mute-eligibility set below -- a second load would only
+    # re-glob checks/ and re-import every candidate module to agree with the first.
     catalog = load_precheck_catalog()
     patterns_count = len(catalog)
     settings = _settings_path()
@@ -402,16 +352,10 @@ def cmd_status() -> int:
     if settings.exists():
         data = json.loads(settings.read_text(encoding="utf-8"))
         hooks_wired = _hooks_wired(data)
-    # MAKOTO_DISABLE_PATTERNS is honored by the Pre-tier predicate loop ONLY
-    # (`dispatch._run_predicates`); the Stop gates are governed by their own `_gates_enabled()`
-    # switch and never consult this list. Echoing the raw request as `patterns_disabled`
-    # therefore told a user who muted a noisy GATE that it was disabled while it went on
-    # blocking them — the report asserting an effect the decision path never applies, the same
-    # defect as an uninstall that reports `unwired` without measuring. Requested vs effective
-    # are separate fields, and an id that cannot fully take effect is named rather than
-    # silently implied. A Stop-edge id keeps firing regardless of the env var, so requesting a
-    # mute for one is ineffective too. (Until 2026-09-18 gate.contract_order was a check on BOTH
-    # edges and only its Pre half could be muted; no id is dual-edge today.)
+    # MAKOTO_DISABLE_PATTERNS is honored by the Pre-tier predicate loop ONLY; Stop gates are
+    # governed by their own `_gates_enabled()` switch and never consult this list. So requested
+    # vs. effective are reported as separate fields, rather than telling a user who muted a
+    # noisy gate that it was disabled while it kept firing.
     requested = [p.strip() for p in os.environ.get("MAKOTO_DISABLE_PATTERNS", "").split(",") if p.strip()]
     stop_ids = {c.id for c in load_checks(edge="Stop")}
     muteable = {p.id for p in catalog} - stop_ids

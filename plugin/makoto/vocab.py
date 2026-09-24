@@ -1,32 +1,17 @@
 """Shared vocabulary: PreCheck + Finding dataclasses, plus the L0 lexicons.
 
-Merged from core/schema.py + core/lexicons.py (Stage 2, seam 3) -- both pure data.
-
---- schema (dataclasses) ---
-PreCheck + Finding dataclasses.
-
 PreCheck fields are the minimum data needed at hot-path dispatch:
   id / fire_level / description / retry_hint / predicate_module / keywords.
 
-The 1.0.3 collapse dropped intent / motivation / evidence from the dataclass
-(forensic catalog metadata). Those facts belong in the check module's own
-docstring, not in the Python dataclass — predicates never read them at runtime.
+`PreCheck` survives as a convenience dataclass for hand-constructing synthetic pattern fixtures
+in unit tests that call a predicate directly without going through the loader; the live Pre-tier
+catalog is `registry.load_precheck_catalog()`, whose rows are `Check` instances, not `PreCheck`
+instances -- the two are structurally similar but not the same type, and nothing at runtime
+converts one into the other.
 
-The `load_prechecks()` TOML-adapter loader that used to live here (schema.py owning a second,
-parallel catalog alongside `registry`) was retired 2026-08-16: the migration to a
-single discovery path (`registry.load_checks`/`load_precheck_catalog`) is complete.
-`PreCheck` itself survives as a convenience dataclass for hand-constructing synthetic pattern
-fixtures in unit tests that call a predicate directly without going through the loader; the live
-Pre-tier catalog is `registry.load_precheck_catalog()`, whose rows are `Check`
-instances, not `PreCheck` instances -- the two are structurally similar but no longer the same
-type, and nothing at runtime converts one into the other.
-
---- lexicons (regexes + word-sets) ---
-L0 lexicons — the single home for makoto's regexes + word-sets.
-
-Pure data: compiled regexes + frozensets, no in-package imports (L0 of the layered DAG).
-Detectors, gates, and primitives import these by name so one edit governs every surface.
-Stdlib only (re). CUT verbatim from predicates/helpers.py (Task 3) — never retyped.
+L0 lexicons — the single home for makoto's regexes + word-sets. Pure data: compiled regexes +
+frozensets, no in-package imports (L0 of the layered DAG). Detectors, gates, and primitives
+import these by name so one edit governs every surface.
 """
 from __future__ import annotations
 import re
@@ -36,11 +21,10 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class PreCheck:
     """one declarative pattern definition -- test-fixture convenience shape ONLY (the live
-    Pre-tier catalog is `registry.load_precheck_catalog()`, whose rows are `Check`
-    instances, not this class). Kept for tests that hand-construct a synthetic pattern to call
-    a predicate directly, unit-test style."""
+    Pre-tier catalog is `registry.load_precheck_catalog()`, whose rows are `Check` instances, not
+    this class)."""
     id: str
-    fire_level: str                                          # "error" ONLY, by convention -- no longer runtime-checked here
+    fire_level: str                                          # "error" ONLY, by convention
     description: str                                          # human-facing; interpolated into Finding.message
     retry_hint: str = ""                                      # agent-facing imperative remediation hint
     predicate_module: str = ""                                # dotted path to the predicate function
@@ -58,10 +42,8 @@ class Finding:
     retry_hint: str = ""
     snippet: str = ""
     source_event_id: int = 0   # provenance: the events.id this finding was derived from.
-                               # Stamped centrally at the dispatch boundary (where event_id is
-                               # in scope) via dataclasses.replace — predicates stay pure detectors
-                               # and never thread it themselves. A live-dispatched finding always
-                               # carries a non-zero id (enforced by test_source_event_id.py); a 0
+                               # Stamped centrally at the dispatch boundary via
+                               # dataclasses.replace, so predicates stay pure detectors. A 0
                                # marks a finding built outside the hot path (a direct unit call).
 
 
@@ -77,14 +59,12 @@ _PATH_EXT = (
 
 _NEGATION_RX = re.compile(r"\b(not|never|no)\b|n['’]t\b", re.IGNORECASE)
 
-# Universal exemption marker (2026-05-29). Makoto's bundled CLAUDE.md (written by the
-# installer) teaches the AI: when a flagged shape is LEGITIMATE, annotate it with
+# Universal exemption marker: the bundled CLAUDE.md tells the AI that when a flagged shape is
+# LEGITIMATE, annotate it with
 # `makoto-allow: <reason>` and makoto will not flag it. This makes every content-scan
 # pattern FP-exemptable EVERYWHERE — a compliant AI marks its legitimate cases, so only
-# UNMARKED (likely-violation) content fires. Generalizes the ADR-backlink exemption
-# (1.4/1.8) to all content-scan patterns. makoto targets the AI (which reads the bundled
-# CLAUDE.md), never the user. The marker is plain-text + case-insensitive so it works in
-# any language/comment style. Like the ADR exemption, it is file-level (a deliberate evader
+# UNMARKED (likely-violation) content fires. The marker is plain-text + case-insensitive so it
+# works in any language/comment style. It is file-level (a deliberate evader
 # who writes a false `makoto-allow: <reason>` leaves an on-the-record, auditable rationale).
 # Structured marker (2026-06-01, §7.5b): `makoto-allow:` followed by a non-empty reason. A bare
 # `makoto-allow` with no colon/reason no longer exempts — an exemption without an on-the-record
@@ -97,20 +77,15 @@ _MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE
 
 # JWT/JOSE library callee gate — a `decode` call is a JWT verification iff its callee chain names a
 # jwt/jose library, BOUNDARY-delimited so `myjwthelper` does not match: `jwt`, `jose` (python-jose),
-# `pyjwt`. Shared by content.jwt_signature_disabled (verify=False / verify_signature) and content.jwt_none_alg (algorithms=["none"]).
+# `pyjwt`.
 JWT_CALLEE_RX = re.compile(r"(?i)(?:^|\.)(?:jwt|jose|pyjwt)(?:\.|$)")
 
 # ---- Test-runner provenance + failure-verdict (shared by the ledger + the green-claim gate) ----
-# Shared vocabulary for gate.green_claim (checks.falseGreenClaim.green_claim_gate):
-#   _TEST_RUNNER_RX  — the legacy lexical runner vocabulary, retained as an import-compatible
-#                      lexicon export. Actual command provenance is argv-structured in
-#                      core._shell._command_runs_tests: a runner word inside `cat pytest.log`,
-#                      quoted prose, or a comment is not an invocation and never becomes a
-#                      `testrun` ledger row.
-#   kit.is_failing_testrun — does test-runner OUTPUT show >=1 REAL failure? xfail-safe by
-#                      construction: `\bfailed\b` cannot match inside `xfailed`/`xpassed` (no word
-#                      boundary), and the count must be >=1, so `=== 681 passed, 3 xfailed ===` and
-#                      a clean `=== 681 passed ===` are both NOT failures.
+# _TEST_RUNNER_RX is the legacy lexical runner vocabulary, retained as an import-compatible
+# export; actual command provenance is argv-structured in core._shell._command_runs_tests, so a
+# runner word inside `cat pytest.log` or quoted prose is not an invocation.
+# kit.is_failing_testrun asks: does test-runner OUTPUT show >=1 REAL failure? xfail-safe since
+# `\bfailed\b` cannot match inside `xfailed`/`xpassed` (no word boundary).
 _TEST_RUNNER_RX = re.compile(
     r"\b("
     r"pytest|py\.test|python[0-9.]*\s+-m\s+(?:pytest|unittest)|-m\s+unittest|"
@@ -154,10 +129,9 @@ _FAILURE_MARKER_RX = re.compile(
     r"^(?:FAILED\s+\S|ERROR\s+\S|FAIL\b|={2,}\s*FAILURES\s*={2,}|={2,}\s*ERRORS\s*={2,})",
     re.MULTILINE)
 
-# ANSI SGR color codes. vitest/jest colorize the summary, and the SGR terminator 'm' is a WORD char
-# that abuts the count ('\x1b[31m2 failed'), killing the \b before `[1-9]\d* failed` so a REAL
-# failing run reads as green. Stripped before failure detection (is_failing_testrun) — FP-safe:
-# removing color cannot manufacture a failure, and the count/xfail word-boundary guards are untouched.
+# ANSI SGR color codes. vitest/jest colorize the summary, and the SGR terminator 'm' is a WORD
+# char that abuts the count ('\x1b[31m2 failed'), killing the \b before `[1-9]\d* failed` so a
+# REAL failing run reads as green. Stripped before failure detection (is_failing_testrun).
 _ANSI_SGR_RX = re.compile(r"\x1b\[[0-9;:]*m")
 
 # _ADMIT_CORE — the retrospective first-person admission shapes.
@@ -210,10 +184,9 @@ _CITATION_RX = re.compile(
     r'\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?)\s+(?:et al\.\s+)?(\d{4})\b'
 )
 
-# Capitalized English words that match the Author position of the regex but
-# aren't author surnames. Added 1.0.5 (v§16): live audit log showed 40% FP rate
-# on content.phantom_citation from precisely this shape — 'Saved 2026' (date prefix),
-# 'The 2023' (article+year), etc.
+# Capitalized English words that match the Author position of the regex but aren't author
+# surnames -- 'Saved 2026' (date prefix), 'The 2023' (article+year), etc. measured to drive a
+# 40% FP rate on content.phantom_citation without this filter.
 _CITATION_AUTHOR_STOPWORDS = frozenset({
     # Articles / determiners
     "The", "This", "That", "These", "Those", "A", "An", "Any", "Some",
@@ -242,20 +215,17 @@ _CITATION_AUTHOR_STOPWORDS = frozenset({
 })
 
 
-# --- Stop-gate vocabulary (relocated from engine.py, §3b/§6 — L0) ---
+# --- Stop-gate vocabulary ---
 
 # A PRODUCTION claim asserts the assistant PRODUCED/changed a file (past/perfective):
 # "wrote / created / added / saved / updated / implemented ... <path>". The completion gate
 # fires only when such a verb GOVERNS a located path that has no trace — never on a mere
-# co-occurrence of a done-word and a path. This is the 'make it clearer, not looser' fix for
-# the measured 9% completion-gate FP (displaying code, listing a subagent's deliverable, an
-# incidental path mention). A produce verb within _BIND_BEFORE chars before the path binds --
-# unless a forward frame ("will/going to/next/TODO") or a negation ("didn't/couldn't/not") sits
-# right against it.
-# A produce verb in ACTIVE past/perfective voice. `built(?!-)` so the adjective "built-in"
-# does not false-match. The gate requires the verb to sit BEFORE the path and govern it
-# directly — "I created `X`", "Wrote `X` to `Y`" — never the passive "`X` was created" or a
-# verb that governs a different clause's noun.
+# co-occurrence of a done-word and a path (this avoided a measured 9% completion-gate FP:
+# displaying code, listing a subagent's deliverable, an incidental path mention). A produce verb
+# within _BIND_BEFORE chars before the path binds -- unless a forward frame or a negation sits
+# right against it. `built(?!-)` so the adjective "built-in" does not false-match. The gate
+# requires the verb to sit BEFORE the path and govern it directly — "I created `X`" — never the
+# passive "`X` was created".
 _PRODUCE_VERB_RX = re.compile(
     r"\b(wrote|written|created|added|saved|implemented|generated|produced|built(?!-)|"
     r"updated|modified|landed|committed|emitted|wired|refactored|patched|"
@@ -263,16 +233,13 @@ _PRODUCE_VERB_RX = re.compile(
 # A passive/copular auxiliary right before the verb ⇒ "was written / is wired" — a
 # description of state or of another subject's action, NOT a first-person production claim.
 _BE_AUX_RX = re.compile(r"(?:\b(?:was|were|is|are|been|being|be|am)\s*$)|(?:['’](?:s|re)\s*$)", re.IGNORECASE)
-# A conditional/hypothetical OFFER governing a promise -> not a firm commitment. Hoisted here
-# when it was byte-identical in the file-path commitment store and `state/plan.py`, the same
-# class of drift risk `_BE_AUX_RX` above was hoisted for; that store was cut 2026-09-18, so
-# `state/plan.py` is the one consumer now.
+# A conditional/hypothetical OFFER governing a promise -> not a firm commitment. `state/plan.py`
+# is the one consumer.
 _OFFER_COND_RX = re.compile(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
                             re.IGNORECASE)
 # Makoto watches the AI's OWN promises: a commitment needs a FIRST-PERSON subject ("I'll add X",
 # "we need to write X") OR a clause-initial imperative ("Add X to Y"). A THIRD-PERSON or
-# adverbial subject is NOT a promise the AI made. Hoisted with `_OFFER_COND_RX` above, same
-# reason, and likewise down to one consumer.
+# adverbial subject is NOT a promise the AI made.
 _FIRST_PERSON_RX = re.compile(
     r"\b(?:i|we|i'?ll|we'?ll|i'?m|we'?re|i'?ve|we'?ve|i'?d|we'?d|let'?s|my|our)\b", re.IGNORECASE)
 # A clause boundary between the verb and the path ⇒ the verb governs a different clause.
@@ -280,24 +247,19 @@ _CLAUSE_BREAK_RX = re.compile(r"[.;:\n—]")
 # A double- or single-quoted string span — used to blank quoted argument bodies before scanning a shell
 # command, so a --message/path body that merely MENTIONS a keyword can't masquerade as the command itself.
 _QUOTED_RX = re.compile(r'"[^"]*"|\'[^\']*\'')
-# A full ```fenced``` code block (DOTALL: the span crosses newlines). L0 SINGLE SOURCE for fenced-span
-# extraction — substrate.claims._code_spans (fences + inline backticks) consumes this exact
-# object, so the fence regex lives in one place. It had a second consumer,
-# state.commitments._fenced_spans, until that store was cut 2026-09-18. Distinct from the
-# `_FENCE_RX` line-anchored parity marker (a different algorithm, correctly not shared), which
-# now lives in checks.relativePathCitation alone.
+# A full ```fenced``` code block (DOTALL: the span crosses newlines). L0 SINGLE SOURCE for
+# fenced-span extraction — substrate.claims._code_spans (fences + inline backticks) consumes
+# this exact object, so the fence regex lives in one place. Distinct from the `_FENCE_RX`
+# line-anchored parity marker (a different algorithm), which lives in checks.relativePathCitation.
 _FENCE_SPAN_RX = re.compile(r"```.*?```", re.DOTALL)
 
-# UNAMBIGUOUS integrity / verification / audit vocabulary (a raw alternation STRING, not a compiled
-# regex — each consumer anchors it differently). L0 SINGLE SOURCE for the integrity-named-concept
-# word-set: checks.integritySuppressionFlag (suppression-flag KEY names an integrity concept,
-# anchored into a TOML-line regex) and checks.envGatedAudit (the gated body / env-var key names an
-# integrity concept) both consume THIS string, so the vocabulary lives in one place.
-# Deliberately NARROW: broad stems
-# (validat/guard/enforc/seal/complian) were dropped 2026-06-02 after a reviewer cited concrete
-# non-integrity toggles they would block (`input_validation_skip` = web-form validation, a UI
-# `guard_skip`, a rate-limit `enforce_skip`). Every stem here names the integrity/verification/audit
-# of a CHECK, not a generic policy — so a blocking fire stays MATERIAL.
+# UNAMBIGUOUS integrity / verification / audit vocabulary (a raw alternation STRING, not a
+# compiled regex — each consumer anchors it differently). L0 SINGLE SOURCE for the
+# integrity-named-concept word-set, consumed by checks.integritySuppressionFlag and
+# checks.envGatedAudit. Deliberately NARROW: broad stems (validat/guard/enforc/seal/complian)
+# were dropped after a reviewer cited concrete non-integrity toggles they would block
+# (`input_validation_skip` = web-form validation). Every stem here names the
+# integrity/verification/audit of a CHECK, not a generic policy — so a blocking fire stays MATERIAL.
 _INTEG_VOCAB = r"audit|verif|integrit|attest|checksum|signatur|tamper|provenance"
 _FORWARD_FRAME_RX = re.compile(
     r"\b(will|going to|gonna|i'?ll|plan to|need to|about to|next|todo|should|"
@@ -310,13 +272,10 @@ _NEG_FRAME_RX = re.compile(
 # a done-word through FUNCTION WORDS ONLY: "all done", "everything is complete", "the whole
 # thing is finished". The head is the genuine unbounded quantifier — "everything", bare "all",
 # or the idiom "the whole/entire <scope-noun>". A DETERMINER ("all four phases", "every variant
-# tested", "all Wave-2 validators complete") puts a CONTENT noun/number between the quantifier
-# and the done-word: that is distributive or scoped/enumerable, NOT the unbounded "the whole
-# task is done" claim the advance gate owns. Every one of the six adjudicated real-corpus FPs
-# was a determiner ("every variant tested"), a scoped/count claim, or a done-word quoted from
-# code (`done|complete|finished`) — this head-vs-determiner split, plus code-span exclusion,
-# kills all six without a char-window heuristic. ('complete' alone is a SCOPED done-word, never
-# a quantifier — "the design is complete" must not fire; the head quantifier is required.)
+# tested") puts a CONTENT noun/number between the quantifier and the done-word: that is
+# distributive or scoped/enumerable, NOT the unbounded claim the advance gate owns. ('complete'
+# alone is a SCOPED done-word, never a quantifier — "the design is complete" must not fire; the
+# head quantifier is required.)
 _HEAD_UNIVERSAL = (r"(?:everything|all|the\s+(?:whole|entire)\s+"
                    r"(?:thing|lot|project|repo|codebase|suite|implementation|task|job|set))")
 _DONE_WORD = (r"(?:done|complete|completed|finished|finalis\w+|finaliz\w+|implemented|built|"
@@ -365,11 +324,7 @@ _GREEN_UNIVERSAL_PREMOD = frozenset(
     {"the", "all", "every", "our", "my", "full", "entire", "whole", "complete", "test"})
 
 # ---- recorded per-test verdicts: the EVIDENCE side of a named-test claim ----------------------
-# Relocated here 2026-09-18 from checks/switch.py, unchanged. It sat in a NAMED check
-# module, so the two other consumers could not reach it: tests/test_import_direction.py firewalls
-# check siblings from each other, and `kit.compute_delta` needed a documented call-time back-edge
-# (`_CALL_TIME_OK`) to import it at all -- an exception this move DELETES. A parser is lexicon,
-# and lexicon is rank 0, where every layer above can reach it.
+# A parser is lexicon, and lexicon is rank 0, where every layer above can reach it.
 
 # A bare pytest-style test identifier. Exact token; coreference is by exact string equality.
 _TESTNAME_RX = re.compile(r"\btest_[A-Za-z0-9_]+")
@@ -377,11 +332,10 @@ _TESTNAME_RX = re.compile(r"\btest_[A-Za-z0-9_]+")
 # Recorded per-test FAILED / PASSED markers (the evidence side). Case-SENSITIVE runner tokens so
 # prose like "failed to connect" never matches. Both orderings (verdict leads / trails the id).
 # The lead forms tolerate a line PREFIX before the verdict token (pytest-xdist emits
-# "[gw0] [100%] PASSED tests/…::test_x"; the old ^-anchor recorded that runner's FAILED via the
-# short-summary line but never its PASSED, so a real red became undischargeable). The id captures
-# the MODULE PATH (the header's "exact test id" pin — a bare-name key let tests/a's failure deny a
-# claim about tests/b's same-named green test) and any PARAMETRIZATION suffix (stripping it let a
-# green test_charge[eur] discharge a red test_charge[usd]).
+# "[gw0] [100%] PASSED tests/…::test_x"). The id captures the MODULE PATH (a bare-name key would
+# let tests/a's failure deny a claim about tests/b's same-named green test) and any
+# PARAMETRIZATION suffix (stripping it would let a green test_charge[eur] discharge a red
+# test_charge[usd]).
 _TEST_ID = r"(?P<path>\S*?)::(?P<name>test_[A-Za-z0-9_]+(?:\[[^\]\n]*\])?)"
 _REC_FAIL_LEAD_RX = re.compile(r"^[^\n]*?\b(?:FAILED|ERROR)\s+" + _TEST_ID, re.MULTILINE)
 _REC_FAIL_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
@@ -396,8 +350,8 @@ _TEETH_SCOPE_AFTER = 120
 
 
 def _recorded_names(text: str, lead_rx, trail_rx) -> set:
-    """Shared shape of recorded_failed_names/recorded_passed_names (found alpha-equivalent by AST
-    canonicalization, 2026-07-09) -- same extraction, different verdict regex pair."""
+    """Shared shape of recorded_failed_names/recorded_passed_names -- same extraction, different
+    verdict regex pair."""
     if not text:
         return set()
     return ({m.group("name") for m in lead_rx.finditer(text)}
@@ -414,10 +368,9 @@ def recorded_passed_names(text: str) -> set:
     return _recorded_names(text, _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX)
 
 
-# DELIBERATELY-INDUCED failure framing (lifted from the named-test check 2026-06-09, two consumers:
-# checks.namedTestTeeth's #1 firewall + checks.stalePytestCache's claim window): a FAILED produced
-# by mutation/teeth testing is
-# not a material failure — the test FAILED because the code was intentionally broken to prove it has
+# DELIBERATELY-INDUCED failure framing (two consumers: checks.namedTestTeeth's firewall +
+# checks.stalePytestCache's claim window): a FAILED produced by mutation/teeth testing is not a
+# material failure — the test FAILED because the code was intentionally broken to prove it has
 # teeth.
 _TEETH_FRAME_RX = re.compile(
     r"\b(?:neuter(?:ed|ing|s)?|mutat(?:e|es|ed|ing|ion|ions)|teeth|"

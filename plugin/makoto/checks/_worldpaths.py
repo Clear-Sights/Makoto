@@ -1,42 +1,26 @@
 """Cross-machine and cross-process world resolution for Stop gates.
 
-gate.completion verifies a production claim against the results ledger and a cwd-relative
-os.path.exists. That observation window alone misses a file that lives under a synced repo root
-rather than under cwd.
+gate.completion checks a claim against the results ledger and a cwd-relative os.path.exists,
+which misses a file living under a synced repo root instead of cwd. This module WIDENS THE
+OBSERVATION, never the verdict: every successful resolution still ends in a live
+os.path.exists.
 
-This module WIDENS THE OBSERVATION, never the verdict:
+Candidate roots are only local git work-trees this session actually synced (a `git pull|fetch`
+Bash event, bounded, no os.walk on the Stop hot path). A candidate file must be git-tracked in
+that root and suffix-match the claim at a path-separator boundary (auth.py never matches
+auth_helper.py).
 
-  - candidate roots are ONLY local git work-trees this session actually synced — a
-    `git -C <dir> pull|fetch` or `cd <dir> && git pull|fetch` Bash event (bounded regex over
-    session history; no os.walk, per the Stop-hot-path rule in dispatch);
-  - a candidate file must be git-TRACKED in that root (`git ls-files` — an index query, not a
-    filesystem crawl) AND suffix-match the claim at a path-separator boundary (the fakeexcuse
-    firewall from substrate._shared: auth.py never matches auth_helper.py) AND exist on disk
-    right now.
+Cross-process: a repo-relative artifact resolves from the local git worktree root and must
+exist on disk now; a pushed-branch claim is backed only when the local branch and
+`refs/remotes/origin/<branch>` point to the same object. No `git ls-remote` — network I/O does
+not belong on the Stop hot path.
 
-A claim about a file that exists nowhere still blocks: every successful file resolution ends in
-a live os.path.exists (and the synced-repo route additionally requires a tracked file).
-Falsifiability is preserved — the check sees more of the world; it does not believe more of the
-word.
+`substrate._shared` holds the cross-process implementations; re-exported here beside the
+cross-machine resolver for one facade.
 
-Cross-process observations follow the same law:
-
-  - a repo-relative artifact is resolved from the local Git worktree root, then must exist on
-    disk now (a child process need not have emitted a visible Write event);
-  - a pushed-branch claim is backed only when the local branch and its
-    `refs/remotes/origin/<branch>` world-trace both exist and point to the same object.
-
-Both are bounded local Git metadata reads. There is deliberately no `git ls-remote`: network I/O
-does not belong on the Stop hot path.
-
-The cross-process implementations live in `substrate._shared`, the architecture-approved common
-home imported by gate modules; this module re-exports them beside the earlier cross-machine
-resolver so callers have one world-resolution facade.
-
-Deliberate non-goal: commands inside an `ssh <host> '...'` string can match the cd-form and
-yield a REMOTE path. Harmless by construction — the path only survives if it is ALSO a local
-git work-tree holding a tracked, existing file, which in the dual-machine mirror layout is
-exactly the synced-clone case this patch exists to recognize."""
+An `ssh <host> '...'` command can match the cd-form and yield a remote path; harmless since it
+only survives if it is ALSO a local git work-tree with a tracked, existing file.
+"""
 from __future__ import annotations
 import os
 import re
@@ -59,10 +43,9 @@ _LS_FILES_TIMEOUT = 3.0
 def synced_repo_roots(history, cwd, cap=_ROOT_CAP):
     """Local git work-tree dirs this session synced, in first-seen order, capped.
 
-    Sources are the session's own Bash events (the faithful events-table rows, same feed the
-    fabrication gates walk) — a dir qualifies only if the agent actually ran a pull/fetch
-    against it AND it exists locally as a git work-tree. Fail-open per event: an unparseable
-    row is skipped by iter_tool_events; a vanished dir is skipped here."""
+    Only dirs the session actually ran pull/fetch against, that exist locally as a git
+    work-tree. Fail-open per event: an unparseable row is skipped by iter_tool_events; a
+    vanished dir is skipped here."""
     roots, seen = [], set()
     for tool, cmd, _resp in iter_tool_events(history):
         if len(roots) >= cap:
@@ -88,9 +71,8 @@ def synced_repo_roots(history, cwd, cap=_ROOT_CAP):
 
 
 def resolve_in_synced_repos(loc, roots):
-    """The absolute path of a tracked file in one of `roots` that suffix-matches `loc` at a
-    separator boundary and exists on disk — else None (caller falls back to its original
-    verdict; resolution failure never discharges anything)."""
+    """Absolute path of a tracked file in `roots` that suffix-matches `loc` at a separator
+    boundary and exists on disk, else None."""
     comps = _path_components(loc)
     if not comps or not roots:
         return None

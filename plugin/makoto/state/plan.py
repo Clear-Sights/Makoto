@@ -1,31 +1,16 @@
-"""Plan store: persist/read a declared contract Plan (SPEC-5 Makoto-absorbs-Assay merge).
+"""Plan store: persist/read a declared contract Plan.
 
-Ported BY SHAPE (rule 5 -- copy, never import) from `assay/assay/runtime/engine.py`'s
-declare/_persist/load/declare_from_artifact quartet (engine.py:160-230, 729-758), re-homed
-onto Makoto's own `plans` sqlite table (see db.py) instead of Assay's `kernel.ledger` JSONL
-stream (Makoto has no JSONL-store analog -- `makoto/ledger.py` is a different, narrower
-substrate: `touched`/`testrun`/`value` rows keyed by normalized path, not a Plan container).
-LATEST-WINS on the WHOLE plan per session_id, mirroring Assay's semantics exactly: `declare_plan`
-replaces the whole plan (falsifiability-gated -- a non-falsifiable node rejects the WHOLE
-declare); `persist_plan` rewrites the whole plan after a node advances (e.g. mark_done), with
-no falsifiability re-check (every node was already gated at declare time). Dropped from the
-Assay original: the anchored-bucket clear + owning-session store -- Makoto has no anchored-
-fact/binding concept for a Plan to interact with (that gap is tracked separately, DEFERRED.md's
-SPEC-5 Task 6 entry), so there is nothing here to port for that part.
+Uses Makoto's own `plans` sqlite table (see db.py). LATEST-WINS on the WHOLE plan per
+session_id: `declare_plan` replaces the whole plan (falsifiability-gated -- a non-falsifiable
+node rejects the WHOLE declare); `persist_plan` rewrites the whole plan after a node advances
+(e.g. mark_done), with no falsifiability re-check (every node was already gated at declare time).
 
-SessionStart artifact path: `<cwd>/.claude/makoto-plan.jsonl`. Chosen because Makoto has no
-existing per-PROJECT (not per-session-state) declared-artifact convention to reuse --
-`makoto/state.py` only resolves the GLOBAL `$MAKOTO_STATE_DIR`; `makoto/install.py` only wires
-`~/.claude/settings.json` / `~/.claude/CLAUDE.md`, both global, never per-project. This mirrors
-Assay's own `<cwd>/.assay/plan.jsonl` convention, swapping in Makoto's own `.claude/` project
-directory (the same directory Makoto's control-plane files already live under, per
-`checks/forbiddenLocation.py`'s self-guard) rather than inventing a new `.makoto/` segment
-Makoto has never used anywhere else.
+SessionStart artifact path: `<cwd>/.claude/makoto-plan.jsonl` -- Makoto's `.claude/` project
+directory (the same one its control-plane files already live under), never a new `.makoto/`
+segment.
 
-The locating-call reader (`_LOCATING_TOOLS` / `event_location`) lives here too. It was
-`checks/contractOrder.py`'s until that gate was cut (2026-09-18, register-unbound); its
-remaining consumer is the live plan lifecycle in `dispatch._accumulate`, which is
-this store's own job, so it moved to the store rather than to another detector.
+The locating-call reader (`_LOCATING_TOOLS` / `event_location`) lives here too, since its one
+consumer is the live plan lifecycle in `dispatch._accumulate`, this store's own job.
 
 Stdlib only; no LLM, no HTTP.
 """
@@ -40,13 +25,10 @@ from typing import Optional
 
 from makoto.checks import normalize_path
 from makoto.substrate._planNode import Plan
-# _OFFER_COND_RX / _FIRST_PERSON_RX: L0 shared lexicon (makoto.vocab -- dedup: was a
-# byte-identical local copy of the exact regexes the since-cut state/commitments.py hoisted;
-# this store is their one consumer now).
 from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 
-# SessionStart only declares from the artifact on a genuinely-new session (mirrors Assay's own
-# STARTUP-gated `declare_from_artifact`) -- a resume/clear/compact must never re-declare.
+# SessionStart only declares from the artifact on a genuinely-new session -- a resume/clear/
+# compact must never re-declare.
 STARTUP = "startup"
 _PLAN_ARTIFACT = ".claude/makoto-plan.jsonl"
 
@@ -101,19 +83,16 @@ def declare_plan(conn, session_id: str, plan: Plan) -> None:
             )
         status = row.get("status", "open")
         if status != "open":
-            # A node born DONE (or any non-open status) at declare time is as unholdable as a
-            # vacuous one: there is nothing left to hold anyone to, so admitting it would empty
-            # the remainder without the work happening. Same whole-plan rejection as the
-            # falsifiability gate -- fail-closed on tamper, not on absence.
+            # A node born DONE at declare time is as unholdable as a vacuous one: work cannot
+            # be born already discharged. Same whole-plan rejection as the falsifiability gate.
             raise ValueError(
                 f"non-falsifiable declaration {row!r}: a declared node must start 'open' "
                 f"(got status {status!r}) -- work cannot be born already discharged"
             )
         node_id = row.get("id", "")
         if node_id == f"{row['what']}::{row['passthrough']}::{row['where']}":
-            # The id was auto-derived from the RAW `where` (PlanNode.__post_init__); re-derive
-            # it from the normalized `where` so the stored node's identity and its `where`
-            # agree with the documented "<what>::<passthrough>::<where>" composite.
+            # id was auto-derived from the RAW `where`; re-derive from the normalized one so
+            # identity and `where` agree.
             node_id = ""
         normalized.add_node(
             row["what"], row["passthrough"], where,
@@ -152,10 +131,7 @@ def load_plan(conn, session_id: str) -> Optional[Plan]:
 
 def _read_artifact_plan(cwd: str) -> Optional[Plan]:
     """Read + parse `<cwd>/.claude/makoto-plan.jsonl` into an un-declared `Plan`, or `None` on
-    any absence/malformation (fail-open). The shared core BOTH admission paths use --
-    `declare_from_session_artifact` (SessionStart) and `declare_from_live_write` (a live
-    mid-session tool call writing the artifact itself) -- so the read/parse contract lives in
-    exactly one place."""
+    any absence/malformation (fail-open). The shared core both admission paths use."""
     artifact = os.path.join(cwd, _PLAN_ARTIFACT) if cwd else _PLAN_ARTIFACT
     try:
         with open(artifact, "r", encoding="utf-8") as fh:
@@ -163,12 +139,9 @@ def _read_artifact_plan(cwd: str) -> Optional[Plan]:
     except (OSError, ValueError):
         return None
     # Parse PER LINE, not whole-artifact: one typo on line 3 of a 5-node plan must not silently
-    # discard the other 4 nodes (that made a malformed line indistinguishable from "no plan
-    # declared" -- absence reading green at Stop). A bad line is skipped LOUDLY (stderr, the
-    # same diagnostic channel configchange.py uses; never stdout, which carries the hook's one
-    # JSON object) and the remaining well-formed rows are still admitted. A line that is valid
-    # JSON but not an object (`[]`, `1`, `"x"`) is the same defect class, and previously escaped
-    # the fail-open contract entirely as an AttributeError out of `Plan.from_rows`.
+    # discard the other 4 (that would read as "no plan declared" -- absence reading green at
+    # Stop). A bad line is skipped LOUDLY (stderr, never stdout which carries the hook's JSON
+    # object) and the remaining well-formed rows are still admitted.
     rows = []
     for lineno, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
@@ -196,10 +169,9 @@ def _read_artifact_plan(cwd: str) -> Optional[Plan]:
 
 
 def _admit_artifact_plan(cwd: str, session_id: str, conn) -> Optional[Plan]:
-    """Read the artifact and declare it LATEST-WINS -- the shared tail BOTH admission paths run.
+    """Read the artifact and declare it LATEST-WINS -- the shared tail both admission paths run.
     Absent / unreadable / malformed / empty declares NOTHING (fail-open, `None`); a plan carrying
-    a NON-FALSIFIABLE node is REJECTED whole (`declare_plan` raises; caught -> `None`, fail-closed
-    on tamper, not on absence). Returns the declared `Plan` or `None`."""
+    a NON-FALSIFIABLE node is REJECTED whole. Returns the declared `Plan` or `None`."""
     raw = _read_artifact_plan(cwd)
     if raw is None:
         return None
@@ -214,51 +186,35 @@ def declare_from_session_artifact(
     cwd: str, session_id: str, conn, *, source: str = ""
 ) -> Optional[Plan]:
     """SessionStart: admit the plan from `<cwd>/.claude/makoto-plan.jsonl` and INSTANTIATE it
-    for `session_id`, declaring ONLY on a genuinely-new session (`source == STARTUP`).
-
-    An absent / unreadable / malformed / empty artifact declares NOTHING (fail-open, returns
-    `None`). A plan carrying a NON-FALSIFIABLE node is REJECTED whole (`declare_plan` raises;
-    caught -> `None`, fail-closed on tamper, not on absence). Returns the declared `Plan` or
-    `None`.
-    """
+    for `session_id`, declaring ONLY on a genuinely-new session (`source == STARTUP`). Same
+    fail-open contract as `_admit_artifact_plan`."""
     if source != STARTUP:
         return None
     return _admit_artifact_plan(cwd, session_id, conn)
 
 
 def declare_from_live_write(cwd: str, session_id: str, conn) -> Optional[Plan]:
-    """Mid-session admission (2026-07-23): a locating tool call (Write/Edit/MultiEdit) touched
-    the plan artifact itself -- re-read `<cwd>/.claude/makoto-plan.jsonl` and re-declare
-    LATEST-WINS, the SAME falsifiability gate and whole-plan-replace semantics
-    `declare_from_session_artifact` uses, just triggered by a live tool call instead of session
-    boot. Before this existed, the ONLY way to populate a plan was a file already sitting on disk
-    BEFORE SessionStart fired -- nothing let Claude declare (or replace) a plan mid-session at
-    all. Called from `makoto/dispatch.py`'s PostToolUse handler (`_accumulate`); see
-    `makoto/events.py`'s PostToolUse entry. Same fail-open contract: absent, unreadable,
-    malformed, empty, or non-falsifiable content declares nothing and returns `None`.
+    """Mid-session admission: a locating tool call (Write/Edit/MultiEdit) touched the plan
+    artifact itself -- re-read `<cwd>/.claude/makoto-plan.jsonl` and re-declare LATEST-WINS, the
+    same falsifiability gate and whole-plan-replace semantics `declare_from_session_artifact`
+    uses, triggered by a live tool call instead of session boot. Called from
+    `makoto/dispatch.py`'s PostToolUse handler (`_accumulate`). Same fail-open contract.
     """
     return _admit_artifact_plan(cwd, session_id, conn)
 
 
 # =============================================================================================
-# plan-item commitments (merged from session/planItems.py -- Stage 2 seam 1)
-# Plan-item commitments store: source open PLAN/TASK-LABELED promises ("I'll finish §9.3",
-# "next I need to close out Task #19") from the assistant's own text, and read them back
-# un-windowed by session.
+# plan-item commitments: source open PLAN/TASK-LABELED promises ("I'll finish §9.3", "next I
+# need to close out Task #19") from the assistant's own text, and read them back un-windowed by
+# session.
 #
-# Distinct from the file-path commitment store (cut 2026-09-18; it sourced a promise to a FILE
-# PATH and discharged
-# it by checking the filesystem/touched-keys): a plan/task label ("§9.3", "Task #19") has no
-# filesystem location at all, so discharge here is PURELY TEXTUAL -- a later first-person
-# completion statement naming the same label, or an explicit retraction. This closes the gap a
-# real session hit: a forward commitment phrased as a section/task reference, never a file path,
-# was silently dropped and never appeared in ANY commitment store because that store's
-# sourcer requires a file-shaped location and found none.
+# A plan/task label ("§9.3", "Task #19") has no filesystem location, so discharge here is
+# PURELY TEXTUAL -- a later first-person completion statement naming the same label, or an
+# explicit retraction.
 #
-# Sourcing discipline mirrors the cut store's hardened guards (first-person, active, non-past,
-# non-negated, non-conditional) at the same rigor tier, scoped down for this narrower label-shaped
-# surface rather than re-deriving from a real-session FP corpus this module has not been measured
-# against yet -- see the module docstring's own caveat below.
+# Sourcing discipline mirrors hardened guards elsewhere (first-person, active, non-past,
+# non-negated, non-conditional), scoped down for this narrower label-shaped surface, not yet
+# corpus-measured for FPs.
 #
 # Stdlib only; no LLM, no HTTP.
 
@@ -308,8 +264,7 @@ def _normalize_label(raw: str) -> str:
 
 def _first_person_governs(text: str, verb_start: int, line_start: int) -> bool:
     """True iff the clause containing the verb has a first-person subject, or the verb sits at
-    the start of its line after at most a bullet/number marker (an imperative plan bullet, same
-    line-initial convention the cut store used)."""
+    the start of its line after at most a bullet/number marker (an imperative plan bullet)."""
     if verb_start < line_start:
         # The verb sits on a PREVIOUS line (the label's line_start is past it): judge the verb
         # against ITS OWN line, never a reversed/empty slice -- an empty prefix here used to
@@ -323,9 +278,7 @@ def _first_person_governs(text: str, verb_start: int, line_start: int) -> bool:
 
 def source_plan_item_promise(text: str) -> Optional[dict]:
     """First plan/task label that is the object of a first-person, active, non-past, non-negated,
-    non-conditional FORWARD promise, else None. Mirrors the cut store's `_promise_match`
-    clause discipline scoped to this label-shaped surface (not yet corpus-measured for FPs --
-    named honestly in the module docstring)."""
+    non-conditional FORWARD promise, else None. Not yet corpus-measured for FPs."""
     if not text:
         return None
     for m in _LABEL_RX.finditer(text):
@@ -450,10 +403,8 @@ def sync_plan_items(conn, session_id: str, text: str) -> None:
 
 def record_task_event(conn, session_id: str, payload: dict) -> None:
     """The GROUND-TRUTH source for the same store: the harness's own TaskCreate/TaskUpdate tool
-    calls, read off the PostToolUse payload (Task #19c, 2026-07-10). Unlike the prose sourcer
-    above (regex over chat text, hardened but fuzzy by nature), a Task tool call is an explicit,
-    deliberate act with a stable id -- there is nothing to guess. Payload shapes were captured
-    LIVE from Makoto's own events table (this exact dispatch wiring), not from docs:
+    calls, read off the PostToolUse payload. Unlike the prose sourcer above, a Task tool call is
+    an explicit, deliberate act with a stable id. Payload shapes:
 
       TaskCreate  PostToolUse: tool_response = {"task": {"id": "1", "subject": ...}}
       TaskUpdate  PostToolUse: tool_input  = {"taskId": "1", ...}
@@ -463,9 +414,8 @@ def record_task_event(conn, session_id: str, payload: dict) -> None:
     The label is `task:<id>` -- the SAME canonical key `_normalize_label` gives a prose mention
     of "Task #<id>", so a chat promise and the real Task object dedupe into one commitment. A
     `to: completed` transition discharges it ('done'); `to: deleted` retracts it; a create (or a
-    resumed session's first update to a task this store never saw) opens it. Anything else --
-    subject edits, ownership, blocks -- is not a lifecycle transition and is ignored. Fail-open:
-    a malformed payload is a no-op, never a raise (callers additionally wrap, like every store)."""
+    resumed session's first update to a task this store never saw) opens it. Anything else is
+    not a lifecycle transition and is ignored. Fail-open: a malformed payload is a no-op."""
     tool = payload.get("tool_name", "")
     resp = payload.get("tool_response") or {}
     if not isinstance(resp, dict):
@@ -489,10 +439,8 @@ def record_task_event(conn, session_id: str, payload: dict) -> None:
         elif to == "deleted":
             set_plan_item_status(conn, session_id, label, "retracted")
         elif to == "in_progress":
-            # a task this store never saw (resumed session) surfaces as open; an already-open
-            # or retracted-then-resumed one re-opens -- record_plan_item's own upsert rule --
-            # and a COMPLETED-then-resumed one re-opens too: the harness says the task is live
-            # again, so a 'done' row must not stay discharged (record_plan_item's upsert only
-            # lifts 'retracted', hence the explicit status set after it).
+            # A task this store never saw surfaces as open; a completed-then-resumed one must
+            # also re-open, so the status is set explicitly after the upsert (which only lifts
+            # 'retracted').
             record_plan_item(conn, session_id, {"label": label, "description": ""})
             set_plan_item_status(conn, session_id, label, "open")

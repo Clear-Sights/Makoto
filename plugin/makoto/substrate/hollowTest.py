@@ -1,41 +1,33 @@
-"""gate.hollow_test's pure AST analyzer: a HOLLOWED-class detector (SPIRIT.md §4) — a test that
-survives in name while its content is gutted. Four independently-firing sub-patterns, each
-zero-FP by construction or by corpus measurement (see tests/test_hollow_test_fp.py):
+"""gate.hollow_test's pure AST analyzer — a test that survives in name while its content is
+gutted. Four independently-firing sub-patterns, each zero-FP by construction or by corpus
+measurement (see tests/test_hollow_test_fp.py):
 
   1. no_assertion       — the test body asserts nothing at all (no `assert`, no assertion-shaped
                            call), and is not an explicitly `@skip`-decorated stub.
-  2. tautology           — an `assert` on a statically-truthy literal (`assert True`, `assert 1`,
-                           `assert "nonempty"`, `assert not False`), or an `assert x == x` /
-                           `assert x is x` where both
-                           sides of the comparison are the textually-identical expression AND
-                           neither side contains a Call OR an attribute access (a call can return a
-                           different object/value on each evaluation — e.g. `assert cache() is
-                           cache()` is a genuine memoization/identity check; an attribute read can
-                           be a property whose value changes between reads — so neither is flagged;
-                           corpus-found FP, see test_gate_shape.py's own
-                           `assert load_stopchecks() is load_stopchecks()`).
-  3. swallowed_failure   — a `try` around the call-under-test (or around the assertion itself)
-                           whose only `except` is both BROAD (bare/`Exception`/`BaseException`)
-                           and a no-op, with no assertion anywhere else in the function to catch a
-                           failure.
+  2. tautology           — an `assert` on a statically-truthy literal (`assert True`, `assert 1`),
+                           or an `assert x == x` / `assert x is x` where both sides are the
+                           textually-identical expression AND neither contains a Call or an
+                           attribute access (a call can return a different value each evaluation,
+                           e.g. `assert cache() is cache()` is a genuine identity check; an
+                           attribute read can be a property that changes between reads).
+  3. swallowed_failure   — a `try` around the call-under-test (or the assertion itself) whose
+                           only `except` is both BROAD (bare/`Exception`/`BaseException`) and a
+                           no-op, with no assertion elsewhere in the function to catch a failure.
   4a. uncollectable_nested      — a test-shaped `def test_*` nested inside another function's body.
-                           pytest's own collector never descends into a function looking for further
+                           pytest's collector never descends into a function looking for further
                            `def`s, so this can never be independently run/skipped/reported — only
-                           flagged when its OWN body contains a recognized assertion (an incidentally
-                           `test_`-named private helper with no real check inside is not a finding).
-  4b. uncollectable_always_skip — a `skipif`/`skipIf` guard (decorator, or a function-body
-                           `if <cond>: pytest.skip(...)` / `raise unittest.SkipTest(...)` guard as the
-                           function's first statement, or a module-level `pytestmark =
-                           pytest.mark.skipif(...)`) whose condition is PROVABLY always-true by the
-                           same `_is_tautology` predicate already proven zero-FP for sub-pattern 2. A
-                           bare, argument-less `@pytest.mark.skip(...)` / `@unittest.skip(...)` (no
-                           condition at all) is explicitly NOT this pattern — that is an honest,
-                           transparently-labeled skip (SPIRIT.md §4 INCOMPLETE), not a disguised one.
+                           flagged when its own body contains a recognized assertion.
+  4b. uncollectable_always_skip — a `skipif`/`skipIf` guard (decorator, function-body
+                           `if <cond>: pytest.skip(...)` guard as the first statement, or a
+                           module-level `pytestmark = pytest.mark.skipif(...)`) whose condition is
+                           PROVABLY always-true by the same `_is_tautology` predicate as
+                           sub-pattern 2. A bare, argument-less `@pytest.mark.skip(...)` (no
+                           condition at all) is NOT this pattern -- that is an honest,
+                           transparently-labeled skip, not a disguised one.
 
 The analyzer engine and its Stop-hook adapter live in this ONE flat file. The analyzer
 itself is self-contained (zero imports beyond stdlib `ast`); the `makoto-allow` exemption and the
-GateContext plumbing live in the adapter half below — this discipline is unchanged from the split
-layout, only the file boundary moved."""
+GateContext plumbing live in the adapter half below."""
 from __future__ import annotations
 import ast
 import os
@@ -60,12 +52,11 @@ def _bases_are_unittest_style(class_node) -> bool:
 
 
 def _iter_test_functions(tree):
-    """Yields every function/async-function whose name starts with `test_` (pytest's
-    `python_functions` convention) that is reachable from module level WITHOUT crossing a function
-    boundary — i.e. also inside a module-level `if`/`try`/`with`/`for`/`while` block (pytest
-    collects those normally) and inside a class at any class-nesting depth. For a class whose name
-    starts with `Test` AND whose base list textually includes something containing `TestCase`
-    (unittest style), a bare `test`-prefixed method name (no underscore) also counts."""
+    """Yields every function/async-function whose name starts with `test_` that is reachable from
+    module level WITHOUT crossing a function boundary -- also inside a module-level
+    `if`/`try`/`with`/`for`/`while` block and inside a class at any nesting depth. For a
+    unittest-style `Test*` class (base list includes `TestCase`), a bare `test`-prefixed method
+    name (no underscore) also counts."""
     blocks = [ast.If, ast.Try, ast.With, ast.AsyncWith, ast.For, ast.AsyncFor, ast.While,
               ast.ExceptHandler]
     if hasattr(ast, "TryStar"):
@@ -115,8 +106,6 @@ def _iter_own_scope(stmts):
 
 
 # ---- the assertion recognizer (generous by design: an FN here only suppresses a fire) -----------
-# _callee_chain is imported at module top from _stdlib_ast_helpers, the stdlib-isolated shared
-# helper home (see tests/test_detector_engines_are_stdlib_isolated.py).
 def _is_assertion_call(node) -> bool:
     """Generous recognizer: any Call whose dotted callee has a component (case-insensitive)
     starting with `assert` (`self.assertTrue`, `assert_that(...)`, `mock.assert_called_with`), OR
@@ -156,11 +145,9 @@ def _is_recognized_assertion(node, helper_asserts: frozenset = frozenset()) -> b
 
 def _local_helper_index(tree):
     """name -> FunctionDef/AsyncFunctionDef node, for every module-level function PLUS every
-    method of a module-level class (any class-nesting depth) — the latter so the standard
-    unittest `self._helper()` assert-helper resolves (nested defs stay excluded). A same-file,
-    name-resolved fact only — never a general call-graph solver, and never crossing file
-    boundaries; a name collision resolves to the LAST definition, which is FN-safe (it can only
-    suppress a fire, never add one)."""
+    method of a module-level class -- the latter so the standard unittest `self._helper()`
+    assert-helper resolves. Same-file, name-resolved only; a name collision resolves to the LAST
+    definition, which is FN-safe."""
     idx = {}
 
     def _collect(nodes):
@@ -176,13 +163,10 @@ def _local_helper_index(tree):
 
 def _helper_names_that_assert(tree) -> frozenset:
     """Names of module-level helper functions whose own body (transitively, through calls to other
-    same-file module-level helpers) contains a recognized assertion. Extends the recognizer to the
-    extremely common 'shared assert helper' pattern (a test's only observable check is a call to a
-    same-file helper like `_clean(call)` / `_assert_ok(x)` that itself does `assert not x.fired`) --
-    corpus-found FP class (assay's test_forbidden_location.py). Generous/FN-safe by construction:
-    it can only make a sub-pattern fire LESS, never more. Each body is walked exactly ONCE, into
-    (does it assert directly?, which bare names does it call?); the fixpoint then closes over that
-    finite, already-extracted call graph, so it always terminates."""
+    same-file module-level helpers) contains a recognized assertion. Extends the recognizer to
+    the common 'shared assert helper' pattern, where a test's only observable check is a call to
+    a same-file helper that itself asserts. Generous/FN-safe by construction. Each body is walked
+    exactly ONCE; the fixpoint then closes over that finite call graph, so it always terminates."""
     asserts: set = set()
     calls: dict = {}
     for name, func in _local_helper_index(tree).items():
@@ -212,18 +196,14 @@ def _imported_helper_names_that_assert(tree, path: str) -> frozenset:
     """Names imported from a SIBLING module whose definition there asserts.
 
     `_helper_names_that_assert` is deliberately same-file, which leaves one FP class uncovered:
-    the SHARED plant-and-restore helper. A "can this check fail" test whose whole body is
-    `smoke_replace(self, path, old, new, ...)` -- where the imported helper plants a fault,
-    asserts the named test goes red, restores it, and asserts byte-identity -- reads as
-    no_assertion and fires. Measured: it fired on all three of Gyroscope's teeth tests, each of
-    which asserts four times inside that helper. A gate that fires on the very tests written to
-    prove other tests can fail is exactly the shape that gets the gate switched off.
+    a "can this check fail" test whose whole body is a call to an imported plant-and-restore
+    helper that asserts internally reads as no_assertion and fires -- exactly the shape that
+    gets a gate switched off.
 
     ONE hop, and only to a module resolvable next to this file: the sibling's own same-file
     transitive closure counts, but the sibling's imports are NOT followed, so this stays a
-    name-resolved fact and never becomes a call-graph solver. Any failure to resolve, read or
-    parse adds NOTHING and leaves the finding exactly as it was -- the same FN-safe direction as
-    the same-file index, since these names can only make a sub-pattern fire less.
+    name-resolved fact. Any failure to resolve, read or parse adds NOTHING -- the same FN-safe
+    direction as the same-file index.
     """
     names: set = set()
     here = os.path.dirname(os.path.abspath(path))
@@ -373,12 +353,10 @@ def _is_swallowed_failure(try_stmt, func_stmts, helper_asserts: frozenset = froz
 
 # ---- sub-pattern 4a: a test-shaped function that can never fire independently --------------------
 def _iter_nested_defs(stmts):
-    """Every `FunctionDef`/`AsyncFunctionDef` reachable from `stmts` by control-flow-only recursion
-    (the same discipline `_walk_own_scope` already uses for sub-patterns 1-3) -- i.e., genuinely
-    nested one level inside the enclosing function's own body. `_walk_own_scope` stops descending the
-    instant it hits ANY nested scope, so this naturally finds each directly-reachable nested def
-    without also picking up a def-inside-that-def (out of scope for this sub-pattern; see the
-    module docstring)."""
+    """Every `FunctionDef`/`AsyncFunctionDef` reachable from `stmts` by control-flow-only
+    recursion -- genuinely nested one level inside the enclosing function's own body.
+    `_walk_own_scope` stops descending at the first nested scope, so this never also picks up a
+    def-inside-that-def."""
     for n in _iter_own_scope(stmts):
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
             yield n
@@ -437,10 +415,9 @@ def _is_skip_call_stmt(stmt) -> bool:
 
 
 def _function_body_always_skip_guard(func):
-    """The function's FIRST statement (ignoring a leading docstring, which is documentation, not
-    a statement), if (and only if) it is `if <cond>: pytest.skip(...)` /
-    `if <cond>: raise unittest.SkipTest(...)` -- deliberately shallow (first-statement-only, per the
-    mission spec) so this never overreaches into scanning every branch of the function body."""
+    """The function's FIRST statement (ignoring a leading docstring), if it is
+    `if <cond>: pytest.skip(...)` / `if <cond>: raise unittest.SkipTest(...)` -- deliberately
+    shallow so this never scans every branch of the function body."""
     body = func.body
     if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
             and isinstance(body[0].value.value, str):
@@ -493,7 +470,7 @@ def _analyze_test_function(func, helper_asserts: frozenset = frozenset()) -> lis
     nested_findings = _analyze_nested_test_functions(func, helper_asserts)
 
     # ONE construct, ONE fire: when the only "assertion" lives in an uncollectable nested test
-    # def, the specific uncollectable_nested finding below already blocks — stacking a second
+    # def, the uncollectable_nested finding below already blocks — stacking a second
     # no_assertion fire on the enclosing function would demand two `makoto-allow` lines to clear
     # one construct.
     if not any(_is_recognized_assertion(n, helper_asserts) for n in scope_nodes) \
@@ -535,10 +512,8 @@ def analyze_file(src: str, path: str) -> list:
 
 
 # =============================================================================================
-# Stop-hook adapter (formerly stopchecks/stopcheck_hollow_test.py)
+# Stop-hook adapter
 # =============================================================================================
-# _is_scratch/_read (imported at module top from _stdlib_ast_helpers) are shared verbatim with
-# deadPureStatement.py -- see tests/test_detector_engines_are_stdlib_isolated.py.
 
 
 _KIND_MESSAGE = {
@@ -561,30 +536,21 @@ _KIND_MESSAGE = {
 
 
 def _allowed(lineno, lines) -> bool:
-    """On-the-record override (makoto convention), via the ONE canonical marker predicate.
-
-    The marker is recognized by `makoto_allowed`/`_MAKOTO_ALLOW_RX` (§7.5b, the predicate every
-    factory-built content check uses), which requires a colon and a NON-EMPTY reason — matching
+    """On-the-record override (makoto convention), via the ONE canonical marker predicate,
+    requiring a colon and a NON-EMPTY reason -- matching
     this module's own finding text ("annotate `# makoto-allow: <reason>`") and the rule makoto
-    installs into the user's CLAUDE.md ("an on-the-record, auditable rationale, never a
-    disguise"). One concept, one predicate: the marker means the same thing everywhere it is
-    honored, so an exemption asserting an audit trail can never be accepted without one.
-    (`makoto.vocab` is already on this engine's isolation allowlist — see
-    tests/test_detector_engines_are_stdlib_isolated.py.)"""
+    installs. One concept, one predicate: the marker means the same thing everywhere it is
+    honored."""
     return 1 <= lineno <= len(lines) and _MAKOTO_ALLOW_RX.search(lines[lineno - 1]) is not None
 
 
 def _run(ctx) -> list:
     out = []
-    # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
-    # deadPureStatement._run via the stdlib-isolated helper home
     for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         lines = src.splitlines()
         if _is_test_filename(str(p)):
             # A test file that does not parse cannot be analyzed OR collected: absence of
-            # findings over it would be vacuous, not clean. This is a decision input (the very
-            # corpus this gate rules on), not a transport failure, so it must not fail open the
-            # way an unreadable file does — report it instead of silently skipping it.
+            # findings over it would be vacuous, not clean. Report it, don't fail open.
             try:
                 ast.parse(src)
             except SyntaxError as e:

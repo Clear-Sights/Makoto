@@ -1,8 +1,8 @@
 """Small shell-argv normalizer shared by command-evidence consumers.
 
-This is deliberately not a Bash evaluator. It recognizes literal command segments, strips
-transparent launch wrappers, and fails open on malformed syntax. Quoted prose, comments, and
-arguments of unrelated programs never become executable evidence.
+Not a Bash evaluator: it recognizes literal command segments, strips transparent launch
+wrappers, and fails open on malformed syntax. Quoted prose, comments, and arguments of
+unrelated programs never become executable evidence.
 """
 from __future__ import annotations
 
@@ -18,11 +18,8 @@ _DIRECT_TEST_RUNNERS = frozenset({
     "pytest", "py.test", "nox", "tox", "jest", "vitest", "mocha", "ava", "jasmine",
     "rspec", "phpunit", "ctest",
 })
-# Runners whose test intent lives in a target word (`npm test`, `yarn test:ci`, ...), split by
-# WHERE that word may legally sit: package runners take one command word in the subcommand slot
-# (a test-shaped word elsewhere -- `npm install --save-dev test-utils` -- is an argument, not
-# intent), while build runners take a list of positional goals/targets (`make lint test`,
-# `mvn clean test`), any of which may be the test one.
+# Package runners take one test word in the subcommand slot (`npm test`); build runners take a
+# list of positional goals, any of which may be the test one (`make lint test`).
 _SUBCOMMAND_TARGET_RUNNERS = frozenset({"rails", "npm", "yarn", "pnpm"})
 _MULTI_TARGET_RUNNERS = frozenset({"make", "just", "mvn", "gradle", "gradlew"})
 _TEST_TARGET_RUNNERS = _SUBCOMMAND_TARGET_RUNNERS | _MULTI_TARGET_RUNNERS
@@ -48,9 +45,8 @@ def _basename(word: str) -> str:
 def _effective_argv(argv):
     """Strip leading assignments and transparent launch wrappers; preserve option argv.
 
-    Every wrapper may be followed by another wrapper -- `nohup sudo prog` and `sudo nohup prog`
-    are the same launch, so evidence must not depend on wrapper ORDER (the old asymmetric
-    break made the first read as no launch at all)."""
+    A wrapper may follow another wrapper (`nohup sudo prog`, `sudo nohup prog` are the same
+    launch), so evidence must not depend on wrapper order."""
     argv = list(argv)
     while argv and _ASSIGNMENT_RX.fullmatch(argv[0]):
         argv.pop(0)
@@ -58,9 +54,8 @@ def _effective_argv(argv):
         wrapper = _basename(argv.pop(0))
         while argv and (argv[0].startswith("-") or _ASSIGNMENT_RX.fullmatch(argv[0])):
             option = argv.pop(0)
-            # Wrapper options such as ``sudo -u bob`` consume the following word too.  Leaving
-            # that value at argv[0] makes it masquerade as the launched program and loses the
-            # command evidence that follows it.
+            # `sudo -u bob` consumes the following word too; left alone, it would masquerade
+            # as the launched program.
             if wrapper == "sudo" and option in _SUDO_VALUED_OPTIONS and argv:
                 argv.pop(0)
         if wrapper == "timeout" and argv and _TIMEOUT_DURATION_RX.fullmatch(argv[0]):
@@ -71,7 +66,7 @@ def _effective_argv(argv):
 # A run of control-operator punctuation shlex groups into one token that is not in
 # `_SHELL_SEPARATORS` (``|&``, ``;;``, ...). Bash treats these as operators, never argv words,
 # so they must SEPARATE segments rather than glue two commands into one argv. Redirection
-# punctuation (anything with ``<``/``>``) deliberately stays inside the argv as before.
+# punctuation (anything with ``<``/``>``) stays inside the argv.
 _CONTROL_RUN_RX = re.compile(r"[|;&]+")
 # A leading command-substitution word -- ``$(prog`` or ``name=$(prog`` (backtick form too;
 # ``$((`` arithmetic excluded). Only consulted at a segment's HEAD, where the substitution IS
@@ -82,12 +77,9 @@ _HEAD_SUBSTITUTION_RX = re.compile(r"(?:[A-Za-z_][A-Za-z0-9_]*=)?(?:\$\((?!\()|`
 def _normalize_segment_argv(argv):
     """Dissolve grouping/substitution punctuation glued onto a segment's real words.
 
-    Standalone ``(`` / ``)`` subshell delimiters are dropped and glued ones stripped from the
-    first/last word, so ``( pytest -q )`` and ``(pytest -q)`` both expose ``pytest``. A HEAD
-    command-substitution word loses its wrapper (``out=$(pytest -q)`` runs pytest; the
-    assignment's exit is the substitution's). A substitution buried in a later argument of an
-    unrelated program is deliberately left alone -- scanning it would need the consumer-visible
-    nested-segment boundary to move too."""
+    Standalone or glued ``(``/``)`` are stripped so ``( pytest -q )`` and ``(pytest -q)`` both
+    expose ``pytest``. A HEAD command-substitution word loses its wrapper (``out=$(pytest -q)``
+    runs pytest). A substitution in a later argument of an unrelated program is left alone."""
     argv = [t for t in argv if t not in ("(", ")")]
     if not argv:
         return argv
@@ -111,9 +103,9 @@ def _shell_segments(command: str):
     try:
         lexer = shlex.shlex(command or "", posix=True, punctuation_chars="|;&<>\n")
         lexer.whitespace_split = True
-        # Bash starts a comment only at WORD start; shlex's built-in commenters cut the line
-        # from a ``#`` ANYWHERE (``--format=%h#%s`` lost the rest of the line, including a
-        # following statement). Whole-token ``#...`` comments are recognized in the loop below.
+        # Bash starts a comment only at WORD start; shlex's built-in commenters cut the line at
+        # a ``#`` ANYWHERE (breaking e.g. ``--format=%h#%s``). Whole-token comments are handled
+        # in the loop below instead.
         lexer.commenters = ""
         lexer.whitespace = " \t\r"
         tokens = list(lexer)
@@ -136,9 +128,8 @@ def _shell_segments(command: str):
     for i, token in enumerate(tokens):
         newline = token == "\n"
         if active_heredoc is not None:
-            # Here-doc BODY: data fed to a non-shell command, never statements of this shell
-            # (prose must not become executable evidence). Ends at the delimiter standing
-            # alone at line start; an unterminated body skips to the end -- fail open.
+            # Here-doc BODY: data fed to a non-shell command, never statements of this shell.
+            # Ends at the delimiter alone at line start; unterminated skips to the end.
             if at_line_start and token == active_heredoc and (
                     i + 1 >= len(tokens) or tokens[i + 1] == "\n"):
                 active_heredoc = pending_heredocs.pop(0) if pending_heredocs else None
@@ -155,11 +146,9 @@ def _shell_segments(command: str):
         if expect_delimiter and not newline and token not in _SHELL_SEPARATORS:
             pending_heredocs.append(token)
             expect_delimiter = False
-            current.append(token)      # the delimiter word stays in the argv, as before
+            current.append(token)      # the delimiter word stays in the argv
             if _basename((_effective_argv(current) or [""])[0]) in _NESTED_SHELL_PROGRAMS:
-                # ``bash <<EOF`` executes its body: keep the historical inline lexing so that
-                # evidence inside it stays visible to consumers.
-                suppress_bodies = False
+                suppress_bodies = False  # ``bash <<EOF`` executes its body: keep it visible
             continue
         if token == "<<":
             expect_delimiter = True
@@ -196,10 +185,9 @@ def _shell_segments(command: str):
             if command is None:
                 expanded.append((argv, operator))
                 continue
-            # ``bash -c pytest`` is as much a shell invocation as the quoted form; the
-            # old whitespace gate silently missed it.  Splice nested segments *here*, not
-            # after all outer segments, so the outer control operator remains adjacent to
-            # the command it controls.
+            # ``bash -c pytest`` is as much a shell invocation as the quoted form. Splice
+            # nested segments *here*, not after all outer segments, so the outer control
+            # operator stays adjacent to the command it controls.
             nested = _shell_segments(command)
             if nested:
                 nested[-1] = (nested[-1][0], operator)

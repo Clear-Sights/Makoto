@@ -1,19 +1,6 @@
 """CLI entry — makoto status / install / uninstall / show / receipt / pattern.
 
-Hook dispatch (PreToolUse, Stop) is handled by dispatch.py via the plugin
-shim or settings.json wiring. This module exposes the install lifecycle, a
-status report, and catalog inspection.
-
-Subcommands:
-  status               summary of patterns_count, hooks_wired, state_dir,
-                       patterns_disabled (from MAKOTO_DISABLE_PATTERNS env)
-  install              state setup + settings.json hook wiring (idempotent)
-  uninstall            remove Makoto-managed hook entries
-  show <key>           read the results ledger by normalized location key
-  receipt [--session]  print the current chain receipt as JSON (read-time view)
-  pattern list         show every pattern in the catalog as a table
-  pattern show <id>    show full detail for one pattern + first 30 lines of
-                       its predicate module
+Hook dispatch (PreToolUse, Stop) lives in dispatch.py, not here.
 """
 from __future__ import annotations
 import argparse
@@ -27,12 +14,11 @@ from makoto.registry import load_precheck_catalog
 
 
 def _clip(text: str, width: int) -> str:
-    """`text` bounded to `width` display columns, an ellipsis standing in for the tail."""
+    """`text` truncated to `width` columns, tail replaced with an ellipsis."""
     return text if len(text) <= width else text[:width - 1] + "…"
 
 
 def _cmd_pattern_list() -> int:
-    """print every loaded pattern as a tab-aligned table."""
     patterns = load_precheck_catalog()
     if not patterns:
         print("makoto: no patterns loaded")
@@ -48,7 +34,7 @@ def _cmd_pattern_list() -> int:
 
 
 def _cmd_pattern_show(pid: str) -> int:
-    """print full detail for one pattern + the first 30 lines of its predicate module."""
+    """Print full pattern detail plus the first 30 lines of its predicate module."""
     patterns = {p.id: p for p in load_precheck_catalog()}
     if pid not in patterns:
         print(f"makoto: no pattern with id {pid!r}; available: {', '.join(sorted(patterns))}",
@@ -74,20 +60,15 @@ def _cmd_pattern_show(pid: str) -> int:
 
 
 def _cmd_receipt(session_id: str | None) -> int:
-    """print the current receipt (Task 2 slice 4) as JSON -- a pure read-time view over the
-    chain, never a persisted row. Fail-soft: no chain yet -> a vacuous all-zero receipt, exit 0
-    (matching `_cmd_show`'s "no DB yet" discipline; this is inspection, never a gate)."""
+    """Print the current receipt as JSON -- a read-time view, never a persisted row. No chain
+    yet: a vacuous all-zero receipt, exit 0."""
     from makoto.state.ledger import emit_receipt
     print(json.dumps(emit_receipt(session_id=session_id), indent=2))
     return 0
 
 
 def _cmd_show(key: str) -> int:
-    """read the results ledger by normalized key; print the row or 'no record'.
-
-    A read-only inspection command — it never evaluates predicates, never fires,
-    never blocks. Fail-soft: no DB yet -> a friendly note, exit 0.
-    """
+    """Read-only: never evaluates predicates, never fires, never blocks. No DB yet -> exit 0."""
     import sqlite3
     from makoto.state.store import _state_dir
     from makoto.state import ledger
@@ -108,8 +89,7 @@ def _cmd_show(key: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the CLI argument parser. Extracted from main() so tests can introspect the
-    live command set (tests/test_doc_materiality.py) without spawning a subprocess."""
+    """Separate from main() so tests can introspect the command set without a subprocess."""
     p = argparse.ArgumentParser(prog="makoto")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
@@ -129,7 +109,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    """argparse dispatch."""
     args = build_parser().parse_args()
     if args.cmd == "status":
         from makoto.install import cmd_status

@@ -1,6 +1,6 @@
-"""makoto.substrate._declared -- the check ids that SHOULD be live: the manifest
-`gate.undeclared_falsifiable` holds the catalog against. A row deleted, or a family module that
-fails to import, leaves its ids here with nothing live behind them, and that is the finding.
+"""The check ids that SHOULD be live: the manifest `gate.undeclared_falsifiable` holds the
+catalog against. A row deleted, or a family module that fails to import, leaves its ids here
+with nothing live behind them, and that is the finding.
 """
 DECLARED_IDS: frozenset[str] = frozenset({
     "content.env_gated_audit",
