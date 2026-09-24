@@ -30,86 +30,20 @@ ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"
 # source before the write drawn from it (LINEAGE).
 TESTS_SHAPES = frozenset({"SPEC", "OTHER_POINT", "SWITCH", "LINEAGE"})
 
-# The ONLY documented exception to "every Stop-gate finding blocks" (DESIGN DECISION 6):
-# gate.self_wired ships at level="advisory" so a partial hook-wiring strip is recorded to the audit
-# trail without ever blocking a turn (stopchecks/stopcheck_self_wired.py's own docstring; behavioral
-# pin: tests/test_dispatch.py::test_dispatch_self_wired_gate_never_blocks_even_when_it_fires).
-# Adding a gate id here must cite its own DESIGN DECISION the same way.
-#
-# gate.canon_fingerprints_advisory (DESIGN DECISION 26) is the second: most of the ported canon
-# session fingerprints rest on a soft/claim atom the gold-oracle finding doc's robust core does
-# not name, or are among that doc's explicitly-named WORST DISQUALIFIED fingerprints — the
-# total-retention rule keeps them in the catalog, evaluated and recorded, but never blocking. Its
-# sibling gate.canon_fingerprints (the robust-core, blocking-capable fingerprints) is
-# intentionally NOT here — it always emits level="error" (see canonFingerprints.py).
-# gate.unprobed_fanout and gate.unasked_plan are the third and fourth: both are ACT_VS_GUARD
-# obligations with a real benign class (a dispatch that IS the exploration; a plan for a request
-# that carried no ambiguity) and no corpus-measured FP rate yet. Promoting either to BLOCK needs
-# that measurement, not a preference. Each module's docstring says so.
-_ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
-                                  "gate.plan_item_drift",
-                                  "gate.unprobed_fanout", "gate.unasked_plan",
-                                  # same reasoning: each has a named benign class in its own
-                                  # module docstring and no corpus-measured FP rate yet.
-                                  "gate.unread_structure",
-                                  "gate.unwitnessed_verifier",
-                                  "gate.unknown_ref_switch",
-                                  "gate.unobserved_destruction",
-                                  "gate.relaunched_unchanged",
-                                  # a deliberately permanent waiver is a real and common thing
-                                  # and looks identical to an oversight.
-                                  "gate.undischarged_waiver",
-                                  # the benign case (the runner's own summary pasted, names
-                                  # visible in it) looks identical.
-                                  "gate.unnamed_failure",
-                                  # DOCUMENTING a command's output in a session that never
-                                  # ran it looks identical.
-                                  "gate.report_before_run",
-                                  # an unreachable new unit and a premature abstraction look
-                                  # the same from the record.
-                                  "gate.unclaimed_unit",
-                                  # a check-id list this architecture keeps in three homes, and
-                                  # a house convention wider than four lines, are both measured
-                                  # benign classes that look identical from the record.
-                                  "gate.pasted_fix",
-                                  # a catalog-completeness drift is a maintenance signal, not a
-                                  # live integrity violation of anything the agent claimed this
-                                  # turn (see checks/spec.py's own docstring), so it must never
-                                  # block even though it now reaches the decision like every
-                                  # other ADVISE Stop check.
-                                  "gate.undeclared_falsifiable",
-                                  })
-
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called
 # "posture" and they are three different vocabularies: a CHECK's native tier is `BLOCK`/`ADVISE`
 # (here); `makoto.verdict`'s OUTCOME vocabulary is `block`/`advise` lower-case; and
 # `verdict._POSTURES` is the operator's configured mode, `loose`/`strict`/`ask`/`silent`.
 # `_valid_check` used to require only that `posture` be truthy, so any spelling loaded -- and two
-# checks shipped their native tier spelled in the OUTCOME vocabulary's case. Nothing noticed,
-# because the one consumer that publishes a blocking count never read posture at all. With the
-# set closed, a fourth spelling cannot be loaded rather than being caught later by a reader.
+# checks shipped their native tier spelled in the OUTCOME vocabulary's case. With the set closed, a
+# fourth spelling cannot be loaded rather than being caught later by a reader.
+#
+# `posture` is the ONE owner of blocking vs advisory: every Stop-edge finding now reaches
+# `_emit_decision` (dispatch.py), and a check's `posture` (BLOCK/ADVISE) is what a reader --
+# tools/render_checks.py's counts, this package's own tests -- consults to classify it.
 POSTURE_BLOCK = "BLOCK"
 POSTURE_ADVISE = "ADVISE"
 ALLOWED_POSTURES = frozenset({POSTURE_BLOCK, POSTURE_ADVISE})
-
-
-def blocking_eligible(check) -> bool:
-    """Which end-of-turn gates the catalog counts as blocking. ONE owner OF THAT COUNT,
-    called by every consumer of it -- not the one owner of the word: a pre-check denies
-    without being Stop-edge, and `_canonAtoms.BLOCK_IDS` counts patterns rather than checks.
-    README lists all of them.
-
-    The Check docstring below has always defined this as BOTH signals: `may_block is True`
-    AND `posture == BLOCK`. `tools/render_checks.py` implemented a different rule -- Stop
-    edge, `may_block`, and absence from `_ADVISORY_ALLOWLIST` -- and never consulted posture
-    at all. The two agree on today's catalog only because the allowlist happens to name
-    exactly the four checks whose posture is ADVISE. Set a gate's posture to ADVISE without
-    editing the allowlist and the README goes on calling it blocking, because the sentence
-    that defines the word and the code that publishes the count were different owners.
-    """
-    return (getattr(check, "applies_at", None) == "Stop"
-            and bool(getattr(check, "may_block", False))
-            and getattr(check, "posture", None) == POSTURE_BLOCK)
 
 
 _PACKAGE_DIR = Path(__file__).parent / "checks"
@@ -120,10 +54,6 @@ class Check:
     """A convenience shape a check module MAY use for its `CHECK` export -- not required, the
     loader only duck-types `.id` / `.applies_at` / `.posture`, so a module exporting its own
     richer dataclass is equally discoverable.
-
-    `may_block`: a Stop-edge check is blocking-eligible only when BOTH `may_block is True` AND
-    `posture == BLOCK` -- two independent signals, not one. A Pre-tier CHECK leaves it False.
-
 
     `keywords`/`retry_hint`/`description`/`predicate_module` are Pre-tier fields; Stop-tier checks
     leave their safe empty defaults.
@@ -145,7 +75,6 @@ class Check:
     applies_at: str
     posture: str
     run: Optional[Callable] = None
-    may_block: bool = False
     keywords: tuple = ()
     retry_hint: str = ""
     description: str = ""

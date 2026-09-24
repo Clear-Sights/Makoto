@@ -449,7 +449,7 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
 
 
 from makoto.registry import Check as _Check
-shipped_CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BLOCK", may_block=True,
+shipped_CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BLOCK",
                tests="OTHER_POINT",
                eats=frozenset({"text", "history_all_agents", "cwd"}),
                run=lambda c: claimed_shipped_gate(
@@ -602,7 +602,7 @@ def completion_gate(
     return None
 
 
-completion_CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK", may_block=True,
+completion_CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK",
                tests="OTHER_POINT",
                eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
                run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
@@ -832,7 +832,7 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
     return None
 
 
-dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK", may_block=True,
+dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK",
                tests="OTHER_POINT",
                eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
                run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))
@@ -1073,14 +1073,13 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
 # (tests/test_stop_gate_level_invariant.py) as ALWAYS "advisory", never "error" (the one
 # DESIGN-DECISION-cited advisory exception among the Stop gates, FD6) -- declaring it
 # CHECK.posture="BLOCK" here would misrepresent that in the flat checks/ catalog's own metadata.
-# `may_block=True` here is NOT a contradiction: it only says "structurally eligible IF posture
-# were ever BLOCK" (it isn't, and is pinned as such by the test above) -- the actual never-blocks
-# guarantee still rests on posture=="ADVISE", same as always.
+# posture is the one owner of blocking vs advisory; the never-blocks guarantee rests on
+# posture=="ADVISE" alone.
 from makoto.kit import live_query_finding
 wired_run = live_query_finding(
     query=lambda fs_read: self_wired_gate(fs_read), posture_label="gate.self_wired"
 )
-wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", may_block=True,
+wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE",
                eats=frozenset({"fs_read"}),
                run=wired_run, layer="meta", tests="OTHER_POINT")
 
@@ -1194,7 +1193,7 @@ def claimed_consent_absent_gate(text, *, transcript_path=None):
 
 
 consent_CHECK = _Check(id="gate.claimed_consent_absent", applies_at="Stop", posture="BLOCK",
-               may_block=True, tests="OTHER_POINT",
+               tests="OTHER_POINT",
                keywords=("you approved", "you asked", "you said", "you confirmed",
                          "as you asked", "per your", "with your approval"),
                retry_hint=consent_RETRY_HINT, description=consent_DESCRIPTION,

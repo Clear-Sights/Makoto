@@ -13,14 +13,13 @@ adapter merged with its own engine into one file. `makoto/stopchecks/__init__.py
 as a thin compat shim (`load_stopchecks()` re-exported, still memoized); that shim was removed
 2026-07-09 (no backwards-compat shims policy). Then, 2026-07-10, `load_stopchecks()`/`GATE`/
 `StopCheck` themselves were retired entirely: every gate module now expresses its Stop-edge
-surface as a plain `CHECK` discovered by the SAME unified `checks._loader.load_checks(edge="Stop")` every Pre-tier
-check already used, with a new `Check.may_block` field marking exactly the checks that used to
-export a `GATE` -- the structural "reaches the decision pipeline at all" signal, independent of
-`.posture`/`.level` (see `_loader.py`'s `Check.may_block` docstring and `dispatch.py`'s
-`_blocking_gate_ids()`). This test's GATES_DIR and every design declaration below point at
-`checks/`. Because `checks/` also holds every precheck, `forbiddenLocation`, and the completeness
-check itself, the file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness
-files must be present), not an exact-set equality over the whole directory the way the old
+surface as a plain `CHECK` discovered by the SAME unified `checks._loader.load_checks(edge="Stop")`
+every Pre-tier check already used. Every discovered Stop-edge CHECK reaches the decision pipeline
+now (dispatch._emit_decision) -- `posture` (BLOCK/ADVISE) is the one owner of whether a fire
+actually blocks. This test's GATES_DIR and every design declaration below point at `checks/`.
+Because `checks/` also holds every precheck, `forbiddenLocation`, and the completeness check
+itself, the file-shape assertion is a SUBSET check (the 11 named gates + 3 shared/harness files
+must be present), not an exact-set equality over the whole directory the way the old
 single-purpose `stopchecks/` package allowed.
 """
 from __future__ import annotations
@@ -29,20 +28,14 @@ import dataclasses
 import importlib
 from pathlib import Path
 
-from makoto.registry import Check, _ADVISORY_ALLOWLIST, load_checks
+from makoto.registry import Check, load_checks
 from makoto.context import GateContext
 from tests._rows import SHAPES
 
 
 def _live_gates() -> list:
-    """The checks eligible to reach the Stop decision pipeline at all (formerly: discovered via
-    load_stopchecks()'s GATE-export scan) -- Check.may_block=True. Every live Stop-edge CHECK
-    now carries may_block=True (undeclaredFalsifiable's finding used to be silently dropped by
-    may_block=False; it now reaches the agent like every other ADVISE Stop check)."""
-    return sorted(
-        (c for c in load_checks(edge="Stop") if c.may_block),
-        key=lambda c: c.id,
-    )
+    """Every check discovered at the Stop edge -- all of them reach the decision pipeline now."""
+    return sorted(load_checks(edge="Stop"), key=lambda c: c.id)
 
 GATES_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 
@@ -68,7 +61,7 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.unclaimed_unit",
                           "gate.pasted_fix",
                           "gate.undeclared_falsifiable"}
-EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
+EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
                                    # content.self_mute_guard / gate.self_wired are "meta" today
@@ -117,12 +110,6 @@ def test_each_live_gate_exports_a_well_formed_CHECK():
         assert isinstance(g, Check)
         assert callable(g.run)
         assert g.applies_at == "Stop"
-        # `may_block is True` used to be asserted here. `_live_gates()` is DEFINED as
-        # `[c for c in load_checks(edge="Stop") if c.may_block]`, so that assertion was the
-        # selection restated: it could not fail while this loop had anything to iterate over.
-        # The property it was reaching for -- that the may_block set is exactly the designed set
-        # -- is checked where it can fail, in test_discovered_gates_match_the_design above,
-        # against EXPECTED_LIVE_GATE_IDS.
         homes = [stem for stem in SHAPES
                  if importlib.import_module(f"makoto.checks.{stem}").ROWS.get(g.id) is g]
         assert len(homes) == 1, f"{g.id}: must be a row of exactly one shape module, is in {homes}"
@@ -141,27 +128,11 @@ def _shadow_field_violation(fields: set) -> str | None:
     return None
 
 
-def _partition_violation(non_blocking_ids: set) -> str | None:
-    """THE partition law, likewise: no id may be both may_block=False and a live blocking gate."""
-    leaked = sorted(non_blocking_ids & EXPECTED_LIVE_GATE_IDS)
-    if leaked:
-        return (f"these ids are declared non-blocking AND listed as live blocking gates: "
-                f"{leaked}. The partition is not total.")
-    return None
-
-
 def test_gate_dataclass_has_no_undeclared_shadow_state():
     fields = {f.name for f in dataclasses.fields(Check)}
     assert _shadow_field_violation(fields) is None, _shadow_field_violation(fields)
-    # may_block IS the structural blocking-eligibility signal (replacing GATE-export presence) --
-    # every live Stop-edge CHECK now carries may_block=True, so the non-blocking side of the
-    # partition is empty and the law is trivially satisfied. The teeth test below still proves
-    # the law would catch a leak if one existed.
     live_ids = {g.id for g in _live_gates()}
     assert live_ids == EXPECTED_LIVE_GATE_IDS
-    non_blocking_stop_checks = [c for c in load_checks(edge="Stop") if not c.may_block]
-    violation = _partition_violation({c.id for c in non_blocking_stop_checks})
-    assert violation is None, violation
 
 
 def test_gate_context_carries_the_substrate_and_derives_roots():
@@ -203,8 +174,7 @@ def test_TEETH_no_shadow_field_check_catches_a_planted_blocking_field():
         applies_at: str
         posture: str
         run: object
-        may_block: bool
-        blocking: bool                                     # a re-introduced SECOND shadow field
+        blocking: bool                                     # a re-introduced shadow field
     fields = {f.name for f in dataclasses.fields(PlantedGate)}
     assert "blocking" in fields, "the plant did not plant; there is no shadow field to catch"
     # THE REAL LAW, applied. This used to assert `fields != EXPECTED_GATE_FIELDS` with a comment
@@ -215,20 +185,6 @@ def test_TEETH_no_shadow_field_check_catches_a_planted_blocking_field():
         "the shipped no-shadow-field law does not report a re-introduced `blocking` field")
     assert _shadow_field_violation({f.name for f in dataclasses.fields(Check)}) is None, (
         "CONTROL: the same law must pass on the real Check, or it reports everything")
-
-
-def test_TEETH_may_block_partition_catches_a_leaked_advisory_id():
-    # The plant is a live blocking gate id leaking into the non-blocking set. It is taken FROM
-    # EXPECTED_LIVE_GATE_IDS rather than spelled as a literal, so the plant cannot quietly stop
-    # being a leak when that set is edited.
-    leaked = sorted(EXPECTED_LIVE_GATE_IDS)[0]
-    planted_non_blocking_ids = {"gate.stale_establisher", "gate.undeclared_falsifiable", leaked}
-    assert _partition_violation(planted_non_blocking_ids) is not None, (
-        f"the shipped partition law does not report {leaked!r} being declared non-blocking "
-        f"while listed as a live blocking gate")
-    real = {c.id for c in load_checks(edge="Stop") if not c.may_block}
-    assert _partition_violation(real) is None, (
-        "CONTROL: the same law must pass on the real non-blocking set, or it reports everything")
 
 
 def test_TEETH_discovery_count_is_load_bearing():

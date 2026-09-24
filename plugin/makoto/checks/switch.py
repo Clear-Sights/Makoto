@@ -205,7 +205,7 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
 
 
 from makoto.registry import Check as _Check
-running_CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK", may_block=True,
+running_CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history_all_agents"}),
                run=lambda c: claimed_running_gate(c.text, history=c.history_all_agents))
@@ -309,7 +309,7 @@ def fabricated_action_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-action_CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", may_block=True,
+action_CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: fabricated_action_gate(c.text, history=c.history))
@@ -433,7 +433,7 @@ def unexamined_wall_gate(text, *, history=None, transcript_path=None):
 
 
 wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK",
-               may_block=True, tests="SWITCH",
+               tests="SWITCH",
                keywords=("no way to tell", "no way to know", "cannot determine",
                          "can't tell", "no way of knowing", "unable to verify"),
                retry_hint=wall_RETRY_HINT, description=wall_DESCRIPTION,
@@ -466,14 +466,9 @@ wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK
 #     END of each maximal consecutive run, and the LAST judgment for each key wins — so a later
 #     success for the same key silences it even when other, different calls happened in between.
 #
-# PATTERN_ID CONVENTION: `dispatch._blocking_gate_ids()` derives the blocking set from
-# `{c.id for c in load_checks(edge="Stop") if c.may_block and c.posture == BLOCK}` — the CHECK's
-# OWN id ("gate.canon") — and filters gate_findings by `finding.pattern_id in
-# _blocking_gate_ids()`. Every other live gate stamps `pattern_id == its own CHECK id`, so a
-# per-primitive pattern_id here would make `canon.timeout`/`canon.recur` findings silently
-# invisible to `_blocking_gate_ids()` — discovered but never actually blocking. This stamps
-# `pattern_id="gate.canon"` instead and keeps the firing sub-primitive's identity in the MESSAGE,
-# prefixed `"canon.<id>: "`.
+# PATTERN_ID CONVENTION: every other live gate stamps `pattern_id == its own CHECK id`
+# ("gate.canon"), so this does too, and keeps the firing sub-primitive's identity in the MESSAGE
+# instead, prefixed `"canon.<id>: "`.
 #
 # LEVEL: "error" — the ONLY blocking level in live makoto (makoto.vocab._ALLOWED_FIRE_LEVELS ==
 # {"error"}). This is an ORDINARY blocking gate, NOT the one advisory exception
@@ -841,7 +836,7 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     return out
 
 
-canon_CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", may_block=True,
+canon_CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_gate(c.history, transcript_path=c.transcript_path,
@@ -1188,7 +1183,7 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", may_block=True,
+named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: named_test_gate(c.text, history=c.history))
@@ -1323,7 +1318,6 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
 
 
 unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: unnamed_failure_gate(c.text, history=c.history))
@@ -1401,7 +1395,7 @@ def green__finding() -> Finding:
 
 
 # tests="SWITCH": registered ONE_OFF -- claim-vs-history and test-run-delta genuinely straddle here.
-green_CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
+green_CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "testrun_output", "testrun_exit"}),
                run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output,
@@ -1491,7 +1485,7 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
     return None
 
 
-stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK", may_block=True,
+stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "cwd"}),
                run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))
@@ -1547,7 +1541,6 @@ relaunched_unchanged_gate = unmet_obligation_gate(
 
 
 relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: relaunched_unchanged_gate(c.history))
@@ -1608,7 +1601,6 @@ unobserved_destruction_gate = unmet_obligation_gate(
 
 
 destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unobserved_destruction_gate(c.history))
@@ -1691,7 +1683,7 @@ unwitnessed_verifier_gate = unmet_obligation_gate(
 )
 
 
-verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE", may_block=True,
+verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE",
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unwitnessed_verifier_gate(c.history))
@@ -1792,7 +1784,6 @@ report_before_run_gate = unmet_obligation_gate(
 
 
 report_CHECK = _Check(id="gate.report_before_run", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: report_before_run_gate(c.history))
@@ -1844,7 +1835,7 @@ unasked_plan_gate = unmet_obligation_gate(
 )
 
 
-plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE", may_block=True,
+plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE",
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unasked_plan_gate(c.history))

@@ -30,15 +30,16 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 - **17 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **3**, `gate`: **1**
 - **30 Stop checks** (all checks registered at the Stop edge)
-- **30 end-of-turn gates** (`may_block=True`)
-- **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **16 advisory end-of-turn gates** (advisory-allowlisted)
+- **30 end-of-turn gates** (every Stop check reaches the decision)
+- **14 blocking end-of-turn gates** (`posture == BLOCK`)
+- **16 advisory end-of-turn gates** (`posture == ADVISE`)
 
 <!-- END GENERATED: check-counts -->
 
 Two different things are called a *gate* in that list, and the counts are not comparable. The
-`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is a
-check registered at the Stop edge with `may_block=True`. One pre-check carries the prefix today —
+`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is any
+check registered at the Stop edge — every one of them reaches the decision pipeline, and its
+`posture` (`BLOCK`/`ADVISE`) alone decides whether a fire blocks the turn. One pre-check carries the prefix today —
 `gate.claude_identity` (Pre-tier, self-defense) — the same naming convention `gate.contract_order`
 used before it was cut 2026-09-18 along with its Stop sibling. Every count above is scoped by
 edge, so no check is counted twice within a line.

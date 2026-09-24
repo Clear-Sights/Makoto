@@ -193,7 +193,7 @@ def test_plugin_description_predicate_count_matches_disk():
     from makoto.registry import load_checks
 
     def _live_gates():
-        return [c for c in load_checks(edge="Stop") if c.may_block]
+        return load_checks(edge="Stop")
 
     desc = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text())["description"]
     for phrase_rx, loader, tier in (

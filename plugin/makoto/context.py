@@ -206,9 +206,9 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             return None
 
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
-        # edge via checks._loader.load_checks -- this includes undeclaredFalsifiable, since it
-        # exports no GATE; `may_block=False` keeps its pattern_id structurally out of
-        # `_blocking_gate_ids()`. Each gate module owns its own adapter (GateContext -> the
+        # edge via checks._loader.load_checks -- this includes gate.undeclared_falsifiable, an
+        # ADVISE-posture check that ignores this GateContext entirely and audits the checks/
+        # package on disk instead. Each gate module owns its own adapter (GateContext -> the
         # gate's heterogeneous signature), so this loop never names a gate. gate.dropped resolves
         # against the agent's OWN ledger (touched_keys) + cwd-relative fs_exists/fs_read via
         # ctx.roots=[cwd] — NOT an unbounded os.walk (a Stop-hot-path landmine).

@@ -629,7 +629,6 @@ undeclared_CHECK = Check(
     id="gate.undeclared_falsifiable",
     applies_at="Stop",
     posture=POSTURE_ADVISE,
-    may_block=True,
     tests="SPEC",
     run=lambda ctx=None: undeclared_falsifiable_gate(),
 )
@@ -1152,7 +1151,6 @@ def undischarged_waiver_gate(history) -> Optional[Finding]:
 
 
 waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SPEC",
                eats=frozenset({"history"}),
                run=lambda c: undischarged_waiver_gate(c.history))
@@ -1367,7 +1365,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     return out
 
 
-fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK", may_block=True,
+fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK",
                tests="SPEC",
                eats=frozenset({"text", "history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_fingerprint_block_gate(
@@ -1384,8 +1382,8 @@ fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOC
 # the catalog, evaluated and recorded, but NEVER block.
 #
 # Sibling of canonFingerprints.py; see that module's comment for why this is two gate modules
-# instead of one. This id is named in makoto.registry's _ADVISORY_ALLOWLIST, the same mechanism
-# gate.self_wired uses for its own advisory-only tier.
+# instead of one. Its `posture="ADVISE"` below is what keeps it non-blocking, the same as
+# gate.self_wired's own advisory-only tier.
 
 
 def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
@@ -1411,7 +1409,7 @@ def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
 fpadv_CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", posture="ADVISE",
                tests="SPEC",
                eats=frozenset({"text", "history"}),
-               may_block=True, run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))
+               run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))
 
 # ==============================================================================================
 # planItemDrift
@@ -1453,7 +1451,7 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
 drift_CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="ADVISE",
                tests="SPEC",
                eats=frozenset({"open_plan_items"}),
-               may_block=True, run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))
+               run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))
 # content.phantom_citation predicate — phantom citation (Author-Year not in canonical set).
 #
 # Reads tool_input.content, never disk. Extracts Author-Year strings via
@@ -1597,9 +1595,9 @@ def liveness_run(ctx):
     return _run(ctx)
 
 
-hollow_CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=hollow_run,
+hollow_CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", run=hollow_run,
                eats=frozenset({"touched", "cwd", "fs_read"}), tests="SPEC")
-liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=liveness_run,
+liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", run=liveness_run,
                eats=frozenset({"touched", "cwd", "fs_read"}), tests="SPEC")
 
 # the SPEC shape: its rows, and the one Pre entry dispatch calls for any of them

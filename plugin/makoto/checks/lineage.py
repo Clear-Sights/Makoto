@@ -636,7 +636,7 @@ unread_structure_gate = unmet_obligation_gate(
 )
 
 
-structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="ADVISE", may_block=True,
+structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="ADVISE",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unread_structure_gate(c.history))
@@ -683,7 +683,7 @@ unknown_ref_switch_gate = unmet_obligation_gate(
 )
 
 
-ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADVISE", may_block=True,
+ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADVISE",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unknown_ref_switch_gate(c.history))
@@ -740,7 +740,7 @@ unprobed_fanout_gate = unmet_obligation_gate(
 )
 
 
-fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADVISE", may_block=True,
+fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADVISE",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unprobed_fanout_gate(c.history))
@@ -901,7 +901,6 @@ def pasted_fix_gate(history) -> Optional[Finding]:
 
 
 pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: pasted_fix_gate(c.history))
@@ -1073,7 +1072,6 @@ def _named_by_operator(name: str, transcript_path) -> bool:
 
 
 unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="LINEAGE",
                eats=frozenset({"history", "transcript_path"}),
                run=lambda c: unclaimed_unit_gate(c.history,

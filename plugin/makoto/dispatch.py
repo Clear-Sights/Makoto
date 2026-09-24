@@ -448,13 +448,6 @@ def _gates_enabled() -> bool:
     return os.environ.get("MAKOTO_DISABLE_GATES", "").strip().lower() not in ("1", "true", "yes", "on")
 
 
-@lru_cache(maxsize=1)
-def _blocking_gate_ids() -> frozenset:
-    """Stop-check ids eligible to reach `_emit_decision`, derived from `Check.may_block`.
-    Lazy and memoized to avoid catalog imports outside Stop dispatch."""
-    return frozenset(c.id for c in load_checks(edge="Stop") if c.may_block)
-
-
 def _run_predicates(conn, payload: dict, history: list, event_id: int,
                     state_dir: Path, payload_raw: str) -> list[Finding]:
     """keyword-prefilter the catalog, invoke each candidate predicate, collect Findings.
@@ -598,8 +591,8 @@ def _worst_finding(findings: list[Finding]) -> tuple[str, Finding] | None:
 def _meta_check_ids() -> frozenset:
     """The check ids tagged `layer=\"meta\"` in the catalog (see Check.layer's docstring in
     makoto/registry.py) -- DERIVED from `load_checks()` across every edge, never a hand-synced
-    literal, same discipline as `_blocking_gate_ids()`. Lazy + memoized because the loader
-    imports every checks/*.py module: `_finding_layer` below only calls this on the one branch
+    literal. Lazy + memoized because the loader imports every checks/*.py module: `_finding_layer`
+    below only calls this on the one branch
     where the answer can matter (a BLOCK under a softening posture), so the default STRICT hot
     path never pays the import."""
     return frozenset(c.id for c in load_checks() if c.layer == "meta")
@@ -808,7 +801,9 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     completion claim. Gates evaluate on Stop AND SubagentStop (real last_assistant_message) —
     a SubagentStop payload carries the same shape (last_assistant_message, session_id, cwd,
     etc.) as a main-thread Stop, so a sub-agent's own completion claim is checked by the same
-    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless."""
+    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless. Every
+    Stop-edge finding reaches `_emit_decision` -- whether it actually blocks or only advises is
+    `verdict.apply`'s fold over the finding's own level/posture, not a filter here."""
     hook_event = payload.get("hook_event_name", "")
     history = _select_recent(conn, payload.get("session_id", ""), event_id)
     findings = _run_predicates(conn, payload, history, event_id,
@@ -821,8 +816,7 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
                          for f in run_stop_checks(conn, payload, history, root=state_dir)]
     blocking = list(findings)
     if _gates_enabled():
-        blocking += [gf for gf in gate_findings
-                     if gf.pattern_id in _blocking_gate_ids()]
+        blocking += gate_findings
     _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"),
                   stop_hook_active=payload.get("stop_hook_active") is True)
     _record_audit(state_dir, findings + gate_findings, payload)

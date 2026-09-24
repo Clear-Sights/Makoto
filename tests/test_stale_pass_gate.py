@@ -73,7 +73,6 @@ def test_gate_export_shape():
     assert CHECK.id == "gate.stale_pass"
     assert CHECK.applies_at == "Stop"
     assert CHECK.posture == "BLOCK"
-    assert CHECK.may_block is True
 
 
 def test_latency_budget_literal_lookup_class(tmp_path):
