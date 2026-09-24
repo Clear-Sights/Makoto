@@ -667,6 +667,30 @@ def regex_file_predicate(
     return _predicate
 
 
+def unwitnessed(events, *, owes, pays, paid=()):
+    """The one shape: an event owes a witness, and only an earlier event can pay it.
+
+    `owes(ev)` gives the subjects `ev` commits to; `pays(ev)` gives a predicate over subjects
+    that `ev` witnesses, or None. Yields `(ev, subject)` for every subject nothing up to it
+    paid. `paid` seeds predicates that hold before the first event, for a caller whose witness
+    is the whole record rather than one event of it. A witness pays its own event and every
+    later one, never an earlier one. One pass; a predicate that pays everything
+    short-circuits, so an obligation stays O(events).
+
+    The register's families differ only in what counts as the witness: none can pay a held
+    wrong form (SPEC), a second reading of the subject (THE OTHER POINT), an act that selected
+    the branch (THE SWITCH), a read of the source before the write (THE LINEAGE).
+    """
+    paid = list(paid)
+    for ev in events:
+        p = pays(ev)
+        if p is not None:
+            paid.append(p)
+        for subject in owes(ev) or ():
+            if not any(q(subject) for q in paid):
+                yield ev, subject
+
+
 def claim_vs_history_predicate(
     *, claim_rxs, neg_ref_rx, grounded_in_history, tool_gate, message,
 ) -> Callable[..., Optional[Finding]]:
@@ -696,9 +720,9 @@ def claim_vs_history_predicate(
                     # `lastindex`, not `groups()`: "the regex HAS groups" is not "group 1
                     # matched" — a non-participating optional group yielded claims=[None].
                     claims.append(match.group(1) if match.lastindex else match.group(0))
-        for claimed in claims:
-            if grounded_in_history(claimed, history):
-                continue
+        for _ev, claimed in unwitnessed(
+                (subject,), owes=lambda _s: claims, pays=lambda _s: None,
+                paid=(lambda c: grounded_in_history(c, history),)):
             rendered = message(claimed, subject, pattern) if callable(message) else message.format(
                 claimed=claimed, id=pattern.id, description=pattern.description
             )
@@ -802,9 +826,10 @@ def introduced_regex_predicate(
             return None  # universal exemption: AI documented this as legitimate (see CLAUDE.md)
         if grounded_in_history is None:
             return _introduced_regex_finding(pattern, m, text, tool_input, tool_name)
-        if grounded_in_history(history):
-            return None  # a real instance IS on the record -- the claim is grounded, not illusory
-        return _introduced_regex_finding(pattern, m, text, tool_input, tool_name, veto_suffix)
+        for _ev, _m in unwitnessed((m,), owes=lambda mm: (mm,), pays=lambda _mm: None,
+                                   paid=(lambda _mm: grounded_in_history(history),)):
+            return _introduced_regex_finding(pattern, m, text, tool_input, tool_name, veto_suffix)
+        return None  # a real instance IS on the record -- the claim is grounded, not illusory
     return _predicate
 
 
@@ -884,21 +909,14 @@ def unmet_obligation_gate(*, act, guard, message, retry_hint, pattern_id,
     own evidence, and it fails OPEN -- the gate goes quiet, never louder.
     """
     def _run(history) -> Optional[Finding]:
-        seen_guard = False
-        unguarded = 0
-        offender = None
-        for row in history or ():
-            ev = decode_history_event(row)
-            if not isinstance(ev, dict):
-                continue                   # fail open: an undecodable row could be the guard
-            if guard(ev):
-                seen_guard = True
-                continue
-            if act(ev) and not seen_guard:
-                unguarded += 1
-                offender = ev
-        if unguarded < min_acts or offender is None:
+        # fail open: an undecodable row could be the guard, so it is skipped, never an act
+        events = (ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict))
+        unpaid = [ev for ev, _ in unwitnessed(
+            events, owes=lambda ev: (ev,) if act(ev) else (),
+            pays=lambda ev: (lambda _s: True) if guard(ev) else None)]
+        if len(unpaid) < min_acts:
             return None
+        offender = unpaid[-1]
         return Finding(
             pattern_id=pattern_id, file="", line=0, level=level,
             message=message, retry_hint=retry_hint,
