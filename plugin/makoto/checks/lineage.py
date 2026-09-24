@@ -1078,46 +1078,23 @@ unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="A
                                                  transcript_path=c.transcript_path))
 
 
-# event.unbriefed_dispatch -- a worker sent without what it reads, what it may write, and what
-# pays it. `PROPOSED-REGISTER-ROWS.md`'s I1: refuse an Agent/Task call whose prompt lacks a
-# READ:, a WRITE: and an ACCEPTANCE: line (line-start labels, case-sensitive).
-#
-# LINEAGE: the witness is a read of the source before the write drawn from it -- here, the three
-# lines a dispatch's OWN prompt must carry before the worker acts at all. `kit.dispatch_brief_lines`
-# is the one parser this row shares with event.unpinned_input's READ:-path check and
-# gate.unpaid_acceptance's ACCEPTANCE: read, so the three-label grammar has one definition.
-#
-# OPT-IN, per the register's own cost line ("every makoto user's dispatches need the three
-# lines... yours to decide"): silent unless the dispatching session's own working tree declares
-# `dispatch = true` in its `makoto.toml` -- the same declaration file `core._declaredverifiers`
-# already reads for the verifier tier, generalized (not duplicated) via `dispatch_opt_in`.
-from makoto.kit import dispatch_brief_lines, unwitnessed
+# event.unbriefed_dispatch -- refuses an Agent/Task dispatch whose prompt lacks a READ:, WRITE:
+# and ACCEPTANCE: line.
+from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines, unwitnessed
 from makoto.core._declaredverifiers import dispatch_opt_in
-
-# The two dispatch-tool names the register names literally. An MCP tool dispatching a subagent
-# under a third name is `gate.unprobed_fanout`'s wider net (advisory, name-or-`prompt`-shaped);
-# this row stays to the register's own closed pair.
-_DISPATCH_TOOL_NAMES = frozenset({"Agent", "Task"})
-
-
-def _dispatch_prompt(ev: dict):
-    """The prompt of an about-to-run Agent/Task dispatch, or None when `ev` is not one."""
-    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in _DISPATCH_TOOL_NAMES:
-        return None
-    ti = ev.get("tool_input")
-    prompt = ti.get("prompt") if isinstance(ti, dict) else None
-    return prompt if isinstance(prompt, str) else None
-
-
-def _briefed(prompt: str) -> bool:
-    """True iff `prompt` carries all three of READ:/WRITE:/ACCEPTANCE: at least once each."""
-    lines = dispatch_brief_lines(prompt)
-    return bool(lines["READ"] and lines["WRITE"] and lines["ACCEPTANCE"])
 
 
 def unbriefed_owes(ev: dict):
-    """LINEAGE: the about-to-run dispatch commits to its own prompt carrying the full brief."""
-    return (prompt,) if (prompt := _dispatch_prompt(ev)) is not None else ()
+    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in DISPATCH_TOOL_NAMES:
+        return ()
+    ti = ev.get("tool_input")
+    prompt = ti.get("prompt") if isinstance(ti, dict) else None
+    return (prompt,) if isinstance(prompt, str) else ()
+
+
+def _briefed(prompt: str) -> bool:
+    lines = dispatch_brief_lines(prompt)
+    return bool(lines["READ"] and lines["WRITE"] and lines["ACCEPTANCE"])
 
 
 def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:

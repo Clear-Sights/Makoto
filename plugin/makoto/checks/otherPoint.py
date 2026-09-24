@@ -1320,44 +1320,26 @@ thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 from makoto.registry import Check
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
-# event.unpinned_input -- an expensive run true for the input it read then, not the one on disk
-# now. `PROPOSED-REGISTER-ROWS.md`'s I2: refuse a dispatch whose READ paths carry no
-# @<12+ hex> content hash, and a Bash call with timeout > 120000 ms unless the same command
-# verifies pins (sha256sum -c) or names path@hash.
-#
-# OTHER_POINT: the witness is a second reading of the same subject -- the READ path or Bash
-# command itself, read for whether it names the pin it needs -- never an act exercised elsewhere.
-#
-# OPT-IN, same declaration and same reader as event.unbriefed_dispatch: silent unless the
-# session's own working tree's `makoto.toml` declares `dispatch = true`.
-from makoto.kit import dispatch_brief_lines as _dispatch_brief_lines
-from makoto.core._declaredverifiers import dispatch_opt_in as _dispatch_opt_in
+# event.unpinned_input -- refuses a dispatch whose READ paths carry no @<12+ hex> content hash,
+# and a Bash call with timeout > 120000 ms unless it verifies pins (sha256sum -c) or names
+# path@hash.
+from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines as _dispatch_brief_lines
+from makoto.core._declaredverifiers import dispatch_opt_in
 
-# The two dispatch-tool names the register names literally -- shared vocabulary with
-# `lineage.event.unbriefed_dispatch`, kept as its own small frozenset here rather than an
-# import across the shape boundary these two families are deliberately kept apart by.
-_UNPINNED_DISPATCH_TOOLS = frozenset({"Agent", "Task"})
-# A READ path pinned by content hash: the WHOLE line value is `<path>@<12+ hex>`, matching the
-# register's own example (`plugin/makoto/kit.py@3f2a9c1e0b7d`).
 _PINNED_READ_RX = re.compile(r"^\S+@[0-9a-fA-F]{12,}$")
-# A command that verifies pins itself: `sha256sum -c`/`--check`, or names a `path@hash` token
-# anywhere in the command line (the same pin shape, inline).
 _SHA256SUM_CHECK_RX = re.compile(r"\bsha256sum\b[^\n]*(?:-[A-Za-z]*c\b|--check\b)")
 _PATH_AT_HASH_RX = re.compile(r"\S+@[0-9a-fA-F]{12,}\b")
-# The register's own threshold: a Bash call expensive enough that a stale input is costly.
 _LONG_TIMEOUT_MS = 120000
 
 
 def unpinned_owes(ev: dict):
-    """OTHER_POINT: an about-to-run dispatch commits to every READ path it names carrying a pin;
-    an about-to-run long-timeout Bash call commits to itself naming one."""
     if ev.get("hook_event_name") != "PreToolUse":
         return ()
     tool = ev.get("tool_name") or ""
     ti = ev.get("tool_input")
     if not isinstance(ti, dict):
         return ()
-    if tool in _UNPINNED_DISPATCH_TOOLS:
+    if tool in DISPATCH_TOOL_NAMES:
         prompt = ti.get("prompt")
         if not isinstance(prompt, str):
             return ()
@@ -1375,7 +1357,7 @@ def unpinned_owes(ev: dict):
 
 
 def unpinned_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
-    if not _dispatch_opt_in(current_event.get("cwd")):
+    if not dispatch_opt_in(current_event.get("cwd")):
         return None
     for _ev, subject in unwitnessed((current_event,), owes=unpinned_owes):
         return Finding(
@@ -1400,40 +1382,18 @@ unpinned_CHECK = _Check(id='event.unpinned_input', applies_at="Pre", posture="BL
              retry_hint=unpinned_RETRY_HINT, description=unpinned_DESCRIPTION,
              eats=frozenset({"current_event", "pattern"}), tests="OTHER_POINT")
 
-# gate.unpaid_acceptance -- done claimed while the dispatch's ACCEPTANCE command never exited 0.
-# `PROPOSED-REGISTER-ROWS.md`'s I3: at Stop, each dispatch's ACCEPTANCE is owed; only a later
-# Bash run of that exact command with exit 0 pays it.
-#
-# OTHER_POINT, through `kit.unwitnessed` walked in REVERSE: the obligation is owed by the
-# dispatch event and can only be paid by a LATER one, so the history is walked newest-first --
-# `pays` for a real-time-later event is then already in `unwitnessed`'s accumulated `paid` list
-# by the time `owes` reaches the (real-time-earlier) dispatch that raised it. That is the same
-# single left-to-right pass `unwitnessed` already offers, over the one input order that makes
-# "a later event pays an earlier obligation" fall out of it directly, rather than a second,
-# order-inverted engine.
-#
-# IN-FLIGHT EXCLUSION: a worker dispatched THIS turn has not necessarily reported back yet --
-# workers usually run in the background -- so only a dispatch from BEFORE the operator's current
-# turn (`ledger.last_operator_turn_ts`, the same boundary `gate.unexamined_wall` windows against)
-# can owe. No established boundary at all (no operator turn on record) means no dispatch can be
-# PROVEN prior-turn, so none is owed -- the same fail-open direction `wall_gate` documents for an
-# unestablishable window.
-#
-# ONE BOUNCE: this row's posture is BLOCK, and `verdict._STOP_WIRE` suppresses only ADVISE on
-# `stop_hook_active` -- a BLOCK is never auto-suppressed there. So this row takes its own bounce,
-# in its own `run`, the same direction: `stop_hook_active` true means this Stop already fired once
-# this turn, and the agent gets to actually stop rather than looping on the same finding forever.
-#
-# OPT-IN, same declaration and reader as its two Pre-tier siblings.
-from makoto.core._declaredverifiers import dispatch_opt_in as _unpaid_dispatch_opt_in
+# gate.unpaid_acceptance -- fires when done was claimed but a prior-turn dispatch's ACCEPTANCE
+# command never later ran to exit 0. Walks history newest-first so a later payment is already
+# witnessed by the time the earlier dispatch that owes it is reached. Excludes this-turn
+# dispatches (worker may still be in flight) and takes its own one bounce on stop_hook_active,
+# since BLOCK gets no automatic wire-level suppression there.
 from makoto.state.ledger import last_operator_turn_ts as _last_operator_turn_ts
 from makoto.state.ledger import _event_instant as _op_event_instant
 from makoto.substrate._canonAtoms import _row_ts as _op_row_ts
 
 
 def _decorated_events(history):
-    """`history` rows decoded, each carrying its own raw `ts` under `_ts` -- `decode_history_row`
-    drops the wrapper column, and the in-flight exclusion needs it back beside the payload."""
+    """`history` rows decoded, each carrying its raw `ts` under `_ts` (decode_history_row drops it)."""
     out = []
     for row in history or ():
         ev = decode_history_row(row)
@@ -1446,11 +1406,7 @@ def _decorated_events(history):
 
 
 def _acceptance_owed(ev: dict, *, since_instant):
-    """Every ACCEPTANCE command a PRIOR-turn dispatch event commits to, whitespace-normalized.
-    No boundary at all (`since_instant is None`), a dispatch at or after it (this turn's own),
-    or a dispatch whose own ts cannot be read, is not owed -- none of those PROVES the dispatch
-    is prior-turn, and only a proven-prior dispatch is owed. See the module comment above."""
-    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in _UNPINNED_DISPATCH_TOOLS:
+    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in DISPATCH_TOOL_NAMES:
         return ()
     if since_instant is None:
         return ()              # no operator-turn boundary at all -- nothing PROVEN prior-turn
@@ -1465,7 +1421,6 @@ def _acceptance_owed(ev: dict, *, since_instant):
 
 
 def _acceptance_paid(ev: dict):
-    """A settled, successful Bash run pays every ACCEPTANCE command equal to its own (stripped)."""
     if ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
         return None
     ti = ev.get("tool_input")
@@ -1479,9 +1434,6 @@ def _acceptance_paid(ev: dict):
 
 
 def unpaid_acceptance_gate(history, *, transcript_path=None) -> Optional[Finding]:
-    """Fire iff a PRIOR-turn dispatch's ACCEPTANCE command never later ran to exit 0. `history`
-    is walked newest-first (see module comment above) so a later real-time payment is already
-    witnessed by the time the earlier dispatch that owes it is reached."""
     since_instant = None
     if transcript_path:
         try:
@@ -1511,7 +1463,7 @@ unpaid_CHECK = _Check(id="gate.unpaid_acceptance", applies_at="Stop", posture="B
               eats=frozenset({"history", "cwd", "transcript_path", "stop_hook_active"}),
               run=lambda c: (None if c.stop_hook_active else
                              (unpaid_acceptance_gate(c.history, transcript_path=c.transcript_path)
-                              if _unpaid_dispatch_opt_in(c.cwd) else None)))
+                              if dispatch_opt_in(c.cwd) else None)))
 
 
 # the OTHER_POINT shape's rows, and the one Pre entry dispatch calls for any of them

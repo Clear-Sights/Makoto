@@ -66,12 +66,7 @@ class GateContext:
     #   across threads -- a risk that does not apply to a completed PostToolUse Bash call. Every
     #   other gate should keep reading `history`; widen a gate onto this field only with the same
     #   completed-evidence reasoning these claim gates document.
-    stop_hook_active: bool = False          # raw hook payload's `stop_hook_active` verbatim
-    #   (CONFIRMED real, top-level on Stop/SubagentStop -- Claude Code hooks reference): true iff
-    #   this Stop already fired once this turn and the agent is retrying to stop. Read by
-    #   gate.unpaid_acceptance, whose BLOCK posture gets no automatic wire-level bounce
-    #   (verdict._STOP_WIRE suppresses only ADVISE) -- it takes its own one bounce here, the same
-    #   direction the ADVISE wire already gives every other Stop check.
+    stop_hook_active: bool = False          # true iff this Stop already fired once this turn
 
     @property
     def roots(self):

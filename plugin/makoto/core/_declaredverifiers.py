@@ -38,10 +38,7 @@ from functools import lru_cache
 
 DECLARATION_BASENAME = "makoto.toml"
 DECLARATION_KEY = "verifiers"
-# The opt-in key the dispatch-discipline rows (event.unbriefed_dispatch, event.unpinned_input,
-# gate.unpaid_acceptance) gate on. Same file, same reader, a second top-level key -- not a second
-# config file or a second parser: `_declaration` below is the ONE place `makoto.toml` is read and
-# decoded, and both `declared_verifiers` and `dispatch_opt_in` are thin projections of its result.
+# The opt-in key the dispatch-discipline rows gate on -- same file, same reader.
 DISPATCH_KEY = "dispatch"
 
 _EMPTY: tuple[frozenset, frozenset] = (frozenset(), frozenset())
@@ -58,10 +55,7 @@ def _tail(word: str) -> str:
 
 @lru_cache(maxsize=16)
 def _declaration(root: str) -> dict:
-    """`root`'s `makoto.toml`, decoded once, or `{}`. The ONE read+parse of the file; every
-    projection (`declared_verifiers`, `dispatch_opt_in`) reads this cached dict rather than
-    re-opening or re-decoding it. Memoised per root: call `cache_clear()` when a test writes a
-    declaration under a root this process has already asked about."""
+    """`root`'s `makoto.toml`, decoded once, or `{}`. Memoised per root; call `cache_clear()` after a test writes one."""
     if not root:
         return {}
     path = os.path.join(root, DECLARATION_BASENAME)
@@ -87,24 +81,16 @@ def declared_verifiers(root: str) -> tuple[frozenset, frozenset]:
     return (tokens, frozenset(_tail(v) for v in tokens))
 
 
-# `declared_verifiers.cache_clear` invalidates the one underlying read; a test that pokes it
-# (pre-dating this split) still works.
 declared_verifiers.cache_clear = _declaration.cache_clear
 
 
 def dispatch_opt_in(root) -> bool:
-    """True iff `root`'s `makoto.toml` declares `dispatch = true`.
-
-    The one gate the three dispatch-discipline rows share: silent by default, on only when the
-    session's own working tree opts in. An unreadable/malformed/absent declaration reads as
-    "not opted in" (fail-open, same direction `declared_verifiers` fails), never as a block
-    invented from a bad parse or a false "no" from a real makoto.toml elsewhere."""
+    """True iff `root`'s `makoto.toml` declares `dispatch = true`. Fail-open: unreadable/absent reads as not opted in."""
     if not isinstance(root, str) or not root:
         return False
     return _declaration(root).get(DISPATCH_KEY) is True
 
 
-# Shares `_declaration`'s cache too -- one read, two projections, one cache to clear.
 dispatch_opt_in.cache_clear = _declaration.cache_clear
 
 
