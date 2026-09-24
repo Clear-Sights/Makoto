@@ -97,6 +97,34 @@ def test_run_adapter_is_witnessed_firing_and_silent(tmp_path):
     assert staleEstablisher.established_run(ctx(None)) is None
 
 
+def test_relative_where_resolves_against_the_session_cwd_not_the_process_cwd(tmp_path):
+    """REAL BUG: a relative `where` (the plan artifact's normal shape) must be checked against
+    the SESSION's own payload cwd, never wherever the dispatcher process happens to be running
+    from. Without `cwd` threaded through, an establisher that genuinely exists in the session's
+    project reads as stale."""
+    from makoto.context import GateContext
+
+    (tmp_path / "gen").mkdir()
+    (tmp_path / "gen" / "parser.py").write_text("def parse():\n    pass\n", encoding="utf-8")
+
+    plan = Plan()
+    plan.add_node("Write", "parser", "gen/parser.py", id="establisher")
+    plan.mark_done("establisher")
+    plan.add_node("Write", "parser", "gen/test_parser.py", id="dependent")
+
+    assert staleEstablisher.established_check(plan, cwd=str(tmp_path)) is None, \
+        "a relative `where` that genuinely exists under the session cwd must not fire"
+    assert staleEstablisher.established_check(plan, cwd=str(tmp_path / "nonexistent")) is not None, \
+        "resolved against a cwd where it truly does not exist, it must still fire"
+
+    ctx = GateContext(text="", touched=frozenset(), empty=frozenset(),
+                      testrun_output="", cwd=str(tmp_path), fs_exists=lambda p: False,
+                      fs_size=lambda p: None, fs_read=lambda p: None, history=(),
+                      plan=plan)
+    assert staleEstablisher.established_run(ctx) is None, \
+        "the live .run adapter must thread ctx.cwd through, not just check()'s own default"
+
+
 def test_never_discovered_as_a_blocking_stop_gate():
     """Structural proof of the never-BLOCK guarantee: staleEstablisher's CHECK stays
     may_block=False, so it never enters dispatch._blocking_gate_ids() (load_checks(edge="Stop")-
