@@ -4,6 +4,7 @@ Exercise each through real dispatch, with a blocking control for the exemptions.
 """
 from __future__ import annotations
 
+import json
 
 from makoto.state import ledger
 from tests.conftest import _setup_state, _run_dispatch
@@ -79,21 +80,32 @@ def test_disabled_pattern_exemption_is_a_chained_row(tmp_path):
     assert ledger.verify_chain(root=state) is None
 
 
+def _self_wired_stop(state_dir, tmp_path, sid):
+    """Fire gate.self_wired (ADVISE, never blocks) via a partial hook-wiring strip: PreToolUse
+    and PostToolUse are wired but Stop is not."""
+    claude_dir = tmp_path / ".claude"
+    if not claude_dir.exists():
+        claude_dir.mkdir()
+        (claude_dir / "settings.json").write_text(json.dumps({"hooks": {
+            "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+            "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        }}))
+    return _run_dispatch(state_dir, {"hook_event_name": "Stop", "session_id": sid,
+                                     "cwd": str(tmp_path),
+                                     "last_assistant_message": "Done for now."})
+
+
 # ---- 3. the advisory tier --------------------------------------------------------------------
 def test_advisory_tier_fire_is_a_chained_row(tmp_path):
-    """An ADVISE-tier finding (e.g. the test-delta redirect) is recorded via _record_audit ->
-    audit.append_row -> the chain (kind="audit"), same as any BLOCK-tier fire -- the advisory
-    tier is never a second-class, unrecorded mercy."""
+    """An ADVISE-tier finding (gate.self_wired, fired by a partial hook-wiring strip) is recorded
+    via _record_audit -> audit.append_row -> the chain (kind="audit"), same as any BLOCK-tier
+    fire -- the advisory tier is never a second-class, unrecorded mercy."""
     state = _setup_state(tmp_path)
     sid = "mercy-advisory"
-    for res in ({"stdout": "PASSED tests/x.py::test_a\n", "stderr": "", "exitCode": 0},
-                {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1}):
-        _run_dispatch(state, {"hook_event_name": "PostToolUse", "tool_name": "Bash",
-                              "session_id": sid, "cwd": "/tmp",
-                              "tool_input": {"command": "pytest -q"}, "tool_response": res})
-    rows = [r for r in ledger.read(root=state) if r.get("kind") == "audit"]
+    _self_wired_stop(state, tmp_path, sid)
+    rows = [r for r in ledger.read(root=state) if r.get("kind") == "audit"
+            and "gate.self_wired" in r.get("pattern_fires", [])]
     assert len(rows) == 1
-    assert rows[0]["pattern_fires"] == ["makoto.test_delta"]
 
 
 # ---- the unifying claim itself -----------------------------------------------------------------
@@ -108,17 +120,13 @@ def test_all_mercy_mechanisms_are_distinct_on_the_same_chain(tmp_path):
     rc, out = _pre_write(state, _WEAK_VERIFIER, sid,
                          extra_env={"MAKOTO_DISABLE_PATTERNS": "content.verifier_predicate_weakened"})
     assert out == ""
-    # 3: the advisory tier via real dispatch (test-delta redirect -> kind="audit")
-    for res in ({"stdout": "PASSED tests/x.py::test_a\n", "stderr": "", "exitCode": 0},
-                {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1}):
-        _run_dispatch(state, {"hook_event_name": "PostToolUse", "tool_name": "Bash",
-                              "session_id": sid, "cwd": "/tmp",
-                              "tool_input": {"command": "pytest -q"}, "tool_response": res})
+    # 3: the advisory tier via real dispatch (gate.self_wired -> kind="audit")
+    _self_wired_stop(state, tmp_path, sid)
     rows = list(ledger.read(root=state))
-    assert {r.get("kind") for r in rows} == {"exemption", "audit", "testrun"}
+    assert {r.get("kind") for r in rows} >= {"exemption", "audit"}
     assert ({r.get("exemption_kind") for r in rows if r.get("kind") == "exemption"}
             == {"makoto-allow", "disabled-pattern"})
     advisory = [r for r in rows if r.get("kind") == "audit"
-                and r.get("pattern_fires") == ["makoto.test_delta"]]
+                and "gate.self_wired" in r.get("pattern_fires", [])]
     assert len(advisory) == 1, "the advisory tier's own audit row must be on the chain"
     assert ledger.verify_chain(root=state) is None

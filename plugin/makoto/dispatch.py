@@ -778,44 +778,23 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
 
     Both PostToolUse terminals have already been stored by ``_ingest_event`` before this handler
     runs, so history-walking decoders can see successes and failures alike.  Only a successful
-    PostToolUse may mutate the update ledger, record a task event, or emit a test delta.
-    PostToolUseFailure is evidence that the operation did *not* land; retaining it in history
-    while returning here prevents a failed Write/Bash from discharging gates or latest-wins
-    clobbering an earlier real result.
+    PostToolUse may mutate the update ledger or record a task event. PostToolUseFailure is
+    evidence that the operation did *not* land; retaining it in history while returning here
+    prevents a failed Write/Bash from discharging gates or latest-wins clobbering an earlier
+    real result.
 
     No predicate evaluation and no block — settled tool events accumulate evidence, never decide."""
     if payload.get("hook_event_name") == "PostToolUseFailure":
         return
     try:
         from makoto.state import ledger as _ledger
-        from makoto.kit import bash_output_text, compute_delta, is_test_runner
         sid = payload.get("session_id", "")
-        delta_finding = None
-        # Compute test delta before record_update overwrites the prior run; surface it as ADVISE.
-        if payload.get("tool_name") == "Bash":
-            cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
-            if is_test_runner(cmd):
-                prior_output = _ledger.latest_testrun(conn, sid)
-                tr = payload.get("tool_response", {})
-                new_output = bash_output_text(tr) if isinstance(tr, dict) else ""
-                delta = compute_delta(prior_output, new_output)
-                if delta:
-                    delta_finding = Finding(
-                        pattern_id="makoto.test_delta", file="", line=0, level="advisory",
-                        message=f"Test delta vs the prior recorded run: {delta}",
-                        retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
         # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
             from makoto.state import plan as _plan_items
             _plan_items.record_task_event(conn, sid, payload)
-        if delta_finding is not None:
-            delta_finding = replace(delta_finding, source_event_id=event_id)
-            _emit_decision([delta_finding], payload.get("hook_event_name", ""),
-                           permission_mode=payload.get("permission_mode"))
-            # Persist the delta redirect finding
-            _record_audit(state_dir, [delta_finding], payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)

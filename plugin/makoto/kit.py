@@ -1,13 +1,10 @@
 """makoto.kit — the shared check-building kit: L1 predicate factories and AST
-primitives, tool/event I/O parsing, deterministic location/quantity/subject
-primitives, transient-vs-deterministic failure classification, per-test verdict
-delta, and shared gate helpers (the `GateContext` schema itself lives in
-`context.py`).
+primitives, tool/event I/O parsing, deterministic location/subject primitives,
+transient-vs-deterministic failure classification, per-test verdict tracking,
+and shared gate helpers (the `GateContext` schema itself lives in `context.py`).
 
 Stdlib only; no HTTP, no LLM (Knight-Leveson hot-path invariant). Imports only L0
-(`makoto.vocab`, `makoto.core._shell`); `compute_delta`'s reuse of namedTestTeeth's
-parsers stays a call-time import so the kit never carries an import-time edge into
-a named check module.
+(`makoto.vocab`, `makoto.core._shell`).
 """
 from __future__ import annotations
 
@@ -30,7 +27,7 @@ from makoto.vocab import (
     _MAKOTO_ALLOW_REASON_RX,
     _PATH_EXT,
     Finding,
-    # recorded per-test verdict parsers; compute_delta/current_named_verdicts read them.
+    # recorded per-test verdict parsers; current_named_verdicts reads them.
     _TEETH_FRAME_RX,
     _TEETH_SCOPE_AFTER,
     _TEETH_SCOPE_BEFORE,
@@ -842,15 +839,6 @@ def classify_failure(text: str) -> Optional[bool]:
     return None
 
 
-# ---- test-delta redirect -------------------------------------------------------------------------
-# Wired DIRECTLY into `dispatch.py`'s PostToolUse branch, not the patterns.toml/load_prechecks
-# catalog (Pre-only) nor the Stop-gate catalog (Stop-only) -- neither covers a Post-edge advisory.
-#
-# `compute_delta` reuses `namedTestTeeth.py`'s OWN `recorded_failed_names`/`recorded_passed_names`
-# parsers (one implementation, never a second one) to diff the per-test verdict set between the
-# PRIOR recorded testrun output and the NEW one just produced. The import is call-time so this
-# kit module never carries an import-time edge into a named check module.
-
 def current_named_verdicts(history) -> dict:
     """{full_test_id: 'FAIL'|'PASS'} from the recorded TEST-RUNNER outputs in `history`, in
     order. The key is the exact recorded id — `path::name[param]` — matching the header's
@@ -872,9 +860,8 @@ def current_named_verdicts(history) -> dict:
         if not resp or not is_test_runner(cmd or ""):
             continue
         resp = _ANSI_SGR_RX.sub("", resp)
-        # Short-circuit through the shared per-name parsers (the same evidence primitives
-        # kit.compute_delta reuses) before the positioned scan below: most runner responses
-        # carry no per-test verdict lines at all.
+        # Short-circuit through the shared per-name parsers before the positioned scan below:
+        # most runner responses carry no per-test verdict lines at all.
         if not (recorded_failed_names(resp) or recorded_passed_names(resp)):
             continue
         records = []
@@ -891,27 +878,6 @@ def current_named_verdicts(history) -> dict:
     return verdict
 
 
-def compute_delta(prior_output: str, new_output: str) -> Optional[str]:
-    """None when there's nothing to say: no prior run to diff against, or no verdict flipped.
-    "Newly failing" = named tests failing now that were NOT already failing in the prior run;
-    "newly passing" = named tests passing now that WERE failing in the prior run (a genuine
-    fix). A test that was already failing and is STILL failing is neither -- not new information,
-    so it stays out of the delta (grounding on what CHANGED, not the whole persistent state)."""
-    if not prior_output or not new_output:
-        return None
-    prior_failed = recorded_failed_names(prior_output)
-    new_failed = recorded_failed_names(new_output)
-    new_passed = recorded_passed_names(new_output)
-    newly_failing = sorted(new_failed - prior_failed)
-    newly_passing = sorted(new_passed & prior_failed)
-    if not newly_failing and not newly_passing:
-        return None
-    parts = []
-    if newly_failing:
-        parts.append(f"{len(newly_failing)} newly failing: {', '.join(newly_failing)}")
-    if newly_passing:
-        parts.append(f"{len(newly_passing)} newly passing: {', '.join(newly_passing)}")
-    return "; ".join(parts)
 
 
 # ---- shared discharge/suffix-match helpers ---------------------------------------------------

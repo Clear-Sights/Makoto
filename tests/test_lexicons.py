@@ -114,8 +114,8 @@ def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():
 def test_the_recorded_verdict_parsers_are_one_object_under_every_spelling():
     """The EVIDENCE side of a named-test claim moved to its reachable home 2026-09-18 -- the
     recorded-marker parsers to `vocab` (rank 0) and the history walk over them to `kit` (rank 1)
-    -- so three consumers reach them without a lateral check-to-check import and
-    `kit.compute_delta` no longer needs a call-time back-edge into a named check module.
+    -- so three consumers reach them without a lateral check-to-check import and no call-time
+    back-edge into a named check module is needed at all.
 
     `namedTestTeeth` still SPELLS them, because its own tests and this file address them there.
     That spelling must stay a re-export and never become a second copy: a plant that rebinds

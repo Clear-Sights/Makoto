@@ -510,46 +510,6 @@ def test_dispatch_failed_terminal_does_not_clobber_prior_failing_testrun(tmp_pat
     assert event_types == ["PostToolUse", "PostToolUseFailure"]
 
 
-def test_dispatch_test_delta_redirect_advises_on_newly_failing_test(tmp_path):
-    """Task 3's test-delta redirect: a test run whose verdict set changed vs the PRIOR recorded
-    run emits an ADVISE-tier additionalContext on the CORRECT (Post) edge -- never blocks, never
-    denies the call, and never claims a PreToolUse-shaped hookEventName for a PostToolUse event
-    (the _HOOK_TO_EDGE gap this task also found and fixed)."""
-    import json as _json
-    state_dir = _setup_state(tmp_path)
-    sid = "delta_s1"
-    first = {
-        "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"command": "pytest -q"},
-        "tool_response": {"stdout": "PASSED tests/x.py::test_a\n", "stderr": "", "exitCode": 0},
-    }
-    rc1, out1 = _run_dispatch(state_dir, first)
-    assert out1 == "", "no PRIOR run to diff against yet -> nothing to say"
-
-    second = {
-        "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"command": "pytest -q"},
-        "tool_response": {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1},
-    }
-    rc2, out2 = _run_dispatch(state_dir, second)
-    body = _json.loads(out2)
-    assert body["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
-    assert "newly failing: test_a" in body["hookSpecificOutput"]["additionalContext"]
-
-
-def test_dispatch_test_delta_redirect_silent_when_verdict_set_is_unchanged(tmp_path):
-    state_dir = _setup_state(tmp_path)
-    sid = "delta_s2"
-    payload = {
-        "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"command": "pytest -q"},
-        "tool_response": {"stdout": "FAILED tests/x.py::test_a\n", "stderr": "", "exitCode": 1},
-    }
-    rc1, _ = _run_dispatch(state_dir, payload)
-    rc2, out2 = _run_dispatch(state_dir, payload)   # same verdict set, re-run
-    assert out2 == ""
-
-
 def test_dispatch_completion_gate_blocks_by_default(tmp_path):
     """2026-06-01 flip: an unbacked PRODUCTION claim (a produce verb governs an absent path)
     BLOCKS live by default — no env var needed. This is the validated completion gate."""
