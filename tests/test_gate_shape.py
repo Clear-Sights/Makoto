@@ -36,9 +36,9 @@ from tests._rows import SHAPES
 
 def _live_gates() -> list:
     """The checks eligible to reach the Stop decision pipeline at all (formerly: discovered via
-    load_stopchecks()'s GATE-export scan) -- Check.may_block=True, not every Stop-edge CHECK
-    (staleEstablisher/undeclaredFalsifiable are Stop-edge but structurally excluded, may_block
-    default False)."""
+    load_stopchecks()'s GATE-export scan) -- Check.may_block=True. Every live Stop-edge CHECK
+    now carries may_block=True (undeclaredFalsifiable's finding used to be silently dropped by
+    may_block=False; it now reaches the agent like every other ADVISE Stop check)."""
     return sorted(
         (c for c in load_checks(edge="Stop") if c.may_block),
         key=lambda c: c.id,
@@ -66,7 +66,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.unnamed_failure",
                           "gate.report_before_run",
                           "gate.unclaimed_unit",
-                          "gate.pasted_fix"}
+                          "gate.pasted_fix",
+                          "gate.undeclared_falsifiable"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run", "may_block",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -153,24 +154,12 @@ def test_gate_dataclass_has_no_undeclared_shadow_state():
     fields = {f.name for f in dataclasses.fields(Check)}
     assert _shadow_field_violation(fields) is None, _shadow_field_violation(fields)
     # may_block IS the structural blocking-eligibility signal (replacing GATE-export presence) --
-    # not a shadow tier because it's a total, testable partition: every live gate id is may_block
-    # True, and nothing else claims to be. staleEstablisher/undeclaredFalsifiable are Stop-edge
-    # CHECKs too but stay may_block=False -- discovered and run, but structurally excluded from
-    # _blocking_gate_ids() regardless of their own .level, never a silent in-between state.
+    # every live Stop-edge CHECK now carries may_block=True, so the non-blocking side of the
+    # partition is empty and the law is trivially satisfied. The teeth test below still proves
+    # the law would catch a leak if one existed.
     live_ids = {g.id for g in _live_gates()}
     assert live_ids == EXPECTED_LIVE_GATE_IDS
     non_blocking_stop_checks = [c for c in load_checks(edge="Stop") if not c.may_block]
-    assert non_blocking_stop_checks, "expected at least staleEstablisher/undeclaredFalsifiable"
-    # BY CONSTRUCTION on real input, and marked as such. `EXPECTED_LIVE_GATE_IDS` was just
-    # asserted equal to the may_block-True ids, and `non_blocking_stop_checks` is the may_block-
-    # False ones, so the two are complementary halves of one catalog and cannot intersect
-    # however the dispatcher behaves. This stays as the statement of the partition, and its
-    # discriminating power lives in the teeth test that plants a leak into it.
-    #
-    # The CLAIM the partition stands for -- may_block decides what reaches the decision -- is
-    # observed, not restated, in tests/test_dispatch.py::
-    # test_may_block_is_what_actually_reaches_the_decision, which drives a planted finding from
-    # each side through _evaluate_and_gate and requires opposite outcomes.
     violation = _partition_violation({c.id for c in non_blocking_stop_checks})
     assert violation is None, violation
 

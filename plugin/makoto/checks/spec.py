@@ -629,6 +629,7 @@ undeclared_CHECK = Check(
     id="gate.undeclared_falsifiable",
     applies_at="Stop",
     posture=POSTURE_ADVISE,
+    may_block=True,
     tests="SPEC",
     run=lambda ctx=None: undeclared_falsifiable_gate(),
 )

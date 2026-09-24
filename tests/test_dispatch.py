@@ -1701,7 +1701,9 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.unnamed_failure",      # register C12's runner, same tier
                           "gate.report_before_run",    # register C11's runner, same tier
                           "gate.unclaimed_unit",       # register H6's runner, same tier
-                          "gate.pasted_fix"}           # register H3's runner, same tier
+                          "gate.pasted_fix",           # register H3's runner, same tier
+                          "gate.undeclared_falsifiable"}  # catalog-completeness auditor;
+                                               # now reaches the agent like every other ADVISE gate
     # `discovered` is built from may_block, and `_blocking_gate_ids()` IS
     # `{c.id for c in load_checks(edge="Stop") if c.may_block}` -- so comparing them is a
     # restatement that holds however the dispatcher behaves. It stays as documentation of the
@@ -1715,6 +1717,33 @@ def test_no_shadow_gate_every_gate_blocks():
     referenced = {name for c in live for name in c.run.__code__.co_names}
     assert "claim_check" not in referenced
     assert "dropped_gate" in referenced       # live -> discovered + reaches the pipeline
+
+
+def test_dispatch_undeclared_falsifiable_gate_never_blocks_even_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.undeclared_falsifiable (the
+    catalog-completeness auditor) fires (audited) but never blocks -- it ships at
+    level="advisory" like every other named ADVISE exception here.
+
+    Unlike every other gate, its `run` ignores GateContext and audits the REAL checks/ package
+    on disk, so this plants a genuine orphan module into the real package for the one dispatch
+    call and removes it in `finally`, whatever the outcome."""
+    state_dir = _setup_state(tmp_path)
+    checks_dir = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
+    orphan = checks_dir / "zz_test_orphan_probe.py"
+    orphan.write_text("VALUE = 1\n")
+    try:
+        stop = {"hook_event_name": "Stop", "session_id": "uf", "cwd": str(tmp_path),
+                "last_assistant_message": "Done for now."}
+        rc, out = _run_dispatch(state_dir, stop)
+    finally:
+        orphan.unlink(missing_ok=True)
+    assert out, "gate.undeclared_falsifiable (ADVISE) must reach the agent as a Stop block when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.undeclared_falsifiable" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.undeclared_falsifiable" in r.get("pattern_fires", []) for r in rows), \
+        "the advisory fire must still be audited so it leaves a forensic trail"
 
 
 def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
@@ -1757,7 +1786,8 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
                         "gate.unnamed_failure",
                         "gate.report_before_run",
                         "gate.unclaimed_unit",
-                        "gate.pasted_fix"}
+                        "gate.pasted_fix",
+                        "gate.undeclared_falsifiable"}
     # A NAME IS NOT A TEST. This searched the source for `def test_dispatch_<name>_gate_blocks`,
     # so an empty function with the right name -- or one that asserts nothing, or never reaches
     # the dispatcher -- satisfied a law whose whole subject is BEHAVIOURAL coverage. The name is
@@ -2348,26 +2378,20 @@ def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch,
 
 
 def test_may_block_is_what_actually_reaches_the_decision(monkeypatch, capsys, state_dir):
-    """may_block <=> reaches the pipeline, OBSERVED in both directions.
+    """may_block <=> reaches the pipeline, OBSERVED (not just asserted by set comparison).
 
-    The correspondence is asserted elsewhere by comparing two sets that are the same set by
-    construction. What that comparison stands for is a fact about the dispatcher: a finding from
-    a may_block gate reaches `_emit_decision`, and one from a non-may_block Stop check does not.
-    Neither half is visible to any set comparison, and if `_evaluate_and_gate` stopped consulting
-    `_blocking_gate_ids()` altogether every such comparison would still hold.
-
-    Both halves are driven here through `_evaluate_and_gate` itself, with `run_stop_checks`
-    replaced by one returning a planted Finding at the worst level the vocabulary has.
+    Every live Stop check now carries may_block=True (gate.undeclared_falsifiable's finding
+    used to be silently dropped; it now reaches the agent like every other ADVISE Stop check),
+    so there is no non-may_block Stop check left to prove the exclusion half against. This
+    drives a planted Finding from a may_block gate through `_evaluate_and_gate` itself and
+    requires it to actually produce a decision.
     """
     import json as _json
     import sqlite3
     from makoto import dispatch as D
-    from makoto.registry import load_checks
 
     eligible = sorted(D._blocking_gate_ids())
-    excluded = sorted({c.id for c in load_checks(edge="Stop") if not c.may_block})
-    assert eligible, "no gate is blocking-eligible; the first half below would be vacuous"
-    assert excluded, "no Stop check is excluded; the second half below would be vacuous"
+    assert eligible, "no gate is blocking-eligible; the check below would be vacuous"
 
     payload = {"hook_event_name": "Stop", "session_id": "may-block-roundtrip",
                "cwd": str(state_dir), "last_assistant_message": "done"}
@@ -2388,6 +2412,3 @@ def test_may_block_is_what_actually_reaches_the_decision(monkeypatch, capsys, st
     assert drive(eligible[0]), (
         f"{eligible[0]} is may_block=True and its finding produced no decision through "
         f"_evaluate_and_gate; may_block no longer means 'reaches the pipeline'")
-    assert drive(excluded[0]) == "", (
-        f"{excluded[0]} is may_block=False and its finding reached the decision anyway; the "
-        f"dispatcher is not consulting _blocking_gate_ids()")

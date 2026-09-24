@@ -72,6 +72,12 @@ _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_adv
                                   # a house convention wider than four lines, are both measured
                                   # benign classes that look identical from the record.
                                   "gate.pasted_fix",
+                                  # a catalog-completeness drift is a maintenance signal, not a
+                                  # live integrity violation of anything the agent claimed this
+                                  # turn (see checks/spec.py's own docstring), so it must never
+                                  # block even though it now reaches the decision like every
+                                  # other ADVISE Stop check.
+                                  "gate.undeclared_falsifiable",
                                   })
 
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called

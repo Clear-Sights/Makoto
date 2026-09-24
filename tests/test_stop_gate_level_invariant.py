@@ -31,10 +31,21 @@ from makoto.registry import _ADVISORY_ALLOWLIST, load_checks
 from makoto.context import GateContext
 
 
+# gate.undeclared_falsifiable is structurally unlike every other gate here: its `run` ignores
+# the GateContext entirely and audits the REAL checks/ package on disk (orphan modules / dangling
+# manifest ids), so there is no synthetic ctx that can make it fire without actually planting an
+# orphan file into the live package -- which would corrupt the catalog for every other test in
+# this process. Its Finding shape and level ("advisory", pinned) are already covered directly by
+# tests/test_undeclared_falsifiable.py, so it is excluded from this module's scenario-driven scan.
+_SELF_AUDIT_GATES = frozenset({"gate.undeclared_falsifiable"})
+
+
 def _live_gates() -> list:
     """The checks eligible to reach the Stop decision pipeline at all (formerly:
-    load_stopchecks()'s GATE-export scan) -- Check.may_block=True."""
-    return [c for c in load_checks(edge="Stop") if c.may_block]
+    load_stopchecks()'s GATE-export scan) -- Check.may_block=True, minus the self-audit gate (see
+    `_SELF_AUDIT_GATES`)."""
+    return [c for c in load_checks(edge="Stop")
+            if c.may_block and c.id not in _SELF_AUDIT_GATES]
 
 def _ctx(**over):
     base = dict(text="", touched=frozenset(), empty=frozenset(), testrun_output="",

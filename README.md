@@ -29,10 +29,10 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **17 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **3**, `gate`: **1**
-- **32 Stop checks** (all checks registered at the Stop edge)
-- **29 end-of-turn gates** (`may_block=True`)
+- **30 Stop checks** (all checks registered at the Stop edge)
+- **30 end-of-turn gates** (`may_block=True`)
 - **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **15 advisory end-of-turn gates** (advisory-allowlisted)
+- **16 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
 
@@ -116,6 +116,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.report_before_run` | a run's success written into prose with no verifier run before it | advisory | advisory |
 | `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | advisory | advisory |
 | `gate.pasted_fix` | one repair's text edited into a second file with no verifier run between the two landings | advisory | advisory |
+| `gate.undeclared_falsifiable` | the checks/ catalog itself has an orphan module or a dangling manifest id | advisory | advisory |
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 
