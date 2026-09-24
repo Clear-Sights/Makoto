@@ -879,14 +879,20 @@ def pasted_fix_gate(history) -> Optional[Finding]:
         at, ev = item
         tool = ev.get("tool_name", "")
         tool_input = ev.get("tool_input")
-        if ev.get("hook_event_name") != "PostToolUse" or tool not in _EDIT_TOOLS \
+        # A block LANDS (registers as a possible first site) from a Write same as an Edit --
+        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered. Without
+        # this, a fix Written into a brand-new module and then Edited into a second file is
+        # invisible: the Write never enters `landed`, so the Edit is never seen as a second paste.
+        if ev.get("hook_event_name") != "PostToolUse" or tool not in (_EDIT_TOOLS | {"Write"}) \
                 or not isinstance(tool_input, dict):
             return ()
         path = str(tool_input.get("file_path", ""))
         second = []
         for block in _blocks(_kept_lines(introduced_text(tool, tool_input))):
             where, first = landed.setdefault(block, (path, at))
-            if where != path:
+            # Only an Edit/MultiEdit second landing fires (narrowing 2): two Writes sharing a
+            # block is convention (e.g. a house import header), never a repair transfer.
+            if where != path and tool in _EDIT_TOOLS:
                 second.append((block, where, first, path))
         return second
 
