@@ -8,15 +8,7 @@ exporting a `CHECK` object duck-typing `.id` / `.applies_at` (one of
 directory is the whole of registering a check. Files whose name starts with `_` are
 package plumbing and the scan skips them.
 
-Re-exports below keep `from makoto.checks import normalize_path`-shaped call sites
-working. `makoto.kit` is stdlib-only, so this adds no import cost to hook events.
+`makoto.kit` is the one owner of the shared primitives (`normalize_path`,
+`detect_locations`, ...); every consumer, plugin or test, imports them from there
+directly rather than through a second re-export route here.
 """
-from makoto.kit import (
-    normalize_path,
-    detect_locations,
-)
-
-__all__ = [
-    "normalize_path",
-    "detect_locations",
-]

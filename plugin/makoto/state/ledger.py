@@ -28,8 +28,7 @@ except ImportError:  # pragma: no cover - exercised on Windows, and by the injec
 else:
     msvcrt = None
 
-from makoto.checks import normalize_path
-from makoto.kit import bash_output_text, decode_history_event, is_test_runner
+from makoto.kit import bash_output_text, decode_history_event, is_test_runner, normalize_path
 from makoto.substrate._canonAtoms import _row_ts
 from makoto.state.store import _state_dir as _chain_state_dir
 

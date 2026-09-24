@@ -2,7 +2,7 @@
 
 Cheap, deterministic, no DB. Asserts the path normalizer and the location detector.
 """
-from makoto.checks import (
+from makoto.kit import (
     normalize_path,
     detect_locations,
 )

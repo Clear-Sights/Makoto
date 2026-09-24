@@ -458,7 +458,7 @@ shipped_CHECK = _Check(id="gate.claimed_shipped", applies_at="Stop", posture="BL
 
 import os
 import re
-from makoto.checks import detect_locations, normalize_path
+from makoto.kit import detect_locations, normalize_path
 from makoto.vocab import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
@@ -609,7 +609,7 @@ completion_CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOC
                eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
                run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
 
-from makoto.checks import normalize_path
+from makoto.kit import normalize_path
 from makoto.vocab import _EMPTY_OK, _FENCE_SPAN_RX
 from makoto.kit import _path_components, _suffix_match, unwitnessed
 
