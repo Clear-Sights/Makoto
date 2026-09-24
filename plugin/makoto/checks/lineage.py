@@ -978,13 +978,20 @@ def _introduced_units(text: str) -> list:
         return []                    # unparseable fragment -> never a finding (FN-safe)
     out = []
     for node in ast.iter_child_nodes(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if node.decorator_list:
+                continue              # a framework registered it: that IS the claim
+            name = node.name
+        elif (isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda)
+                and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)):
+            # `compute_ratio = lambda a, b: a / b` binds a unit exactly as a `def` would --
+            # the same unclaimed-surface question, under Python's other function-binding form.
+            name = node.targets[0].id
+        else:
             continue
-        if node.decorator_list:
-            continue                 # a framework registered it: that IS the claim
-        if node.name.startswith(_COLLECTED_PREFIX):
+        if name.startswith(_COLLECTED_PREFIX):
             continue                 # claimed by collection
-        out.append(node.name)
+        out.append(name)
     return out
 
 
