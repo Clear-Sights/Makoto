@@ -402,8 +402,9 @@ _RUNNING_SUBJECT = (
 # mid-word match: "itinerary" cannot satisfy `(?:is|are|'s|'re)` at the position right after
 # "it", so that alternative fails there and the engine moves on).
 _RUNNING_PRED = (
-    r"(?:is|are|['’]s|['’]re)\s*(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+)?"
-    r"(?:up\s+and\s+running|running|live|up|listening|serving)\b"
+    r"(?:is|are|['’]s|['’]re)\s*"
+    r"(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+|fully\s+)?"
+    r"(?:up\s+and\s+running|running|live|up|listening|serving|operational)\b"
 )
 # Two subject-less alternatives for banner-style status prose ("Now running.", "listening on
 # port 5173", "serving at http://...") — each anchored on a recency/port/URL token so a bare
