@@ -1,12 +1,7 @@
-"""makoto.context — the Stop-edge evaluation context (Stage 2 seam 4, final cut): the
-`GateContext` schema (formerly `substrate/_shared.py`, ex-`stopchecks/_types.py`), the
+"""makoto.context — the Stop-edge evaluation context: the `GateContext` schema, the
 `_history_for_agent` thread-boundary firewall, and `run_stop_checks` — the function that
 assembles the Stop substrate (touched/empty keys -> the declared Plan -> fs closures) and
-evaluates every discovered Stop check over it. Moved VERBATIM out of
-`dispatch.py`/`_shared.py`. Until 2026-09-18 this function also sourced commitments and ran the
-retraction reconcile before reading `open_commitments`, an order that was behavior-bearing for
-gate.advance; that gate was cut (register-unbound) and nothing read `GateContext.opens`
-afterwards, so the whole path went with it.
+evaluates every discovered Stop check over it.
 
 Knight-Leveson: stdlib only. NO LLM, NO HTTP. Called from `makoto.dispatch` (which re-imports
 `run_stop_checks` under its own name for its Stop/SubagentStop handlers and for every existing
@@ -22,7 +17,7 @@ from makoto.registry import load_checks
 from makoto.substrate._planNode import Plan
 
 
-# ---- schemas (formerly stopchecks/_types.py) --------------------------------------------------
+# ---- schemas ------------------------------------------------------------------------------------
 @dataclass(frozen=True)
 class GateContext:
     """The Stop-event substrate, assembled ONCE per event and shared by every gate."""
@@ -43,21 +38,21 @@ class GateContext:
     #   of this substrate stays valid, and an unrecorded status behaves exactly as before rather
     #   than becoming a new way to fail.
     permission_mode: Optional[str] = None   # raw hook payload's `permission_mode` field verbatim
-    #   (CONFIRMED real, snake_case, top-level on every hook event — Claude Code hooks reference,
-    #   fetched 2026-07-06: "default"|"plan"|"acceptEdits"|"auto"|"dontAsk"|"bypassPermissions").
-    #   No gate reads this yet (additive/observability-only per this ticket's scope).
+    #   (CONFIRMED real, snake_case, top-level on every hook event — Claude Code hooks reference:
+    #   "default"|"plan"|"acceptEdits"|"auto"|"dontAsk"|"bypassPermissions").
+    #   No gate reads this yet (additive/observability-only).
     agent_id: Optional[str] = None          # raw `agent_id` — present only when the hook fired
     #   inside a subagent call (CONFIRMED real, top-level, per the same hooks reference). The
     #   nearest real substrate to a "this is a subagent" flag; no literal isSubAgent/isSidechain
     #   field exists in the documented schema, so this is the grounded substitute, not a guess.
     agent_type: Optional[str] = None        # raw `agent_type` (e.g. "Explore") — companion to
     #   agent_id, present when the session uses --agent or the hook fires inside a subagent.
-    plan: Optional[Plan] = None             # the declared contract Plan (SPEC-5) for this
+    plan: Optional[Plan] = None             # the declared contract Plan for this
     #   session, loaded once by run_stop_checks via makoto.state.plan.load_plan; None when no plan is
     #   declared. Read by staleEstablisher's advisory check.
-    session_id: Optional[str] = None        # raw hook payload's `session_id` (Task 2 slice 5).
+    session_id: Optional[str] = None        # raw hook payload's `session_id`.
     transcript_path: Optional[str] = None   # raw `transcript_path` (CONFIRMED real, top-level on
-    #   every hook event -- Claude Code hooks reference, fetched 2026-07-07: "Path to conversation
+    #   every hook event -- Claude Code hooks reference: "Path to conversation
     #   JSONL file"). Read by the operator-window boundary in makoto.state.ledger.
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the fingerprint window can read the audit chain at the SAME root the dispatcher itself
@@ -157,7 +152,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
         from makoto.state import plan as _plan
         try:
-            plan = _plan.load_plan(conn, sid)                # SPEC-5: the declared contract Plan
+            plan = _plan.load_plan(conn, sid)                # the declared contract Plan
         except Exception:
             plan = None                                      # fail-open per-store, like every other read above
         try:
@@ -169,7 +164,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         # cwd-first, and on a miss resolve against git work-trees this session synced
         # (checks/_worldpaths.py) — a file produced remotely over ssh and landed here via
         # `git pull` is on disk under a repo root, not under cwd, and a bare-name claim
-        # ("index.md") false-blocked gate.completion (issue #2). Observation widens; the
+        # ("index.md") false-blocked gate.completion. Observation widens; the
         # verdict doesn't: every alternate path still ends in a live os.path.exists.
         _wp_roots = None          # lazily resolved once per event, then reused (incl. empty)
         _wp_cache = {}
@@ -225,24 +220,19 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             return None
 
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
-        # edge (2026-07-10: unified via checks._loader.load_checks, retiring the former
-        # load_stopchecks()-only loop -- this ALSO now naturally includes staleEstablisher and
-        # undeclaredFalsifiable, formerly special-cased direct-call/never-invoked carve-outs below
-        # this comment, since neither exported a GATE and load_stopchecks() never discovered them;
-        # `may_block=False` on both keeps their pattern_id structurally out of
-        # `_blocking_gate_ids()` regardless of this unification, exactly as before). Each gate
-        # module owns its own adapter (GateContext -> the gate's heterogeneous signature), so this
-        # loop never names a gate. gate.dropped resolves against the agent's OWN ledger
-        # (touched_keys) + cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an unbounded
-        # os.walk (a Stop-hot-path landmine). meaning_gate / hidden_retraction were CUT (io-purge
-        # B3): designs + measured FP evidence live in docs/MAKOTO-BIBLE.md; git history is the
-        # recovery path.
+        # edge via checks._loader.load_checks -- this includes staleEstablisher and
+        # undeclaredFalsifiable, since neither exports a GATE; `may_block=False` on both keeps
+        # their pattern_id structurally out of `_blocking_gate_ids()`. Each gate module owns its
+        # own adapter (GateContext -> the gate's heterogeneous signature), so this loop never
+        # names a gate. gate.dropped resolves against the agent's OWN ledger (touched_keys) +
+        # cwd-relative fs_exists/fs_read via ctx.roots=[cwd] — NOT an unbounded os.walk (a
+        # Stop-hot-path landmine).
         ctx = GateContext(
             text=text, touched=touched, empty=empty,
             testrun_output=_ledger.latest_testrun(conn, sid),
             testrun_exit=_ledger.latest_testrun_exit(conn, sid),
             cwd=cwd, fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
-            history=history,   # faithful events-table rows (A1.3) — fabrication gates walk this
+            history=history,   # faithful events-table rows — fabrication gates walk this
             history_all_agents=history_all_agents,   # unnarrowed twin — see GateContext's own doc
             # Additive decode-layer extension (observability-only, no gate reads these yet):
             # permission_mode/agent_id/agent_type are confirmed-real top-level hook payload
@@ -250,7 +240,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             permission_mode=payload.get("permission_mode"),
             agent_id=payload.get("agent_id"),
             agent_type=payload.get("agent_type"),
-            plan=plan,   # SPEC-5: read by staleEstablisher (below)
+            plan=plan,   # read by staleEstablisher (below)
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # canonFingerprints.py reads its audit firing boundary here
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder

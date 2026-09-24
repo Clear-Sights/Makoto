@@ -1,46 +1,35 @@
 """makoto.core._declaredverifiers — the repository's own statement of which programs verify it.
 
-WHY THIS EXISTS. `checks/spec.py` recognises a verifier two ways, and both are
-name-shaped:
+WHY THIS EXISTS. `checks/spec.py` recognises a verifier two ways, both name-shaped:
 
-  * `_LEAD_RUNNER_RX` — a closed vocabulary of foreign-ecosystem runner NAMES (`pytest`,
-    `go test`, `npm test`). Unambiguous, so it may BLOCK. Blind to anything not on the list.
-  * `_LOCAL_SCRIPT_VERIFIER_RX` — a heuristic over FILE NAMING (`gate|check|verify|...`).
-    Its own docstring states both failure directions: it cannot see `python3 eval/replay.py`
-    (a real verifier — this repository's own corpus replay — whose name says nothing), and it
-    matches `check-deploy.sh`, which may well be a deploy step. Because a name is not an
-    interface, that tier may only ADVISE.
+  * `_LEAD_RUNNER_RX` — a closed vocabulary of foreign-ecosystem runner names (`pytest`,
+    `go test`, `npm test`). Unambiguous, so it may block. Blind to anything not listed.
+  * `_LOCAL_SCRIPT_VERIFIER_RX` — a heuristic over file naming (`gate|check|verify|...`). It
+    cannot see `python3 eval/replay.py` (a real verifier whose name says nothing) and matches
+    `check-deploy.sh`, which may well be a deploy step. A name is not an interface, so this tier
+    may only advise.
 
-Neither hole can be closed by adding more names. A third source closes both: the repository
-SAYING which of its own programs are verifiers. A declaration is not a guess about a name, it is
-a statement by the only party that knows, so a mask on a DECLARED verifier is unambiguous
-evidence and may block — exactly the standard `_is_runner_command`'s own docstring already sets
-for spending a deny ("only ever spent on a token whose runner-hood is unambiguous").
+Neither hole closes by adding more names. A declaration is not a guess about a name, it is a
+statement by the only party that knows, so a mask on a declared verifier is unambiguous and may
+block.
 
-THE DECLARATION. A file named `makoto.toml` at the repository root (the `cwd` the host reports
-with the event), carrying one array:
+THE DECLARATION. A file named `makoto.toml` at the repository root, carrying one array:
 
-    # Programs this repository verifies itself with.
     verifiers = ["eval/replay.py", "gates.sh", "tools/render_checks.py"]
 
-MATCHED EXACTLY, never by pattern: a command's leading token is declared iff the token as
+Matched exactly, never by pattern: a command's leading token is declared iff the token as
 written is listed, or its trailing path component equals a listed entry's trailing path
-component. No globs, no substrings, no word-stems — the whole point is to stop guessing at
-names, so this must not smuggle in a smaller guess of its own.
+component. No globs, no substrings, no word-stems.
 
-THE DECLARATION NEVER SILENCES ANYTHING. It is consulted BEFORE the naming heuristic and adds a
-blocking tier; it cannot switch the heuristic off. A declaration that could suppress findings
-would be a self-mute lever an agent could pull by declaring one harmless program — the shape
-`checks/spec.py` exists to catch. So this file can only ever make makoto stricter,
-which is also why an unreadable or malformed declaration is answered with "nothing is declared"
-(fail-open, matching every other loader in this package): the worst that costs is a block that
-degrades to the heuristic's advisory, never a block invented out of a bad parse.
+THE DECLARATION NEVER SILENCES ANYTHING. It is consulted before the naming heuristic and only
+adds a blocking tier; it cannot switch the heuristic off, which would let an agent self-mute by
+declaring one harmless program. An unreadable or malformed declaration reads as "nothing is
+declared" (fail-open): the worst that costs is a block degrading to advisory, never a block
+invented from a bad parse.
 
 COST. One `os.path.isfile` plus one small read per (root, process), memoised — every later
 segment of the same command, and every later command in the process, is a frozenset membership
-test. The dispatcher forks per event, so the read is paid at most once per event that reaches the
-masking branch at all, and never by an event whose command carries no mask keyword (the catalog's
-keyword pre-filter runs first).
+test.
 """
 from __future__ import annotations
 
@@ -56,8 +45,8 @@ _EMPTY: tuple[frozenset, frozenset] = (frozenset(), frozenset())
 def _tail(word: str) -> str:
     """Trailing path component of a declared or observed path word.
 
-    Deliberately NOT `core._shell._basename`: that one splits on "/" only, which is right for an
-    argv word, while a declaration is typed by an operator who may have used "\\".
+    Deliberately not `core._shell._basename`: that splits on "/" only, right for an argv word,
+    while a declaration may be typed by an operator using "\\".
     """
     return word.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
 
@@ -74,13 +63,11 @@ def declared_verifiers(root: str) -> tuple[frozenset, frozenset]:
     path = os.path.join(root, DECLARATION_BASENAME)
     try:
         if not os.path.isfile(path):
-            # isfile, not exists: a FIFO or device node planted at this path would block the read
-            # and wedge the hook -- the same guard selfWiredCheck._default_plugin_fs_read carries.
+            # isfile, not exists: a FIFO or device node here would block the read and wedge the hook.
             return _EMPTY
         import tomllib
         with open(path, "rb") as handle:
-            # Binary by tomllib's own contract: it decodes UTF-8 itself, so the platform default
-            # encoding is never consulted here (tests/test_encoding_is_stated.py's subject).
+            # Binary: tomllib decodes UTF-8 itself, so the platform default encoding is never consulted.
             data = tomllib.load(handle)
     except Exception:
         return _EMPTY

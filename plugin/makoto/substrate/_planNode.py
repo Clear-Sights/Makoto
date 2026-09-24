@@ -1,17 +1,12 @@
-"""makoto.substrate._planNode -- the declared-Plan / contract-dependency shape (SPEC-5 Makoto
-absorbs Assay). Ported BY SHAPE (rule 5 -- copy, never import) from Assay's
-`assay/assay/plan/node.py` (the ``PlanNode`` frozen dataclass) + `assay/assay/plan/gaps.py`
-(the ``Plan`` container + the GAP rule), combined into ONE Makoto module per the merge plan.
-Logic is unchanged from Assay's own; only the import path/home moved.
+"""makoto.substrate._planNode -- the declared-Plan / contract-dependency shape.
 
-Underscore-prefixed (deviating from the merge plan's literal ``checks/planNode.py`` path --
-see the SPEC-5 Task's own DEFERRED.md-adjacent note in the landing commit): this module is
-package PLUMBING, not a detector -- it exports no ``CHECK``/``GATE`` and answers no hook event
-directly. Every other non-detector file in this package (``_shared.py``, ``_primitives.py``,
-``_loader.py``, ``_declared.py``) is underscore-prefixed so ``checks._loader``'s scan skips it;
-a bare ``planNode.py`` would instead be treated as an ORPHAN detector module (no CHECK export)
-by ``checks.undeclaredFalsifiable``'s completeness audit, a false completeness-drift signal
-for a file that was never meant to be a detector. Consumers: ``makoto/plan.py`` (the sqlite
+Underscore-prefixed: this module is package PLUMBING, not a detector -- it exports no
+``CHECK``/``GATE`` and answers no hook event directly. Every other non-detector file in this
+package (``_shared.py``, ``_primitives.py``, ``_loader.py``, ``_declared.py``) is
+underscore-prefixed so ``checks._loader``'s scan skips it; a bare ``planNode.py`` would instead
+be treated as an ORPHAN detector module (no CHECK export) by
+``checks.undeclaredFalsifiable``'s completeness audit -- a false completeness-drift signal for
+a file that was never meant to be a detector. Consumers: ``makoto/plan.py`` (the sqlite
 persistence layer), ``makoto/checks/otherPoint.py`` (the check built over this grammar)
 and ``makoto/context.py``.
 

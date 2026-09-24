@@ -15,28 +15,26 @@ boundary applied throughout below, distinct from Detent's byte-flow boundary.
 """
 from __future__ import annotations
 
-# Stop and SubagentStop ride ONE dispatch route and therefore one moves list, spelled once here
-# so a change to the route cannot land on one row and silently miss its twin (nothing compares
-# the two rows: the reconciling test only asks that each named move exist in dispatch.py).
-# dispatch.HANDLERS maps PostToolUse AND PostToolUseFailure to `_accumulate` too — but the moves
-# lists deliberately DIFFER: `_accumulate`'s first statement returns for PostToolUseFailure
-# (retention happens upstream in `_ingest_event`), so naming the accumulation moves on that row
-# would promise seven moves its handler never runs, a no-op event reading as fully accumulating.
+# Stop and SubagentStop ride one dispatch route and therefore one moves list, spelled once here
+# so a change to the route cannot land on one row and silently miss its twin. dispatch.HANDLERS
+# maps PostToolUse AND PostToolUseFailure to `_accumulate` too -- but their moves lists
+# deliberately differ: `_accumulate`'s first statement returns for PostToolUseFailure (retention
+# happens upstream in `_ingest_event`), so naming the accumulation moves on that row would
+# promise moves its handler never runs.
 _POST_ACCUMULATION_MOVES = (
     "_accumulate", "_ledger.record_update", "compute_delta", "_plan_items.record_task_event",
     "_plan.event_location", "_plan.persist_plan", "_plan.declare_from_live_write",
-    # the test-delta ADVISE finding actually reaches the wire and the audit log from this
-    # event: _accumulate calls both (the row's own reason text says so).
     "_emit_decision", "_record_audit")
 _STOP_GATE_MOVES = (
     "_evaluate_and_gate", "run_stop_checks", "_blocking_gate_ids", "_emit_decision")
 
 EVENTS: dict[str, dict] = {
-    # ── WIRED — hooks/hooks.json wires exactly this set; each names its HANDLERS-table row ────
-    # (dispatch.py routing is the HANDLERS row table: adding an event is adding one row plus
-    # at most one handler, never another branch in main().)
+    # WIRED: hooks/hooks.json wires exactly this set; each names its HANDLERS-table row. Adding
+    # an event means adding one HANDLERS row plus at most one handler, never another branch in
+    # main().
     "PreToolUse": {"status": "WIRED", "moves": (
         "_evaluate_and_gate", "_run_predicates", "_emit_decision")},
+    # _accumulate calls both _emit_decision and _record_audit for the test-delta ADVISE finding.
     "PostToolUse": {"status": "WIRED", "moves": _POST_ACCUMULATION_MOVES, "reason": (
         "accumulation only, never a blocking decision — the ledger update, the declared-Plan "
         "advance (a Write/Edit/MultiEdit/NotebookEdit at an open node's `where` resolves + marks "
@@ -72,7 +70,6 @@ EVENTS: dict[str, dict] = {
         "wired the event, so the branch was unreachable. Wired 2026-07-12 on direct owner "
         "instruction (rule-4 sign-off given in-session), closing the gap the matrix surfaced")},
 
-    # ── HOLE — a Makoto-shaped handler exists (or is unit-tested) but isn't shipped-wired ──────
     "ConfigChange": {"status": "HOLE", "reason": (
         "built, owner-authorized (2026-07-08, per configchange.py's own docstring), "
         "and unit-tested against constructed payloads (makoto.configchange) — "
@@ -83,7 +80,6 @@ EVENTS: dict[str, dict] = {
         "Unblock: ship the hooks.json entry once live delivery is actually confirmed, same "
         "rule-4 sign-off as the others")},
 
-    # ── OUT — declared outside Makoto's writ, each with its reason ─────────────────────────────
     "UserPromptSubmit": {"status": "OUT", "reason": (
         "carries ORACLE-authored content (the human's own words); Makoto verifies the "
         "ASSISTANT's claims against its own logged record, not the human's prompts")},

@@ -1,38 +1,22 @@
-"""The ConfigChange feature, whole: the pure strip-detection predicate + the hook ADAPTER — the
-real entry point a `.claude/settings.json` `ConfigChange` hook entry invokes via
-`python3 -m makoto.configchange`. One feature, one file (Stage 2 seam 6 — merged from
-`_dispatch_configchange.py` + `verdict/configchange_verdict.py`, both verbatim).
+"""The ConfigChange feature: the pure strip-detection predicate plus the hook adapter that
+`.claude/settings.json`'s `ConfigChange` hook entry invokes via
+`python3 -m makoto.configchange`.
 
-**WIRED, 2026-07-08 (owner, identifying as Makoto's creator, gave direct, specifically-named
-authorization).** `.claude/settings.json` carries a live `ConfigChange` entry pointing at this
-module via `dispatch_configchange.sh`.
-The pure predicate this module's adapter
-calls (`configchange_verdict`, below) is unit-tested against constructed payloads.
-
-**TWO TIERS, both owner-authorized (D5, docs/DEFERRED.md):**
-  1. **ADVISORY** (unconditional, per DESIGN DECISION 6/9's precedent): the underlying verdict
-     firing on a path that has NEVER been recorded as wired or previously-clean always logs a
-     stderr line + a best-effort audit-row append. Never blocks. This is the ambiguous
-     "never wired vs. just stripped" case `configchange_verdict` itself cannot resolve.
-  2. **BLOCKING** (2026-07-08, owner-authorized, FP-safety-scoped): fires ONLY when the strip is
-     a genuine, evidenced transition -- either (a) `config_path` is in the installer's own
-     manifest of paths it wired (`<state_dir>/configchange_manifest.json`, written by
-     `install.cmd_install`), or (b) a PRIOR evaluation of this exact `config_path` observed
-     makoto's hooks present (`<state_dir>/configchange_snapshots.json`). A path with neither --
-     no manifest entry, no prior "had hooks" observation -- can NEVER block, no matter how many
-     times it evaluates as stripped; this is the whole FP-safety property (a project that never
-     had makoto's hooks must never be blocked from editing its own settings). On block: the
-     documented top-level `{"decision": "block", "reason": ...}` shape on stdout, exit 0 (JSON is
-     only processed on exit 0, confirmed against Claude Code's own hooks reference, 2026-07-08).
-     Never for `policy_settings` -- already excluded upstream, `configchange_verdict`'s own
-     `_APPLICABLE_SOURCES` never includes it, so `verdict.fires` is already False there.
-
-**Verified only against constructed payloads** for the underlying predicate logic (the
-predicate section below); a live-fire probe in this session (a scratch, empty
-`~/.claude/settings.json` edited mid-session) produced no observed advisory fire -- most likely
-because Claude Code snapshots a session's hook set at session start, before this session's own
-mid-session wiring landed. Recorded honestly as inconclusive, not claimed as verified-working;
-only a hook wired from a session's own start could actually confirm live delivery.
+Two tiers on a firing verdict:
+  1. ADVISORY (unconditional): a verdict firing on a path never recorded as wired or
+     previously-clean always logs a stderr line and a best-effort audit-row append, and never
+     blocks. This is the ambiguous "never wired vs. just stripped" case `configchange_verdict`
+     itself cannot resolve.
+  2. BLOCKING (FP-safety-scoped): fires only when the strip is a genuine, evidenced transition
+     -- either (a) `config_path` is in the installer's own wired-manifest
+     (`<state_dir>/configchange_manifest.json`, written by `install.cmd_install`), or (b) a
+     prior evaluation of this exact `config_path` observed makoto's hooks present
+     (`<state_dir>/configchange_snapshots.json`). A path with neither can never block, no
+     matter how many times it evaluates as stripped -- a project that never had makoto's hooks
+     must never be blocked from editing its own settings. On block:
+     `{"decision": "block", "reason": ...}` on stdout, exit 0 (Claude Code only processes hook
+     JSON on exit 0). Never fires for `policy_settings`, which `_APPLICABLE_SOURCES` already
+     excludes.
 """
 from __future__ import annotations
 import json
@@ -48,30 +32,25 @@ from makoto.state.audit import AuditRow, append_row
 from makoto.state.store import _state_dir
 
 
-# ---- The pure predicate (formerly makoto/verdict/configchange_verdict.py, verbatim) -----------
+# The pure predicate
 #
-# Background:
 # Makoto's Stop-time `gate.self_wired` (`checks/otherPoint.py`) can only ever see a PARTIAL
-# strip of its own PreToolUse/PostToolUse/Stop hook entries in `.claude/settings.json` — a single
-# edit that removes all three simultaneously also removes the Stop entry that would have reported
-# the loss, so that check has zero coverage against the canonical full-strip attack. Claude Code's
-# `ConfigChange` hook event (fired by the file-watcher when a settings file changes, independent
-# of Makoto's dispatch chain) observes the file-level edit itself, so a full simultaneous strip is
-# exactly the kind of event it fires for. The adapter section below is what wires this predicate
-# to that event.
+# strip of its own PreToolUse/PostToolUse/Stop hook entries in `.claude/settings.json` -- a
+# single edit that removes all three simultaneously also removes the Stop entry that would have
+# reported the loss, so that check has zero coverage against a full-strip attack. Claude Code's
+# `ConfigChange` hook event observes the file-level edit itself, independent of Makoto's dispatch
+# chain, so a full simultaneous strip is exactly what it fires for.
 #
-# Detection logic reuse: rather than a third hand-duplicated copy of the "which of PreToolUse/
-# PostToolUse/Stop lost its makoto-dispatching entry" predicate, this module imports
-# `_missing_makoto_events` directly from `selfWiredCheck`. The gate-module layering firewall
-# (`tests/test_import_direction.py`, the pipeline-order firewall) restricts what a *gate* module may import;
-# it does not restrict what a non-gate module may import from a gate module.
+# This module imports `_missing_makoto_events` directly from `selfWiredCheck` rather than
+# duplicating that predicate a third time. The gate-module layering firewall
+# (`tests/test_import_direction.py`) restricts what a *gate* module may import, not what a
+# non-gate module may import from a gate module.
 
-# The two `config_source` values (per Claude Code's documented ConfigChange schema — see the
-# followup doc's citations) that can carry Makoto's hook wiring at all. `user_settings` (global,
-# outside this repo), `policy_settings` (managed/enterprise, cannot be blocked per the docs and is
-# not where a repo-local hook is installed), and `skills` are structurally incapable of carrying
-# `.claude/settings.json`'s or `.claude/settings.local.json`'s `hooks` object, so a change to one of
-# them is never applicable to this predicate regardless of content.
+# The two `config_source` values that can carry Makoto's hook wiring at all. `user_settings`
+# (global, outside this repo), `policy_settings` (managed/enterprise, not where a repo-local hook
+# is installed), and `skills` are structurally incapable of carrying `.claude/settings.json`'s or
+# `.claude/settings.local.json`'s `hooks` object, so a change to one of them is never applicable
+# regardless of content.
 _APPLICABLE_SOURCES = ("project_settings", "local_settings")
 
 
@@ -79,9 +58,8 @@ _APPLICABLE_SOURCES = ("project_settings", "local_settings")
 class ConfigChangeVerdict:
     """The result of evaluating one ConfigChange event against Makoto's hook wiring.
 
-    No `fire_level`/advisory-vs-blocking field on purpose (see module docstring): `fires` is the one
-    boolean fact this predicate is willing to assert — the adapter below maps it to whatever
-    enforcement tier a human/main authorizes, this predicate does not pick one.
+    No `fire_level`/advisory-vs-blocking field: `fires` is the one boolean fact this predicate
+    asserts, and the adapter below maps it to an enforcement tier.
     """
     config_source: str                # verbatim from the event, or None if absent
     config_path: str                  # verbatim from the event, or "" if absent
@@ -103,26 +81,19 @@ def _get(event, key):
 
 def configchange_verdict(event, *, settings_json: Optional[dict] = None,
                           fs_read: Optional[Callable[[str], Optional[str]]] = None) -> ConfigChangeVerdict:
-    """Evaluate a `ConfigChange`-shaped `event` against Makoto's own hook wiring.
+    """Evaluate a `ConfigChange`-shaped `event` (dict-like or attribute-like) against Makoto's
+    own hook wiring.
 
-    `event` carries the two documented ConfigChange fields, `config_source` and `config_path`
-    (dict-like or attribute-like; either works via `_get`). The settings file's own content is
-    supplied by the caller in one of two ways (caller's choice, not fixed by this function):
-      - `settings_json`: the already-parsed JSON object (preferred when the caller already has it,
-        e.g. a test, or a future adapter that reads the file itself before calling this function), or
-      - `fs_read`: a `path -> Optional[str]` reader called with `event`'s `config_path`, mirroring the
-        `fs_read` convention `gate.self_wired` already uses for its own settings.json read.
-    If both are omitted, or the content can't be read/parsed as a JSON object, the verdict fails open
-    (`evaluated=False`, `fires=False`) — same fail-open philosophy as every other gate in this repo:
-    an indeterminate read is not treated as evidence of a strip.
+    The settings content comes from either `settings_json` (already parsed) or `fs_read`
+    (a `path -> Optional[str]` reader called with `config_path`). If both are omitted, or the
+    content can't be read/parsed as a JSON object, the verdict fails open (`evaluated=False`,
+    `fires=False`): an indeterminate read is not evidence of a strip.
 
-    Not applicable (`applicable=False`) for any `config_source` other than `project_settings` or
-    `local_settings`, regardless of content — those are the only two sources capable of carrying
-    `.claude/settings.json` / `.claude/settings.local.json`'s `hooks` object.
+    Not applicable for any `config_source` other than `project_settings` or `local_settings` --
+    the only two sources capable of carrying the `hooks` object.
 
-    Cannot distinguish "never wired" from "just stripped" (same caveat as `gate.self_wired`'s own
-    docstring): a settings file that simply never had Makoto's hooks wired produces the identical
-    all-three-missing signal as a full strip would.
+    Cannot distinguish "never wired" from "just stripped": a settings file that never had
+    Makoto's hooks wired produces the identical all-three-missing signal as a full strip would.
     """
     config_source = _get(event, "config_source")
     config_path = _get(event, "config_path") or ""
@@ -154,8 +125,7 @@ def configchange_verdict(event, *, settings_json: Optional[dict] = None,
             reason="settings content unavailable or not a JSON object; fail-open, cannot evaluate",
         )
 
-    # `_missing_makoto_events` normalizes a missing/non-dict "hooks" to {} itself -- its own
-    # documented contract, which selfWiredCheck's comment names this caller as relying on.
+    # `_missing_makoto_events` normalizes a missing/non-dict "hooks" to {} itself.
     missing = tuple(_missing_makoto_events(data.get("hooks")))
     stripped = bool(missing)
     reason = (f"missing makoto-dispatching entries for: {', '.join(missing)}" if stripped
@@ -167,16 +137,14 @@ def configchange_verdict(event, *, settings_json: Optional[dict] = None,
     )
 
 
-# ---- The hook adapter (formerly makoto/_dispatch_configchange.py, verbatim) -------------------
+# The hook adapter
 
 def _make_fs_read(payload: dict):
     """Build a `path -> Optional[str]` reader for `configchange_verdict`'s `fs_read` param.
 
     Absolute paths are opened directly; relative paths are joined against the payload's `cwd`
-    (or `os.getcwd()` if absent) — the same cwd-relative convention `dispatch.py`'s Stop-check
-    `fs_read` closures already use. Never raises: any failure (missing file, permissions, a
-    directory instead of a file, etc.) is treated as "content unavailable", which
-    `configchange_verdict` already fails open on.
+    (or `os.getcwd()` if absent). Never raises: any failure is treated as "content unavailable",
+    which `configchange_verdict` already fails open on.
     """
     cwd = payload.get("cwd") or os.getcwd()
 
@@ -194,16 +162,9 @@ def _make_fs_read(payload: dict):
 
 
 def _record_fire(payload: dict, verdict, *, pattern_id: str, level: str, message: str) -> None:
-    """Shared AuditRow-construction shape for both the advisory and blocking tiers -- was two
-    12-line byte-identical bodies differing only in pattern_id/level/message. `exit_code` and
-    `retry_hint_emitted` are DERIVED here from the finding, the same rule
-    `dispatch._record_audit` uses (error-level finding -> exit 2), rather than passed in as
-    literals by each caller. The block tier used to hardcode `exit_code=0` on the very path that
-    PRINTS `{"decision": "block"}`, so every block fire read as a clean exit to anything mining
-    the audit trail: the ledger misreporting the one event it exists to record. Two callers
-    independently supplying a value that is actually a function of `level` is exactly the shape
-    that let it rot; deriving it once, here, makes that drift structurally impossible rather
-    than merely fixed for today."""
+    """Shared AuditRow-construction shape for both the advisory and blocking tiers.
+    `exit_code` is derived here from `level` (error -> exit 2) rather than passed in by each
+    caller, so the two tiers can't independently drift out of sync."""
     try:
         state_dir = _state_dir()
         finding = {
@@ -234,40 +195,26 @@ def _record_fire(payload: dict, verdict, *, pattern_id: str, level: str, message
 
 
 def _record_advisory_fire(payload: dict, verdict) -> None:
-    """Loud stderr note (mirrors `dispatch._dispatch_fact`'s style) + a best-effort AuditRow
-    append. Wrapped so an observability failure can never break the hook — same fail-open
-    philosophy as `dispatch._record_exemption_sink`."""
+    """Stderr note plus a best-effort AuditRow append. An observability failure must never
+    break the hook."""
     print(f"makoto.configchange: ADVISORY {verdict.reason}", file=sys.stderr)
     _record_fire(payload, verdict, pattern_id="gate.configchange_advisory",
                  level="advisory", message=verdict.reason)
 
 
 def _record_block_fire(payload: dict, verdict, reason: str) -> None:
-    """Same shape as `_record_advisory_fire`, level="error" -- the blocking tier's own audit
-    trail, distinct pattern_id so audit-mining can tell the two tiers apart."""
+    """Same shape as `_record_advisory_fire`, level="error", with a distinct pattern_id so
+    audit-mining can tell the two tiers apart."""
     _record_fire(payload, verdict, pattern_id="gate.configchange_transition",
                  level="error", message=reason)
 
 
-# ---- D5 blocking tier (owner-authorized, 2026-07-08): manifest + transition detection ----------
+# Blocking tier: manifest + transition detection
 
 def _resolved_config_path(config_path: str) -> str:
-    """The state-key form of a verdict's `config_path`: resolved to an absolute, symlink-free
-    string so the manifest (which `install._record_configchange_manifest` writes in exactly that
-    form) and the snapshot store agree on one key per file. Fail-soft: any resolution fault
-    falls back to the path verbatim, so a fault degrades the key rather than raising.
-
-    Extracted because `_should_block` and `main` each carried a byte-identical copy of this
-    expression -- the same "two callers independently computing one derived value" shape
-    `_record_fire`'s docstring records as what let its own `exit_code` rot.
-
-    History: `Path` was missing from this module's imports, so `Path(config_path)` raised
-    `NameError`, the `except Exception` below swallowed it, and this function always returned
-    `config_path` verbatim -- never resolved. A manifest entry (written resolved by
-    `install._record_configchange_manifest`) therefore never matched a symlinked or relative
-    `config_path`, silently degrading `_should_block` from its blocking tier to advisory, and a
-    relative `config_path` became a snapshot key shared by every project that had one. The import
-    is now present, so the resolution the rest of this docstring describes actually happens."""
+    """Resolved, absolute, symlink-free form of `config_path`, so the manifest (written in this
+    same form by `install._record_configchange_manifest`) and the snapshot store agree on one
+    key per file. Fail-soft: any resolution fault falls back to the path verbatim."""
     try:
         return str(Path(config_path).resolve()) if config_path else ""
     except Exception:
@@ -317,19 +264,14 @@ def _save_snapshot(config_path: str, had_hooks: bool) -> None:
 
 
 def _should_block(verdict) -> tuple:
-    """(should_block, reason) for a FIRING verdict (caller only invokes this when
-    `verdict.fires` is already True). Reads the manifest + PRIOR snapshot (before any update),
-    so this call's own result never depends on state it is about to write.
+    """(should_block, reason) for a firing verdict. Reads the manifest and the prior snapshot
+    (before any update), so the result never depends on state it is about to write.
 
-    should_block iff EITHER:
-      - `verdict.config_path` (resolved) is in the installer's own wired-manifest -- Makoto's
-        own install recorded this exact path as genuinely wired, so a stripped evaluation now
-        IS a real strip, not an ambiguous never-wired case; OR
-      - a PRIOR evaluation of this exact path observed hooks present (`had_hooks=True`) -- a
-        real had->lost transition, observed twice, not a guess from a single snapshot.
+    should_block iff either the resolved `config_path` is in the installer's wired-manifest
+    (a real strip, not an ambiguous never-wired case), or a prior evaluation of this exact path
+    observed hooks present (a real had->lost transition, not a guess from one snapshot).
 
-    A path with NEITHER never blocks, regardless of how many times it evaluates as stripped --
-    the whole FP-safety property this tier depends on."""
+    A path with neither never blocks, regardless of how many times it evaluates as stripped."""
     resolved = _resolved_config_path(verdict.config_path)
     if resolved and resolved in _manifest_paths():
         return True, (f"{verdict.reason} -- this settings path was recorded by makoto's own "
@@ -372,10 +314,8 @@ def main() -> int:
             else:
                 _record_advisory_fire(payload, verdict)
 
-        # Update the snapshot AFTER computing the block decision (never before -- the decision
-        # must read the PRIOR state, not the one it is about to write), on every evaluation where
-        # the content was actually readable, regardless of whether it fired this time -- this is
-        # what lets a FUTURE evaluation detect a transition.
+        # Update the snapshot after computing the block decision, not before -- the decision
+        # must read the prior state, not the one it is about to write.
         if verdict.applicable and verdict.evaluated:
             resolved = _resolved_config_path(verdict.config_path)
             if resolved:
@@ -383,8 +323,7 @@ def main() -> int:
 
         return 0
     except Exception as exc:
-        # Never crash the hook to a non-zero exit, and never stay silent about a genuine fault —
-        # same never-crash contract every other adapter in this codebase honors.
+        # Never crash the hook to a non-zero exit, and never stay silent about a genuine fault.
         print(f"makoto.configchange: unexpected exception, loud-allow: "
               f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return 0

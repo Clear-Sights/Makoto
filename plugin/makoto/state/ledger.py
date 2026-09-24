@@ -51,8 +51,7 @@ def _bash_key(ev: dict) -> str:
 def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) -> None:
     """Record one update from a PostToolUse event. Write/Edit -> a `touched` row;
     Bash -> a `value` row with extracted output + exit code. Latest-wins in sqlite;
-    ALSO chain-appended (Task 2 part 2 -- closing the shared Record schema, same unify pattern
-    as audit.append_row/slice 3b): sqlite stays the latest-wins query index, the chain preserves
+    ALSO chain-appended: sqlite stays the latest-wins query index, the chain preserves
     every update sqlite's upsert would otherwise overwrite-and-lose. `root` overrides env-var
     resolution for the chain write only (see `store_root`); sqlite's own root always comes from
     `conn`, unaffected."""
@@ -153,10 +152,10 @@ def empty_write_keys(conn, session_id: str) -> set:
 
 
 class LedgerView:
-    """Thin read-surface FACADE over one (conn, session_id) pair (SPEC-5 Task 2's unified
-    read surface, `ledger.view_for`) — every check module (Tasks 3-9) reads its ledger state
-    through this, rather than hand-rolling its own SQL. Delegates to this module's existing
-    module-level functions verbatim; it adds no new SQL and changes no existing behavior.
+    """Thin read-surface FACADE over one (conn, session_id) pair — every check module reads its
+    ledger state through this (`ledger.view_for`), rather than hand-rolling its own SQL.
+    Delegates to this module's existing module-level functions verbatim; it adds no new SQL and
+    changes no existing behavior.
 
     Built once per (conn, session_id) and handed to a check the same way GateContext is: a
     small bag of already-resolved facts, not a live query object a check pokes ad hoc."""
@@ -240,14 +239,12 @@ def latest_testrun_exit(conn, session_id: str) -> "int | None":
 
 
 # =============================================================================================
-# The chained, tamper-evident surface (owner decision 2026-07-07: verification lives IN the
-# ledger — the gates' verdicts depend on these rows, so the store and its verifier share one
-# home). Ported by shape from Assay's kernel/ledger.py + identity (the substrate the SPEC-5
-# merge dropped), re-homed onto makoto.state.store._state_dir(). Append-only JSONL with
-# prev_hash/row_hash links; verify_chain names the exact broken row; an exclusive fcntl.flock
-# across tail-read+append means concurrent hook invocations can never fork the chain.
+# The chained, tamper-evident surface: verification lives IN the ledger, since the gates'
+# verdicts depend on these rows and the store and its verifier share one home. Append-only
+# JSONL with prev_hash/row_hash links; verify_chain names the exact broken row; an exclusive
+# fcntl.flock across tail-read+append means concurrent hook invocations can never fork the chain.
 # Relationship to the sqlite surface above: sqlite stays the latest-wins QUERY INDEX; this is
-# the tamper-evident RECORD. Two surfaces, one module, no third store (rule 5).
+# the tamper-evident RECORD. Two surfaces, one module, no third store.
 # =============================================================================================
 _DEFAULT_STREAM = "chain"
 OPEN = "open"
@@ -286,16 +283,16 @@ def _row_hash(prev_hash: str, row: dict) -> str:
 # backslash-escape), but these three code points sit above that escaped range, so with
 # ensure_ascii=False they pass through byte-for-byte. They are therefore the ONLY characters
 # that can make a pre-2.4.0 row's legacy digest (below) diverge from `_row_hash`'s exact-byte
-# one (issue #70). Built via chr() of the code points rather than written as literal characters
-# here, so this source file itself stays plain ASCII.
+# one. Built via chr() of the code points rather than written as literal characters here, so
+# this source file itself stays plain ASCII.
 _LEGACY_SPLIT_SEPARATORS = tuple(chr(cp) for cp in (0x2028, 0x2029, 0x85))
 
 
 def _legacy_row_hash(prev_hash: str, row: dict) -> str:
     """VERIFICATION-ONLY reconstruction of pre-2.4.0's norm_sha256(prev_hash + canonical(row)) --
     never call this from append(); it exists solely so verify_chain can recognize a row written
-    before a80fa32 as authentic under the DIFFERENT construction it was actually hashed with,
-    rather than as tampered.
+    before the 2.4.0 hash change as authentic under the DIFFERENT construction it was actually
+    hashed with, rather than as tampered.
 
     Reproduces the old per-line-rstripped hash exactly: split the link bytes on every boundary
     str.splitlines() recognizes (the wider set that is _row_hash's whole complaint about the
@@ -313,9 +310,9 @@ def store_root(*, root: Optional[Path] = None) -> Path:
     `root`, when given, overrides env-var resolution entirely (additive -- every existing zero-arg
     call site keeps today's behavior unchanged). For a caller that already holds its own explicit
     state root (audit.py's whole contract is `state_root: Path` params, never env vars) rather
-    than relying on `MAKOTO_STATE_DIR` -- DESIGN DECISION 2026-07-07 (Task 2 slice 3b): this beats
-    a second, duplicate hash-chain implementation inside audit.py, which would let two copies of
-    the canonicalization/hashing logic silently drift."""
+    than relying on `MAKOTO_STATE_DIR`: this beats a second, duplicate hash-chain implementation
+    inside audit.py, which would let two copies of the canonicalization/hashing logic silently
+    drift."""
     return root if root is not None else _chain_state_dir()
 
 
@@ -472,13 +469,13 @@ def verify_chain(*, name: str = _DEFAULT_STREAM, root: Optional[Path] = None,
     stream.
 
     `legacy_hits`, when passed a list, gets the index of every row that verified ONLY under
-    `_legacy_row_hash` -- a row genuinely written before a80fa32 (issue #70). Such a row is
+    `_legacy_row_hash` -- a row genuinely written under the pre-2.4.0 construction. Such a row is
     authentic, not tampered, so it must not become this function's return value; but it is not
     silently indistinguishable from an ordinary clean row either, so a caller that wants to know
     (dispatch's `_self_verify_chain`) can. Either way the walk CONTINUES past it with the same
     `expected_prev` chaining as any other row -- accepting a legacy row must never blind this
-    function to a REAL tamper later in the chain, which is the exact failure #70 reported
-    (`chain_tamper` pinned at the first, spurious break, masking everything after it)."""
+    function to a REAL tamper later in the chain (`chain_tamper` pinned at the first, spurious
+    break, masking everything after it)."""
     target = store_root(root=root) / f"{name}.jsonl"
     if not target.exists():
         return None
@@ -547,7 +544,7 @@ def _is_genuine_user_turn(entry: dict) -> Optional[str]:
     """Return the entry's text iff it is a genuine, host-written, non-synthetic user turn -- else None. A tool result or a synthetic/system-injected turn can
     never qualify, no matter what text it happens to contain."""
     # Claude records queued prompts as their own attachment, even when the rendered message
-    # appears beside tool output (anthropics/claude-code#49625, captured 2.1.112 transcript).
+    # appears beside tool output.
     attachment = entry.get("attachment")
     if (entry.get("type") == "attachment" and entry.get("userType") == "external"
             and isinstance(attachment, dict) and attachment.get("type") == "queued_command"
@@ -620,18 +617,15 @@ def _transcript_entries(transcript_path: Optional[str], *, limit: int | None, ne
         return []
     entries = []
     # `splitlines()`, NOT iteration over the file handle, and the difference is a live false deny.
-    #
-    # This was briefly rewritten to `islice` over an open handle, to apply the `limit` bound before
-    # paying for every byte rather than after. That bound is a real concern and the rewrite was
-    # wrong anyway: file iteration splits ONLY on \n, while `splitlines()` also splits on \v, \f,
-    # \x1c-\x1e, \x85, U+2028 and U+2029. A transcript carrying any of those collapsed into one
-    # unparseable line and this function returned [] -- measured, all five separators tested.
+    # File iteration splits ONLY on \n, while `splitlines()` also splits on \v, \f, \x1c-\x1e,
+    # \x85, U+2028 and U+2029. A transcript carrying any of those would collapse into one
+    # unparseable line and this function would return [].
     #
     # [] here does not read as "no evidence". It flows into `_user_supplied`, which reports that the
     # user never typed the URL, and `content.unsourced_webfetch` DENIES with exactly that as its
-    # stated reason. So the optimization turned an ordinary WebFetch of a URL the user had typed
-    # into a hard deny resting on a false fact -- the one thing a gate must never do. Correctness
-    # first: if the unbounded read has to go, it needs a form that splits on the same set.
+    # stated reason. So reading by file iteration would turn an ordinary WebFetch of a URL the user
+    # had typed into a hard deny resting on a false fact -- the one thing a gate must never do. Any
+    # bounded-read optimization here needs a form that splits on the same set.
     lines = raw.splitlines()
     for line in (lines[-limit:] if newest and limit is not None and limit > 0 else lines[:limit]):
         # `strip("\ufeff")` as well as whitespace. "utf-8-sig" removes a BOM only at BYTE ZERO, so
@@ -733,7 +727,7 @@ def last_fired_ts(fingerprint_id: str, *, gate_pattern_id: str = "gate.canon_fin
 
 
 # =============================================================================================
-# receipt (merged from record/receipt.py -- Stage 2 seam 1)
+# receipt
 _CLAIM_KINDS = frozenset({"verdict", "certified-fact", "testrun"})
 _EXEMPTION_KIND = "exemption"
 

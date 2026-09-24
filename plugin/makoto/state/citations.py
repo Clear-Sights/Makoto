@@ -1,22 +1,15 @@
 """Citation machinery — keep `canonical_citations` in sync with reality.
 
-Two cooperating concerns over one canonical citation shape (the table pattern-1.6
-validates against):
+Two cooperating concerns over one canonical citation shape:
 
   - extract_citations(text): the lowest-level primitive — Author-Year strings in text
         -> (cite, line, snippet), stopword- and ISO-date-filtered. pattern-1.6 calls it.
   - refresh_if_stale(conn): when docs/CITATIONS.md's mtime differs from the stored
         mtime, atomically rebuild canonical_citations from the file.
 
-All use the single canonical vocab._CITATION_RX, so extraction, the on-disk
-refresh, and pattern-1.6 validation all agree on what a citation looks like
-byte-for-byte. Knight-Leveson: stdlib only (os, pathlib); the sqlite3 conn
-is passed in. Spec §5.2 (refresh); v1.0.5 (extract stopword/date filter).
-
-SPEC-5 Task 8: capture() (PostToolUse research-tool citation harvesting) and its
-_RESEARCH_TOOLS allowlist were REMOVED here — Makoto's absorbed catalog has no check that
-reads captured research citations (only extract_citations()/refresh_if_stale() are live,
-both retained above). git history is the recovery path if this is ever needed again.
+All use the single canonical vocab._CITATION_RX, so extraction, the on-disk refresh, and
+pattern-1.6 validation all agree on what a citation looks like byte-for-byte. stdlib only
+(os, pathlib); the sqlite3 conn is passed in.
 """
 from __future__ import annotations
 import os
@@ -38,9 +31,9 @@ def extract_citations(text: str) -> list[tuple[str, int, str]]:
     full match including any 'et al.'; line_number is 1-indexed; snippet is
     up to 40 chars of context on each side of the match.
 
-    Filters out matches where the "author" position is a known English
-    stopword (The, From, Per, Saved, ...) — added 1.0.5 after the live audit
-    log showed 40% FP rate from this exact shape.
+    Filters out matches where the "author" position is a known English stopword
+    (The, From, Per, Saved, ...): this exact shape caused a 40% false-positive rate
+    in the live audit log.
     """
     out: list[tuple[str, int, str]] = []
     for m in _CITATION_RX.finditer(text):
@@ -68,16 +61,15 @@ def extract_citations(text: str) -> list[tuple[str, int, str]]:
 def refresh_if_stale(conn) -> None:
     """if docs/CITATIONS.md mtime differs from stored mtime, rebuild canonical_citations.
 
-    Spec §5.2. Called by dispatch.py after the sqlite connect, before any predicate
-    runs. Single source of truth: both the path AND the stored mtime live in the
-    `config` table (v5 fix #16). Atomic rebuild via BEGIN/DELETE/INSERTs/COMMIT
-    (honored because the connection opens in autocommit mode, isolation_level=None).
-    No-op when the path is unset (including a NULL config value), missing,
-    UNREADABLE (not UTF-8, a directory, permissions), or mtime is unchanged — an
+    Called by dispatch.py after the sqlite connect, before any predicate runs. Single
+    source of truth: both the path and the stored mtime live in the `config` table.
+    Atomic rebuild via BEGIN/DELETE/INSERTs/COMMIT (the connection opens in autocommit
+    mode, isolation_level=None). No-op when the path is unset, missing, unreadable
+    (not UTF-8, a directory, permissions), or mtime is unchanged — an
     unreadable-but-present user-editable data file must degrade to "canonical
-    untouched", never raise into dispatch's blanket handler where it would loud-allow
-    the whole event (skipping every check AND event ingestion) on every invocation.
-    A corrupt stored mtime reads as stale, so the rebuild self-heals it.
+    untouched", never raise into dispatch's blanket handler, which would loud-allow
+    the whole event on every invocation. A corrupt stored mtime reads as stale, so the
+    rebuild self-heals it.
     """
     row = conn.execute(
         "SELECT value FROM config WHERE key = 'canonical_citations_path'"
@@ -106,20 +98,17 @@ def refresh_if_stale(conn) -> None:
     conn.execute("BEGIN")
     try:
         _rebuild_canonical(conn, text)
-        # INSERT OR REPLACE, not a bare UPDATE: when the mtime KEY is absent (a state this
-        # function explicitly supports, stored == -1) a bare UPDATE affects zero rows, the
-        # fast path never engages, and every dispatch re-runs the full write transaction on
-        # the hot path forever.
+        # INSERT OR REPLACE, not a bare UPDATE: when the mtime key is absent (stored == -1) a
+        # bare UPDATE affects zero rows, the fast path never engages, and every dispatch
+        # re-runs the full write transaction forever.
         conn.execute(
             "INSERT OR REPLACE INTO config(key, value) VALUES ('canonical_citations_mtime', ?)",
             [str(on_disk_mtime)],
         )
         conn.execute("COMMIT")
     except Exception:
-        # The rollback gets its own suppressing guard: on errors where SQLite already
-        # auto-rolled back (SQLITE_FULL / SQLITE_IOERR) an explicit ROLLBACK raises "cannot
-        # rollback - no transaction is active" and would REPLACE the real cause in the
-        # emitted fact.
+        # Suppressing guard: when SQLite already auto-rolled back (SQLITE_FULL / SQLITE_IOERR)
+        # an explicit ROLLBACK raises and would replace the real cause in the emitted fact.
         try:
             conn.execute("ROLLBACK")
         except Exception:
@@ -132,10 +121,9 @@ def _rebuild_canonical(conn, text: str) -> None:
 
     Extraction IS extract_citations — the same stopword + ISO-date filters and the same
     whitespace fold — so the canonical set and pattern-1.6 validation agree byte-for-byte.
-    A raw-regex rebuild applied NEITHER filter, so a maintenance date line in CITATIONS.md
-    ('- Reviewed 2024-03-01 by the maintainer') minted a canonical row ('Reviewed 2024')
-    that granted a PASS to a citation nobody ever listed, plus unreachable junk rows
-    ('The 2023')."""
+    A raw-regex rebuild applying neither filter would mint a canonical row from a
+    maintenance date line ('- Reviewed 2024-03-01' -> 'Reviewed 2024'), granting a PASS
+    to a citation nobody listed, plus unreachable junk rows."""
     # The set dedups: `cite` is the PRIMARY KEY and the INSERT below has no OR IGNORE.
     rows = list({(cite,) for cite, _line, _snippet in extract_citations(text)})
     conn.execute("DELETE FROM canonical_citations")

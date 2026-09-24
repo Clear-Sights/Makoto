@@ -1,62 +1,51 @@
 """makoto.core.hostdialect -- the host-dialect boundary: one hop from a host's spelling to the protocol.
 
-ONE domain: a hook envelope arrives from SOME host, and every reader downstream of
-`dispatch.main()` -- routing, gates, history, audit -- must see the SAME protocol regardless of
-which host sent it. Consumed by `dispatch.main()` alone, at the top, immediately after the
-payload parses and before anything routes on it. Stdlib-only, no makoto-internal imports: safe
-for anything to depend on.
+One domain: a hook envelope arrives from some host, and every reader downstream of
+`dispatch.main()` -- routing, gates, history, audit -- must see the same protocol regardless of
+which host sent it. Consumed by `dispatch.main()` alone, at the top, before anything routes on
+the payload. Stdlib-only, no makoto-internal imports: safe for anything to depend on.
 
-WHY THIS MODULE EXISTS (#19)
+WHY THIS MODULE EXISTS
 `dispatch.main()` routes on an exact-match `HANDLERS` lookup keyed on Claude Code's PascalCase
-event names. Cursor loads Claude-Code-compatible hook wiring (including a third-party plugin's
-`hooks/hooks.json`) but delivers the event name in camelCase: `preToolUse`, not `PreToolUse`.
-Under the wildcard-law routing a `postToolUse` therefore ran the WRONG handler
-(`_evaluate_and_gate` instead of `_accumulate`: no ledger row, no plan advance), the Pre-tier
-predicates that key on `hook_event_name == "PreToolUse"` silently no-opped, and the persisted
-events-table row carried the host's own spelling -- leaving every history decoder that keys on
-the protocol names (`canon.timeout`/`canon.recur`, `gate.identical_retry`, the claim-graph Bash
-evidence path) blind for the rest of the session. A check that reads nothing reports no finding,
-and nothing reports that it read nothing.
+event names. Cursor delivers the same events in camelCase (`preToolUse`, not `PreToolUse`).
+Without translation, a `postToolUse` event runs the wrong handler, Pre-tier predicates keyed on
+`hook_event_name == "PreToolUse"` silently no-op, and the persisted events-table row carries the
+host's own spelling, blinding every history decoder that keys on the protocol names for the rest
+of the session. A check that reads nothing reports no finding, and nothing reports that it read
+nothing.
 
-WHAT IS DELIBERATELY *NOT* RELAXED
-The genuinely unevaluable envelopes -- non-JSON stdin, non-object payload -- keep failing exactly
-as before (loud-allow / fail-closed respectively; see `dispatch.main()`'s HYBRID contract). A
-genuinely unknown event name (Cursor's native-only `beforeShellExecution`, `sessionEnd`, or
-garbage) is left untouched: `canonical_event` can only ever return a name the caller already
-declared, so this module cannot invent an event, only recognize one that was already installed
-under a different capitalization.
+WHAT IS DELIBERATELY NOT RELAXED
+Genuinely unevaluable envelopes -- non-JSON stdin, non-object payload -- keep failing exactly as
+before (loud-allow / fail-closed; see `dispatch.main()`'s hybrid contract). A genuinely unknown
+event name is left untouched: `canonical_event` can only return a name the caller already
+declared, so this module cannot invent an event, only recognize one installed under a different
+capitalization.
 
 WHY DERIVED, NOT A HAND-WRITTEN ALIAS MAP
-The alias index is built FROM the caller's own set of known event names. A hand-maintained
-`{"preToolUse": "PreToolUse", ...}` table is a second list of the events, and the failure mode of
-a second list is that someone adds a `HANDLERS` row and forgets the alias -- reintroducing exactly
-this outage for the new event only, on one host, silently. Deriving means a new event is aliased
-the moment it is routable, by construction, with nothing to remember. Folding is applied only
-where it is unambiguous: if two known names collide case-insensitively the fold is refused for
-that name and exact-match still decides, so the index can never make routing MORE ambiguous than
-the caller's own table.
+The alias index is built from the caller's own set of known event names. A hand-maintained alias
+table is a second list of the events, and the failure mode of a second list is that someone adds
+a `HANDLERS` row and forgets the alias. Deriving means a new event is aliased the moment it is
+routable, with nothing to remember. Folding applies only where unambiguous: if two known names
+collide case-insensitively the fold is refused for that name and exact-match still decides, so
+the index can never make routing more ambiguous than the caller's own table.
 
 PAYLOAD-FIELD PARITY
 Aliasing the event restores routing, but several checks then silently no-op on a foreign host
-because the payload FIELDS differ too. `normalize_payload` fills the protocol field from the
-host's spelling ONLY when the protocol field is absent, so a host that already speaks the
-protocol is passed through untouched.
+because the payload fields differ too. `normalize_payload` fills the protocol field from the
+host's spelling only when the protocol field is absent, so a host that already speaks the
+protocol passes through untouched.
 
-Deliberately NOT filled: `last_assistant_message`. Cursor's documented stop schema has no
+Deliberately not filled: `last_assistant_message`. Cursor's documented stop schema has no
 equivalent, and the Stop gates that read it degrade to empty (fail-open) without it. Fabricating
-a value -- from a transcript, or from anything else -- would manufacture the very evidence those
-gates exist to check. An absent field is an honest gap; a synthesized one is a lie the gate
-cannot see through. Closing it needs a real transcript adapter, not a rename.
+a value would manufacture the very evidence those gates exist to check. An absent field is an
+honest gap; a synthesized one is a lie the gate cannot see through.
 
 WHAT GETS PERSISTED
-`dispatch` ingests the NORMALIZED payload into the events table whenever normalization changed
-anything (a protocol-speaking host still ingests its own bytes, byte-identical). That table is
-the rolling substrate every history decoder reads, and those decoders key on the payload's own
-`hook_event_name` and `tool_name` -- so persisting the host's spelling instead would admit a
-dialect envelope live and then leave it invisible to every history-derived gate for the rest of
-the session: host compatibility bought by silently blinding the Stop tier. The dialect itself is
-not lost -- it is recorded once per session as a dispatch fact naming the host spellings that
-were translated.
+`dispatch` ingests the normalized payload into the events table whenever normalization changed
+anything. That table is what every history decoder reads, keyed on `hook_event_name` and
+`tool_name` -- so persisting the host's spelling instead would blind every history-derived gate
+for the rest of the session. The dialect itself is not lost: it is recorded once per session as a
+dispatch fact naming the host spellings translated.
 """
 from __future__ import annotations
 
@@ -131,17 +120,13 @@ def normalize_payload(payload: dict, known_events) -> tuple:
     """Return `(normalized_payload, notes)` -- the payload as the protocol, plus what was renamed.
 
     `notes` is a dict of the host spellings actually encountered, empty when the payload already
-    spoke the protocol. It exists so a dialect translation is an auditable event and not an
-    invisible one: a silent rename is indistinguishable from a bug the next time a field goes
-    missing. The caller owns what to do with a still-unrecognized event -- this function changes
-    nothing else about that decision.
+    spoke the protocol: it makes a dialect translation an auditable event rather than an
+    invisible one.
 
-    Never mutates the caller's dict; a host already speaking the protocol gets an equal copy.
-    The copy is deep on `tool_input`/`tool_response` specifically -- `dict(payload)` alone is
-    shallow, and now that the caller persists the normalized dict as the events-table row (see
-    the module docstring's WHAT GETS PERSISTED), any future in-place edit of a nested field by a
-    handler would silently rewrite the persisted record through the alias. Nothing today mutates
-    these in place, but the guarantee should not depend on that staying true."""
+    Never mutates the caller's dict. The copy is deep on `tool_input`/`tool_response`
+    specifically -- `dict(payload)` alone is shallow, and the caller persists the normalized
+    dict as the events-table row, so an in-place edit of a nested field would otherwise rewrite
+    the persisted record through the alias."""
     if not isinstance(payload, dict):
         return payload, {}
     out = dict(payload)

@@ -1,19 +1,17 @@
 """makoto.substrate.pytest_cache (L1) — existence-filtered reader over pytest's own on-disk record.
 
-ACCESS CONTRACT (spec §0, Makoto-not-Historia): deterministic direct-pointer I/O ONLY.
-This module opens exactly ONE determined file (`<cwd>/.pytest_cache/v/cache/lastfailed`)
-and then follows only paths NAMED INSIDE it, scanning each for the node's own concrete
-tokens (a line-leading `def <test_name>`, plus `class <Name>` for each class segment).
-O(entries), bounded by _MAX_ENTRIES, zero directory enumeration —
-no enumeration primitive of any kind, ever (pinned by tests/test_pytest_cache.py).
+ACCESS CONTRACT: deterministic direct-pointer I/O only. This module opens exactly ONE
+determined file (`<cwd>/.pytest_cache/v/cache/lastfailed`) and then follows only paths NAMED
+INSIDE it, scanning each for the node's own concrete tokens (a line-leading `def <test_name>`,
+plus `class <Name>` for each class segment). O(entries), bounded by _MAX_ENTRIES, zero
+directory enumeration — no enumeration primitive of any kind, ever (pinned by
+tests/test_pytest_cache.py).
 
-WHY existence-filtering (the staleness firewall): pytest clears a lastfailed entry only
-when it COLLECTS that node and sees it pass — a deleted/renamed node is uncollectable, so
-its entry persists forever. MEASURED 2026-06-09 on this repo's green suite: 42/42 stale
-entries were exactly that class; the filter (file exists AND `def <name>` present) killed
-all 42 with 0 false survivors. A surviving entry therefore means: this node EXISTS and its
-last recorded run FAILED, never re-run green — pytest rewrites the cache on every run, so
-the record is latest-wins with no makoto bookkeeping. Knight-Leveson: stdlib json/re/os only.
+WHY existence-filtering (the staleness firewall): pytest clears a lastfailed entry only when it
+COLLECTS that node and sees it pass — a deleted/renamed node is uncollectable, so its entry
+persists forever. A surviving entry therefore means: this node EXISTS and its last recorded run
+FAILED, never re-run green — pytest rewrites the cache on every run, so the record is
+latest-wins with no makoto bookkeeping. stdlib json/re/os only.
 """
 from __future__ import annotations
 import json

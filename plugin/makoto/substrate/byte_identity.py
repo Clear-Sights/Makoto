@@ -1,5 +1,5 @@
 """makoto.substrate.byte_identity — an op-restricted byte-identity wrapper, the NEUTRAL LEAF home of
-``ByteIdentity`` (copied by shape from the makoto-dev ancestor, CANON-PORT-1).
+``ByteIdentity``.
 
 ``ByteIdentity`` makes a content-MEANING read UNCONSTRUCTIBLE rather than merely discouraged: it
 exposes ONLY ``==`` / ``len`` / ``hash``. There is NO ``__contains__``, ``__iter__``,

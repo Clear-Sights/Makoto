@@ -1,4 +1,4 @@
-"""Python dispatcher hot path — Spec §5.5.
+"""Python dispatcher hot path.
 
 Pipeline:
   stdin -> parse JSON -> ensure DB exists (lazy init) -> connect (with retry)
@@ -199,14 +199,11 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool,
 # that exits 0 goes to the DEBUG LOG ONLY -- never the transcript, never the user, never the model.
 # So a can't-evaluate looked identical, from every seat, to a clean pass: the pending call
 # proceeded, no output appeared, and the one party who could have retried or reported it was the
-# only party not told. Measured: 30 loud-allows in one day, on one machine, noticed by nobody until
-# somebody went looking through the state directory for an unrelated reason.
+# only party not told.
 #
 # `systemMessage` is a universal hook-output field that IS surfaced to the user, on every event
 # that can carry output. Using it keeps the fail direction exactly where it was -- open, never
 # blocking, a broken gate must not wedge the session -- while removing the "silently".
-# Gyroscope's own shim reached the same conclusion for the same reason; this is that precedent
-# applied one layer in, to the faults that happen after carriage succeeds.
 #
 # Only faults that mean A CHECK DID NOT RUN produce a notice. A REPAIRED payload evaluated normally
 # and says nothing; a chain-tamper advisory has its own audit row and is not about this call.
@@ -280,11 +277,11 @@ def _note_legacy_row_hash(state_dir: Path, session_id, legacy_rows: list) -> boo
     an ordinary clean chain to be worth a line. Returns whether this call was the one that
     recorded it.
 
-    Same rationale and marker shape as `_note_host_dialect` (issue #70, direction 3): a chain
+    Same rationale and marker shape as `_note_host_dialect`: a chain
     with such a row would otherwise get this fact on EVERY dispatch for the rest of the chain's
-    life -- ~12,000 rows on the reporting install alone -- crowding dispatch_errors.jsonl and the
-    stderr floor with a fact that adds nothing after the first. Best-effort by construction: an
-    unwritable marker degrades to re-noting (noisy but correct), never to crashing the hot path."""
+    life -- crowding dispatch_errors.jsonl and the stderr floor with a fact that adds nothing
+    after the first. Best-effort by construction: an unwritable marker degrades to re-noting
+    (noisy but correct), never to crashing the hot path."""
     try:
         marker_dir = state_dir / "legacy_row_hash"
         marker_dir.mkdir(parents=True, exist_ok=True)
@@ -311,12 +308,11 @@ def _self_verify_chain(state_dir: Path, ids: dict | None = None) -> None:
     other fact carries it: a tamper report nobody can tie to a session is a report nobody can
     act on.
 
-    A row genuinely written before a80fa32 verifies under a different construction
-    (`ledger._legacy_row_hash`) and is authentic, never `chain_tamper` -- `ledger.verify_chain`
-    already tells the two apart and keeps walking past a legacy row so a REAL edit further down
-    still surfaces below. That distinct, non-tamper state gets its own once-per-session note
-    (`_note_legacy_row_hash`), not the every-dispatch `chain_tamper` cadence this function's own
-    history deliberately kept for genuine tamper (issue #70)."""
+    A row genuinely written under the legacy hash construction (`ledger._legacy_row_hash`) is
+    authentic, never `chain_tamper` -- `ledger.verify_chain` already tells the two apart and
+    keeps walking past a legacy row so a REAL edit further down still surfaces below. That
+    distinct, non-tamper state gets its own once-per-session note (`_note_legacy_row_hash`), not
+    the every-dispatch `chain_tamper` cadence kept for genuine tamper."""
     try:
         from makoto.state import ledger as _ledger
         legacy_hits: list = []
@@ -530,11 +526,11 @@ def _run_predicates(conn, payload: dict, history: list, event_id: int,
 # JIT conventions delivery: the installed CLAUDE.md block carries only the 3-line law; each
 # check's convention + the `makoto-allow` escape hatch arrive HERE, at the moment they bind.
 # A pattern is listed iff its predicate IMPLEMENTS the marker exemption (the factory scaffolds
-# check makoto_allowed centrally; 1.6/1.34 call it directly) — bound to source by
-# tests/test_conventions_jit.py, so the hint can never offer a hatch the code does not honor
-# (1.9/1.21/1.22 are event-shapes with no content line to annotate; content.self_mute_guard self-mute refuses the
-# marker — the seal on the mint cannot be signed by the would-be forger; gate.* check claims
-# against the ledger, where the only discharge is doing or honestly retracting the thing said).
+# it centrally; some checks call it directly) — bound to source by tests/test_conventions_jit.py,
+# so the hint can never offer a hatch the code does not honor (some checks are event-shapes with
+# no content line to annotate; content.self_mute_guard's self-mute refuses the marker — the seal
+# on the mint cannot be signed by the would-be forger; gate.* checks claims against the ledger,
+# where the only discharge is doing or honestly retracting the thing said).
 _ALLOW_EXEMPT_IDS = frozenset({
     "content.verifier_predicate_weakened", "content.env_gated_audit", "content.integrity_suppression_flag", "content.phantom_citation", "content.verifier_body_hollowed",
     "content.illusory_authorship_trailer", "content.illusory_interruption_claim"})
@@ -592,8 +588,7 @@ def _named(finding) -> str:
 
 
 def _worst_finding(findings: list[Finding]) -> tuple[str, Finding] | None:
-    """Pick the worst-outcome finding — BLOCK > ASK > ADVISE > ALLOW, first one at that rank
-    (matching `_build_decision`'s old `errors[0]` precedent when multiple BLOCK findings fire).
+    """Pick the worst-outcome finding — BLOCK > ASK > ADVISE > ALLOW, first one at that rank.
     A level this catalog never emits (anything but 'error'/'advisory') maps to ALLOW, per the
     posture-vocabulary's own fail-open rule for an unrecognized outcome."""
     best = None
@@ -774,7 +769,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
 
 
 def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> None:
-    """append an audit row IFF at least one Finding was produced (only-fires policy, 1.0.2).
+    """append an audit row IFF at least one Finding was produced (only-fires policy).
 
     Silent hook fires carry no forensic signal; recording them flooded logs to
     99%+ noise. Predicate-level errors are captured separately via append_error.
@@ -806,9 +801,9 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
 
 
 def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
-    """SessionStart — SPEC-5 (Makoto absorbs Assay): admit a declared Plan from the on-disk
-    artifact. SessionStart never blocks — it is an admission step, not a gate — so this always
-    completes silently regardless of whether a plan was actually declared."""
+    """SessionStart: admit a declared Plan from the on-disk artifact. SessionStart never blocks —
+    it is an admission step, not a gate — so this always completes silently regardless of
+    whether a plan was actually declared."""
     try:
         from makoto.state import plan as _plan
         _plan.declare_from_session_artifact(
@@ -974,9 +969,8 @@ def _dispatch() -> int:
     """orchestrator — HYBRID fail-mode (never silent, never blind-open): a tamper-shaped payload
     fails CLOSED (block, exit 2 + reason); transient infra (unparseable pipe, DB init/lock failure,
     unexpected body fault) fails LOUD-ALLOW (exit 0 + stderr); every can't-evaluate writes an
-    on-the-record audit fact. See docs/archive/specs/2026-06-03-dispatch-fail-loud-hybrid-design.md.
-    Routing is HANDLERS, the row table above — main() knows the common prologue (parse, verify,
-    ingest) and nothing about any event."""
+    on-the-record audit fact. Routing is HANDLERS, the row table above — main() knows the common
+    prologue (parse, verify, ingest) and nothing about any event."""
     # The byte boundary comes FIRST, before anything reads a character. `makoto.core.wire` pins the
     # decode to errors="replace" instead of inheriting the ambient locale's surrogateescape handler,
     # so a host byte that is not valid UTF-8 can no longer enter as a lone surrogate and detonate
@@ -1025,7 +1019,7 @@ def _dispatch() -> int:
     # -- so routing, gates, history, commitments and audit all see one canonical payload rather
     # than each learning a second dialect. Cursor loads Claude-Code-compatible hook wiring but
     # delivers camelCase (`preToolUse`): under the wildcard-law routing that ran the WRONG
-    # handler and persisted a row every history decoder was blind to (#19). The unevaluable-
+    # handler and persisted a row every history decoder was blind to. The unevaluable-
     # envelope refusals ABOVE are untouched: this normalizes a known event's capitalization, and
     # `canonical_event` can only return a name already in HANDLERS, so a genuinely unknown event
     # still takes exactly the wildcard path it took before.
@@ -1036,10 +1030,8 @@ def _dispatch() -> int:
     # JSON *string*. An unpaired `\ud800` escape inside that inner document is plain ASCII in the
     # outer payload -- invisible to `wire.read_stdin`, and invisible to the `wire.scrub` above,
     # because at that point it is still an unparsed string. Normalization is what materializes it,
-    # so normalization is what has to be followed by a scrub. Verified by reproducing the ORIGINAL
-    # UnicodeEncodeError on a camelCase envelope after the boundary fix was already in place: the
-    # ensure_ascii=False reserialization below then carried the live surrogate straight into the
-    # sqlite3 bind. Found by an independent review pass, not by the tests that existed.
+    # so normalization is what has to be followed by a scrub: the ensure_ascii=False
+    # reserialization below would otherwise carry a live surrogate straight into the sqlite3 bind.
     payload, dialect_escaped = wire.scrub(payload)
     if dialect_escaped:
         _dispatch_fact(state_dir, "unencodable_input",

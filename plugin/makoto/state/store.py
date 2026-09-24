@@ -1,27 +1,24 @@
 """SQLite(WAL) schema bootstrap — single init_db creates every table makoto needs.
 
 Idempotent: safe to call on a fresh DB or one already initialized. cmd_install
-invokes init_db() once per install; the dispatcher (Phase 5.3+) never runs DDL
-beyond the lazy-init bootstrap in dispatch._ensure_db_initialized.
+invokes init_db() once per install; the dispatcher never runs DDL beyond the
+lazy-init bootstrap in dispatch._ensure_db_initialized.
 
-Knight-Leveson: stdlib `sqlite3` only. No LLM, no HTTP.
+stdlib `sqlite3` only. No LLM, no HTTP.
 
 Connections open in autocommit mode (`isolation_level=None`) so the explicit
 BEGIN/COMMIT/ROLLBACK in citations.refresh_if_stale is honored verbatim rather than
 fighting the driver's implicit transaction management. WAL gives concurrent
-readers + a single writer, so parallel hook fires no longer serialize on a
-file-level write lock the way the DuckDB backend did.
+readers plus a single writer, so parallel hook fires no longer serialize on a
+file-level write lock.
 
 Tables (all idempotent via IF NOT EXISTS):
   events              — append-only event log; (session_id, ts) + event_type indexes
   canonical_citations — Author-Year lookup populated by citations.refresh_if_stale
   config              — key/value seed (canonical_citations_path + _mtime)
   ledger              — results/touches keyed by normalized location, latest-wins
-  plans               — one declared contract Plan (SPEC-5) per session, latest-wins whole
-  plan_item_commitments — forward promises to plan/task LABELS, discharged purely textually
-
-Spec: §8 (stores) of the bidirectional-falsifiability design; that document is no longer
-in-tree — git history is the recovery path.
+  plans               — one declared contract Plan per session, latest-wins whole
+  plan_item_commitments — forward promises to plan/task labels, discharged purely textually
 """
 from __future__ import annotations
 import os
@@ -47,15 +44,12 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
     state_dir.mkdir(parents=True, exist_ok=True)
     conn = _connect(state_dir / "makoto.record.db")
     try:
-        # ONE transaction around every DDL statement AND the config seeds. In autocommit
-        # mode each statement committed separately, so a process interrupted after the
-        # CREATE TABLEs but before the two config seeds left a DB with tables and NO seed
-        # rows -- a state phantom-citation reads as "no canonical_citations_path
-        # configured" and enforces an empty allowlist globally (the exact failure the "-1"
-        # always-stale sentinel below was written to prevent, and which that sentinel
-        # cannot cover when its own row is the one missing). BEGIN IMMEDIATE takes the
-        # write lock up front so a concurrent init waits (busy_timeout) instead of
-        # interleaving; COMMIT publishes tables and seeds as one atom.
+        # One transaction around every DDL statement and the config seeds. In autocommit
+        # mode each statement commits separately, so an interruption after the CREATE
+        # TABLEs but before the config seeds would leave a DB with tables and no seed
+        # rows: phantom-citation then reads "no canonical_citations_path configured" and
+        # enforces an empty allowlist globally. BEGIN IMMEDIATE takes the write lock up
+        # front so a concurrent init waits (busy_timeout) instead of interleaving.
         conn.execute("BEGIN IMMEDIATE")
         # events — append-only event log
         conn.execute("""
@@ -99,9 +93,8 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
-        # plans — one declared contract Plan (SPEC-5 Makoto-absorbs-Assay merge) per session,
-        # latest-wins on the WHOLE plan (mirrors Assay's declare/_persist semantics: declare
-        # replaces the whole plan, mark_done+resync persists the whole plan again). `rows` is
+        # plans — one declared contract Plan per session, latest-wins on the WHOLE plan
+        # (declare replaces the whole plan, mark_done+resync persists it again). `rows` is
         # the JSON-encoded list of PlanNode row dicts, in plan (ledger) order.
         conn.execute("""
             CREATE TABLE IF NOT EXISTS plans (
@@ -110,12 +103,11 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 ts         TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
-        # plan_item_commitments -- a forward promise to a PLAN/TASK-LABELED item ("§9.3",
-        # "Task #19"), never a file path, so filesystem-touch discharge (_discharged reads
-        # touched_keys/fs_exists) is meaningless for it. Sourced
-        # and discharged PURELY TEXTUALLY (a later first-person completion/retraction statement
-        # naming the same label); un-windowed by session, because a promise does not expire
-        # because an hour passed. See state/plan.py.
+        # plan_item_commitments -- a forward promise to a plan/task-labeled item, never a file
+        # path, so filesystem-touch discharge (_discharged reads touched_keys/fs_exists) is
+        # meaningless for it. Discharged purely textually, by a later first-person
+        # completion/retraction statement naming the same label; un-windowed by session,
+        # because a promise does not expire because an hour passed. See state/plan.py.
         conn.execute("""
             CREATE TABLE IF NOT EXISTS plan_item_commitments (
                 commitment_key  TEXT PRIMARY KEY,
@@ -127,14 +119,12 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
-        # config seed rows (single source of truth for citations path + mtime).
-        # Seed the mtime to the "-1" ALWAYS-STALE sentinel — NOT the file's current mtime.
-        # init_db only CREATES the (empty) canonical_citations table; the first
-        # refresh_if_stale (run by dispatch before any predicate) is what POPULATES it from
-        # CITATIONS.md. Seeding the real mtime made refresh see "not stale" and skip that
-        # initial rebuild, leaving canonical EMPTY so content.phantom_citation (error-level) false-fired on
-        # every Author-Year citation as phantom. -1 guarantees the first refresh rebuilds; it
-        # then records the real mtime and subsequent dispatches fast-path.
+        # Seed the mtime to the "-1" always-stale sentinel, not the file's current mtime.
+        # init_db only creates the (empty) canonical_citations table; the first
+        # refresh_if_stale populates it from CITATIONS.md. Seeding the real mtime would make
+        # refresh see "not stale" and skip that initial rebuild, leaving canonical empty so
+        # content.phantom_citation false-fires on every Author-Year citation. -1 guarantees
+        # the first refresh rebuilds and records the real mtime, so later dispatches fast-path.
         conn.execute(
             "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
             ["canonical_citations_path", str(citations_path)],
@@ -155,10 +145,9 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
 
 
 # =============================================================================================
-# shared state-directory resolution (merged from record/state.py -- Stage 2 seam 1).
-# Reads $MAKOTO_STATE_DIR env var; defaults to $HOME/.claude/makoto_state/.
-# Importable by dispatch.py, citations refresh, and tests without circular imports
-# (Knight-Leveson: stdlib only).
+# Shared state-directory resolution. Reads $MAKOTO_STATE_DIR env var; defaults to
+# $HOME/.claude/makoto_state/. Importable by dispatch.py, citations refresh, and tests
+# without circular imports (stdlib only).
 # =============================================================================================
 
 

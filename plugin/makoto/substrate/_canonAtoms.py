@@ -3,31 +3,20 @@ substrate for the two canon-fingerprint gates (canonFingerprints.py = BLOCK tier
 canonFingerprintsAdvisory.py = ADVISE tier). Underscore-prefixed so checks._loader's scan skips
 it -- not itself a detector module.
 
-SPEC-5 Task 9 (Makoto absorbs Assay): ports 17 of the 27 named session-level "canon" fingerprints
-from REF-lever-graded-primitives/signalminer/grade_planted.py's THE_CANON dict onto Makoto's real
-Stop-gate observable surface (GateContext.history: raw hook-event payload rows -- the same shape
-makoto/checks/switch.py and every ledger-gate already reads).
+Implements the 13 atoms used by 17 of the known session-level "canon" fingerprints, read over
+Makoto's Stop-gate observable surface (GateContext.history: raw hook-event payload rows, the
+same shape makoto/checks/switch.py and every ledger-gate already reads).
 
-SCOPE CUT (logged in DEFERRED.md, "SPEC-5 Task 9" entry): 10 of the 27 fingerprints reference one
-of three atoms (assistant_admit, red_text, does_not_exist) that have NO source implementation
-anywhere reachable in this repo or REF-lever-graded-primitives/ (primitives.py's own
-`from ..gaming_atoms import ...` points at a module confirmed absent). Those 10 are NOT ported
-here. This file implements only the 13 atoms the remaining 17 fingerprints actually use.
+Ten of the fingerprints reference one of three atoms (assistant_admit, red_text,
+does_not_exist) with no source implementation reachable anywhere; those atoms are not
+implemented here.
 
-PORTING NOTE (the other half of the gap): primitives.py's FALLOUT dict gives real, self-contained
-combinator logic (EXISTS/ABSENT/PRECEDES/CONJ/DISJ, and REVERTS in full) for these atoms, but
-several of its LEAF field-tests (test_cmd, result_failed/passed, is_test, read_oracle, cmd_disable,
-cmd_swallow_test, edit_weakened_test, edit_has_secret) delegate their actual regex/predicate
-BODIES to the same missing `gaming_atoms` module -- so the exact original regex text is not
-recoverable either. What IS ported verbatim below: every combinator shape (EXISTS-over-calls,
-PRECEDES, CONJ, REVERTS) and every field read (which Call key each field-test consults). What is
-NEW authorship (per the ticket's own "this is real authorship, not scope to re-investigate"
-carve-out): the regex BODIES themselves, written fresh here -- reusing Makoto's OWN existing
-equivalents wherever one already exists (is_test_runner/is_failing_testrun for test-run atoms,
+The combinator shapes (EXISTS-over-calls, PRECEDES, CONJ, REVERTS) and each field-test's field
+reads are preserved from the original design; the regex bodies themselves are new, reusing
+Makoto's own equivalents where one exists (is_test_runner/is_failing_testrun for test-run atoms,
 whole_suite_pass_claim for the claim atom, plus Makoto's four locating edit tools) rather than
-re-deriving a text-extraction Makoto already has.
-Each NEW regex is marked `# ponytail:` with its ceiling (a heuristic denylist/keyword set) and the
-obvious upgrade path -- none of them claim to reproduce gaming_atoms' unrecoverable exact pattern.
+re-deriving a text-extraction Makoto already has. Each new regex is marked `# ponytail:` with its
+ceiling (a heuristic denylist/keyword set) and the obvious upgrade path.
 
 POSTURE (BLOCK vs ADVISE): see BLOCK_IDS below for the full citation trail.
 """
@@ -63,9 +52,7 @@ _EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 # actions. PostToolUse carries tool_input/tool_response; PostToolUseFailure carries tool_input and
 # top-level error/is_interrupt. Neither needs Pre/Post pairing or dangling-Pre synthesis here.
 def _decode_row(row):
-    # Row-decode step shared via kit.decode_history_event (2026-07-09 dedup: this function
-    # and checks.writeThrashRevert._prior_whole_file_writes each re-derived the same tuple/dict-
-    # payload sniff + json.loads by hand -- found duplicated by jscpd). The shared helper owns the
+    # Row-decode step shared via kit.decode_history_event: the shared helper owns the
     # event-wrapper fallback; only the terminal filter and Call-dict shaping stay local.
     ev = decode_history_event(row)
     if not isinstance(ev, dict):
@@ -170,7 +157,7 @@ def _segments(c: Call):
     return _shell_segments(_cmd(c)) if c["name"] == "Bash" else []
 
 
-# ---- NEW regex authorship (gaming_atoms' own bodies are unrecoverable -- see module docstring) ----
+# ---- regex-based atom bodies (see module docstring) ----
 # Full-token bypass flags. SKIP is intentionally case-pinned: lowercase `dd skip=` is unrelated.
 _DISABLE_RX = re.compile(
     r"--no-verify|--no-gpg-sign|--no-hooks?|--force|(?-i:SKIP=)\S+|--skip-tests?",
@@ -346,16 +333,14 @@ _EXPLICIT_TIMEOUT_RX = re.compile(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
 def atom_tool_timeout(calls, text) -> bool:
     """A harness interruption, an explicitly timeout-marked error (``tool_timeout``,
     ``timed out`` -- matched without word boundaries, since ``_`` defeats ``\\b``), or a
-    confidently DETERMINISTIC direct error occurred.
+    confidently deterministic direct error occurred.
 
-    Transient and UNCERTAIN failure terminals are deliberately excluded: each is evidence that
-    the call failed, but not enough evidence that the turn timed out. classify_failure's None
-    "is the safe default a BLOCK-tier caller must treat as 'do not fire'" (kit.py), and the
-    ``"tool call failed"`` fallback kit.failure_terminal_result substitutes for an absent error
-    detail is generic precisely so it stays unclassified -- reading it as a timeout made a
-    detail-free PostToolUseFailure row BLOCK where the same row with a transient error string
-    stayed silent (absence of evidence read as evidence). Explicit harness aborts still count
-    even when their accompanying error text looks transient.
+    Transient and uncertain failure terminals are deliberately excluded: each is evidence the
+    call failed, but not enough evidence the turn timed out. `classify_failure`'s None is the
+    safe default a BLOCK-tier caller must treat as "do not fire"; the generic
+    ``"tool call failed"`` fallback for an absent error detail must stay unclassified, or a
+    detail-free failure row would BLOCK where the same row with a transient error string stays
+    silent. Explicit harness aborts still count even when their error text looks transient.
     """
     def _is_timeout(c):
         result = c["result"]
@@ -441,8 +426,7 @@ def atom_check_disabled(calls, text) -> bool:
 
 
 def atom_revert_loop(calls, text) -> bool:
-    """REVERTS, ported verbatim from primitives.py (self-contained, no gaming_atoms dependency):
-    a later edit's (old,new) on the SAME file exactly reverses an earlier one's."""
+    """REVERTS: a later edit's (old,new) on the same file exactly reverses an earlier one's."""
     history: Dict[str, list] = {}
     for c in calls:
         if not _is_edit(c):
@@ -484,8 +468,7 @@ def compute_atoms(calls, text) -> Dict[str, bool]:
     return {name: fn(calls, text) for name, fn in ATOMS.items()}
 
 
-# ---- THE_CANON_17: verbatim (formula text) from REF-lever-graded-primitives/signalminer/
-# grade_planted.py's THE_CANON, restricted to the 17 whose literals are all in ATOMS above ----------
+# THE_CANON_17: the 17 known "canon" fingerprints whose formula literals are all in ATOMS above.
 THE_CANON_17: Dict[str, str] = {
     "nogreen_revert_timeout":   "NOT_test_run_green ∧ revert_loop ∧ tool_timeout",
     "nogreen_checkdisabled":    "NOT_test_run_green ∧ check_disabled",
@@ -506,19 +489,15 @@ THE_CANON_17: Dict[str, str] = {
     "weakened_secret_timeout":  "assertion_weakened ∧ secret_committed ∧ tool_timeout",
 }
 
-# BLOCK_IDS: the 4 of the 17 that are BOTH (a) named in the gold-oracle finding doc's "robust core"
-# 7 (docs/findings/2026-06-23-gold-oracle-certification.md) AND (b) actually in this 17-fingerprint
-# scope -- 3 of the original 7 (nosrc_claim_red, nogreen_admit_destruct, checkdisabled_dne_revert)
-# depend on the missing assistant_admit/does_not_exist atoms and are among the 10 NOT ported here
-# (see DEFERRED.md's "SPEC-5 Task 9" entry). DESIGN DECISION 26 ratifies this exact count -- 4, not
-# 7 and not 3 -- after an initial dispatcher miscount during this same session.
+# BLOCK_IDS: the 4 of the 17 that are both named in the gold-oracle finding doc's "robust core"
+# and actually in this 17-fingerprint scope. The rest of that robust core depends on the missing
+# assistant_admit/does_not_exist atoms and is not implemented here.
 #
 # Everything else in the 17 either rests on a soft/claim atom (claimed_pass_no_run, tool_timeout,
-# assertion_weakened) not named in the robust core, or is one of the finding doc's explicitly-named
-# WORST DISQUALIFIED fingerprints (nogreen_secret_testedit, red_no_green, claim_secret,
-# claim_revert). All 13 of those default to ADVISE -- SPEC-5's own conservative default for
-# ungrounded soft-atom fingerprints ("soft/claim-based atoms -> ADVISE-only until scenario-matched
-# re-validation").
+# assertion_weakened) not named in the robust core, or is one of the finding doc's explicitly
+# disqualified fingerprints (nogreen_secret_testedit, red_no_green, claim_secret, claim_revert).
+# All 13 of those default to ADVISE: soft/claim-based atoms stay ADVISE-only until
+# scenario-matched re-validation.
 BLOCK_IDS: frozenset = frozenset({
     "nogreen_checkdisabled", "nosrc_destruct", "nosrc_green_timeout", "notestedit_destruct",
 })

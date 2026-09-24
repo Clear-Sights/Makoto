@@ -1,25 +1,15 @@
-"""makoto.verdict — the verdict seam (Stage 2 seam 5): the former `verdict/posture.py`
-(posture vocabulary + the MAKOTO_MODE fold), `verdict/wire.py` (posture enum -> host JSON wire
-tables), and `verdict/recheck.py` (the F4 CONTENT-law verdict certificate) — merged verbatim,
-one flat module: vocabulary -> fold -> wire -> certificate. Each section below keeps its source
-file's own docstrings/comments; logic is byte-for-byte unchanged.
+"""makoto.verdict — the verdict seam: posture vocabulary and the MAKOTO_MODE fold, the wire
+tables mapping a folded posture to host JSON, and the CONTENT-law verdict certificate. One flat
+module: vocabulary -> fold -> wire -> certificate.
 
-Seam 6 finished the plan's shape: with `configchange_verdict.py` merged into `configchange.py`,
-the former `verdict/` package collapsed to this top-level `makoto/verdict.py` module (same
-import surface — `from makoto import verdict` / `from makoto.verdict import ...` are unchanged).
-
-Section 1 (posture) original module docstring follows.
-
-Makoto :: posture.py — the ONE enforcement-posture home (the ``MAKOTO_MODE`` reader).
+Section 1: posture — the ONE enforcement-posture home (the ``MAKOTO_MODE`` reader).
 
 Intent: Read the configured ``MAKOTO_MODE`` posture and merge it with a raw check outcome into the
 final posture the host acts on — the single place that decides how hard a contradiction bites.
 
-SPEC-5 (Makoto absorbs Assay): this module is a copy-BY-SHAPE of Assay's ``runtime/mode.py`` —
-the logic and doc intent are ported verbatim, but this file does NOT import from ``assay`` (repo
-boundary law: no faculty imports another; shapes are copied, never imported, across
-``assay/``/``staging/makoto/``/``staging/ventura/``/``staging/crucible/``). Assay retires later, so
-Makoto's posture module must stand alone.
+This module is a copy-BY-SHAPE, not an import: repo boundary law forbids one faculty importing
+another, so shapes are copied, never imported, across
+``assay/``/``staging/makoto/``/``staging/ventura/``/``staging/crucible/``.
 
 TWO vocabularies, ONE seam:
   * the CONFIGURED posture (env input): ``LOOSE | STRICT | ASK | SILENT`` — what the operator asked
@@ -27,8 +17,8 @@ TWO vocabularies, ONE seam:
     invariant "unset enforces by default" holds.
   * the OUTCOME (a check's decision seam): ``BLOCK | ASK | ADVISE | ALLOW`` — what a check
     concluded before the posture is applied. A check returns one of these; this module's ``apply``
-    folds the configured posture over it; ``wire.py`` is then a zero-policy lookup table from the
-    folded OUTCOME to the host's wire words.
+    folds the configured posture over it; the wire table below is then a zero-policy lookup from
+    the folded OUTCOME to the host's wire words.
 
 CONFIG-DRIVEN MERGE (the file's role): ``apply(outcome, posture_value)`` is a pure function — no
 I/O, no env read of its own (the caller passes the posture it read via ``posture()``) — that merges
@@ -46,7 +36,7 @@ from __future__ import annotations
 
 import os
 
-# --- the OUTCOME vocabulary (a check's decision seam, folded by posture, read by wire.py) -------
+# --- the OUTCOME vocabulary (a check's decision seam, folded by posture, read by the wire table) -
 # The raw decision a check produces, BEFORE the configured posture is applied.
 BLOCK = "block"  # a genuine, actionable contradiction — deny the call / block the stop
 ASK = "ask"  # an abstention the host should escalate to the human (UNKNOWN-shaped)
@@ -106,8 +96,8 @@ def posture(env=None) -> str:
     return value if value in _POSTURES else DEFAULT_POSTURE
 
 
-# D6 (docs/DEFERRED.md, DESIGN DECISION 2026-07-07): the two permission_mode values where Claude
-# Code's OWN human-confirmation layer is off. When the harness already isn't asking a human to
+# The two permission_mode values where Claude Code's OWN human-confirmation layer is off. When
+# the harness already isn't asking a human to
 # confirm a tool call, an operator-configured softening (LOOSE/SILENT) makes a flagged check
 # uncheckable in name only -- neither ADVISE (surfaces to an agent that auto-approves) nor ASK
 # (defers to a human who is not in the loop) actually holds in these two modes. Forced to STRICT
@@ -150,7 +140,7 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
     only emits known tokens, so this branch is unreachable in the spine); an unrecognized POSTURE
     fails CLOSED to the STRICT branch, honoring the raw outcome unchanged (never a silent ALLOW).
 
-    `permission_mode` (D6, optional, additive): when `is_oversight_clamped(permission_mode)`,
+    `permission_mode` (optional, additive): when `is_oversight_clamped(permission_mode)`,
     `posture_value` is IGNORED and the STRICT rule applies instead -- see the module-level
     comment above `_REDUCED_OVERSIGHT_MODES` for why softening in these two modes is unsafe.
 
@@ -189,18 +179,11 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
     return outcome
 
 
-# ==== Section 2: wire (former verdict/wire.py) — original module docstring: ====
-# Makoto :: wire.py — the wire protocol seam (posture enum -> host JSON).
+# ==== Section 2: wire — the wire protocol seam (posture enum -> host JSON). ====
 #
-# Intent: Be the ONE zero-inspection lookup table from ``posture.py``'s folded posture enum
+# Intent: Be the ONE zero-inspection lookup table from the folded posture enum
 # (``BLOCK | ASK | ADVISE | ALLOW``) to a Claude Code hook response, re-deriving NO policy and
 # failing OPEN on every renderer path (a lookup miss returns ``{}`` — never an exception).
-#
-# SPEC-5 (Makoto absorbs Assay): this module is a copy-BY-SHAPE of Assay's
-# ``adapters/hook_bridge.py`` (its ``_PRE_WIRE``/``_STOP_WIRE``/``_POST_WIRE`` tables and renderers,
-# ``hook_bridge.py:148-222``) — the logic and doc intent are ported, but this file does NOT import
-# from ``assay`` (repo boundary law: shapes are copied, never imported, across the faculties; Assay
-# retires later, so Makoto's wire module must stand alone).
 #
 # ZERO INSPECTION. ``dispatch_posture`` maps a live edge name to the matching table and looks the
 # folded posture up in it — one table per hook edge, keyed by the enum, no branching on message /
@@ -210,9 +193,8 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
 # overrides the constant wording (see ``_detail``).
 #
 # RETURN SHAPE. ``dispatch_posture(edge, posture, hook_name) -> dict`` returns the CC hook response
-# body only (no exit-code tuple — Task 1's public seam is a pure body renderer; the process's exit
-# code is the caller's concern, wired at Task 8's dispatch integration). This is the seam Task 8's
-# ``dispatch.py`` cutover calls.
+# body only (no exit-code tuple: the process's exit code is the caller's own concern). This is the
+# seam ``dispatch.py`` calls.
 #
 # WIRE TABLES, one per edge:
 #   * Pre  (``_PRE_WIRE``):  BLOCK -> deny, ASK -> ask, ADVISE -> allow + ``additionalContext``,
@@ -339,7 +321,7 @@ _HOOK_NAME_EDGES = (_EDGE_STOP, _EDGE_SUBAGENT_STOP)
 
 def dispatch_posture(edge: str, posture_value: str, hook_name: str) -> dict:
     """Intent: The public seam — map ONE folded posture at ONE hook edge to a Claude Code hook
-    response body, re-deriving no policy. This is what Task 8's ``dispatch.py`` cutover calls.
+    response body, re-deriving no policy. This is what ``dispatch.py`` calls.
 
     ``edge`` is one of ``"Pre"`` / ``"Post"`` / ``"Stop"`` / ``"SubagentStop"``. ``posture_value``
     is a folded posture (``posture.BLOCK`` / ``ASK`` / ``ADVISE`` / ``ALLOW``, or a ``Decision``
@@ -362,8 +344,8 @@ def dispatch_posture(edge: str, posture_value: str, hook_name: str) -> dict:
     return render(posture_value)
 
 
-# ==== Section 3: recheck (former verdict/recheck.py) — original module docstring: ====
-# Certificates that recheck a claimed verdict against its raw fold inputs.
+# ==== Section 3: recheck — certificates that recheck a claimed verdict against its raw fold
+# inputs. ====
 
 
 from dataclasses import dataclass
@@ -390,7 +372,7 @@ def recheck_certificate(certificate: VerdictCertificate) -> tuple[str, str]:
     other checks, but a fold-aggregator mismatch invalidates the verdict itself and is therefore
     not a per-check fault that can safely be ignored.
     """
-    # Local so the later F4 wiring can import this module from dispatch without an import cycle.
+    # Local import: avoids a cycle with dispatch.
     from makoto.dispatch import _finding_layer, _jit_hint, _worst_finding
 
     worst = _worst_finding(list(certificate.findings))

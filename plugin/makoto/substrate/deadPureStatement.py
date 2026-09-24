@@ -1,8 +1,6 @@
-"""gate.liveness's pure AST analyzer + its Stop-hook adapter (SPEC-5 Task 4, owner-revised
-layout: formerly `stopchecks/liveness.py` + `stopchecks/stopcheck_liveness.py`, combined into one
-flat file here — same single-file choice as `hollowTest.py`/`canonTimeoutRecur.py`; see
-`hollowTest.py`'s module docstring for the rationale). The gate id (`gate.liveness`), `.run(ctx)`
-contract, and `GateContext` are UNCHANGED — only the file/import path moved.
+"""gate.liveness's pure AST analyzer and its Stop-hook adapter, combined into one flat file --
+same single-file choice as `hollowTest.py`/`canonTimeoutRecur.py`; see `hollowTest.py`'s module
+docstring for the rationale.
 
 The analyzer detects ILLUSORY statements: provably pure computations whose result never reaches
 I/O or a live binding (dead code shaped like work). Import-isolated like `hollowTest.py`: stdlib
@@ -525,7 +523,7 @@ def analyze_file(src: str, path: str) -> list:
     redacted = [b.decode("utf-8", "replace") for b in redacted]
 
     def _allowed(stmt):
-        # On-the-record override via the ONE canonical marker predicate (§7.5b): a reasonless
+        # On-the-record override via the ONE canonical marker predicate: a reasonless
         # `# makoto-allow` does NOT exempt, matching what this check's own finding text already
         # tells the author to write. An exemption marker asserts an audit trail; accepting one
         # without a rationale accepts the assertion unmeasured. The marker is honored on ANY
@@ -551,18 +549,18 @@ def analyze_file(src: str, path: str) -> list:
 
 
 # =============================================================================================
-# Stop-hook adapter (formerly stopchecks/stopcheck_liveness.py)
+# Stop-hook adapter
 # =============================================================================================
-# The iteration scaffold (iter_touched_python_sources, imported from _stdlib_ast_helpers) is shared with
-# hollowTest.py (2026-07-09: found alpha-equivalent by AST canonicalization; extracted rather than
-# left duplicated -- the stdlib-only helper module preserves the same import-graph-isolation
-# property both detectors need, enforced by tests/test_detector_engines_are_stdlib_isolated.py).
+# The iteration scaffold (iter_touched_python_sources, imported from _stdlib_ast_helpers) is
+# shared with hollowTest.py: the stdlib-only helper module preserves the same
+# import-graph-isolation property both detectors need, enforced by
+# tests/test_detector_engines_are_stdlib_isolated.py.
 
 
 def _run(ctx) -> list:
     out = []
     # iteration scaffold (touched -> .py -> cwd-anchor -> scratch-skip -> read) shared with
-    # hollowTest._run via the stdlib-isolated helper home -- 2026-07-09 dedup round 2
+    # hollowTest._run via the stdlib-isolated helper home
     for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         for f in analyze_file(src, str(p)):
             out.append(Finding(

@@ -1,17 +1,13 @@
-"""makoto.kit — the shared check-building kit (Stage 2 seam 4): the former
-`substrate/factories.py` (L1 predicate factories + AST primitives), `substrate/io.py`
-(tool/event I/O parsing: payload decode, Bash output, test-run detection),
-`substrate/_primitives.py` (deterministic location/quantity/subject primitives),
-`substrate/_failureClassifier.py` (transient-vs-deterministic failure classification),
-`substrate/_testDelta.py` (per-test verdict delta), and `substrate/_shared.py`'s shared
-gate helpers (everything except the `GateContext` schema, which stays behind pending its
-own extraction into `context.py`) — merged verbatim, one flat module. Each section below
-keeps its source file's own docstrings/comments; logic is byte-for-byte unchanged.
+"""makoto.kit — the shared check-building kit: L1 predicate factories and AST
+primitives, tool/event I/O parsing, deterministic location/quantity/subject
+primitives, transient-vs-deterministic failure classification, per-test verdict
+delta, and shared gate helpers (the `GateContext` schema itself lives in
+`context.py`).
 
 Stdlib only; no HTTP, no LLM (Knight-Leveson hot-path invariant). Imports only L0
 (`makoto.vocab`, `makoto.core._shell`); `compute_delta`'s reuse of namedTestTeeth's
-parsers stays a call-time import exactly as its `dispatch.py` consumer already was,
-so the kit never carries an import-time edge into a named check module.
+parsers stays a call-time import so the kit never carries an import-time edge into
+a named check module.
 """
 from __future__ import annotations
 
@@ -25,7 +21,7 @@ from typing import Callable, Optional
 
 from makoto.core._shell import _command_runs_tests
 from makoto.vocab import (
-    _TEST_RUNNER_RX,  # compatibility export pinned by tests/test_lexicons.py
+    _TEST_RUNNER_RX,  # pinned by tests/test_lexicons.py
     _FAILURE_SUMMARY_RX,
     _FAILURE_MARKER_RX,
     _ANSI_SGR_RX,
@@ -35,9 +31,7 @@ from makoto.vocab import (
     _PATH_EXT,
     Finding,
     JWT_CALLEE_RX,
-    # the recorded per-test verdict parsers, which vocab now owns (2026-09-18). `compute_delta`
-    # and `current_named_verdicts` below read them; they used to arrive through a call-time
-    # import of a NAMED check module, which the layout order excepted by name.
+    # recorded per-test verdict parsers; compute_delta/current_named_verdicts read them.
     _TEETH_FRAME_RX,
     _TEETH_SCOPE_AFTER,
     _TEETH_SCOPE_BEFORE,
@@ -49,17 +43,14 @@ from makoto.vocab import (
     recorded_passed_names,
 )
 
-# `pattern:` arguments below are typed `Check` (registry.Check) only in a docstring/
-# comment sense, never a real import: this L1 module's own layering firewall
-# (tests/lib/test_factories.py) bars it from importing the registry (an L2+ module) even for a
-# type hint. `from __future__ import annotations` (top of file) means annotations are never
-# evaluated at runtime, so the bare `Check` name in each signature below resolves to nothing at
-# runtime and is safe -- it exists purely for readers, not as a real dependency edge.
+# `pattern: Check` below is a hint only, never a real import: this L1 module's layering
+# firewall (tests/lib/test_factories.py) bars importing the registry (L2+) even for a type
+# hint. `from __future__ import annotations` means the name is never evaluated at runtime.
 
 
-# ---- deterministic check primitives (formerly substrate/_primitives.py) -----------------------
-# Location is normalized-path EQUALITY (not substring — equality is the fakeexcuse
-# firewall). Quantity is a number compare. Subject-binding gates retraction reasons.
+# ---- deterministic check primitives ------------------------------------------------------------
+# Location is normalized-path EQUALITY (not substring — the fakeexcuse firewall).
+# Quantity is a number compare. Subject-binding gates retraction reasons.
 
 def normalize_path(p: str) -> str:
     """Case-folded, normalized, trailing-separator-stripped path for equality.
@@ -176,20 +167,18 @@ def bash_nonempty_violation(tool_response: dict) -> bool:
     return out.strip() == "" and exit_code == 0
 
 
-# ---- tool/event I/O parsing (formerly substrate/io.py) ----------------------------------------
-# Pure-Python ports of Phase 4's install-helpers/predicates.sh helpers. Knight-Leveson:
-# stdlib only (json, regex). No HTTP, no LLM, no DuckDB. Consumed by the history-walking
-# predicate (content.fabricated_commit_sha), the ledger, and the Stop green-claim gate.
+# ---- tool/event I/O parsing --------------------------------------------------------------------
+# Knight-Leveson: stdlib only (json, regex). No HTTP, no LLM, no DuckDB. Consumed by the
+# history-walking predicate (content.fabricated_commit_sha), the ledger, and the Stop
+# green-claim gate.
 
 def _raw_payload(row):
     """The raw payload cell of a history row, across both shapes: the events-table
     (id, ts, event_type, cwd, payload_json) tuple carries it at index 4, a dict-like carries it
     under 'payload'. Unknown shape -> None (falsy, exactly like an absent payload).
 
-    The one row-shape sniff shared by `raw_payload_str` (which wants the raw string) and
-    `decode_history_row` (which wants the decoded dict), so the two can never drift on what
-    counts as a payload cell -- the same "shared decode step, caller-owned interpretation" split
-    `decode_history_row`'s own docstring describes.
+    Shared by `raw_payload_str` and `decode_history_row` so the two can never drift on
+    what counts as a payload cell.
     """
     if isinstance(row, (tuple, list)) and len(row) > 4:
         return row[4]
@@ -203,7 +192,7 @@ def raw_payload_str(entry) -> str:
 
     events-table rows are 5-tuples (id, ts, event_type, cwd, payload_json); some callers pass
     dict-likes with a 'payload' key. Exposed for callers that need the raw string itself
-    (content.fabricated_commit_sha's grounded-SHA substring scan) — formerly a byte-identical local copy in precheck_1_22.
+    (content.fabricated_commit_sha's grounded-SHA substring scan).
     """
     raw = _raw_payload(entry)
     return raw if isinstance(raw, str) else ""
@@ -216,11 +205,9 @@ def decode_history_row(row):
     Fail-open: an undecodable row yields None rather than raising, so one malformed row can never
     crash a caller's scan.
 
-    The ONE canonical row-decode step (found triplicated by jscpd, 2026-07-09: iter_tool_events
-    below, substrate._canonAtoms._decode_row, and checks.writeThrashRevert._prior_whole_file_writes
-    each re-derived this same tuple/dict-payload sniff + json.loads by hand). Callers keep their own
-    downstream shape/filter (a Call dict, a (name, command, response) tuple, a ByteIdentity list) --
-    only the shared decode-to-dict step lives here."""
+    The ONE canonical row-decode step. Callers keep their own downstream shape/filter (a Call
+    dict, a (name, command, response) tuple, a ByteIdentity list) -- only the shared
+    decode-to-dict step lives here."""
     raw = _raw_payload(row)
     if not raw:
         return None
@@ -237,14 +224,10 @@ def decode_history_event(row):
     doesn't carry one -- the canonical merge of `decode_history_row` + the wrapper-etype
     fallback.
 
-    Two checks (`canonTimeoutRecur._decode_row`, `identicalRetryInterdiction`) used to re-derive
-    this fallback independently, each a byte-similar copy of the row-union handling above. One
-    drifted: it read only the payload's own field, so a row whose event type lived solely on the
-    wrapper decoded to a payload with no `hook_event_name` -- and `event.identical_retry`
-    requires an exact `== "PostToolUse"` match, so it went silently blind to rows
-    `canon.timeout`/`canon.recur` acted on, from the same table, for the same concept. One
-    primitive now serves both -- see `decode_history_row`'s own docstring on why a shared decode
-    step exists at all."""
+    A payload whose event type lives solely on the wrapper column would otherwise decode with no
+    `hook_event_name`, and `event.identical_retry` requires an exact `== "PostToolUse"` match --
+    so it would go silently blind to rows `canon.timeout`/`canon.recur` act on, from the same
+    table, for the same concept."""
     wrapper_etype = _event_type_of(row)   # '' (falsy) when the row carries no wrapper column
     ev = decode_history_row(row)
     if ev is None:
@@ -278,8 +261,7 @@ def bash_output_text(tool_response) -> str:
     PRODUCTION SHAPE (verified vs the real makoto events DB): Bash PostToolUse
     tool_response is a DICT with keys stdout/stderr/interrupted/isImage/
     noOutputExpected. We pull stdout and stderr. str / list are tolerated for the
-    synthetic-test payload shape. Shared by the ledger (records Bash result rows);
-    formerly defined in pattern_2_6, kept here after that pattern was cut."""
+    synthetic-test payload shape. Shared by the ledger (records Bash result rows)."""
     if isinstance(tool_response, dict):
         out = tool_response.get("stdout", "") or ""
         err = tool_response.get("stderr", "") or ""
@@ -315,17 +297,13 @@ def iter_tool_events(history):
     """Yield (tool_name, command, response_text) per prior tool event in `history`. Rows are the
     (id, ts, event_type, cwd, raw_payload_json) tuples dispatch._select_recent returns, OR dicts
     with a 'payload' key (the shape measure_corpus_fp builds). The faithful events-table source
-    (full command + full tool_response, like predicate content.unsourced_webfetch) — NOT the lossy ledger. Fail-open: an
-    unparseable row is skipped, so a malformed event can never crash a Stop gate.
+    (full command + full tool_response, like predicate content.unsourced_webfetch) — NOT the lossy
+    ledger. Fail-open: an unparseable row is skipped, so a malformed event can never crash a Stop
+    gate.
 
-    Relocated VERBATIM from stopchecks/_common.py (2026-06-09 consolidation T2.5): the one
-    history-row decoder lives at L1 beside raw_payload_str; consumers (named_test,
-    precheck_1_22's _real_commit_in_history) import from here. NOTE: tolerates dict payloads
-    (raw if isinstance(raw, dict)), deliberately MORE permissive than the str-only
-    raw_payload_str path — corpus byte-comparison (T2.6) arbitrates that the union changes nothing.
-
-    Decode step delegates to decode_history_row (2026-07-09 dedup); parsed JSON with the wrong
-    envelope shape is skipped there just like invalid JSON, so it cannot crash this iterator."""
+    Tolerates dict payloads (raw if isinstance(raw, dict)), deliberately MORE permissive than the
+    str-only raw_payload_str path. Decode step delegates to decode_history_row, so parsed JSON
+    with the wrong envelope shape is skipped there just like invalid JSON."""
     for row in history or ():
         ev = decode_history_row(row)
         if ev is None:
@@ -341,7 +319,7 @@ def iter_tool_events(history):
         yield (ev.get("tool_name", ""), ti.get("command", "") or "", resp.strip())
 
 
-# ---- predicate factories + AST primitives (formerly substrate/factories.py) -------------------
+# ---- predicate factories + AST primitives -------------------------------------------------------
 # regex_file_predicate / ast_introduced_predicate build the PreToolUse content-scan predicate
 # scaffold; scan_target_content / parse_introduced / is_false_const / is_cert_none / callee_chain /
 # makoto_allowed are their shared leaves.
@@ -368,10 +346,10 @@ def makoto_allow_reason(content: str) -> Optional[str]:
 
 
 # Exemption recording is an UPWARD concern (it writes to the audit layer), so this L1 leaf must not
-# reach for it. Instead it exposes a SINK the L3 orchestrator injects (dependency inversion): the
-# factory stays L0-import-pure and a pure unit call (no sink installed) is unchanged — it returns
-# None on an exempted match exactly as before. The dispatcher wires the audit-writing sink at import,
-# so in production every suppressed match is recorded; the detector never grows an audit dependency.
+# reach for it. Instead it exposes a SINK the L3 orchestrator injects (dependency inversion): a
+# pure unit call with no sink installed returns None on an exempted match, unchanged. The
+# dispatcher wires the audit-writing sink at import, so the detector never grows an audit
+# dependency.
 _EXEMPTION_SINK: Optional[Callable[..., None]] = None
 
 
@@ -398,10 +376,9 @@ def _record_exemption(current_event: dict, conn, *, pattern_id: str, file: str,
 
 def _gated_content(*, current_event: dict, target_rx: re.Pattern,
                     exempt_rx: Optional[re.Pattern]) -> Optional[tuple]:
-    """Shared gate scaffold of both content-scan factories below (found duplicated by jscpd,
-    2026-07-09): PreToolUse-only, `target_rx` gates `file_path`, `exempt_rx` gates content.
-    Returns `(fp, content)` to continue, or None to stay silent (mirrors each predicate's own
-    "no opinion" return)."""
+    """Shared gate scaffold of both content-scan factories below: PreToolUse-only, `target_rx`
+    gates `file_path`, `exempt_rx` gates content. Returns `(fp, content)` to continue, or None to
+    stay silent (mirrors each predicate's own "no opinion" return)."""
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     ti = current_event.get("tool_input", {}) or {}
@@ -416,20 +393,17 @@ def _gated_content(*, current_event: dict, target_rx: re.Pattern,
 
 def _exempt_or_finding(*, current_event: dict, conn, pattern: Check, fp: str, line_no: int,
                        snippet: str, content: str, message: str) -> Optional[Finding]:
-    """Shared tail of both content-scan factories below (found duplicated by jscpd, 2026-07-09,
-    lines 174-181/242-249 and 201-208/262-272 of the pre-extraction file): DETECT-THEN-EXEMPT --
-    record a suppressed match rather than silently drop it (R5b), else build the real Finding."""
+    """Shared tail of both content-scan factories below: DETECT-THEN-EXEMPT -- record a
+    suppressed match rather than silently drop it (R5b), else build the real Finding."""
     if makoto_allowed(content):
         _record_exemption(current_event, conn, pattern_id=pattern.id, file=fp,
                           line=line_no, reason=makoto_allow_reason(content) or "",
                           snippet=snippet)
         return None  # AI documented this instance as legitimate (see CLAUDE.md) — recorded
     return Finding(
-        # Pre-tier checks are invariantly posture=BLOCK (enforced by
-        # tests/test_pre_tier_block_invariant.py, no longer by a `.fire_level` field on the
-        # pattern object -- `Check` has no `fire_level`, only `posture`), and Finding.level's
-        # vocabulary ("error"/"advisory") is a separate axis from posture's ("BLOCK"/"ADVISE"/
-        # ...), so this is a literal, not a `pattern.posture` passthrough.
+        # Pre-tier checks are invariantly posture=BLOCK (tests/test_pre_tier_block_invariant.py).
+        # Finding.level's vocabulary ("error"/"advisory") is a separate axis from posture's
+        # ("BLOCK"/"ADVISE"/...), so this is a literal, not a `pattern.posture` passthrough.
         pattern_id=pattern.id, file=fp, line=line_no, level="error",
         message=message, retry_hint=pattern.retry_hint, snippet=snippet,
     )
@@ -441,10 +415,10 @@ def scan_target_content(tool_input: dict) -> str:
     Write exposes the full new file as ``content``; Edit exposes its replacement as
     ``new_string``; MultiEdit exposes a list of ``{old_string, new_string}`` edits. We
     return the text being INTRODUCED (never ``old_string``), so an AI cannot weaken a
-    verifier via Edit/MultiEdit and evade the content-scan patterns — the EDIT-CONTENT GAP
-    (an AI could insert `.startswith(` into a verifier via Edit and slip past content.verifier_predicate_weakened) closed
-    2026-06-01. Scanning only the introduced text (not the whole post-edit file) keeps Edit
-    FP-safe: a pattern fires solely on a shape the AI is actively adding.
+    verifier via Edit/MultiEdit and evade the content-scan patterns (e.g. inserting
+    `.startswith(` into a verifier via Edit to slip past content.verifier_predicate_weakened).
+    Scanning only the introduced text (not the whole post-edit file) keeps Edit FP-safe:
+    a pattern fires solely on a shape the AI is actively adding.
     """
     if not isinstance(tool_input, dict):
         return ""
@@ -464,17 +438,15 @@ def scan_target_content(tool_input: dict) -> str:
 def introduced_text(tool_name: str, tool_input: dict) -> str:
     """The text a PreToolUse call would introduce, across every tool that can carry it: a
     Bash `command` verbatim, or the Write/Edit/MultiEdit new content (`scan_target_content`).
-    Shared by every "would this call INTRODUCE a flagged string" predicate (content.illusory_authorship_trailer,
-    content.illusory_interruption_claim, ...) — factored out (2026-07-19) after
-    test_no_alpha_duplicate_functions caught two checks carrying a byte-identical local copy."""
+    Shared by every "would this call INTRODUCE a flagged string" predicate
+    (content.illusory_authorship_trailer, content.illusory_interruption_claim, ...)."""
     if not isinstance(tool_input, dict):
         return ""
     if tool_name == "Bash":
         return tool_input.get("command", "") or ""
     if tool_name == "NotebookEdit":
-        # NotebookEdit carries its new cell text under `new_source` (the key
-        # `substrate/_canonAtoms.py` already reads), not `content`/`new_string` —
-        # without this branch a flagged string introduced via a notebook cell read as clean.
+        # NotebookEdit carries its new cell text under `new_source`, not `content`/`new_string`
+        # -- without this branch a flagged string introduced via a notebook cell read as clean.
         return tool_input.get("new_source", "") or ""
     return scan_target_content(tool_input)
 
@@ -547,11 +519,10 @@ def callee_chain(call: ast.Call) -> str:
 def jwt_decode_callee_chain(node) -> Optional[str]:
     """The callee-chain string iff `node` is an `ast.Call` targeting a jwt/jose `decode` entry
     point (JWT_CALLEE_RX matches the chain, AND the chain's tail is literally `decode`); None
-    otherwise. Shared callee gate for content.jwt_signature_disabled (verify=False / options-dict disable) and content.jwt_none_alg
-    (algorithms=["none"] whitelisting) — both patterns need this SAME 'is this really a
-    jwt.decode(...) call' precondition before inspecting their own distinct keyword (found
-    duplicated by jscpd, 2026-07-09: the two predicates' node_match functions repeated this exact
-    4-statement gate by hand)."""
+    otherwise. Shared callee gate for content.jwt_signature_disabled (verify=False /
+    options-dict disable) and content.jwt_none_alg (algorithms=["none"] whitelisting) — both
+    patterns need this SAME 'is this really a jwt.decode(...) call' precondition before
+    inspecting their own distinct keyword."""
     if not isinstance(node, ast.Call):
         return None
     chain = callee_chain(node)
@@ -629,19 +600,14 @@ def regex_file_predicate(
 ) -> Callable[..., Optional[Finding]]:
     """build a PreToolUse Write/Edit content-scan predicate from two regexes.
 
-    Replaces the 24-line copy-paste scaffold formerly duplicated across patterns
-    1.1/1.2/1.3/1.4/1.5/1.8 — including 1.4/1.8, which fold their ADR-backlink
-    carve-out into the optional `exempt_rx` below. Each predicate now declares its
-    regex constants and instantiates this factory — module LoC drops from ~24 to ~5.
-
     Args:
       target_rx:    matched against `tool_input.file_path`; gate (None if no match)
       body_rx:      matched against `tool_input.content`; fires Finding on first hit
       exempt_rx:    optional SECOND exemption (beyond the universal makoto_allowed) — when it
-                    matches the content, the predicate stays silent. This is the documented-
-                    suppression carve-out 1.4/1.8 need (an `ADR-NNN` backlink exempts the finding).
+                    matches the content, the predicate stays silent (e.g. an `ADR-NNN` backlink
+                    exempts the finding).
       exempt_label: human label for exempt_rx; when set, a firing message gets the
-                    ` with no <label>` suffix (preserves 1.4/1.8's exact wording).
+                    ` with no <label>` suffix.
 
     Returns:
       A predicate(*, current_event, history, pattern, conn) -> Optional[Finding]
@@ -735,9 +701,8 @@ def claim_vs_history_predicate(
 
 
 # The fields a GitHub MCP call publishes as text. Without them a PR body or comment carrying an
-# attribution footer read as clean: measured 2026-09-23, create_pull_request with the harness
-# footer was allowed. Search `query` strings are left out, so an audit that searches for the
-# footer is not refused for naming it.
+# attribution footer read as clean. Search `query` strings are left out, so an audit that
+# searches for the footer is not refused for naming it.
 _PUBLISHED_KEYS = ("title", "body", "message", "commit_title", "commit_message")
 
 
@@ -759,8 +724,7 @@ def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
     `introduced_text` — Write/Edit/MultiEdit content OR a Bash command, not just a file-path-gated
     Write/Edit body the way `regex_file_predicate`'s `target_rx` requires) for `body_rx`. Returns
     None (no finding) or a (match, text, tool_input, tool_name) tuple for the caller to finish
-    building a Finding from — see `introduced_regex_predicate`'s own docstring for how its callers
-    diverge (a `grounded_in_history` veto or not) after this scan step.
+    building a Finding from.
     """
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -804,9 +768,7 @@ def introduced_regex_predicate(
         m, text, tool_input, tool_name = hit
         if makoto_allowed(text):
             # DETECT-THEN-EXEMPT (R5b), matching `_exempt_or_finding`: the match is real, the
-            # marker suppresses the Finding, and the suppression is RECORDED. The old order
-            # (exempt before matching, inside `_introduced_regex_scan`) wrote no exemption row,
-            # so this whole factory family suppressed silently.
+            # marker suppresses the Finding, and the suppression is RECORDED (not silently dropped).
             line_no = text[: m.start()].count("\n") + 1
             _record_exemption(
                 current_event, conn, pattern_id=pattern.id,
@@ -848,10 +810,9 @@ def command_of(ev: dict) -> str:
 def command_matches(rx: re.Pattern):
     """An act/guard predicate for `unmet_obligation_gate`: this event's Bash command matches `rx`.
 
-    Hoisted because `tests/test_no_alpha_duplicate_functions.py` caught four copies of the body
-    across the obligation gates the moment the second batch landed -- the law working as
-    intended. A gate that needs more than "the command matches" still writes its own predicate
-    (`unreadStructure` reads the RESPONSE too, `unobservedDestruction` splits shell segments).
+    Shared to avoid duplicate copies across the obligation gates. A gate that needs more than
+    "the command matches" still writes its own predicate (`unreadStructure` reads the RESPONSE
+    too, `unobservedDestruction` splits shell segments).
     """
     def _predicate(ev: dict) -> bool:
         cmd = command_of(ev)
@@ -861,12 +822,10 @@ def command_matches(rx: re.Pattern):
 
 # A verifier RAN in this event, whatever it reported. ONE definition, shared by every obligation
 # whose guard is "something observed behaviour": `gate.unobserved_destruction` and
-# `gate.relaunched_unchanged` both mean exactly this, and two copies would be
-# `F2 TWO SOURCES OF TRUTH`. The vocabulary is `vocab._TEST_RUNNER_RX`, unchanged. The verdict is
-# deliberately not read: a report either way is the observation, and only the absence of both
-# leaves the act resting on nothing. Spelled as a `command_matches` application rather than its
-# own def, because a def with that body is alpha-equivalent to the factory's -- which
-# tests/test_no_alpha_duplicate_functions.py said when it was written the other way.
+# `gate.relaunched_unchanged` both mean exactly this. The verdict is deliberately not read: a
+# report either way is the observation, and only the absence of both leaves the act resting on
+# nothing. Spelled as a `command_matches` application rather than its own def, because a def
+# with that body would be alpha-equivalent to the factory's.
 ran_a_verifier = command_matches(_TEST_RUNNER_RX)
 
 
@@ -875,12 +834,9 @@ def unmet_obligation_gate(*, act, guard, message, retry_hint, pattern_id,
     """Build a Stop-edge OBLIGATION gate: a costly act ran this session and no qualifying guard
     preceded it.
 
-    This is a result shape makoto had no mechanism for, and the blindspot register names it.
     Every other check in this catalog holds the assistant's STATEMENT against the record. An
     obligation holds an ACT against a guard that had to come first: no statement is needed and
-    none is read, so a turn that says nothing at all can still owe. Ported BY SHAPE from Keel's
-    clause table (`clear-sights/keel`, `plugin/keel/clauses.json`), where a row is
-    (occasion, costly, guard, deny_reason) with `subject=session_id` and `window=session`.
+    none is read, so a turn that says nothing at all can still owe.
 
     `act` and `guard` are predicates over ONE decoded history event -- the full dict, not
     `iter_tool_events`' (name, command, response) triple, so a caller can read the `tool_input`
@@ -890,9 +846,8 @@ def unmet_obligation_gate(*, act, guard, message, retry_hint, pattern_id,
     costly thing is the REPEAT rather than the first one.
 
     One O(history) pass and no store: the obligation is a pure function of the event sequence,
-    so it cannot go stale and has no write path to get wrong. That is deliberate -- makoto HAD a
-    persisted obligation store (`state/commitments.py`) and it was cut on 2026-09-18 once
-    nothing read it; a derived obligation needs neither the table nor the reconcile.
+    so it cannot go stale and has no write path to get wrong; a derived obligation needs
+    neither a table nor a reconcile.
 
     NAMED RECALL BOUND: history is `_select_recent`'s rolling window, so an act older than the
     window reads as never having happened. Same bound `claimedRunningAbsent` documents for its
@@ -938,14 +893,10 @@ def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Findin
     return _check
 
 
-# ---- transient-vs-deterministic failure classification (formerly substrate/_failureClassifier.py)
-# The ship-bar the design review named for D1 (identical-retry interdiction, docs/DEFERRED.md).
-# Two design consultations converged on this exact requirement: a BLOCK-tier check denying a
-# retry must never deny a LEGITIMATE re-poll of a transient failure (a timeout, a 5xx, "still
-# running"), so this classifier is conservative -- it fails toward UNCERTAIN (None), never toward
-# "assume deterministic", whenever the signal is ambiguous. "If the runtime cannot discriminate,
-# the honest outcome is to cut or defer the check, not demote it to advisory" (design ruling,
-# verbatim) -- this classifier is what makes discrimination possible at all;
+# ---- transient-vs-deterministic failure classification -------------------------------------------
+# A BLOCK-tier check denying a retry must never deny a LEGITIMATE re-poll of a transient failure
+# (a timeout, a 5xx, "still running"), so this classifier is conservative -- it fails toward
+# UNCERTAIN (None), never toward "assume deterministic", whenever the signal is ambiguous.
 # identicalRetryInterdiction.py refuses to fire on anything but a confident True.
 
 # Markers whose PRESENCE means the failure will NOT change on an UNMODIFIED retry -- the error is
@@ -998,23 +949,14 @@ def classify_failure(text: str) -> Optional[bool]:
     return None
 
 
-# ---- test-delta redirect (formerly substrate/_testDelta.py) -----------------------------------
-# Task 3, the domain correction (owner: "Makoto owns block + redirect -- that is its entire
-# domain"). This move started life in Lever's catalogue as "test-delta redirect" but is
-# REDIRECT-shaped (reactive to a test run that just completed, not a proactive positive-
-# positioning move) -- so per the owner's boundary it belongs here, not Lever.
-#
+# ---- test-delta redirect -------------------------------------------------------------------------
 # Wired DIRECTLY into `dispatch.py`'s PostToolUse branch, not the patterns.toml/load_prechecks
-# catalog (Pre-only) nor the Stop-gate catalog (Stop-only) -- neither covers a Post-edge advisory
-# today. This is a one-off wire, honestly disclosed at its call site, not hidden behind a catalog
-# entry that would misleadingly imply broader dispatch-loader coverage than exists.
+# catalog (Pre-only) nor the Stop-gate catalog (Stop-only) -- neither covers a Post-edge advisory.
 #
 # `compute_delta` reuses `namedTestTeeth.py`'s OWN `recorded_failed_names`/`recorded_passed_names`
 # parsers (one implementation, never a second one) to diff the per-test verdict set between the
-# PRIOR recorded testrun output and the NEW one just produced -- grounding every downstream fix on
-# the delta itself, not a re-read of the full pytest wall of text. The import is call-time (as its
-# `dispatch.py` consumer's already was) so this kit module never carries an import-time edge into
-# a named check module.
+# PRIOR recorded testrun output and the NEW one just produced. The import is call-time so this
+# kit module never carries an import-time edge into a named check module.
 
 def current_named_verdicts(history) -> dict:
     """{full_test_id: 'FAIL'|'PASS'} from the recorded TEST-RUNNER outputs in `history`, in
@@ -1027,7 +969,7 @@ def current_named_verdicts(history) -> dict:
     run-fix-rerun sequence captured in one Bash call ends on its true final verdict), exactly
     as the last verdict wins across responses (a fix-and-rerun-green discharges an earlier
     red; a re-fail re-opens). ANSI is stripped first (vitest/jest colorize verdict lines). A
-    verdict recorded inside mutation/teeth framing (#1) is not material — scoped to the
+    verdict recorded inside mutation/teeth framing is not material — scoped to the
     record's own vicinity (`_TEETH_SCOPE_*`), never the whole response, and applied
     SYMMETRICALLY: a framed FAILED is no material failure, and a framed PASSED (a pass under
     deliberately-induced-failure framing is evidence the test cannot fail) is no material
@@ -1079,7 +1021,7 @@ def compute_delta(prior_output: str, new_output: str) -> Optional[str]:
     return "; ".join(parts)
 
 
-# ---- shared discharge/suffix-match helpers (formerly substrate/_shared.py, ex-stopchecks/_common.py)
+# ---- shared discharge/suffix-match helpers ---------------------------------------------------
 _BIND_BEFORE = 70
 _KNOWN_PATH_EXT_RX = re.compile(r"(?:" + _PATH_EXT + r")\Z", re.IGNORECASE)
 _LOCAL_GIT_TIMEOUT = 0.75
@@ -1138,9 +1080,7 @@ def _discharge_kwargs(c) -> dict:
     """The four GateContext fields a `_discharged()`-style gate needs, forwarded as kwargs from a
     GateContext `c`. Single-sources the "these are the discharge-relevant fields" convention so a
     gate's `run=lambda c: ...` wiring doesn't hand-repeat `touched_keys=c.touched,
-    fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size` at every call site (found
-    duplicated by jscpd, 2026-07-09, between gate.completion's and its sibling's own `run=`
-    lambdas)."""
+    fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size` at every call site."""
     return dict(touched_keys=c.touched, fs_exists=c.fs_exists, empty_keys=c.empty, fs_size=c.fs_size)
 
 
@@ -1246,11 +1186,8 @@ def extract_pushed_branch(text):
     """The branch name from a "pushed ... to/branch X" claim in `text`, trailing
     quote/punctuation stripped -- or None if no such claim is present.
 
-    Was two byte-identical regex-plus-rstrip pairs (`pushed_ref_matches_world` here and
-    `checks/claimedShippedAbsent.pushed_tip_matches_remote`), each with its own postprocessing
-    call site. One extraction step; each caller keeps its own downstream use (this module
-    validates against local/remote refs, claimedShippedAbsent compares tips) -- the same
-    shared-decode/caller-owned-interpretation split `decode_history_event` uses."""
+    One extraction step; each caller keeps its own downstream use (this module validates
+    against local/remote refs, claimedShippedAbsent compares tips)."""
     match = _PUSH_BRANCH_RX.search(text or "")
     return match.group(1).rstrip("`'\",:;.") if match else None
 

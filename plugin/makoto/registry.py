@@ -1,4 +1,4 @@
-"""makoto.registry — the flat checks/ package's own discovery mechanism (SPEC-5 Task 2).
+"""makoto.registry — the flat checks/ package's own discovery mechanism.
 
 A check module is any `.py` file directly under `makoto/checks/` whose name does NOT start
 with `_` (package plumbing -- `__init__.py`, `_loader.py`, `_primitives.py`, `_declared.py`,
@@ -9,8 +9,7 @@ attributes: `.id` (str), `.applies_at` (one of Pre/Post/Stop/SubagentStop/Sessio
 posture folds over it -- see `makoto.verdict`'s OUTCOME vocabulary). A candidate file that fails
 to import, has no `CHECK`, or whose `CHECK` fails this shape check is silently skipped
 (fail-open, matching every other loader/gate in this codebase) -- `checks.undeclaredFalsifiable`
-(SPEC-5 Task 2 Step 6) is the one check whose job is to surface that skip as a finding instead
-of silence.
+is the one check whose job is to surface that skip as a finding instead of silence.
 
 This module is the sole discovery path for both edges; `load_precheck_catalog()` is the Pre-tier
 convenience wrapper."""
@@ -22,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
-# The only admissible `applies_at` values -- the five hook edges Task 1's posture skeleton
+# The only admissible `applies_at` values -- the five hook edges the posture skeleton
 # recognizes.
 ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"})
 # The four families of the register: what pays a check's subject. SPEC holds its definition and
@@ -31,51 +30,49 @@ ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"
 # source before the write drawn from it (LINEAGE).
 TESTS_SHAPES = frozenset({"SPEC", "OTHER_POINT", "SWITCH", "LINEAGE"})
 
-# The ONLY documented exception to "every Stop-gate finding blocks" (2026-07-05, DESIGN DECISION 6):
+# The ONLY documented exception to "every Stop-gate finding blocks" (DESIGN DECISION 6):
 # gate.self_wired ships at level="advisory" so a partial hook-wiring strip is recorded to the audit
 # trail without ever blocking a turn (stopchecks/stopcheck_self_wired.py's own docstring; behavioral
 # pin: tests/test_dispatch.py::test_dispatch_self_wired_gate_never_blocks_even_when_it_fires).
 # Adding a gate id here must cite its own DESIGN DECISION the same way.
 #
-# gate.canon_fingerprints_advisory (SPEC-5 Task 9, DESIGN DECISION 26) is the second: 13 of the 17
-# ported canon session fingerprints rest on a soft/claim atom the gold-oracle finding doc's robust
-# core does not name, or are among that doc's explicitly-named WORST DISQUALIFIED fingerprints —
-# SPEC-5's own total-retention rule keeps them in the catalog, evaluated and recorded, but never
-# blocking. Its sibling gate.canon_fingerprints (the 4 robust-core, blocking-capable fingerprints)
-# is intentionally NOT here — it always emits level="error" (see canonFingerprints.py).
-# gate.unprobed_fanout and gate.unasked_plan (2026-09-18) are the third and fourth: both are
-# ACT_VS_GUARD obligations with a real benign class (a dispatch that IS the exploration; a plan
-# for a request that carried no ambiguity) and no corpus-measured FP rate yet. Promoting either
-# to BLOCK needs that measurement, not a preference. Each module's docstring says so.
+# gate.canon_fingerprints_advisory (DESIGN DECISION 26) is the second: most of the ported canon
+# session fingerprints rest on a soft/claim atom the gold-oracle finding doc's robust core does
+# not name, or are among that doc's explicitly-named WORST DISQUALIFIED fingerprints — the
+# total-retention rule keeps them in the catalog, evaluated and recorded, but never blocking. Its
+# sibling gate.canon_fingerprints (the robust-core, blocking-capable fingerprints) is
+# intentionally NOT here — it always emits level="error" (see canonFingerprints.py).
+# gate.unprobed_fanout and gate.unasked_plan are the third and fourth: both are ACT_VS_GUARD
+# obligations with a real benign class (a dispatch that IS the exploration; a plan for a request
+# that carried no ambiguity) and no corpus-measured FP rate yet. Promoting either to BLOCK needs
+# that measurement, not a preference. Each module's docstring says so.
 _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
                                   "gate.relative_path_citation", "gate.plan_item_drift",
                                   "gate.unprobed_fanout", "gate.unasked_plan",
-                                  # the second obligation batch, same reasoning: each has a
-                                  # named benign class in its own module docstring and no
-                                  # corpus-measured FP rate yet.
+                                  # same reasoning: each has a named benign class in its own
+                                  # module docstring and no corpus-measured FP rate yet.
                                   "gate.unread_structure",
                                   "gate.unwitnessed_verifier",
                                   "gate.unknown_ref_switch",
                                   "gate.unobserved_destruction",
                                   "gate.relaunched_unchanged",
-                                  # B9's runner: a deliberately permanent waiver is a real
-                                  # and common thing and looks identical to an oversight.
+                                  # a deliberately permanent waiver is a real and common thing
+                                  # and looks identical to an oversight.
                                   "gate.undischarged_waiver",
-                                  # C12's runner: the benign case (the runner's own summary
-                                  # pasted, names visible in it) looks identical.
+                                  # the benign case (the runner's own summary pasted, names
+                                  # visible in it) looks identical.
                                   "gate.unnamed_failure",
-                                  # C11's runner: DOCUMENTING a command's output in a
-                                  # session that never ran it looks identical.
+                                  # DOCUMENTING a command's output in a session that never
+                                  # ran it looks identical.
                                   "gate.report_before_run",
-                                  # H6's runner: an unreachable new unit and a premature
-                                  # abstraction look the same from the record.
+                                  # an unreachable new unit and a premature abstraction look
+                                  # the same from the record.
                                   "gate.unclaimed_unit",
-                                  # H3's runner: a check-id list this architecture keeps in
-                                  # three homes, and a house convention wider than four
-                                  # lines, are both measured benign classes that look
-                                  # identical from the record.
+                                  # a check-id list this architecture keeps in three homes, and
+                                  # a house convention wider than four lines, are both measured
+                                  # benign classes that look identical from the record.
                                   "gate.pasted_fix",
-                                  })  # FD6, FD26, 2026-07-09
+                                  })
 
 # THE CHECK-POSTURE VOCABULARY, closed. Three different things in this package are called
 # "posture" and they are three different vocabularies: a CHECK's native tier is `BLOCK`/`ADVISE`
