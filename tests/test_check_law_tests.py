@@ -95,15 +95,9 @@ def test_family_law_catches_planted_rows():
 
 
 def test_every_advisory_gate_declares_the_fields_its_tier_rests_on():
-    """The allowlist and the declared posture must name the same set: the README's
-    blocking/advisory counts are published off the allowlist and its posture off the check.
-    `may_block=True` is what puts a check in the decision pipeline, so only those are compared."""
-    from makoto.registry import _ADVISORY_ALLOWLIST, POSTURE_ADVISE, POSTURE_BLOCK
+    """Every Stop-edge check's `.posture` must be one of the two closed values -- `posture` is
+    the one owner of blocking vs advisory now, with no separate allowlist to agree with it."""
+    from makoto.registry import POSTURE_ADVISE, POSTURE_BLOCK
     stop = {row.id: row.module.ROWS[row.id] for row in _ROWS.values() if row.edge == "Stop"}
-    pipeline = {cid: c for cid, c in stop.items() if getattr(c, "may_block", False)}
-    advisory_by_posture = {cid for cid, c in pipeline.items() if c.posture == POSTURE_ADVISE}
-    assert advisory_by_posture == set(_ADVISORY_ALLOWLIST), (
-        f"only-posture={sorted(advisory_by_posture - set(_ADVISORY_ALLOWLIST))} "
-        f"only-allowlist={sorted(set(_ADVISORY_ALLOWLIST) - advisory_by_posture)}")
     for cid, c in stop.items():
         assert c.posture in (POSTURE_ADVISE, POSTURE_BLOCK), cid

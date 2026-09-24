@@ -205,7 +205,7 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
 
 
 from makoto.registry import Check as _Check
-running_CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK", may_block=True,
+running_CHECK = _Check(id="gate.claimed_running", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history_all_agents"}),
                run=lambda c: claimed_running_gate(c.text, history=c.history_all_agents))
@@ -230,7 +230,10 @@ action_SHAPE = "SWITCH"
 
 # closed lexicon of TOOL-shaped past-tense actions (NOT reasoning verbs)
 _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed|launched)"
-_ACTION_RX = re.compile(rf"\bI\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
+# "I've/I'd deployed" is the same first-person completed-action claim as "I deployed" -- the
+# contraction must not defeat the \bI\s+VERB shape (mirrors _PROCESS_START_VERB_RX's own
+# contraction handling for the sibling gate.claimed_running).
+_ACTION_RX = re.compile(rf"\bI(?:['’]ve|['’]d)?\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
 _NEG = re.compile(r"\b(?:not|never|without)\b|n't", re.I)
 _FUTURE = re.compile(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
 # PRIOR-TURN frame: the claim is a truthful RECAP of work done in an earlier turn/session, not an
@@ -306,7 +309,7 @@ def fabricated_action_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-action_CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK", may_block=True,
+action_CHECK = _Check(id="gate.fabricated_action", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: fabricated_action_gate(c.text, history=c.history))
@@ -430,7 +433,7 @@ def unexamined_wall_gate(text, *, history=None, transcript_path=None):
 
 
 wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK",
-               may_block=True, tests="SWITCH",
+               tests="SWITCH",
                keywords=("no way to tell", "no way to know", "cannot determine",
                          "can't tell", "no way of knowing", "unable to verify"),
                retry_hint=wall_RETRY_HINT, description=wall_DESCRIPTION,
@@ -463,14 +466,9 @@ wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK
 #     END of each maximal consecutive run, and the LAST judgment for each key wins — so a later
 #     success for the same key silences it even when other, different calls happened in between.
 #
-# PATTERN_ID CONVENTION: `dispatch._blocking_gate_ids()` derives the blocking set from
-# `{c.id for c in load_checks(edge="Stop") if c.may_block and c.posture == BLOCK}` — the CHECK's
-# OWN id ("gate.canon") — and filters gate_findings by `finding.pattern_id in
-# _blocking_gate_ids()`. Every other live gate stamps `pattern_id == its own CHECK id`, so a
-# per-primitive pattern_id here would make `canon.timeout`/`canon.recur` findings silently
-# invisible to `_blocking_gate_ids()` — discovered but never actually blocking. This stamps
-# `pattern_id="gate.canon"` instead and keeps the firing sub-primitive's identity in the MESSAGE,
-# prefixed `"canon.<id>: "`.
+# PATTERN_ID CONVENTION: every other live gate stamps `pattern_id == its own CHECK id`
+# ("gate.canon"), so this does too, and keeps the firing sub-primitive's identity in the MESSAGE
+# instead, prefixed `"canon.<id>: "`.
 #
 # LEVEL: "error" — the ONLY blocking level in live makoto (makoto.vocab._ALLOWED_FIRE_LEVELS ==
 # {"error"}). This is an ORDINARY blocking gate, NOT the one advisory exception
@@ -503,25 +501,9 @@ def _result(c: Call) -> dict:
     return r if isinstance(r, dict) else {}
 
 
-def _input(c: Call) -> dict:
-    i = c.get("input")
-    return i if isinstance(i, dict) else {}
-
-
 def interrupted(c: Call) -> bool:
     """agnostic terminal `interrupted`: the harness set result.interrupted True (timeout/abort)."""
     return _result(c).get("interrupted") is True
-
-
-def exit_code(c: Call):
-    """agnostic terminal `exit_code`: the recorded process exit code, or None if absent. Kept as
-    a terminal helper for any future primitive that needs it; `timed_out` deliberately does not
-    read it (see its own docstring — the real substrate carries no exit_code on tool calls, and a
-    non-zero exit on an idempotent call is not itself an error state).
-
-    The key read is the real substrate's camelCase `"exitCode"`, matching every other reader of a
-    Bash tool_response in this repo."""
-    return _result(c).get("exitCode")
 
 
 def self_error_code(c: Call):
@@ -533,23 +515,6 @@ def self_error_code(c: Call):
     if "error" in r and r["error"] is not None:
         return r["error"]
     return r.get("error_code") or None
-
-
-def stale_read_hint(c: Call):
-    """agnostic terminal `stale_read_hint`: the harness's own stale-read-state warning on the
-    result, read verbatim (string/dict/whatever shape the harness emits, or None if absent).
-    Maps to the real substrate's `tool_response.staleReadFileStateHint` (the terminal's `result`
-    IS the raw tool_response dict passed through in full by `calls_from_history`, so this is a
-    plain key lookup, not a new decode step). Observability-only: no primitive reads it yet."""
-    return _result(c).get("staleReadFileStateHint")
-
-
-def sandbox_bypassed(c: Call) -> bool:
-    """agnostic terminal `sandbox_bypassed`: True iff the call's own tool_input requested the
-    sandbox-bypass escape hatch. Reads `input.dangerouslyDisableSandbox`, a real tool_input schema
-    key, not a guessed name. Absence (the overwhelmingly common case) returns False, never
-    crashes. Observability-only: no primitive reads it yet."""
-    return _input(c).get("dangerouslyDisableSandbox") is True
 
 
 # ---- the installed per-call primitive (type-2, direct error state) ---------------------------
@@ -742,45 +707,34 @@ def _pairing_input(inp) -> str:
 
     A leading `__` is a transport/bookkeeping convention, never call semantics, so dropping it
     cannot collapse two genuinely distinct calls — for pairing or for a verdict. Primitives in
-    OTHER modules (`identical_retry`) still key on their own folds."""
+    OTHER modules (`identical_retry`) still key on their own folds.
+
+    String leaves are also stripped of leading/trailing whitespace before folding: a retry whose
+    command differs only by incidental surrounding whitespace ("flaky-tool --check " vs
+    "flaky-tool --check") is the SAME call for verdict/pairing purposes, and treating it as a
+    distinct key would let a genuinely stuck retry loop escape `recur_stuck`/the transient budget
+    by accumulating one stray space per attempt."""
+    return canon_input(_strip_leaves(_drop_dunders(inp)))
+
+
+def _drop_dunders(inp):
     if isinstance(inp, dict):
-        return canon_input({k: v for k, v in inp.items() if not str(k).startswith("__")})
-    return canon_input(inp)
+        return {k: v for k, v in inp.items() if not str(k).startswith("__")}
+    return inp
+
+
+def _strip_leaves(v):
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, dict):
+        return {k: _strip_leaves(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_strip_leaves(x) for x in v]
+    return v
 
 
 # ---- the history -> Call adapter (protocol-field decode; fail-open per row) -------------------
-def _decode_row(row):
-    """Decode ONE history row into (etype, name, input_dict, result_dict), or None to skip.
-
-    Raw decode + wrapper-event-type fallback is `kit.decode_history_event` -- the canonical
-    step, shared with `identicalRetryInterdiction._most_recent_completed_bash_call`. This
-    function keeps only what's specific to canon's OWN adapter shape: the tuple conversion, and
-    PostToolUseFailure normalized to PostToolUse with its real top-level error/is_interrupt
-    fields, so it is the failed call's terminal. PreToolUse rows decode too; `calls_from_history`
-    yields nothing for them."""
-    ev = decode_history_event(row)
-    if ev is None:
-        return None
-    etype = ev.get("hook_event_name")
-    name = ev.get("tool_name", "") or ""
-    if etype not in ("PreToolUse", "PostToolUse", "PostToolUseFailure") or not name:
-        return None
-    ti = ev.get("tool_input")
-    ti = ti if isinstance(ti, dict) else {}
-    if etype == "PostToolUseFailure":
-        return ("PostToolUse", name, ti, failure_terminal_result(ev))
-    if etype == "PostToolUse":
-        tr = ev.get("tool_response")
-        return ("PostToolUse", name, ti, tr if isinstance(tr, dict) else {})
-    return ("PreToolUse", name, ti, {})
-
-
-def calls_from_history(history) -> list:
-    """Every terminal row (PostToolUse, or PostToolUseFailure normalized to it by `_decode_row`)
-    is one Call; a PreToolUse row is not a call and yields nothing. A call the owner declined,
-    one that was abandoned, and one still running all leave the same trace, a Pre with no
-    terminal, and none of them is evidence of a failure."""
-    return [{"name": name, "input": ti, "result": tr} for etype, name, ti, tr in (d for d in (_decode_row(r) for r in (history or ())) if d is not None) if etype == "PostToolUse"]
+from makoto.substrate._canonAtoms import calls_from_history  # one decoder for canon's calls
 
 
 # ---- sequence-primitive catalog: {id -> (seq_predicate(calls)->bool, stop_text, retry_hint)} --
@@ -851,7 +805,7 @@ def canon_gate(history, *, transcript_path=None, session_id=None, state_root=Non
     return out
 
 
-canon_CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK", may_block=True,
+canon_CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_gate(c.history, transcript_path=c.transcript_path,
@@ -921,7 +875,7 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     or nothing at all). Failed terminals classify their real top-level error text.
 
     Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
-    step, shared with `canonTimeoutRecur._decode_row`. Sharing it is what keeps this predicate
+    step, shared with `_canonAtoms._decode_row`. Sharing it is what keeps this predicate
     and its sibling gate (canon.timeout/canon.recur) reading the SAME rows from the same table
     for the same concept -- including rows whose event type lives only on the WRAPPER column."""
     rows = list(history or ())
@@ -1198,7 +1152,7 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK", may_block=True,
+named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: named_test_gate(c.text, history=c.history))
@@ -1333,7 +1287,6 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
 
 
 unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: unnamed_failure_gate(c.text, history=c.history))
@@ -1411,7 +1364,7 @@ def green__finding() -> Finding:
 
 
 # tests="SWITCH": registered ONE_OFF -- claim-vs-history and test-run-delta genuinely straddle here.
-green_CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK", may_block=True,
+green_CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "testrun_output", "testrun_exit"}),
                run=lambda c: green_claim_gate(c.text, testrun_output=c.testrun_output,
@@ -1501,7 +1454,7 @@ def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
     return None
 
 
-stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK", may_block=True,
+stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "cwd"}),
                run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))
@@ -1557,7 +1510,6 @@ relaunched_unchanged_gate = unmet_obligation_gate(
 
 
 relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: relaunched_unchanged_gate(c.history))
@@ -1618,7 +1570,6 @@ unobserved_destruction_gate = unmet_obligation_gate(
 
 
 destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unobserved_destruction_gate(c.history))
@@ -1701,7 +1652,7 @@ unwitnessed_verifier_gate = unmet_obligation_gate(
 )
 
 
-verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE", may_block=True,
+verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE",
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unwitnessed_verifier_gate(c.history))
@@ -1802,7 +1753,6 @@ report_before_run_gate = unmet_obligation_gate(
 
 
 report_CHECK = _Check(id="gate.report_before_run", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: report_before_run_gate(c.history))
@@ -1854,7 +1804,7 @@ unasked_plan_gate = unmet_obligation_gate(
 )
 
 
-plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE", may_block=True,
+plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE",
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unasked_plan_gate(c.history))

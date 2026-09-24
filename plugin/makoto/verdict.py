@@ -200,7 +200,10 @@ def apply(outcome, posture_value, *, permission_mode=None, layer="object") -> st
 #   * Pre  (``_PRE_WIRE``):  BLOCK -> deny, ASK -> ask, ADVISE -> allow + ``additionalContext``,
 #     ALLOW -> absent (``{}`` — proceed untouched).
 #   * Stop / SubagentStop (``_STOP_WIRE``): BLOCK -> block the stop (``decision: "block"``, echoing
-#     whichever of the two edges actually fired via ``hookEventName``); everything else -> ``{}``.
+#     whichever of the two edges actually fired via ``hookEventName``); ADVISE -> the SAME block
+#     shape, worded as advice, but ONLY when the host's ``stop_hook_active`` is not true (this is
+#     the one bounce the agent gets inside the turn to read it); with ``stop_hook_active`` true it
+#     renders ``{}`` (the agent already got its bounce). ASK / ALLOW -> ``{}``.
 #   * Post (``_POST_WIRE``): ADVISE -> allow + ``additionalContext``; everything else -> ``{}`` — the
 #     audit edge is otherwise silent and NEVER emits a deny/block key, regardless of posture.
 #
@@ -237,6 +240,9 @@ _POST_ADVISE_REASON = (
     "the prior location before continuing"
 )
 _STOP_REASON = "makoto: the declared plan is unfinished"
+_STOP_ADVISE_REASON = (
+    "makoto: an advisory finding surfaced at stop — address it or say why not, then stop"
+)
 
 
 def _detail(posture_value, fallback: str) -> str:
@@ -278,25 +284,21 @@ _PRE_WIRE: dict[str, Callable] = {
 }
 
 
-def _stop_block(posture_value, hook_name: str) -> dict:
-    """Intent: Render the Stop/SubagentStop ``block`` response — a blocking preventive finding for
-    an unfinished plan / unreconciled contradiction, carrying the exact coordinates when the check
-    named them AND which edge actually fired (``Stop`` vs ``SubagentStop``), so a sub-agent's own
-    completion claim is distinguishable from a main-thread Stop in the wire body itself, not just
-    inferred from which process received it."""
-    return {
-        "decision": "block",
-        "reason": _detail(posture_value, _STOP_REASON),
-        "hookEventName": hook_name,
-    }
+def _stop(posture_value, hook_name: str, stop_hook_active: bool, *,
+          reason: str, suppress_if_active: bool) -> dict:
+    """Intent: Render the Stop/SubagentStop block-shaped response, worded by `reason`. A BLOCK
+    (`suppress_if_active=False`) is never suppressed; an ADVISE (`suppress_if_active=True`) renders
+    `{}` once `stop_hook_active` is true — the agent already got its one bounce this turn."""
+    if suppress_if_active and stop_hook_active:
+        return {}
+    return {"decision": "block", "reason": _detail(posture_value, reason), "hookEventName": hook_name}
 
 
-# Stop / SubagentStop: BLOCK -> block the stop (unfinished plan / unreconciled contradiction, with
-# coordinates); everything else -> {} (allow). ASK / ADVISE / ALLOW never block the agent from
-# stopping. The renderer takes the posture (coordinates) AND the actual hook name that fired, so
-# one table serves both edges without re-deriving which one it was.
+# Stop / SubagentStop: BLOCK -> block the stop; ADVISE -> the same shape worded as advice, gated on
+# `stop_hook_active`; ASK / ALLOW -> {}. ASK never blocks the agent from stopping.
 _STOP_WIRE: dict[str, Callable] = {
-    BLOCK: _stop_block,
+    BLOCK: partial(_stop, reason=_STOP_REASON, suppress_if_active=False),
+    ADVISE: partial(_stop, reason=_STOP_ADVISE_REASON, suppress_if_active=True),
 }
 
 
@@ -319,20 +321,11 @@ _EDGE_TABLES: dict[str, dict[str, Callable]] = {
 _HOOK_NAME_EDGES = (_EDGE_STOP, _EDGE_SUBAGENT_STOP)
 
 
-def dispatch_posture(edge: str, posture_value: str, hook_name: str) -> dict:
+def dispatch_posture(edge: str, posture_value: str, hook_name: str,
+                     stop_hook_active: bool = False) -> dict:
     """Intent: The public seam — map ONE folded posture at ONE hook edge to a Claude Code hook
-    response body, re-deriving no policy. This is what ``dispatch.py`` calls.
-
-    ``edge`` is one of ``"Pre"`` / ``"Post"`` / ``"Stop"`` / ``"SubagentStop"``. ``posture_value``
-    is a folded posture (``posture.BLOCK`` / ``ASK`` / ``ADVISE`` / ``ALLOW``, or a ``Decision``
-    carrying coordinates). ``hook_name`` is the actual Claude Code hook-event name that fired
-    (``"Stop"`` or ``"SubagentStop"``) — only the Stop-shaped edges echo it back in the body; the
-    Pre/Post renderers use their own constant ``hookEventName``, matching the source shape.
-
-    FAIL-OPEN: an unrecognized ``edge`` or a posture with no entry in that edge's table both
-    render ``{}`` (no objection) — never an exception. The Post edge's table only ever holds an
-    ADVISE entry, so BLOCK/ASK/ALLOW at Post structurally can never render anything but ``{}``.
-    """
+    response body, re-deriving no policy. This is what ``dispatch.py`` calls. FAIL-OPEN: an
+    unrecognized ``edge`` or a posture with no entry in that edge's table both render ``{}``."""
     table = _EDGE_TABLES.get(edge)
     if table is None:
         return {}
@@ -340,64 +333,5 @@ def dispatch_posture(edge: str, posture_value: str, hook_name: str) -> dict:
     if render is None:
         return {}
     if edge in _HOOK_NAME_EDGES:
-        return render(posture_value, hook_name)
+        return render(posture_value, hook_name, stop_hook_active)
     return render(posture_value)
-
-
-# ==== Section 3: recheck — certificates that recheck a claimed verdict against its raw fold
-# inputs. ====
-
-
-from dataclasses import dataclass
-
-from makoto.vocab import Finding
-
-
-@dataclass(frozen=True)
-class VerdictCertificate:
-    """Raw verdict inputs paired with the outcome and detail they claim."""
-
-    findings: tuple[Finding, ...]
-    mode: str
-    permission_mode: str | None
-    claimed_outcome: str
-    claimed_detail: str
-
-
-def recheck_certificate(certificate: VerdictCertificate) -> tuple[str, str]:
-    """Reconstruct and verify a certificate's claimed ``(outcome, detail)``.
-
-    A mismatch raises deliberately instead of following ``dispatch.py``'s per-check
-    ``try/except: continue`` fail-open convention. A broken individual check must not suppress
-    other checks, but a fold-aggregator mismatch invalidates the verdict itself and is therefore
-    not a per-check fault that can safely be ignored.
-    """
-    # Local import: avoids a cycle with dispatch.
-    from makoto.dispatch import _finding_layer, _jit_hint, _worst_finding
-
-    worst = _worst_finding(list(certificate.findings))
-    if worst is None:
-        reconstructed = (ALLOW, "")
-    else:
-        outcome, finding = worst
-        detail = finding.message
-        if outcome == BLOCK:
-            hint = _jit_hint(finding)
-            if hint:
-                detail = f"{detail}\n{hint}"
-        folded = apply(
-            Decision(outcome, detail),
-            certificate.mode,
-            permission_mode=certificate.permission_mode,
-            layer=_finding_layer(outcome, finding, certificate.mode,
-                                 certificate.permission_mode),
-        )
-        reconstructed = (str(folded), getattr(folded, "detail", ""))
-
-    claimed = (certificate.claimed_outcome, certificate.claimed_detail)
-    if reconstructed != claimed:
-        raise ValueError(
-            f"certificate claim does not match reconstruction: "
-            f"claimed={claimed!r}, reconstructed={reconstructed!r}"
-        )
-    return reconstructed

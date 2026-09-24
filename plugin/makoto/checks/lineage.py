@@ -73,9 +73,9 @@ _CLAIM_RXS = (
         re.IGNORECASE,
     ),
     # strong completion verb directly citing a SHA, no "commit" noun needed: "pushed e5d6c7b",
-    # "merged as e5d6c7b" — a completion assertion, not co-occurrence.
+    # "merged as e5d6c7b", "shipped it at e5d6c7b" — a completion assertion, not co-occurrence.
     re.compile(
-        r"\b(?:landed|pushed|merged)\b\s*[:#]?\s*(?:as\s+|at\s+|in\s+|to\s+\S+\s+as\s+)?"
+        r"\b(?:landed|pushed|merged|shipped)\b\s*(?:it\s+)?[:#]?\s*(?:as\s+|at\s+|in\s+|to\s+\S+\s+as\s+)?"
         + _SHA_RX,
         re.IGNORECASE,
     ),
@@ -309,7 +309,7 @@ sha_predicate = claim_vs_history_predicate(
 sha_RETRY_HINT = 'Cite a real `git commit`/`git tag` run (or the SHA echoed in its tool output) before claiming a commit/tag landed. A SHA presented as proof with no commit/tag tool_use behind it this session is fabricated evidence (CLAUDE.md commandment 1, tool-call-diff canary).'
 sha_DESCRIPTION = 'fabricated commit SHA/tag presented as proof of a commit (no git commit/tag ran)'
 
-sha_CHECK = Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made'), retry_hint=sha_RETRY_HINT, description=sha_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
+sha_CHECK = Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made', 'shipped', 'Shipped'), retry_hint=sha_RETRY_HINT, description=sha_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
 # content.illusory_interruption_claim predicate — a fabricated "interrupted by user" excuse
 # (same genre as content.illusory_authorship_trailer).
 #
@@ -471,15 +471,27 @@ def _user_supplied(url: str, current_event: dict) -> bool:
     return any(_ends_url(turn, url) for turn in turns)
 
 
+def _is_fetch_shaped(tool_name: str, tool_input: dict) -> bool:
+    """True for the built-in WebFetch, and for an MCP fetch tool under any other name: the
+    url INPUT is the signal that a tool is being used as a WebFetch, not the literal string
+    "WebFetch" -- an MCP tool whose own name says it fetches (e.g. `mcp__browser__fetch`) and
+    that actually carries a url is the same fabricated-evidence surface under a different name."""
+    if tool_name == "WebFetch":
+        return True
+    return (tool_name.startswith("mcp__") and "fetch" in tool_name.lower()
+            and isinstance(tool_input.get("url"), str) and bool(tool_input.get("url")))
+
+
 def _webfetch_url(current_event: dict) -> Optional[str]:
-    """The url a WebFetch commits to, or None when the event never owes one at all: not a
-    WebFetch, no url, or a TRUSTED host. The user-typed oracle is a real witness and lives in
-    `pays`/`paid`, not here."""
+    """The url a WebFetch-shaped tool commits to, or None when the event never owes one at
+    all: not fetch-shaped, no url, or a TRUSTED host. The user-typed oracle is a real witness
+    and lives in `pays`/`paid`, not here."""
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
-    if current_event.get("tool_name") != "WebFetch":
+    tool_input = current_event.get("tool_input") or {}
+    if not _is_fetch_shaped(current_event.get("tool_name") or "", tool_input):
         return None
-    url = current_event.get("tool_input", {}).get("url", "")
+    url = tool_input.get("url", "")
     if not url:
         return None
     # Trusted-host short-circuit
@@ -541,15 +553,6 @@ def webfetch_owes(ev: dict):
     return (url,) if (url := _webfetch_url(ev)) is not None else ()
 
 
-def webfetch_pays(ev: dict):
-    """OTHER_POINT: the witnesses are seeded whole via `paid` (a prior tool response, or the
-    user's own transcript turn) -- no per-event witness inside this one-event stream."""
-    return None
-
-
-webfetch_SHAPE = "OTHER_POINT"
-
-
 def webfetch_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     """The Pre predicate. Fires iff the WebFetch url passes no short-circuit (`_webfetch_url`:
     trusted host) and is witnessed by neither a prior tool RESPONSE (`_url_grounded_in_history`)
@@ -557,7 +560,7 @@ def webfetch_predicate(*, current_event: dict, history: list, pattern, conn=None
     actually checked: the user-typed clause is asserted only when a transcript was available to
     consult (`_oracle_consulted`)."""
     for _ev, url in unwitnessed(
-            (current_event,), owes=webfetch_owes, pays=webfetch_pays,
+            (current_event,), owes=webfetch_owes,
             paid=(lambda u: _url_grounded_in_history(u, history),
                   lambda u: _user_supplied(u, current_event))):
         if _oracle_consulted(current_event.get("transcript_path")):
@@ -602,9 +605,10 @@ _TRAVERSAL_RX = re.compile(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b
 # the file.
 _STRUCTURE_RX = re.compile(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
                            r"\bpaths\b|\bto_entries\b|-e\b)")
-# What a failed traversal prints: a literal JSON null as the WHOLE output. `.strip()` has already
-# run, so an anchored match is the whole of it.
-_NULL_OUTPUT_RX = re.compile(r"\Anull\Z")
+# What a failed traversal prints: a literal null as the WHOLE output -- JSON's `null` (jq/yq) or
+# Python's `None` (the same absent-value token printed by a `python3 -c ...json...` traversal).
+# `.strip()` has already run, so an anchored match is the whole of it.
+_NULL_OUTPUT_RX = re.compile(r"\A(?:null|None)\Z")
 
 
 def _is_null_traversal(ev: dict) -> bool:
@@ -632,7 +636,7 @@ unread_structure_gate = unmet_obligation_gate(
 )
 
 
-structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="ADVISE", may_block=True,
+structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="ADVISE",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unread_structure_gate(c.history))
@@ -652,8 +656,11 @@ from makoto.kit import unmet_obligation_gate, command_matches
 
 # Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms; `git checkout --`
 # and `git checkout -- <path>` restore a FILE and move nothing, so they are excluded by
-# requiring the argument not to start with a dash.
-_REF_SWITCH_RX = re.compile(r"\bgit\s+(?:checkout|switch)\s+(?!-)")
+# requiring the argument not to start with a dash. `git reset --hard <ref>` moves HEAD (and the
+# working tree) to a ref the same way; `git reset --hard` with no ref just discards edits in
+# place and names no boundary to cross, so a ref argument is required there too.
+_REF_SWITCH_RX = re.compile(
+    r"\bgit\s+(?:checkout|switch)\s+(?!-)|\bgit\s+reset\s+--hard\s+(?!-)\S")
 # Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
 # switched TO.
 _REF_PRINT_RX = re.compile(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
@@ -676,7 +683,7 @@ unknown_ref_switch_gate = unmet_obligation_gate(
 )
 
 
-ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADVISE", may_block=True,
+ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADVISE",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unknown_ref_switch_gate(c.history))
@@ -696,16 +703,25 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADV
 from makoto.kit import unmet_obligation_gate
 
 # The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
-# the name this harness reports, and both are accepted rather than guessed between -- a closed
-# vocabulary whose miss is a RECALL bound (a dispatch under some third name reads as no dispatch
-# and the gate goes quiet), never a false block.
+# the name this harness reports, and both are accepted by name alone. An MCP tool that dispatches
+# a subagent under a third name (`mcp__subagents__dispatch`) is the same act, recognized by its
+# `prompt` input rather than guessed by name -- the brief a dispatch hands off is the one input
+# common to every dispatch tool, named or not.
 _DISPATCH_TOOLS = frozenset({"Task", "Agent"})
 # The reads that pay the obligation.
 _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
 
 
 def _is_dispatch(ev: dict) -> bool:
-    return ev.get("tool_name") in _DISPATCH_TOOLS
+    name = ev.get("tool_name") or ""
+    if name in _DISPATCH_TOOLS:
+        return True
+    if not name.startswith("mcp__"):
+        return False
+    lname = name.lower()
+    if "agent" not in lname and "dispatch" not in lname:
+        return False
+    return isinstance((ev.get("tool_input") or {}).get("prompt"), str)
 
 
 def _is_probe(ev: dict) -> bool:
@@ -724,7 +740,7 @@ unprobed_fanout_gate = unmet_obligation_gate(
 )
 
 
-fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADVISE", may_block=True,
+fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADVISE",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unprobed_fanout_gate(c.history))
@@ -857,14 +873,20 @@ def pasted_fix_gate(history) -> Optional[Finding]:
         at, ev = item
         tool = ev.get("tool_name", "")
         tool_input = ev.get("tool_input")
-        if ev.get("hook_event_name") != "PostToolUse" or tool not in _EDIT_TOOLS \
+        # A block LANDS (registers as a possible first site) from a Write same as an Edit --
+        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered. Without
+        # this, a fix Written into a brand-new module and then Edited into a second file is
+        # invisible: the Write never enters `landed`, so the Edit is never seen as a second paste.
+        if ev.get("hook_event_name") != "PostToolUse" or tool not in (_EDIT_TOOLS | {"Write"}) \
                 or not isinstance(tool_input, dict):
             return ()
         path = str(tool_input.get("file_path", ""))
         second = []
         for block in _blocks(_kept_lines(introduced_text(tool, tool_input))):
             where, first = landed.setdefault(block, (path, at))
-            if where != path:
+            # Only an Edit/MultiEdit second landing fires (narrowing 2): two Writes sharing a
+            # block is convention (e.g. a house import header), never a repair transfer.
+            if where != path and tool in _EDIT_TOOLS:
                 second.append((block, where, first, path))
         return second
 
@@ -879,7 +901,6 @@ def pasted_fix_gate(history) -> Optional[Finding]:
 
 
 pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: pasted_fix_gate(c.history))
@@ -950,13 +971,20 @@ def _introduced_units(text: str) -> list:
         return []                    # unparseable fragment -> never a finding (FN-safe)
     out = []
     for node in ast.iter_child_nodes(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if node.decorator_list:
+                continue              # a framework registered it: that IS the claim
+            name = node.name
+        elif (isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda)
+                and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)):
+            # `compute_ratio = lambda a, b: a / b` binds a unit exactly as a `def` would --
+            # the same unclaimed-surface question, under Python's other function-binding form.
+            name = node.targets[0].id
+        else:
             continue
-        if node.decorator_list:
-            continue                 # a framework registered it: that IS the claim
-        if node.name.startswith(_COLLECTED_PREFIX):
+        if name.startswith(_COLLECTED_PREFIX):
             continue                 # claimed by collection
-        out.append(node.name)
+        out.append(name)
     return out
 
 
@@ -974,14 +1002,6 @@ def unclaimed_owes(ev: dict):
     fp = str(ti.get("file_path", "")) if isinstance(ti, dict) else ""
     return tuple((name, fp) for name in _introduced_units(text))
 
-
-def unclaimed_pays(ev: dict):
-    """OTHER_POINT: the witnesses (the session's own introduced-text blob, the operator-turn
-    ledger) are seeded whole via `paid` -- no per-event witness inside this loop."""
-    return None
-
-
-unclaimed_SHAPE = "OTHER_POINT"
 
 
 def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
@@ -1006,7 +1026,7 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
     # line. One occurrence is the definition itself; a second is a use.
     blob = "\n".join(introduced)
     unclaimed = [subject for _ev, subject in unwitnessed(
-        events, owes=unclaimed_owes, pays=unclaimed_pays,
+        events, owes=unclaimed_owes,
         paid=(lambda s: sum(1 for tok in _TOKEN_RX.findall(blob or "") if tok == s[0])
                         >= _REACHED_AT,
               lambda s: _named_by_operator(s[0], transcript_path)))]
@@ -1052,7 +1072,6 @@ def _named_by_operator(name: str, transcript_path) -> bool:
 
 
 unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="LINEAGE",
                eats=frozenset({"history", "transcript_path"}),
                run=lambda c: unclaimed_unit_gate(c.history,

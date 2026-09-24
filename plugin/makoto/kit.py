@@ -1,13 +1,10 @@
 """makoto.kit — the shared check-building kit: L1 predicate factories and AST
-primitives, tool/event I/O parsing, deterministic location/quantity/subject
-primitives, transient-vs-deterministic failure classification, per-test verdict
-delta, and shared gate helpers (the `GateContext` schema itself lives in
-`context.py`).
+primitives, tool/event I/O parsing, deterministic location/subject primitives,
+transient-vs-deterministic failure classification, per-test verdict tracking,
+and shared gate helpers (the `GateContext` schema itself lives in `context.py`).
 
 Stdlib only; no HTTP, no LLM (Knight-Leveson hot-path invariant). Imports only L0
-(`makoto.vocab`, `makoto.core._shell`); `compute_delta`'s reuse of namedTestTeeth's
-parsers stays a call-time import so the kit never carries an import-time edge into
-a named check module.
+(`makoto.vocab`, `makoto.core._shell`).
 """
 from __future__ import annotations
 
@@ -30,8 +27,7 @@ from makoto.vocab import (
     _MAKOTO_ALLOW_REASON_RX,
     _PATH_EXT,
     Finding,
-    JWT_CALLEE_RX,
-    # recorded per-test verdict parsers; compute_delta/current_named_verdicts read them.
+    # recorded per-test verdict parsers; current_named_verdicts reads them.
     _TEETH_FRAME_RX,
     _TEETH_SCOPE_AFTER,
     _TEETH_SCOPE_BEFORE,
@@ -66,38 +62,6 @@ def normalize_path(p: str) -> str:
     return os.path.normcase(os.path.normpath(p.strip())).lower().rstrip("/\\").replace("\\", "/")
 
 
-def location_match(location: str, touched_keys) -> bool:
-    """True iff the named location EQUALS (normalized) one of the touched keys.
-
-    Equality, never substring: 'auth.py' must NOT match 'auth_helper.py'.
-    """
-    loc = normalize_path(location)
-    if not loc:
-        return False
-    return any(normalize_path(k) == loc for k in touched_keys)
-
-
-def quantity_match(value, *, n=None, lo=None, hi=None) -> bool:
-    """True iff `value` equals `n`, or falls within [lo, hi]. None value -> False."""
-    if value is None:
-        return False
-    if n is not None:
-        return value == n
-    if lo is not None and value < lo:
-        return False
-    if hi is not None and value > hi:
-        return False
-    return lo is not None or hi is not None
-
-
-def subject_binds(commitment_location: str, result_key: str) -> bool:
-    """A cited result is 'about' a commitment iff its key EQUALS (normalized) the
-    commitment location. Equality (not containment) kills the fakeexcuse vector:
-    an empty `fakeexcuse.txt` cannot stand in for a commitment at `auth.py`.
-    """
-    return normalize_path(commitment_location) == normalize_path(result_key)
-
-
 # A location is a GENUINE FILE PATH: a known-extension filename, optionally with a
 # directory prefix (relative, absolute, ~/, or ./), OR a well-known extensionless file.
 # It is NOT a version (2.0, v1.2.0), a git SHA, a duration (31.8s), a task-id (A.1), or
@@ -115,21 +79,6 @@ _LOC_RX = re.compile(
     r"(?![\w])",                                                     # right boundary (ext not extended)
     re.IGNORECASE,
 )
-# A quantity is a number (optionally a `Nx` / `N×` speedup), or a range
-# (`N-M`, `N to M`, `N and M`). Decimals allowed (e.g. 2.4x) — the `x`/`×` suffix is
-# why a trailing `\b` after the digits won't do: in "2x" the digit is glued to a letter.
-_QTY_RX = re.compile(
-    r"\b(\d+(?:\.\d+)?)\s*(?:[-–]|to|and)\s*(\d+(?:\.\d+)?)\b"
-    r"|\b(\d+(?:\.\d+)?)(?:[x×])?\b"
-)
-
-
-def detect_location(text: str):
-    """Return the first located file path in `text`, or None if the claim is unlocated."""
-    m = _LOC_RX.search(text or "")
-    return m.group(0) if m else None
-
-
 def detect_locations(text: str):
     """Yield (location, start, end) for every located file path in `text`, in order.
 
@@ -137,34 +86,6 @@ def detect_locations(text: str):
     message names several (the producing verb may govern the second, not the first)."""
     for m in _LOC_RX.finditer(text or ""):
         yield (m.group(0), m.start(), m.end())
-
-
-def detect_quantity(text: str):
-    """Return (lo, hi) for a quantity claim (exact N -> (N, N)), or None.
-
-    Floats, so a speedup like 2.4x compares correctly; integer values are equal to
-    their int form ((3, 3) == (3.0, 3.0)) so existing callers are unaffected.
-    """
-    m = _QTY_RX.search(text or "")
-    if not m:
-        return None
-    if m.group(1):
-        return (float(m.group(1)), float(m.group(2)))
-    return (float(m.group(3)), float(m.group(3)))
-
-
-def bash_nonempty_violation(tool_response: dict) -> bool:
-    """Constant invariant: a Bash command's output should be non-empty — BUT honor
-    the harness's own `noOutputExpected` signal. Fires only when output is empty
-    AND exit code is 0 AND noOutputExpected is False (so `mkdir`/`touch` never fire).
-    """
-    if not isinstance(tool_response, dict):
-        return False
-    if tool_response.get("noOutputExpected") is True:
-        return False
-    out = (tool_response.get("stdout") or "") + (tool_response.get("stderr") or "")
-    exit_code = tool_response.get("exitCode", tool_response.get("exit", 0)) or 0
-    return out.strip() == "" and exit_code == 0
 
 
 # ---- tool/event I/O parsing --------------------------------------------------------------------
@@ -321,8 +242,8 @@ def iter_tool_events(history):
 
 # ---- predicate factories + AST primitives -------------------------------------------------------
 # regex_file_predicate / ast_introduced_predicate build the PreToolUse content-scan predicate
-# scaffold; scan_target_content / parse_introduced / is_false_const / is_cert_none / callee_chain /
-# makoto_allowed are their shared leaves.
+# scaffold; scan_target_content / parse_introduced / callee_chain / makoto_allowed are their
+# shared leaves.
 
 def makoto_allowed(content: str) -> bool:
     """True iff the content carries a structured `makoto-allow: <reason>` exemption marker
@@ -481,20 +402,6 @@ def parse_introduced(content: str):
         return None, 0
 
 
-def is_false_const(node) -> bool:
-    """True iff `node` is the literal ``False`` constant (an AST Constant whose value IS False).
-    Shared by the ``verify=False`` / ``check_hostname=False`` keyword detectors (content.cert_verify_disabled TLS, content.jwt_signature_disabled JWT)."""
-    return isinstance(node, ast.Constant) and node.value is False
-
-
-def is_cert_none(node) -> bool:
-    """True iff `node` is ``ssl.CERT_NONE`` (Attribute) or a bare ``CERT_NONE`` Name. Shared by the
-    cert-disable detectors: content.cert_none_mode (``verify_mode = CERT_NONE`` assign) and content.cert_reqs_none (``cert_reqs=CERT_NONE`` kwarg)."""
-    if isinstance(node, ast.Attribute) and node.attr == "CERT_NONE":
-        return True
-    return isinstance(node, ast.Name) and node.id == "CERT_NONE"
-
-
 def callee_chain(call: ast.Call) -> str:
     """Dotted callee name of a Call — ``requests.get``, ``jwt.decode``, ``jose.jwt.decode``.
     Descends through an intermediate Call so ``requests.Session().get(...)`` / ``jwt.JWT().decode(...)``
@@ -514,23 +421,6 @@ def callee_chain(call: ast.Call) -> str:
         else:
             break
     return ".".join(reversed(parts))
-
-
-def jwt_decode_callee_chain(node) -> Optional[str]:
-    """The callee-chain string iff `node` is an `ast.Call` targeting a jwt/jose `decode` entry
-    point (JWT_CALLEE_RX matches the chain, AND the chain's tail is literally `decode`); None
-    otherwise. Shared callee gate for content.jwt_signature_disabled (verify=False /
-    options-dict disable) and content.jwt_none_alg (algorithms=["none"] whitelisting) — both
-    patterns need this SAME 'is this really a jwt.decode(...) call' precondition before
-    inspecting their own distinct keyword."""
-    if not isinstance(node, ast.Call):
-        return None
-    chain = callee_chain(node)
-    if not JWT_CALLEE_RX.search(chain):
-        return None
-    if chain.split(".")[-1] != "decode":
-        return None
-    return chain
 
 
 def canon_input(inp) -> str:
@@ -633,7 +523,7 @@ def regex_file_predicate(
     return _predicate
 
 
-def unwitnessed(events, *, owes, pays, paid=()):
+def unwitnessed(events, *, owes, pays=None, paid=()):
     """The one shape: an event owes a witness, and only an earlier event can pay it.
 
     `owes(ev)` gives the subjects `ev` commits to; `pays(ev)` gives a predicate over subjects
@@ -643,13 +533,17 @@ def unwitnessed(events, *, owes, pays, paid=()):
     later one, never an earlier one. One pass; a predicate that pays everything
     short-circuits, so an obligation stays O(events).
 
+    `pays` defaults to None -- no per-event witness at all -- for the callers whose witnesses are
+    seeded whole via `paid` (a prior tool response, the whole session's own record, the operator-
+    turn ledger). A caller with nothing to add here need not write its own always-None function.
+
     The register's families differ only in what counts as the witness: none can pay a held
     wrong form (SPEC), a second reading of the subject (THE OTHER POINT), an act that selected
     the branch (THE SWITCH), a read of the source before the write (THE LINEAGE).
     """
     paid = list(paid)
     for ev in events:
-        p = pays(ev)
+        p = pays(ev) if pays is not None else None
         if p is not None:
             paid.append(p)
         for subject in owes(ev) or ():
@@ -687,7 +581,7 @@ def claim_vs_history_predicate(
                     # matched" — a non-participating optional group yielded claims=[None].
                     claims.append(match.group(1) if match.lastindex else match.group(0))
         for _ev, claimed in unwitnessed(
-                (subject,), owes=lambda _s: claims, pays=lambda _s: None,
+                (subject,), owes=lambda _s: claims,
                 paid=(lambda c: grounded_in_history(c, history),)):
             rendered = message(claimed, subject, pattern) if callable(message) else message.format(
                 claimed=claimed, id=pattern.id, description=pattern.description
@@ -949,15 +843,6 @@ def classify_failure(text: str) -> Optional[bool]:
     return None
 
 
-# ---- test-delta redirect -------------------------------------------------------------------------
-# Wired DIRECTLY into `dispatch.py`'s PostToolUse branch, not the patterns.toml/load_prechecks
-# catalog (Pre-only) nor the Stop-gate catalog (Stop-only) -- neither covers a Post-edge advisory.
-#
-# `compute_delta` reuses `namedTestTeeth.py`'s OWN `recorded_failed_names`/`recorded_passed_names`
-# parsers (one implementation, never a second one) to diff the per-test verdict set between the
-# PRIOR recorded testrun output and the NEW one just produced. The import is call-time so this
-# kit module never carries an import-time edge into a named check module.
-
 def current_named_verdicts(history) -> dict:
     """{full_test_id: 'FAIL'|'PASS'} from the recorded TEST-RUNNER outputs in `history`, in
     order. The key is the exact recorded id — `path::name[param]` — matching the header's
@@ -979,9 +864,8 @@ def current_named_verdicts(history) -> dict:
         if not resp or not is_test_runner(cmd or ""):
             continue
         resp = _ANSI_SGR_RX.sub("", resp)
-        # Short-circuit through the shared per-name parsers (the same evidence primitives
-        # kit.compute_delta reuses) before the positioned scan below: most runner responses
-        # carry no per-test verdict lines at all.
+        # Short-circuit through the shared per-name parsers before the positioned scan below:
+        # most runner responses carry no per-test verdict lines at all.
         if not (recorded_failed_names(resp) or recorded_passed_names(resp)):
             continue
         records = []
@@ -998,27 +882,6 @@ def current_named_verdicts(history) -> dict:
     return verdict
 
 
-def compute_delta(prior_output: str, new_output: str) -> Optional[str]:
-    """None when there's nothing to say: no prior run to diff against, or no verdict flipped.
-    "Newly failing" = named tests failing now that were NOT already failing in the prior run;
-    "newly passing" = named tests passing now that WERE failing in the prior run (a genuine
-    fix). A test that was already failing and is STILL failing is neither -- not new information,
-    so it stays out of the delta (grounding on what CHANGED, not the whole persistent state)."""
-    if not prior_output or not new_output:
-        return None
-    prior_failed = recorded_failed_names(prior_output)
-    new_failed = recorded_failed_names(new_output)
-    new_passed = recorded_passed_names(new_output)
-    newly_failing = sorted(new_failed - prior_failed)
-    newly_passing = sorted(new_passed & prior_failed)
-    if not newly_failing and not newly_passing:
-        return None
-    parts = []
-    if newly_failing:
-        parts.append(f"{len(newly_failing)} newly failing: {', '.join(newly_failing)}")
-    if newly_passing:
-        parts.append(f"{len(newly_passing)} newly passing: {', '.join(newly_passing)}")
-    return "; ".join(parts)
 
 
 # ---- shared discharge/suffix-match helpers ---------------------------------------------------
@@ -1119,21 +982,6 @@ def _discharged(location: str, touched_keys, fs_exists, *, empty_keys=None, fs_s
     return False
 
 
-def _default_veto(claim, _c, *, touched_keys, fs_exists, empty_keys=None, fs_size=None) -> bool:
-    """Default veto: treat the claim as a location and ask the shared discharge test.
-
-    An ADAPTER, not sugar. `_discharged` is `(location, touched_keys, fs_exists, *, ...)`, but a
-    veto is called `(claim, ctx, **facts)` -- so naming `_discharged` itself as the default handed
-    the `GateContext` to the `touched_keys` slot positionally AND again as a keyword:
-    `TypeError: _discharged() got multiple values for argument 'touched_keys'`, raised at Stop, i.e.
-    a decision error and a spurious fail-CLOSED block, for any caller that did not pass its own
-    `veto=`. Latent only because the sole caller today does.
-    """
-    location = claim.get("location", "") if isinstance(claim, dict) else claim
-    return _discharged(location, touched_keys, fs_exists,
-                       empty_keys=empty_keys, fs_size=fs_size)
-
-
 class _CarriageFault(str):
     """Truthy sentinel for "Git did not answer", distinct from "the path is absent"."""
     __slots__ = ()
@@ -1172,7 +1020,7 @@ def resolve_in_worktree(loc, cwd):
             return None
         return candidate if os.path.exists(candidate) else None
     except (OSError, subprocess.SubprocessError):
-        # See `pushed_ref_matches_world`: `git` unreachable is a CARRIAGE fault, and returning None
+        # `git` unreachable is a CARRIAGE fault, and returning None
         # spelled it "the deliverable is absent" -- the exact value that makes the caller DENY. The
         # worktree was never consulted, so absence was never established. Callers must treat this
         # sentinel as fail-open; it is truthy so a caller that ignores it fails safe rather than
@@ -1192,46 +1040,6 @@ def extract_pushed_branch(text):
     return match.group(1).rstrip("`'\",:;.") if match else None
 
 
-def pushed_ref_matches_world(text, cwd):
-    """True iff local and origin remote-tracking refs back a pushed-branch claim."""
-    if not text or not cwd:
-        return False
-    try:
-        branch = extract_pushed_branch(text)
-        if branch is None:
-            branch_result = subprocess.run(
-                ["git", "-C", cwd, "symbolic-ref", "--quiet", "--short", "HEAD"],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
-            )
-            if branch_result.returncode != 0:
-                return False
-            branch = branch_result.stdout.strip()
-        if (
-            not branch
-            or branch.startswith(("-", ".", "/"))
-            or branch.endswith((".", "/", ".lock"))
-            or ".." in branch
-            or "@{" in branch
-            or "//" in branch
-        ):
-            return False
-        refs = (f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")
-        result = subprocess.run(
-            ["git", "-C", cwd, "show-ref", "--verify", "--hash", *refs],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
-        )
-        object_ids = result.stdout.splitlines()
-        return result.returncode == 0 and len(object_ids) == 2 and object_ids[0] == object_ids[1]
-    except (OSError, subprocess.SubprocessError):
-        # CARRIAGE, not evidence. `git` missing from PATH, the _LOCAL_GIT_TIMEOUT budget blown, any
-        # OS error -- none of them observed anything about the refs, yet `return False` handed the
-        # caller the same value a genuine mismatch produces, and the caller DENIES on False. A real
-        # push then read as unpushed and the deny asserted a fact nobody established. This repo's
-        # rule is open on carriage, closed on decision, so an unanswered question does not
-        # contradict the claim.
-        return True
-    except Exception:
-        return False
 
 
 def _event_type_of(row) -> str:

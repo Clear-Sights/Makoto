@@ -91,8 +91,7 @@ def test_pre_upgrade_rows_still_parse(tmp_path):
     log.write_text(json.dumps({"ts": "2026-01-01T00:00:00+00:00", "event_id": None,
                                "pattern_id": "dispatch.exception", "exc_type": "ValueError",
                                "exc_message": "old"}) + "\n")
-    from makoto.state import audit
-    rows = list(audit.read_errors(Path(state_dir)))
+    rows = _errors(state_dir)
     assert len(rows) == 1 and rows[0].get("session_id", "") == ""
 
 

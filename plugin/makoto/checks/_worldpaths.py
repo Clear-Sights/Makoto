@@ -26,8 +26,8 @@ import os
 import re
 import subprocess
 from makoto.kit import _path_components, _suffix_match, iter_tool_events
-# Facade re-exports (see module docstring), not used below:
-from makoto.kit import pushed_ref_matches_world, resolve_in_worktree
+# Facade re-export (see module docstring), not used below:
+from makoto.kit import resolve_in_worktree
 
 # `git -C <dir> pull|fetch` — the dir may be bare, or single/double quoted (spaces, CJK).
 _GIT_C_RX = re.compile(

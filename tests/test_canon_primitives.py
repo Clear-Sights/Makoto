@@ -6,7 +6,7 @@ unit-vs-live-battery split test_stopcheck_self_wired.py / test_gate_dropped.py u
 gates."""
 import json
 
-from makoto.checks.switch import CANON_SEQ_PRIMITIVES, _decode_row as _decode_canon_row, calls_from_history, canon_gate, exit_code, fired_primitives, interrupted, recur_stuck, sandbox_bypassed, self_error_code, stale_read_hint, timed_out, timed_out_at_turn_end
+from makoto.checks.switch import CANON_SEQ_PRIMITIVES, calls_from_history, canon_gate, fired_primitives, interrupted, recur_stuck, self_error_code, timed_out, timed_out_at_turn_end
 
 
 def _call(name="Bash", input=None, result=None):
@@ -20,29 +20,6 @@ def test_interrupted_reads_result_interrupted_true_only():
     assert interrupted(_call(result={"interrupted": False})) is False
     assert interrupted(_call(result={})) is False
     assert interrupted(_call(result="not-a-dict")) is False
-
-
-def test_exit_code_reads_result_exitCode():
-    # RED-before/GREEN-after this ticket's bugfix: the real substrate carries the Bash exit
-    # status camelCase, `exitCode` (see makoto/ledger.py:49, makoto/checks.py:124 — both already
-    # read it correctly). The terminal previously read the wrong key `exit_code` and so could
-    # never observe a real call's exit code; this pins the CORRECT key.
-    assert exit_code(_call(result={"exitCode": 1})) == 1
-    assert exit_code(_call(result={})) is None
-    assert exit_code(_call(result={"exit_code": 1})) is None   # the OLD (wrong) key must NOT match
-
-
-def test_stale_read_hint_reads_result_staleReadFileStateHint():
-    assert stale_read_hint(_call(result={"staleReadFileStateHint": "stale"})) == "stale"
-    assert stale_read_hint(_call(result={})) is None
-    assert stale_read_hint(_call(result="not-a-dict")) is None
-
-
-def test_sandbox_bypassed_reads_input_dangerouslyDisableSandbox():
-    assert sandbox_bypassed(_call(input={"dangerouslyDisableSandbox": True})) is True
-    assert sandbox_bypassed(_call(input={"dangerouslyDisableSandbox": False})) is False
-    assert sandbox_bypassed(_call(input={})) is False
-    assert sandbox_bypassed(_call(input="not-a-dict")) is False
 
 
 def test_self_error_code_reads_error_or_error_code():
@@ -211,9 +188,9 @@ def test_calls_from_history_decodes_posttooluse_tuple_rows():
 def test_decode_row_normalizes_posttoolusefailure_with_real_error_text():
     row = _failure_tuple_row(1, "mcp__svc__poll", {"query": "x"}, "Connection error",
                              is_interrupt=True)
-    assert _decode_canon_row(row) == (
-        "PostToolUse", "mcp__svc__poll", {"query": "x"},
-        {"error": "Connection error", "interrupted": True})
+    assert calls_from_history([row]) == [{
+        "name": "mcp__svc__poll", "input": {"query": "x"},
+        "result": {"error": "Connection error", "interrupted": True}}]
 
 
 def test_timeout_at_turn_end_silent_on_last_transient_failure_terminal():

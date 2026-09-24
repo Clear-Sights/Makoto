@@ -145,29 +145,7 @@ _VERIFIER_NAME_RX = re.compile(
 _BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
 
 
-def _is_truthy_const(node) -> bool:
-    """True iff `node` is a literal constant that is TRUTHY. `None` and every falsy literal are
-    excluded — `bool(None)` is already False."""
-    return isinstance(node, ast.Constant) and bool(node.value)
-
-
-def _is_tautology(node) -> bool:
-    """True iff `node` is an ALWAYS-TRUTHY expression: a truthy literal, `not <falsy-const>`,
-    `bool(<truthy-const>)`, or a comparison whose two sides are the same expression under
-    `==`/`is`/`<=`/`>=`."""
-    if _is_truthy_const(node):
-        return True
-    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)\
-            and isinstance(node.operand, ast.Constant) and not node.operand.value:
-        return True
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "bool"\
-            and len(node.args) == 1 and not node.keywords and _is_truthy_const(node.args[0]):
-        return True
-    if isinstance(node, ast.Compare) and len(node.comparators) == 1\
-            and all(isinstance(op, (ast.Eq, ast.Is, ast.LtE, ast.GtE)) for op in node.ops)\
-            and ast.dump(node.left) == ast.dump(node.comparators[0]):
-        return True
-    return False
+from makoto.substrate.hollowTest import _is_tautology
 
 
 def _swallows(stmt) -> bool:
@@ -1173,122 +1151,9 @@ def undischarged_waiver_gate(history) -> Optional[Finding]:
 
 
 waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Stop", posture="ADVISE",
-               may_block=True,
                tests="SPEC",
                eats=frozenset({"history"}),
                run=lambda c: undischarged_waiver_gate(c.history))
-# gate.relative_path_citation -- flags a chat response that cites a file path in a non-absolute
-# (unclickable) form.
-#
-# Most terminal/IDE hosts only turn an ABSOLUTE path (or an explicit `file_path:line_number`
-# citation) into a clickable jump target; a relative or `~`-relative path renders as plain,
-# unclickable text in many hosts.
-#
-# ADVISORY tier only: a communication-quality signal, not an integrity violation.
-#
-# Detection is deliberately narrow and syntactic:
-#   - A candidate token needs real path shape: a directory separator plus a dotted-extension
-#     basename, or a bare `name.ext:NNN` line-citation.
-#   - Already-absolute ('/...') tokens are not flagged -- they ARE clickable.
-#   - A token inside a fenced code block is code being shown, not a citation.
-#   - A token immediately preceded by a URL scheme is excluded -- a URL path segment is not a
-#     filesystem citation.
-#   - A dotted CODE IDENTIFIER (`Finding.source_event_id`) or version/pattern id ("v1.2") is
-#     excluded by requiring the post-dot segment to be a plausible lowercase file extension,
-#     never purely digits and never capitalized.
-from bisect import bisect_right
-
-
-# A plausible file EXTENSION: short, lowercase, alphanumeric, not purely numeric -- separates a
-# real filename from a dotted code identifier or version/pattern id.
-_EXT_RX = r"[a-z][a-z0-9]{0,4}"
-# A directory-qualified path: at least one '<segment>/' before a dotted basename. The `~/` branch
-# admits only a dotted basename DIRECTLY under the home root -- '~/.claude/foo.py' is not matched
-# today, and the leading-'/' lookbehind blocks re-entry at the inner '.claude/foo.py'.
-_DIR_QUALIFIED_RX = re.compile(
-    rf"(?<![\w/.~-])((?:~/|(?:[\w.-]+/)+)[\w.-]*\.{_EXT_RX}(?::\d+)?)(?![\w/])"
-)
-# A bare `name.ext:NNN` line-citation with no directory at all -- still a citation, still
-# unclickable without an absolute root.
-_BARE_CITATION_RX = re.compile(
-    rf"(?<![\w/.~-])([\w-]+\.{_EXT_RX}:\d+)(?![\w/])"
-)
-_URL_SCHEME_RX = re.compile(r"(?:https?|ftp)://[\w.\-/]*$")
-_FENCE_RX = re.compile(r"(?m)^\s{0,3}```")
-
-
-def _in_fence(fence_ends: list, offset: int) -> bool:
-    """True iff `offset` sits inside a fenced code block -- an ODD count of ``` fences before it
-    means so. Equivalent to a whole-prefix parity scan, computed as a bisect over fence-end
-    offsets instead."""
-    return bisect_right(fence_ends, offset) % 2 == 1
-
-
-def _after_url_scheme(text: str, start: int) -> bool:
-    """True iff the text immediately before `start` ends in a URL scheme -- a URL path segment
-    is not a filesystem citation."""
-    return bool(_URL_SCHEME_RX.search(text[max(0, start - 32):start]))
-
-
-def find_relative_citations(text: str) -> list[tuple[str, int]]:
-    """Return [(path, offset), ...] for every non-absolute, non-URL, non-fenced path-shaped
-    citation in `text`, in order of first appearance, each path reported once."""
-    if not text:
-        return []
-    # End offset of every ``` fence marker, scanned once per call so `_in_fence` is a bisect, not
-    # a fresh whole-prefix scan per candidate.
-    fence_ends = [m.end() for m in _FENCE_RX.finditer(text)]
-    seen = set()
-    out = []
-    for rx in (_DIR_QUALIFIED_RX, _BARE_CITATION_RX):
-        for m in rx.finditer(text):
-            path = m.group(1)
-            # The absolute-path and URL guards are already implied by the two patterns' shared
-            # lookbehind; kept explicit against a future loosening of that lookbehind. The fence
-            # guard is the live one.
-            if path.startswith("/"):
-                continue                              # already absolute -> clickable, not flagged
-            if _in_fence(fence_ends, m.start()):
-                continue                              # code being shown, not a citation
-            if _after_url_scheme(text, m.start()):
-                continue                              # a URL path segment, not a filesystem path
-            if path in seen:
-                continue
-            seen.add(path)
-            out.append((path, m.start()))
-    out.sort(key=lambda t: t[1])
-    return out
-
-
-def relative_path_gate(text: str) -> Optional[Finding]:
-    """Fire iff `text` cites at least one non-absolute path-shaped location. Names every distinct
-    offender so several unclickable citations in one response get one finding."""
-    hits = find_relative_citations(text)
-    if not hits:
-        return None
-    names = ", ".join(f"`{p}`" for p, _ in hits[:5])
-    more = f" (+{len(hits) - 5} more)" if len(hits) > 5 else ""
-    return Finding(
-        pattern_id="gate.relative_path_citation",
-        file="",
-        line=0,
-        level="advisory",
-        message=(
-            f"cited path(s) not absolute, so not clickable in most hosts: {names}{more}. "
-            f"Prefer an absolute path (or this assistant's own file_path:line_number convention "
-            f"rooted at an absolute file_path)."
-        ),
-        retry_hint="Re-cite with an absolute path when referencing a specific file/location.",
-    )
-
-
-# `may_block=True` alongside posture="ADVISE" is structural-eligibility-only: dispatch keys off
-# may_block so the finding reaches _emit_decision, where it folds to ADVISE and never denies
-# (pinned by tests/test_dispatch.py).
-relpath_CHECK = _Check(id="gate.relative_path_citation", applies_at="Stop", posture="ADVISE",
-               tests="SPEC",
-               eats=frozenset({"text"}),
-               may_block=True, run=lambda c: relative_path_gate(c.text))
 # gate.claude_identity -- a commit about to be stamped with an identity nobody chose: the
 # container's git layer (an env var or config file) names Claude at the anthropic.com noreply
 # address, and a plain `git commit` takes that setting as if it were who is writing.
@@ -1500,7 +1365,7 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     return out
 
 
-fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK", may_block=True,
+fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOCK",
                tests="SPEC",
                eats=frozenset({"text", "history", "transcript_path", "session_id", "state_root"}),
                run=lambda c: canon_fingerprint_block_gate(
@@ -1517,8 +1382,8 @@ fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOC
 # the catalog, evaluated and recorded, but NEVER block.
 #
 # Sibling of canonFingerprints.py; see that module's comment for why this is two gate modules
-# instead of one. This id is named in makoto.registry's _ADVISORY_ALLOWLIST, the same mechanism
-# gate.self_wired uses for its own advisory-only tier.
+# instead of one. Its `posture="ADVISE"` below is what keeps it non-blocking, the same as
+# gate.self_wired's own advisory-only tier.
 
 
 def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
@@ -1544,7 +1409,7 @@ def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
 fpadv_CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", posture="ADVISE",
                tests="SPEC",
                eats=frozenset({"text", "history"}),
-               may_block=True, run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))
+               run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))
 
 # ==============================================================================================
 # planItemDrift
@@ -1586,7 +1451,7 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
 drift_CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="ADVISE",
                tests="SPEC",
                eats=frozenset({"open_plan_items"}),
-               may_block=True, run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))
+               run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))
 # content.phantom_citation predicate — phantom citation (Author-Year not in canonical set).
 #
 # Reads tool_input.content, never disk. Extracts Author-Year strings via
@@ -1730,9 +1595,9 @@ def liveness_run(ctx):
     return _run(ctx)
 
 
-hollow_CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=hollow_run,
+hollow_CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", run=hollow_run,
                eats=frozenset({"touched", "cwd", "fs_read"}), tests="SPEC")
-liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=liveness_run,
+liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", run=liveness_run,
                eats=frozenset({"touched", "cwd", "fs_read"}), tests="SPEC")
 
 # the SPEC shape: its rows, and the one Pre entry dispatch calls for any of them
@@ -1766,15 +1631,26 @@ lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK
 bound__TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
 
 
+_UNITTEST_BOUND_METHODS = frozenset({"assertLess", "assertLessEqual"})
+
+
 def _slack_ceiling(node: ast.AST) -> Optional[str]:
-    if not (isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare)
+    if (isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare)
             and len(node.test.ops) == 1 and isinstance(node.test.ops[0], (ast.Lt, ast.LtE))):
+        left, right, label_node = node.test.left, node.test.comparators[0], node.test
+    elif (isinstance(node, ast.Call)
+          and (getattr(node.func, "attr", None) or getattr(node.func, "id", None))
+              in _UNITTEST_BOUND_METHODS
+          and len(node.args) >= 2):
+        # unittest's own ceiling form: self.assertLess(len(x), N) / assertLessEqual(...) is the
+        # same "ceiling not exact count" shape as `assert len(x) < N`, just spelled as a call.
+        left, right, label_node = node.args[0], node.args[1], node
+    else:
         return None
-    left, right = node.test.left, node.test.comparators[0]
     counted = isinstance(left, ast.Call) and (
         getattr(left.func, "id", None) == "len" or getattr(left.func, "attr", None) == "count")
     if counted and isinstance(right, ast.Constant) and type(right.value) is int:
-        return ast.unparse(node.test)
+        return ast.unparse(label_node)
     return None
 
 
@@ -1850,7 +1726,7 @@ budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
 budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, relpath_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}

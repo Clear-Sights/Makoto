@@ -6,7 +6,7 @@ Field-name grounding (not guesses): `permission_mode`, `agent_id`, `agent_type` 
 confirmed-real, top-level fields on every Claude Code hook payload (hooks reference, fetched
 2026-07-06). No literal `isSubAgent`/`isSidechain`/`permissionMode` (camelCase) field exists in
 the documented schema — `agent_id` presence is the real, grounded substrate for "is this a
-subagent", surfaced here as the derived `GateContext.is_subagent` convenience.
+subagent", though no gate reads it that way today.
 """
 import sqlite3
 
@@ -17,14 +17,13 @@ from makoto.context import GateContext
 
 
 # ---- GateContext itself: additive fields, safe defaults ---------------------------------------
-def test_gate_context_permission_agent_fields_default_none_and_not_subagent():
+def test_gate_context_permission_agent_fields_default_none():
     ctx = GateContext(text="x", touched=frozenset(), empty=frozenset(),
                        testrun_output="", cwd="/tmp",
                        fs_exists=lambda p: False, fs_size=lambda p: None, fs_read=lambda p: None)
     assert ctx.permission_mode is None
     assert ctx.agent_id is None
     assert ctx.agent_type is None
-    assert ctx.is_subagent is False
 
 
 def test_gate_context_carries_permission_agent_fields_when_set():
@@ -35,7 +34,6 @@ def test_gate_context_carries_permission_agent_fields_when_set():
     assert ctx.permission_mode == "plan"
     assert ctx.agent_id == "agent-123"
     assert ctx.agent_type == "Explore"
-    assert ctx.is_subagent is True
 
 
 # ---- end-to-end: run_stop_checks decodes the raw payload onto the built GateContext ------------
@@ -62,7 +60,6 @@ def test_run_stop_checks_extracts_permission_mode_and_agent_fields_from_payload(
     assert ctx.permission_mode == "acceptEdits"
     assert ctx.agent_id == "sub-1"
     assert ctx.agent_type == "security-reviewer"
-    assert ctx.is_subagent is True
 
 
 def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(state_dir, tmp_path, monkeypatch):
@@ -80,4 +77,3 @@ def test_run_stop_checks_leaves_fields_none_when_payload_omits_them(state_dir, t
     assert ctx.permission_mode is None
     assert ctx.agent_id is None
     assert ctx.agent_type is None
-    assert ctx.is_subagent is False

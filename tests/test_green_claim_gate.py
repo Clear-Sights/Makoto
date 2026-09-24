@@ -18,8 +18,17 @@ from makoto.state import ledger as L
 def test_signal_tp_whole_suite_claims():
     for s in ["tests pass", "all tests pass", "the tests pass", "tests passed",
               "the suite passes", "the test suite is green", "the full test suite passes",
-              "CI is green", "tests are passing", "tests now pass", "the build passes"]:
+              "CI is green", "tests are passing", "tests now pass", "the build passes",
+              "The suite is green across the board."]:
         assert whole_suite_pass_claim(s), s
+
+
+def test_gate_fires_on_across_the_board_reword_over_red_run():
+    # 'green across the board' is the same whole-suite claim as 'is green' -- the trailing
+    # adverbial phrase must not defeat the predicate's clause-boundary check.
+    f = green_claim_gate("The suite is green across the board.",
+                         testrun_output="=== 1 failed, 4 passed in 1s ===")
+    assert f is not None and f.pattern_id == "gate.green_claim"
 
 
 def test_signal_neg_subset_claims():

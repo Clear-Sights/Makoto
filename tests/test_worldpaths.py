@@ -8,7 +8,6 @@ import json
 import subprocess
 
 from makoto.checks._worldpaths import (
-    pushed_ref_matches_world,
     resolve_in_synced_repos,
     resolve_in_worktree,
     synced_repo_roots,
@@ -59,17 +58,6 @@ def test_resolve_in_worktree_preserves_absence_and_root_confinement(tmp_path):
     (tmp_path / "outside.py").write_text("outside\n", encoding="utf-8")
     assert resolve_in_worktree("genuinely_absent.py", nested) is None
     assert resolve_in_worktree("../outside.py", nested) is None
-
-
-def test_pushed_ref_matches_world_requires_equal_local_and_origin_refs(tmp_path):
-    repo = _make_repo(tmp_path / "repo", {"seed.txt": "seed\n"})
-    oid = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    _git("update-ref", "refs/heads/topic/world", oid, cwd=repo)
-    assert pushed_ref_matches_world("I've pushed it to topic/world.", repo) is False
-    _git("update-ref", "refs/remotes/origin/topic/world", oid, cwd=repo)
-    assert pushed_ref_matches_world("I've pushed it to topic/world.", repo) is True
 
 
 # ==== synced_repo_roots =======================================================================

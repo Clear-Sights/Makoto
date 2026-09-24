@@ -63,7 +63,7 @@ def test_owned_and_dispatches_are_the_same_predicate():
 
 def test_module_form_does_not_swallow_other_makoto_submodules():
     assert MAKOTO_INVOCATION_RX.search("python3 -m makoto.dispatcher_v2") is None
-    assert MAKOTO_INVOCATION_RX.search("python3 -m makoto.configchange") is not None
+    assert MAKOTO_INVOCATION_RX.search("python3 -m makoto.dispatch") is not None
 
 
 # ---- (b) a decoy hook merely naming makoto must not read as wired ----------------------------

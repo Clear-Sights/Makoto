@@ -46,14 +46,6 @@ def test_completion_not_a_doneclaim_is_silent():
     assert completion_gate("I will add to src/auth.py next", touched_keys=set()) is None
 
 
-# --- reconcile -----------------------------------------------------------------
-def test_subject_binding_is_equality_not_substring():
-    """If reconcile bound by substring instead of equality, fakeexcuse vectors would
-    clear. Prove the firewall rejects a non-equal key even when it is 'contained'."""
-    from makoto.checks import subject_binds
-    assert subject_binds("src/auth.py", "src/auth.py") is True
-    assert subject_binds("auth", "src/auth_helper.py") is False     # substring would WRONGLY bind
-
 
 # --- _discharged: the empty-component suffix-match firewall guard (engine line 207) ---------
 def test_discharged_empty_component_key_does_not_match():

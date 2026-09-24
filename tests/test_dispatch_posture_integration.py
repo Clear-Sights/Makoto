@@ -169,11 +169,3 @@ def test_object_block_finding_still_folds_normally(monkeypatch):
     assert "additionalContext" in loose["hookSpecificOutput"], "LOOSE object BLOCK -> ADVISE"
     assert loose["hookSpecificOutput"].get("permissionDecision") != "ask"
     assert _emit(obj, "silent", monkeypatch) == "", "object BLOCK under SILENT stays suppressed"
-
-
-def test_meta_floor_recheck_certificate_agrees(monkeypatch):
-    """F4 consistency: with MAKOTO_RECHECK_CERTIFICATE=1 the certificate reconstruction folds
-    the meta floor identically (a mismatch would raise inside _emit_decision)."""
-    monkeypatch.setenv("MAKOTO_RECHECK_CERTIFICATE", "1")
-    out = _emit(_block_finding("content.self_mute_guard"), "loose", monkeypatch)
-    assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "ask"

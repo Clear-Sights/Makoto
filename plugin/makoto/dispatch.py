@@ -448,13 +448,6 @@ def _gates_enabled() -> bool:
     return os.environ.get("MAKOTO_DISABLE_GATES", "").strip().lower() not in ("1", "true", "yes", "on")
 
 
-@lru_cache(maxsize=1)
-def _blocking_gate_ids() -> frozenset:
-    """Stop-check ids eligible to reach `_emit_decision`, derived from `Check.may_block`.
-    Lazy and memoized to avoid catalog imports outside Stop dispatch."""
-    return frozenset(c.id for c in load_checks(edge="Stop") if c.may_block)
-
-
 def _run_predicates(conn, payload: dict, history: list, event_id: int,
                     state_dir: Path, payload_raw: str) -> list[Finding]:
     """keyword-prefilter the catalog, invoke each candidate predicate, collect Findings.
@@ -562,12 +555,6 @@ _HOOK_TO_EDGE = {"PreToolUse": "Pre", "PostToolUse": "Post",
 # Both settled tool terminals use the Post wire edge.
 
 
-def _recheck_certificate_enabled() -> bool:
-    """Whether MAKOTO_RECHECK_CERTIFICATE enables pre-wire verdict verification. A mismatch
-    raises."""
-    return os.environ.get("MAKOTO_RECHECK_CERTIFICATE", "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def _named(finding) -> str:
     """The finding's message, guaranteed to name the check that produced it.
 
@@ -604,8 +591,8 @@ def _worst_finding(findings: list[Finding]) -> tuple[str, Finding] | None:
 def _meta_check_ids() -> frozenset:
     """The check ids tagged `layer=\"meta\"` in the catalog (see Check.layer's docstring in
     makoto/registry.py) -- DERIVED from `load_checks()` across every edge, never a hand-synced
-    literal, same discipline as `_blocking_gate_ids()`. Lazy + memoized because the loader
-    imports every checks/*.py module: `_finding_layer` below only calls this on the one branch
+    literal. Lazy + memoized because the loader imports every checks/*.py module: `_finding_layer`
+    below only calls this on the one branch
     where the answer can matter (a BLOCK under a softening posture), so the default STRICT hot
     path never pays the import."""
     return frozenset(c.id for c in load_checks() if c.layer == "meta")
@@ -617,8 +604,7 @@ def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -
     raw BLOCK under LOOSE/SILENT with no oversight clamp). Everywhere else it returns \"object\",
     which is fold-equivalent to the true layer by `apply`'s own rule (the floor only acts on
     exactly that branch) -- so the catalog import in `_meta_check_ids` is never paid on the
-    default-STRICT hot path. Shared verbatim by `verdict.recheck_certificate` so the F4
-    certificate reconstruction folds identically."""
+    default-STRICT hot path."""
     if (outcome == verdict.BLOCK
             and mode in (verdict.LOOSE, verdict.SILENT)
             and not verdict.is_oversight_clamped(permission_mode)
@@ -628,7 +614,7 @@ def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -
 
 
 def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
-                   permission_mode=None) -> None:
+                   permission_mode=None, stop_hook_active: bool = False) -> None:
     """Fold the worst fired outcome through the configured MAKOTO_MODE posture (makoto.verdict) and
     render it via verdict.dispatch_posture's per-edge table, writing the body to stdout iff non-empty.
 
@@ -639,6 +625,10 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     `permission_mode` (D6, additive): threaded into `verdict.apply` so a session running
     bypassPermissions/dontAsk is clamped to STRICT regardless of the operator's configured
     MAKOTO_MODE — see `verdict.is_oversight_clamped`'s own docstring for why.
+
+    `stop_hook_active` (additive): the host payload's own flag, threaded to
+    `verdict.dispatch_posture` unchanged. It only gates the Stop-edge ADVISE rendering (a BLOCK
+    is never suppressed by it) — see `verdict._stop`'s own docstring for why.
     """
     worst = _worst_finding(findings)
     if worst is None:
@@ -649,6 +639,9 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         hint = _jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
+    if hook_event in ("Stop", "SubagentStop"):
+        # A stop gets one bounce, so every finding rides it; the worst alone hid its siblings.
+        detail = "\n".join([detail] + [_named(f) for f in findings if f is not finding])
     # The fold itself is DECISION machinery: a raise out of `posture`/`_finding_layer`/`apply`
     # (e.g. a malformed host value, or `_meta_check_ids` -> `load_checks` failing on the
     # LOOSE/SILENT+BLOCK branch) used to unwind through this function into `_dispatch`'s
@@ -668,35 +661,6 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             f"{detail}\n[makoto: verdict fold failed and fails closed on the raw outcome: "
             f"{type(exc).__name__}: {exc}]",
         )
-    if _recheck_certificate_enabled():
-        # CONTENT law (opt-in): pure data assembly from locals already in scope — the raw
-        # pre-fold inputs paired with the post-fold claim — rechecked BEFORE the wire write so
-        # a fold mismatch never reaches stdout. recheck_certificate raises on mismatch by
-        # design (see makoto.verdict's recheck section); that raise is unreachable unless
-        # MAKOTO_RECHECK_CERTIFICATE is explicitly set.
-        from makoto.verdict import VerdictCertificate, recheck_certificate
-        try:
-            recheck_certificate(VerdictCertificate(
-                findings=tuple(findings),
-                mode=mode,
-                permission_mode=permission_mode,
-                claimed_outcome=str(folded),
-                claimed_detail=getattr(folded, "detail", ""),
-            ))
-        except Exception as exc:
-            # CAUGHT, and the direction matters more than the catch. Letting the raise fly was the
-            # whole defect: it unwound past this wire write into `_dispatch`'s carriage handler,
-            # which records a fact and returns 0 -- so the one mechanism built to catch a corrupted
-            # fold produced NO verdict at all and the call was allowed. Detecting tampering in the
-            # verdict machinery and then failing OPEN on the detection is worse than not checking.
-            # A fold mismatch is a DECISION fault, not a carriage fault, and this repo's rule is
-            # open on carriage, closed on decision -- so the mismatch becomes the verdict, at BLOCK,
-            # bypassing `apply` entirely (the fold is exactly what is not to be trusted here).
-            folded = verdict.Decision(
-                verdict.BLOCK,
-                "makoto could not certify its own verdict fold and is failing closed: "
-                f"{type(exc).__name__}: {exc}",
-            )
     # Meta-floor teeth at the Stop edges: `apply` floors a meta BLOCK to ASK under a softening
     # posture, but `_STOP_WIRE` deliberately has no ASK entry ("ASK never blocks the agent from
     # stopping" — pinned by tests/test_posture_wire.py), so at Stop/SubagentStop that floored
@@ -724,7 +688,8 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     # this drops a mislabelled body, never the record of the fire.
     edge = _HOOK_TO_EDGE.get(hook_event, hook_event)
     try:
-        body = verdict.dispatch_posture(edge, folded, hook_event)
+        body = verdict.dispatch_posture(edge, folded, hook_event,
+                                        stop_hook_active=stop_hook_active)
     except Exception as exc:
         # Same fail-closed rule as the fold above: a raise while RENDERING the verdict must not
         # become an exit-0 allow. Re-render what the fold already concluded with minimal
@@ -801,85 +766,28 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
     audit.append_row(state_dir, row)
 
 
-def _admit_plan(conn, payload, payload_raw, event_id, state_dir) -> None:
-    """SessionStart: admit a declared Plan from the on-disk artifact. SessionStart never blocks —
-    it is an admission step, not a gate — so this always completes silently regardless of
-    whether a plan was actually declared."""
-    try:
-        from makoto.state import plan as _plan
-        _plan.declare_from_session_artifact(
-            payload.get("cwd") or os.getcwd(),
-            payload.get("session_id", ""),
-            conn,
-            source=payload.get("source", ""),
-        )
-    except Exception as exc:
-        print(f"makoto.dispatch: plan declare failed (non-fatal): {exc}",
-              file=sys.stderr)
-
-
 def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
     """Settled-tool accumulation, with failure evidence kept out of success-shaped state.
 
     Both PostToolUse terminals have already been stored by ``_ingest_event`` before this handler
     runs, so history-walking decoders can see successes and failures alike.  Only a successful
-    PostToolUse may mutate the update ledger, advance a plan, record a task event, or emit a test
-    delta.  PostToolUseFailure is evidence that the operation did *not* land; retaining it in
-    history while returning here prevents a failed Write/Bash from discharging gates or
-    latest-wins clobbering an earlier real result.
+    PostToolUse may mutate the update ledger or record a task event. PostToolUseFailure is
+    evidence that the operation did *not* land; retaining it in history while returning here
+    prevents a failed Write/Bash from discharging gates or latest-wins clobbering an earlier
+    real result.
 
     No predicate evaluation and no block — settled tool events accumulate evidence, never decide."""
     if payload.get("hook_event_name") == "PostToolUseFailure":
         return
     try:
         from makoto.state import ledger as _ledger
-        from makoto.kit import (_path_components, bash_output_text, compute_delta,
-                                is_test_runner)
         sid = payload.get("session_id", "")
-        cwd = payload.get("cwd") or os.getcwd()
-        delta_finding = None
-        # Compute test delta before record_update overwrites the prior run; surface it as ADVISE.
-        if payload.get("tool_name") == "Bash":
-            cmd = (payload.get("tool_input", {}) or {}).get("command", "") or ""
-            if is_test_runner(cmd):
-                prior_output = _ledger.latest_testrun(conn, sid)
-                tr = payload.get("tool_response", {})
-                new_output = bash_output_text(tr) if isinstance(tr, dict) else ""
-                delta = compute_delta(prior_output, new_output)
-                if delta:
-                    delta_finding = Finding(
-                        pattern_id="makoto.test_delta", file="", line=0, level="advisory",
-                        message=f"Test delta vs the prior recorded run: {delta}",
-                        retry_hint="")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # Locating tools declare or advance the live plan through the shared Plan.resolve contract.
-        from makoto.state import plan as _plan
-        if payload.get("tool_name") in _plan._LOCATING_TOOLS:
-            loc = _plan.event_location(payload.get("tool_name", ""), payload.get("tool_input") or {})
-            if loc is not None:
-                if _path_components(loc)[-2:] == [".claude", "makoto-plan.jsonl"]:
-                    # DECLARE: a locating call wrote the artifact itself -- (re-)admit it live,
-                    # LATEST-WINS, the same falsifiability gate declare_plan always enforces.
-                    _plan.declare_from_live_write(cwd, sid, conn)
-                else:
-                    # ADVANCE: a locating call at an OPEN node's own `where` marks it DONE.
-                    plan_obj = _plan.load_plan(conn, sid)
-                    if plan_obj is not None:
-                        nid = plan_obj.resolve(loc, payload.get("tool_name", ""))
-                        if nid is not None and nid in plan_obj.open_nodes():
-                            plan_obj.mark_done(nid)
-                            _plan.persist_plan(conn, sid, plan_obj)
         # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
         if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
             from makoto.state import plan as _plan_items
             _plan_items.record_task_event(conn, sid, payload)
-        if delta_finding is not None:
-            delta_finding = replace(delta_finding, source_event_id=event_id)
-            _emit_decision([delta_finding], payload.get("hook_event_name", ""),
-                           permission_mode=payload.get("permission_mode"))
-            # Persist the delta redirect finding
-            _record_audit(state_dir, [delta_finding], payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)
@@ -893,7 +801,9 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     completion claim. Gates evaluate on Stop AND SubagentStop (real last_assistant_message) —
     a SubagentStop payload carries the same shape (last_assistant_message, session_id, cwd,
     etc.) as a main-thread Stop, so a sub-agent's own completion claim is checked by the same
-    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless."""
+    gates. Stop gates block live under `_gates_enabled`; every fire is audited regardless. Every
+    Stop-edge finding reaches `_emit_decision` -- whether it actually blocks or only advises is
+    `verdict.apply`'s fold over the finding's own level/posture, not a filter here."""
     hook_event = payload.get("hook_event_name", "")
     history = _select_recent(conn, payload.get("session_id", ""), event_id)
     findings = _run_predicates(conn, payload, history, event_id,
@@ -906,15 +816,16 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
                          for f in run_stop_checks(conn, payload, history, root=state_dir)]
     blocking = list(findings)
     if _gates_enabled():
-        blocking += [gf for gf in gate_findings
-                     if gf.pattern_id in _blocking_gate_ids()]
-    _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"))
+        blocking += gate_findings
+    _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"),
+                  stop_hook_active=payload.get("stop_hook_active") is True)
     _record_audit(state_dir, findings + gate_findings, payload)
 
 
-# The table maps hook_event_name to its pipeline; unknown events use the evaluation pipeline.
+# The table maps hook_event_name to its pipeline; unknown events (including SessionStart, which
+# has no dedicated handler now that the declared-Plan admission step is gone) use the wildcard
+# evaluation pipeline.
 HANDLERS: dict[str, Any] = {
-    "SessionStart": _admit_plan,
     "PostToolUse": _accumulate,
     "PostToolUseFailure": _accumulate,
     "PreToolUse": _evaluate_and_gate,

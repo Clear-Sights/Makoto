@@ -75,11 +75,6 @@ _MAKOTO_ALLOW_RX = re.compile(r"makoto-allow\s*:\s*\S", re.IGNORECASE)
 # the hot boolean check stays a bare search and only the recording path pays for the capture.
 _MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE)
 
-# JWT/JOSE library callee gate — a `decode` call is a JWT verification iff its callee chain names a
-# jwt/jose library, BOUNDARY-delimited so `myjwthelper` does not match: `jwt`, `jose` (python-jose),
-# `pyjwt`.
-JWT_CALLEE_RX = re.compile(r"(?i)(?:^|\.)(?:jwt|jose|pyjwt)(?:\.|$)")
-
 # ---- Test-runner provenance + failure-verdict (shared by the ledger + the green-claim gate) ----
 # _TEST_RUNNER_RX is the legacy lexical runner vocabulary, retained as an import-compatible
 # export; actual command provenance is argv-structured in core._shell._command_runs_tests, so a
@@ -133,52 +128,6 @@ _FAILURE_MARKER_RX = re.compile(
 # char that abuts the count ('\x1b[31m2 failed'), killing the \b before `[1-9]\d* failed` so a
 # REAL failing run reads as green. Stripped before failure detection (is_failing_testrun).
 _ANSI_SGR_RX = re.compile(r"\x1b\[[0-9;:]*m")
-
-# _ADMIT_CORE — the retrospective first-person admission shapes.
-_ADMIT_CORE_RX = re.compile(
-    r"\bI\s+(?:didn['’]t|did\s+not)\s+(?:actually\s+)?"
-    r"(?:finish|complete|run|verify|test|check|implement|do)\b"          # hollow prior claim
-    r"|\bI\s+forgot\b"                                                    # omitted prior work (gated by _ASIDE)
-    r"|\bI\s+missed\b"                                                    # overlooked prior work
-    r"|\bI\s+overclaimed\b"
-    r"|\bI\s+was\s+wrong\b"
-    r"|\bI\s+should\s+have\b"
-    r"|\b(?:it|that|this)\s+(?:isn['’]t|wasn['’]t|is\s+not|was\s+not)\s+actually\s+done\b",
-    re.IGNORECASE,
-)
-
-# _FORWARD — a future frame voids the match: "I didn't run it YET, I WILL run it next"
-# describes work ahead, not a hollow prior claim. Requires both a `yet` token AND a future
-# verb in the admission's clause window.
-_FORWARD_YET_RX = re.compile(r"\byet\b", re.IGNORECASE)
-
-_FORWARD_FUTURE_RX = re.compile(r"\b(?:will|going\s+to|gonna|next|I['’]ll)\b", re.IGNORECASE)
-
-# _ASIDE — "I forgot to mention/note/add/say/point out ..." is a conversational aside, NOT
-# an admission that prior WORK is incomplete. Only the `forgot` core is gated by this.
-_ASIDE_RX = re.compile(r"\bI\s+forgot\s+to\s+(?:mention|note|add|say|point\s+out|tell)\b", re.IGNORECASE)
-
-# A nearby user-concession STRENGTHENS (not required). Surfaced for callers that want it.
-_USER_CONCESSION_RX = re.compile(
-    r"\b(?:you['’]re\s+right|as\s+you\s+said|you\s+caught|you\s+pointed\s+out|"
-    r"you\s+were\s+right|good\s+catch)\b",
-    re.IGNORECASE,
-)
-
-# The subset that asserts a COMPLETE set (the universal/completeness quantifiers).
-_UNIVERSAL_RX = re.compile(
-    r"\b(all|every|everything|fully|full|complete|completed|exhaustive|entire|whole|each)\b",
-    re.IGNORECASE,
-)
-
-# An enumeration of the scope: a count adjacent to a universal ("all 712", "5 of 5"),
-# OR a list/count anywhere ("\n- ", "\n1.", "N tests", "N%"). Presence => scope is checkable.
-_ENUMERATION_RX = re.compile(
-    r"\b\d[\d,]*\s*(of\s+\d|%|tests?|cases?|files?|patterns?|items?|atoms?|factors?|tasks?|steps?|"
-    r"passed|passing|failed|failing|xfailed|xpassed|skipped|green|/\s*\d)"
-    r"|(?:^|\n|\s)\s*(?:[-*]|\d+[.)])\s",
-    re.IGNORECASE,
-)
 
 _CITATION_RX = re.compile(
     r'\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?)\s+(?:et al\.\s+)?(\d{4})\b'
@@ -268,34 +217,6 @@ _NEG_FRAME_RX = re.compile(
     r"\b(not|never|without|unable|can'?t|cannot|couldn'?t|didn'?t|won'?t|"
     r"haven'?t|hasn'?t|fail(?:ed|s)?)\b|n'?t\b", re.IGNORECASE)
 
-# A universal-COMPLETION claim = a HEAD quantifier asserting the WHOLE scope is done, bound to
-# a done-word through FUNCTION WORDS ONLY: "all done", "everything is complete", "the whole
-# thing is finished". The head is the genuine unbounded quantifier — "everything", bare "all",
-# or the idiom "the whole/entire <scope-noun>". A DETERMINER ("all four phases", "every variant
-# tested") puts a CONTENT noun/number between the quantifier and the done-word: that is
-# distributive or scoped/enumerable, NOT the unbounded claim the advance gate owns. ('complete'
-# alone is a SCOPED done-word, never a quantifier — "the design is complete" must not fire; the
-# head quantifier is required.)
-_HEAD_UNIVERSAL = (r"(?:everything|all|the\s+(?:whole|entire)\s+"
-                   r"(?:thing|lot|project|repo|codebase|suite|implementation|task|job|set))")
-_DONE_WORD = (r"(?:done|complete|completed|finished|finalis\w+|finaliz\w+|implemented|built|"
-              r"wired|shipped|pushed|merged|deployed|landed|wrapped\s+up|in\s+place|ready)")
-# The done-word must sit at a CLAUSE BOUNDARY (end, punctuation, or a coordinating
-# conjunction/adverb), NOT be followed by a content noun. "all deployed TOOLS" / "all completed
-# TASKS" is the done-word used ADJECTIVALLY inside a noun phrase ("all [adj] [noun]") — a
-# distributive determiner, not a predicate (real-corpus FP: "Missing from ALL deployed tools").
-# "All done.", "everything is landed and …", "all pushed (digest …)" are predicates -> fire.
-_DONE_TRAIL = (r"(?=\s*(?:$|[.,;:!()\[\]{}<>\"'»—–\-]|"
-               r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also)\b))")
-# Function words permitted between the head and the done-word (copulas, adverbs, conjunctions,
-# anaphora). A CONTENT noun/number is NOT here, so a determiner reading breaks the match.
-_CONNECTOR = (r"(?:['’]s|is|are|was|were|been|now|then|already|finally|essentially|basically|"
-              r"effectively|properly|fully|completely|truly|quite|pretty\s+much|more\s+or\s+less|"
-              r"so\s+far|of\s+(?:it|them|that)|here|there|and|but|so|—|–|-|:|;|,)")
-_UNIVERSAL_DONE_RX = re.compile(
-    r"\b" + _HEAD_UNIVERSAL + r"\b(?:['’]s)?(?:\s+" + _CONNECTOR + r")*\s+"
-    + _DONE_WORD + r"\b" + _DONE_TRAIL,
-    re.IGNORECASE)
 _SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?])\s|\n")
 # A Python-source file gate (".py only — .md is prose"). One home for the security/integrity
 # checks that key on "is this a .py file" — consolidated from per-file `_TARGET_RX` copies
@@ -402,8 +323,9 @@ _RUNNING_SUBJECT = (
 # mid-word match: "itinerary" cannot satisfy `(?:is|are|'s|'re)` at the position right after
 # "it", so that alternative fails there and the engine moves on).
 _RUNNING_PRED = (
-    r"(?:is|are|['’]s|['’]re)\s*(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+)?"
-    r"(?:up\s+and\s+running|running|live|up|listening|serving)\b"
+    r"(?:is|are|['’]s|['’]re)\s*"
+    r"(?:now\s+|currently\s+|already\s+|successfully\s+|back\s+|still\s+|fully\s+)?"
+    r"(?:up\s+and\s+running|running|live|up|listening|serving|operational)\b"
 )
 # Two subject-less alternatives for banner-style status prose ("Now running.", "listening on
 # port 5173", "serving at http://...") — each anchored on a recency/port/URL token so a bare

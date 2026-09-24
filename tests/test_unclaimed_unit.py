@@ -43,6 +43,16 @@ def test_an_edit_introduces_a_unit_as_much_as_a_write():
     assert unclaimed_unit_gate([_unit_write(BARE, tool_name="Edit")]) is not None
 
 
+def test_a_top_level_lambda_assignment_is_a_unit_too():
+    """The same unclaimed-surface question under Python's other function-binding form:
+    `name = lambda ...: ...` names a unit exactly as a `def` would, and the AST scan must not
+    stop at FunctionDef/AsyncFunctionDef/ClassDef."""
+    finding = unclaimed_unit_gate([_unit_write("compute_ratio = lambda a, b: a / b\n")])
+    assert finding is not None
+    assert finding.pattern_id == "gate.unclaimed_unit"
+    assert "compute_ratio" in finding.message
+
+
 # ---- claim 1: something reaches it ----------------------------------------------------------
 
 def test_a_call_in_the_same_write_discharges_it():

@@ -273,10 +273,13 @@ def _test_verdict(c: Call):
     result = c["result"]
     out = bash_output_text(result)
     exit_code = result.get("exitCode", result.get("exit"))
-    if exit_code is not None:
-        if exit_code != 0:
-            return "red"
-    elif is_failing_testrun(out if out.strip() else str(result.get("error") or "")):
+    if exit_code is not None and exit_code != 0:
+        return "red"
+    # THE TAIL, always -- not only when exit_code is absent: a masked exit (`pytest -k x ||
+    # true`, a trailing pipe eating the real status) still leaves the runner's own "N failed"
+    # in the text, and a swallowed failure must not read as green just because the shell's own
+    # exit code was laundered on the way out.
+    if is_failing_testrun(out if out.strip() else str(result.get("error") or "")):
         return "red"
     return "green" if _SUCCESS_SUMMARY_RX.search(out) else None
 
@@ -369,8 +372,36 @@ def atom_test_edited(calls, text) -> bool:
     return _existing(calls, lambda c: _is_edit(c) and _is_test_path(_fp(c)))
 
 
+def _bash_edited_path(c: Call):
+    """A source-file path a Bash call wrote to directly: `sed -i ... file` or a shell
+    redirect (`>`/`>>`) into a file. Best-effort argv-level reading, not a shell evaluator --
+    a target reached through further indirection stays outside this net, the same open-world
+    tradeoff every other command-evidence reader in this module already accepts. Closes the
+    edit-tool-only blind spot in `atom_source_edited`: a source edit made via Bash is just as
+    real as one made via Edit/Write, and must count the same way."""
+    if c["name"] != "Bash":
+        return None
+    for argv, _op in _segments(c):
+        eff = _effective_argv(argv)
+        if eff and eff[0].rsplit("/", 1)[-1] == "sed" and any(
+                a == "-i" or a.startswith("-i") for a in eff[1:]):
+            positional = [a for a in eff[1:] if not a.startswith("-")]
+            if positional:
+                return positional[-1]
+        for i, tok in enumerate(argv):
+            if tok in (">", ">>") and i + 1 < len(argv) and argv[i + 1] != "/dev/null":
+                return argv[i + 1]
+    return None
+
+
 def atom_source_edited(calls, text) -> bool:
-    return _existing(calls, lambda c: _is_edit(c) and bool(_fp(c)) and not _is_test_path(_fp(c)))
+    def _edited(c):
+        if _is_edit(c) and bool(_fp(c)) and not _is_test_path(_fp(c)):
+            return True
+        path = _bash_edited_path(c)
+        return bool(path) and not _is_test_path(path)
+
+    return _existing(calls, _edited)
 
 
 def atom_assertion_weakened(calls, text) -> bool:

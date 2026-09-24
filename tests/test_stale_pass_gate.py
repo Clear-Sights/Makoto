@@ -24,6 +24,15 @@ def test_d_teeth_live_failing_node_plus_clean_green_claim_FIRES(tmp_path):
     assert "tests/t.py::test_red" in f.message
 
 
+def test_across_the_board_reword_FIRES(tmp_path):
+    # same 'green across the board' trailing-adverbial reword as gate.green_claim, against a
+    # live lastfailed record.
+    cwd = _cache(tmp_path, {"tests/t.py::test_red": True},
+                 [("tests/t.py", "def test_red():\n    assert False\n")])
+    f = stale_pass_gate("The suite is green across the board.", cwd=cwd)
+    assert f is not None and f.pattern_id == "gate.stale_pass"
+
+
 def test_a_stale_deleted_node_green_claim_silent(tmp_path):
     cwd = _cache(tmp_path, {"tests/gone.py::test_x": True})
     assert stale_pass_gate("All tests pass now.", cwd=cwd) is None
@@ -64,7 +73,6 @@ def test_gate_export_shape():
     assert CHECK.id == "gate.stale_pass"
     assert CHECK.applies_at == "Stop"
     assert CHECK.posture == "BLOCK"
-    assert CHECK.may_block is True
 
 
 def test_latency_budget_literal_lookup_class(tmp_path):

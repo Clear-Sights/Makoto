@@ -12,11 +12,10 @@ That publication claim is deliberately bounded: Shipped plugin — installable a
 
 **Integrity**, as this tool uses the word, is exactly that agreement: a claim the agent made this
 turn is matched by the record of the deed it names. Nothing wider — not correctness, not code
-quality, not whether the deed was a good idea. So `gate.relative_path_citation` says a bare
-path is "a communication-quality signal, not an integrity violation": it contradicts no claim
-against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is
-the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
-code* — and is not a second definition of this one.
+quality, not whether the deed was a good idea. A gate that only flags a communication-quality
+issue, never a contradiction against the record, is deliberately ADVISE tier for that reason.
+`makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is the lexical half of the same idea — the word-set
+naming integrity concepts *in a subject's code* — and is not a second definition of this one.
 
 Checks declare their inputs in `registry.Check.eats`. Runtime outcomes are folded by
 `verdict.apply`; receipt fields come from `state.ledger.emit_receipt`.
@@ -30,18 +29,20 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **17 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **3**, `gate`: **1**
-- **32 Stop checks** (all checks registered at the Stop edge)
-- **30 end-of-turn gates** (`may_block=True`)
-- **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **16 advisory end-of-turn gates** (advisory-allowlisted)
+- **30 Stop checks** (all checks registered at the Stop edge)
+- **30 end-of-turn gates** (every Stop check reaches the decision)
+- **14 blocking end-of-turn gates** (`posture == BLOCK`)
+- **16 advisory end-of-turn gates** (`posture == ADVISE`)
 
 <!-- END GENERATED: check-counts -->
 
 Two different things are called a *gate* in that list, and the counts are not comparable. The
-`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is a
-check registered at the Stop edge with `may_block=True`. No pre-check carries the prefix today —
-`gate.contract_order`, the one that did, was cut 2026-09-18 along with its Stop sibling. Every
-count above is scoped by edge, so no check is counted twice within a line.
+`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is any
+check registered at the Stop edge — every one of them reaches the decision pipeline, and its
+`posture` (`BLOCK`/`ADVISE`) alone decides whether a fire blocks the turn. One pre-check carries the prefix today —
+`gate.claude_identity` (Pre-tier, self-defense) — the same naming convention `gate.contract_order`
+used before it was cut 2026-09-18 along with its Stop sibling. Every count above is scoped by
+edge, so no check is counted twice within a line.
 
 **Verifier weakening** — a check silently neutered
 - `content.verifier_predicate_weakened` loose-comparator verifier (`startswith`/`endswith`/`re.match` where `==` is meant)
@@ -58,9 +59,16 @@ count above is scoped by edge, so no check is counted twice within a line.
 
 **Self-defense**
 - `content.self_mute_guard` makoto self-mute (disabling or un-wiring makoto via `settings.json`)
+- `gate.claude_identity` a commit or push that records Claude as author or committer from the git layer
 
 **Scope & contract discipline** — illusory progress and out-of-contract action (SPEC-5, ported by shape from Assay)
 - `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
+- `event.nested_budget` an inner `timeout` longer than the Bash call's own limit
+- `event.identical_retry` byte-identical Bash retry immediately following that same call's deterministic failure, with no intervening state change
+
+**Overdefinition** — a claim shaped wider than what was actually measured
+- `content.last_wins` a dict or JSON object repeats a key with a different value, so the last one silently wins
+- `content.bound_as_count` a test asserts a count under a literal ceiling instead of its exact value
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
 
@@ -96,7 +104,6 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.canon_fingerprints` | ported canon fingerprints in the robust core established by gold-oracle certification | blocking | established |
 | `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | advisory | advisory |
 | `gate.canon_fingerprints_advisory` | the advisory remainder (soft/claim atoms or gold-disqualified) | advisory | advisory |
-| `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |
 | `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
 | `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | advisory | advisory |
 | `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | advisory | advisory |
@@ -110,6 +117,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.report_before_run` | a run's success written into prose with no verifier run before it | advisory | advisory |
 | `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | advisory | advisory |
 | `gate.pasted_fix` | one repair's text edited into a second file with no verifier run between the two landings | advisory | advisory |
+| `gate.undeclared_falsifiable` | the checks/ catalog itself has an orphan module or a dangling manifest id | advisory | advisory |
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 
@@ -309,13 +317,6 @@ Check and audit failures retain their own reporting paths.
 Audit writes are best-effort. If the append fails (disk full, permission denied), dispatch prints one
 stderr line and continues with its original exit code. The audit subsystem cannot cause makoto to
 mis-block or mis-allow a tool call — a fundamental separation-of-concerns invariant.
-
-## ConfigChange watch (advisory + evidence-gated blocking)
-
-The optional `ConfigChange` command is `python -m makoto.configchange`; it is not shipped in
-[hooks.json](plugin/hooks/hooks.json). It advises on missing wiring and blocks a strip only
-when an install manifest or prior snapshot establishes that the exact path was wired.
-`configchange._APPLICABLE_SOURCES` owns its source scope; unexpected faults fail open.
 
 ## Receipt: word → deed → record → receipt
 

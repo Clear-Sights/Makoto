@@ -3,38 +3,42 @@
 Historically, `makoto/vocab.py`'s now-retired `load_prechecks()` enforced this invariant
 for prechecks at LOAD TIME (`_ALLOWED_FIRE_LEVELS == {"error"}`, raising on any other
 fire_level). That enforcement now lives in `tests/test_pre_tier_block_invariant.py` instead (see
-`registry.load_precheck_catalog()`'s own docstring). Stop gates have no equivalent
-load-time enforcement — Check carries no
-`fire_level`/`blocking` field at all (only `may_block`, the structural discovery-eligibility
-signal; by design that is NOT the same as "blocks" — the level lives on the `Finding` each gate's
-predicate constructs when it actually fires).
-tests/test_gate_shape.py::test_gate_dataclass_has_no_undeclared_shadow_state only pins the Check
-dataclass SHAPE (no reintroduced 'blocking' field) — it never inspects what level a gate's
-predicate emits when triggered. `gate.self_wired` (formerly stopchecks/stopcheck_self_wired.py) is the ONE
-documented advisory exception (2026-07-05, DESIGN DECISION 6: an advisory-only partial-hook-strip
-detector that must never block per the "advisory over blocking" standing policy). Nothing before
-this test caught a SECOND silent advisory (or any other non-"error") gate being added later.
+`registry.load_precheck_catalog()`'s own docstring). Stop gates have no equivalent load-time
+enforcement — a Check's declared `.posture` (BLOCK/ADVISE) is what a gate is SUPPOSED to fire at;
+the level actually lives on the `Finding` each gate's predicate constructs when it fires, and
+nothing at load time stops the two from disagreeing. `gate.self_wired` (formerly
+stopchecks/stopcheck_self_wired.py) is the best-known example: it declares `posture="ADVISE"`
+(2026-07-05, DESIGN DECISION 6) and must never emit "error".
 
 This test fires EVERY live gate discovered by `_live_gates()` through its real `.run(ctx)`
 entry point — the exact call `run_stop_checks` makes — with a scenario proven (via each gate's own
 existing sentinel tests / test_dispatch.py's behavioral pins, cited per-branch below) to make it
-emit at least one Finding, then asserts the emitted level is "error" (the only blocking level,
-makoto.vocab._ALLOWED_FIRE_LEVELS) UNLESS the gate id is in the explicit, named allowlist below.
-A future gate that ships a silent advisory tier without updating the allowlist reddens here.
+emit at least one Finding, then asserts the emitted level matches its declared posture: "error"
+for a BLOCK-posture gate, "advisory" for an ADVISE-posture gate. A future gate whose Finding.level
+disagrees with its own declared posture reddens here.
 """
 from __future__ import annotations
 
 import json
 import os
 
-from makoto.registry import _ADVISORY_ALLOWLIST, load_checks
+from makoto.registry import POSTURE_ADVISE, POSTURE_BLOCK, load_checks
 from makoto.context import GateContext
 
 
+# gate.undeclared_falsifiable is structurally unlike every other gate here: its `run` ignores
+# the GateContext entirely and audits the REAL checks/ package on disk (orphan modules / dangling
+# manifest ids), so there is no synthetic ctx that can make it fire without actually planting an
+# orphan file into the live package -- which would corrupt the catalog for every other test in
+# this process. Its Finding shape and level ("advisory", pinned) are already covered directly by
+# tests/test_undeclared_falsifiable.py, so it is excluded from this module's scenario-driven scan.
+_SELF_AUDIT_GATES = frozenset({"gate.undeclared_falsifiable"})
+
+
 def _live_gates() -> list:
-    """The checks eligible to reach the Stop decision pipeline at all (formerly:
-    load_stopchecks()'s GATE-export scan) -- Check.may_block=True."""
-    return [c for c in load_checks(edge="Stop") if c.may_block]
+    """Every check discovered at the Stop edge, minus the self-audit gate (see
+    `_SELF_AUDIT_GATES`) -- all of them reach the decision pipeline now."""
+    return [c for c in load_checks(edge="Stop") if c.id not in _SELF_AUDIT_GATES]
 
 def _ctx(**over):
     base = dict(text="", touched=frozenset(), empty=frozenset(), testrun_output="",
@@ -135,11 +139,6 @@ def _scenario_self_wired(tmp_path):
         "PostToolUse": [{"hooks": [{"command": "python3 -m makoto.dispatch"}]}],
     }})
     return _ctx(fs_read=lambda p: wired if p == ".claude/settings.json" else None)
-
-
-def _scenario_relative_path_citation(tmp_path):
-    # fires: tests/test_relative_path_citation.py::test_gate_fires_finding_advisory_never_error
-    return _ctx(text="see substrate/hollowTest.py:146 for the detector")
 
 
 def _scenario_plan_item_drift(tmp_path):
@@ -307,7 +306,6 @@ _SCENARIOS = {
     "gate.canon_fingerprints": _scenario_canon_fingerprints,
     "gate.canon_fingerprints_advisory": _scenario_canon_fingerprints_advisory,
     "gate.self_wired": _scenario_self_wired,
-    "gate.relative_path_citation": _scenario_relative_path_citation,
     "gate.plan_item_drift": _scenario_plan_item_drift,
     "gate.claimed_running": _scenario_claimed_running,
     "gate.claimed_shipped": _scenario_claimed_shipped,
@@ -370,35 +368,25 @@ def test_every_gate_scenario_actually_fires(tmp_path):
     assert not silent, f"scenario(s) did not fire (fixture drift?): {silent}"
 
 
-def _violation(gate_id: str, level: str):
-    """THE invariant, as a callable, so its teeth test can APPLY it instead of restating it.
-
-    The teeth test below used to spell out `(id not in allowlist) and (level != "error")` in its
-    own words. That proves nothing about the rule that ships: the two can be edited apart and
-    the teeth test goes on passing over a rule that has stopped discriminating. Both callers run
-    this function now.
-    """
-    if gate_id in _ADVISORY_ALLOWLIST:
-        if level == "error":
-            return (gate_id, level, "allowlisted gate emitted 'error' — allowlist entry is "
-                                    "stale, remove it")
-        return None
-    if level != "error":
-        return (gate_id, level, "non-blocking level on a non-allowlisted gate — either this is "
-                                "a bug, or the gate needs an explicit, named, "
-                                "DESIGN-DECISION-cited allowlist entry")
+def _violation(gate_id: str, posture: str, level: str):
+    """THE invariant, as a callable, so its teeth test can APPLY it instead of restating it: a
+    gate's emitted Finding.level must agree with its own declared `.posture` -- BLOCK posture
+    fires "error", ADVISE posture fires "advisory". Both callers run this function now."""
+    expected = "error" if posture == POSTURE_BLOCK else "advisory"
+    if level != expected:
+        return (gate_id, posture, level,
+                f"declared posture={posture!r} but fired level={level!r}; the two must agree")
     return None
 
 
 def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
-    """The runtime invariant: every live Stop gate's emitted Finding.level is "error" (the sole
-    blocking level, makoto.vocab._ALLOWED_FIRE_LEVELS) UNLESS its id is in _ADVISORY_ALLOWLIST.
-    A future gate that silently ships a second advisory-tier exception reddens THIS test, not just
-    a shape/dataclass pin."""
+    """The runtime invariant: every live Stop gate's emitted Finding.level agrees with its own
+    declared `.posture` -- "error" for BLOCK, "advisory" for ADVISE. A future gate whose fired
+    level disagrees with its own posture reddens THIS test, not just a shape/dataclass pin."""
     violations = []
     for g in _live_gates():
         for finding in _findings_for(g, tmp_path / g.id):
-            violation = _violation(g.id, finding.level)
+            violation = _violation(g.id, g.posture, finding.level)
             if violation:
                 violations.append(violation)
     assert not violations, violations
@@ -406,19 +394,16 @@ def test_every_fired_gate_is_blocking_level_unless_named_advisory(tmp_path):
 
 def test_TEETH_allowlist_check_catches_an_unnamed_advisory_gate():
     """Planted-violation teeth (mirrors tests/test_gate_shape.py's TEETH_* style): a hypothetical
-    gate id NOT in the allowlist that emits level="advisory" must be flagged by the same logic
-    the real test above applies, proving the check has discriminating power rather than always
-    passing vacuously."""
-    assert _ADVISORY_ALLOWLIST, "the allowlist is empty; both halves below would be vacuous"
-    # An id NOT on the allowlist emitting a non-blocking level: the defect the rule exists for.
-    assert _violation("gate.not_on_the_allowlist", "advisory") is not None, (
-        "the shipped invariant does not report an unnamed gate shipping an advisory level")
-    # ...and a named exception at the same level must NOT be reported, or the rule reports
+    BLOCK-posture gate that fires level="advisory" (or vice versa) must be flagged by the same
+    logic the real test above applies, proving the check has discriminating power rather than
+    always passing vacuously."""
+    # A BLOCK-posture gate firing a non-blocking level: the defect the rule exists for.
+    assert _violation("gate.hypothetical", POSTURE_BLOCK, "advisory") is not None, (
+        "the shipped invariant does not report a BLOCK-posture gate firing an advisory level")
+    # ...and an ADVISE-posture gate firing "advisory" must NOT be reported, or the rule reports
     # everything and its silence above means nothing.
-    named = sorted(_ADVISORY_ALLOWLIST)[0]
-    assert _violation(named, "advisory") is None, (
-        f"the shipped invariant reports {named}, which is on the allowlist precisely so it may "
-        f"ship an advisory level")
-    # The other direction the rule also owns: an allowlisted gate that has started blocking.
-    assert _violation(named, "error") is not None, (
-        f"a stale allowlist entry -- {named} now emitting 'error' -- goes unreported")
+    assert _violation("gate.hypothetical", POSTURE_ADVISE, "advisory") is None, (
+        "the shipped invariant reports an ADVISE-posture gate firing the level its posture calls for")
+    # The other direction the rule also owns: an ADVISE-posture gate that has started blocking.
+    assert _violation("gate.hypothetical", POSTURE_ADVISE, "error") is not None, (
+        "an ADVISE-posture gate now emitting 'error' goes unreported")

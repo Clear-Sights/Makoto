@@ -209,3 +209,16 @@ def test_witness_no_bash_call_at_all_still_fires():
     f = claimed_running_gate("I started the server. It is now running.", history=[])
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
+
+def test_tp_adjectival_operational_predicate():
+    # "fully operational" is the same ongoing-liveness claim as "up and running" -- 'operational'
+    # was missing from the closed state-word list, and 'fully' from the optional adverb slot.
+    assert _running_claim("I restarted the payment service; it's fully operational now.") \
+        is not None
+
+
+def test_reword_operational_claim_fires_with_no_evidence():
+    f = claimed_running_gate(
+        "I restarted the payment service; it's fully operational now.", history=[])
+    assert f is not None and f.pattern_id == "gate.claimed_running"
+

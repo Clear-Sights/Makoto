@@ -103,6 +103,23 @@ def test_two_adjacent_dangling_pres_are_silent():
     assert recur_stuck(calls_from_history(history)) is False
 
 
+# ---- incidental whitespace must not split the key -----------------------------------------
+def test_pairing_input_ignores_trailing_whitespace_on_a_string_leaf():
+    """A retry differing only by a stray trailing space is the SAME call for verdict/pairing
+    identity -- a literal string compare would treat it as a distinct key and let the loop
+    escape both recur_stuck's run-length check and timed_out_at_turn_end's transient budget."""
+    assert _pairing_input({"command": "flaky-tool --check"}) == \
+        _pairing_input({"command": "flaky-tool --check "})
+
+
+def test_a_retry_differing_only_by_trailing_whitespace_still_fires():
+    history = [_row("PreToolUse", "Bash", {"command": "flaky-tool --check"}),
+               _row("PostToolUse", "Bash", {"command": "flaky-tool --check"}, error=True),
+               _row("PreToolUse", "Bash", {"command": "flaky-tool --check "}),
+               _row("PostToolUse", "Bash", {"command": "flaky-tool --check "}, error=True)]
+    assert recur_stuck(calls_from_history(history)) is True
+
+
 def test_every_fired_primitive_names_an_action():
     history = [_row("PostToolUse", "Bash", {"command": "q"}, error=True)] * 2
     hints = {cid: hint for cid, _, hint in fired_primitives(history)}

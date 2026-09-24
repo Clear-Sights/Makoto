@@ -27,8 +27,7 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # two-segment path so a bare `dispatch.sh` living anywhere else doesn't match),
 # `${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh` (the plugin-manifest shim form, anchored the
 # same way plus a trailing `\b` so a foreign or decoy filename never reads as makoto's), and the
-# module forms `-m makoto.dispatch` / `-m makoto.configchange` (`\b` so `makoto.dispatcher_v2`
-# never matches).
+# module form `-m makoto.dispatch` (`\b` so `makoto.dispatcher_v2` never matches).
 #
 # An ownership predicate that recognizes a filename nothing installs is a standing licence to
 # delete a file makoto did not write, so no unused form is kept "just in case".
@@ -43,7 +42,7 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 MAKOTO_INVOCATION_RX = re.compile(
     r"makoto_state[/\\]dispatch\.sh"
     r"|makoto[/\\]_dispatch_shim\.sh\b"
-    r"|-m\s+makoto\.(?:dispatch|configchange)\b",
+    r"|-m\s+makoto\.dispatch\b",
     re.IGNORECASE)
 
 

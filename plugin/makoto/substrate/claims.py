@@ -19,14 +19,14 @@ _INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 # respects exactly the clause/line boundaries the negation veto respects and a previous
 # sentence's last word can never masquerade as the head's modifier.
 _PREMOD_RUN_RX = re.compile(r"(?:\w+[ \t]+)+\Z")
-# Right boundary for the success predicate — the same shape as vocab._DONE_TRAIL on the
-# universal-done gate: the predicate must sit at a clause boundary (end of line/text, any
-# punctuation, or a coordinating word), NOT flow into a content noun. 'the build passes
-# ARGUMENTS to pytest' / 'the tests pass RATE' is the verb/noun used attributively, not a
+# Right boundary for the success predicate: the predicate must sit at a clause boundary (end of
+# line/text, any punctuation, or a coordinating word), NOT flow into a content noun. 'the build
+# passes ARGUMENTS to pytest' / 'the tests pass RATE' is the verb/noun used attributively, not a
 # whole-suite green claim.
 _PRED_TRAIL_RX = re.compile(
     r"(?=[^\S\n]*(?:$|\n|[^\w\s]|"
-    r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also|again)\b))",
+    r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also|again|"
+    r"across\s+the\s+board)\b))",
     re.IGNORECASE)
 # Post-match negation window terminator: the claim's own clause only.
 _POST_CLAUSE_RX = re.compile(r"[,;.!?\n]|—|–")
