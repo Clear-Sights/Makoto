@@ -1,13 +1,21 @@
-"""tests for makoto.state.audit — JSONL writer, reader, error log, snippet helper.
+"""tests for makoto.state.audit — JSONL writer, error log, snippet helper.
 
 1.0.3 collapse: dropped summarize / read_recent_events tests + `audit` CLI
 subprocess tests (their corresponding code was removed). Kept tests for
-AuditRow + append_row + read_rows + append_error + _make_snippet — the
-functions the dispatcher actually uses.
+AuditRow + append_row + append_error + _make_snippet — the functions the
+dispatcher actually uses. The log is write-only in production (no plugin
+reader), so `read_rows`/`_read_jsonl` were removed with the rest of the
+dead reader surface (state/audit.py); a round-trip check here reads the
+jsonl file directly instead.
 """
 import json
 import pytest
-from makoto.state.audit import AuditRow, append_row, read_rows, append_error
+from makoto.state.audit import AuditRow, append_row, append_error
+
+
+def _read_jsonl(path):
+    """Local test-only reader: one dict per line of <path>, in order."""
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def _sample_row(**overrides) -> AuditRow:
@@ -65,41 +73,10 @@ def test_read_rows_round_trips_appended_data(tmp_path):
     """write + read returns equivalent dicts."""
     append_row(tmp_path, _sample_row(event="live.stop"))
     append_row(tmp_path, _sample_row(event="pre_commit"))
-    rows = list(read_rows(tmp_path))
+    rows = _read_jsonl(tmp_path / "audit.jsonl")
     assert len(rows) == 2
     assert rows[0]["event"] == "live.stop"
     assert rows[1]["event"] == "pre_commit"
-
-
-def test_read_rows_missing_file_returns_empty(tmp_path):
-    """no audit.jsonl -> empty iterator (not an error)."""
-    assert list(read_rows(tmp_path)) == []
-
-
-def test_read_rows_skips_malformed_lines(tmp_path):
-    """invalid JSON lines are silently skipped, not raised."""
-    log = tmp_path / "audit.jsonl"
-    log.write_text(
-        json.dumps({"ts": "2026-01-01T00:00:00Z", "event": "good"}) + "\n"
-        + "this is not json\n"
-        + json.dumps({"ts": "2026-01-02T00:00:00Z", "event": "alsogood"}) + "\n",
-        encoding="utf-8",
-    )
-    rows = list(read_rows(tmp_path))
-    assert len(rows) == 2
-    assert rows[0]["event"] == "good"
-    assert rows[1]["event"] == "alsogood"
-
-
-def test_read_rows_since_filter_drops_earlier_rows(tmp_path):
-    """since='2026-05-24T01:30:00Z' drops rows with smaller ts strings."""
-    for ts in ["2026-05-24T01:00:00.000000Z",
-               "2026-05-24T02:00:00.000000Z",
-               "2026-05-24T03:00:00.000000Z"]:
-        append_row(tmp_path, _sample_row(ts=ts))
-    rows = list(read_rows(tmp_path, since="2026-05-24T01:30:00Z"))
-    assert len(rows) == 2
-    assert rows[0]["ts"].startswith("2026-05-24T02")
 
 
 def test_append_row_also_chain_appends_with_matching_root(tmp_path):
@@ -123,7 +100,7 @@ def test_append_row_audit_jsonl_line_carries_additive_chain_fields(tmp_path):
     use dict.get, so this is back-compatible), and two appends chain-link correctly."""
     append_row(tmp_path, _sample_row(session_id="a"))
     append_row(tmp_path, _sample_row(session_id="b"))
-    rows = list(read_rows(tmp_path))
+    rows = _read_jsonl(tmp_path / "audit.jsonl")
     assert len(rows) == 2
     assert rows[0]["prev_hash"] == ""
     assert rows[1]["prev_hash"] == rows[0]["row_hash"]
@@ -137,7 +114,7 @@ def test_append_row_chain_fault_never_blocks_audit_jsonl_write(tmp_path, monkeyp
         raise RuntimeError("chain unavailable")
     monkeypatch.setattr(_ledger, "append", _boom)
     append_row(tmp_path, _sample_row(event="live.stop"))
-    rows = list(read_rows(tmp_path))
+    rows = _read_jsonl(tmp_path / "audit.jsonl")
     assert len(rows) == 1
     assert rows[0]["event"] == "live.stop"
     assert "prev_hash" not in rows[0] and "row_hash" not in rows[0]

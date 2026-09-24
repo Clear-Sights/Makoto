@@ -1,4 +1,4 @@
-"""append-only observability log — JSONL writer + reader + structured error log.
+"""append-only observability log — JSONL writer + structured error log.
 
 Three append-only file outputs under the caller's state root:
 - audit.jsonl           : one row per Finding-producing dispatcher invocation
@@ -10,13 +10,15 @@ root (see `_chain_then_append`).
 Concurrent appends lean on O_APPEND short-write atomicity, which holds only while a row stays
 inside the atomic write unit (~PIPE_BUF, 4KB): true of an error or exemption row, NOT guaranteed
 of an audit row, whose `findings` list carries every finding's message AND snippet.
+
+Write-only in production: no plugin code reads these logs back (a human or external tool reads
+the jsonl files directly), so this module carries no readers.
 """
 from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
 
 
 @dataclass
@@ -83,32 +85,6 @@ def _chain_then_append(state_root: Path, filename: str, structural_kind: str,
     _append_jsonl(state_root, filename, obj)
 
 
-def _read_jsonl(state_root: Path, filename: str, since: str | None) -> Iterator[dict]:
-    """stream <state_root>/<filename> line by line, yielding one dict per valid JSON row. Missing
-    file -> empty; blank/malformed lines skipped; optional ISO-8601 `since` filters by `ts`. The
-    one reader all three append-only logs share."""
-    log = state_root / filename
-    if not log.exists():
-        return
-    with log.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if since is not None and row.get("ts", "") < since:
-                continue
-            yield row
-
-
-def read_rows(state_root: Path, since: str | None = None) -> Iterator[dict]:
-    """stream the audit (fires) log; one dict per valid JSON row. See _read_jsonl for the contract."""
-    yield from _read_jsonl(state_root, "audit.jsonl", since)
-
-
 def append_error(state_root: Path, event_id: int | None,
                  pattern_id: str | None, exc: BaseException,
                  *, session_id: str = "", tool_name: str = "",
@@ -148,16 +124,6 @@ def append_error(state_root: Path, event_id: int | None,
     })
 
 
-def read_errors(state_root: Path, since: str | None = None) -> Iterator[dict]:
-    """stream the dispatch-error log; one dict per valid JSON row. See _read_jsonl for the contract.
-
-    Lets this log answer "were any checks skipped this session?" -- absence of a finding is only
-    good news if nothing was silently unable to produce one. No production caller reads it today;
-    `dispatch` only writes here, so this is write-only in practice.
-    """
-    yield from _read_jsonl(state_root, "dispatch_errors.jsonl", since)
-
-
 def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
                      line: int, reason: str, snippet: str = "",
                      session_id: str = "", tool_name: str = "") -> None:
@@ -192,6 +158,3 @@ def append_exemption(state_root: Path, *, pattern_id: str, kind: str, file: str,
     _chain_then_append(state_root, "exemptions.jsonl", "exemption", obj, chain_payload)
 
 
-def read_exemptions(state_root: Path, since: str | None = None) -> Iterator[dict]:
-    """stream the exemptions log; keeps it from being a write-only artifact. See _read_jsonl."""
-    yield from _read_jsonl(state_root, "exemptions.jsonl", since)

@@ -13,6 +13,15 @@ from makoto.state import audit
 from makoto import kit as factories
 
 
+def _exemptions(st) -> list:
+    """Local test-only reader: exemptions.jsonl is write-only in production (no plugin reader),
+    so audit.read_exemptions was removed with the rest of the dead reader surface."""
+    log = st / "exemptions.jsonl"
+    if not log.exists():
+        return []
+    return [json.loads(ln) for ln in log.read_text().splitlines() if ln.strip()]
+
+
 def _evt(fp: str, content: str, sid: str = "s1", tool: str = "Write") -> dict:
     return {"hook_event_name": "PreToolUse", "session_id": sid, "tool_name": tool,
             "tool_input": {"file_path": fp, "content": content}}
@@ -36,7 +45,7 @@ def test_exempted_real_match_is_recorded(state_dir):
                "    write_audit_trail()  # makoto-allow: pinned internal dev host\n")
     out = _run("content.env_gated_audit", _evt("client.py", content), conn)
     assert out is None, "the marker must still exempt (no block)"
-    rows = list(audit.read_exemptions(st))
+    rows = _exemptions(st)
     assert len(rows) == 1, "an exempted REAL match must leave exactly one on-record exemption row"
     r = rows[0]
     assert r["pattern_id"] == "content.env_gated_audit"
@@ -54,7 +63,7 @@ def test_marker_without_a_real_match_records_nothing(state_dir):
     content = "write_audit_trail()  # makoto-allow: nothing wrong here\n"
     out = _run("content.env_gated_audit", _evt("client.py", content), conn)
     assert out is None
-    assert list(audit.read_exemptions(st)) == [], "no real match -> no exemption noise"
+    assert _exemptions(st) == [], "no real match -> no exemption noise"
     conn.close()
 
 
@@ -78,7 +87,7 @@ def test_regex_factory_path_also_records(state_dir):
     content = "audit_skip = true  # makoto-allow: legacy flag, owner aware\n"
     out = _run("content.integrity_suppression_flag", _evt("config.toml", content), conn)
     assert out is None
-    rows = list(audit.read_exemptions(st))
+    rows = _exemptions(st)
     assert len(rows) == 1 and rows[0]["pattern_id"] == "content.integrity_suppression_flag"
     assert "owner aware" in rows[0]["reason"]
     conn.close()
@@ -97,7 +106,7 @@ def test_disabled_pattern_suppression_is_recorded(state_dir, monkeypatch):
     payload = {"hook_event_name": "PreToolUse", "session_id": "s2", "tool_name": "Bash",
                "tool_input": {"command": kw + " something"}}
     _run_predicates(conn, payload, [], 1, st, json.dumps(payload))
-    rows = [r for r in audit.read_exemptions(st) if r["kind"] == "disabled-pattern"]
+    rows = [r for r in _exemptions(st) if r["kind"] == "disabled-pattern"]
     assert any(r["pattern_id"] == pat.id for r in rows), "a muted keyword-hit pattern must be recorded"
     conn.close()
 
@@ -111,11 +120,11 @@ def test_makoto_allow_reason_extracts_and_trims(tmp_path):
 
 
 def test_append_exemption_round_trips_through_reader(state_dir):
-    """append_exemption writes a row read_exemptions yields back — the writer/reader pair is whole."""
+    """append_exemption writes a row the jsonl file yields back — the write path is whole."""
     st = state_dir
     audit.append_exemption(st, pattern_id="content.timing_unsafe_compare", kind="makoto-allow", file="h.py", line=4,
                            reason="constant-time compare not needed here", snippet="a == b")
-    rows = list(audit.read_exemptions(st))
+    rows = _exemptions(st)
     assert len(rows) == 1 and rows[0]["pattern_id"] == "content.timing_unsafe_compare" and rows[0]["line"] == 4
 
 
@@ -135,7 +144,7 @@ def test_append_exemption_also_chain_appends_with_renamed_kind(state_dir):
     assert rows[0]["kind"] == "exemption"
     assert rows[0]["exemption_kind"] == "makoto-allow"
     assert rows[0]["pattern_id"] == "content.timing_unsafe_compare"
-    exempt_rows = list(audit.read_exemptions(st))
+    exempt_rows = _exemptions(st)
     assert exempt_rows[0]["kind"] == "makoto-allow"          # untouched on the jsonl side
 
 
@@ -161,5 +170,5 @@ def test_no_disable_env_means_no_suppression_work(state_dir):
     payload = {"hook_event_name": "PreToolUse", "session_id": "s3", "tool_name": "Bash",
                "tool_input": {"command": pat.keywords[0] + " something"}}
     _run_predicates(conn, payload, [], 1, st, json.dumps(payload))
-    assert [r for r in audit.read_exemptions(st) if r["kind"] == "disabled-pattern"] == []
+    assert [r for r in _exemptions(st) if r["kind"] == "disabled-pattern"] == []
     conn.close()
