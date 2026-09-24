@@ -614,9 +614,10 @@ _TRAVERSAL_RX = re.compile(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b
 # the file.
 _STRUCTURE_RX = re.compile(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
                            r"\bpaths\b|\bto_entries\b|-e\b)")
-# What a failed traversal prints: a literal JSON null as the WHOLE output. `.strip()` has already
-# run, so an anchored match is the whole of it.
-_NULL_OUTPUT_RX = re.compile(r"\Anull\Z")
+# What a failed traversal prints: a literal null as the WHOLE output -- JSON's `null` (jq/yq) or
+# Python's `None` (the same absent-value token printed by a `python3 -c ...json...` traversal).
+# `.strip()` has already run, so an anchored match is the whole of it.
+_NULL_OUTPUT_RX = re.compile(r"\A(?:null|None)\Z")
 
 
 def _is_null_traversal(ev: dict) -> bool:

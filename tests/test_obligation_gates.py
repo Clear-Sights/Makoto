@@ -164,6 +164,15 @@ def test_unread_structure_needs_null_to_be_the_whole_output():
     assert unread_structure_gate([_bash("jq '.' config.json", '{"a": null}')]) is None
 
 
+def test_unread_structure_fires_on_a_python_none_traversal():
+    """The same defect via `python3 -c ...json...` printing `None` -- Python's null token, not
+    the literal JSON word `null` -- must still fire."""
+    f = unread_structure_gate([_bash(
+        "python3 -c \"import json; d=json.load(open('data.json')); print(d.get('x'))\"",
+        "None")])
+    assert f is not None and f.level == "advisory"
+
+
 # gate.unwitnessed_verifier (register B4 WRONG ORACLE)
 
 def test_unwitnessed_verifier_fires_on_a_first_clean_run():
