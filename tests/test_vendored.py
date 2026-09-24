@@ -3,7 +3,7 @@
 These copies are correct duplication, not an oversight: each plugin installs alone and none
 inherits the others' coverage, so extracting a shared module would break the independence the
 marketplace advertises.  What correct duplication cannot survive is silent drift -- if one copy
-of `is_cert_none` stops matching, that plugin quietly stops catching a TLS bypass the other
+of a vendored predicate stops matching, that plugin quietly stops catching what the other
 still catches, and nothing says so.
 
 Every vendored symbol therefore pins a digest, and this suite recomputes it.  Three properties

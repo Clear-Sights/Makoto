@@ -245,8 +245,8 @@ def iter_tool_events(history):
 
 # ---- predicate factories + AST primitives -------------------------------------------------------
 # regex_file_predicate / ast_introduced_predicate build the PreToolUse content-scan predicate
-# scaffold; scan_target_content / parse_introduced / is_false_const / is_cert_none / callee_chain /
-# makoto_allowed are their shared leaves.
+# scaffold; scan_target_content / parse_introduced / callee_chain / makoto_allowed are their
+# shared leaves.
 
 def makoto_allowed(content: str) -> bool:
     """True iff the content carries a structured `makoto-allow: <reason>` exemption marker
@@ -403,20 +403,6 @@ def parse_introduced(content: str):
         return ast.parse("if True:\n" + body), 1
     except (SyntaxError, ValueError):
         return None, 0
-
-
-def is_false_const(node) -> bool:
-    """True iff `node` is the literal ``False`` constant (an AST Constant whose value IS False).
-    Shared by the ``verify=False`` / ``check_hostname=False`` keyword detectors (content.cert_verify_disabled TLS, content.jwt_signature_disabled JWT)."""
-    return isinstance(node, ast.Constant) and node.value is False
-
-
-def is_cert_none(node) -> bool:
-    """True iff `node` is ``ssl.CERT_NONE`` (Attribute) or a bare ``CERT_NONE`` Name. Shared by the
-    cert-disable detectors: content.cert_none_mode (``verify_mode = CERT_NONE`` assign) and content.cert_reqs_none (``cert_reqs=CERT_NONE`` kwarg)."""
-    if isinstance(node, ast.Attribute) and node.attr == "CERT_NONE":
-        return True
-    return isinstance(node, ast.Name) and node.id == "CERT_NONE"
 
 
 def callee_chain(call: ast.Call) -> str:
