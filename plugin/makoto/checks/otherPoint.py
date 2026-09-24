@@ -52,15 +52,13 @@ def pushed_tip_matches_remote(text, cwd) -> PushTipResult:
     accepted as a proxy for this world fact. Git output and failures are deliberately treated as
     bounded evidence, so unusual ref output (including MORE than one answering ref line) or a
     timeout also remains NOT_EVALUABLE. A claim naming no branch falls back to the checked-out
-    branch via `git symbolic-ref --short HEAD` — the same fallback `kit.pushed_ref_matches_world`
-    uses — so a bare "I pushed it" is still evaluable. The LOCAL side is the branch ref, never
-    bare HEAD: a true push to a branch that is not currently checked out must not read as a
-    mismatch, and the compared branch is carried in the result so a DENY can name it.
+    branch via `git symbolic-ref --short HEAD` -- so a bare "I pushed it" is still evaluable.
+    The LOCAL side is the branch ref, never bare HEAD: a true push to a branch that is not
+    currently checked out must not read as a mismatch, and the compared branch is carried in the
+    result so a DENY can name it.
     """
     if not text or not cwd:
         return PushTipResult(PushTipStatus.NOT_EVALUABLE, detail="missing claim text or cwd")
-    # Pushed-branch extraction: kit.extract_pushed_branch, shared with
-    # kit.pushed_ref_matches_world's own call site -- one definition, not two copies.
     branch = extract_pushed_branch(text)
     try:
         if branch is None:

@@ -1097,7 +1097,7 @@ def resolve_in_worktree(loc, cwd):
             return None
         return candidate if os.path.exists(candidate) else None
     except (OSError, subprocess.SubprocessError):
-        # See `pushed_ref_matches_world`: `git` unreachable is a CARRIAGE fault, and returning None
+        # `git` unreachable is a CARRIAGE fault, and returning None
         # spelled it "the deliverable is absent" -- the exact value that makes the caller DENY. The
         # worktree was never consulted, so absence was never established. Callers must treat this
         # sentinel as fail-open; it is truthy so a caller that ignores it fails safe rather than
@@ -1117,46 +1117,6 @@ def extract_pushed_branch(text):
     return match.group(1).rstrip("`'\",:;.") if match else None
 
 
-def pushed_ref_matches_world(text, cwd):
-    """True iff local and origin remote-tracking refs back a pushed-branch claim."""
-    if not text or not cwd:
-        return False
-    try:
-        branch = extract_pushed_branch(text)
-        if branch is None:
-            branch_result = subprocess.run(
-                ["git", "-C", cwd, "symbolic-ref", "--quiet", "--short", "HEAD"],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
-            )
-            if branch_result.returncode != 0:
-                return False
-            branch = branch_result.stdout.strip()
-        if (
-            not branch
-            or branch.startswith(("-", ".", "/"))
-            or branch.endswith((".", "/", ".lock"))
-            or ".." in branch
-            or "@{" in branch
-            or "//" in branch
-        ):
-            return False
-        refs = (f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")
-        result = subprocess.run(
-            ["git", "-C", cwd, "show-ref", "--verify", "--hash", *refs],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_LOCAL_GIT_TIMEOUT,
-        )
-        object_ids = result.stdout.splitlines()
-        return result.returncode == 0 and len(object_ids) == 2 and object_ids[0] == object_ids[1]
-    except (OSError, subprocess.SubprocessError):
-        # CARRIAGE, not evidence. `git` missing from PATH, the _LOCAL_GIT_TIMEOUT budget blown, any
-        # OS error -- none of them observed anything about the refs, yet `return False` handed the
-        # caller the same value a genuine mismatch produces, and the caller DENIES on False. A real
-        # push then read as unpushed and the deny asserted a fact nobody established. This repo's
-        # rule is open on carriage, closed on decision, so an unanswered question does not
-        # contradict the claim.
-        return True
-    except Exception:
-        return False
 
 
 def _event_type_of(row) -> str:
