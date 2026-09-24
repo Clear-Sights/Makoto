@@ -1,108 +1,52 @@
-"""makoto.substrate._declared -- the flat checks/ package's own hand-maintained manifest of
-pattern IDs that SHOULD resolve to a live module (SPEC-5 Task 2 Step 6). `{id: file_stem}`.
-
-Every check module landed in this package (Tasks 3-9's ~19 prechecks, ~11 stopchecks, the
-merging Assay checks, and the 27 canon fingerprints) is meant to add ONE entry here alongside
-dropping in its own `.py` file -- the two are meant to move together.
-
-Only ONE of those two directions is machine-audited, and only over the KEYS. `orphan_ids` (in
-`checks.undeclaredFalsifiable`) walks manifest -> reality: an ID listed here that no live
-`CHECK.id` matches is reported, which is why this manifest exists at all -- a deleted module, a
-module whose `CHECK.id` changed, or an entry that never got a module written for it all leave a
-lingering key that gets caught.
-
-Two gaps are NOT covered, and neither is enforced anywhere else:
-  * The file_stem VALUES are never read by any code -- `orphan_ids` iterates keys only. They are
-    documentation, not a validated mapping, so renaming a module's `.py` file while keeping its
-    `CHECK.id` leaves a stem here pointing at a file that no longer exists, silently.
-  * The reality -> manifest direction is unaudited. `orphan_modules` reports on-disk modules that
-    expose no loader-valid `CHECK`; it never compares the catalog against this manifest, so a
-    perfectly live module that was simply never added here is caught by nothing -- and an
-    unlisted module has no key to dangle, so its later deletion goes unreported too.
-Keeping this file complete and its stems truthful is therefore still a hand-maintenance duty.
-
-Started as exactly the live catalog (just this task's own new check) so the completeness check
-reported zero drift at rest; grows by one line per module landed.
+"""makoto.substrate._declared -- the check ids that SHOULD be live: the manifest
+`gate.undeclared_falsifiable` holds the catalog against. A row deleted, or a family module that
+fails to import, leaves its ids here with nothing live behind them, and that is the finding.
 """
-DECLARED_IDS: dict[str, str] = {
-    "gate.undeclared_falsifiable": "undeclaredFalsifiable",
-    # content.cert_verify_disabled, content.jwt_signature_disabled, content.cert_none_mode,
-    # content.timing_unsafe_compare, content.jwt_none_alg, content.paramiko_host_key_weakened,
-    # content.cert_reqs_none moved to Ward, 2026-07-13 (github.com/Clear-Sights/Ward) -- hard
-    # denies with no deterministic substitute, dangerous regardless of intent or honesty, a
-    # third axis distinct from this project's sincerity charter.
-    "content.verifier_predicate_weakened": "verifierPredicateWeakened",
-    "content.env_gated_audit": "envGatedAudit",
-    "content.integrity_suppression_flag": "integritySuppressionFlag",
-    "content.verifier_exit_masking": "verifierExitMasking",
-    "content.verifier_body_hollowed": "verifierBodyHollowed",
-    "content.phantom_citation": "phantomCitation",
-    "content.unsourced_webfetch": "unsourcedWebfetch",
-    "content.fabricated_commit_sha": "fabricatedCommitSha",
-    "content.self_mute_guard": "selfMuteGuard",
-    "content.illusory_authorship_trailer": "illusoryAuthorshipTrailer",
-    "content.illusory_interruption_claim": "illusoryInterruptionClaim",
-    "event.thrash_revert": "writeThrashRevert",
-    "event.identical_retry": "identicalRetryInterdiction",
-    # SPEC-5 Task 4: the stop-gate catalog (formerly makoto/stopchecks/stopcheck_*.py + engines),
-    # migrated into this flat package with descriptive names. Declared `.id`s are UNCHANGED from
-    # the pre-migration stopchecks/ catalog -- only the filename/import path moved.
-    "gate.hollow_test": "hollowTest",
-    "gate.liveness": "deadPureStatement",
-    "gate.completion": "claimedProduceAbsent",
-    "gate.dropped": "silentlyDroppedCommitment",
-    "gate.green_claim": "falseGreenClaim",
-    "gate.stale_pass": "stalePytestCache",
-    "gate.fabricated_action": "fabricatedToolAction",
-    "gate.named_test": "namedTestTeeth",
-    "gate.canon": "canonTimeoutRecur",
-    "gate.self_wired": "selfWiredCheck",
-    # SPEC-5 Task 9: 17 of the 27 canon session fingerprints (THE_CANON,
-    # REF-lever-graded-primitives/signalminer/grade_planted.py), split BLOCK/ADVISE across two
-    # gate modules that share their atom/decode substrate via _canonAtoms.py (see that module's
-    # docstring for the scope cut and canonFingerprints.py's for the two-module split rationale).
-    "gate.canon_fingerprints": "canonFingerprints",
-    "gate.canon_fingerprints_advisory": "canonFingerprintsAdvisory",
-    # SPEC-5 (Makoto absorbs Assay): the declared-Plan establisher check, ported by shape from
-    # Assay's patterns/stale_establisher.py.
-    "gate.stale_establisher": "staleEstablisher",
-    # An agnostic (gate.canon-sense) claimed-running-but-nothing-runs check, mirroring
-    # gate.completion's claim-vs-ledger shape but for ongoing process/service liveness.
-    "gate.claimed_running": "claimedRunningAbsent",
-    # Immediate completed-remote-action sibling: a pushed/merged/live claim must be backed by a
-    # successful Bash git-push or an explicitly recognized remote-mutating tool call.
-    "gate.claimed_shipped": "claimedShippedAbsent",
-    # 2026-08-20 completeness sweep: four live modules had shipped without their manifest line,
-    # so deleting any of them (or breaking its CHECK) was invisible to `orphan_ids` — the
-    # reality -> manifest gap this file's own docstring warns about. Adding the keys closes it
-    # for these four; keeping this manifest complete remains a hand-maintenance duty.
-    "gate.plan_item_drift": "planItemDrift",
-    "gate.relative_path_citation": "relativePathCitation",
-    # 2026-09-18: the first two ACT_VS_GUARD obligations, ported by shape from Keel's clause
-    # table so the register entries B11 and G2 have a runner. See kit.unmet_obligation_gate.
-    "gate.unprobed_fanout": "unprobedFanout",
-    "gate.unasked_plan": "unaskedPlan",
-    # 2026-09-18, second batch: five more ACT_VS_GUARD obligations, one per register entry that
-    # Keel's clause table covered and makoto did not -- A3, B4, D12, D14, E13.
-    "gate.unread_structure": "unreadStructure",
-    "gate.unwitnessed_verifier": "unwitnessedScanner",
-    "gate.unknown_ref_switch": "unknownRefSwitch",
-    "gate.unobserved_destruction": "unobservedDestruction",
-    "gate.relaunched_unchanged": "relaunchedUnchanged",
-    # 2026-09-18, third batch: the waiver-discharge gate, register entry B9. A
-    # PATTERN_MATCH over introduced text rather than an obligation -- the register's rule
-    # is that a waiver NAMES a checkable end, which is a property of its own text.
-    "gate.undischarged_waiver": "undischargedWaiver",
-    # 2026-09-18: the first of the five entries no tool ran. C12 VERDICT WITHOUT ITS
-    # SUBJECT -- a counted failure whose identity the record held and the turn dropped.
-    "gate.unnamed_failure": "unnamedFailure",
-    # 2026-09-18: C11 REPORT BEFORE DECIDE -- a run's success written into prose before any
-    # verifier ran. Same ACT_VS_GUARD factory as the seven Keel-shaped obligations.
-    "gate.report_before_run": "reportBeforeRun",
-    # 2026-09-18: H6 FUNCTION DRAWN FROM NO CLAIM -- a top-level unit the session added
-    # that no operator turn names, nothing it wrote reaches, and no decorator registered.
-    "gate.unclaimed_unit": "unclaimedUnit",
-    # 2026-09-18: H3 FIX DRAWN FROM FIXES -- one repair's text reaching a second file with
-    # no verifier run between the two landings, so the second site was never checked.
-    "gate.pasted_fix": "pastedFix",
-}
+DECLARED_IDS: frozenset[str] = frozenset({
+    "content.env_gated_audit",
+    "content.fabricated_commit_sha",
+    "content.illusory_authorship_trailer",
+    "content.illusory_interruption_claim",
+    "content.integrity_suppression_flag",
+    "content.phantom_citation",
+    "content.self_mute_guard",
+    "content.unsourced_webfetch",
+    "content.verifier_body_hollowed",
+    "content.verifier_exit_masking",
+    "content.verifier_predicate_weakened",
+    "event.identical_retry",
+    "event.thrash_revert",
+    "gate.canon",
+    "gate.canon_fingerprints",
+    "gate.canon_fingerprints_advisory",
+    "gate.claimed_consent_absent",
+    "gate.claimed_running",
+    "gate.claimed_shipped",
+    "gate.claude_identity",
+    "gate.completion",
+    "gate.dropped",
+    "gate.fabricated_action",
+    "gate.green_claim",
+    "gate.hollow_test",
+    "gate.liveness",
+    "gate.named_test",
+    "gate.pasted_fix",
+    "gate.plan_item_drift",
+    "gate.relative_path_citation",
+    "gate.relaunched_unchanged",
+    "gate.report_before_run",
+    "gate.self_wired",
+    "gate.stale_establisher",
+    "gate.stale_pass",
+    "gate.unasked_plan",
+    "gate.unclaimed_unit",
+    "gate.undeclared_falsifiable",
+    "gate.undischarged_waiver",
+    "gate.unexamined_wall",
+    "gate.unknown_ref_switch",
+    "gate.unnamed_failure",
+    "gate.unobserved_destruction",
+    "gate.unprobed_fanout",
+    "gate.unread_structure",
+    "gate.unwitnessed_verifier",
+})

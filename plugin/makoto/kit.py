@@ -791,20 +791,10 @@ def _introduced_regex_finding(pattern: Check, m, text: str, tool_input: dict, to
 def introduced_regex_predicate(
     *, body_rx: re.Pattern, grounded_in_history=None, veto_suffix: str = "",
 ) -> Callable[..., Optional[Finding]]:
-    """Build a Pre predicate over `_introduced_regex_scan` + `_introduced_regex_finding` — the
-    shared scaffold behind illusoryAuthorshipTrailer.py (PATTERN_MATCH: no `grounded_in_history`)
-    and illusoryInterruptionClaim.py (CLAIM_VS_HISTORY: `grounded_in_history` supplied — when it
-    returns True on `history`, a real instance of the claim IS on the record, so the finding is
-    suppressed rather than raised).
-
-    One factory, not two, because the shape distinction between these callers is genuinely just
-    "is there a veto after the match" — the same shape `_introduced_regex_scan`'s own docstring
-    already named as the real divergence point. `tests/test_check_law_tests.py`'s `_factory_shape`
-    derives PATTERN_MATCH vs. CLAIM_VS_HISTORY from whether the call site passes
-    `grounded_in_history=` — a literal AST check on the call's keywords, not a runtime value, so
-    the law still VERIFIES the declared shape from source rather than trusting a name or a
-    manifest (the failure mode the DSL/Rego/CEL angle of this session's prior-art investigation
-    found and rejected for exactly this reason).
+    """Build a Pre predicate over `_introduced_regex_scan` + `_introduced_regex_finding`. With no
+    `grounded_in_history` it is a SPEC row (the pattern is the whole definition); with one, a real
+    instance of the claim on the record is its witness, paid through `unwitnessed`, and the finding
+    is suppressed. tests/test_check_law_tests.py reads which from the call's own keywords.
     """
     def _predicate(*, current_event: dict, history: list,
                    pattern: Check, conn=None) -> Optional[Finding]:

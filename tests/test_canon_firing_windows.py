@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from makoto.checks.canonFingerprints import canon_fingerprint_block_gate
+from makoto.checks.spec import canon_fingerprint_block_gate
 from makoto.state import audit, ledger
 from tests.test_canon_atom_window import T0, T1, T2, _green, _operator, _row, _timeout, _transcript
 

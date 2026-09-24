@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 
-from makoto.checks import selfMuteGuard
+from makoto.checks import spec as selfMuteGuard
 from makoto.substrate.wiring import (
     MAKOTO_INVOCATION_RX,
     entry_dispatches_to_makoto,
@@ -80,11 +80,11 @@ def test_mute_guard_uses_the_shared_invocation_regex():
 
 
 def _mute_predicate(old: str, new: str):
-    return selfMuteGuard.predicate(
+    return selfMuteGuard.mute_predicate(
         current_event={"hook_event_name": "PreToolUse",
                        "tool_input": {"file_path": "/home/u/.claude/settings.json",
                                       "old_string": old, "new_string": new}},
-        history=[], pattern=selfMuteGuard.CHECK)
+        history=[], pattern=selfMuteGuard.mute_CHECK)
 
 
 def test_mute_guard_does_not_false_block_a_users_own_dispatch_sh():   # RED-before

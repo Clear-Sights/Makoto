@@ -36,8 +36,8 @@ def test_identical_retry_sees_a_wrapper_only_row_like_its_sibling():
     """The original drift: identicalRetryInterdiction's hand-rolled decoder read only the
     payload, so gate.identical_retry was BLIND to rows canon.timeout/canon.recur acted on,
     from the same table, for the same concept. Both now share kit.decode_history_event."""
-    from makoto.checks.identicalRetryInterdiction import _most_recent_completed_bash_call
-    from makoto.checks.canonTimeoutRecur import _decode_row as canon_decode
+    from makoto.checks.switch import _most_recent_completed_bash_call
+    from makoto.checks.switch import _decode_row as canon_decode
     row = (1, "ts", "PostToolUse", "/repo",
            json.dumps({"tool_name": "Bash", "tool_input": {"command": "x"},
                        "tool_response": {"stderr": "SyntaxError: bad", "exitCode": 1}}))
@@ -47,8 +47,9 @@ def test_identical_retry_sees_a_wrapper_only_row_like_its_sibling():
 
 def test_failure_terminal_result_is_one_shared_normalizer():
     from makoto.kit import failure_terminal_result
-    from makoto.checks import canonTimeoutRecur, claimedRunningAbsent
-    from makoto.checks import identicalRetryInterdiction
+    from makoto.checks import switch as canonTimeoutRecur
+    from makoto.checks import switch as claimedRunningAbsent
+    from makoto.checks import switch as identicalRetryInterdiction
     from makoto.substrate import _canonAtoms
 
     for module in (
@@ -71,13 +72,13 @@ def test_offer_and_first_person_regexes_are_the_one_vocab_object():
 
 def test_extract_pushed_branch_is_shared_and_strips_trailing_punctuation():
     from makoto.kit import extract_pushed_branch
-    import makoto.checks.claimedShippedAbsent as csa
+    import makoto.checks.otherPoint as csa
     assert csa.extract_pushed_branch is extract_pushed_branch
     assert extract_pushed_branch("pushed the work to `feat/x`,") == "feat/x"
     assert extract_pushed_branch("nothing of the sort") is None
 
 
 def test_unsourced_webfetch_uses_the_canonical_row_unwrap():
-    import makoto.checks.unsourcedWebfetch as uw
+    import makoto.checks.lineage as uw
     from makoto.kit import raw_payload_str
     assert uw.raw_payload_str is raw_payload_str

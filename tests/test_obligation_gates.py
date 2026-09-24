@@ -8,13 +8,13 @@ text is empty in every case below, on purpose: a turn that says nothing at all c
 from __future__ import annotations
 
 from makoto.kit import unmet_obligation_gate
-from makoto.checks.unprobedFanout import unprobed_fanout_gate
-from makoto.checks.unaskedPlan import unasked_plan_gate
-from makoto.checks.unreadStructure import unread_structure_gate
-from makoto.checks.unwitnessedScanner import unwitnessed_verifier_gate
-from makoto.checks.unknownRefSwitch import unknown_ref_switch_gate
-from makoto.checks.unobservedDestruction import unobserved_destruction_gate
-from makoto.checks.relaunchedUnchanged import relaunched_unchanged_gate
+from makoto.checks.lineage import unprobed_fanout_gate
+from makoto.checks.switch import unasked_plan_gate
+from makoto.checks.lineage import unread_structure_gate
+from makoto.checks.switch import unwitnessed_verifier_gate
+from makoto.checks.lineage import unknown_ref_switch_gate
+from makoto.checks.switch import unobserved_destruction_gate
+from makoto.checks.switch import relaunched_unchanged_gate
 
 
 def _row(tool_name, **ti):

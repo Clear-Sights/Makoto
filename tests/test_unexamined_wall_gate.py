@@ -6,7 +6,7 @@ because those are the two ways this gate could become a paraphrase judge.
 """
 import json
 
-from makoto.checks.unexaminedWall import unexamined_wall_gate
+from makoto.checks.switch import unexamined_wall_gate
 
 _T0 = "2026-09-08T20:00:00.000Z"
 _T1 = "2026-09-08T21:00:00.000Z"

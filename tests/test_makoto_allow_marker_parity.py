@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from makoto.checks import deadPureStatement, hollowTest
+from makoto.substrate import deadPureStatement, hollowTest
 from makoto.kit import makoto_allowed
 
 _CHECKS_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"

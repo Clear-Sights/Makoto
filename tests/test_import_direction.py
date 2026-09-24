@@ -37,7 +37,7 @@ _RANK = {  # the layout order: an import may only point at a strictly lower rank
 }
 _SIBLING_OK = {"makoto.substrate", "makoto.state"}
 _CALL_TIME_OK = {  # documented lazy imports, each breaking a cycle at call time
-    # ("makoto.kit", "makoto.checks.namedTestTeeth") was here for kit.compute_delta's parser
+    # ("makoto.kit", "makoto.checks.switch") was here for kit.compute_delta's parser
     # reuse, and is GONE: 2026-09-18 the recorded-marker parsers moved to vocab (rank 0) and the
     # history walk over them to kit itself, so there is no back-edge left to except. An exception
     # removed is worth more than an exception documented.
@@ -95,9 +95,8 @@ def test_package_root_membership_is_explicit():
 
 def test_TEETH_direction_checker_rejects_planted_backward_edges():
     assert not _edge_ok("makoto.kit", "makoto.dispatch")                      # low -> high
-    assert not _edge_ok("makoto.checks.namedTestTeeth",
-                        "makoto.checks.hollowTest")                           # sibling gate
-    assert not _edge_ok("makoto.checks.staleEstablisher", "makoto.state.plan")  # curated state slice
-    assert not _edge_ok("makoto.checks.selfMuteGuard", "makoto.context")      # gate -> orchestrator
+    assert not _edge_ok("makoto.checks.switch", "makoto.checks.spec")    # sibling family
+    assert not _edge_ok("makoto.checks.otherPoint", "makoto.state.plan")  # curated state slice
+    assert not _edge_ok("makoto.checks.spec", "makoto.context")      # gate -> orchestrator
     assert _edge_ok("makoto.state.ledger", "makoto.state.store")              # sibling store: fine
-    assert _edge_ok("makoto.checks.falseGreenClaim", "makoto.kit")            # downward: fine
+    assert _edge_ok("makoto.checks.switch", "makoto.kit")            # downward: fine

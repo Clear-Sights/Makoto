@@ -45,7 +45,7 @@ def test_install_wires_hooks_and_records_manifest(tmp_path, monkeypatch):
     from makoto.install import cmd_install
     assert cmd_install() == 0
     settings = json.loads((fake_home / ".claude" / "settings.json").read_text())
-    from makoto.checks.selfWiredCheck import _missing_makoto_events
+    from makoto.checks.otherPoint import _missing_makoto_events
     assert _missing_makoto_events(settings.get("hooks", {})) == [], \
         "install must wire every required event to makoto dispatch"
     manifest = fake_home / ".claude" / "makoto_state" / "configchange_manifest.json"

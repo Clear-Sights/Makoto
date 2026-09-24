@@ -1,6 +1,6 @@
 import ast
 
-from makoto.checks.hollowTest import (
+from makoto.substrate.hollowTest import (
     _is_test_filename, _iter_test_functions, _is_assertion_call, _callee_chain,
     _has_skip_decorator, _is_tautology, _is_swallowed_failure, _analyze_test_function, analyze_file,
     _iter_nested_defs, _analyze_nested_test_functions, _is_skipif_call, _is_skip_call_stmt,

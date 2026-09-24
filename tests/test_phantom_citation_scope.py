@@ -13,7 +13,7 @@ import pytest
 
 from makoto.state.store import init_db
 from makoto.state.citations import refresh_if_stale
-from makoto.checks.phantomCitation import predicate, _governed_root
+from makoto.checks.spec import citation_predicate as predicate, _governed_root
 from makoto.registry import load_precheck_catalog
 
 _PAT = {p.id: p for p in load_precheck_catalog()}["content.phantom_citation"]

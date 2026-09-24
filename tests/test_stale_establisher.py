@@ -1,4 +1,4 @@
-"""makoto.checks.staleEstablisher -- the opt-in ADVISORY (never blocking) ground-truth
+"""makoto.checks.otherPoint -- the opt-in ADVISORY (never blocking) ground-truth
 staleness detector (SPEC-5). Falsifying tests for the check() logic itself, and a structural
 proof that it can never block: its CHECK export stays `may_block=False` (2026-07-10, retiring
 `load_stopchecks()`/`GATE`), so its pattern_id can never enter dispatch._blocking_gate_ids()
@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import json
 
-from makoto.checks import staleEstablisher
+from makoto.checks import otherPoint as staleEstablisher
 from makoto.substrate._planNode import Plan
 
 
 def test_check_is_none_when_no_plan_declared():
-    assert staleEstablisher.check(None) is None
+    assert staleEstablisher.established_check(None) is None
 
 
 def test_check_fires_when_done_establisher_file_is_gone(tmp_path):
@@ -22,7 +22,7 @@ def test_check_fires_when_done_establisher_file_is_gone(tmp_path):
     plan.add_node("Write", "gone.py", str(missing), id="establisher")
     plan.mark_done("establisher")
     plan.add_node("Edit", "gone.py", str(tmp_path / "other.py"), id="dependent")
-    finding = staleEstablisher.check(plan)
+    finding = staleEstablisher.established_check(plan)
     assert finding is not None
     assert finding.pattern_id == "gate.stale_establisher"
     assert finding.level == "advisory"
@@ -36,7 +36,7 @@ def test_check_clean_when_establisher_file_still_exists(tmp_path):
     plan.add_node("Write", "here.py", str(present), id="establisher")
     plan.mark_done("establisher")
     plan.add_node("Edit", "here.py", str(tmp_path / "other.py"), id="dependent")
-    assert staleEstablisher.check(plan) is None
+    assert staleEstablisher.established_check(plan) is None
 
 
 def test_check_clean_when_no_dependent_shares_the_passthrough(tmp_path):
@@ -44,14 +44,14 @@ def test_check_clean_when_no_dependent_shares_the_passthrough(tmp_path):
     plan = Plan()
     plan.add_node("Write", "gone.py", str(missing), id="establisher")
     plan.mark_done("establisher")   # DONE, missing on disk, but NO later node shares its name
-    assert staleEstablisher.check(plan) is None
+    assert staleEstablisher.established_check(plan) is None
 
 
 def test_check_clean_when_establisher_still_open():
     plan = Plan()
     plan.add_node("Write", "x.py", "/repo/x.py", id="establisher")   # still open, not DONE
     plan.add_node("Edit", "x.py", "/repo/other.py", id="dependent")
-    assert staleEstablisher.check(plan) is None
+    assert staleEstablisher.established_check(plan) is None
 
 
 def test_run_adapter_is_witnessed_firing_and_silent(tmp_path):
@@ -78,7 +78,7 @@ def test_run_adapter_is_witnessed_firing_and_silent(tmp_path):
     stale.add_node("Write", "gone.py", str(missing), id="establisher")
     stale.mark_done("establisher")
     stale.add_node("Edit", "gone.py", str(tmp_path / "other.py"), id="dependent")
-    fired = staleEstablisher.run(ctx(stale))
+    fired = staleEstablisher.established_run(ctx(stale))
     assert fired is not None, "the live .run adapter never reaches check()'s finding"
     findings = list(fired) if isinstance(fired, (list, tuple)) else [fired]
     assert [f.pattern_id for f in findings] == ["gate.stale_establisher"]
@@ -93,15 +93,15 @@ def test_run_adapter_is_witnessed_firing_and_silent(tmp_path):
     fresh.add_node("Write", "here.py", str(present), id="establisher")
     fresh.mark_done("establisher")
     fresh.add_node("Edit", "here.py", str(tmp_path / "other.py"), id="dependent")
-    assert staleEstablisher.run(ctx(fresh)) is None
-    assert staleEstablisher.run(ctx(None)) is None
+    assert staleEstablisher.established_run(ctx(fresh)) is None
+    assert staleEstablisher.established_run(ctx(None)) is None
 
 
 def test_never_discovered_as_a_blocking_stop_gate():
     """Structural proof of the never-BLOCK guarantee: staleEstablisher's CHECK stays
     may_block=False, so it never enters dispatch._blocking_gate_ids() (load_checks(edge="Stop")-
     derived, filtered on may_block) regardless of what `.level` its own Finding carries."""
-    assert staleEstablisher.CHECK.may_block is False
+    assert staleEstablisher.established_CHECK.may_block is False
     from makoto.registry import load_checks
     live_ids = {c.id for c in load_checks(edge="Stop") if c.may_block}
     assert "gate.stale_establisher" not in live_ids
@@ -162,10 +162,10 @@ def test_a_stale_establisher_finding_does_not_block_when_dispatch_runs_it(
 
 
 def test_check_export_is_advisory_and_stop_scoped():
-    assert staleEstablisher.CHECK.id == "gate.stale_establisher"
-    assert staleEstablisher.CHECK.applies_at == "Stop"
+    assert staleEstablisher.established_CHECK.id == "gate.stale_establisher"
+    assert staleEstablisher.established_CHECK.applies_at == "Stop"
     # The CHECK-posture vocabulary, not `verdict`'s OUTCOME vocabulary that shares these
     # names in lower case. This assertion used to read `verdict.ADVISE` ('advise'), which is
     # what the module itself wrongly imported, so the test agreed with the defect.
     from makoto.registry import POSTURE_ADVISE
-    assert staleEstablisher.CHECK.posture == POSTURE_ADVISE
+    assert staleEstablisher.established_CHECK.posture == POSTURE_ADVISE

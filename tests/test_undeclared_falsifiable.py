@@ -1,4 +1,4 @@
-"""makoto.checks.undeclaredFalsifiable -- SPEC-5 Task 2 Step 6, declared-falsifiability
+"""makoto.checks.spec -- SPEC-5 Task 2 Step 6, declared-falsifiability
 completeness. Distinct from anything Assay does: Assay forces a claim to *be* falsifiable; this
 checks that every piece claiming falsifiability in the checks/ catalog is actually *declared* --
 a manifest-vs-reality auditor over the catalog itself. Same Stop-time, advisory-tier shape as
@@ -12,12 +12,7 @@ in-memory manifests -- never by mutating the real live `makoto/checks/` package:
     CHECK (unregistered -- missing/malformed CHECK, or a mismatched id).
   * ORPHAN ID: an ID is declared in the catalog's manifest but no live module backs it.
 """
-from makoto.checks.undeclaredFalsifiable import (
-    CHECK,
-    orphan_ids,
-    orphan_modules,
-    undeclared_falsifiable_gate,
-)
+from makoto.checks.spec import undeclared_CHECK as CHECK, orphan_ids, orphan_modules, undeclared_falsifiable_gate
 
 
 def _good(tmp_path, name, id_, applies_at="Stop"):
@@ -103,6 +98,11 @@ def test_real_catalog_has_zero_drift_at_rest():
     # this file registers itself in the manifest, so running the gate against the REAL package
     # (no injected declared=/package_dir=) finds nothing to report.
     assert undeclared_falsifiable_gate() is None
+    # and the other direction, which the gate does not read: every live row is declared, so
+    # deleting any of them leaves a key behind for the gate to find.
+    from makoto.registry import discover
+    from makoto.substrate._declared import DECLARED_IDS
+    assert {c.id for c in discover()} == DECLARED_IDS
 
 
 def test_check_is_discovered_by_load_checks():

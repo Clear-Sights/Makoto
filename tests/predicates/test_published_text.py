@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks import illusoryAuthorshipTrailer as mod
+from makoto.checks import spec as mod
 
 FOOTER = "\U0001f916 Gener" + "ated with [Claude Code](https://claude.com/claude-code)"
 TRAILER = "Co-Author" + "ed-By: Claude <x@y>"
@@ -11,7 +11,7 @@ TRAILER = "Co-Author" + "ed-By: Claude <x@y>"
 
 def _fires(tool, tool_input):
     ev = {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": tool_input}
-    return mod.predicate(current_event=ev, history=[], pattern=mod.CHECK)
+    return mod.trailer_predicate(current_event=ev, history=[], pattern=mod.trailer_CHECK)
 
 
 @pytest.mark.parametrize("tool,ti", [

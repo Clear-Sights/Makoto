@@ -7,7 +7,7 @@ and a non-PreToolUse event.
 """
 import pytest
 
-from makoto.checks.verifierPredicateWeakened import predicate
+from makoto.checks.spec import weakened_predicate as predicate
 from makoto.vocab import PreCheck
 
 _PAT = PreCheck(id="content.verifier_predicate_weakened", fire_level="error", description="verifier predicate weakened", retry_hint="x")

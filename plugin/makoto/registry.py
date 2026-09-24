@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
@@ -26,14 +25,11 @@ from typing import Callable, Optional
 # The only admissible `applies_at` values -- the five hook edges Task 1's posture skeleton
 # recognizes.
 ALLOWED_EDGES = frozenset({"Pre", "Post", "Stop", "SubagentStop", "SessionStart"})
-TESTS_SHAPES = frozenset({
-    "PATTERN_MATCH", "CLAIM_VS_HISTORY", "CLAIM_VS_LEDGER", "LIVE_QUERY", "TESTRUN_DELTA",
-    # An OBLIGATION: a costly act ran and no qualifying guard preceded it. Distinct from
-    # CLAIM_VS_HISTORY because no claim is read -- a turn that says nothing at all can still
-    # owe. `kit.unmet_obligation_gate` is its only factory; see that docstring for the port from
-    # Keel's clause table and for the window bound.
-    "ACT_VS_GUARD",
-})
+# The four families of the register: what pays a check's subject. SPEC holds its definition and
+# needs no witness; the other three decide through `kit.unwitnessed`, each with its own witness --
+# a second reading of the subject (OTHER_POINT), an act and its response (SWITCH), a read of the
+# source before the write drawn from it (LINEAGE).
+TESTS_SHAPES = frozenset({"SPEC", "OTHER_POINT", "SWITCH", "LINEAGE"})
 
 # The ONLY documented exception to "every Stop-gate finding blocks" (2026-07-05, DESIGN DECISION 6):
 # gate.self_wired ships at level="advisory" so a partial hook-wiring strip is recorded to the audit
@@ -162,39 +158,6 @@ def _candidate_files(directory: Path) -> list[Path]:
     return sorted(p for p in directory.glob("*.py") if not p.name.startswith("_"))
 
 
-_APPLIES_AT_RE = re.compile(r'applies_at\s*=\s*["\']([^"\']+)["\']')
-
-
-def _candidate_edges(path: Path) -> frozenset[str]:
-    """Every `applies_at` edge value that appears as a string literal in `path`'s source text --
-    read as plain text, WITHOUT importing the module. Used only as a cheap pre-filter so
-    `scan()`/`discover()` can skip importing a file that provably cannot contribute to a
-    requested `edge`: a module's CHECK (and any EXTRA_CHECKS) always spells its `applies_at` as a literal string at the call site --
-    verified repo-wide, see this module's own docstring update -- so grepping the source text
-    for that pattern yields the exact same edge-set `_valid_check` would see after a real
-    import, just without paying the import cost.
-
-    Deliberately conservative in the only direction that matters: if the file can't be read, or
-    no `applies_at=...` literal is found at all (e.g. a future check built `applies_at` from a
-    variable instead of a literal), this returns "could be any edge" rather than guessing wrong
-    -- so the pre-filter can only ever cause an extra, unnecessary import of an irrelevant
-    module, never a wrongly-skipped import of a relevant one. `scan()`/`discover()`'s actual
-    output (which files' CHECK objects show up) is unchanged by this function's existence
-    either way; it only changes how many modules get imported to compute that output."""
-    try:
-        # utf-8, stated. The default here is `locale.getpreferredencoding(False)`, which is
-        # cp1252 on a Windows host -- and this read is the CHECK CATALOG loader, so a decode
-        # failure does not fail one check, it fails the population. Measured in the field:
-        # `UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d in position 3017`, whose
-        # call was then allowed without being checked. Python source is utf-8 by definition, so
-        # this is the encoding these files actually have, not a guess.
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return ALLOWED_EDGES
-    edges = frozenset(_APPLIES_AT_RE.findall(text))
-    return edges if edges else ALLOWED_EDGES
-
-
 def _load_module(path: Path, directory: Path):
     """Import `path`. Scanning the real package (`directory == _PACKAGE_DIR`) imports it
     properly as `makoto.checks.<name>` (normal caching, normal tracebacks, normal
@@ -229,16 +192,12 @@ def _primary_check(mod):
     return chk if (chk is not None and _valid_check(chk)) else None
 
 
-def _iter_modules(directory: Path, edge: Optional[str]):
+def _iter_modules(directory: Path):
     """`(file_stem, imported-module-or-None)` for every candidate file in `directory`, in
-    file-stem order -- the one candidate walk `scan()` and `discover()` share, so each file is
-    globbed, edge-pre-filtered (one `read_text`) and imported exactly once per call rather than
-    twice. A `None` module means the file was skipped by the `edge` pre-filter (see
-    `_candidate_edges`) or failed to import; neither is fatal, both are recorded, not raised."""
+    file-stem order -- the one candidate walk `scan()` and `discover()` share. A `None` module
+    means the file failed to import; that is recorded, not raised. Every family module carries
+    rows at both edges, so there is no edge to skip a file by."""
     for path in _candidate_files(directory):
-        if edge is not None and edge not in _candidate_edges(path):
-            yield path.stem, None
-            continue
         try:
             mod = _load_module(path, directory)
         except Exception:
@@ -246,43 +205,23 @@ def _iter_modules(directory: Path, edge: Optional[str]):
         yield path.stem, mod
 
 
-def scan(*, package_dir: Optional[Path] = None, edge: Optional[str] = None) -> dict:
+def scan(*, package_dir: Optional[Path] = None) -> dict:
     """`{file_stem: CHECK-or-None}` for every candidate file in `package_dir` (defaults to the
     real `checks/` package). `None` means the file failed to produce a valid,
-    loader-discoverable `CHECK` -- an orphan module, in `checks.undeclaredFalsifiable`'s
-    vocabulary. Never raises: an import failure is recorded as `None`, not propagated.
-
-    `edge`, when given, is a pure import-cost optimization (see `_candidate_edges`): a file
-    whose source text provably cannot produce a CHECK at `edge` is recorded as `None` WITHOUT
-    being imported at all, instead of being imported just to discover its `applies_at` doesn't
-    match. Note what that means for this dict specifically: a stem the pre-filter skipped maps
-    to `None` even though an unfiltered `scan()` would have mapped it to a perfectly valid
-    `CHECK` at another edge -- `None` here is "produced no CHECK at `edge`", NOT "orphan
-    module". A caller that reads `None` as "orphan" (`checks.undeclaredFalsifiable`) must
-    therefore call `scan()` with no `edge`, as it does. `discover()`/`load_checks()`, which
-    drop `None`s and re-filter by `applies_at` anyway, are unaffected."""
+    loader-discoverable `CHECK` -- an orphan module, in `gate.undeclared_falsifiable`'s
+    vocabulary. Never raises: an import failure is recorded as `None`, not propagated."""
     directory = package_dir or _PACKAGE_DIR
-    return {stem: _primary_check(mod) for stem, mod in _iter_modules(directory, edge)}
+    return {stem: _primary_check(mod) for stem, mod in _iter_modules(directory)}
 
 
-def discover(*, package_dir: Optional[Path] = None, edge: Optional[str] = None) -> list:
-    """Every valid `CHECK` found directly in `package_dir` (defaults to the real `checks/`
-    package), in file-stem order. A module MAY additionally export `EXTRA_CHECKS: list` for a
-    second (or more) firing surface sharing the same file/id at a DIFFERENT `applies_at` edge.
-    No module in the catalog declares one today: `contractOrder.py` was the only two-surface
-    module and it was cut 2026-09-18 (no register entry named it), so the mechanism is live and
-    unused. Each `EXTRA_CHECKS` entry is validated the same way as a primary CHECK
-    (`_valid_check`) and silently skipped (not fatal) if malformed -- consistent with every other
-    loader failure mode in this module.
-
-    `edge`, when given, is applied by the shared candidate walk (`_iter_modules`) so a file whose
-    source text cannot possibly contain an `applies_at` match (in its `CHECK` OR its
-    `EXTRA_CHECKS`, since `_candidate_edges` greps the whole file) is never imported at all --
-    the import-avoidance this whole parameter exists for. It is a pre-filter only: the final
-    per-`applies_at` filtering of the returned list still happens in `load_checks`, unchanged."""
+def discover(*, package_dir: Optional[Path] = None) -> list:
+    """Every valid check found directly in `package_dir` (defaults to the real `checks/`
+    package), in file-stem order: each module's `CHECK` and then its `EXTRA_CHECKS` -- a family
+    module exports its rows as `CHECK, *EXTRA_CHECKS`. Each is validated (`_valid_check`) and a
+    malformed one is skipped, not fatal."""
     directory = package_dir or _PACKAGE_DIR
     primary, extra = [], []
-    for _stem, mod in _iter_modules(directory, edge):
+    for _stem, mod in _iter_modules(directory):
         chk = _primary_check(mod)
         if chk is not None:
             primary.append(chk)
@@ -306,15 +245,8 @@ def load_checks(edge: Optional[str] = None, *, package_dir: Optional[Path] = Non
     filtered to one `applies_at` edge ("Pre"/"Post"/"Stop"/"SubagentStop"/"SessionStart");
     omit `edge` for every discovered check regardless of edge. `package_dir` is test-only (see
     `scan`) -- production callers always get the real package.
-
-    When `edge` is given it is also passed down to `discover()`/`scan()` as an import-cost
-    pre-filter (see `_candidate_edges`): a check module whose source text cannot possibly
-    produce a CHECK at this edge is never imported in the first place, instead of being
-    imported and then filtered out below. The filter below is still the source of truth for
-    correctness -- the pre-filter can only skip imports it has proven are irrelevant, never
-    change the resulting list.
     """
-    found = discover(package_dir=package_dir, edge=edge)
+    found = discover(package_dir=package_dir)
     if edge is not None:
         found = [c for c in found if c.applies_at == edge]
     return found

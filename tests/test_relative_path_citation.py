@@ -1,9 +1,9 @@
-from makoto.checks.relativePathCitation import find_relative_citations, relative_path_gate
+from makoto.checks.spec import find_relative_citations, relative_path_gate
 
 
 def test_fires_on_bare_relative_directory_path():
-    hits = find_relative_citations("see checks/hollowTest.py for the detector")
-    assert hits == [("checks/hollowTest.py", 4)]
+    hits = find_relative_citations("see substrate/hollowTest.py for the detector")
+    assert hits == [("substrate/hollowTest.py", 4)]
 
 
 def test_fires_on_bare_file_line_citation():
@@ -12,7 +12,7 @@ def test_fires_on_bare_file_line_citation():
 
 
 def test_silent_on_absolute_path():
-    assert find_relative_citations("see /home/user/makoto-dev/checks/hollowTest.py") == []
+    assert find_relative_citations("see /home/user/makoto-dev/substrate/hollowTest.py") == []
 
 
 def test_silent_on_url():
@@ -37,15 +37,15 @@ def test_silent_on_bare_word_slash_word():
 
 
 def test_dedupes_repeated_citation():
-    hits = find_relative_citations("edit checks/hollowTest.py then re-check checks/hollowTest.py again")
+    hits = find_relative_citations("edit substrate/hollowTest.py then re-check substrate/hollowTest.py again")
     assert len(hits) == 1
 
 
 def test_gate_fires_finding_advisory_never_error():
-    f = relative_path_gate("see checks/hollowTest.py:146")
+    f = relative_path_gate("see substrate/hollowTest.py:146")
     assert f is not None
     assert f.level == "advisory"
-    assert "checks/hollowTest.py:146" in f.message
+    assert "substrate/hollowTest.py:146" in f.message
 
 
 def test_gate_silent_on_no_citations():

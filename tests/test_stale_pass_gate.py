@@ -3,7 +3,7 @@ Sentinels (a)-(d) per spec §1; (d) is the teeth arm (sole-killer for the gate b
 import json
 import time
 
-from makoto.checks.stalePytestCache import stale_pass_gate, CHECK
+from makoto.checks.switch import stale_pass_gate, stale_CHECK as CHECK
 
 
 def _cache(tmp_path, entries, live=()):

@@ -9,11 +9,7 @@ forward-framed clause guards (mirroring substrate.claims.whole_suite_pass_claim'
 in the gate.canon sense: the failure verdict reads only protocol terminals (`interrupted`, a
 non-zero `exitCode`, or PostToolUseFailure's top-level `error`), never a test-runner regex or a
 language/framework token."""
-from makoto.checks.claimedRunningAbsent import (
-    _latest_process_call_failed,
-    _running_claim,
-    claimed_running_gate,
-)
+from makoto.checks.switch import _latest_process_call_failed, _running_claim, claimed_running_gate
 
 
 def _post(cmd="npm run dev", **response):

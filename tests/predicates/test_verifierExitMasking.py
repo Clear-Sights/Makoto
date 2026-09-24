@@ -6,7 +6,7 @@ guarantee zero FP on the named legit cases. SCOPED 2026-06-02: the `2>/dev/null`
 removed (stream redirect ≠ exit masking) — graduated to blocking (error).
 """
 import pytest
-from makoto.checks.verifierExitMasking import predicate
+from makoto.checks.spec import masking_predicate as predicate
 from makoto.vocab import PreCheck
 
 

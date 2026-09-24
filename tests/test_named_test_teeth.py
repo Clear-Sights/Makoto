@@ -1,4 +1,4 @@
-"""Unit-level FP guards for gate.named_test's claim parser (checks/namedTestTeeth.py).
+"""Unit-level FP guards for gate.named_test's claim parser (checks/switch.py).
 
 Sibling gates each have a dedicated helpers test file (test_green_claim_helpers.py etc.); this one
 was missing before this session found a real false positive live (see guard #4 below) — the only
@@ -8,7 +8,7 @@ just #4, so this file matches the rigor bar the module's own comments already cl
 """
 from __future__ import annotations
 
-from makoto.checks.namedTestTeeth import claimed_passing_names
+from makoto.checks.switch import claimed_passing_names
 
 
 def test_plain_present_tense_claim_fires():

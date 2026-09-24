@@ -10,7 +10,7 @@ import sqlite3
 
 from makoto.substrate.claims import whole_suite_pass_claim
 from makoto.kit import is_failing_testrun
-from makoto.checks.falseGreenClaim import green_claim_gate
+from makoto.checks.switch import green_claim_gate
 from makoto.dispatch import run_stop_checks
 from makoto.state import ledger as L
 # === whole_suite_pass_claim: the whole-suite green claim ==============================
@@ -180,7 +180,7 @@ def test_NON_VACUITY_a_green_status_with_a_green_tail_stays_silent():
 
 def test_an_unrecorded_status_behaves_exactly_as_before():
     """The new read must not turn 'we do not know' into a new way to fail."""
-    from makoto.checks.falseGreenClaim import green_claim_gate
+    from makoto.checks.switch import green_claim_gate
     claim = "All tests pass."
     assert green_claim_gate(claim, testrun_output="Killed\n", testrun_exit=None) is None
     assert green_claim_gate(claim, testrun_output="1 failed, 2 passed", testrun_exit=None) is not None

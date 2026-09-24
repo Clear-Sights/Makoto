@@ -11,14 +11,13 @@ Binds the three contract surfaces so none can silently drift:
   (4) the full conventions doc names every active pattern id (catalog-bound materiality).
 """
 from __future__ import annotations
-import importlib
-import inspect
 from pathlib import Path
 
 from makoto import dispatch
 from makoto.dispatch import _jit_hint, _worst_finding, _ALLOW_EXEMPT_IDS
 from makoto.vocab import Finding
 from makoto.registry import load_precheck_catalog
+from tests._rows import reached, rows
 
 REPO = Path(dispatch.__file__).resolve().parent
 
@@ -71,20 +70,11 @@ def test_no_findings_no_worst_outcome():
 
 # --- (3) the exempt-id set is DERIVED, not asserted ---------------------------
 def test_allow_exempt_ids_match_predicate_sources():
-    """A pattern belongs in _ALLOW_EXEMPT_IDS iff its predicate module implements the
-    exemption: it builds on a factory scaffold (regex_file_predicate / ast_introduced_predicate,
-    both of which check makoto_allowed centrally) or calls makoto_allowed directly. Source-derived
-    so the JIT hint can never claim an escape hatch the code does not honor — or hide one it does."""
-    derived = set()
-    for p in load_precheck_catalog():
-        if not p.predicate_module:
-            continue
-        src = inspect.getsource(importlib.import_module(p.predicate_module))
-        implements = ("regex_file_predicate" in src or "ast_introduced_predicate" in src
-                      or "introduced_regex_predicate" in src or "makoto_allowed" in src)
-        refuses = "does NOT exempt" in src
-        if implements and not refuses:
-            derived.add(p.id)
+    """A Pre row belongs in _ALLOW_EXEMPT_IDS iff its verdict reaches the exemption: a factory
+    scaffold that checks makoto_allowed centrally, or makoto_allowed itself. Source-derived so
+    the JIT hint can never claim an escape hatch the code does not honor -- or hide one it does."""
+    honors = {"regex_file_predicate", "ast_introduced_predicate", "introduced_regex_predicate", "makoto_allowed"}
+    derived = {row.id for row in rows().values() if row.edge == "Pre" and reached(row) & honors}
     assert derived == set(_ALLOW_EXEMPT_IDS), (
         f"drift: derived-from-source {sorted(derived)} != declared {sorted(_ALLOW_EXEMPT_IDS)}")
 

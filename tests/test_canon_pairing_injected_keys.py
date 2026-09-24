@@ -6,13 +6,7 @@ from __future__ import annotations
 
 import json
 
-from makoto.checks.canonTimeoutRecur import (
-    canon_input,
-    _pairing_input,
-    calls_from_history,
-    fired_primitives,
-    recur_stuck,
-)
+from makoto.checks.switch import canon_input, _pairing_input, calls_from_history, fired_primitives, recur_stuck
 
 BASE = {"file_path": "/x", "content": "c", "mode": "w"}
 INJECTED = {**BASE, "__artifactPlanConsentAsk": True,

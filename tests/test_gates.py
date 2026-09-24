@@ -7,7 +7,7 @@ dropped ledger touch fails open against the live filesystem so a real edit never
 The commitments-store and retraction-reconcile tests that used to live here went with the store
 itself (2026-09-18): gate.advance was its only reader and it is cut.
 """
-from makoto.checks.claimedProduceAbsent import completion_gate
+from makoto.checks.otherPoint import completion_gate
 from makoto.kit import _discharged, _path_components, _suffix_match
 
 

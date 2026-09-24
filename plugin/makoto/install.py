@@ -23,7 +23,7 @@ import re
 import sys
 from pathlib import Path
 from makoto.registry import load_checks, load_precheck_catalog
-# Hoisted 2026-07-09 to makoto.substrate.wiring (shared with checks/selfWiredCheck.py, which the
+# Hoisted 2026-07-09 to makoto.substrate.wiring (shared with checks/otherPoint.py, which the
 # gate-side layering firewall bars from importing this lifecycle module directly).
 from makoto.substrate.wiring import (
     MAKOTO_CLAUDE_FLAG as _MAKOTO_CLAUDE_FLAG,

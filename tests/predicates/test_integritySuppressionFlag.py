@@ -9,7 +9,7 @@ prose, comments, or perf toggles. (A green corpus alone does not prove low FP â€
 the corpus simply never exhibited the TP; these sentinels do.)
 """
 from __future__ import annotations
-from makoto.checks.integritySuppressionFlag import predicate
+from makoto.checks.spec import suppress_predicate as predicate
 from makoto.vocab import PreCheck
 
 _PAT = PreCheck(id="content.integrity_suppression_flag", fire_level="error",

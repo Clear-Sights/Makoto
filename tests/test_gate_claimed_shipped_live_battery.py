@@ -9,7 +9,7 @@ import sqlite3
 import subprocess
 
 from makoto.dispatch import run_stop_checks
-from makoto.checks.claimedShippedAbsent import _successful_remote_mutation
+from makoto.checks.otherPoint import _successful_remote_mutation
 
 
 def _git(cwd, *args):
@@ -102,7 +102,7 @@ def test_red_push_claim_with_no_cwd_falls_back_to_evidence_route_and_fires():
     — absence is checked there, never read as green with nothing checked at all. Called on the
     gate directly: the live path can never deliver a falsy cwd (context.py substitutes the
     dispatch process's own CWD), so this arm is only reachable as a pure-function contract."""
-    from makoto.checks.claimedShippedAbsent import claimed_shipped_gate
+    from makoto.checks.otherPoint import claimed_shipped_gate
     history = [_row(1, "", "Bash", {"command": "git push origin main"},
                     {"exitCode": 1, "stderr": "rejected"})]
     f = claimed_shipped_gate("I've pushed it to main.", history=history, cwd=None)
@@ -171,7 +171,7 @@ def test_not_evaluable_pretooluse_push_record_stays_silent_with_cwd(tmp_path):
 def test_red_no_cwd_dangling_pretooluse_is_not_settled_evidence():
     """On the no-cwd fallback route (pure-function, see above), a dangling PreToolUse push
     record must NOT discharge the claim: only a settled successful mutation is evidence."""
-    from makoto.checks.claimedShippedAbsent import claimed_shipped_gate
+    from makoto.checks.otherPoint import claimed_shipped_gate
     history = [_row(1, "", "push_files", {"branch": "main"}, {},
                     event="PreToolUse")]
     f = claimed_shipped_gate("I pushed it to main.", history=history, cwd=None)

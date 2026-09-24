@@ -13,8 +13,8 @@ from makoto.substrate._canonAtoms import (
     calls_from_history,
     compute_atoms,
 )
-from makoto.checks.canonFingerprints import canon_fingerprint_block_gate
-from makoto.checks.canonFingerprintsAdvisory import canon_fingerprint_advisory_gate
+from makoto.checks.spec import canon_fingerprint_block_gate
+from makoto.checks.spec import canon_fingerprint_advisory_gate
 
 
 def _row(tool_name, tool_input, tool_response=None, event_type="PostToolUse"):

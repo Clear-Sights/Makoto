@@ -5,8 +5,8 @@ import json
 
 import pytest
 
-from makoto.checks.canonFingerprints import canon_fingerprint_block_gate
-from makoto.checks.canonTimeoutRecur import canon_gate
+from makoto.checks.spec import canon_fingerprint_block_gate
+from makoto.checks.switch import canon_gate
 from makoto.state import ledger
 from makoto.substrate._canonAtoms import calls_since
 

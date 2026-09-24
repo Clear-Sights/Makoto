@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib
 from makoto.vocab import PreCheck
 
-MOD = importlib.import_module("makoto.checks.illusoryInterruptionClaim")
+MOD = importlib.import_module("makoto.checks.lineage")
 PAT = PreCheck(id="content.illusory_interruption_claim", fire_level="error",
               description="illusory interruption claim", retry_hint="remove it")
 

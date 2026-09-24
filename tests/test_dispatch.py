@@ -1532,7 +1532,7 @@ def test_dispatch_relative_path_citation_gate_never_blocks_even_when_it_fires(tm
     last_assistant_message cites a non-absolute path."""
     state_dir = _setup_state(tmp_path)
     stop = {"hook_event_name": "Stop", "session_id": "relpath", "cwd": str(tmp_path),
-            "last_assistant_message": "see checks/hollowTest.py:146 for the detector"}
+            "last_assistant_message": "see substrate/hollowTest.py:146 for the detector"}
     rc, out = _run_dispatch(state_dir, stop)
     assert out == "", "gate.relative_path_citation must NEVER block, even when it fires"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]

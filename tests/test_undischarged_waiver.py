@@ -16,9 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks.undischargedWaiver import (
-    CHECK, _undischarged_directives, undischarged_waiver_gate,
-)
+from makoto.checks.spec import waiver_CHECK as CHECK, _undischarged_directives, undischarged_waiver_gate
 
 H = "#"          # a comment opener, assembled
 SL = "//"
@@ -68,7 +66,7 @@ def test_an_end_on_the_line_above_discharges_it():
 
 
 def test_an_end_two_lines_above_does_not_discharge_it():
-    """The window stops at one line. checks/integritySuppressionFlag.py measured whole-content
+    """The window stops at one line. checks/spec.py measured whole-content
     scope as a laundering token: one unrelated reference anywhere in the payload disarmed that
     check silently. A discharge two lines away is not attached to the directive."""
     body = f"{H} remove when the vendored parser is upgraded\n{H} unrelated\nvalue = parse(raw)  {H} noqa"
@@ -106,7 +104,7 @@ def test_a_keyword_in_a_string_literal_does_not_match():
 def test_the_check_module_does_not_fire_on_its_own_source():
     """Measured, not asserted. The lesson this pin exists for is concrete: a literal marker in a
     test made scour refuse to run on its own tree."""
-    import makoto.checks.undischargedWaiver as mod
+    import makoto.checks.spec as mod
     src = open(mod.__file__, encoding="utf-8").read()
     assert _undischarged_directives(src) == []
 

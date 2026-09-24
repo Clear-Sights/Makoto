@@ -21,7 +21,7 @@ the near-misses pin (1) is dissolved by the active-code AST gate AND a bare feat
 (no integrity token) stays silent (a green corpus alone does not prove low FP — these do).
 """
 from __future__ import annotations
-from makoto.checks.envGatedAudit import predicate
+from makoto.checks.spec import env_predicate as predicate
 from makoto.vocab import PreCheck
 
 _PAT = PreCheck(id="content.env_gated_audit", fire_level="error",

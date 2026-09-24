@@ -31,6 +31,7 @@ from pathlib import Path
 
 from makoto.registry import Check, _ADVISORY_ALLOWLIST, load_checks
 from makoto.context import GateContext
+from tests._rows import SHAPES
 
 
 def _live_gates() -> list:
@@ -46,63 +47,7 @@ def _live_gates() -> list:
 GATES_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 
 # ---- the declared design (single source; the package must MATCH it) --------------------------
-# The named Stop-gate modules — each is its adapter AND its own engine merged into one file
-# (SPEC-5 Task 4 folded what used to be a separate `stopcheck_X.py` + `X.py` engine pair together).
-GATE_MODULE_STEMS = {
-    "unexaminedWall",        # register G5's runner: an epistemic "cannot" with no act in the
-                             # window since the operator last spoke
-    "claimedConsentAbsent",  # the agent cites the operator's word in a session with no operator
-                             # turn at all -- the ORACLE channel as record, never as subject
-    "claimedProduceAbsent", "falseGreenClaim", "silentlyDroppedCommitment",
-    "fabricatedToolAction", "namedTestTeeth", "stalePytestCache",
-    "deadPureStatement",    # liveness gate: adapter + its own AST analyzer engine, one file
-    "selfWiredCheck",       # the ONE advisory-tier exception to "discovered<=>live<=>blocking"
-                            # (2026-07-05, DESIGN DECISION, self-defense-asymmetry-followup mitigation)
-                            # — partial-strip detection of makoto's own settings.json hook wiring.
-    "hollowTest",           # hollow_test gate: adapter + its own AST analyzer engine, one file
-    "canonTimeoutRecur",    # canon gate: adapter + its own pure engine (canon.timeout/canon.recur)
-    "canonFingerprints",           # SPEC-5 Task 9: BLOCK-tier half of the 17 canon fingerprints
-    "canonFingerprintsAdvisory",   # SPEC-5 Task 9: ADVISE-tier half (shares _canonAtoms.py)
-    "relativePathCitation", # 2026-07-09: advisory-only, flags a chat response citing a non-
-                             # absolute (unclickable) path. Discovered normally, like selfWiredCheck.
-    "planItemDrift",        # 2026-07-09: advisory-only reminder of open plan/task-labeled
-                             # commitments ("§9.3", "Task #19") sourced from chat prose by
-                             # session/planItems.py -- see that module for why this can't reuse
-                             # the cut store's file-path-only sourcing.
-    "claimedRunningAbsent", # 2026-07-23: an agnostic (gate.canon-sense) claimed-running-but-
-                             # nothing-runs gate -- claim vs this session's own recorded Bash
-                             # evidence, mirroring claimedProduceAbsent's claim-vs-ledger shape.
-    "claimedShippedAbsent", # completed remote mutation claim checked against successful Bash
-                             # git-push and closed-set GitHub mutation evidence across all agents.
-    "unprobedFanout",       # 2026-09-18: register B11's runner, the first ACT_VS_GUARD
-                             # obligation -- a dispatch with no read before it. ADVISE tier.
-    "unaskedPlan",          # 2026-09-18: register G2's runner, the second -- a plan presented
-                             # with no question asked. ADVISE tier.
-    # 2026-09-18, second batch: the five obligations Keel's clause table covered and makoto did
-    # not. All ADVISE tier, all ACT_VS_GUARD, one register entry each.
-    "unreadStructure",      # register A3 POSITIONAL PAIRING
-    "unwitnessedScanner",   # register B4 WRONG ORACLE
-    "unknownRefSwitch",     # register D12 PRESERVE TO VOLATILE
-    "unobservedDestruction", # register D14 UNDO UNPROVEN
-    "relaunchedUnchanged",  # register E13 PARKED ON AN INHERITED CHANNEL
-    "undischargedWaiver",   # register B9 WAIVER NEVER EXPIRES: a silencing directive
-                            # introduced with no checkable end named beside it
-    "unnamedFailure",       # register C12 VERDICT WITHOUT ITS SUBJECT: a counted failure
-                            # whose identity the run recorded and the turn dropped
-    "reportBeforeRun",      # register C11 REPORT BEFORE DECIDE: a run's success written
-                            # into prose before any verifier ran
-    "unclaimedUnit",        # register H6 FUNCTION DRAWN FROM NO CLAIM: a top-level unit
-                            # answering to nothing on the record
-    "pastedFix",            # register H3 FIX DRAWN FROM FIXES: one repair's text reaching a
-                            # second file with no verifier run between the two landings
-}
-GATE_MODULE_FILES = {f"{stem}.py" for stem in GATE_MODULE_STEMS}
-# the shared substrate (GateContext + common predicates) + the two test-only FP/soundness
-# harnesses (never imported by a gate module itself — only by their own battery tests) that travel
-# with the gate catalog but are not gates. _canonAtoms.py is the same kind of shared substrate,
-# scoped to the two canonFingerprints* gates (SPEC-5 Task 9).
-EXPECTED_SHARED_FILES = set()  # 2026-07-09: all former checks/ plumbing moved to substrate/
-EXPECTED_GATE_FILES = GATE_MODULE_FILES | EXPECTED_SHARED_FILES     # the gate subset of checks/
+# checks/ holds one module per register family; every check is a row of one of them.
 EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.fabricated_action", "gate.named_test", "gate.stale_pass", "gate.liveness",
                           "gate.self_wired", "gate.hollow_test", "gate.canon",
@@ -139,63 +84,6 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "testrun_output",
                            "history_all_agents"}   # 2026-07-23: gate.claimed_running's
                            # cross-agent-pooled Bash evidence twin of `history` (see GateContext's
                            # own field doc)
-EXPECTED_FUNCTION_COUNTS = {
-    "unreadStructure.py": 2,  # 2026-09-18 obligation, register A3
-    "unwitnessedScanner.py": 2,  # 2026-09-18 obligation, register B4
-    "unknownRefSwitch.py": 0,  # 2026-09-18 obligation, register D12
-    "unobservedDestruction.py": 1,  # 2026-09-18 obligation, register D14
-    "relaunchedUnchanged.py": 1,  # 2026-09-18 obligation, register E13
-    "unprobedFanout.py": 2,                                  # 2026-09-18: ACT_VS_GUARD obligation
-    "unaskedPlan.py": 2,                                  # 2026-09-18: ACT_VS_GUARD obligation
-                               # top-level def count per module, verified
-    "claimedProduceAbsent.py": 2,
-    "falseGreenClaim.py": 2,
-    "silentlyDroppedCommitment.py": 6,                     # 7->6, 2026-08-20: _drop_def_or_class
-                                                            # inlined into its single call site
-    "fabricatedToolAction.py": 3,
-    "namedTestTeeth.py": 3,                                # 6->7, 2026-07-09: recorded_failed_names/
-                                                            # recorded_passed_names now share one
-                                                            # extracted _recorded_names helper.
-                                                            # 7->3, 2026-09-18: the EVIDENCE side
-                                                            # (those two, _recorded_names and
-                                                            # current_named_verdicts) moved to
-                                                            # vocab/kit, its reachable home; the
-                                                            # CLAIM side stays. See the module's
-                                                            # own note and tests/test_import_direction.py
-    "unnamedFailure.py": 1,                                # 2026-09-18, register C12
-    "reportBeforeRun.py": 1,                               # 2026-09-18, register C11
-    "unclaimedUnit.py": 5,                                 # 2026-09-18, register H6
-    "pastedFix.py": 4,                                     # 2026-09-18, register H3
-    "stalePytestCache.py": 1,
-    "deadPureStatement.py": 15,                            # engine + adapter merged (_run lives here);
-                                                            # 19->15, 2026-07-09: _scratch_roots/_under/
-                                                            # _is_scratch/_read extracted to _stdlib_ast_helpers.py
-    "selfWiredCheck.py": 3,                                # 3->2, 2026-07-09: _entry_dispatches_to_makoto
-                                                            # hoisted to substrate/wiring.py (shared with
-                                                            # install.py -- the refactor the module's own
-                                                            # note asked for). 2->3, 2026-07-22:
-                                                            # _default_plugin_fs_read added (two-source
-                                                            # wiring check, plugin manifest fallback)
-    "hollowTest.py": 31,                                   # engine + adapter merged (_run lives here);
-                                                            # 35->30, 2026-07-09: _callee_chain/_scratch_roots/
-                                                            # _under/_is_scratch/_read extracted to
-                                                            # _stdlib_ast_helpers.py. 30->31, 2026-08-20:
-                                                            # _imported_helper_names_that_assert (the shared
-                                                            # plant-and-restore helper FP class)
-    "canonTimeoutRecur.py": 15,                            # sequence engine + Stop adapter
-    "canonFingerprints.py": 1,                             # thin adapter; atoms/decode live in _canonAtoms.py
-    "canonFingerprintsAdvisory.py": 1,                     # thin adapter; atoms/decode live in _canonAtoms.py
-    "relativePathCitation.py": 4,
-    "planItemDrift.py": 1,
-    "claimedRunningAbsent.py": 4,
-    "claimedShippedAbsent.py": 6,                          # 5->6, 2026-09-15: _first_json_object_
-                                                            # in_content_blocks extracted -- the one
-                                                            # decode for a bare-list MCP tool_response
-                                                            # (Claude Code's real toolUseResult shape,
-                                                            # not a dict), shared by _as_dict and
-                                                            # available to _merged_true's own
-                                                            # dict-wrapped-content-list arm
-}
 # Stage 2 seam 7: the gate-side import firewall (the former ALLOWED_IMPORT_ROOTS curated
 # allowlist + sibling-gate scan) now lives in tests/test_import_direction.py — "the layer
 # firewall becomes the file order": every makoto.* import must point strictly earlier in the
@@ -204,10 +92,6 @@ EXPECTED_FUNCTION_COUNTS = {
 
 
 # ---- pure shape predicates (each is fed a planted violation by a test_TEETH_* below) ---------
-def _def_count(src: str) -> int:
-    return sum(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) for n in ast.parse(src).body)
-
-
 def _leads_with_future_import(src: str) -> bool:
     """True if the future-annotations import is the file's first statement, or its first
     statement after a leading module docstring (SPEC-5 Task 4 merged each gate's own engine
@@ -238,14 +122,9 @@ def test_each_live_gate_exports_a_well_formed_CHECK():
         # The property it was reaching for -- that the may_block set is exactly the designed set
         # -- is checked where it can fail, in test_discovered_gates_match_the_design above,
         # against EXPECTED_LIVE_GATE_IDS.
-        # the CHECK (or EXTRA_CHECKS entry) lives in the merged adapter+engine module.
-        home = g.run.__module__
-        assert home.startswith("makoto.checks.")
-        assert home.rsplit(".", 1)[-1] in GATE_MODULE_STEMS
-        mod = importlib.import_module(home)
-        # the module's own CHECK export IS the gate; EXTRA_CHECKS remains the second home a
-        # module may declare a further edge from (no module uses it today).
-        assert getattr(mod, "CHECK", None) is g or g in (getattr(mod, "EXTRA_CHECKS", None) or [])
+        homes = [stem for stem in SHAPES
+                 if importlib.import_module(f"makoto.checks.{stem}").ROWS.get(g.id) is g]
+        assert len(homes) == 1, f"{g.id}: must be a row of exactly one shape module, is in {homes}"
 
 
 def _shadow_field_violation(fields: set) -> str | None:
@@ -310,37 +189,16 @@ def test_gatecontext_has_history_field():
 
 
 def test_package_file_shape_matches_the_design():
-    # checks/ is the SHARED flat home for every check (prechecks, forbiddenLocation, the
-    # completeness check, and this gate subset) — a subset check, not exact-set equality.
-    present = {p.name for p in GATES_DIR.glob("*.py")}
-    assert EXPECTED_GATE_FILES <= present, f"missing gate files: {EXPECTED_GATE_FILES - present}"
-    assert not (GATES_DIR / "_dark").exists()                    # dark tier CUT (io-purge B3) — Bible holds the designs
-    assert len(GATE_MODULE_FILES & present) == 30                # 6 ledger-gates + liveness + self_wired +
-    # hollow_test + canon + the 2 canon-fingerprint gates (SPEC-5 Task 9) + relativePathCitation +
-    # planItemDrift (2026-07-09) + claimedRunningAbsent (2026-07-23) + claimedConsentAbsent
-    # (2026-09-08). 21->18, 2026-09-18: contractOrder / undischargedCommitment /
-    # runIntentUnfulfilled cut -- no register entry named any of them. 18->20, 2026-09-18:
-    # unprobedFanout / unaskedPlan added -- register B11 and G2, which had no runner. 20->25,
-    # same day: the second obligation batch, register A3 / B4 / D12 / D14 / E13. 25->26,
-    # same day: undischargedWaiver -- register B9, whose row read NOT-COUNTABLE because it
-    # was answering whether the discharge HAPPENED rather than whether one is NAMED. 26->27,
-    # same day: unnamedFailure -- register C12, the first of the five entries no tool ran.
-    # 27->28, same day: reportBeforeRun -- register C11, the second of those five. 28->29,
-    # same day: unclaimedUnit -- register H6, the third.
-
-
-def test_module_function_counts_match_the_design():
-    for name, n in EXPECTED_FUNCTION_COUNTS.items():
-        assert _def_count((GATES_DIR / name).read_text()) == n, f"{name}: expected {n} top-level defs"
+    present = {p.stem for p in GATES_DIR.glob("*.py") if not p.name.startswith("_")}
+    assert present == set(SHAPES), f"checks/ must hold exactly the four family modules: {sorted(present)}"
 
 
 def test_each_gate_module_follows_the_house_style():
-    for stem in GATE_MODULE_STEMS:
+    for stem in SHAPES:
         f = GATES_DIR / f"{stem}.py"
         src = f.read_text()
         assert _leads_with_future_import(src), f"{f.name}: missing future header"
-        assert "\nCHECK = " in src or "\nEXTRA_CHECKS = " in src, \
-            f"{f.name}: Stop-edge CHECK/EXTRA_CHECKS export missing/misplaced"
+        assert "\nROWS = " in src and "\nCHECK, *EXTRA_CHECKS = _ROWS" in src, f"{f.name}: row export missing"
 
 
 # ---- teeth: every shape predicate must go RED on a planted violation --------------------------
@@ -382,12 +240,6 @@ def test_TEETH_may_block_partition_catches_a_leaked_advisory_id():
     real = {c.id for c in load_checks(edge="Stop") if not c.may_block}
     assert _partition_violation(real) is None, (
         "CONTROL: the same law must pass on the real non-blocking set, or it reports everything")
-
-
-def test_TEETH_function_count_check_catches_a_drift():
-    planted = "def a():\n    pass\ndef b():\n    pass\n"
-    assert _def_count(planted) == 2
-    assert _def_count(planted) != EXPECTED_FUNCTION_COUNTS["silentlyDroppedCommitment.py"]  # a 6->2 drift reddens
 
 
 def test_TEETH_discovery_count_is_load_bearing():

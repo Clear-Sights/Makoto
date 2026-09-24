@@ -620,11 +620,3 @@ def _run(ctx) -> list:
                             "intentional."),
             ))
     return out
-
-
-# A Stop gate (fires on the Stop hook, like every gate). Its `fn` is the AST analyzer rather than a
-# claim-vs-ledger predicate — mirrors gate.liveness's split exactly. `run` returns list[Finding] (a
-# closed test file can have many hollow tests); run_stop_checks normalizes a list like a single finding.
-from makoto.registry import Check as _Check
-CHECK = _Check(id="gate.hollow_test", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
-               eats=frozenset({"touched", "cwd", "fs_read"}), tests="PATTERN_MATCH")

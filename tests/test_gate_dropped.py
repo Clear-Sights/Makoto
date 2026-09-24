@@ -4,7 +4,7 @@ standalone build (/tmp dropped anchor: 9 sentinels + 3 teeth, dogfood 1 genuine 
 TP fires + adversarial near-miss TNs (discharged / vague / negated / count-met) stay silent;
 neutering dropped_gate reddens the TP tests (falsify teeth).
 """
-from makoto.checks.silentlyDroppedCommitment import dropped_gate
+from makoto.checks.otherPoint import dropped_gate
 
 
 def _call(text, *, touched=(), reads=None):

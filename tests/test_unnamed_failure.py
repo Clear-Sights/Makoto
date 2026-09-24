@@ -10,9 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks.unnamedFailure import (
-    CHECK, _COUNTED_FAILURE_RX, unnamed_failure_gate,
-)
+from makoto.checks.switch import unnamed_CHECK as CHECK, _COUNTED_FAILURE_RX, unnamed_failure_gate
 
 RED_OUTPUT = ("tests/test_billing.py::test_charge FAILED\n"
               "tests/test_billing.py::test_refund FAILED\n"

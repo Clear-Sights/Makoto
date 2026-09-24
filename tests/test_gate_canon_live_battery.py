@@ -27,7 +27,7 @@ import json
 import sqlite3
 
 from makoto.dispatch import run_stop_checks
-from makoto.checks.canonTimeoutRecur import calls_from_history, recur_stuck, timed_out_at_turn_end
+from makoto.checks.switch import calls_from_history, recur_stuck, timed_out_at_turn_end
 
 _COMMIT_DDL = (
     "CREATE TABLE commitments (commitment_key TEXT PRIMARY KEY, session_id TEXT, "

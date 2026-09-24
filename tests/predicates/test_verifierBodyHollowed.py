@@ -11,7 +11,7 @@ that MENTIONS the shape never fires. The narrow path anchor is what kills the FP
 permissive base-class/null-object `return True` methods (they live elsewhere).
 """
 from __future__ import annotations
-from makoto.checks.verifierBodyHollowed import predicate
+from makoto.checks.spec import body_predicate as predicate
 from makoto.vocab import PreCheck
 
 _PAT = PreCheck(id="content.verifier_body_hollowed", fire_level="error",

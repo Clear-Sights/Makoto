@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from makoto.checks import claudeIdentity as mod
+from makoto.checks import spec as mod
 
 CLAUDE = {"GIT_AUTHOR_NAME": "Claude", "GIT_AUTHOR_EMAIL": "noreply" + "@anthropic.com",
           "GIT_COMMITTER_NAME": "Claude", "GIT_COMMITTER_EMAIL": "noreply" + "@anthropic.com"}
@@ -37,7 +37,7 @@ def repo(tmp_path, monkeypatch):
 
 def _fires(cmd, cwd):
     ev = {"tool_name": "Bash", "tool_input": {"command": cmd}, "cwd": str(cwd)}
-    return mod.predicate(current_event=ev, history=[], pattern=mod.CHECK)
+    return mod.identity_predicate(current_event=ev, history=[], pattern=mod.identity_CHECK)
 
 
 @pytest.mark.parametrize("cmd", [

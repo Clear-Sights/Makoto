@@ -4,7 +4,7 @@ This file pins that directly and through dispatch: no Call is synthesized, so ga
 silent on a dangling Pre wherever it sits, and a fully paired call still becomes one Call."""
 import json
 
-from makoto.checks.canonTimeoutRecur import calls_from_history, canon_gate, timed_out_at_turn_end
+from makoto.checks.switch import calls_from_history, canon_gate, timed_out_at_turn_end
 
 
 # ---- pure calls_from_history unit tests: the narrowed synthesis rule --------------------------

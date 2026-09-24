@@ -577,13 +577,3 @@ def _run(ctx) -> list:
                          f"is complete; annotate `# makoto-allow: <reason>` only if it is intentional."),
             ))
     return out
-
-
-# A Stop gate (fires on the Stop hook, like every gate). Its `fn` is the AST analyzer rather than a
-# claim-vs-ledger predicate, so its teeth are audited BEHAVIORALLY (the soundness/FP suite +
-# test_dispatch_liveness_gate_blocks), not by falsify's single-fn mutation harness — see
-# scripts/falsify._BEHAVIORAL_TEETH. `run` returns list[Finding] (a closed unit can have many
-# illusory statements); run_stop_checks normalizes a list exactly like a single finding.
-from makoto.registry import Check as _Check
-CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", may_block=True, run=_run,
-               eats=frozenset({"touched", "cwd", "fs_read"}), tests="PATTERN_MATCH")

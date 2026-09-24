@@ -139,7 +139,7 @@ def _scenario_self_wired(tmp_path):
 
 def _scenario_relative_path_citation(tmp_path):
     # fires: tests/test_relative_path_citation.py::test_gate_fires_finding_advisory_never_error
-    return _ctx(text="see checks/hollowTest.py:146 for the detector")
+    return _ctx(text="see substrate/hollowTest.py:146 for the detector")
 
 
 def _scenario_plan_item_drift(tmp_path):

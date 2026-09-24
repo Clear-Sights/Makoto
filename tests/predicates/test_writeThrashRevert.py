@@ -4,7 +4,7 @@ judged (the canon.oscillate 7-FP lesson); whitespace-only differences are the sa
 import json
 
 from makoto.vocab import Finding, PreCheck
-from makoto.checks.writeThrashRevert import predicate
+from makoto.checks.otherPoint import thrash_predicate as predicate
 
 _PAT = PreCheck(
     id="event.thrash_revert", fire_level="error",

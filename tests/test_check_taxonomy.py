@@ -24,7 +24,7 @@ def test_collapsed_packages_are_gone():
 
 def test_liveness_run_adapter_emits_findings(tmp_path):
     # The Stop adapter reads each touched .py file and emits a real Finding per illusory statement.
-    from makoto.checks.deadPureStatement import _run
+    from makoto.substrate.deadPureStatement import _run
     from makoto.vocab import Finding
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
@@ -44,7 +44,7 @@ def test_liveness_run_adapter_emits_findings(tmp_path):
 
 
 def test_liveness_run_adapter_skips_nonpy_and_missing(tmp_path):
-    from makoto.checks.deadPureStatement import _run
+    from makoto.substrate.deadPureStatement import _run
 
     class Ctx:
         touched = frozenset({str(tmp_path / "notes.txt"), str(tmp_path / "gone.py")})
@@ -56,7 +56,7 @@ def test_liveness_run_adapter_skips_nonpy_and_missing(tmp_path):
 
 
 def test_liveness_gate_fires_on_touched_file(tmp_path):
-    from makoto.checks.deadPureStatement import CHECK
+    from makoto.checks.spec import liveness_CHECK as CHECK
     f = tmp_path / "m.py"
     f.write_text("def fn():\n d = 1+1\n return 0\n")
 

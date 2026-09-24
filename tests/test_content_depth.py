@@ -9,7 +9,7 @@ import os
 import sqlite3
 
 from makoto.kit import _discharged
-from makoto.checks.claimedProduceAbsent import completion_gate
+from makoto.checks.otherPoint import completion_gate
 from makoto.dispatch import run_stop_checks
 from makoto.state import ledger as L
 def _conn():

@@ -6,7 +6,7 @@ it -- not itself a detector module.
 SPEC-5 Task 9 (Makoto absorbs Assay): ports 17 of the 27 named session-level "canon" fingerprints
 from REF-lever-graded-primitives/signalminer/grade_planted.py's THE_CANON dict onto Makoto's real
 Stop-gate observable surface (GateContext.history: raw hook-event payload rows -- the same shape
-makoto/checks/canonTimeoutRecur.py and every ledger-gate already reads).
+makoto/checks/switch.py and every ledger-gate already reads).
 
 SCOPE CUT (logged in DEFERRED.md, "SPEC-5 Task 9" entry): 10 of the 27 fingerprints reference one
 of three atoms (assistant_admit, red_text, does_not_exist) that have NO source implementation

@@ -9,12 +9,7 @@ full-strip attack — see docs/self-defense-asymmetry-followup.md.
 """
 import json
 
-from makoto.checks.selfWiredCheck import (
-    CHECK,
-    _entry_dispatches_to_makoto,
-    _missing_makoto_events,
-    self_wired_gate,
-)
+from makoto.checks.otherPoint import wired_CHECK as CHECK, _entry_dispatches_to_makoto, _missing_makoto_events, self_wired_gate
 from makoto.substrate.wiring import event_wired, read_plugin_manifest_hooks
 
 

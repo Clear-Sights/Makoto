@@ -5,7 +5,7 @@ from makoto.state.plan import (
     source_plan_item_promise, source_plan_item_completions,
     record_plan_item, open_plan_items, set_plan_item_status, sync_plan_items,
 )
-from makoto.checks.planItemDrift import plan_item_drift_gate
+from makoto.checks.spec import plan_item_drift_gate
 
 
 def _conn():

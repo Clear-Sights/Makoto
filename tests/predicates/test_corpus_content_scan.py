@@ -29,6 +29,7 @@ import importlib
 import pytest
 from makoto.vocab import PreCheck
 from makoto.registry import load_precheck_catalog
+from makoto.checks import spec, otherPoint, switch, lineage
 
 # A file_path that matches each content-scan check's target_rx (so the gate passes).
 _PATH = {
@@ -55,12 +56,15 @@ def _parse(path: str):
     rc = re.search(r'reason_contains:\s*"([^"]+)"', fm)
     reason = rc.group(1) if rc else None
     fr = re.match(r"(?:TP|TN)_([A-Za-z]+)_", os.path.basename(path))
-    assert fr, f"{path}: corpus filename must be T[PN]_<checkModuleStem>_<slug>.md"
+    assert fr, f"{path}: corpus filename must be T[PN]_<row key in its shape module>_<slug>.md"
     return fr.group(1), expects_fire, reason, body
 
 
 def _params():
-    stem_to_id = {p.predicate_module.rsplit(".", 1)[-1]: p.id for p in load_precheck_catalog()}
+    live = {p.id for p in load_precheck_catalog()}
+    stem_to_id = {name[:-len("_CHECK")]: row.id
+                  for shape in (spec, otherPoint, switch, lineage)
+                  for name, row in vars(shape).items() if name.endswith("_CHECK") and row.id in live}
     out = []
     for p in sorted(glob.glob(os.path.join(_CDIR, "T[PN]_*.md"))):
         name = os.path.basename(p)

@@ -21,10 +21,10 @@ from pathlib import Path
 
 import pytest
 
-from makoto.checks import hollowTest as _analyzer
+from makoto.substrate import hollowTest as _analyzer
 from tests._fpHarness import measure
-from makoto.checks.hollowTest import analyze_file
-from makoto.checks.hollowTest import _run as adapter_run
+from makoto.substrate.hollowTest import analyze_file
+from makoto.substrate.hollowTest import _run as adapter_run
 
 REPO_ROOT = Path(__file__).resolve().parent.parent   # Makoto repository root
 

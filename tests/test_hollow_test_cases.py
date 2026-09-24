@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from makoto.checks.hollowTest import analyze_file
+from makoto.substrate.hollowTest import analyze_file
 
 CASES_PATH = Path(__file__).resolve().parent / "hollow_test_cases.json"
 CASES = json.loads(CASES_PATH.read_text(encoding="utf-8"))

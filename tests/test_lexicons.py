@@ -106,7 +106,8 @@ def test_integ_vocab_is_the_single_source_for_the_integrity_wordset():
     # (identity), so the byte-identical `audit|verif|integrit|...` alternation is not re-declared per
     # detector. It is a raw alternation STRING (each consumer anchors it differently), not a PreCheck.
     from makoto import vocab as lexicons
-    from makoto.checks import integritySuppressionFlag, envGatedAudit
+    from makoto.checks import spec as integritySuppressionFlag
+    from makoto.checks import spec as envGatedAudit
     assert isinstance(lexicons._INTEG_VOCAB, str)
     assert "audit" in lexicons._INTEG_VOCAB and "provenance" in lexicons._INTEG_VOCAB
     assert integritySuppressionFlag._INTEG is lexicons._INTEG_VOCAB        # p14._INTEG stays the L0 object
@@ -126,13 +127,13 @@ def test_the_recorded_verdict_parsers_are_one_object_under_every_spelling():
     parsers that agree today are still two parsers.
     """
     from makoto import vocab as lexicons, kit
-    from makoto.checks import namedTestTeeth as ntt
+    from makoto.checks import switch as ntt
     for name in ("_TESTNAME_RX", "_REC_FAIL_LEAD_RX", "_REC_FAIL_TRAIL_RX", "_REC_PASS_LEAD_RX",
                  "_REC_PASS_TRAIL_RX", "_recorded_names", "recorded_failed_names",
                  "recorded_passed_names"):
         assert getattr(ntt, name) is getattr(lexicons, name), f"{name} is no longer one object"
     assert ntt.current_named_verdicts is kit.current_named_verdicts
     # ...and the new C12 gate reads the same objects rather than its own pair.
-    from makoto.checks import unnamedFailure as uf
+    from makoto.checks import switch as uf
     assert uf._TESTNAME_RX is lexicons._TESTNAME_RX
     assert uf.current_named_verdicts is kit.current_named_verdicts

@@ -22,8 +22,8 @@ per-pattern adversarial teeth. The teeth test proves a neutered predicate would 
 from __future__ import annotations
 
 from makoto.vocab import PreCheck
-from makoto.checks.envGatedAudit import predicate as p_1_2
-from makoto.checks.verifierBodyHollowed import predicate as p_1_27
+from makoto.checks.spec import env_predicate as p_1_2
+from makoto.checks.spec import body_predicate as p_1_27
 # certVerifyDisabled/jwtSignatureDisabled/certNoneMode/timingUnsafeCompare/jwtNoneAlg/
 # paramikoHostKeyWeakened/certReqsNone moved to Ward, 2026-07-13 (github.com/Clear-Sights/Ward) --
 # their new-file FP-battery coverage moved with them (see Ward's own tests/test_checks.py).

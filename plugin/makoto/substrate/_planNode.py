@@ -12,7 +12,7 @@ directly. Every other non-detector file in this package (``_shared.py``, ``_prim
 a bare ``planNode.py`` would instead be treated as an ORPHAN detector module (no CHECK export)
 by ``checks.undeclaredFalsifiable``'s completeness audit, a false completeness-drift signal
 for a file that was never meant to be a detector. Consumers: ``makoto/plan.py`` (the sqlite
-persistence layer), ``makoto/checks/staleEstablisher.py`` (the check built over this grammar)
+persistence layer), ``makoto/checks/otherPoint.py`` (the check built over this grammar)
 and ``makoto/context.py``.
 
   * ``PlanNode`` -- one declared step: operation ``what`` on operand-name ``passthrough`` at

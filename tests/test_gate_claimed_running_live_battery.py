@@ -32,7 +32,7 @@ import json
 import sqlite3
 
 from makoto.dispatch import run_stop_checks
-from makoto.checks.claimedRunningAbsent import _latest_process_call_failed
+from makoto.checks.switch import _latest_process_call_failed
 
 _COMMIT_DDL = (
     "CREATE TABLE commitments (commitment_key TEXT PRIMARY KEY, session_id TEXT, "

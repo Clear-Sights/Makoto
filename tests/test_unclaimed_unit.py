@@ -11,9 +11,7 @@ import json
 
 import pytest
 
-from makoto.checks.unclaimedUnit import (
-    CHECK, _introduced_units, unclaimed_unit_gate,
-)
+from makoto.checks.lineage import unclaimed_CHECK as CHECK, _introduced_units, unclaimed_unit_gate
 
 BARE = "def helper(a):\n    return a + 1\n"
 

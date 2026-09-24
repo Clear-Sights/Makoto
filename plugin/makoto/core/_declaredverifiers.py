@@ -1,6 +1,6 @@
 """makoto.core._declaredverifiers — the repository's own statement of which programs verify it.
 
-WHY THIS EXISTS. `checks/verifierExitMasking.py` recognises a verifier two ways, and both are
+WHY THIS EXISTS. `checks/spec.py` recognises a verifier two ways, and both are
 name-shaped:
 
   * `_LEAD_RUNNER_RX` — a closed vocabulary of foreign-ecosystem runner NAMES (`pytest`,
@@ -31,7 +31,7 @@ names, so this must not smuggle in a smaller guess of its own.
 THE DECLARATION NEVER SILENCES ANYTHING. It is consulted BEFORE the naming heuristic and adds a
 blocking tier; it cannot switch the heuristic off. A declaration that could suppress findings
 would be a self-mute lever an agent could pull by declaring one harmless program — the shape
-`checks/selfMuteGuard.py` exists to catch. So this file can only ever make makoto stricter,
+`checks/spec.py` exists to catch. So this file can only ever make makoto stricter,
 which is also why an unreadable or malformed declaration is answered with "nothing is declared"
 (fail-open, matching every other loader in this package): the worst that costs is a block that
 degrades to the heuristic's advisory, never a block invented out of a bad parse.

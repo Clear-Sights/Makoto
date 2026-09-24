@@ -1,329 +1,109 @@
-"""RESULT-SHAPE law: every check declares and evidences exactly one verdict shape."""
+"""FAMILY law: every row sits in its family's module, and decides the way its family decides.
+
+The register has four families, and each names what pays a check's subject. SPEC holds its own
+definition and needs no witness. The other three owe a witness -- a second reading of the subject
+(OTHER_POINT), an act and its response (SWITCH), a read of the source before the write drawn from
+it (LINEAGE) -- and every one of them decides through the one engine, `kit.unwitnessed`. So the
+law is one line per direction: a witness family's row reaches the engine, a SPEC row does not.
+
+STATED LIMIT: this reads source. It establishes that the engine is on the row's reachable path,
+not that the verdict comes from it; the behavioural half is the engine's own plant (a witness
+that never pays turns the suite red) and each row's tests.
+"""
 from __future__ import annotations
 
 import ast
-import importlib
-from pathlib import Path
+import inspect
 
 import pytest
 
-from makoto.registry import ALLOWED_EDGES, TESTS_SHAPES, Check, load_checks
+from makoto import kit
+from makoto.registry import ALLOWED_EDGES, TESTS_SHAPES, load_checks
+from tests._rows import SHAPES, functions, rows
 
-
-FACTORY_SHAPES = {
-    "ast_introduced_predicate": "PATTERN_MATCH",
-    "regex_file_predicate": "PATTERN_MATCH",
-    "claim_vs_history_predicate": "CLAIM_VS_HISTORY",
-    "live_query_finding": "LIVE_QUERY",
-    "unmet_obligation_gate": "ACT_VS_GUARD",
-    # "introduced_regex_predicate" is NOT listed here: it serves both PATTERN_MATCH and
-    # CLAIM_VS_HISTORY callers (illusoryAuthorshipTrailer.py / illusoryInterruptionClaim.py),
-    # so its shape isn't derivable from factory NAME alone — see _factory_shape's special case
-    # below, which derives it from whether the call site passes `grounded_in_history=` instead.
-    # That's still a literal AST check on the call's own keywords, not a runtime value or a
-    # trusted manifest, so the law keeps verifying the declared shape from source.
-}
-
-ONE_OFF = {
-    "content.self_mute_guard": "hardcoded makoto-allow immunity cannot use universal routing",
-    "gate.undeclared_falsifiable": "meta-level audit over registry/loader completeness",
-    "gate.green_claim": "genuine CLAIM_VS_HISTORY / TESTRUN_DELTA straddle",
-}
-
-HISTORY_PRIMITIVES = frozenset({
-    "iter_tool_events", "raw_payload_str", "decode_history_row", "decode_history_event",
-    "turn_tool_calls", "calls_from_history",
-    # `calls_since` is `calls_from_history` with the atom window applied (the calls since the
-    # operator last spoke). It reads the same history rows through the same decoder, so it is the
-    # same primitive at a narrower quantifier -- not a second way of consulting history.
-    "calls_since",
-    # `user_turn_texts` is the ORACLE half of the same session record: the host-written user
-    # turns, read as the record a claim ABOUT the operator is held against. Same session, same
-    # spoof-resistance (`_is_genuine_user_turn`), different channel.
-    "user_turn_texts",
-})
-LEDGER_PRIMITIVES = frozenset({"_discharged", "_discharge_kwargs", "_drop_discharged"})
-# An obligation's evidence is the ORDERED event sequence, so its primitive is the factory that
-# walks it. The factory is the only way to reach that walk: a module that declares ACT_VS_GUARD
-# and hand-rolls the loop instead fails this law, which is the point -- one home for the order
-# rule, since the order IS the check.
-ACT_GUARD_PRIMITIVES = frozenset({"unmet_obligation_gate"})
-TESTRUN_PRIMITIVES = frozenset({
-    "classify_failure", "compute_delta", "recorded_failed_names", "is_failing_testrun",
-    "_bash_call_after",
-    # `current_named_verdicts` is the same family at the grain a per-test verdict needs: it
-    # builds {exact_id: FAIL|PASS} out of the responses of RECOGNIZED runner invocations only,
-    # over the same `recorded_failed_names`/`recorded_passed_names` parsers the others use. A
-    # gate reaching it has consulted a test run, which is what this shape's evidence means --
-    # and reaching it is the only sound way to do so, because it is what keeps a `FAILED` line
-    # the agent merely displayed (`cat old.log`) from grounding a verdict.
-    "current_named_verdicts",
-})
-INTRODUCED_PRIMITIVES = frozenset({
-    "_gated_content", "scan_target_content", "introduced_text",
-    "iter_touched_python_sources", "calls_from_history", "fired_canon_fingerprints",
-})
-LIVE_PRIMITIVES = frozenset({
-    "open", "stale_failing_node", "read_plugin_manifest_hooks",
-    "_read_plugin_manifest_hooks",
-})
-
-
-def _functions(tree: ast.AST) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
-    return {
-        node.name: node
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
+# `introduced_regex_predicate` pays through the engine only when handed a witness.
+_OPTIONAL_WITNESS = {"introduced_regex_predicate": "grounded_in_history"}
 
 
 def _call_name(node: ast.Call) -> str:
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        parts = [node.func.attr]
-        value = node.func.value
-        while isinstance(value, ast.Attribute):
-            parts.append(value.attr)
-            value = value.value
-        if isinstance(value, ast.Name):
-            parts.append(value.id)
-        return ".".join(reversed(parts))
-    return ""
+    f = node.func
+    return f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
 
 
-def _walk_calls(root: ast.AST, funcs, seen: set[str]) -> set[str]:
-    """Same-module reachable call graph, mirroring the eats law's `_walk_reads`."""
-    out: set[str] = set()
+def _reaches(root: ast.AST, defs: dict, target: set, seen: set) -> bool:
+    """Whether `root` calls, or names, anything in `target`, following the names `defs` binds."""
     for node in ast.walk(root):
-        if not isinstance(node, ast.Call):
-            continue
-        name = _call_name(node)
-        if name:
-            out.add(name)
-        short = name.rsplit(".", 1)[-1]
-        if short in funcs and short not in seen:
-            seen.add(short)
-            out |= _walk_calls(funcs[short], funcs, seen)
-    return out
-
-
-def _introduced_regex_predicate_shape(node: ast.Call) -> str:
-    """`introduced_regex_predicate` alone serves both PATTERN_MATCH and CLAIM_VS_HISTORY callers
-    (see kit.py's own docstring) — its shape is derived from whether the call passes
-    `grounded_in_history=`, a literal keyword on THIS call node, not a runtime value or a name
-    lookup. Still a source-derived verdict, not a trusted declaration."""
-    return "CLAIM_VS_HISTORY" if any(kw.arg == "grounded_in_history" for kw in node.keywords) \
-        else "PATTERN_MATCH"
-
-
-def _factory_shape(tree: ast.Module) -> str | None:
-    shapes = set()
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        name = _call_name(node).rsplit(".", 1)[-1]
-        if name == "introduced_regex_predicate":
-            shapes.add(_introduced_regex_predicate_shape(node))
-        elif name in FACTORY_SHAPES:
-            shapes.add(FACTORY_SHAPES[name])
-    assert len(shapes) <= 1, f"module mixes result-shape factories: {sorted(shapes)}"
-    return next(iter(shapes), None)
-
-
-def _module_calls(tree: ast.Module) -> set[str]:
-    funcs = _functions(tree)
-    calls = _walk_calls(tree, funcs, set())
-    return calls | {name.rsplit(".", 1)[-1] for name in calls}
-
-
-def _discarded_calls(tree: ast.Module) -> set[str]:
-    """Primitives called as a BARE STATEMENT, so whatever they return is thrown away.
-
-    `_module_calls` answers "is this primitive called". A call whose result nothing reads is not
-    evidence: the check can call the history reader, ignore what it says, and return a verdict
-    reached some other way, while the shape law sees the name and passes. Only calls in
-    statement position are collected here -- a call inside a comparison, an assignment, a return
-    or an argument is used by definition.
-    """
-    discarded = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-            name = _call_name(node.value)
-            if name:
-                discarded.add(name)
-                discarded.add(name.rsplit(".", 1)[-1])
-    return discarded
-
-
-def _has_required_evidence(shape: str, tree: ast.Module) -> bool:
-    # A primitive whose result is discarded does not count as having been consulted.
-    calls = _module_calls(tree) - _discarded_calls(tree)
-    if shape == "CLAIM_VS_HISTORY":
-        return bool(calls & HISTORY_PRIMITIVES)
-    if shape == "CLAIM_VS_LEDGER":
-        if calls & LEDGER_PRIMITIVES:
-            return True
-        return any(
-            isinstance(node, ast.Call) and _call_name(node) == "getattr"
-            and len(node.args) > 1 and isinstance(node.args[1], ast.Constant)
-            and node.args[1].value == "open_plan_items"
-            for node in ast.walk(tree)
-        )
-    if shape == "ACT_VS_GUARD":
-        return bool(calls & ACT_GUARD_PRIMITIVES)
-    if shape == "TESTRUN_DELTA":
-        return bool(calls & TESTRUN_PRIMITIVES)
-    if shape == "LIVE_QUERY":
-        return bool(calls & LIVE_PRIMITIVES) or any(
-            name in {"os.path.exists", "os.path.getsize"} or name.startswith("subprocess.")
-            for name in calls
-        )
-    if shape == "PATTERN_MATCH":
-        match_call = any(
-            # `ast.iter_child_nodes` joins `ast.walk` as a matching act: a TOP-LEVEL-only
-            # analyzer (gate.unclaimed_unit judges module-level defs and classes, because a
-            # method answers to its class) applies its pattern to the module's own children and
-            # must not descend. Requiring `ast.walk` of it would mean walking the whole tree to
-            # throw most of it away, so the law would be paid in a worse analyzer.
-            name in {"re.search", "re.match", "ast.walk", "ast.iter_child_nodes"}
-            or name.endswith((".search", ".match", ".finditer"))
-            for name in calls
-        )
-        gated = bool(calls & INTRODUCED_PRIMITIVES) or any(
-            isinstance(node, ast.Constant) and node.value in {"current_event", "touched", "text"}
-            for node in ast.walk(tree)
-        )
-        return match_call and gated
+        name = _call_name(node) if isinstance(node, ast.Call) else \
+            node.id if isinstance(node, ast.Name) else ""
+        if name in target:
+            witness = _OPTIONAL_WITNESS.get(name)
+            if witness is None or isinstance(node, ast.Call) and any(kw.arg == witness for kw in node.keywords):
+                return True
+        if name in defs and name not in seen:
+            seen.add(name)
+            if _reaches(defs[name], defs, target, seen):
+                return True
     return False
 
 
-def test_no_dead_result_shape_in_the_closed_vocabulary():
-    """`TESTS_SHAPES` is a CLOSED vocabulary, and nothing checked the other direction: a shape
-    nobody declares sits in it undetectably. That is `B7 RULE WITH NO RUNNER` applied to a
-    vocabulary rather than to a rule, and a plant on 2026-09-18 -- adding a bogus shape --
-    left the whole suite green.
-
-    Every member must be declared by at least one live check, or be named in `RESERVED_SHAPES`
-    with the reason. `FACTORY_SHAPES`' values must also all be real members, so a factory cannot
-    be mapped to a shape the vocabulary does not carry.
-    """
-    RESERVED_SHAPES: dict[str, str] = {}      # none reserved today; a member here needs a reason
-    declared = {c.tests for c in _catalog().values() if c.tests}
-    dead = sorted(TESTS_SHAPES - declared - set(RESERVED_SHAPES))
-    assert not dead, (
-        f"result shape(s) in TESTS_SHAPES that no live check declares: {dead}. Either a check "
-        f"should declare one, or the member is dead vocabulary and comes out.")
-    invented = sorted(set(FACTORY_SHAPES.values()) - TESTS_SHAPES)
-    assert not invented, f"FACTORY_SHAPES maps a factory to shape(s) the vocabulary lacks: {invented}"
-    assert not (declared - TESTS_SHAPES), "a live check declares a shape outside the vocabulary"
+def _engine() -> set:
+    """`unwitnessed` and every kit function whose own body reaches it."""
+    kit_defs = functions(ast.parse(inspect.getsource(kit)))
+    return {"unwitnessed"} | {n for n in kit_defs if _reaches(kit_defs[n], kit_defs, {"unwitnessed"}, set())}
 
 
-def _catalog() -> dict[tuple[str, str], Check]:
-    return {
-        (check.id, check.applies_at): check
-        for edge in ALLOWED_EDGES
-        for check in load_checks(edge=edge)
-    }
+def _decides_through_engine(row) -> bool:
+    start = row.binds[row.entry] if row.entry in row.binds else row.root
+    return _reaches(start, {**row.binds, **row.funcs}, _engine(), set())
 
 
-def _source_trees(package: Path) -> dict[tuple[str, str], ast.Module]:
-    out = {}
-    for path in sorted(package.glob("*.py")):
-        if path.name.startswith("_"):
-            continue
-        tree = ast.parse(path.read_text(), filename=str(path))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            keywords = {kw.arg: kw.value for kw in node.keywords}
-            id_node = keywords.get("id")
-            edge_node = keywords.get("applies_at")
-            if (
-                isinstance(id_node, ast.Constant) and isinstance(id_node.value, str)
-                and isinstance(edge_node, ast.Constant) and isinstance(edge_node.value, str)
-            ):
-                out[(id_node.value, edge_node.value)] = tree
-    return out
+_ROWS = rows()
 
 
-def _cases():
-    package = Path(importlib.import_module("makoto.checks").__file__).parent
-    catalog = _catalog()
-    trees = _source_trees(package)
-    for key, check in sorted(catalog.items()):
-        yield key, check, trees[key]
+def test_every_live_check_is_a_row_of_a_shape_module():
+    live = {(c.id, c.applies_at) for edge in ALLOWED_EDGES for c in load_checks(edge=edge)}
+    assert live == set(_ROWS), f"only-live={sorted(live - set(_ROWS))} only-rows={sorted(set(_ROWS) - live)}"
 
 
-@pytest.mark.parametrize("key,check,tree", list(_cases()), ids=lambda value: str(value))
-def test_check_declares_and_evidences_result_shape(key, check, tree):
-    if check.id in ONE_OFF:
-        assert check.tests == "", f"registered ONE_OFF must remain undeclared: {ONE_OFF[check.id]}"
-        return
-    assert check.tests in TESTS_SHAPES, f"{key}: undeclared tests shape"
-    factory_shape = _factory_shape(tree)
-    if factory_shape is not None:
-        assert check.tests == factory_shape
+def test_the_vocabulary_is_the_four_families_and_each_holds_a_row():
+    assert TESTS_SHAPES == set(SHAPES.values())
+    assert {row.module.__name__.rsplit(".", 1)[-1] for row in _ROWS.values()} == set(SHAPES)
+
+
+@pytest.mark.parametrize("key", sorted(_ROWS), ids=str)
+def test_row_declares_its_module_family_and_decides_as_that_family(key):
+    row = _ROWS[key]
+    family = SHAPES[row.module.__name__.rsplit(".", 1)[-1]]
+    declared = row.module.ROWS[row.id].tests
+    assert declared == family, f"{key}: declares {declared!r} but sits in the {family} module"
+    if family == "SPEC":
+        assert not _decides_through_engine(row), f"{key}: a SPEC row holds its definition; it owes no witness"
     else:
-        assert _has_required_evidence(check.tests, tree), (
-            f"{key}: declares {check.tests} without its required evidence primitive, or calls "
-            f"one only as a bare statement and discards what it returns. STATED LIMIT: this "
-            f"law reads the module's source -- it establishes that the primitive is consulted "
-            f"and its result used, not that the verdict is derived from it. The behavioural "
-            f"half is tests/predicates/<check>.py and the universal law in "
-            f"tests/test_stop_gate_level_invariant.py."
-        )
+        assert _decides_through_engine(row), f"{key}: a {family} row owes a witness and must decide through kit.unwitnessed"
 
 
-def test_result_shape_law_catches_an_underdeclared_fixture():
-    fixture = Check("fixture.underdeclared", "Stop", "ADVISE", tests="CLAIM_VS_LEDGER")
-    tree = ast.parse("def run(c):\n    return None\n")
-    assert fixture.tests in TESTS_SHAPES
-    assert not _has_required_evidence(fixture.tests, tree)
+def test_family_law_catches_planted_rows():
+    engine = _engine()
+    witnessed = ast.parse("def run(ctx):\n    return next(unwitnessed(ctx.events, owes=f, pays=g), None)\n")
+    bare = ast.parse("def run(ctx):\n    return None\n")
+    unwitnessed_factory = ast.parse("p = introduced_regex_predicate(body_rx=R)\n")
+    witnessed_factory = ast.parse("p = introduced_regex_predicate(body_rx=R, grounded_in_history=g)\n")
+    assert _reaches(witnessed, functions(witnessed), engine, set())
+    assert not _reaches(bare, functions(bare), engine, set())
+    assert not _reaches(unwitnessed_factory, {}, engine, set())
+    assert _reaches(witnessed_factory, {}, engine, set())
 
 
-def test_every_advisory_gate_declares_the_four_fields_its_tier_rests_on():
-    """ONE home for what three new test modules were each restating in 2026-09-18.
-
-    `gate.undischarged_waiver`, `gate.unnamed_failure` and `gate.report_before_run` each shipped
-    with a `test_the_check_ships_advisory_and_declares_its_shape` asserting posture, edge, shape
-    and eats for its own check -- the same four lines, three times, which is what
-    `F2 TWO SOURCES OF TRUTH` names. The four properties are each already held by a law
-    (`registry._ADVISORY_ALLOWLIST` with test_stop_gate_level_invariant's level pin, this file's
-    shape law, and test_check_law_eats), so what was actually missing was a single statement that
-    the allowlist and the declared posture agree. That is here, over the whole set, where adding
-    a check to one and not the other reddens it.
-
-    Precedent for the subtraction: tests/test_gate_shape.py dropped its own `may_block is True`
-    assertion for the same reason -- `_live_gates()` is defined by it, so the assertion was the
-    selection restated and could not fail.
-    """
+def test_every_advisory_gate_declares_the_fields_its_tier_rests_on():
+    """The allowlist and the declared posture must name the same set: the README's
+    blocking/advisory counts are published off the allowlist and its posture off the check.
+    `may_block=True` is what puts a check in the decision pipeline, so only those are compared."""
     from makoto.registry import _ADVISORY_ALLOWLIST, POSTURE_ADVISE, POSTURE_BLOCK
-    catalog = _catalog()
-    stop = {cid: c for (cid, edge), c in catalog.items() if edge == "Stop"}
-    # The allowlist's subject is the checks that REACH the decision pipeline: `may_block=True`
-    # puts a check in `dispatch._blocking_gate_ids()`, and the allowlist is what then keeps
-    # `tools/render_checks.py` from publishing it as blocking. Writing this law as "every
-    # ADVISE check is allowlisted" reddened on gate.stale_establisher and
-    # gate.undeclared_falsifiable, which are ADVISE with `may_block=False` -- they never reach
-    # the pipeline, so there is nothing for an allowlist entry to correct, and their absence is
-    # the design rather than drift. `blocking_eligible`'s own docstring says the allowlist
-    # "happens to name exactly the four checks whose posture is ADVISE", and that sentence was
-    # already wrong about these two when it was written.
+    stop = {row.id: row.module.ROWS[row.id] for row in _ROWS.values() if row.edge == "Stop"}
     pipeline = {cid: c for cid, c in stop.items() if getattr(c, "may_block", False)}
     advisory_by_posture = {cid for cid, c in pipeline.items() if c.posture == POSTURE_ADVISE}
     assert advisory_by_posture == set(_ADVISORY_ALLOWLIST), (
-        "a Stop check's declared posture and the advisory allowlist disagree; the README's "
-        "blocking/advisory counts are published off the allowlist and its posture off the check, "
-        f"so the two must name the same set. only-posture={sorted(advisory_by_posture - set(_ADVISORY_ALLOWLIST))} "
+        f"only-posture={sorted(advisory_by_posture - set(_ADVISORY_ALLOWLIST))} "
         f"only-allowlist={sorted(set(_ADVISORY_ALLOWLIST) - advisory_by_posture)}")
     for cid, c in stop.items():
         assert c.posture in (POSTURE_ADVISE, POSTURE_BLOCK), cid
-        assert c.tests or cid in ONE_OFF, f"{cid} declares no result shape and is not a ONE_OFF"
-        # eats is required of a check that declares a SHAPE, because a shape's evidence arrives
-        # through a channel. gate.undeclared_falsifiable declares neither, and correctly: its
-        # subject is the registry itself, not the Stop substrate, so it reads no channel for
-        # test_check_law_eats to hold it to. That is why the condition is `c.tests` rather than
-        # a blanket requirement -- written blanket first, it reddened on exactly that check.
-        if c.tests:
-            assert c.eats, f"{cid} declares a shape but no eats, so test_check_law_eats has nothing to hold it to"

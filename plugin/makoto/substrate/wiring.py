@@ -2,7 +2,7 @@
 
 ONE domain: does a settings.json hook entry functionally reach makoto's dispatch? Consumed by
 BOTH sides of the wiring contract -- install.py (the writer/status reporter) and
-checks/selfWiredCheck.py (the self-defense gate that detects partial stripping). Hoisted here
+checks/otherPoint.py (the self-defense gate that detects partial stripping). Hoisted here
 2026-07-09 from the byte-for-byte duplicate both files carried: selfWiredCheck's own module
 note asked for exactly this ("a future refactor that hoists both to a shared L0 module would
 let this duplication go away") -- the gate-side layering firewall

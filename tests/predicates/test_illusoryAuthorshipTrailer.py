@@ -9,7 +9,7 @@ import importlib
 import pytest
 from makoto.vocab import PreCheck
 
-MOD = importlib.import_module("makoto.checks.illusoryAuthorshipTrailer")
+MOD = importlib.import_module("makoto.checks.spec")
 PAT = PreCheck(id="content.illusory_authorship_trailer", fire_level="error",
               description="illusory Claude-authorship trailer", retry_hint="remove it")
 

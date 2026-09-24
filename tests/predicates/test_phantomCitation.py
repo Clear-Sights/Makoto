@@ -1,7 +1,7 @@
 """tests for predicates/pattern_1_6.py — phantom citation."""
 import sqlite3
 
-from makoto.checks.phantomCitation import predicate
+from makoto.checks.spec import citation_predicate as predicate
 from makoto.vocab import PreCheck
 
 

@@ -12,7 +12,7 @@ reddens.
 """
 from __future__ import annotations
 
-from makoto.checks.pastedFix import CHECK, _blocks, _kept_lines, pasted_fix_gate
+from makoto.checks.lineage import pasted_CHECK as CHECK, _blocks, _kept_lines, pasted_fix_gate
 
 # Four substantial lines: a null-default and a range guard. The grain is four, so this is the
 # shortest repair the gate can see -- see the module docstring's named recall bound.
@@ -184,4 +184,3 @@ def test_the_check_ships_at_the_stop_edge_reading_history_only():
     assert CHECK.id == "gate.pasted_fix"
     assert CHECK.applies_at == "Stop"
     assert CHECK.eats == frozenset({"history"})
-    assert CHECK.tests == "PATTERN_MATCH"

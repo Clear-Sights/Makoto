@@ -1,12 +1,12 @@
 """D1 (docs/DEFERRED.md): red-before-green + FP-guard battery for
-event.identical_retry (checks/identicalRetryInterdiction.py). Proves the ship-bar directly: a
+event.identical_retry (checks/switch.py). Proves the ship-bar directly: a
 deterministic-failure retry blocks; a transient-failure retry (the KNOWN FP class the whole
 design exists to avoid) never does; an intervening action always breaks the match; a
 non-identical retry never fires.
 """
 from __future__ import annotations
 
-from makoto.checks.identicalRetryInterdiction import predicate
+from makoto.checks.switch import retry_predicate as predicate
 from makoto.vocab import PreCheck
 
 PATTERN = PreCheck(id="event.identical_retry", fire_level="error", description="x", retry_hint="y")

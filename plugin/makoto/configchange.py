@@ -43,7 +43,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
-from makoto.checks.selfWiredCheck import _missing_makoto_events
+from makoto.checks.otherPoint import _missing_makoto_events
 from makoto.state.audit import AuditRow, append_row
 from makoto.state.store import _state_dir
 
@@ -51,7 +51,7 @@ from makoto.state.store import _state_dir
 # ---- The pure predicate (formerly makoto/verdict/configchange_verdict.py, verbatim) -----------
 #
 # Background (see `docs/self-defense-asymmetry-followup.md`, "2026-07-05 followup" section):
-# Makoto's Stop-time `gate.self_wired` (`checks/selfWiredCheck.py`) can only ever see a PARTIAL
+# Makoto's Stop-time `gate.self_wired` (`checks/otherPoint.py`) can only ever see a PARTIAL
 # strip of its own PreToolUse/PostToolUse/Stop hook entries in `.claude/settings.json` — a single
 # edit that removes all three simultaneously also removes the Stop entry that would have reported
 # the loss, so that check has zero coverage against the canonical full-strip attack. Claude Code's

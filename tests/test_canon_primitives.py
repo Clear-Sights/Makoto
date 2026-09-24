@@ -6,21 +6,7 @@ unit-vs-live-battery split test_stopcheck_self_wired.py / test_gate_dropped.py u
 gates."""
 import json
 
-from makoto.checks.canonTimeoutRecur import (
-    CANON_SEQ_PRIMITIVES,
-    _decode_row as _decode_canon_row,
-    calls_from_history,
-    canon_gate,
-    exit_code,
-    fired_primitives,
-    interrupted,
-    recur_stuck,
-    sandbox_bypassed,
-    self_error_code,
-    stale_read_hint,
-    timed_out,
-    timed_out_at_turn_end,
-)
+from makoto.checks.switch import CANON_SEQ_PRIMITIVES, _decode_row as _decode_canon_row, calls_from_history, canon_gate, exit_code, fired_primitives, interrupted, recur_stuck, sandbox_bypassed, self_error_code, stale_read_hint, timed_out, timed_out_at_turn_end
 
 
 def _call(name="Bash", input=None, result=None):

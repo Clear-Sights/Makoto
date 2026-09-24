@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from makoto.checks.unsourcedWebfetch import predicate
+from makoto.checks.lineage import webfetch_predicate as predicate
 from makoto.registry import load_precheck_catalog
 
 URL = "https://obscure-vendor.example/api/v3/reference"

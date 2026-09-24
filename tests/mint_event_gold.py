@@ -32,9 +32,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from makoto.checks.verifierPredicateWeakened import predicate as _verifier_weakened_predicate
-from makoto.checks.identicalRetryInterdiction import predicate as _identical_retry_predicate
-from makoto.checks.namedTestTeeth import named_test_gate
+from makoto.checks.spec import weakened_predicate as _verifier_weakened_predicate
+from makoto.checks.switch import retry_predicate as _identical_retry_predicate
+from makoto.checks.switch import named_test_gate
 from makoto.vocab import PreCheck
 
 

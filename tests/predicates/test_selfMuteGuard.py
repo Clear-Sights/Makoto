@@ -13,7 +13,7 @@ var, re-ENABLING makoto (DISABLE set to a falsey value), the same shape in a
 NON-settings file (docs/examples), an edit that KEEPS the managed hook.
 """
 from makoto.vocab import PreCheck
-from makoto.checks import selfMuteGuard
+from makoto.checks import spec as selfMuteGuard
 
 
 _SETTINGS = "/Users/dev/.claude/settings.json"
@@ -25,7 +25,7 @@ _PAT = PreCheck(
     retry_hint="Do not disable makoto in-session. If a pause is genuinely needed, set "
                "MAKOTO_DISABLE_GATES/MAKOTO_DISABLE_PATTERNS in your own shell, or run "
                "`makoto uninstall` — both are out-of-band and operator-visible.",
-    predicate_module="makoto.checks.selfMuteGuard",
+    predicate_module="makoto.checks.spec",
     keywords=["settings.json", "MAKOTO_DISABLE", "MAKOTO_PAUSE", "_makoto_managed"],
 )
 
@@ -45,7 +45,7 @@ def _pre(file_path, *, content=None, new_string=None, old_string=None, edits=Non
 
 
 def _run(payload):
-    return selfMuteGuard.predicate(current_event=payload, history=[], pattern=_PAT, conn=None)
+    return selfMuteGuard.mute_predicate(current_event=payload, history=[], pattern=_PAT, conn=None)
 
 
 # ---- FIRE: introducing a makoto-disable env var into settings.json --------------
@@ -230,6 +230,6 @@ def test_catalog_row_exists_and_matches():
     cat = {p.id: p for p in load_precheck_catalog()}
     assert "content.self_mute_guard" in cat, "patterns.toml missing row content.self_mute_guard"
     row = cat["content.self_mute_guard"]
-    assert row.predicate_module == "makoto.checks.selfMuteGuard"
+    assert row.predicate_module == "makoto.checks.spec"
     assert row.posture.strip().upper() == "BLOCK"
     assert "settings.json" in row.keywords

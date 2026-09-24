@@ -90,51 +90,6 @@ def test_collapsed_packages_are_still_gone():
             importlib.import_module(dead)
 
 
-def test_load_checks_does_not_import_modules_irrelevant_to_the_requested_edge():
-    # Loader-level perf guard (measured regression: load_checks(edge=...) used to import EVERY
-    # check module in makoto/checks/ regardless of which edge was requested -- ~35 modules,
-    # ~600KB of code, on every single call). This scans the REAL package -- unlike the rest of
-    # this file -- because the point is specifically that a Pre-only real module never lands in
-    # `sys.modules` for a Stop-edge request, and vice versa. No module declares a dual Pre+Stop
-    # surface via EXTRA_CHECKS today (contractOrder.py, the only one that did, was cut
-    # 2026-09-18), so nothing needs excluding from the "must not appear" sets below.
-    import sys
-
-    from makoto.registry import ALLOWED_EDGES, scan
-
-    def _reset_check_modules():
-        for mod in list(sys.modules):
-            if mod.startswith("makoto.checks."):
-                del sys.modules[mod]
-
-    # Ground truth for "which edge does each real module's own CHECK belong to" (stem -> CHECK,
-    # from an unfiltered scan() so this test never hardcodes the real catalog by hand). This
-    # only sees each module's PRIMARY CHECK, not EXTRA_CHECKS -- fine, since no module exports
-    # EXTRA_CHECKS today.
-    stems_by_edge = {edge: set() for edge in ALLOWED_EDGES}
-    for stem, chk in scan().items():
-        if chk is not None:
-            stems_by_edge[chk.applies_at].add(stem)
-
-    pre_only_stems = stems_by_edge["Pre"] - stems_by_edge["Stop"]
-    stop_only_stems = stems_by_edge["Stop"] - stems_by_edge["Pre"]
-    assert pre_only_stems and stop_only_stems  # sanity: real catalog has both kinds
-
-    _reset_check_modules()
-    assert load_checks(edge="Stop")
-    imported_stems = {m.rsplit(".", 1)[-1] for m in sys.modules if m.startswith("makoto.checks.")}
-    assert not (pre_only_stems & imported_stems), (
-        "load_checks(edge='Stop') imported Pre-only module(s): "
-        f"{pre_only_stems & imported_stems}")
-
-    _reset_check_modules()
-    assert load_checks(edge="Pre")
-    imported_stems = {m.rsplit(".", 1)[-1] for m in sys.modules if m.startswith("makoto.checks.")}
-    assert not (stop_only_stems & imported_stems), (
-        "load_checks(edge='Pre') imported Stop-only module(s): "
-        f"{stop_only_stems & imported_stems}")
-
-
 def test_existing_prechecks_and_stopchecks_loaders_unaffected():
     # 2026-08-16: `schema.load_prechecks()` (the loader-adapter shim this comment used to say
     # was "explicitly not touched/superseded") has now been retired -- the migration to a single

@@ -365,7 +365,7 @@ _GREEN_UNIVERSAL_PREMOD = frozenset(
     {"the", "all", "every", "our", "my", "full", "entire", "whole", "complete", "test"})
 
 # ---- recorded per-test verdicts: the EVIDENCE side of a named-test claim ----------------------
-# Relocated here 2026-09-18 from checks/namedTestTeeth.py, unchanged. It sat in a NAMED check
+# Relocated here 2026-09-18 from checks/switch.py, unchanged. It sat in a NAMED check
 # module, so the two other consumers could not reach it: tests/test_import_direction.py firewalls
 # check siblings from each other, and `kit.compute_delta` needed a documented call-time back-edge
 # (`_CALL_TIME_OK`) to import it at all -- an exception this move DELETES. A parser is lexicon,

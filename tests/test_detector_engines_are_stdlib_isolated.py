@@ -6,7 +6,7 @@ contained"). The owner correctly rejected treating that claim as sufficient just
 own -- a claim of intent is not proof the intent holds. This test makes the property fail loudly
 the moment it stops being true, instead of resting on an assertion.
 
-`checks/_stdlib_ast_helpers.py` is the one whitelisted shared import both engines may use --
+`substrate/_stdlib_ast_helpers.py` is the one whitelisted shared import both engines may use --
 it exists specifically so the isolation property is real without duplicating the shared helper
 functions across both files.
 """
@@ -15,11 +15,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_CHECKS_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
 _SUBSTRATE_DIR = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "substrate"
 _ALLOWED_STDLIB = {"ast", "os", "tempfile", "pathlib", "__future__"}
-_ALLOWED_MAKOTO = {"makoto.context", "makoto.substrate._stdlib_ast_helpers", "makoto.vocab",
-                   "makoto.registry"}
+_ALLOWED_MAKOTO = {"makoto.substrate._stdlib_ast_helpers", "makoto.vocab"}
 
 
 def _imported_modules(path: Path) -> set:
@@ -34,7 +32,7 @@ def _imported_modules(path: Path) -> set:
 
 
 def _assert_isolated(filename: str) -> None:
-    mods = _imported_modules(_CHECKS_DIR / filename)
+    mods = _imported_modules(_SUBSTRATE_DIR / filename)
     offenders = {m for m in mods
                  if m not in _ALLOWED_STDLIB and m not in _ALLOWED_MAKOTO}
     assert not offenders, (

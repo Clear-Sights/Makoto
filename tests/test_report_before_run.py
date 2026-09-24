@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks.reportBeforeRun import (
-    CHECK, _reports_a_run_verdict, report_before_run_gate,
-)
+from makoto.checks.switch import report_CHECK as CHECK, _reports_a_run_verdict, report_before_run_gate
 
 
 def _prose_write(path, content, tool_name="Write"):
@@ -126,7 +124,7 @@ def test_bash_is_not_a_report_channel_and_the_TARGET_gate_is_why():
     prose-target gate has already decided it. The allowlist is defense in depth over the same
     exclusion, not the thing doing the excluding -- measured below by admitting Bash and
     requiring silence anyway."""
-    import makoto.checks.reportBeforeRun as mod
+    import makoto.checks.switch as mod
     ev = {"hook_event_name": "PostToolUse", "tool_name": "Bash",
           "tool_input": {"command": "echo 'The suite passes.' > HANDOFF.md"},
           "tool_response": {"stdout": ""}}
