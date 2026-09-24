@@ -369,8 +369,36 @@ def atom_test_edited(calls, text) -> bool:
     return _existing(calls, lambda c: _is_edit(c) and _is_test_path(_fp(c)))
 
 
+def _bash_edited_path(c: Call):
+    """A source-file path a Bash call wrote to directly: `sed -i ... file` or a shell
+    redirect (`>`/`>>`) into a file. Best-effort argv-level reading, not a shell evaluator --
+    a target reached through further indirection stays outside this net, the same open-world
+    tradeoff every other command-evidence reader in this module already accepts. Closes the
+    edit-tool-only blind spot in `atom_source_edited`: a source edit made via Bash is just as
+    real as one made via Edit/Write, and must count the same way."""
+    if c["name"] != "Bash":
+        return None
+    for argv, _op in _segments(c):
+        eff = _effective_argv(argv)
+        if eff and eff[0].rsplit("/", 1)[-1] == "sed" and any(
+                a == "-i" or a.startswith("-i") for a in eff[1:]):
+            positional = [a for a in eff[1:] if not a.startswith("-")]
+            if positional:
+                return positional[-1]
+        for i, tok in enumerate(argv):
+            if tok in (">", ">>") and i + 1 < len(argv) and argv[i + 1] != "/dev/null":
+                return argv[i + 1]
+    return None
+
+
 def atom_source_edited(calls, text) -> bool:
-    return _existing(calls, lambda c: _is_edit(c) and bool(_fp(c)) and not _is_test_path(_fp(c)))
+    def _edited(c):
+        if _is_edit(c) and bool(_fp(c)) and not _is_test_path(_fp(c)):
+            return True
+        path = _bash_edited_path(c)
+        return bool(path) and not _is_test_path(path)
+
+    return _existing(calls, _edited)
 
 
 def atom_assertion_weakened(calls, text) -> bool:
