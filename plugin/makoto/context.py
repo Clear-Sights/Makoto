@@ -66,6 +66,12 @@ class GateContext:
     #   across threads -- a risk that does not apply to a completed PostToolUse Bash call. Every
     #   other gate should keep reading `history`; widen a gate onto this field only with the same
     #   completed-evidence reasoning these claim gates document.
+    stop_hook_active: bool = False          # raw hook payload's `stop_hook_active` verbatim
+    #   (CONFIRMED real, top-level on Stop/SubagentStop -- Claude Code hooks reference): true iff
+    #   this Stop already fired once this turn and the agent is retrying to stop. Read by
+    #   gate.unpaid_acceptance, whose BLOCK posture gets no automatic wire-level bounce
+    #   (verdict._STOP_WIRE suppresses only ADVISE) -- it takes its own one bounce here, the same
+    #   direction the ADVISE wire already gives every other Stop check.
 
     @property
     def roots(self):
@@ -228,6 +234,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # canonFingerprints.py reads its audit firing boundary here
             open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
+            stop_hook_active=payload.get("stop_hook_active") is True,
         )
         out = []
         for check in sorted(load_checks(edge="Stop"), key=lambda c: c.id):

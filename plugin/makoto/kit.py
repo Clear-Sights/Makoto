@@ -701,6 +701,25 @@ def command_of(ev: dict) -> str:
     return str(ti.get("command", "") or "")
 
 
+# A dispatch brief's three line-start labels -- READ:/WRITE:/ACCEPTANCE: -- what a worker is sent
+# to read, may write, and what pays it. Case-sensitive, line-start only (`(?m)^LABEL:`), so a
+# loose paraphrase ("Reads:") never counts as the declared line. ONE parser, shared by every check
+# that reads a dispatch prompt's brief (event.unbriefed_dispatch, event.unpinned_input,
+# gate.unpaid_acceptance) rather than three re-derived copies of the same three regexes.
+_BRIEF_LABELS = ("READ", "WRITE", "ACCEPTANCE")
+_BRIEF_LINE_RX = re.compile(r"(?m)^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$")
+
+
+def dispatch_brief_lines(prompt: str) -> dict:
+    """`{"READ": [...], "WRITE": [...], "ACCEPTANCE": [...]}` -- every line-start label's value
+    in `prompt`, in order, stripped. A label that never appears is an empty list, never a missing
+    key, so every caller can index all three unconditionally."""
+    out = {label: [] for label in _BRIEF_LABELS}
+    for label, value in _BRIEF_LINE_RX.findall(prompt or ""):
+        out[label].append(value.strip())
+    return out
+
+
 def command_matches(rx: re.Pattern):
     """An act/guard predicate for `unmet_obligation_gate`: this event's Bash command matches `rx`.
 

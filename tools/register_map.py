@@ -41,7 +41,14 @@ ENTRY_RX = re.compile(r"^([A-H]\d+)\s+[A-Z]")
 # name here is a visible act: the reason is graded non-empty, the name must be a live check,
 # and a name that the map ALSO cites is refused -- a check is either in the register's subject
 # or declared outside it, never both.
-OUTSIDE_THE_REGISTER = {}
+OUTSIDE_THE_REGISTER = {
+    "event.unbriefed_dispatch": "serves PROPOSED-REGISTER-ROWS.md's I1 (THE LINEAGE), a "
+        "separate dispatch-discipline register, not an entry of docs/REGISTER.md (Gabriel's).",
+    "event.unpinned_input": "serves PROPOSED-REGISTER-ROWS.md's I2 (THE OTHER POINT), same "
+        "separate register as event.unbriefed_dispatch above.",
+    "gate.unpaid_acceptance": "serves PROPOSED-REGISTER-ROWS.md's I3 (THE OTHER POINT), same "
+        "separate register as event.unbriefed_dispatch above.",
+}
 
 from makoto import registry  # noqa: E402
 

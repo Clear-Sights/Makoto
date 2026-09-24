@@ -60,7 +60,8 @@ EXPECTED_LIVE_GATE_IDS = {"gate.completion", "gate.green_claim", "gate.dropped",
                           "gate.report_before_run",
                           "gate.unclaimed_unit",
                           "gate.pasted_fix",
-                          "gate.undeclared_falsifiable"}
+                          "gate.undeclared_falsifiable",
+                          "gate.unpaid_acceptance"}
 EXPECTED_GATE_FIELDS = {"id", "applies_at", "posture", "run",
                         "keywords", "retry_hint", "description", "predicate_module",
                         "layer", "eats", "tests"}   # "object" | "meta" -- see Check's own docstring; only
@@ -75,9 +76,11 @@ EXPECTED_CONTEXT_FIELDS = {"text", "touched", "empty", "testrun_output",
                            "permission_mode", "agent_id", "agent_type",
                            "session_id", "transcript_path", "state_root",
                            "open_plan_items",   # Task 2 slice 5 / 2026-07-09 planItemDrift
-                           "history_all_agents"}   # 2026-07-23: gate.claimed_running's
+                           "history_all_agents",   # 2026-07-23: gate.claimed_running's
                            # cross-agent-pooled Bash evidence twin of `history` (see GateContext's
                            # own field doc)
+                           "stop_hook_active"}   # gate.unpaid_acceptance's own one-bounce (see
+                           # GateContext's own field doc)
 # Stage 2 seam 7: the gate-side import firewall (the former ALLOWED_IMPORT_ROOTS curated
 # allowlist + sibling-gate scan) now lives in tests/test_import_direction.py — "the layer
 # firewall becomes the file order": every makoto.* import must point strictly earlier in the

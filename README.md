@@ -27,11 +27,11 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **17 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **3**, `gate`: **1**
-- **30 Stop checks** (all checks registered at the Stop edge)
-- **30 end-of-turn gates** (every Stop check reaches the decision)
-- **14 blocking end-of-turn gates** (`posture == BLOCK`)
+- **19 pre-checks**
+- Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **5**, `gate`: **1**
+- **31 Stop checks** (all checks registered at the Stop edge)
+- **31 end-of-turn gates** (every Stop check reaches the decision)
+- **15 blocking end-of-turn gates** (`posture == BLOCK`)
 - **16 advisory end-of-turn gates** (`posture == ADVISE`)
 
 <!-- END GENERATED: check-counts -->
@@ -97,6 +97,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.claimed_running` | "it's running/up" contradicted by this session's own Bash record | blocking | established |
 | `gate.claimed_shipped` | "merged/pushed/live" with no successful remote-mutating call on record | blocking | established |
 | `gate.claimed_consent_absent` | cites the operator's approval, instruction or word in a session whose transcript carries no genuine operator turn at all | blocking | new |
+| `gate.unpaid_acceptance` | a prior-turn dispatch's own ACCEPTANCE command claimed done with no later run of it exiting 0 | blocking | new (opt-in: `makoto.toml` `dispatch = true`) |
 | `gate.unexamined_wall` | states that a fact cannot be determined when no action at all has been taken since the operator's last turn | blocking | new |
 | `gate.liveness` | a statement with no live effect inside a closed function | blocking | established |
 | `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |

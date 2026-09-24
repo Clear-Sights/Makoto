@@ -1078,11 +1078,80 @@ unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="A
                                                  transcript_path=c.transcript_path))
 
 
+# event.unbriefed_dispatch -- a worker sent without what it reads, what it may write, and what
+# pays it. `PROPOSED-REGISTER-ROWS.md`'s I1: refuse an Agent/Task call whose prompt lacks a
+# READ:, a WRITE: and an ACCEPTANCE: line (line-start labels, case-sensitive).
+#
+# LINEAGE: the witness is a read of the source before the write drawn from it -- here, the three
+# lines a dispatch's OWN prompt must carry before the worker acts at all. `kit.dispatch_brief_lines`
+# is the one parser this row shares with event.unpinned_input's READ:-path check and
+# gate.unpaid_acceptance's ACCEPTANCE: read, so the three-label grammar has one definition.
+#
+# OPT-IN, per the register's own cost line ("every makoto user's dispatches need the three
+# lines... yours to decide"): silent unless the dispatching session's own working tree declares
+# `dispatch = true` in its `makoto.toml` -- the same declaration file `core._declaredverifiers`
+# already reads for the verifier tier, generalized (not duplicated) via `dispatch_opt_in`.
+from makoto.kit import dispatch_brief_lines, unwitnessed
+from makoto.core._declaredverifiers import dispatch_opt_in
+
+# The two dispatch-tool names the register names literally. An MCP tool dispatching a subagent
+# under a third name is `gate.unprobed_fanout`'s wider net (advisory, name-or-`prompt`-shaped);
+# this row stays to the register's own closed pair.
+_DISPATCH_TOOL_NAMES = frozenset({"Agent", "Task"})
+
+
+def _dispatch_prompt(ev: dict):
+    """The prompt of an about-to-run Agent/Task dispatch, or None when `ev` is not one."""
+    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in _DISPATCH_TOOL_NAMES:
+        return None
+    ti = ev.get("tool_input")
+    prompt = ti.get("prompt") if isinstance(ti, dict) else None
+    return prompt if isinstance(prompt, str) else None
+
+
+def _briefed(prompt: str) -> bool:
+    """True iff `prompt` carries all three of READ:/WRITE:/ACCEPTANCE: at least once each."""
+    lines = dispatch_brief_lines(prompt)
+    return bool(lines["READ"] and lines["WRITE"] and lines["ACCEPTANCE"])
+
+
+def unbriefed_owes(ev: dict):
+    """LINEAGE: the about-to-run dispatch commits to its own prompt carrying the full brief."""
+    return (prompt,) if (prompt := _dispatch_prompt(ev)) is not None else ()
+
+
+def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if not dispatch_opt_in(current_event.get("cwd")):
+        return None
+    for _ev, prompt in unwitnessed((current_event,), owes=unbriefed_owes, paid=(_briefed,)):
+        return Finding(
+            pattern_id=pattern.id, file="", line=0, level="error",
+            message=(f"row {pattern.id} ({pattern.description}): dispatch prompt carries no "
+                     "READ:, WRITE: and ACCEPTANCE: line -- a worker sent without what it "
+                     "reads, may write, and what pays it."),
+            retry_hint=pattern.retry_hint,
+            snippet=prompt[:200],
+        )
+    return None
+
+
+unbriefed_RETRY_HINT = ('Give the dispatch a brief with a line-start `READ:`, `WRITE:` and '
+                        '`ACCEPTANCE:` (the paths it reads, the paths it may write, and the '
+                        'command that pays the work) before sending it.')
+unbriefed_DESCRIPTION = ('dispatch prompt lacks a READ:, WRITE: and ACCEPTANCE: line '
+                         '(opt-in: makoto.toml `dispatch = true`)')
+
+unbriefed_CHECK = Check(id='event.unbriefed_dispatch', applies_at="Pre", posture="BLOCK",
+              predicate_module=__name__, keywords=('Agent', 'Task'),
+              retry_hint=unbriefed_RETRY_HINT, description=unbriefed_DESCRIPTION,
+              eats=frozenset({"current_event", "pattern"}), tests="LINEAGE")
+
+
 # the LINEAGE shape: its rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (sha_CHECK, interrupt_CHECK, webfetch_CHECK, structure_CHECK, ref_CHECK, fanout_CHECK, pasted_CHECK, unclaimed_CHECK,)
+_ROWS = (sha_CHECK, interrupt_CHECK, webfetch_CHECK, structure_CHECK, ref_CHECK, fanout_CHECK, pasted_CHECK, unclaimed_CHECK, unbriefed_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {sha_CHECK.id: sha_predicate, interrupt_CHECK.id: interrupt_predicate, webfetch_CHECK.id: webfetch_predicate}
+_PREDICATES = {sha_CHECK.id: sha_predicate, interrupt_CHECK.id: interrupt_predicate, webfetch_CHECK.id: webfetch_predicate, unbriefed_CHECK.id: unbriefed_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):
