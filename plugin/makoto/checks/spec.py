@@ -1766,15 +1766,26 @@ lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK
 bound__TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
 
 
+_UNITTEST_BOUND_METHODS = frozenset({"assertLess", "assertLessEqual"})
+
+
 def _slack_ceiling(node: ast.AST) -> Optional[str]:
-    if not (isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare)
+    if (isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare)
             and len(node.test.ops) == 1 and isinstance(node.test.ops[0], (ast.Lt, ast.LtE))):
+        left, right, label_node = node.test.left, node.test.comparators[0], node.test
+    elif (isinstance(node, ast.Call)
+          and (getattr(node.func, "attr", None) or getattr(node.func, "id", None))
+              in _UNITTEST_BOUND_METHODS
+          and len(node.args) >= 2):
+        # unittest's own ceiling form: self.assertLess(len(x), N) / assertLessEqual(...) is the
+        # same "ceiling not exact count" shape as `assert len(x) < N`, just spelled as a call.
+        left, right, label_node = node.args[0], node.args[1], node
+    else:
         return None
-    left, right = node.test.left, node.test.comparators[0]
     counted = isinstance(left, ast.Call) and (
         getattr(left.func, "id", None) == "len" or getattr(left.func, "attr", None) == "count")
     if counted and isinstance(right, ast.Constant) and type(right.value) is int:
-        return ast.unparse(node.test)
+        return ast.unparse(label_node)
     return None
 
 

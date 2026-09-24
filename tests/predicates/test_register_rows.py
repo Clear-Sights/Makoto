@@ -37,6 +37,13 @@ def test_last_wins(path, content, fires):
     ("/r/tests/test_x.py", "def test_a():\n    assert len(xs) == 500\n", False),
     ("/r/tests/test_x.py", "def test_a():\n    assert elapsed < 2.0\n", False),
     ("/r/src/x.py", "assert len(xs) <= 500\n", False),
+    # unittest-style call form (reword2): same "ceiling not exact count" shape as the ast.Assert
+    # case above, just spelled as self.assertLess(len(x), N) / assertLessEqual(...).
+    ("/r/tests/test_x.py", "class T:\n    def test_a(self):\n        self.assertLess(len(results), 10)\n", True),
+    ("/r/tests/test_x.py",
+     "class T:\n    def test_a(self):\n        self.assertLessEqual(xs.count('a'), 3)\n", True),
+    ("/r/tests/test_x.py",
+     "class T:\n    def test_a(self):\n        self.assertEqual(len(results), 10)\n", False),
 ])
 def test_bound_as_count(path, content, fires):
     assert _fires("content.bound_as_count", "Write", {"file_path": path, "content": content}) is fires
