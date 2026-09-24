@@ -553,9 +553,6 @@ def webfetch_owes(ev: dict):
     return (url,) if (url := _webfetch_url(ev)) is not None else ()
 
 
-webfetch_SHAPE = "OTHER_POINT"
-
-
 def webfetch_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     """The Pre predicate. Fires iff the WebFetch url passes no short-circuit (`_webfetch_url`:
     trusted host) and is witnessed by neither a prior tool RESPONSE (`_url_grounded_in_history`)
@@ -1006,10 +1003,6 @@ def unclaimed_owes(ev: dict):
     fp = str(ti.get("file_path", "")) if isinstance(ti, dict) else ""
     return tuple((name, fp) for name in _introduced_units(text))
 
-
-
-
-unclaimed_SHAPE = "OTHER_POINT"
 
 
 def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:

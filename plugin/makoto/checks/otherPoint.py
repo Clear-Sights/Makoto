@@ -25,7 +25,6 @@ from makoto.core._shell import _command_pushes_git
 # Declared as the dominant shape (SWITCH covers non-push claims outright, and is also the
 # fallback a push claim reaches once its own tip comparison is NOT_EVALUABLE); see the return
 # report's SPLIT annotation for the other half.
-shipped_SHAPE = "SWITCH"
 
 
 class PushTipStatus(Enum):
@@ -467,7 +466,6 @@ from makoto.kit import (_BIND_BEFORE, CARRIAGE_FAULT, DISCHARGE_EATS, _discharge
 
 # gate.completion's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): OTHER_POINT -- the witness
 # is a second reading of the same subject (the results ledger, or the filesystem itself).
-completion_SHAPE = "OTHER_POINT"
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -615,7 +613,6 @@ from makoto.kit import _path_components, _suffix_match, unwitnessed
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject on the assistant's own
 # ledger/filesystem (`touched_keys`, `fs_exists`, `fs_read`) -- never an act exercised here.
-dropped_SHAPE = "OTHER_POINT"
 
 
 _DROP_FORWARD = r"(?:I['’]?ll|I\s+will|I['’]?m\s+going\s+to|I\s+am\s+going\s+to|let\s+me|let['’]s|let\s+us|going\s+to|i\s+plan\s+to|next\s+i\s+will|we['’]?ll|we\s+will|i\s+need\s+to|i\s+should|i\s+want\s+to)"
@@ -1123,7 +1120,6 @@ wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE", 
 # gate.claimed_consent_absent's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): OTHER_POINT --
 # the witness is a second reading of the same subject (the operator's own turns, read from the
 # transcript) against the agent's claim of what the operator said.
-consent_SHAPE = "OTHER_POINT"
 
 # The claim side: the agent attributing a position to the operator. Read on the ASSISTANT's own
 # words, which is what every check here does -- the non-agnostic surface in this package is the
@@ -1231,7 +1227,6 @@ from makoto.kit import decode_history_row, unwitnessed
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- an earlier
 # whole-file Write of the SAME path, a history row -- never a live-exercised act or a source read.
-thrash_SHAPE = "OTHER_POINT"
 
 
 def thrash_owes(ev):
