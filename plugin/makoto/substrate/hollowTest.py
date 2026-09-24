@@ -281,7 +281,11 @@ def _is_tautology(test) -> bool:
             return None                                   # not a literal: truth unknown
     if _literal_truth(test) is True:
         return True                                       # a statically-truthy literal always passes
-    if isinstance(test, ast.Compare) and len(test.ops) == 1 and isinstance(test.ops[0], (ast.Eq, ast.Is)):
+    if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "bool"\
+            and len(test.args) == 1 and not test.keywords and _literal_truth(test.args[0]) is True:
+        return True
+    if isinstance(test, ast.Compare) and len(test.ops) == 1\
+            and isinstance(test.ops[0], (ast.Eq, ast.Is, ast.LtE, ast.GtE)):
         left_node, right_node = test.left, test.comparators[0]
 
         def _may_dispatch(n):

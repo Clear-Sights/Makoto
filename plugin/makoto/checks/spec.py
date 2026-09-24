@@ -145,29 +145,7 @@ _VERIFIER_NAME_RX = re.compile(
 _BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
 
 
-def _is_truthy_const(node) -> bool:
-    """True iff `node` is a literal constant that is TRUTHY. `None` and every falsy literal are
-    excluded — `bool(None)` is already False."""
-    return isinstance(node, ast.Constant) and bool(node.value)
-
-
-def _is_tautology(node) -> bool:
-    """True iff `node` is an ALWAYS-TRUTHY expression: a truthy literal, `not <falsy-const>`,
-    `bool(<truthy-const>)`, or a comparison whose two sides are the same expression under
-    `==`/`is`/`<=`/`>=`."""
-    if _is_truthy_const(node):
-        return True
-    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)\
-            and isinstance(node.operand, ast.Constant) and not node.operand.value:
-        return True
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "bool"\
-            and len(node.args) == 1 and not node.keywords and _is_truthy_const(node.args[0]):
-        return True
-    if isinstance(node, ast.Compare) and len(node.comparators) == 1\
-            and all(isinstance(op, (ast.Eq, ast.Is, ast.LtE, ast.GtE)) for op in node.ops)\
-            and ast.dump(node.left) == ast.dump(node.comparators[0]):
-        return True
-    return False
+from makoto.substrate.hollowTest import _is_tautology
 
 
 def _swallows(stmt) -> bool:
