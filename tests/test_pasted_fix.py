@@ -126,6 +126,18 @@ def test_two_written_files_are_not_a_finding():
                             _landing("src/writer.py", tool_name="Write")]) is None
 
 
+def test_a_write_then_an_edit_of_the_same_block_still_fires():
+    """Narrowing 2 excludes a Write from TRIGGERING a fire (see the test above), not from being
+    REMEMBERED as a possible first site. A block Written into a brand-new file and then Edited
+    into a second, existing one is the same repair-transfer as two Edits -- the second site's
+    correctness is still drawn from the first rather than checked."""
+    finding = pasted_fix_gate([_landing("src/new_module.py", tool_name="Write"),
+                               _landing("src/writer.py")])
+    assert finding is not None
+    assert finding.pattern_id == "gate.pasted_fix"
+    assert finding.file == "src/writer.py"
+
+
 def test_a_multiedit_is_a_change_to_what_exists():
     """MultiEdit is an Edit that carries several replacements; `kit.introduced_text` joins
     them, so the second landing is seen exactly as a plain Edit's would be."""

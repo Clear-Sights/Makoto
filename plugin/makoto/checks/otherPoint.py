@@ -882,10 +882,16 @@ from makoto.substrate._planNode import DONE, Plan
 from makoto.registry import POSTURE_ADVISE
 
 
-def established_check(plan: Optional[Plan]) -> Optional[Finding]:
+def established_check(plan: Optional[Plan], *, cwd: str = "") -> Optional[Finding]:
     """Fire iff a DONE node's `where` is missing from disk AND a later node shares its
     passthrough (a real dependent whose gap-check would wrongly read as satisfied) -- else
     `None`. `plan=None` (no declared plan) is inert.
+
+    A relative `where` (the plan artifact stores paths relative to the session's own project
+    root) is resolved against `cwd` -- the session's payload cwd, never the process's own
+    working directory. Without `cwd`, a relative `where` was checked against wherever the
+    dispatcher process happened to be running FROM (the plugin root, in the installed case),
+    so an establisher that genuinely exists in the session's project read as stale.
 
     Walks the plan in declared order; for each DONE node, checks whether any LATER node shares
     its passthrough (per the same recurrence rule `substrate._planNode` reads) and, only then,
@@ -906,9 +912,13 @@ def established_check(plan: Optional[Plan]) -> Optional[Finding]:
     # artifact-backed commitment treats zero bytes as undelivered.
     owed = (node for i, node in enumerate(nodes)
             if node.status == DONE and last_use[node.passthrough] > i and node.where)
+    def _resolved(where: str) -> str:
+        return os.path.join(cwd, where) if cwd and not os.path.isabs(where) else where
+
     for node, _ in unwitnessed(
             owed, owes=lambda n: (n,), pays=lambda _n: None,
-            paid=(lambda n: os.path.exists(n.where) and os.path.getsize(n.where) > 0,)):
+            paid=(lambda n: os.path.exists(_resolved(n.where))
+                  and os.path.getsize(_resolved(n.where)) > 0,)):
         return Finding(
             pattern_id="gate.stale_establisher",
             file=node.where,
@@ -923,13 +933,17 @@ def established_check(plan: Optional[Plan]) -> Optional[Finding]:
     return None
 
 
-established_run = live_query_finding(query=lambda plan: established_check(plan), posture_label="gate.stale_establisher")
+def established_run(c):
+    """Not built on `live_query_finding`: that helper reads a single named context field, and
+    this check needs two -- the declared plan AND the cwd a relative `where` resolves against."""
+    return established_check(c.plan, cwd=c.cwd)
+
 
 established_CHECK = Check(
     id="gate.stale_establisher",
     applies_at="Stop",
     posture=POSTURE_ADVISE,
-    eats=frozenset({"plan"}),
+    eats=frozenset({"plan", "cwd"}),
     run=established_run,
     tests="OTHER_POINT",
 )
@@ -1226,7 +1240,8 @@ _CONSENT_RX = re.compile(
     r"\b(?:"
     r"(?:you|the\s+(?:user|operator|owner))\s+"
     r"(?:approved|confirmed|agreed|authorized|authorised|okayed|"
-    r"said|asked|told\s+me|requested|instructed|signed\s+off|greenlit)"
+    r"said|asked|told\s+me|requested|instructed|signed\s+off|greenlit|"
+    r"gave\s+(?:me\s+)?the\s+green\s+light)"
     r"|per\s+your\s+(?:approval|request|instruction|confirmation|go-ahead)"
     r"|as\s+you\s+(?:asked|requested|instructed|said|confirmed|approved)"
     r"|with\s+your\s+(?:approval|consent|go-ahead|sign-off)"

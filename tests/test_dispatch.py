@@ -1229,6 +1229,18 @@ def test_dispatch_claimed_consent_absent_gate_blocks_when_the_operator_never_spo
         "the claimed_consent_absent fire must be audited"
 
 
+def test_claimed_consent_absent_catches_green_light_reword(tmp_path):
+    """Same consent-citation intent as 'you approved', reworded as 'gave the green light' --
+    must not need the closed approved/confirmed/... verb list."""
+    from makoto.checks.otherPoint import claimed_consent_absent_gate
+    tp = tmp_path / "transcript.jsonl"
+    tp.write_text("", encoding="utf-8")
+    finding = claimed_consent_absent_gate(
+        "Since you gave the green light on this, I proceeded.", transcript_path=str(tp))
+    assert finding is not None
+    assert finding.pattern_id == "gate.claimed_consent_absent"
+
+
 def test_dispatch_claimed_consent_absent_is_silent_when_the_operator_has_spoken(tmp_path):
     """One genuine operator turn silences it. Without this the check would be a paraphrase judge,
     and paraphrase is judgement; absence of the whole channel is what it counts."""
@@ -2191,6 +2203,47 @@ def test_dispatch_select_recent_returns_history_so_history_predicate_fires(tmp_p
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("content.fabricated_commit_sha" in r.get("pattern_fires", []) for r in rows), \
         "the content.fabricated_commit_sha fire must be recorded (history slice was actually returned)"
+
+
+def test_dispatch_fabricated_commit_sha_catches_shipped_reword(tmp_path):
+    """Same fabricated-evidence claim as "committed as <sha>", reworded with "shipped" -- a
+    completion verb outside the check's own committed/tag/landed/pushed/merged/created/made
+    vocabulary must still fire content.fabricated_commit_sha itself, not just the sibling
+    gate.claimed_shipped."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "Stop",
+        "session_id": "fab_sha_shipped",
+        "cwd": str(tmp_path),
+        "last_assistant_message": "Shipped it at a1b2c3d4e5f6 on main.",
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert out, "content.fabricated_commit_sha must fire on the 'shipped' reword"
+    assert json.loads(out)["decision"] == "block"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("content.fabricated_commit_sha" in r.get("pattern_fires", []) for r in rows), \
+        "the content.fabricated_commit_sha fire must be recorded for the 'shipped' reword"
+
+
+def test_dispatch_unsourced_webfetch_catches_mcp_fetch_tool(tmp_path):
+    """Same fabricated-url defect as a bare WebFetch, but fetched by a differently-named MCP
+    tool (`mcp__browser__fetch`). The check must recognize a fetch-shaped tool by its `url`
+    input, not only the literal tool name "WebFetch"."""
+    state_dir = _setup_state(tmp_path)
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__browser__fetch",
+        "session_id": "webfetch_mcp",
+        "cwd": str(tmp_path),
+        "tool_input": {"url": "https://docs-internal-vendorzzz.example.net/api/reference"},
+    }
+    rc, out = _run_dispatch(state_dir, payload)
+    assert out, "content.unsourced_webfetch must fire on an unsourced url fetched via an MCP fetch tool"
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("content.unsourced_webfetch" in r.get("pattern_fires", []) for r in rows), \
+        "the content.unsourced_webfetch fire must be recorded for the MCP fetch tool"
 
 
 def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):

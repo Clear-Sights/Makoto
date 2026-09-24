@@ -63,6 +63,16 @@ def test_unprobed_fanout_treats_agent_as_the_same_act_as_task():
     assert unprobed_fanout_gate([_row("Agent", description="x")]) is not None
 
 
+def test_unprobed_fanout_catches_a_dispatch_tool_named_neither_task_nor_agent():
+    """Same unprobed dispatch, but through an MCP tool named neither Task nor Agent
+    (`mcp__subagents__dispatch`) -- recognized by its `prompt` input, the one thing every
+    dispatch tool hands to the subagent, not by a closed name list."""
+    f = unprobed_fanout_gate([_row("mcp__subagents__dispatch",
+                                   prompt="Refactor the auth module for clarity")])
+    assert f is not None
+    assert f.pattern_id == "gate.unprobed_fanout"
+
+
 # ---- gate.unasked_plan (register G2 DETERMINED ASKED AS OPEN) ---------------------------------
 
 def test_unasked_plan_fires_on_a_plan_with_no_question():
@@ -164,6 +174,15 @@ def test_unread_structure_needs_null_to_be_the_whole_output():
     assert unread_structure_gate([_bash("jq '.' config.json", '{"a": null}')]) is None
 
 
+def test_unread_structure_fires_on_a_python_none_traversal():
+    """The same defect via `python3 -c ...json...` printing `None` -- Python's null token, not
+    the literal JSON word `null` -- must still fire."""
+    f = unread_structure_gate([_bash(
+        "python3 -c \"import json; d=json.load(open('data.json')); print(d.get('x'))\"",
+        "None")])
+    assert f is not None and f.level == "advisory"
+
+
 # gate.unwitnessed_verifier (register B4 WRONG ORACLE)
 
 def test_unwitnessed_verifier_fires_on_a_first_clean_run():
@@ -214,6 +233,18 @@ def test_unknown_ref_switch_does_not_accept_status_or_log_as_the_print():
     """Neither names the ref being switched TO, which is the whole point of the guard."""
     assert unknown_ref_switch_gate([_bash("git status"), _bash("git checkout x")]) is not None
     assert unknown_ref_switch_gate([_bash("git log --oneline"), _bash("git checkout x")]) is not None
+
+
+def test_unknown_ref_switch_fires_on_a_reset_hard_to_an_unprinted_ref():
+    """`git reset --hard <ref>` moves HEAD to a ref the same way a checkout/switch does -- the
+    same boundary under a third verb, not just checkout/switch."""
+    f = unknown_ref_switch_gate([_bash("git reset --hard origin/some-unprinted-ref")])
+    assert f is not None and f.level == "advisory"
+
+
+def test_unknown_ref_switch_ignores_a_bare_reset_hard():
+    """`git reset --hard` with no ref discards edits in place and names no boundary to cross."""
+    assert unknown_ref_switch_gate([_bash("git reset --hard")]) is None
 
 
 # gate.unobserved_destruction (register D14 UNDO UNPROVEN)
