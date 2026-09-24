@@ -628,7 +628,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
 
     `stop_hook_active` (additive): the host payload's own flag, threaded to
     `verdict.dispatch_posture` unchanged. It only gates the Stop-edge ADVISE rendering (a BLOCK
-    is never suppressed by it) — see `verdict._stop_advise`'s own docstring for why.
+    is never suppressed by it) — see `verdict._stop`'s own docstring for why.
     """
     worst = _worst_finding(findings)
     if worst is None:

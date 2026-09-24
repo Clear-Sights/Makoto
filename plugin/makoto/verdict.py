@@ -284,49 +284,21 @@ _PRE_WIRE: dict[str, Callable] = {
 }
 
 
-def _stop_block(posture_value, hook_name: str, stop_hook_active: bool = False) -> dict:
-    """Intent: Render the Stop/SubagentStop ``block`` response — a blocking preventive finding for
-    an unfinished plan / unreconciled contradiction, carrying the exact coordinates when the check
-    named them AND which edge actually fired (``Stop`` vs ``SubagentStop``), so a sub-agent's own
-    completion claim is distinguishable from a main-thread Stop in the wire body itself, not just
-    inferred from which process received it.
-
-    ``stop_hook_active`` is accepted (and ignored) so this renderer shares the same call shape as
-    ``_stop_advise`` — a genuine BLOCK is never suppressed by a re-fired Stop."""
-    return {
-        "decision": "block",
-        "reason": _detail(posture_value, _STOP_REASON),
-        "hookEventName": hook_name,
-    }
-
-
-def _stop_advise(posture_value, hook_name: str, stop_hook_active: bool = False) -> dict:
-    """Intent: Render an ADVISE finding at Stop/SubagentStop as the SAME block shape as a BLOCK,
-    worded as advice (address it or say why not, then stop) rather than a denial — the only way a
-    non-blocking advisory reaches the agent inside the turn, since Stop/SubagentStop carry no
-    ``additionalContext`` channel the way Pre/Post do.
-
-    Rendered ONLY when ``stop_hook_active`` is not true: a true value means the host already
-    bounced this Stop once for this turn, and blocking it a second time to hand over advice the
-    agent cannot act on again would trap the turn rather than advise it. With it true, this
-    renders ``{}`` — no objection, the agent already got its one bounce."""
-    if stop_hook_active is True:
+def _stop(posture_value, hook_name: str, stop_hook_active: bool, *,
+          reason: str, suppress_if_active: bool) -> dict:
+    """Intent: Render the Stop/SubagentStop block-shaped response, worded by `reason`. A BLOCK
+    (`suppress_if_active=False`) is never suppressed; an ADVISE (`suppress_if_active=True`) renders
+    `{}` once `stop_hook_active` is true — the agent already got its one bounce this turn."""
+    if suppress_if_active and stop_hook_active:
         return {}
-    return {
-        "decision": "block",
-        "reason": _detail(posture_value, _STOP_ADVISE_REASON),
-        "hookEventName": hook_name,
-    }
+    return {"decision": "block", "reason": _detail(posture_value, reason), "hookEventName": hook_name}
 
 
-# Stop / SubagentStop: BLOCK -> block the stop (unfinished plan / unreconciled contradiction, with
-# coordinates); ADVISE -> the same block shape worded as advice, gated on `stop_hook_active` (see
-# `_stop_advise`); ASK / ALLOW -> {} (allow). ASK never blocks the agent from stopping. Both
-# renderers share one call shape (posture, hook_name, stop_hook_active) so one table serves both
-# edges without re-deriving which one it was.
+# Stop / SubagentStop: BLOCK -> block the stop; ADVISE -> the same shape worded as advice, gated on
+# `stop_hook_active`; ASK / ALLOW -> {}. ASK never blocks the agent from stopping.
 _STOP_WIRE: dict[str, Callable] = {
-    BLOCK: _stop_block,
-    ADVISE: _stop_advise,
+    BLOCK: partial(_stop, reason=_STOP_REASON, suppress_if_active=False),
+    ADVISE: partial(_stop, reason=_STOP_ADVISE_REASON, suppress_if_active=True),
 }
 
 
@@ -352,21 +324,8 @@ _HOOK_NAME_EDGES = (_EDGE_STOP, _EDGE_SUBAGENT_STOP)
 def dispatch_posture(edge: str, posture_value: str, hook_name: str,
                      stop_hook_active: bool = False) -> dict:
     """Intent: The public seam — map ONE folded posture at ONE hook edge to a Claude Code hook
-    response body, re-deriving no policy. This is what ``dispatch.py`` calls.
-
-    ``edge`` is one of ``"Pre"`` / ``"Post"`` / ``"Stop"`` / ``"SubagentStop"``. ``posture_value``
-    is a folded posture (``posture.BLOCK`` / ``ASK`` / ``ADVISE`` / ``ALLOW``, or a ``Decision``
-    carrying coordinates). ``hook_name`` is the actual Claude Code hook-event name that fired
-    (``"Stop"`` or ``"SubagentStop"``) — only the Stop-shaped edges echo it back in the body; the
-    Pre/Post renderers use their own constant ``hookEventName``, matching the source shape.
-    ``stop_hook_active`` (Stop-shaped edges only) is the host payload's own flag saying this Stop
-    already bounced once this turn; it only affects the ADVISE renderer (``_stop_advise``) — a
-    BLOCK is never suppressed by it.
-
-    FAIL-OPEN: an unrecognized ``edge`` or a posture with no entry in that edge's table both
-    render ``{}`` (no objection) — never an exception. The Post edge's table only ever holds an
-    ADVISE entry, so BLOCK/ASK/ALLOW at Post structurally can never render anything but ``{}``.
-    """
+    response body, re-deriving no policy. This is what ``dispatch.py`` calls. FAIL-OPEN: an
+    unrecognized ``edge`` or a posture with no entry in that edge's table both render ``{}``."""
     table = _EDGE_TABLES.get(edge)
     if table is None:
         return {}
