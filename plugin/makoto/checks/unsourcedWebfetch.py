@@ -20,7 +20,7 @@ import json
 import os
 from typing import Optional
 from urllib.parse import urlparse
-from makoto.kit import raw_payload_str
+from makoto.kit import raw_payload_str, unwitnessed
 from makoto.vocab import Finding
 
 
@@ -127,6 +127,10 @@ def _user_supplied(url: str, current_event: dict) -> bool:
 
 
 def _webfetch_url(current_event: dict) -> Optional[str]:
+    """The url a WebFetch commits to, or None when the event never owes one at all: not a
+    WebFetch, no url, or a TRUSTED host (a fact about the url itself, not a witness that pays
+    it -- there is no claim to ground in the first place). The user-typed oracle is a real
+    witness and lives in `pays`/`paid`, not here."""
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     if current_event.get("tool_name") != "WebFetch":
@@ -137,9 +141,6 @@ def _webfetch_url(current_event: dict) -> Optional[str]:
     # Trusted-host short-circuit
     host = urlparse(url).netloc.lower()
     if host in _TRUSTED_HOSTS or any(host.endswith("." + th) for th in _TRUSTED_HOSTS):
-        return None
-    # Oracle short-circuit: the user typed this url themselves. See `_user_supplied`.
-    if _user_supplied(url, current_event):
         return None
     return url
 
@@ -198,29 +199,43 @@ def _oracle_consulted(transcript_path) -> bool:
     return bool(transcript_path) and os.path.isfile(transcript_path)
 
 
+def owes(ev: dict):
+    """OTHER_POINT: an untrusted-host WebFetch commits to the url it names."""
+    return (url,) if (url := _webfetch_url(ev)) is not None else ()
+
+
+def pays(ev: dict):
+    """OTHER_POINT: the witnesses are seeded whole via `paid` (a prior tool response, or the
+    user's own transcript turn) -- no per-event witness inside this one-event stream."""
+    return None
+
+
+SHAPE = "OTHER_POINT"
+
+
 def predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     """The Pre predicate (same signature dispatch calls every predicate_module with). Fires iff
-    the WebFetch url passes no short-circuit (`_webfetch_url`: trusted host, user-typed) and is
-    not grounded in a prior tool RESPONSE (`_url_grounded_in_history`). The message states only
-    what was actually checked: the user-typed clause is asserted only when a transcript was
-    available to consult (`_oracle_consulted`)."""
-    url = _webfetch_url(current_event)
-    if url is None:
-        return None
-    if _url_grounded_in_history(url, history):
-        return None
-    if _oracle_consulted(current_event.get("transcript_path")):
-        oracle_clause = "the user never typed it"
-    else:
-        oracle_clause = ("no readable transcript was available to check whether the user "
-                         "typed it")
-    return Finding(
-        pattern_id=pattern.id, file="", line=0, level="error",
-        message=(f"row {pattern.id} ({pattern.description}): this URL was never returned in a "
-                 f"prior tool call's response in this session, and {oracle_clause}"),
-        retry_hint=pattern.retry_hint,
-        snippet=str(url)[:200],
-    )
+    the WebFetch url passes no short-circuit (`_webfetch_url`: trusted host) and is witnessed by
+    neither a prior tool RESPONSE (`_url_grounded_in_history`) nor the user's own transcript
+    turn (`_user_supplied`). The message states only what was actually checked: the user-typed
+    clause is asserted only when a transcript was available to consult (`_oracle_consulted`)."""
+    for _ev, url in unwitnessed(
+            (current_event,), owes=owes, pays=pays,
+            paid=(lambda u: _url_grounded_in_history(u, history),
+                  lambda u: _user_supplied(u, current_event))):
+        if _oracle_consulted(current_event.get("transcript_path")):
+            oracle_clause = "the user never typed it"
+        else:
+            oracle_clause = ("no readable transcript was available to check whether the user "
+                             "typed it")
+        return Finding(
+            pattern_id=pattern.id, file="", line=0, level="error",
+            message=(f"row {pattern.id} ({pattern.description}): this URL was never returned in "
+                     f"a prior tool call's response in this session, and {oracle_clause}"),
+            retry_hint=pattern.retry_hint,
+            snippet=str(url)[:200],
+        )
+    return None
 
 
 from makoto.registry import Check as _Check

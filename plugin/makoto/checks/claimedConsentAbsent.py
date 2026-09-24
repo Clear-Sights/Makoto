@@ -36,6 +36,12 @@ import re
 
 from makoto.state.ledger import user_turn_texts
 from makoto.vocab import Finding
+from makoto.kit import unwitnessed
+
+# gate.claimed_consent_absent's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): OTHER_POINT --
+# the witness is a second reading of the same subject (the operator's own turns, read from the
+# transcript) against the agent's claim of what the operator said.
+SHAPE = "OTHER_POINT"
 
 # The claim side: the agent attributing a position to the operator. Read on the ASSISTANT's own
 # words, which is what every check here does -- the non-agnostic surface in this package is the
@@ -57,41 +63,58 @@ DESCRIPTION = ("Blocks a claim that the operator approved, asked for or confirme
                "session where the operator has not spoken at all.")
 
 
-def claimed_consent_absent_gate(text, *, transcript_path=None):
-    """One BLOCKING Finding when the claim cites the operator and the oracle channel is empty.
+def owes(text):
+    """The one subject a consent claim commits to: itself. Cheap and pure -- the witness (a
+    second, independent reading of the operator's own turns) lives in `paid`, below."""
+    return (m,) if (m := _CONSENT_RX.search(text or "")) else ()
 
-    Never raises. An unreadable or absent transcript reads as NO EVIDENCE and the check is
-    silent: `user_turn_texts` returns [] for a transcript it cannot parse as well as for one with
-    no user turns, and those two must not be treated alike when the consequence is a block. Erring
-    silent here is the safe direction -- the opposite would deny a turn on a decode failure, which
-    is a gate resting on a false fact."""
-    claim = _CONSENT_RX.search(text or "")
-    if not claim:
-        return None
+
+def pays(_text):
+    return None
+
+
+def _oracle_channel_paid(transcript_path) -> bool:
+    """True (silent) unless the oracle channel is CONFIRMED both readable and empty -- the one
+    case that discharges nothing. Never raises: an unreadable or absent transcript reads as NO
+    EVIDENCE and pays silently, because the alternative -- blocking a turn on a decode failure --
+    is a gate resting on a false fact. `user_turn_texts` returns [] for a transcript it cannot
+    parse as well as for one with no user turns, and those two must not be treated alike when the
+    consequence is a block, so an empty result is only trusted once the transcript itself is
+    confirmed to exist."""
     if not transcript_path:
-        return None
+        return True
     try:
         turns = user_turn_texts(transcript_path)
     except Exception:
-        return None
+        return True
     if turns:
         # The operator has spoken. Whether THIS claim matches THAT turn is the similarity
         # question this check refuses to answer; see the stated limit in the module docstring.
-        return None
+        return True
     try:
         import os
         if not os.path.exists(transcript_path):
-            return None
+            return True
     except Exception:
-        return None
-    return Finding(
-        pattern_id="gate.claimed_consent_absent",
-        file="", line=0, level="error",
-        message=(f"Claim cites the operator ({claim.group(0)!r}), but this session's transcript "
-                 f"carries no genuine operator turn — the consent is attributed to a record that "
-                 f"is empty."),
-        retry_hint=RETRY_HINT,
-    )
+        return True
+    return False
+
+
+def claimed_consent_absent_gate(text, *, transcript_path=None):
+    """One BLOCKING Finding when the claim cites the operator and the oracle channel is
+    confirmed empty."""
+    for _ev, claim in unwitnessed(
+            (text,), owes=owes, pays=pays,
+            paid=(lambda _c: _oracle_channel_paid(transcript_path),)):
+        return Finding(
+            pattern_id="gate.claimed_consent_absent",
+            file="", line=0, level="error",
+            message=(f"Claim cites the operator ({claim.group(0)!r}), but this session's transcript "
+                     f"carries no genuine operator turn — the consent is attributed to a record that "
+                     f"is empty."),
+            retry_hint=RETRY_HINT,
+        )
+    return None
 
 
 from makoto.registry import Check as _Check

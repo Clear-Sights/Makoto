@@ -8,7 +8,11 @@ from makoto.vocab import (
     _PRODUCE_VERB_RX, _BE_AUX_RX, _CLAUSE_BREAK_RX, _FORWARD_FRAME_RX, _NEG_FRAME_RX,
 )
 from makoto.kit import (_BIND_BEFORE, CARRIAGE_FAULT, DISCHARGE_EATS, _discharge_kwargs,
-                        _discharged, resolve_in_worktree)
+                        _discharged, resolve_in_worktree, unwitnessed)
+
+# gate.completion's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): OTHER_POINT -- the witness
+# is a second reading of the same subject (the results ledger, or the filesystem itself).
+SHAPE = "OTHER_POINT"
 
 
 # A subordinate-clause marker or a READ/relational FRAME appearing in the verb->path gap means an
@@ -102,20 +106,36 @@ def completion_gate(
     A produced-claim that IS touched, or that the filesystem confirms, is silent (fail-open).
     Only an unbacked production claim bites.
     """
-    for loc in _production_claim_locations(text):
+    def owes(t):
+        # Every located claim in `t` -- cheap and pure; the witness (a second reading of that
+        # same location, in the ledger or on disk) lives in `paid`, below, so a location after
+        # the first unwitnessed one is never even checked.
+        return list(_production_claim_locations(t))
+
+    def pays(_t):
+        return None
+
+    def _location_grounded(loc) -> bool:
+        # True (paid/silent) iff a second reading of `loc` backs the claim: the results ledger,
+        # the caller-supplied filesystem read, or -- widened to the worktree -- the real
+        # filesystem there. `CARRIAGE_FAULT` (the worktree could not be resolved) also pays: an
+        # unreadable worktree must never widen what is blocked.
         if _discharged(loc, touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
-            continue                                  # verified (ledger) or fail-open (filesystem)
+            return True                               # verified (ledger) or fail-open (filesystem)
         worktree_path = resolve_in_worktree(loc, cwd)
         if worktree_path is CARRIAGE_FAULT:
-            continue
+            return True
         if worktree_path:
             # Preserve _discharged's content-depth law for this widened path: a zero-byte
             # non-conventional artifact still does not substantiate a production claim.
-            if _discharged(
+            return _discharged(
                 loc, (), fs_exists=lambda _p: True,
                 fs_size=lambda _p: os.path.getsize(worktree_path),
-            ):
-                continue
+            )
+        return False
+
+    for _ev, loc in unwitnessed(
+            (text,), owes=owes, pays=pays, paid=(_location_grounded,)):
         loc_n = normalize_path(loc)
         return Finding(
             pattern_id="gate.completion",

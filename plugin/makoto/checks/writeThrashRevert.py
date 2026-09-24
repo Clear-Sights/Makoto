@@ -24,9 +24,38 @@ from __future__ import annotations
 from typing import Optional
 
 from makoto.substrate.byte_identity import ByteIdentity
-from makoto.kit import decode_history_row
+from makoto.kit import decode_history_row, unwitnessed
 from makoto.vocab import Finding
 from makoto.registry import Check
+
+# SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- an earlier
+# whole-file Write of the SAME path, a history row -- never a live-exercised act or a source read.
+SHAPE = "OTHER_POINT"
+
+
+def owes(ev):
+    """The about-to-land whole-file Write owes a witness that it is not an A->B->A self-revert.
+    `ev` is `(now, prior)`: `now` is this write's `ByteIdentity` content, `prior` the ordered
+    whole-file contents this session already landed at the same path. Embeds the full A->B->A
+    walk itself (a single left-to-right pass, exactly as before): the obligation is raised only
+    once some earlier landed content equals `now` (an A) AND some later-landed content in between
+    differs from it (a B) -- a bare A->A repeat with no intervening B is a no-op rewrite, not a
+    revert, and never even raises this."""
+    now, prior = ev
+    seen_earlier_a = False
+    for earlier in prior:
+        if earlier == now:
+            seen_earlier_a = True
+        elif seen_earlier_a:
+            return (now,)
+    return ()
+
+
+def pays(_ev):
+    """Nothing pays this obligation: the A->B->A pattern is either present in `prior` or it is
+    not, and `owes` has already read the whole of `prior` to decide that -- there is no further
+    witness this check reads."""
+    return None
 
 
 def _prior_whole_file_writes(history, path: str) -> list:
@@ -78,29 +107,23 @@ def predicate(*, current_event: dict, history: list,
     prior = _prior_whole_file_writes(history, path)
     # A->B->A: some EARLIER whole-file Write of this path == now (an A), AND at least one whole-file
     # Write of DIFFERENT content (a B) lies AFTER that earlier A. A bare A->A repeat (no intervening
-    # different content) is a no-op rewrite, not a revert.
-    # One pass, no tail re-slice per candidate: "an A with some differing B after it" is the same
-    # statement as "a differing B with some equal A before it", so a single left-to-right walk
-    # carrying `seen_earlier_a` decides it.
-    seen_earlier_a = False
-    for earlier in prior:
-        if earlier == now:
-            seen_earlier_a = True
-        elif seen_earlier_a:
-            return Finding(
-                pattern_id=pattern.id,
-                file=path,
-                line=0,
-                level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
-                message=(
-                    f"row {pattern.id} ({pattern.description}): this Write reverts {path!r} back "
-                    f"to a byte-identical copy of an earlier whole-file content after it was "
-                    f"changed in between (an A->B->A oscillation) — the edits cancel out with no "
-                    f"net progress. Decide which content is correct and write it once."
-                ),
-                retry_hint=pattern.retry_hint,
-                snippet=f"<byte-identical whole-file revert of {path!r}>",
-            )
+    # different content) is a no-op rewrite, not a revert. The walk itself lives in `owes` now; see
+    # its docstring for why one left-to-right pass over `prior` decides it.
+    for _ev, _subject in unwitnessed(((now, prior),), owes=owes, pays=pays):
+        return Finding(
+            pattern_id=pattern.id,
+            file=path,
+            line=0,
+            level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
+            message=(
+                f"row {pattern.id} ({pattern.description}): this Write reverts {path!r} back "
+                f"to a byte-identical copy of an earlier whole-file content after it was "
+                f"changed in between (an A->B->A oscillation) — the edits cancel out with no "
+                f"net progress. Decide which content is correct and write it once."
+            ),
+            retry_hint=pattern.retry_hint,
+            snippet=f"<byte-identical whole-file revert of {path!r}>",
+        )
     return None
 
 RETRY_HINT = 'Decide which content is correct and write it once; do not revert to an earlier whole-file version after changing it.'

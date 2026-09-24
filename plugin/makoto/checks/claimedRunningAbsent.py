@@ -7,7 +7,11 @@ from makoto.vocab import (
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.kit import decode_history_event, failure_terminal_result
+from makoto.kit import decode_history_event, failure_terminal_result, unwitnessed
+
+# gate.claimed_running's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): SWITCH -- the witness
+# is a recorded act (a process-start/liveness-check Bash call) whose response was read.
+SHAPE = "SWITCH"
 
 # gate.claimed_running -- the assistant claims an ONGOING running/live/listening/serving state
 # for a process/service ("the server is running", "it's up and running", "now listening on port
@@ -158,24 +162,34 @@ def _latest_process_call_failed(history) -> Optional[bool]:
 def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
     """Fire iff the assistant claims an ongoing running/live/listening/serving state
     (`_running_claim`) and this session's own recorded evidence contradicts it: no process-
-    lifecycle Bash call ever ran (UNFULFILLED), or the most recently recorded one ended in a
-    direct error state (MISREPORTED). Silent when the most recent such call was clean --
-    fail-open: a clean exit is not proof of liveness (see module docstring's SCOPE note), but
-    only a POSITIVE contradiction bites, never mere absence-of-proof-of-liveness."""
-    if _running_claim(text) is None:
+    lifecycle Bash call ever ran (UNFULFILLED, `failed is None`), or the most recently recorded
+    one ended in a direct error state (MISREPORTED, `failed is True`). Silent when the most
+    recent such call was clean -- fail-open: a clean exit is not proof of liveness (see module
+    docstring's SCOPE note), but only a POSITIVE contradiction bites, never mere
+    absence-of-proof-of-liveness."""
+    def owes(t):
+        # The one subject a running claim commits to: itself. Cheap and pure -- the witness
+        # (whether the session's own record contradicts it) lives in `paid`, below, so a claim
+        # never even reaches that check once `_running_claim` alone rules it out.
+        return (t,) if _running_claim(t) is not None else ()
+
+    def pays(_t):
         return None
-    failed = _latest_process_call_failed(history)
-    if failed is None:
-        return Finding(
-            pattern_id="gate.claimed_running", file="", line=0, level="error",
-            message=("Claim states a process/service is running, but no process-start or "
-                     "liveness-check Bash command appears in this session's recent recorded "
-                     "Bash history (the dispatcher's bounded event window) — the word must "
-                     "match the world."),
-            retry_hint=("Actually start or verify the process with a real Bash call and cite a "
-                        "clean result, or scope/retract the running claim."),
-        )
-    if failed:
+
+    for _ev, _claim in unwitnessed(
+            (text,), owes=owes, pays=pays,
+            paid=(lambda _t: _latest_process_call_failed(history) is False,)):
+        failed = _latest_process_call_failed(history)
+        if failed is None:
+            return Finding(
+                pattern_id="gate.claimed_running", file="", line=0, level="error",
+                message=("Claim states a process/service is running, but no process-start or "
+                         "liveness-check Bash command appears in this session's recent recorded "
+                         "Bash history (the dispatcher's bounded event window) — the word must "
+                         "match the world."),
+                retry_hint=("Actually start or verify the process with a real Bash call and cite a "
+                            "clean result, or scope/retract the running claim."),
+            )
         return Finding(
             pattern_id="gate.claimed_running", file="", line=0, level="error",
             message=("Claim states a process/service is running, but the most recently recorded "

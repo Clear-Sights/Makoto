@@ -4,7 +4,11 @@ from typing import Optional
 
 from makoto.vocab import Finding
 from makoto.substrate.claims import _code_spans
-from makoto.kit import turn_tool_calls
+from makoto.kit import turn_tool_calls, unwitnessed
+
+# gate.fabricated_action's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): SWITCH -- the
+# witness is a recorded act (any tool call this turn), not a re-reading of the claim itself.
+SHAPE = "SWITCH"
 
 # gate.fabricated_action — the assistant claims a completed TOOL action ("I ran `X`", "I executed
 # scripts/deploy.sh") in a turn where it made NO tool calls at all. FP-safety is the whole design:
@@ -75,16 +79,23 @@ def fabricated_action_gate(text, *, history=()) -> Optional[Finding]:
     not command-text matching: a real action is narrated in cleaned-up backticks and invisible tools
     (Workflow/Agent/Task) carry no Bash command, but every tool call emits a PreToolUse event — so
     presence is paraphrase-proof and invisible-tool-proof. Silent on no-claim or any tool work."""
-    obj = _action_signal(text)
-    if obj is None:
+    def owes(t):
+        # The one subject a fabricated-action claim commits to: the claimed object itself. Cheap
+        # and pure -- the witness (any tool call this turn) lives in `paid`, below.
+        obj = _action_signal(t)
+        return (obj,) if obj is not None else ()
+
+    def pays(_t):
         return None
-    if turn_tool_calls(history) > 0:
-        return None                                   # real tool work this turn -> claim is backed
-    return Finding(
-        pattern_id="gate.fabricated_action", file="", line=0, level="error",
-        message=(f"Claim states a completed tool action ('{obj}'), but this turn made no tool calls "
-                 f"at all — actually run it (any tool counts) and cite the result, or remove the claim."),
-        retry_hint="Actually run the command/tool, or drop the claim that you did it.")
+
+    for _ev, obj in unwitnessed(
+            (text,), owes=owes, pays=pays, paid=(lambda _o: turn_tool_calls(history) > 0,)):
+        return Finding(
+            pattern_id="gate.fabricated_action", file="", line=0, level="error",
+            message=(f"Claim states a completed tool action ('{obj}'), but this turn made no tool calls "
+                     f"at all — actually run it (any tool counts) and cite the result, or remove the claim."),
+            retry_hint="Actually run the command/tool, or drop the claim that you did it.")
+    return None
 
 
 from makoto.registry import Check as _Check

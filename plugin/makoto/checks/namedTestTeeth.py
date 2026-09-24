@@ -14,7 +14,24 @@ from makoto.vocab import (_TESTNAME_RX, _TEST_ID, _REC_FAIL_LEAD_RX, _REC_FAIL_T
                           _REC_PASS_LEAD_RX, _REC_PASS_TRAIL_RX, _TEETH_SCOPE_BEFORE,
                           _TEETH_SCOPE_AFTER, _recorded_names, recorded_failed_names,
                           recorded_passed_names)
-from makoto.kit import current_named_verdicts
+from makoto.kit import current_named_verdicts, unwitnessed
+
+# SHAPE = OTHER_POINT: the witness is a second reading of the SAME subject -- the named test's
+# own current recorded verdict (`current_named_verdicts`, folded from history rows), never an act
+# exercised here or a read of source.
+SHAPE = "OTHER_POINT"
+
+
+# Every exact test name `text` claims is PRESENTLY passing commits to that claim being true --
+# see `claimed_passing_names` for what qualifies as a clean, present-tense, unnegated claim
+# naming that exact identifier. No event here pays a named claim directly: the witness is seeded
+# once, in `paid`, from the RECORD's own current verdict for that name (`_family_grounded`,
+# nested inside `named_test_gate`) -- a second reading of the same subject, not a fresh event in
+# this stream. Both one-line by construction (module-level lambdas, not `def`): the design pins
+# this module's top-level function count at 3 (`_external_pass_predicate`,
+# `claimed_passing_names`, `named_test_gate`).
+owes = lambda text: sorted(claimed_passing_names(text))
+pays = lambda _text: None
 
 # gate.named_test — a NAMED-test pass-claim contradicted by that test's recorded FAILURE.
 #
@@ -151,39 +168,60 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
     # function are ONE family (a green test_charge[eur] never discharges a red
     # test_charge[usd]), while same-named functions in DIFFERENT modules are DISTINCT candidate
     # referents of the bare name — DENY only when EVERY candidate family holds a red, because a
-    # DENY over an ambiguous name that might refer to a green test rests on a false fact.
-    failing = []
-    for nm in sorted(names):
+    # DENY over an ambiguous name that might refer to a green test rests on a false fact
+    # (`_family_grounded`, seeded below as this claim's one witness). Both helpers are nested here
+    # (not top-level): the design pins this module's top-level function count, and both close
+    # over `verdict` anyway.
+    def _family_grounded(name: str) -> bool:
+        """True iff the record does NOT contradict a present-tense pass claim for `name`: either
+        no run of that bare name was ever recorded (nothing to contradict -- the claim is simply
+        unevaluable, not false), or at least one same-named family (grouped by module path, so
+        parametrized cases of one function are one family) is not entirely red. False only when
+        EVERY candidate family for `name` holds a recorded FAIL and none holds a PASS -- an
+        ambiguous bare name that might still refer to a green test must not be denied on a false
+        fact."""
         families = {}
         for tid, v in verdict.items():
             path, _, ident = tid.rpartition("::")
-            if ident.split("[", 1)[0] == nm:
+            if ident.split("[", 1)[0] == name:
                 families.setdefault(path, []).append((tid, v))
         if not families:
-            continue
-        red_ids = []
+            return True
         every_family_red = True
+        any_red = False
         for members in families.values():
-            fam_red = sorted(tid for tid, v in members if v == "FAIL")
+            fam_red = [tid for tid, v in members if v == "FAIL"]
             if fam_red:
-                red_ids.extend(fam_red)
+                any_red = True
             else:
                 every_family_red = False
-        if every_family_red and red_ids:
-            failing.append((nm, sorted(red_ids)[0]))
-    if not failing:
-        return None
-    nm, red_id = failing[0]
-    return Finding(
-        pattern_id="gate.named_test",
-        file="tests",
-        line=0,
-        level="error",
-        message=(f"Claim states {nm} passes, but the most recent recorded run of that exact test "
-                 f"({red_id}) shows it FAILED — re-run {nm} to green and cite it, or retract "
-                 f"the claim."),
-        retry_hint=f"Re-run {nm} and cite the green result, or narrow/retract the claim.",
-    )
+        return not (every_family_red and any_red)
+
+    def _first_red_id(nm: str) -> str:
+        """The lowest sorted recorded id, across every family, that is currently FAIL for bare
+        name `nm`. Only ever called once `_family_grounded(nm)` is already known False, so at
+        least one such id always exists."""
+        red_ids = []
+        for tid, v in verdict.items():
+            path, _, ident = tid.rpartition("::")
+            if ident.split("[", 1)[0] == nm and v == "FAIL":
+                red_ids.append(tid)
+        return sorted(red_ids)[0]
+
+    for _ev, nm in unwitnessed((text,), owes=owes, pays=pays,
+                               paid=(_family_grounded,)):
+        red_id = _first_red_id(nm)
+        return Finding(
+            pattern_id="gate.named_test",
+            file="tests",
+            line=0,
+            level="error",
+            message=(f"Claim states {nm} passes, but the most recent recorded run of that exact test "
+                     f"({red_id}) shows it FAILED — re-run {nm} to green and cite it, or retract "
+                     f"the claim."),
+            retry_hint=f"Re-run {nm} and cite the green result, or narrow/retract the claim.",
+        )
+    return None
 
 
 from makoto.registry import Check as _Check

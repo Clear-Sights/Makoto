@@ -64,7 +64,13 @@ import re
 from typing import Iterable, List
 
 from makoto.vocab import Finding
-from makoto.kit import canon_input, classify_failure, decode_history_event, failure_terminal_result
+from makoto.kit import (canon_input, classify_failure, decode_history_event,
+                        failure_terminal_result, unwitnessed)
+
+# SHAPE = SWITCH: both primitives below judge a recorded act that exercised the thing -- a tool
+# call whose response was read (`timed_out`/`self_error_code`) -- never a second independent
+# source or a read of source material.
+SHAPE = "SWITCH"
 
 # A Call is one paired tool event in protocol form: {"name": tool_name, "input": tool_input,
 # "result": tool_response} — tool_input/tool_response are kept as full DICTS (not the flattened
@@ -213,7 +219,22 @@ def recur_stuck(calls: list) -> bool:
     if run_key is not None:
         last_bad[run_key] = _run_is_bad(
             run_key, run_len, run_all_err, run_all_transient)
-    return any(last_bad.values())
+    for _ev, _key in unwitnessed(last_bad.items(), owes=recur_owes, pays=recur_pays):
+        return True
+    return False
+
+
+# `item` is `(key, is_bad)` -- one key's LAST-closed run judgment (`_run_is_bad`, above). A key
+# whose latest run closed bad owes a witness that it is not, in fact, a stuck loop; a key whose
+# latest run closed clean owes nothing -- a fresh success already discharged it before this gate
+# runs (the "latest judgment wins" rule the module docstring documents). One-line by construction
+# (module-level lambda, not `def`): the design pins this module's top-level function COUNT, and
+# `_run_is_bad` above has already folded every later success into each key's one verdict, so there
+# is no loop left for this step to do.
+recur_owes = lambda item: (item[0],) if item[1] else ()
+# No witness pays a stuck-loop verdict here: by the time an item reaches `recur_owes` there is
+# nothing left that could still discharge it (see `recur_owes`'s own comment).
+recur_pays = lambda _item: None
 
 
 # The harness's own timeout wording ("Command timed out after 2m 0.0s"). Generic failure
@@ -244,29 +265,56 @@ def timed_out_at_turn_end(calls: list) -> bool:
     if not calls:
         return False
     last = calls[-1]
-    if interrupted(last):
+
+    def _timeout_forgiven(call: dict) -> bool:
+        """True iff the turn's unresolved-looking close on `call` is actually forgiven: an
+        explicit interruption or the harness's own timeout wording is NEVER forgiven, an error
+        classified as anything but confidently transient is never forgiven, and a confidently
+        transient error is forgiven only while its key's transient budget (< 2 across `calls`,
+        this call included) is not yet exhausted. Exact mirror of this function's own old inline
+        body -- see the module docstring for the budget's rationale. Nested here (not top-level):
+        the design pins this module's top-level function count, and `calls` is this closure's
+        only reason to exist as more than a one-line lambda."""
+        if interrupted(call):
+            return False
+        error = self_error_code(call)
+        if error is None:
+            return False  # unreachable when `timed_out(call)` is True, kept for body parity
+        text = str(error)
+        if _TIMEOUT_TEXT_RX.search(text):
+            return False
+        if classify_failure(text) is not False:
+            return False
+        # confidently transient: budget the escape (one retry opportunity, per the stop_text).
+        key = (call.get("name", ""), _pairing_input(call.get("input")))
+        transients = 0
+        for c in calls:
+            if (c.get("name", ""), _pairing_input(c.get("input"))) != key:
+                continue
+            if not timed_out(c):
+                transients = 0                # this key's success resets its budget
+                continue
+            e = self_error_code(c)
+            if e is not None and classify_failure(str(e)) is False:
+                transients += 1
+        return transients < 2
+
+    for _ev, _subject in unwitnessed(
+            (last,), owes=timeout_owes, pays=timeout_pays,
+            paid=(_timeout_forgiven,)):
         return True
-    error = self_error_code(last)
-    if error is None:
-        return False
-    text = str(error)
-    if _TIMEOUT_TEXT_RX.search(text):
-        return True
-    if classify_failure(text) is not False:
-        return True
-    # confidently transient: budget the escape (one retry opportunity, per the stop_text).
-    key = (last.get("name", ""), _pairing_input(last.get("input")))
-    transients = 0
-    for c in calls:
-        if (c.get("name", ""), _pairing_input(c.get("input"))) != key:
-            continue
-        if not timed_out(c):
-            transients = 0                # this key's success resets its budget
-            continue
-        e = self_error_code(c)
-        if e is not None and classify_failure(str(e)) is False:
-            transients += 1
-    return transients >= 2
+    return False
+
+
+# The last call in the stream owes a witness that the turn did not close on it unresolved -- only
+# when it is itself in a direct error state (`timed_out`); a last call that succeeded owes
+# nothing, so `_timeout_forgiven`'s transient-budget question never even needs asking. One-line by
+# construction (module-level lambda, not `def`): see `recur_owes`'s comment for why.
+timeout_owes = lambda call: (call,) if timed_out(call) else ()
+# The only witness `timed_out_at_turn_end` reads is the seeded budget check in `paid`
+# (`_timeout_forgiven`, nested there), not a second event -- there is exactly one call to judge
+# (the LAST one), so nothing here ever adds a fresh witness.
+timeout_pays = lambda _call: None
 
 
 def _pairing_input(inp) -> str:

@@ -66,8 +66,36 @@ from typing import Optional
 
 import re
 
-from makoto.kit import current_named_verdicts
+from makoto.kit import current_named_verdicts, unwitnessed
 from makoto.vocab import Finding, _TESTNAME_RX
+
+# SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- the record's own
+# currently-red test identities (`current_named_verdicts`, folded from history rows) -- compared
+# against what the closing text itself names.
+SHAPE = "OTHER_POINT"
+
+
+# The bare function names of every currently-red recorded test identity -- the SAME
+# `current_named_verdicts` fold `gate.named_test` reads, so a red discharged by a later recorded
+# green of that id is no longer red here either. One-line by construction (module-level lambda,
+# not `def`): the design pins this module's top-level function count at 1 (`unnamed_failure_gate`
+# alone).
+_red_names = lambda history: frozenset(
+    tid.rpartition("::")[2].split("[", 1)[0]
+    for tid, v in current_named_verdicts(history).items() if v == "FAIL")
+
+# `ev` is `(text, history)`. The turn owes naming at least one of the record's own currently-red
+# test identities, but ONLY once it has counted a failure at all -- a text with no counted
+# failure, or a record with no red identity to name, owes nothing (the NOT-EVALUABLE third state
+# the module docstring names).
+owes = lambda ev: ((_red_names(ev[1]),)
+                   if ev[0] and _COUNTED_FAILURE_RX.search(ev[0]) and _red_names(ev[1])
+                   else ())
+# No fresh event pays this obligation: the witness is the text's OWN content, checked once
+# against the record in `paid` (see `unnamed_failure_gate`) -- naming even ONE of the red
+# identities discharges the whole obligation, since this gate is about the habit of naming, not
+# an exhaustive per-test tally.
+pays = lambda _ev: None
 
 # A COUNTED failure as an agent WRITES one. See the docstring for why this is not
 # `vocab._FAILURE_SUMMARY_RX` and must not become it.
@@ -83,31 +111,28 @@ _COUNTED_FAILURE_RX = re.compile(
 def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
     """Fire iff the closing text counts at least one failure, the record holds at least one
     currently-red test identity, and the text names none of them."""
-    if not text or not _COUNTED_FAILURE_RX.search(text):
-        return None
-    verdict = current_named_verdicts(history)
-    red = sorted(tid for tid, v in verdict.items() if v == "FAIL")
-    if not red:
-        return None            # NOT-EVALUABLE: no identity was on the record to name
-    red_names = {tid.rpartition("::")[2].split("[", 1)[0] for tid in red}
-    if red_names & set(_TESTNAME_RX.findall(text)):
-        return None            # the failing identity IS named
-    return Finding(
-        pattern_id="gate.unnamed_failure",
-        file="tests",
-        line=0,
-        level="advisory",
-        message=(
-            f"the turn counts a failure and names none of the {len(red)} failing test "
-            f"identit{'y' if len(red) == 1 else 'ies'} the run itself recorded (e.g. {red[0]}). "
-            f"A count sends the reader back to the output; the name is the thing they act on."
-        ),
-        retry_hint=(
-            "Name the failing identities in the same turn that counts them -- the recorded ids "
-            "are already on the record, so this is a copy, not a re-run."
-        ),
-        snippet=red[0][:200],
-    )
+    for _ev, _red_names in unwitnessed(
+            ((text, history),), owes=owes, pays=pays,
+            paid=(lambda names: bool(names & set(_TESTNAME_RX.findall(text))),)):
+        verdict = current_named_verdicts(history)
+        red = sorted(tid for tid, v in verdict.items() if v == "FAIL")
+        return Finding(
+            pattern_id="gate.unnamed_failure",
+            file="tests",
+            line=0,
+            level="advisory",
+            message=(
+                f"the turn counts a failure and names none of the {len(red)} failing test "
+                f"identit{'y' if len(red) == 1 else 'ies'} the run itself recorded (e.g. {red[0]}). "
+                f"A count sends the reader back to the output; the name is the thing they act on."
+            ),
+            retry_hint=(
+                "Name the failing identities in the same turn that counts them -- the recorded ids "
+                "are already on the record, so this is a copy, not a re-run."
+            ),
+            snippet=red[0][:200],
+        )
+    return None
 
 
 from makoto.registry import Check as _Check

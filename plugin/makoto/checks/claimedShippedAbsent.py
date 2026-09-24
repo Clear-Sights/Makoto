@@ -13,7 +13,17 @@ from makoto.vocab import (
 from makoto.substrate.claims import _code_spans
 from makoto.kit import decode_history_row
 from makoto.kit import extract_pushed_branch
+from makoto.kit import unwitnessed
 from makoto.core._shell import _command_pushes_git
+
+# gate.claimed_shipped's SHAPE (see plugin/makoto/kit.py's `unwitnessed`) is genuinely mixed: a
+# push claim's witness is OTHER_POINT (a second, independent reading of the same branch tip via
+# `git ls-remote`), while every other shipped/merged/published/deployed/released claim's witness
+# is SWITCH (a recorded act -- a settled remote-mutating tool call -- whose response was read).
+# Declared as the dominant shape (SWITCH covers non-push claims outright, and is also the
+# fallback a push claim reaches once its own tip comparison is NOT_EVALUABLE); see the return
+# report's SPLIT annotation for the other half.
+SHAPE = "SWITCH"
 
 
 class PushTipStatus(Enum):
@@ -353,39 +363,13 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
 
     EVERY active claim in the message is examined in order — the first that fails its check
     fires — so an unevaluable push claim can no longer shadow a later, fully checkable claim
-    (previously only the FIRST claim was ever looked at). Push-claim routing, matching the
-    pinned batteries (tests/test_delegated_world_evidence.py,
-    tests/test_gate_claimed_shipped_live_battery.py, tests/test_makaudit_regressions.py):
-
-      * MATCH upholds the claim; MISMATCH fires a push-is-false Finding naming the branch.
-      * NOT_EVALUABLE with a cwd PRESENT stays silent — with a worktree at hand, an
-        unobservable remote is deliberate fail-open; neither a transcript nor a history gap
-        is remote evidence.
-      * With NO cwd at all, nothing world-side is consultable, so the claim falls back to the
-        recorded-mutation-evidence route: a settled successful mutation discharges it, a
-        recorded ATTEMPT that never settled successfully (a failed `git push`, a dangling
-        PreToolUse mutation row) FIRES — absence is checked, never read as green with nothing
-        checked at all — while a history with no attempted remote mutation whatsoever (e.g.
-        only an `echo 'git push ...'`) remains outside a verdict.
-
-    WHAT THIS GATE CANNOT DECIDE (stated, not hidden — it reads a raw Bash command string and
-    has no typed "this call shipped something" field to read instead; the Bash tool envelope
-    carries only `tool_input.command`):
-
-      * WHICH command shipped. `_command_pushes_git` parses argv and recognizes `git push`
-        alone. Every other shipping shape (`gh pr merge`, `npm publish`, `docker push`,
-        `./deploy.sh`) is unreadable, so `_successful_remote_mutation` answers None and this
-        gate stays SILENT rather than asserting absence.
-      * WHETHER a claim's object is the thing a recorded command touched. No coreference
-        between "it" / "#42" and a command's owner/repo/ref is attempted, deliberately.
-      * WHETHER a non-push remote mutation actually reached the world. Only the push arm
-        consults the world (`ls-remote`); merge/publish/deploy claims rest on the transcript.
+    (previously only the FIRST claim was ever looked at). See `_claim_grounded` for the
+    push-vs-non-push routing this reduces to.
     """
-
     def _attempted_remote_mutation(rows) -> bool:
         # An ATTEMPT at a remote mutation, settled or not: any phase of a real push command or
         # of a closed-set remote-mutating tool. `echo 'git push'` is not an attempt
-        # (_command_pushes_git parses argv, not substrings); neither is a --dry-run push.
+        # (`_command_pushes_git` parses argv, not substrings); neither is a --dry-run push.
         for row in rows or ():
             ev = decode_history_row(row)
             if not isinstance(ev, dict):
@@ -401,14 +385,69 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
                     return True
         return False
 
-    pos = 0
-    while True:
-        claim = _shipped_claim(text, start=pos)
-        if claim is None:
-            return None
-        pos = claim.end()
-        push_claim = "pushed" in claim.group(0).lower()
-        if push_claim:
+    def owes(t):
+        # Every active shipped/merged/published/deployed/released claim in `t`, in order --
+        # cheap and pure; the witness for each (the push tip's OTHER_POINT world-read, or the
+        # SWITCH-shaped recorded-mutation evidence) lives in `paid`, below, so a claim after the
+        # first unwitnessed one is never even evaluated.
+        claims = []
+        pos = 0
+        while True:
+            claim = _shipped_claim(t, start=pos)
+            if claim is None:
+                return claims
+            pos = claim.end()
+            claims.append(claim)
+
+    def pays(_t):
+        return None
+
+    def _claim_grounded(claim) -> bool:
+        # True (paid/silent) unless the claim is a positive, checkable contradiction. Push-claim
+        # routing, matching the pinned batteries (tests/test_delegated_world_evidence.py,
+        # tests/test_gate_claimed_shipped_live_battery.py, tests/test_makaudit_regressions.py):
+        #
+        #   * MATCH upholds the claim; MISMATCH is ungrounded (fires a push-is-false Finding
+        #     naming the branch).
+        #   * NOT_EVALUABLE with a cwd PRESENT is grounded (silent) — with a worktree at hand,
+        #     an unobservable remote is deliberate fail-open; neither a transcript nor a history
+        #     gap is remote evidence.
+        #   * With NO cwd at all, nothing world-side is consultable, so the claim falls back to
+        #     the recorded-mutation-evidence route below: a settled successful mutation
+        #     discharges it, a recorded ATTEMPT that never settled successfully (a failed
+        #     `git push`, a dangling PreToolUse mutation row) is ungrounded — absence is
+        #     checked, never read as green with nothing checked at all — while a history with no
+        #     attempted remote mutation whatsoever (e.g. only an `echo 'git push ...'`) remains
+        #     outside a verdict (grounded/silent).
+        #
+        # WHAT THIS CANNOT DECIDE (stated, not hidden — it reads a raw Bash command string and
+        # has no typed "this call shipped something" field to read instead; the Bash tool
+        # envelope carries only `tool_input.command`):
+        #
+        #   * WHICH command shipped. `_command_pushes_git` parses argv and recognizes
+        #     `git push` alone. Every other shipping shape (`gh pr merge`, `npm publish`,
+        #     `docker push`, `./deploy.sh`) is unreadable, so `_successful_remote_mutation`
+        #     answers None and this stays grounded (silent) rather than asserting absence.
+        #   * WHETHER a claim's object is the thing a recorded command touched. No coreference
+        #     between "it" / "#42" and a command's owner/repo/ref is attempted, deliberately.
+        #   * WHETHER a non-push remote mutation actually reached the world. Only the push arm
+        #     consults the world (`ls-remote`); merge/publish/deploy claims rest on the
+        #     transcript.
+        if "pushed" in claim.group(0).lower():
+            tip = pushed_tip_matches_remote(text, cwd)
+            if tip.status is PushTipStatus.MISMATCH:
+                return False
+            if tip.status is PushTipStatus.MATCH or cwd:
+                return True         # upheld, or world present but unobservable (fail-open)
+            if not _attempted_remote_mutation(history):
+                return True         # no cwd AND no recorded attempt: outside a verdict
+        # Three-valued: True discharges the claim, None is NOT-EVALUABLE and stays silent
+        # (grounded). ONLY an explicit False — a grounded negative — is ungrounded here, so a
+        # vocabulary miss can never be spent as a positive assertion that nothing shipped.
+        return _successful_remote_mutation(history) is not False
+
+    for _ev, claim in unwitnessed((text,), owes=owes, pays=pays, paid=(_claim_grounded,)):
+        if "pushed" in claim.group(0).lower():
             tip = pushed_tip_matches_remote(text, cwd)
             if tip.status is PushTipStatus.MISMATCH:
                 return Finding(
@@ -418,15 +457,6 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
                              f"origin/{tip.branch} has {tip.remote_sha}."),
                     retry_hint="Push the local branch, or retract/rescope the push claim.",
                 )
-            if tip.status is PushTipStatus.MATCH or cwd:
-                continue        # upheld, or world present but unobservable (fail-open)
-            if not _attempted_remote_mutation(history):
-                continue        # no cwd AND no recorded attempt: outside a verdict
-        # Three-valued: True discharges the claim, None is NOT-EVALUABLE and stays silent.
-        # ONLY an explicit False — a grounded negative — reaches the Finding below, so a
-        # vocabulary miss can never be spent as a positive assertion that nothing shipped.
-        if _successful_remote_mutation(history) is not False:
-            continue
         return Finding(
             pattern_id="gate.claimed_shipped", file="", line=0, level="error",
             message=(f"Claim states a remote change was shipped "
@@ -435,6 +465,7 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
             retry_hint=("Actually push/merge it so the world records the mutation, or "
                         "retract/rescope the shipping claim."),
         )
+    return None
 
 
 from makoto.registry import Check as _Check

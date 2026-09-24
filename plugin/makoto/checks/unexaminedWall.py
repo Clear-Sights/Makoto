@@ -45,6 +45,12 @@ import re
 from makoto.state.ledger import last_operator_turn_ts
 from makoto.substrate._canonAtoms import calls_since
 from makoto.vocab import Finding
+from makoto.kit import unwitnessed
+
+# gate.unexamined_wall's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): SWITCH -- the witness
+# is a recorded act (any call since the operator's last turn), not a re-reading of the claim
+# itself.
+SHAPE = "SWITCH"
 
 # An EPISTEMIC cannot: the claim is that a fact cannot be established. Not a refusal, not a
 # statement about capabilities in general -- those are excluded by design, see the docstring.
@@ -66,39 +72,53 @@ DESCRIPTION = ("Blocks a claim that something cannot be determined when the agen
                "action at all since the operator's last turn.")
 
 
-def unexamined_wall_gate(text, *, history=None, transcript_path=None):
-    """One BLOCKING Finding when an epistemic cannot is stated with an empty act window.
+def owes(text):
+    """The one subject a wall claim commits to: itself. Cheap and pure -- the witness (an act
+    taken since the operator's last turn) lives in `paid`, below."""
+    return (m,) if (m := _WALL_RX.search(text or "")) else ()
 
-    Never raises. Every failure to establish the window reads as NO EVIDENCE and the check is
-    silent, because the alternative -- blocking a turn on a decode failure -- is a gate resting
-    on a false fact. Note the asymmetry that keeps that safe: `calls_since` widens the window
-    when the boundary cannot be read, so an unreadable transcript yields MORE calls, never
-    fewer, and this gate only fires on zero."""
-    wall = _WALL_RX.search(text or "")
-    if not wall:
-        return None
+
+def pays(_text):
+    return None
+
+
+def _act_window_paid(history, transcript_path) -> bool:
+    """True (silent) unless the act window since the operator's last turn is CONFIRMED both
+    establishable and empty. Never raises: every failure to establish the window reads as NO
+    EVIDENCE and pays silently, because the alternative -- blocking a turn on a decode failure --
+    is a gate resting on a false fact. Note the asymmetry that keeps that safe: `calls_since`
+    widens the window when the boundary cannot be read, so an unreadable transcript yields MORE
+    calls, never fewer, and this only pays False (fires) on a confirmed zero."""
     try:
         since = last_operator_turn_ts(transcript_path)
     except Exception:
-        return None
+        return True
     if since is None:
         # No operator turn to window against. The claim may still be a wall, but the question
         # this gate asks -- did you look before saying no, THIS time -- has no boundary, and a
         # window that cannot be established must never widen what is blocked.
-        return None
+        return True
     try:
         acts = calls_since(history, since)
     except Exception:
-        return None
-    if acts:
-        return None
-    return Finding(
-        pattern_id="gate.unexamined_wall",
-        file="", line=0, level="error",
-        message=(f"Claim that a fact cannot be established ({wall.group(0)!r}), with no action "
-                 f"taken since the operator last spoke — the inventory was never opened."),
-        retry_hint=RETRY_HINT,
-    )
+        return True
+    return bool(acts)
+
+
+def unexamined_wall_gate(text, *, history=None, transcript_path=None):
+    """One BLOCKING Finding when an epistemic cannot is stated with a confirmed-empty act
+    window."""
+    for _ev, wall in unwitnessed(
+            (text,), owes=owes, pays=pays,
+            paid=(lambda _w: _act_window_paid(history, transcript_path),)):
+        return Finding(
+            pattern_id="gate.unexamined_wall",
+            file="", line=0, level="error",
+            message=(f"Claim that a fact cannot be established ({wall.group(0)!r}), with no action "
+                     f"taken since the operator last spoke — the inventory was never opened."),
+            retry_hint=RETRY_HINT,
+        )
+    return None
 
 
 from makoto.registry import Check as _Check

@@ -5,7 +5,11 @@ from typing import Optional
 from makoto.checks import normalize_path
 from makoto.vocab import _EMPTY_OK, _FENCE_SPAN_RX
 from makoto.vocab import Finding
-from makoto.kit import _path_components, _suffix_match
+from makoto.kit import _path_components, _suffix_match, unwitnessed
+
+# SHAPE = OTHER_POINT: the witness is a second reading of the same subject on the assistant's own
+# ledger/filesystem (`touched_keys`, `fs_exists`, `fs_read`) -- never an act exercised here.
+SHAPE = "OTHER_POINT"
 
 
 _DROP_FORWARD = r"(?:I['’]?ll|I\s+will|I['’]?m\s+going\s+to|I\s+am\s+going\s+to|let\s+me|let['’]s|let\s+us|going\s+to|i\s+plan\s+to|next\s+i\s+will|we['’]?ll|we\s+will|i\s+need\s+to|i\s+should|i\s+want\s+to)"
@@ -50,9 +54,10 @@ _DROP_DEF_COUNTER = re.compile(
     r"|^\s*\w+\s*=\s*(?:lambda\b|partial\b|functools\.partial\b)",
     re.M)
 _DROP_TEST_COUNTER = re.compile(r"^\s*(?:async\s+def|def)\s+test\w*", re.M)
-def _drop_extract_forward_claims(text):
-    """[(kind, location, info, raw)] — a forward mutation frame + EXACTLY ONE identifying
-    info + a resolvable-looking location. Vague promises (no info / no path) -> []. Precedence
+def owes(text):
+    """Every forward claim `text` makes commits to being discharged by turn-end: [(kind,
+    location, info, raw)] — a forward mutation frame + EXACTLY ONE identifying info + a
+    resolvable-looking location. Vague promises (no info / no path) -> [] (never owed). Precedence
     most-specific first (line_range > count > named_symbol > named_artifact); a span is
     consumed by the first match. Negated forward frames are dropped. A frame inside a
     ```code fence``` is QUOTED text (a shell command, a demo, someone else's words), never the
@@ -128,14 +133,6 @@ def _drop_resolve_location(L, touched_keys):
         if _suffix_match(Lc, _path_components(k)):
             return normalize_path(k)
     return None
-def _drop_touched(path, touched_keys, empty_keys) -> bool:
-    """A recorded NON-empty touch (Edit/Write/MultiEdit) backs this location (suffix match)."""
-    pc = _path_components(path)
-    empties = {normalize_path(k) for k in (empty_keys or ())}
-    for k in (touched_keys or ()):
-        if _suffix_match(pc, _path_components(k)) and normalize_path(k) not in empties:
-            return True
-    return False
 def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exists, fs_size, fs_read) -> bool:
     """At turn-end, is the forward claim satisfied on `path`? Content-deep where the kind
     needs it (symbol/count read the file via fs_read); artifact/line discharge on a non-empty
@@ -152,6 +149,17 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
     intended reading of two different questions, not an oversight -- but it IS a divergence, and
     an unstated divergence behind a claim of mirroring is how the next reader "fixes" one of them
     into agreement and silently deletes a gate."""
+    def _drop_touched(path, touched_keys, empty_keys) -> bool:
+        """A recorded NON-empty touch (Edit/Write/MultiEdit) backs this location (suffix
+        match). Nested here (its only caller) once `owes`/`pays` claimed the two top-level
+        slots the module-function-count design pins for this file."""
+        pc = _path_components(path)
+        empties = {normalize_path(k) for k in (empty_keys or ())}
+        for k in (touched_keys or ()):
+            if _suffix_match(pc, _path_components(k)) and normalize_path(k) not in empties:
+                return True
+        return False
+
     content = fs_read(path) if (fs_read is not None and path) else None
     touched = _drop_touched(path, touched_keys, empty_keys)
     exists = bool(fs_exists and path and fs_exists(path))
@@ -188,6 +196,15 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
             return len(content.strip()) > 0 or conventional
         return exists and (size != 0 or conventional)
     return True                                          # unknown kind -> fail open
+
+
+def pays(_text):
+    """No event here pays a claim directly: the witness is seeded once per claim, in `paid`, from
+    the assistant's OWN end-of-turn ledger/filesystem (see `dropped_gate`) -- a second reading of
+    the same subject, not a fresh event in this stream."""
+    return None
+
+
 def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
                  fs_read=None, empty_keys=None) -> Optional[Finding]:
     """Fire iff a FORWARD claim carrying identifying info (a count / line-range / named symbol
@@ -196,11 +213,15 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
     said-but-not-done, a claim ✗ the assistant's own end-of-turn ledger/filesystem. A vague
     promise with no identifying info never extracts (so never fires); a negated frame
     ("I won't add X") never fires; a discharged claim is silent (fail-open)."""
-    for kind, loc, info, raw in _drop_extract_forward_claims(text):
+    def _discharged(claim) -> bool:
+        kind, loc, info, raw = claim
         path = _drop_resolve_location(loc, touched_keys) or loc
-        if _drop_discharged(kind, info, raw, path, touched_keys=touched_keys, empty_keys=empty_keys,
-                            fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read):
-            continue
+        return _drop_discharged(kind, info, raw, path, touched_keys=touched_keys, empty_keys=empty_keys,
+                                fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read)
+
+    for _ev, claim in unwitnessed((text,), owes=owes, pays=pays, paid=(_discharged,)):
+        kind, loc, info, raw = claim
+        path = _drop_resolve_location(loc, touched_keys) or loc
         loc_n = normalize_path(path)
         if kind == "count":
             desc = f"claimed {info} {os.path.basename(loc)}"

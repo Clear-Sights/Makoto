@@ -1,8 +1,12 @@
 from __future__ import annotations
 from typing import Optional
 from makoto.vocab import Finding
-from makoto.kit import is_failing_testrun
+from makoto.kit import is_failing_testrun, unwitnessed
 from makoto.substrate.claims import whole_suite_pass_claim
+
+# gate.green_claim's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): SWITCH -- the witness is a
+# recorded act (a test-runner run) whose response was read.
+SHAPE = "SWITCH"
 
 
 # The prose half (the whole-suite green-claim signal) lives in substrate.claims.whole_suite_pass_claim,
@@ -29,19 +33,31 @@ def green_claim_gate(text, *, testrun_output, testrun_exit=None) -> Optional[Fin
     row is never consulted. This is the gate's known absence-reads-as-green edge, stated, not
     inferred. The 'most recent' ordering means a fix-and-rerun-green supersedes an earlier red and
     never fires; it is also SCOPE-BLIND — a narrow green re-run supersedes a whole-suite red."""
-    if not whole_suite_pass_claim(text):
-        return None                                  # no whole-suite green claim -> inert
-    # THE STATUS FIRST, the tail second. A nonzero exit on the latest recorded testrun is the run
-    # saying it failed, in a number: it carries no vocabulary, cannot be paraphrased, and does not
-    # depend on a 500-char tail having kept the summary line. This is the half of the
-    # absence-reads-as-green edge that CAN be closed, and it is closed positively rather than by
-    # widening the token list -- a longer token list has the identical silent mode waiting for the
-    # next runner whose failure it does not spell.
-    if testrun_exit is not None and testrun_exit != 0:
+    def owes(t):
+        # The one subject a whole-suite green claim commits to: itself. Cheap and pure -- the
+        # witness (whether the latest recorded test run contradicts it) lives in `paid`, below.
+        return (t,) if whole_suite_pass_claim(t) else ()
+
+    def pays(_t):
+        return None
+
+    def _testrun_contradicts() -> bool:
+        # True iff the most recently recorded test run is a real, positive contradiction of a
+        # whole-suite green claim. THE STATUS FIRST: an explicit nonzero exit on the latest
+        # recorded testrun is the run saying it failed, in a number -- it carries no vocabulary,
+        # cannot be paraphrased, and does not depend on a 500-char tail having kept the summary
+        # line. This is the half of the absence-reads-as-green edge that CAN be closed, and it is
+        # closed positively rather than by widening the token list -- a longer token list has the
+        # identical silent mode waiting for the next runner whose failure it does not spell. THE
+        # TAIL SECOND: `is_failing_testrun`'s recognized failure tokens.
+        if testrun_exit is not None and testrun_exit != 0:
+            return True
+        return bool(testrun_output) and is_failing_testrun(testrun_output)
+
+    for _ev, _claim in unwitnessed(
+            (text,), owes=owes, pays=pays, paid=(lambda _t: not _testrun_contradicts(),)):
         return _finding()
-    if not testrun_output or not is_failing_testrun(testrun_output):
-        return None                                  # no run, or the latest run was green/xfail
-    return _finding()
+    return None
 
 
 def _finding() -> Finding:

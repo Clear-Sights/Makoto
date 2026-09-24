@@ -58,7 +58,7 @@ import ast
 import re
 from typing import Optional
 
-from makoto.kit import decode_history_event, introduced_text, parse_introduced
+from makoto.kit import decode_history_event, introduced_text, parse_introduced, unwitnessed
 from makoto.vocab import Finding
 
 _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
@@ -93,32 +93,56 @@ def _introduced_units(text: str) -> list:
     return out
 
 
+def owes(ev: dict):
+    """OTHER_POINT: a settled mutation commits to every top-level unit it defines."""
+    if ev.get("hook_event_name") != "PostToolUse":
+        return ()
+    tool = ev.get("tool_name", "")
+    if tool not in _MUTATION_TOOLS:
+        return ()
+    ti = ev.get("tool_input", {}) or {}
+    text = introduced_text(tool, ti) if isinstance(ti, dict) else ""
+    if not text:
+        return ()
+    fp = str(ti.get("file_path", "")) if isinstance(ti, dict) else ""
+    return tuple((name, fp) for name in _introduced_units(text))
+
+
+def pays(ev: dict):
+    """OTHER_POINT: the witnesses (the session's own introduced-text blob, the operator-turn
+    ledger) are seeded whole via `paid` -- no per-event witness inside this loop."""
+    return None
+
+
+SHAPE = "OTHER_POINT"
+
+
 def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
     """Fire iff this session introduced a top-level unit whose name answers to nothing: no
     operator turn names it, nothing in the session's own introduced text reaches it, and no
     decorator registered it."""
-    introduced, defined = [], []
-    for row in history or ():
-        ev = decode_history_event(row)
-        if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+    events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
+    introduced = []
+    for ev in events:
+        if ev.get("hook_event_name") != "PostToolUse":
             continue
         tool = ev.get("tool_name", "")
         if tool not in _MUTATION_TOOLS:
             continue
         ti = ev.get("tool_input", {}) or {}
         text = introduced_text(tool, ti) if isinstance(ti, dict) else ""
-        if not text:
-            continue
-        introduced.append(text)
-        for name in _introduced_units(text):
-            defined.append((name, str(ti.get("file_path", ""))))
-    if not defined:
+        if text:
+            introduced.append(text)
+    if not introduced:
         return None
     # REACHED: the name appears in the session's introduced text beyond its own `def`/`class`
     # line. One occurrence is the definition itself; a second is a use.
     blob = "\n".join(introduced)
-    unclaimed = [(n, f) for n, f in defined
-                 if _token_count(blob, n) < _REACHED_AT and not _named_by_operator(n, transcript_path)]
+    unclaimed = [subject for _ev, subject in unwitnessed(
+        events, owes=owes, pays=pays,
+        paid=(lambda s: sum(1 for tok in _TOKEN_RX.findall(blob or "") if tok == s[0])
+                        >= _REACHED_AT,
+              lambda s: _named_by_operator(s[0], transcript_path)))]
     if not unclaimed:
         return None
     name, where = unclaimed[0]
@@ -148,22 +172,13 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
 _TOKEN_RX = re.compile(r"[A-Za-z0-9_]+")
 
 
-def _words(blob: str) -> list:
-    """The identifier-shaped tokens of `blob`. Exact-token by construction: see the module
-    docstring's recall bound on why prose intent is not read."""
-    return _TOKEN_RX.findall(blob or "")
-
-
-def _token_count(blob: str, name: str) -> int:
-    """Whole-word occurrences of `name` in `blob`."""
-    return sum(1 for tok in _words(blob) if tok == name)
-
-
 def _named_by_operator(name: str, transcript_path) -> bool:
     """True iff a GENUINE operator turn names the unit. Spoof-resistance is inherited, not
     re-derived: `ledger.user_turn_texts` admits only host-written turns, the same channel
     gate.claimed_consent_absent rests on. Import is call-time for the same reason that check's
-    is -- a Stop gate must not carry an import-time edge into the store."""
+    is -- a Stop gate must not carry an import-time edge into the store. Inlines the same
+    identifier-token read `unclaimed_unit_gate`'s REACHED witness uses (`_TOKEN_RX`), so the two
+    witnesses agree on what a "word" is without a shared helper neither other caller needs."""
     if not transcript_path:
         return False
     try:
@@ -171,7 +186,7 @@ def _named_by_operator(name: str, transcript_path) -> bool:
         turns = user_turn_texts(transcript_path)
     except Exception:
         return False                 # fail open: an unreadable transcript is no evidence
-    return any(name in _words(t or "") for t in turns or ())
+    return any(name in _TOKEN_RX.findall(t or "") for t in turns or ())
 
 
 from makoto.registry import Check as _Check

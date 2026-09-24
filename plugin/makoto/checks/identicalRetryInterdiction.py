@@ -24,11 +24,42 @@ from __future__ import annotations
 from typing import Optional
 
 from makoto.kit import (bash_output_text, canon_input, classify_failure, decode_history_event,
-                        failure_terminal_result)
+                        failure_terminal_result, unwitnessed)
 from makoto.vocab import Finding
 from makoto.registry import Check
 
+# The witness is the SINGLE MOST RECENT recorded act that exercised the same command -- a Bash
+# call whose response was already read -- never a second, independent source.
+SHAPE = "SWITCH"
 
+
+def owes(ev):
+    """The about-to-run CURRENT Bash call owes a witness that it is not a byte-identical retry
+    of the immediately preceding call. `ev` is `("current", (prior_input, current_input))`; any
+    other kind owes nothing. Embeds the canon_input equality test itself (like `canon_gate`'s own
+    primitives), so a call whose input differs from the prior one never even raises the
+    obligation -- there is nothing to interdict."""
+    kind, payload = ev
+    if kind != "current":
+        return ()
+    prior_input, current_input = payload
+    if canon_input(prior_input) != canon_input(current_input):
+        return ()
+    return (canon_input(current_input),)
+
+
+def pays(ev):
+    """The PRIOR call's own recorded response is the only witness this predicate reads. `ev` is
+    `("prior", prior_result_text)`; any other kind pays nothing. It pays the retry unconditionally
+    whenever the prior call's classification is anything other than a confident deterministic
+    failure (transient or uncertain both legitimize retrying) -- a confident deterministic failure
+    pays nothing, leaving the identical retry owed."""
+    kind, payload = ev
+    if kind != "prior":
+        return None
+    if classify_failure(payload) is not True:
+        return lambda _subject: True
+    return None
 
 
 def _most_recent_completed_bash_call(history) -> Optional[tuple]:
@@ -79,19 +110,18 @@ def predicate(*, current_event: dict, history: list, pattern: Check,
         return None
     prior_input, prior_result_text = prior
     current_input = current_event.get("tool_input") or {}
-    if canon_input(prior_input) != canon_input(current_input):
-        return None                          # not a retry of the SAME call -- silent
-    if classify_failure(prior_result_text) is not True:
-        return None                          # transient or uncertain -- never fire (the ship bar)
-    return Finding(
-        pattern_id=pattern.id,
-        file="",
-        line=0,
-        level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
-        message=("Identical retry of a Bash call that just failed deterministically -- retrying "
-                 "the byte-identical command cannot change a deterministic error."),
-        retry_hint=pattern.retry_hint,
-    )
+    events = (("prior", prior_result_text), ("current", (prior_input, current_input)))
+    for _ev, _subject in unwitnessed(events, owes=owes, pays=pays):
+        return Finding(
+            pattern_id=pattern.id,
+            file="",
+            line=0,
+            level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
+            message=("Identical retry of a Bash call that just failed deterministically -- retrying "
+                     "the byte-identical command cannot change a deterministic error."),
+            retry_hint=pattern.retry_hint,
+        )
+    return None
 
 
 RETRY_HINT = 'You retried the byte-identical failing Bash command with no intervening change, and the prior failure was deterministic (a syntax/import/permission/not-found error) -- retrying it unmodified cannot make progress. Change the command, fix the underlying cause, or take a different action.'
