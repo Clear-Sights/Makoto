@@ -45,6 +45,10 @@ jobs:
     if: github.repository == 'Clear-Sights/Makoto'
     name: pytest (windows, py3.13)
     runs-on: windows-latest
+    env:
+      # The plugin opens every text file as utf-8 explicitly (0 bare read_text/write_text/open
+      # under plugin/); the tests' fixtures do not, and Windows defaults to cp1252.
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
