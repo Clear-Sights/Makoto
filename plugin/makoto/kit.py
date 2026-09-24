@@ -30,7 +30,6 @@ from makoto.vocab import (
     _MAKOTO_ALLOW_REASON_RX,
     _PATH_EXT,
     Finding,
-    JWT_CALLEE_RX,
     # recorded per-test verdict parsers; compute_delta/current_named_verdicts read them.
     _TEETH_FRAME_RX,
     _TEETH_SCOPE_AFTER,
@@ -439,23 +438,6 @@ def callee_chain(call: ast.Call) -> str:
         else:
             break
     return ".".join(reversed(parts))
-
-
-def jwt_decode_callee_chain(node) -> Optional[str]:
-    """The callee-chain string iff `node` is an `ast.Call` targeting a jwt/jose `decode` entry
-    point (JWT_CALLEE_RX matches the chain, AND the chain's tail is literally `decode`); None
-    otherwise. Shared callee gate for content.jwt_signature_disabled (verify=False /
-    options-dict disable) and content.jwt_none_alg (algorithms=["none"] whitelisting) — both
-    patterns need this SAME 'is this really a jwt.decode(...) call' precondition before
-    inspecting their own distinct keyword."""
-    if not isinstance(node, ast.Call):
-        return None
-    chain = callee_chain(node)
-    if not JWT_CALLEE_RX.search(chain):
-        return None
-    if chain.split(".")[-1] != "decode":
-        return None
-    return chain
 
 
 def canon_input(inp) -> str:

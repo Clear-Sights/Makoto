@@ -12,11 +12,11 @@ the digest must have, each learned from a case that was watched failing:
 * A reworded docstring is not drift.  The copies already differ in their docstrings and are
   correct, so the digest strips the leading docstring; treating prose as drift would make the
   fence noise, and a noisy fence gets deleted.
-* A changed constant IS drift, and it touches no function body.  `jwt_decode_callee_chain`
-  merely *references* `JWT_CALLEE_RX`; dropping `pyjwt` from that regex blinds this plugin to a
-  library the owner still catches while every function body stays byte-identical.  Digesting
-  bodies alone let that through -- measured, not supposed -- so a row may name a module-level
-  constant, and every in-repository constant a fenced body reads must itself carry a row.
+* A changed constant IS drift, and it touches no function body.  A fenced predicate that merely
+  *references* a module-level regex would silently lose coverage if that regex's value drifted
+  while the predicate's own body stayed byte-identical.  Digesting bodies alone let that through
+  -- measured, not supposed -- so a row may name a module-level constant, and every
+  in-repository constant a fenced body reads must itself carry a row.
 * A symbol that has vanished is drift, not a pass.  An absent symbol fails; it never silently
   digests nothing.
 

@@ -75,11 +75,6 @@ _MAKOTO_ALLOW_RX = re.compile(r"makoto-allow\s*:\s*\S", re.IGNORECASE)
 # the hot boolean check stays a bare search and only the recording path pays for the capture.
 _MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE)
 
-# JWT/JOSE library callee gate — a `decode` call is a JWT verification iff its callee chain names a
-# jwt/jose library, BOUNDARY-delimited so `myjwthelper` does not match: `jwt`, `jose` (python-jose),
-# `pyjwt`.
-JWT_CALLEE_RX = re.compile(r"(?i)(?:^|\.)(?:jwt|jose|pyjwt)(?:\.|$)")
-
 # ---- Test-runner provenance + failure-verdict (shared by the ledger + the green-claim gate) ----
 # _TEST_RUNNER_RX is the legacy lexical runner vocabulary, retained as an import-compatible
 # export; actual command provenance is argv-structured in core._shell._command_runs_tests, so a
