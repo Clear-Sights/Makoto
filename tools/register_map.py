@@ -5,13 +5,13 @@ docs/REGISTER.md is a vendored copy; the source is measure-zero-dev/REGISTER.md.
 docs/REGISTER-MAP.tsv gives every entry in it one of three verdicts:
 
   RUNNER          a named check, test or dispatch property enforces the entry
-  NOT-COUNTABLE   the entry is in makoto's subject -- a statement graded against
-                  the record -- but its test would be a similarity judgement, and
-                  makoto refuses those. The note says which comparison it needs.
+  NOT-COUNTABLE   the entry is makoto's subject -- the agent's own writes, commands and
+                  claims -- but no reading of the record separates an instance from correct
+                  work. The note names the closest reading tried and what defeats it: a
+                  counterexample it fires on, a fact no hook payload carries, or a
+                  similarity judgement, which makoto refuses.
   UNCOVERED       the entry is in makoto's subject and countable, and no check enforces
                   it yet. The note says what it would take.
-  OUT-OF-SUBJECT  the entry governs code makoto does not execute or a system it
-                  does not configure. Not a gap in makoto; a gap in nothing.
 
 This runner checks the map against the register and against the live registry:
 every entry carried, no entry invented, every cited check id real, every row's
@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "plugin"))
 REGISTER = ROOT / "docs" / "REGISTER.md"
 MAP = ROOT / "docs" / "REGISTER-MAP.tsv"
-VERDICTS = {"RUNNER", "NOT-COUNTABLE", "UNCOVERED", "OUT-OF-SUBJECT"}
+VERDICTS = {"RUNNER", "NOT-COUNTABLE", "UNCOVERED"}
 ENTRY_RX = re.compile(r"^([A-H]\d+)\s+[A-Z]")
 
 # Live checks that serve no register entry, each with the reason it serves none. Adding a

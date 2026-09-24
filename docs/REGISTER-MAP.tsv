@@ -11,7 +11,7 @@ B7	RUNNER	tools/merge_pass.py	every rule in this repo binds to a runner; this fi
 B9	RUNNER	gate.undischarged_waiver	a silencing directive introduced with no checkable end named on or above it; ADVISE tier. The previous NOT-COUNTABLE note was right that makoto cannot tell whether the discharge HAPPENED -- whether an issue closed or a date passed -- and wrong that the entry needs that: the rule is that the waiver NAMES a checkable end, which is a property of its own introduced text. The forms the instrument discharges itself (@ts-expect-error, xfail, skipif) are excluded by design
 B23	RUNNER	content.bound_as_count	a test asserting len() or .count() under a literal ceiling, blocked when introduced. Over 2,331 files (this tree, Measure-Zero, Measure-Zero-Dev, CPython 3.11's stdlib, and the site-packages of this tree's test environment) it fired once, on this tree's own tests/test_ledger.py:127 `len(row['value']) <= 500`, whose fixture fixes the length at exactly 500; that assert now reads == 500
 B35	RUNNER	content.integrity_suppression_flag	an integrity-suppression flag must cite an ADR that declares the exemption, or it is undeclared; also content.env_gated_audit: an audit reached only when an env var is set is an exemption the rule never mentions
-B36	NOT-COUNTABLE	-	needs the recognizer's own miss count; a turn carries what matched, never the residue it did not
+B36	NOT-COUNTABLE	-	REFUSED WITH A MEASUREMENT. In code, the closest reading, a loop that keeps regex matches with no branch for the misses, matched 73 sites in 2,331 files (this tree, Measure-Zero, Measure-Zero-Dev, CPython 3.11's stdlib, and the site-packages of this tree's test environment); at CPython 3.11 argparse.py:1510 dropping the non-matching option strings is the purpose. In a turn, a recognizer's misses are exactly what never reaches the record: it carries what matched, never the residue
 C2	RUNNER	gate.undeclared_falsifiable	a claim that cannot be evaluated is refused rather than passed
 C6	RUNNER	content.verifier_predicate_weakened	a loose comparator where equality is meant records the wrong direction
 C7	RUNNER	gate.completion	a partial artifact is graded present-or-absent on disk, not by its prefix
@@ -27,16 +27,16 @@ E13	RUNNER	gate.relaunched_unchanged	a second worker launch needs a verifier rep
 G2	RUNNER	gate.unasked_plan	a plan presented with no question asked this session settled its ambiguity by guessing; ADVISE tier, ported by shape from Keel's clause P02 (the previous NOT-COUNTABLE note was right that grading WHICH question was owed is a similarity judgement, and whether ANY was asked is not)
 G3	NOT-COUNTABLE	-	needs each party's span compared against the answer's; that comparison is similarity
 G5	RUNNER	gate.unexamined_wall	an epistemic "cannot" with zero calls since the operator's last turn
-A14	OUT-OF-SUBJECT	-	a normalization inside code makoto does not execute; its own canon() is graded by tests/test_canon_fingerprints.py
+A14	NOT-COUNTABLE	-	REFUSED WITH A MEASUREMENT. The closest reading, a dict or set comprehension keyed by a normalizing call of its item (`{k.lower(): v for k, v in ...}`), matched 21 sites in 2,331 files (this tree, Measure-Zero, Measure-Zero-Dev, CPython 3.11's stdlib, and the site-packages of this tree's test environment), and the merge is the intent at CPython 3.11 distutils/_msvccompiler.py:115 (Windows environment names are case-insensitive) and pip's req/req_uninstall.py:123 (normcase paths). Whether two inputs should merge is intent the code does not state
 B4	RUNNER	gate.unwitnessed_verifier	a verifier reporting clean needs to have been seen reporting a failure, or the clean report is evidence of nothing; ADVISE tier, ported by shape from Keel's clause U25 (the previous NOT-COUNTABLE note was right that proxy-versus-target agreement is a similarity judgement, and whether the oracle has ever fired is not)
 B11	RUNNER	gate.unprobed_fanout	a dispatch to a subagent needs a read, glob or grep before it, so the brief describes what is there rather than what was assumed; ADVISE tier, ported by shape from Keel's clause D01 (the previous NOT-COUNTABLE note read the entry as a with-and-without MEASUREMENT, which is not on any channel makoto reads -- the baseline the clause means is a read of the ground, which is)
-B14	NOT-COUNTABLE	-	with-and-without measurement is outside a single turn's record
-B18	OUT-OF-SUBJECT	-	held-out reporting is a property of the certification sets, not of a turn
+B14	NOT-COUNTABLE	-	argued, not probed. The witness is two runs of one measurement that differ only by the mechanism, plus the claim that it helped. Nothing in a command marks which token is the mechanism, so pairing two runs as with and without is a similarity judgement
+B18	NOT-COUNTABLE	-	argued, not probed. The witness is that the scored set was not the one the thing was built from. The record shows a score and the file it ran on, never what shaped the thing being scored, and a score on a file the session wrote itself reads the same as an honest regression test
 B26	RUNNER	gate.self_wired	makoto's own liveness is an output; absence of its wiring fails loud
 C8	RUNNER	gate.claimed_running	"it's up" is graded against what the run itself emitted
 D1	RUNNER	gate.completion	a write is graded by reading the artifact back, never by the write returning; also content.verifier_exit_masking: a computed nonzero exit that is silenced is the dropped status (from C1); also gate.completion: the artifact is looked for where a consumer would find it, under cwd (from D2)
 D4	RUNNER	gate.stale_pass	a derived pass older than its source is refused against the live record
-D8	OUT-OF-SUBJECT	-	magnitude of a system makoto does not execute
+D8	NOT-COUNTABLE	-	argued, not probed. The witness is a run at the real magnitude in the shipped form, and the real magnitude appears in no hook payload; any fixed size a check chose would be a guess at it
 D11	RUNNER	event.thrash_revert	a whole-artifact rewrite that lands back where it started is refused
 D12	RUNNER	gate.unknown_ref_switch	moving HEAD to a ref needs the ref printed first, so what must survive the boundary is named; ADVISE tier, ported by shape from Keel's clause U09 (the previous OUT-OF-SUBJECT note was right about a copy into volatile storage, and wrong that makoto crosses no boundary -- a git checkout in its own Bash record is one)
 D14	RUNNER	gate.unobserved_destruction	destroying content needs a verifier report before it, or there is no pre-image an undo could be proven against; ADVISE tier, ported by shape from Keel's clause U20, over the one destructive classifier substrate/_canonAtoms already owns (the previous NOT-COUNTABLE note graded proving the undo, which is not countable; whether anything was observed first is)
@@ -46,24 +46,24 @@ F7	RUNNER	gate.stale_pass	the record is re-read at the moment of the claim, not 
 F8	RUNNER	gate.plan_item_drift	an unchanged open item is advisory, not a repeated block
 F14	RUNNER	content.verifier_body_hollowed	"no behaviour change" is graded on the body, not on the description
 G1	RUNNER	content.phantom_citation	the cited source must exist before the sentence resting on it stands (carried from B24, folded into G1); also gate.fabricated_action: a claimed tool action must sit beside the tool call it rests on
-A6	OUT-OF-SUBJECT	-	threshold behaviour of a metric makoto does not compute
+A6	NOT-COUNTABLE	-	REFUSED WITH A MEASUREMENT. The closest reading, a float-literal comparison mapped straight onto 0 or 1 (`1 if s >= 0.9 else 0`), matched 0 of 2,331 files (this tree, Measure-Zero, Measure-Zero-Dev, CPython 3.11's stdlib, and the site-packages of this tree's test environment). Whether a threshold collapses a gradient depends on where the inputs fall, and neither the written code nor any hook payload carries the inputs
 B1	RUNNER	gate.self_wired	makoto's own wiring is read from disk rather than assumed
 B5	RUNNER	gate.hollow_test	a verifier whose verdict is constant is a hollowed body
 B10	RUNNER	tests corpus-FP invariant	every blocking check is certified at zero false positives on the shipped corpus
 B20	RUNNER	gate.hollow_test	a test edited until it passes is a gutted test
 B21	RUNNER	tools/merge_pass.py	each pair is refuted by its own discriminant, never by a sibling's
-B28	OUT-OF-SUBJECT	-	sequencing of test cases inside a suite makoto does not run
+B28	NOT-COUNTABLE	-	argued, not probed. The fault is an absence: no case replays a real succession into shared state. The suite that would hold that case can sit anywhere, a Write shows one file, and a Stop check sees only what ran this session, so no event can establish the absence
 B34	RUNNER	tools/register_map.py	makoto's own law is run over makoto, and names every region it cannot reach: the NOT-COUNTABLE and OUT-OF-SUBJECT rows below
-B37	NOT-COUNTABLE	-	needs semantic equivalence between two differently-worded predicates, which is a similarity judgement
+B37	NOT-COUNTABLE	-	the witness is that two differently-worded predicates are equal. Equality of two predicates is undecidable in general (Rice's theorem); the register's own cure is an act, a run over both, but no event marks two predicates as meant to be equal
 C3	RUNNER	gate.named_test	each named test is evaluated on its own name
 C4	RUNNER	dispatch fail-closed	a check that raises resolves as a denial, never as permission
 C5	RUNNER	dispatch fail-closed	an unrecognised event shape ends in an error, not a fallthrough
 C11	RUNNER	gate.report_before_run	a run's success written into a prose document with no verifier run anywhere before it, so the report precedes the outcome it reports; ADVISE tier, on the same ACT_VS_GUARD factory as the Keel-shaped obligations. Prose documents only: a verdict inside a .py file is a fixture, not a report, which is integritySuppressionFlag's .md decision mirrored for the mirrored reason
 D9	RUNNER	gate.self_wired	makoto excludes itself by identity from the set it judges; also gate.canon_fingerprints: the check requires green before the plant; the pattern is not carried in the detector (from B17)
 E1	RUNNER	tests/test_stop_gate_level_invariant.py	every gate carries a scenario that selects it; also gate.liveness: a pure statement whose result reaches nothing is a branch with no witness input, at statement grain
-E8	OUT-OF-SUBJECT	-	setting combinations of a system makoto does not configure
-E9	OUT-OF-SUBJECT	-	a fallback's coverage of its own trigger, in code makoto does not execute
-F6	OUT-OF-SUBJECT	-	monotonicity of a state space makoto does not walk
+E8	NOT-COUNTABLE	-	argued, not probed. The witness is the combination of settings that ships, run and pinned. Which combination ships appears in no hook payload, so no event separates a tested combination from the one that matters
+E9	NOT-COUNTABLE	-	REFUSED WITH A MEASUREMENT. The closest reading, an except handler that re-runs the call its own try just failed, matched 44 sites in 2,331 files (this tree, Measure-Zero, Measure-Zero-Dev, CPython 3.11's stdlib, and the site-packages of this tree's test environment); CPython 3.11 zipfile.py:505-507 retries `encode` with 'utf-8' after 'ascii' fails, and the fallback does cover its trigger. Whether it does depends on what the callee fails on, which the code does not state
+F6	NOT-COUNTABLE	-	argued, not probed. The witness is a walk of the small state space. The states, and which of them a removal or an addition reaches, are behaviour of the code across runs, which no single event holds
 F12	NOT-COUNTABLE	-	a discriminating observation between mechanisms is a similarity judgement
 B32	RUNNER	gate.undeclared_falsifiable	a claim whose falsifier is itself names nothing
 F10	RUNNER	gate.canon	the event is re-derived from the session's own record, never from a digest of it
