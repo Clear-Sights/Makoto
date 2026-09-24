@@ -41,12 +41,7 @@ ENTRY_RX = re.compile(r"^([A-H]\d+)\s+[A-Z]")
 # name here is a visible act: the reason is graded non-empty, the name must be a live check,
 # and a name that the map ALSO cites is refused -- a check is either in the register's subject
 # or declared outside it, never both.
-OUTSIDE_THE_REGISTER = {
-    "gate.relative_path_citation":
-        "a communication-quality signal, not an integrity blindspot. An unclickable relative "
-        "path costs the reader a step and misstates nothing, so no register entry names it; "
-        "it is ADVISE tier for that reason. Owner-reported pain, kept on its own merit.",
-}
+OUTSIDE_THE_REGISTER = {}
 
 from makoto import registry  # noqa: E402
 

@@ -1408,23 +1408,6 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
         "the advisory self_wired fire must still be audited so a partial strip leaves a forensic trail"
 
 
-def test_dispatch_relative_path_citation_gate_never_blocks_even_when_it_fires(tmp_path):
-    """Behavioral pin, same shape as gate.self_wired's: gate.relative_path_citation (2026-07-09)
-    fires (audited) but never blocks, even when its own condition holds -- a Stop turn whose
-    last_assistant_message cites a non-absolute path."""
-    state_dir = _setup_state(tmp_path)
-    stop = {"hook_event_name": "Stop", "session_id": "relpath", "cwd": str(tmp_path),
-            "last_assistant_message": "see substrate/hollowTest.py:146 for the detector"}
-    rc, out = _run_dispatch(state_dir, stop)
-    assert out, "gate.relative_path_citation (ADVISE) must reach the agent as a Stop block when it fires"
-    decision = json.loads(out)
-    assert decision["decision"] == "block"
-    assert "gate.relative_path_citation" in decision["reason"]
-    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.relative_path_citation" in r.get("pattern_fires", []) for r in rows), \
-        "the advisory fire must still be audited so it leaves a forensic trail"
-
-
 def test_dispatch_plan_item_drift_gate_never_blocks_even_when_it_fires(tmp_path):
     """Behavioral pin, same shape as gate.self_wired's: gate.plan_item_drift (2026-07-09) fires
     (audited) but never blocks, even when a plan/task-labeled commitment is left open across
@@ -1740,7 +1723,6 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.self_wired",   # advisory-tier exception (2026-07-05); still
                                                # discovered <=> in _blocking_gate_ids(), just never
                                                # emits level="error" so never actually blocks
-                          "gate.relative_path_citation",  # advisory-tier (2026-07-09): same shape
                           "gate.plan_item_drift",         # advisory-tier (2026-07-09): same shape
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
@@ -1804,7 +1786,7 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     # Pinned by test_dispatch_unprobed_fanout_gate_never_blocks_even_when_it_fires and
     # test_dispatch_unasked_plan_gate_never_blocks_even_when_it_fires above.
     _ADVISORY_EXEMPT = {"gate.self_wired", "gate.canon_fingerprints_advisory",
-                        "gate.relative_path_citation", "gate.plan_item_drift",
+                        "gate.plan_item_drift",
                         "gate.unprobed_fanout", "gate.unasked_plan",
                         "gate.unread_structure",
                         "gate.unwitnessed_verifier",

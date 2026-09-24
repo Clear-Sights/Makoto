@@ -1177,119 +1177,6 @@ waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Stop", posture=
                tests="SPEC",
                eats=frozenset({"history"}),
                run=lambda c: undischarged_waiver_gate(c.history))
-# gate.relative_path_citation -- flags a chat response that cites a file path in a non-absolute
-# (unclickable) form.
-#
-# Most terminal/IDE hosts only turn an ABSOLUTE path (or an explicit `file_path:line_number`
-# citation) into a clickable jump target; a relative or `~`-relative path renders as plain,
-# unclickable text in many hosts.
-#
-# ADVISORY tier only: a communication-quality signal, not an integrity violation.
-#
-# Detection is deliberately narrow and syntactic:
-#   - A candidate token needs real path shape: a directory separator plus a dotted-extension
-#     basename, or a bare `name.ext:NNN` line-citation.
-#   - Already-absolute ('/...') tokens are not flagged -- they ARE clickable.
-#   - A token inside a fenced code block is code being shown, not a citation.
-#   - A token immediately preceded by a URL scheme is excluded -- a URL path segment is not a
-#     filesystem citation.
-#   - A dotted CODE IDENTIFIER (`Finding.source_event_id`) or version/pattern id ("v1.2") is
-#     excluded by requiring the post-dot segment to be a plausible lowercase file extension,
-#     never purely digits and never capitalized.
-from bisect import bisect_right
-
-
-# A plausible file EXTENSION: short, lowercase, alphanumeric, not purely numeric -- separates a
-# real filename from a dotted code identifier or version/pattern id.
-_EXT_RX = r"[a-z][a-z0-9]{0,4}"
-# A directory-qualified path: at least one '<segment>/' before a dotted basename. The `~/` branch
-# also admits any number of further segments under the home root -- '~/project/helper.py' matches
-# the same as '~/foo.py'; the leading-'/' lookbehind still blocks re-entry at a bare inner segment
-# ('.claude/foo.py' alone, with no '~/' before it, is not a home-relative citation).
-_DIR_QUALIFIED_RX = re.compile(
-    rf"(?<![\w/.~-])((?:~/(?:[\w.-]+/)*|(?:[\w.-]+/)+)[\w.-]*\.{_EXT_RX}(?::\d+)?)(?![\w/])"
-)
-# A bare `name.ext:NNN` line-citation with no directory at all -- still a citation, still
-# unclickable without an absolute root.
-_BARE_CITATION_RX = re.compile(
-    rf"(?<![\w/.~-])([\w-]+\.{_EXT_RX}:\d+)(?![\w/])"
-)
-_URL_SCHEME_RX = re.compile(r"(?:https?|ftp)://[\w.\-/]*$")
-_FENCE_RX = re.compile(r"(?m)^\s{0,3}```")
-
-
-def _in_fence(fence_ends: list, offset: int) -> bool:
-    """True iff `offset` sits inside a fenced code block -- an ODD count of ``` fences before it
-    means so. Equivalent to a whole-prefix parity scan, computed as a bisect over fence-end
-    offsets instead."""
-    return bisect_right(fence_ends, offset) % 2 == 1
-
-
-def _after_url_scheme(text: str, start: int) -> bool:
-    """True iff the text immediately before `start` ends in a URL scheme -- a URL path segment
-    is not a filesystem citation."""
-    return bool(_URL_SCHEME_RX.search(text[max(0, start - 32):start]))
-
-
-def find_relative_citations(text: str) -> list[tuple[str, int]]:
-    """Return [(path, offset), ...] for every non-absolute, non-URL, non-fenced path-shaped
-    citation in `text`, in order of first appearance, each path reported once."""
-    if not text:
-        return []
-    # End offset of every ``` fence marker, scanned once per call so `_in_fence` is a bisect, not
-    # a fresh whole-prefix scan per candidate.
-    fence_ends = [m.end() for m in _FENCE_RX.finditer(text)]
-    seen = set()
-    out = []
-    for rx in (_DIR_QUALIFIED_RX, _BARE_CITATION_RX):
-        for m in rx.finditer(text):
-            path = m.group(1)
-            # The absolute-path and URL guards are already implied by the two patterns' shared
-            # lookbehind; kept explicit against a future loosening of that lookbehind. The fence
-            # guard is the live one.
-            if path.startswith("/"):
-                continue                              # already absolute -> clickable, not flagged
-            if _in_fence(fence_ends, m.start()):
-                continue                              # code being shown, not a citation
-            if _after_url_scheme(text, m.start()):
-                continue                              # a URL path segment, not a filesystem path
-            if path in seen:
-                continue
-            seen.add(path)
-            out.append((path, m.start()))
-    out.sort(key=lambda t: t[1])
-    return out
-
-
-def relative_path_gate(text: str) -> Optional[Finding]:
-    """Fire iff `text` cites at least one non-absolute path-shaped location. Names every distinct
-    offender so several unclickable citations in one response get one finding."""
-    hits = find_relative_citations(text)
-    if not hits:
-        return None
-    names = ", ".join(f"`{p}`" for p, _ in hits[:5])
-    more = f" (+{len(hits) - 5} more)" if len(hits) > 5 else ""
-    return Finding(
-        pattern_id="gate.relative_path_citation",
-        file="",
-        line=0,
-        level="advisory",
-        message=(
-            f"cited path(s) not absolute, so not clickable in most hosts: {names}{more}. "
-            f"Prefer an absolute path (or this assistant's own file_path:line_number convention "
-            f"rooted at an absolute file_path)."
-        ),
-        retry_hint="Re-cite with an absolute path when referencing a specific file/location.",
-    )
-
-
-# `may_block=True` alongside posture="ADVISE" is structural-eligibility-only: dispatch keys off
-# may_block so the finding reaches _emit_decision, where it folds to ADVISE and never denies
-# (pinned by tests/test_dispatch.py).
-relpath_CHECK = _Check(id="gate.relative_path_citation", applies_at="Stop", posture="ADVISE",
-               tests="SPEC",
-               eats=frozenset({"text"}),
-               may_block=True, run=lambda c: relative_path_gate(c.text))
 # gate.claude_identity -- a commit about to be stamped with an identity nobody chose: the
 # container's git layer (an env var or config file) names Claude at the anthropic.com noreply
 # address, and a plain `git commit` takes that setting as if it were who is writing.
@@ -1862,7 +1749,7 @@ budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
 budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, relpath_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}

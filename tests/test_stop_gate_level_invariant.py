@@ -137,11 +137,6 @@ def _scenario_self_wired(tmp_path):
     return _ctx(fs_read=lambda p: wired if p == ".claude/settings.json" else None)
 
 
-def _scenario_relative_path_citation(tmp_path):
-    # fires: tests/test_relative_path_citation.py::test_gate_fires_finding_advisory_never_error
-    return _ctx(text="see substrate/hollowTest.py:146 for the detector")
-
-
 def _scenario_plan_item_drift(tmp_path):
     # fires: tests/test_plan_items.py::test_drift_gate_advisory_lists_open_items
     return _ctx(open_plan_items=[{"commitment_key": "k", "label": "section:9.3", "description": "d"}])
@@ -307,7 +302,6 @@ _SCENARIOS = {
     "gate.canon_fingerprints": _scenario_canon_fingerprints,
     "gate.canon_fingerprints_advisory": _scenario_canon_fingerprints_advisory,
     "gate.self_wired": _scenario_self_wired,
-    "gate.relative_path_citation": _scenario_relative_path_citation,
     "gate.plan_item_drift": _scenario_plan_item_drift,
     "gate.claimed_running": _scenario_claimed_running,
     "gate.claimed_shipped": _scenario_claimed_shipped,

@@ -47,7 +47,7 @@ TESTS_SHAPES = frozenset({"SPEC", "OTHER_POINT", "SWITCH", "LINEAGE"})
 # that carried no ambiguity) and no corpus-measured FP rate yet. Promoting either to BLOCK needs
 # that measurement, not a preference. Each module's docstring says so.
 _ADVISORY_ALLOWLIST = frozenset({"gate.self_wired", "gate.canon_fingerprints_advisory",
-                                  "gate.relative_path_citation", "gate.plan_item_drift",
+                                  "gate.plan_item_drift",
                                   "gate.unprobed_fanout", "gate.unasked_plan",
                                   # same reasoning: each has a named benign class in its own
                                   # module docstring and no corpus-measured FP rate yet.

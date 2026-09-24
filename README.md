@@ -12,11 +12,10 @@ That publication claim is deliberately bounded: Shipped plugin — installable a
 
 **Integrity**, as this tool uses the word, is exactly that agreement: a claim the agent made this
 turn is matched by the record of the deed it names. Nothing wider — not correctness, not code
-quality, not whether the deed was a good idea. So `gate.relative_path_citation` says a bare
-path is "a communication-quality signal, not an integrity violation": it contradicts no claim
-against the record, it is only harder to follow. `makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is
-the lexical half of the same idea — the word-set naming integrity concepts *in a subject's
-code* — and is not a second definition of this one.
+quality, not whether the deed was a good idea. A gate that only flags a communication-quality
+issue, never a contradiction against the record, is deliberately ADVISE tier for that reason.
+`makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is the lexical half of the same idea — the word-set
+naming integrity concepts *in a subject's code* — and is not a second definition of this one.
 
 Checks declare their inputs in `registry.Check.eats`. Runtime outcomes are folded by
 `verdict.apply`; receipt fields come from `state.ledger.emit_receipt`.
@@ -31,9 +30,9 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 - **17 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **3**, `gate`: **1**
 - **32 Stop checks** (all checks registered at the Stop edge)
-- **30 end-of-turn gates** (`may_block=True`)
+- **29 end-of-turn gates** (`may_block=True`)
 - **14 blocking end-of-turn gates** (`registry.blocking_eligible`)
-- **16 advisory end-of-turn gates** (advisory-allowlisted)
+- **15 advisory end-of-turn gates** (advisory-allowlisted)
 
 <!-- END GENERATED: check-counts -->
 
@@ -96,7 +95,6 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.canon_fingerprints` | ported canon fingerprints in the robust core established by gold-oracle certification | blocking | established |
 | `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | advisory | advisory |
 | `gate.canon_fingerprints_advisory` | the advisory remainder (soft/claim atoms or gold-disqualified) | advisory | advisory |
-| `gate.relative_path_citation` | a chat response citing a non-absolute (unclickable) path | advisory | advisory |
 | `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
 | `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | advisory | advisory |
 | `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | advisory | advisory |
