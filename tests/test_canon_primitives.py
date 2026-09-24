@@ -6,7 +6,7 @@ unit-vs-live-battery split test_stopcheck_self_wired.py / test_gate_dropped.py u
 gates."""
 import json
 
-from makoto.checks.switch import CANON_SEQ_PRIMITIVES, _decode_row as _decode_canon_row, calls_from_history, canon_gate, fired_primitives, interrupted, recur_stuck, self_error_code, timed_out, timed_out_at_turn_end
+from makoto.checks.switch import CANON_SEQ_PRIMITIVES, calls_from_history, canon_gate, fired_primitives, interrupted, recur_stuck, self_error_code, timed_out, timed_out_at_turn_end
 
 
 def _call(name="Bash", input=None, result=None):
@@ -188,9 +188,9 @@ def test_calls_from_history_decodes_posttooluse_tuple_rows():
 def test_decode_row_normalizes_posttoolusefailure_with_real_error_text():
     row = _failure_tuple_row(1, "mcp__svc__poll", {"query": "x"}, "Connection error",
                              is_interrupt=True)
-    assert _decode_canon_row(row) == (
-        "PostToolUse", "mcp__svc__poll", {"query": "x"},
-        {"error": "Connection error", "interrupted": True})
+    assert calls_from_history([row]) == [{
+        "name": "mcp__svc__poll", "input": {"query": "x"},
+        "result": {"error": "Connection error", "interrupted": True}}]
 
 
 def test_timeout_at_turn_end_silent_on_last_transient_failure_terminal():

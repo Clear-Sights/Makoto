@@ -37,11 +37,11 @@ def test_identical_retry_sees_a_wrapper_only_row_like_its_sibling():
     payload, so gate.identical_retry was BLIND to rows canon.timeout/canon.recur acted on,
     from the same table, for the same concept. Both now share kit.decode_history_event."""
     from makoto.checks.switch import _most_recent_completed_bash_call
-    from makoto.checks.switch import _decode_row as canon_decode
+    from makoto.substrate._canonAtoms import _decode_row as canon_decode
     row = (1, "ts", "PostToolUse", "/repo",
            json.dumps({"tool_name": "Bash", "tool_input": {"command": "x"},
                        "tool_response": {"stderr": "SyntaxError: bad", "exitCode": 1}}))
-    assert canon_decode(row)[0] == "PostToolUse"
+    assert canon_decode(row)["name"] == "Bash"
     assert _most_recent_completed_bash_call([row]) is not None
 
 

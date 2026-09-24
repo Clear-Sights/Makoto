@@ -734,38 +734,7 @@ def _strip_leaves(v):
 
 
 # ---- the history -> Call adapter (protocol-field decode; fail-open per row) -------------------
-def _decode_row(row):
-    """Decode ONE history row into (etype, name, input_dict, result_dict), or None to skip.
-
-    Raw decode + wrapper-event-type fallback is `kit.decode_history_event` -- the canonical
-    step, shared with `identicalRetryInterdiction._most_recent_completed_bash_call`. This
-    function keeps only what's specific to canon's OWN adapter shape: the tuple conversion, and
-    PostToolUseFailure normalized to PostToolUse with its real top-level error/is_interrupt
-    fields, so it is the failed call's terminal. PreToolUse rows decode too; `calls_from_history`
-    yields nothing for them."""
-    ev = decode_history_event(row)
-    if ev is None:
-        return None
-    etype = ev.get("hook_event_name")
-    name = ev.get("tool_name", "") or ""
-    if etype not in ("PreToolUse", "PostToolUse", "PostToolUseFailure") or not name:
-        return None
-    ti = ev.get("tool_input")
-    ti = ti if isinstance(ti, dict) else {}
-    if etype == "PostToolUseFailure":
-        return ("PostToolUse", name, ti, failure_terminal_result(ev))
-    if etype == "PostToolUse":
-        tr = ev.get("tool_response")
-        return ("PostToolUse", name, ti, tr if isinstance(tr, dict) else {})
-    return ("PreToolUse", name, ti, {})
-
-
-def calls_from_history(history) -> list:
-    """Every terminal row (PostToolUse, or PostToolUseFailure normalized to it by `_decode_row`)
-    is one Call; a PreToolUse row is not a call and yields nothing. A call the owner declined,
-    one that was abandoned, and one still running all leave the same trace, a Pre with no
-    terminal, and none of them is evidence of a failure."""
-    return [{"name": name, "input": ti, "result": tr} for etype, name, ti, tr in (d for d in (_decode_row(r) for r in (history or ())) if d is not None) if etype == "PostToolUse"]
+from makoto.substrate._canonAtoms import calls_from_history  # one decoder for canon's calls
 
 
 # ---- sequence-primitive catalog: {id -> (seq_predicate(calls)->bool, stop_text, retry_hint)} --
@@ -906,7 +875,7 @@ def _most_recent_completed_bash_call(history) -> Optional[tuple]:
     or nothing at all). Failed terminals classify their real top-level error text.
 
     Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
-    step, shared with `canonTimeoutRecur._decode_row`. Sharing it is what keeps this predicate
+    step, shared with `_canonAtoms._decode_row`. Sharing it is what keeps this predicate
     and its sibling gate (canon.timeout/canon.recur) reading the SAME rows from the same table
     for the same concept -- including rows whose event type lives only on the WRAPPER column."""
     rows = list(history or ())
