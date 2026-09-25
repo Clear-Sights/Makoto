@@ -1555,6 +1555,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.unclaimed_unit",       # H6
                           "gate.pasted_fix",           # H3 (and F2)
                           "gate.undeclared_falsifiable",  # B32/C2: catalog-completeness auditor
+                          "gate.unworded_close",       # G1, opt-in words_file
+                          "gate.unrun_count_claim",    # C11: a counted all-pass with no run
                           "gate.unpaid_acceptance"}    # PROPOSED-REGISTER-ROWS.md I3's runner,
                                                # opt-in (makoto.toml `dispatch = true`)
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
@@ -2315,3 +2317,30 @@ def test_pre_obligation_guard_older_than_the_history_window_still_pays(tmp_path)
     conn.commit(); conn.close()
     rc, out = _run_dispatch(state_dir, _pre(tmp_path, "old", "Task", prompt="go", description="x"))
     assert "gate.unprobed_fanout" not in out
+
+
+def test_dispatch_unworded_close_gate_blocks_a_close_citing_no_owner_row(tmp_path):
+    """gate.unworded_close (opt-in words_file): a close that cites no row of the owner's words
+    file blocks; citing `WORDS.tsv:<line>` discharges it."""
+    state_dir = _setup_state(tmp_path)
+    (tmp_path / "makoto.toml").write_text('words_file = "WORDS.tsv"\n')
+    (tmp_path / "WORDS.tsv").write_text("id\twords\nW1\tbuild the index\n")
+    stop = {"hook_event_name": "Stop", "session_id": "worded", "cwd": str(tmp_path),
+            "last_assistant_message": "Closed: the index is done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unworded_close" in decision["reason"]
+    rc, out = _run_dispatch(state_dir, dict(stop, last_assistant_message="Closed WORDS.tsv:2: the index is built."))
+    assert "gate.unworded_close" not in (out or "")
+
+
+def test_dispatch_unrun_count_claim_gate_blocks_a_count_with_no_run(tmp_path):
+    """gate.unrun_count_claim: a counted all-pass in the reply with no verifier run blocks."""
+    state_dir = _setup_state(tmp_path)
+    stop = {"hook_event_name": "Stop", "session_id": "unrun", "cwd": str(tmp_path),
+            "last_assistant_message": "All 602 checks pass."}
+    rc, out = _run_dispatch(state_dir, stop)
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unrun_count_claim: the reply says" in decision["reason"]

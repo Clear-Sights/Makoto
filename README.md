@@ -27,11 +27,11 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **30 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **14**, `event`: **7**, `gate`: **9**
-- **24 Stop checks** (all checks registered at the Stop edge)
-- **24 end-of-turn gates** (every Stop check reaches the decision)
-- **24 blocking end-of-turn gates** (`posture == BLOCK`)
+- **32 pre-checks**
+- Pre-check ids grouped by dotted prefix — `content`: **15**, `event`: **8**, `gate`: **9**
+- **26 Stop checks** (all checks registered at the Stop edge)
+- **26 end-of-turn gates** (every Stop check reaches the decision)
+- **26 blocking end-of-turn gates** (`posture == BLOCK`)
 - **0 advisory end-of-turn gates** (`posture == ADVISE`)
 
 <!-- END GENERATED: check-counts -->
@@ -70,6 +70,8 @@ edge, so no check is counted twice within a line.
 - `content.last_wins` a dict or JSON object repeats a key with a different value, so the last one silently wins
 - `content.bound_as_count` a test asserts a count under a literal ceiling instead of its exact value
 - `content.loosened_after_red` a test assertion loosened while that test's recorded run is red
+- `content.fallthrough_match` a `match` introduced with no raising `case _:`
+- `event.regime_unnamed` (opt-in `require_regime`) code removed on a measured verdict with no `regime:` field
 - `event.repeated_append` a succeeded `>>` append rerun with nothing touching its target since (duplicate rows)
 - `event.owner_path` a delete, overwrite or cut of a path `makoto.toml` declares as the owner's (`owner_paths`)
 
@@ -119,10 +121,14 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.undischarged_waiver` | a checker-silencing directive introduced with no checkable end named beside it | blocking (pre-tool deny) | new |
 | `gate.unnamed_failure` | a counted failure whose recorded failing identity the turn never names | blocking | new |
 | `gate.unverified_merge` | a merge or push to main/master with no clean verifier report settled before it | blocking (pre-tool deny) | new |
+| `gate.unworded_close` | a close citing no row of the owner's words file (opt-in `words_file`) | blocking | new |
+| `gate.unrun_count_claim` | a counted all-pass stated in the reply with no verifier run in the session | blocking | new |
 | `gate.report_before_run` | a run's success written into prose with no verifier run before it | blocking (pre-tool deny) | new |
 | `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | blocking | new |
 | `gate.pasted_fix` | one repair's text edited into a second file with no verifier run after the first landing | blocking | new |
 | `gate.undeclared_falsifiable` | the checks/ catalog itself has an orphan module or a dangling manifest id | blocking | new |
+
+Four register entries whose witness is a judgement (B7, B10, B21, B34) run as model-judged `type: "prompt"` PreToolUse hooks in `plugin/hooks/hooks.json`, each scoped by `if` to the files the rule can apply to; each fire costs one small-model call (about 1.7k input tokens, measured).
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 

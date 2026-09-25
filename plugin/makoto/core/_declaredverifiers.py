@@ -108,6 +108,16 @@ def owner_paths(root) -> tuple:
 owner_paths.cache_clear = _declaration.cache_clear
 
 
+def declared(root, key: str, default=None):
+    """One value `root`'s `makoto.toml` declares under `key`, or `default`. Fail-open."""
+    if not isinstance(root, str) or not root:
+        return default
+    return _declaration(root).get(key, default)
+
+
+declared.cache_clear = _declaration.cache_clear
+
+
 def declares_anything(root) -> bool:
     """True iff `root` declares at least one verifier.
 

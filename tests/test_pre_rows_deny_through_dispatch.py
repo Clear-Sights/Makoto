@@ -54,6 +54,9 @@ _CASES = {
     "gate.unverified_merge": ([_post("Bash", "Command running in background with ID: b7", command="bash tests/run.sh")],
                               _pre("Bash", command="gh pr merge 47 --merge"), {}),
     "gate.report_before_run": ([], _pre("Write", file_path="HANDOFF.md", content="All 602 checks pass.\n"), {}),
+    "content.fallthrough_match": ([], _pre("Write", file_path="route.py", content=(
+        "def route(ev):\n    match ev:\n        case 'a':\n            return 1\n        case 'b':\n            return 2\n")), {}),
+    "event.regime_unnamed": ([], _pre("Bash", command="git commit -am 'Remove capture_index: no gain on the short-task runs'"), {}),
 }
 
 # the same act with its discharge in place: nothing is denied
@@ -67,9 +70,15 @@ _PASSES = {
                               _pre("Bash", command="gh pr merge 47 --merge")),
     "gate.report_before_run": ([_post("Bash", "602 passed", command="python3 -m pytest -q")],
                                _CASES["gate.report_before_run"][1]),
+    "content.fallthrough_match": ([], _pre("Write", file_path="route.py", content=(
+        "def route(ev):\n    match ev:\n        case 'a':\n            return 1\n        case _:\n"
+        "            raise ValueError(ev)\n"))),
+    "event.regime_unnamed": ([], _pre("Bash", command=(
+        "git commit -am 'Remove capture_index: no gain on the short-task runs\n\nregime: short task'"))),
 }
 
-_FILES = {"makoto.toml": 'owner_paths = ["config.env", ".claude/"]\n', "config.env": "X=1\n"}
+_FILES = {"makoto.toml": 'owner_paths = ["config.env", ".claude/"]\nrequire_regime = true\n'
+                          'words_file = "VERIFY/WORDS.tsv"\n', "config.env": "X=1\n"}
 
 
 @pytest.mark.parametrize("row", sorted(_CASES))
@@ -100,3 +109,50 @@ def test_pre_row_allows_its_discharged_twin(tmp_path, row):
         _run_dispatch(state_dir, dict(ev, session_id="s", cwd=str(tmp_path)))
     rc, out = _run_dispatch(state_dir, dict(act, session_id="s", cwd=str(tmp_path)))
     assert row not in (out or ""), f"{row}: denied its discharged twin: {out}"
+
+
+def _stop(tmp_path, history, text, transcript=None):
+    state_dir = _setup_state(tmp_path)
+    for name, body in _FILES.items():
+        (tmp_path / name).write_text(body)
+    (tmp_path / "VERIFY").mkdir(exist_ok=True)
+    (tmp_path / "VERIFY" / "WORDS.tsv").write_text("id\twords\nW1\tBuild the code index for short sessions.\n")
+    for ev in history:
+        _run_dispatch(state_dir, dict(ev, session_id="s", cwd=str(tmp_path)))
+    rc, out = _run_dispatch(state_dir, {"hook_event_name": "Stop", "session_id": "s", "cwd": str(tmp_path),
+                                        "last_assistant_message": text})
+    return json.loads(out) if out else {}
+
+
+def test_unworded_close_blocks_a_close_citing_no_owner_row(tmp_path):
+    d = _stop(tmp_path, [], "Closed: the owner wanted an index of the code, and that is done.")
+    assert d.get("decision") == "block" and "gate.unworded_close: the reply closes" in d["reason"]
+
+
+def test_unworded_close_passes_a_close_citing_its_row(tmp_path):
+    d = _stop(tmp_path, [], "Closed WORDS.tsv:2 (W1): the index is built.")
+    assert "gate.unworded_close" not in json.dumps(d)
+
+
+def test_unrun_count_claim_blocks_a_count_with_no_run(tmp_path):
+    d = _stop(tmp_path, [], "All 602 checks pass.")
+    assert d.get("decision") == "block" and "gate.unrun_count_claim: the reply says" in d["reason"]
+
+
+def test_unrun_count_claim_passes_after_a_run(tmp_path):
+    d = _stop(tmp_path, [_post("Bash", "1 failed, 601 passed", 1, command="python3 -m pytest -q")],
+              "All 602 checks pass.")
+    assert "gate.unrun_count_claim" not in json.dumps(d)
+
+
+def test_owner_path_reads_the_owners_own_words(tmp_path):
+    tp = tmp_path / "t.jsonl"
+    tp.write_text(json.dumps({"type": "user", "timestamp": "2026-09-25T00:00:00Z",
+                              "message": {"role": "user", "content": "zero.py must carry intact; do not cut it."}}) + "\n")
+    state_dir = _setup_state(tmp_path)
+    act = _pre("Edit", file_path="zero/zero.py", old_string="def wave(x):\n    return x + 1\n", new_string="")
+    rc, out = _run_dispatch(state_dir, dict(act, session_id="s", cwd=str(tmp_path), transcript_path=str(tp)))
+    assert out and "event.owner_path" in json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+    keep = _pre("Edit", file_path="zero/zero.py", old_string="x", new_string="x\ny")
+    rc, out = _run_dispatch(state_dir, dict(keep, session_id="s", cwd=str(tmp_path), transcript_path=str(tp)))
+    assert "event.owner_path" not in (out or "")
