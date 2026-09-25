@@ -60,6 +60,14 @@ Event shapes — `makoto-allow` does NOT apply (the evidence is the event itself
 - `event.identical_retry`: a byte-identical Bash retry immediately following that SAME call's DETERMINISTIC failure (a syntax/import/permission/not-found error), with no intervening state change. The proactive twin of `canon.recur` (the stuck-retry canon fingerprint): kills a stuck retry loop at length 1, before the redundant call even runs. Never fires on a transient failure (timeout, connection-refused, 5xx/429) or an ambiguous one: `kit.classify_failure`'s own fail-toward-uncertain contract.
 - `event.unbriefed_dispatch` — an Agent/Task dispatch prompt carries no line-start `READ:`, `WRITE:` and `ACCEPTANCE:` line; opt-in only (`makoto.toml` `dispatch = true`), no `makoto-allow` escape hatch.
 - `event.unpinned_input` — a dispatch `READ:` path names no `@<12+ hex>` content pin, or a long-timeout (`> 120000` ms) Bash call names no pin and verifies none (`sha256sum -c`); opt-in only (`makoto.toml` `dispatch = true`), no `makoto-allow` escape hatch.
+- `gate.unknown_ref_switch` — a `git checkout`/`switch`/`reset --hard <ref>` with no `git branch`/`rev-parse`/`show-ref` earlier in the session; print the refs, then retry.
+- `gate.unprobed_fanout` — a subagent dispatch with no Read, Glob or Grep earlier in the session; read the ground, then retry.
+- `gate.relaunched_unchanged` — a second worker launch with no verifier run anywhere before it; run the target's probe, then retry.
+- `gate.unobserved_destruction` — a destructive command (`rm -rf`, `git reset --hard`, `git clean -f`, force push, ...) with no verifier run earlier in the session; run the relevant test or probe, then retry.
+- `gate.report_before_run` — a Write/Edit putting a run verdict ("all tests pass", `58 passed`) into a prose file before any verifier ran; run it, then write what it printed.
+- `gate.unasked_plan` — `ExitPlanMode` with no `AskUserQuestion` earlier in the session; ask one question, then present the plan.
+- `gate.undischarged_waiver` — a Write/Edit introducing a checker-silencing directive (`noqa`, `type: ignore`, `eslint-disable`, a bare skip, ...) with no checkable end on or above it; name the end (a tracked item, a date, `until ...`) or fix the finding.
+- `gate.plan_item_drift` (end of turn, blocking) reads the plan-item store, not a declared Plan: an open PLAN/TASK-labeled promise sourced from chat prose (`state.plan.source_plan_item_promise`) or from the harness's own `TaskCreate`/`TaskUpdate` calls, recorded via `state.plan.record_plan_item`/`record_task_event` and read back un-windowed by session with `open_plan_items`. Nothing declares a Plan file today; the old JSONL-node mechanism (`gate.stale_establisher`, `gate.contract_order`) was cut 2026-09-24.
 
 End-of-turn gates (`gate.*`) check your closing **claims against the recorded ledger** — they
 have no content line to annotate, so `makoto-allow` does not apply; the discharge is doing (or

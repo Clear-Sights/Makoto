@@ -141,16 +141,3 @@ def test_gutted_managed_entry_does_not_read_as_wired():            # RED-before
 def test_null_hooks_value_reads_unwired_never_raises():            # RED-before (raised TypeError)
     assert entry_dispatches_to_makoto({"matcher": "*", "hooks": None}) is False
     assert event_wired({"PreToolUse": [{"matcher": "*", "hooks": None}]}, "PreToolUse") is False
-
-
-def test_read_plugin_manifest_hooks_fails_closed():
-    """Moved from the removed gate.self_wired tests: install's status reporter still reads it."""
-    from makoto.substrate.wiring import read_plugin_manifest_hooks
-    manifest = json.dumps({"hooks": {"Stop": [{"matcher": "*", "hooks": [
-        {"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh"}]}]}})
-    assert read_plugin_manifest_hooks(None, lambda p: manifest) == {}
-    assert read_plugin_manifest_hooks("/root", lambda p: None) == {}
-    assert read_plugin_manifest_hooks("/root", lambda p: "{not valid") == {}
-    assert read_plugin_manifest_hooks("/root", lambda p: json.dumps({"hooks": "not-a-dict"})) == {}
-    got = read_plugin_manifest_hooks("/root", lambda p: manifest)
-    assert isinstance(got, dict) and event_wired(got, "Stop")

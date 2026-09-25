@@ -18,6 +18,7 @@ Tables (all idempotent via IF NOT EXISTS):
   config              — key/value seed (canonical_citations_path + _mtime)
   ledger              — results/touches keyed by normalized location, latest-wins
   plans               — one declared contract Plan per session, latest-wins whole
+  plan_item_commitments — forward promises to plan/task labels, discharged purely textually
 """
 from __future__ import annotations
 import os
@@ -100,6 +101,22 @@ def init_db(state_dir: Path, citations_path: Path) -> None:
                 session_id TEXT PRIMARY KEY,
                 rows       TEXT NOT NULL,
                 ts         TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+            )
+        """)
+        # plan_item_commitments -- a forward promise to a plan/task-labeled item, never a file
+        # path, so filesystem-touch discharge (_discharged reads touched_keys/fs_exists) is
+        # meaningless for it. Discharged purely textually, by a later first-person
+        # completion/retraction statement naming the same label; un-windowed by session,
+        # because a promise does not expire because an hour passed. See state/plan.py.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS plan_item_commitments (
+                commitment_key  TEXT PRIMARY KEY,
+                session_id      TEXT,
+                label           TEXT,
+                description     TEXT,
+                status          TEXT NOT NULL DEFAULT 'open',
+                retract_param   TEXT,
+                ts              TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
             )
         """)
         # Seed the mtime to the "-1" always-stale sentinel, not the file's current mtime.

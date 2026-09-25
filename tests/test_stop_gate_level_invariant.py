@@ -6,8 +6,9 @@ fire_level). That enforcement now lives in `tests/test_pre_tier_block_invariant.
 `registry.load_precheck_catalog()`'s own docstring). Stop gates have no equivalent load-time
 enforcement — a Check's declared `.posture` (BLOCK/ADVISE) is what a gate is SUPPOSED to fire at;
 the level actually lives on the `Finding` each gate's predicate constructs when it fires, and
-nothing at load time stops the two from disagreeing. Since 2026-09-25 every Stop gate is BLOCK:
-the ADVISE rows were promoted (a discharge exists in-turn) or removed (none did).
+nothing at load time stops the two from disagreeing. Since 2026-09-25 every Stop gate is BLOCK
+(`test_no_stop_gate_is_advise`): the ADVISE rows were promoted, moved to the Pre edge as denies,
+or removed.
 
 This test fires EVERY live gate discovered by `_live_gates()` through its real `.run(ctx)`
 entry point — the exact call `run_stop_checks` makes — with a scenario proven (via each gate's own
@@ -25,10 +26,19 @@ from makoto.registry import POSTURE_ADVISE, POSTURE_BLOCK, load_checks
 from makoto.context import GateContext
 
 
-def _live_gates() -> list:
-    """Every check discovered at the Stop edge -- all of them reach the decision pipeline."""
-    return load_checks(edge="Stop")
+# gate.undeclared_falsifiable is structurally unlike every other gate here: its `run` ignores
+# the GateContext entirely and audits the REAL checks/ package on disk (orphan modules / dangling
+# manifest ids), so there is no synthetic ctx that can make it fire without actually planting an
+# orphan file into the live package -- which would corrupt the catalog for every other test in
+# this process. Its Finding shape and level ("error", pinned) are already covered directly by
+# tests/test_undeclared_falsifiable.py, so it is excluded from this module's scenario-driven scan.
+_SELF_AUDIT_GATES = frozenset({"gate.undeclared_falsifiable"})
 
+
+def _live_gates() -> list:
+    """Every check discovered at the Stop edge, minus the self-audit gate (see
+    `_SELF_AUDIT_GATES`) -- all of them reach the decision pipeline now."""
+    return [c for c in load_checks(edge="Stop") if c.id not in _SELF_AUDIT_GATES]
 
 def _ctx(**over):
     base = dict(text="", touched=frozenset(), empty=frozenset(), testrun_output="",
@@ -111,6 +121,20 @@ def _scenario_canon_fingerprints(tmp_path):
     return _ctx(history=[row])
 
 
+def _scenario_self_wired(tmp_path):
+    # fires: tests/test_self_wired_check.py (partial strip: Stop entry missing)
+    wired = json.dumps({"hooks": {
+        "PreToolUse": [{"hooks": [{"command": "python3 -m makoto.dispatch"}]}],
+        "PostToolUse": [{"hooks": [{"command": "python3 -m makoto.dispatch"}]}],
+    }})
+    return _ctx(fs_read=lambda p: wired if p == ".claude/settings.json" else None)
+
+
+def _scenario_plan_item_drift(tmp_path):
+    # fires: tests/test_plan_items.py::test_drift_gate_advisory_lists_open_items
+    return _ctx(open_plan_items=[{"commitment_key": "k", "label": "section:9.3", "description": "d"}])
+
+
 def _scenario_claimed_running(tmp_path):
     # fires: tests/test_claimed_running_gate.py::test_fires_when_claim_has_no_grounding_evidence
     return _ctx(text="I started the server. It is now running on port 3000.", history=[])
@@ -152,6 +176,11 @@ def _bash_row(command, stdout="", tool_name="Bash"):
     return {"payload": {"hook_event_name": "PostToolUse", "tool_name": tool_name,
                         "tool_input": {"command": command},
                         "tool_response": {"stdout": stdout, "exitCode": 0}}}
+
+
+def _scenario_unread_structure(tmp_path):
+    # fires: tests/test_obligation_gates.py::test_unread_structure_fires_on_a_null_traversal
+    return _ctx(history=[_bash_row("jq '.a.b' config.json", "null")])
 
 
 def _scenario_unwitnessed_verifier(tmp_path):
@@ -201,9 +230,26 @@ def _scenario_unpaid_acceptance(tmp_path):
                transcript_path=str(transcript), history=[dispatch_row])
 
 
+def _scenario_pasted_fix(tmp_path):
+    # fires: tests/test_pasted_fix.py::test_fires_when_the_same_repair_reaches_a_second_file
+    _REPAIR = ("if timeout is None:\n"
+               "    timeout = DEFAULT_TIMEOUT\n"
+               "if timeout < 0:\n"
+               "    raise ValueError(timeout)\n")
+
+    def row(path):
+        return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Edit",
+                            "tool_input": {"file_path": path, "old_string": "pass",
+                                           "new_string": _REPAIR},
+                            "tool_response": {}}}
+    return _ctx(history=[row("src/reader.py"), row("src/writer.py")])
+
+
 _SCENARIOS = {
     "gate.unclaimed_unit": _scenario_unclaimed_unit,
+    "gate.pasted_fix": _scenario_pasted_fix,
     "gate.unnamed_failure": _scenario_unnamed_failure,
+    "gate.unread_structure": _scenario_unread_structure,
     "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,
     "gate.run_promised": _scenario_run_promised,
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
@@ -218,6 +264,8 @@ _SCENARIOS = {
     "gate.hollow_test": _scenario_hollow_test,
     "gate.canon": _scenario_canon,
     "gate.canon_fingerprints": _scenario_canon_fingerprints,
+    "gate.self_wired": _scenario_self_wired,
+    "gate.plan_item_drift": _scenario_plan_item_drift,
     "gate.claimed_running": _scenario_claimed_running,
     "gate.claimed_shipped": _scenario_claimed_shipped,
     "gate.unpaid_acceptance": _scenario_unpaid_acceptance,
@@ -238,7 +286,8 @@ def _findings_for(gate, tmp_path):
 def test_every_history_eating_gate_fails_open_on_malformed_rows():
     """ONE home for what four new test modules were each restating in 2026-09-18.
 
-    `gate.unnamed_failure`, `gate.unclaimed_unit` and two since-removed rows each shipped a `test_an_undecodable_row_...` asserting the same thing
+    `gate.undischarged_waiver`, `gate.unnamed_failure`, `gate.report_before_run` and
+    `gate.unclaimed_unit` each shipped a `test_an_undecodable_row_...` asserting the same thing
     about its own gate. The claim is not per-gate -- a malformed event is no evidence for ANY of
     them, and a raise here is a check-evaluation fault that fails the call open without being
     checked (dispatch records it in dispatch_errors.jsonl). So it is asserted over the whole set,
@@ -321,7 +370,7 @@ def test_TEETH_allowlist_check_catches_an_unnamed_advisory_gate():
 
 
 def test_no_stop_gate_is_advise():
-    """Makoto blocks or stays silent at the Stop edge: a warning there has no discharge the agent
-    can perform, so it only re-bounces. A new ADVISE Stop row reddens here."""
-    advise = sorted(g.id for g in _live_gates() if g.posture != POSTURE_BLOCK)
+    """Makoto blocks or stays silent: a Stop-edge warning has no discharge, it only re-bounces.
+    A new ADVISE Stop row reddens here (the self-audit gate included)."""
+    advise = sorted(g.id for g in load_checks(edge="Stop") if g.posture != POSTURE_BLOCK)
     assert not advise, advise

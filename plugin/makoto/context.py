@@ -53,6 +53,9 @@ class GateContext:
     state_root: Optional[object] = None     # the resolved state dir (Path), threaded through so
     #   the fingerprint window can read the audit chain at the SAME root the dispatcher itself
     #   uses (never guessed via env-var fallback) -- same explicit-root discipline as audit.py.
+    open_plan_items: Sequence = ()          # session/planItems.py's still-open label-shaped
+    #   commitments ("§9.3", "Task #19"), synced once by run_stop_checks. Read by
+    #   planItemDrift.py's ADVISORY-only reminder.
     history_all_agents: Sequence = ()       # the SAME _select_recent time-windowed slice as
     #   `history`, but NOT narrowed by _history_for_agent's thread-boundary firewall -- every
     #   agent's PostToolUse rows pooled. Exists for completed cross-agent evidence used by
@@ -138,6 +141,12 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         from makoto.state import ledger as _ledger
         touched = _ledger.touched_keys(conn, sid)
         empty = _ledger.empty_write_keys(conn, sid)          # §7.1 content-depth signal
+        from makoto.state import plan as _plan
+        try:
+            _plan.sync_plan_items(conn, sid, text)           # source/discharge label-shaped commitments
+            open_plan_items = _plan.open_plan_items(conn, sid)
+        except Exception:
+            open_plan_items = []                             # fail-open per-store, like every other read above
 
         # cwd-first, and on a miss resolve against git work-trees this session synced
         # (checks/_worldpaths.py) — a file produced remotely over ssh and landed here via
@@ -198,7 +207,9 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             return None
 
         # Build the Stop substrate ONCE, then evaluate every live CHECK discovered for the Stop
-        # edge via checks._loader.load_checks. Each gate module owns its own adapter (GateContext -> the
+        # edge via checks._loader.load_checks -- this includes gate.undeclared_falsifiable, an
+        # ADVISE-posture check that ignores this GateContext entirely and audits the checks/
+        # package on disk instead. Each gate module owns its own adapter (GateContext -> the
         # gate's heterogeneous signature), so this loop never names a gate. gate.dropped resolves
         # against the agent's OWN ledger (touched_keys) + cwd-relative fs_exists/fs_read via
         # ctx.roots=[cwd] — NOT an unbounded os.walk (a Stop-hot-path landmine).
@@ -217,6 +228,7 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
             agent_type=payload.get("agent_type"),
             session_id=sid, transcript_path=payload.get("transcript_path"),
             state_root=root,   # canonFingerprints.py reads its audit firing boundary here
+            open_plan_items=open_plan_items,   # planItemDrift.py's ADVISORY-only reminder
             stop_hook_active=payload.get("stop_hook_active") is True,
         )
         out = []

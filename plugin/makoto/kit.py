@@ -717,6 +717,108 @@ def dispatch_brief_lines(prompt: str) -> dict:
     return out
 
 
+def command_matches(rx: re.Pattern):
+    """An act/guard predicate for `unmet_obligation_gate`: this event's Bash command matches `rx`.
+
+    Shared to avoid duplicate copies across the obligation gates. A gate that needs more than
+    "the command matches" still writes its own predicate (`unreadStructure` reads the RESPONSE
+    too, `unobservedDestruction` splits shell segments).
+    """
+    def _predicate(ev: dict) -> bool:
+        cmd = command_of(ev)
+        return bool(cmd and rx.search(cmd))
+    return _predicate
+
+
+# A verifier RAN in this event, whatever it reported. ONE definition, shared by every obligation
+# whose guard is "something observed behaviour": `gate.unobserved_destruction` and
+# `gate.relaunched_unchanged` both mean exactly this. The verdict is deliberately not read: a
+# report either way is the observation, and only the absence of both leaves the act resting on
+# nothing. Spelled as a `command_matches` application rather than its own def, because a def
+# with that body would be alpha-equivalent to the factory's.
+ran_a_verifier = command_matches(_TEST_RUNNER_RX)
+
+
+_SETTLED = ("PostToolUse", "PostToolUseFailure")
+
+
+def _session_rows(conn, session_id, history):
+    """Every row of this session the store still holds, oldest first -- not `_select_recent`'s
+    1-hour window.
+
+    An obligation's guard pays for the rest of the session, so a guard older than the window
+    still paid: measured 2026-09-25, gate.unprobed_fanout denied a dispatch whose Reads were an
+    hour back. NAMED BOUND: the store itself prunes rows past MAKOTO_EVENT_RETENTION_HOURS (1.5 h
+    by default), so a guard older than that is still unseen. Falls back to `history` when there
+    is no store to read (tests, a store fault)."""
+    if conn is None or not session_id:
+        return history or ()
+    try:
+        return conn.execute("SELECT id, ts, event_type, cwd, payload FROM events "
+                            "WHERE session_id = ? ORDER BY id", [session_id]).fetchall()
+    except Exception:
+        return history or ()
+
+
+def unmet_obligation_gate(*, act, guard, message, retry_hint,
+                          min_acts=1) -> Callable[..., Optional[Finding]]:
+    """Build a Pre-edge OBLIGATION deny: this call is a costly act and no qualifying guard ran
+    earlier in the session.
+
+    Every other check holds the assistant's STATEMENT against the record. An obligation holds an
+    ACT against a guard that had to come first, so it is decided where the act is about to run:
+    the deny's discharge is to run the guard and retry, which a Stop-edge reading of the same
+    order could never offer (the act had already run).
+
+    `act` and `guard` are predicates over ONE decoded event dict. Only SETTLED rows of history
+    (PostToolUse / PostToolUseFailure) count as a guard or as an earlier act: a PreToolUse row is
+    a call that may never have landed, and counting it twice made one launch read as two.
+    `min_acts` fires only from the Nth unguarded act onward (the current call included), for a
+    clause whose costly thing is the REPEAT. A guard pays every later act in the session.
+    """
+    def _obligation(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+        if not act(current_event):
+            return None
+        rows = _session_rows(conn, current_event.get("session_id", ""), history)
+        # fail open: an undecodable row could be the guard, so it is skipped, never an act
+        events = [ev for ev in map(decode_history_event, rows) if isinstance(ev, dict)
+                  and ev.get("hook_event_name") in _SETTLED] + [current_event]
+        unpaid = [ev for ev, _ in unwitnessed(
+            events, owes=lambda ev: (ev,) if act(ev) else (),
+            pays=lambda ev: (lambda _s: True) if ev is not current_event and guard(ev) else None)]
+        if len(unpaid) < min_acts or unpaid[-1] is not current_event:
+            return None
+        return Finding(
+            pattern_id=pattern.id, file="", line=0, level="error",
+            message=message, retry_hint=retry_hint,
+            snippet=str(current_event.get("tool_name", ""))[:200],
+        )
+    return _obligation
+
+
+def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Finding]]:
+    """Build a Stop check whose live query result is itself the evidence."""
+    input_name = query.__code__.co_varnames[0] if query.__code__.co_argcount else ""
+    if input_name == "plan":
+        def _check(c):
+            result = query(c.plan)
+            if result is None or isinstance(result, Finding):
+                return result
+            return Finding(pattern_id=posture_label, file="", line=0, level="error",
+                           message=f"{posture_label}: {result}")
+    elif input_name == "fs_read":
+        def _check(c):
+            result = query(c.fs_read)
+            if result is None or isinstance(result, Finding):
+                return result
+            return Finding(pattern_id=posture_label, file="", line=0, level="error",
+                           message=f"{posture_label}: {result}")
+    else:
+        raise TypeError("live query parameter must be named 'plan' or 'fs_read'")
+    _check.__module__ = query.__module__
+    return _check
+
+
 # ---- transient-vs-deterministic failure classification -------------------------------------------
 # A BLOCK-tier check denying a retry must never deny a LEGITIMATE re-poll of a transient failure
 # (a timeout, a 5xx, "still running"), so this classifier is conservative -- it fails toward

@@ -784,6 +784,10 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         sid = payload.get("session_id", "")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
+        # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
+        if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
+            from makoto.state import plan as _plan_items
+            _plan_items.record_task_event(conn, sid, payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)

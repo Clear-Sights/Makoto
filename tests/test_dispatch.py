@@ -1284,6 +1284,30 @@ def test_dispatch_stale_pass_gate_blocks_through_subagent_stop(tmp_path):
     assert "tests/t.py::test_red" in decision["reason"]
 
 
+def test_dispatch_self_wired_gate_blocks_through_subagent_stop(tmp_path):
+    """SubagentStop mirror of test_dispatch_self_wired_gate_blocks_when_it_fires: the
+    advisory-only exception (DESIGN DECISION, 2026-07-05) must never block through SubagentStop
+    either — fires (audited) but never turns into a block decision, matching the Stop-event pin."""
+    state_dir = _setup_state(tmp_path)
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text(json.dumps({"hooks": {
+        "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        # Stop entry deliberately absent -> a partial strip -> gate.self_wired fires, advisory only.
+    }}))
+    subagent_stop = {"hook_event_name": "SubagentStop", "session_id": "sw_sub", "cwd": str(tmp_path),
+                      "last_assistant_message": "Done for now."}
+    rc, out = _run_dispatch(state_dir, subagent_stop)
+    assert out, "gate.self_wired must block the stop when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.self_wired" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.self_wired" in r.get("pattern_fires", []) for r in rows), \
+        "the fire must be audited through SubagentStop too"
+
+
 def test_dispatch_stale_pass_gate_blocks_on_live_lastfailed(tmp_path):
     """Behavioral blocking pin for gate.stale_pass THROUGH the real dispatch. pytest's own
     lastfailed under the Stop payload's cwd names a failing node whose test STILL EXISTS, and the
@@ -1341,15 +1365,84 @@ def test_dispatch_unpaid_acceptance_gate_blocks_when_acceptance_never_ran(tmp_pa
     assert "ACCEPTANCE" in decision["reason"]
 
 
+def test_dispatch_self_wired_gate_blocks_when_it_fires(tmp_path):
+    """Behavioral pin for gate.self_wired's ONE deliberate exception to discovered<=>live<=>blocking
+    (2026-07-05, DESIGN DECISION): it IS discovered (reaching the decision pipeline like every other
+    gate) and its predicate DOES fire on a partial hook-wiring strip, but it ships at
+    level="advisory" (never "error"), so _build_decision's error-only filter must never turn this
+    fire into a block. This is the behavioral counterpart to
+    test_every_blocking_gate_has_a_behavioral_dispatch_block_test's documented exemption for
+    gate.self_wired below (that test cannot require a "...gate_blocks" test for an id that
+    structurally never blocks); this test instead pins the opposite claim end-to-end — fires
+    (audited) AND never blocks — through the real dispatch path."""
+    state_dir = _setup_state(tmp_path)
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text(json.dumps({"hooks": {
+        "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 -m makoto.dispatch"}]}],
+        # Stop entry deliberately absent -> a partial strip -> gate.self_wired fires, advisory only.
+    }}))
+    stop = {"hook_event_name": "Stop", "session_id": "sw", "cwd": str(tmp_path),
+            "last_assistant_message": "Done for now."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out, "gate.self_wired must block the stop when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.self_wired" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.self_wired" in r.get("pattern_fires", []) for r in rows), \
+        "the fire must be audited so a partial strip leaves a forensic trail"
+
+
+def test_dispatch_plan_item_drift_gate_blocks_when_it_fires(tmp_path):
+    """gate.plan_item_drift (F8, BLOCK since 2026-09-25): a plan/task-labeled commitment left open
+    blocks every stop that finds it open, and saying it is done discharges it."""
+    state_dir = _setup_state(tmp_path)
+    first = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
+             "last_assistant_message": "I'll finish §9.3 after this push."}
+    rc, out = _run_dispatch(state_dir, first)
+    assert out, "gate.plan_item_drift must block the stop when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.plan_item_drift" in decision["reason"]
+    second = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
+              "last_assistant_message": "Moving on to other work for now."}
+    rc, out = _run_dispatch(state_dir, second)
+    assert "gate.plan_item_drift" in json.loads(out)["reason"], "still open, still blocks"
+    rc, out = _run_dispatch(state_dir, dict(second, last_assistant_message="I finished §9.3."))
+    assert "gate.plan_item_drift" not in out, "saying it is done discharges it"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert sum("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows) == 2, \
+        "the fire must be audited so it leaves a forensic trail"
+
+
 def _post_bash(tmp_path, session, command, stdout=""):
     return {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
             "tool_name": "Bash", "tool_input": {"command": command},
             "tool_response": {"stdout": stdout, "exitCode": 0}}
 
 
+def test_dispatch_unread_structure_gate_blocks_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.unread_structure (2026-09-18) fires
+    (audited) and blocks (BLOCK since 2026-09-25) when its own condition holds -- a jq traversal that printed `null` with no structure read before it."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_bash(tmp_path, "unread_struct", "jq '.a.b' config.json", "null"))
+    stop = {"hook_event_name": "Stop", "session_id": "unread_struct", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out, "gate.unread_structure must block the stop when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.unread_structure" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.unread_structure" in r.get("pattern_fires", []) for r in rows), \
+        "the fire must be audited so it leaves a forensic trail"
+
+
 def test_dispatch_unwitnessed_verifier_gate_blocks_when_it_fires(tmp_path):
-    """gate.unwitnessed_verifier (promoted to BLOCK 2026-09-25) blocks the stop and is audited when
-    its condition holds -- a first clean verifier run with no red run ever seen."""
+    """Behavioral pin, same shape as gate.self_wired's: gate.unwitnessed_verifier (2026-09-18) fires
+    (audited) and blocks (BLOCK since 2026-09-25) when its own condition holds -- a first clean verifier run with no red run ever seen."""
     state_dir = _setup_state(tmp_path)
     _run_dispatch(state_dir, _post_bash(tmp_path, "unwitnessed", "pytest -q", "58 passed in 2.0s"))
     stop = {"hook_event_name": "Stop", "session_id": "unwitnessed", "cwd": str(tmp_path),
@@ -1365,8 +1458,9 @@ def test_dispatch_unwitnessed_verifier_gate_blocks_when_it_fires(tmp_path):
 
 
 def test_dispatch_unnamed_failure_gate_blocks_when_it_fires(tmp_path):
-    """gate.unnamed_failure (register C12, promoted to BLOCK 2026-09-25) blocks the stop and is
-    audited when a turn counts a failure while the run's own recorded identity goes unnamed."""
+    """Behavioral pin, same shape as gate.self_wired's: gate.unnamed_failure (2026-09-18,
+    register C12) blocks (BLOCK since 2026-09-25) and is audited when its own condition holds -- a turn
+    that counts a failure while the run's own recorded identity goes unnamed."""
     state_dir = _setup_state(tmp_path)
     _run_dispatch(state_dir, _post_bash(
         tmp_path, "unnamed", "python3 -m pytest -q",
@@ -1384,8 +1478,9 @@ def test_dispatch_unnamed_failure_gate_blocks_when_it_fires(tmp_path):
 
 
 def test_dispatch_unclaimed_unit_gate_blocks_when_it_fires(tmp_path):
-    """gate.unclaimed_unit (register H6, promoted to BLOCK 2026-09-25) blocks the stop and is
-    audited when a top-level function is written that nothing reaches and no decorator registered."""
+    """Behavioral pin, same shape as gate.self_wired's: gate.unclaimed_unit (2026-09-18,
+    register H6) blocks (BLOCK since 2026-09-25) and is audited when its own condition holds -- a
+    top-level function written that nothing reaches and no decorator registered."""
     state_dir = _setup_state(tmp_path)
     _run_dispatch(state_dir, {"hook_event_name": "PostToolUse", "session_id": "unclaimed",
                               "cwd": str(tmp_path), "tool_name": "Write",
@@ -1401,6 +1496,33 @@ def test_dispatch_unclaimed_unit_gate_blocks_when_it_fires(tmp_path):
     assert "gate.unclaimed_unit" in decision["reason"]
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert any("gate.unclaimed_unit" in r.get("pattern_fires", []) for r in rows), \
+        "the fire must be audited so it leaves a forensic trail"
+
+
+def test_dispatch_pasted_fix_gate_blocks_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.pasted_fix (2026-09-18, register
+    H3) blocks (BLOCK since 2026-09-25) and is audited when its own condition holds -- one repair's
+    text edited into a second file with no verifier run between the two landings."""
+    state_dir = _setup_state(tmp_path)
+    repair = ("if timeout is None:\n"
+              "    timeout = DEFAULT_TIMEOUT\n"
+              "if timeout < 0:\n"
+              "    raise ValueError(timeout)\n")
+    for path in ("src/reader.py", "src/writer.py"):
+        _run_dispatch(state_dir, {"hook_event_name": "PostToolUse", "session_id": "pasted",
+                                  "cwd": str(tmp_path), "tool_name": "Edit",
+                                  "tool_input": {"file_path": path, "old_string": "pass",
+                                                 "new_string": repair},
+                                  "tool_response": {}})
+    stop = {"hook_event_name": "Stop", "session_id": "pasted", "cwd": str(tmp_path),
+            "last_assistant_message": "Fixed both readers."}
+    rc, out = _run_dispatch(state_dir, stop)
+    assert out, "gate.pasted_fix must block the stop when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.pasted_fix" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.pasted_fix" in r.get("pattern_fires", []) for r in rows), \
         "the fire must be audited so it leaves a forensic trail"
 
 
@@ -1420,14 +1542,19 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.hollow_test",  # HOLLOWED-class detector (SPIRIT.md §4), same split as liveness
                           "gate.canon",        # ported agnostic Stop primitives canon.timeout/canon.recur
                           "gate.canon_fingerprints",            # SPEC-5 Task 9: BLOCK-tier canon fingerprints
+                          "gate.self_wired",   # B1/B26/D9, BLOCK since 2026-09-25
+                          "gate.plan_item_drift",         # F8, BLOCK since 2026-09-25
                           "gate.claimed_running",  # agnostic claim-vs-recorded-Bash-evidence gate (2026-07-23)
                           "gate.claimed_shipped",  # completed remote-mutation claim-vs-record gate
                           "gate.claimed_consent_absent",
                           "gate.unexamined_wall",   # register G5's runner
-                          "gate.unwitnessed_verifier",  # register B4's runner, BLOCK since 2026-09-25
+                          "gate.unread_structure",     # A3: the latest traversal only
+                          "gate.unwitnessed_verifier",  # B4
                           "gate.run_promised",       # C11: a promised run with no Bash since
-                          "gate.unnamed_failure",      # register C12's runner, BLOCK since 2026-09-25
-                          "gate.unclaimed_unit",       # register H6's runner, BLOCK since 2026-09-25
+                          "gate.unnamed_failure",      # C12
+                          "gate.unclaimed_unit",       # H6
+                          "gate.pasted_fix",           # H3 (and F2)
+                          "gate.undeclared_falsifiable",  # B32/C2: catalog-completeness auditor
                           "gate.unpaid_acceptance"}    # PROPOSED-REGISTER-ROWS.md I3's runner,
                                                # opt-in (makoto.toml `dispatch = true`)
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
@@ -1437,6 +1564,33 @@ def test_no_shadow_gate_every_gate_blocks():
     referenced = {name for c in live for name in c.run.__code__.co_names}
     assert "claim_check" not in referenced
     assert "dropped_gate" in referenced       # live -> discovered + reaches the pipeline
+
+
+def test_dispatch_undeclared_falsifiable_gate_blocks_when_it_fires(tmp_path):
+    """Behavioral pin, same shape as gate.self_wired's: gate.undeclared_falsifiable (the
+    catalog-completeness auditor) fires (audited) but never blocks -- it ships at
+    level="advisory" like every other named ADVISE exception here.
+
+    Unlike every other gate, its `run` ignores GateContext and audits the REAL checks/ package
+    on disk, so this plants a genuine orphan module into the real package for the one dispatch
+    call and removes it in `finally`, whatever the outcome."""
+    state_dir = _setup_state(tmp_path)
+    checks_dir = Path(__file__).resolve().parent.parent / "plugin" / "makoto" / "checks"
+    orphan = checks_dir / "zz_test_orphan_probe.py"
+    orphan.write_text("VALUE = 1\n")
+    try:
+        stop = {"hook_event_name": "Stop", "session_id": "uf", "cwd": str(tmp_path),
+                "last_assistant_message": "Done for now."}
+        rc, out = _run_dispatch(state_dir, stop)
+    finally:
+        orphan.unlink(missing_ok=True)
+    assert out, "gate.undeclared_falsifiable must block the stop when it fires"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.undeclared_falsifiable" in decision["reason"]
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert any("gate.undeclared_falsifiable" in r.get("pattern_fires", []) for r in rows), \
+        "the fire must be audited so it leaves a forensic trail"
 
 
 def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
@@ -1449,12 +1603,8 @@ def test_every_blocking_gate_has_a_behavioral_dispatch_block_test():
     follow. A future blocking gate added without one reddens HERE, at landing, instead of leaving
     its real blocking behavior unfalsifiable.
 
-    A gate whose `.posture` is ADVISE (e.g. gate.self_wired, 2026-07-05 DESIGN DECISION) is exempt:
-    it ships at level="advisory", never "error" — it structurally CANNOT cause a block decision, so
-    a "...gate_blocks" test for it would assert something false. Its behavioral pin instead lives in
-    a `..._never_blocks_even_when_it_fires` test (this file), which proves the opposite claim: it
-    fires (audited) and never blocks. Posture is the one source of that split now — no separate
-    hand-maintained exemption list."""
+    Since 2026-09-25 no Stop gate is ADVISE (tests/test_stop_gate_level_invariant.py pins it),
+    so every one needs its block test."""
     from pathlib import Path as _P
     from makoto.registry import POSTURE_ADVISE, load_checks
     stop_checks = load_checks(edge="Stop")
@@ -2083,3 +2233,85 @@ def test_every_stop_gate_finding_reaches_the_decision(monkeypatch, capsys, state
         f"Stop-edge finding must reach it now")
 
 
+
+
+def _pre(tmp_path, sid, tool, **ti):
+    return {"hook_event_name": "PreToolUse", "session_id": sid, "cwd": str(tmp_path),
+            "tool_name": tool, "tool_input": ti}
+
+
+def _settled(tmp_path, sid, tool, stdout="", **ti):
+    return {"hook_event_name": "PostToolUse", "session_id": sid, "cwd": str(tmp_path),
+            "tool_name": tool, "tool_input": ti, "tool_response": {"stdout": stdout, "exitCode": 0}}
+
+
+_H = "#"   # a comment opener, assembled so this file carries no literal directive
+# row id -> (history before the act, the act, the guard that discharges it). Every one of these
+# moved to the Pre edge 2026-09-25: the act is denied before it runs, and running the guard first
+# is the discharge.
+_PRE_OBLIGATIONS = {
+    "gate.unprobed_fanout": ([], ("Task", {"prompt": "refactor the parser", "description": "x"}),
+                             ("Read", {"file_path": "/repo/parser.py"}, "")),
+    "gate.relaunched_unchanged": ([("Read", {"file_path": "/repo/p.py"}, ""),
+                                   ("Task", {"prompt": "fix it", "description": "x"}, "done")],
+                                  ("Task", {"prompt": "fix it", "description": "x"}),
+                                  ("Bash", {"command": "pytest -q"}, "1 failed")),
+    "gate.unknown_ref_switch": ([], ("Bash", {"command": "git checkout feature"}),
+                                ("Bash", {"command": "git branch -a"}, "* main\n  feature")),
+    "gate.unobserved_destruction": ([], ("Bash", {"command": "rm -rf build/"}),
+                                    ("Bash", {"command": "pytest -q"}, "58 passed")),
+    "gate.report_before_run": ([], ("Write", {"file_path": "HANDOFF.md", "content": "The suite passes."}),
+                               ("Bash", {"command": "pytest -q"}, "58 passed")),
+    "gate.unasked_plan": ([], ("ExitPlanMode", {"plan": "step one, step two"}),
+                          ("AskUserQuestion", {"questions": "which target?"}, "main")),
+}
+
+
+@pytest.mark.parametrize("row", sorted(_PRE_OBLIGATIONS))
+def test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs(tmp_path, row):
+    """Catch: the act, with no guard earlier in the session, is denied and names its row.
+    Pass: the same act after the guard settled goes through (that row is silent)."""
+    before, (tool, ti), (gtool, gti, gout) = _PRE_OBLIGATIONS[row]
+    for sid, guarded in (("catch", False), ("pass", True)):
+        (tmp_path / sid).mkdir()
+        state_dir = _setup_state(tmp_path / sid)
+        for btool, bti, bout in before:
+            _run_dispatch(state_dir, _settled(tmp_path, sid, btool, bout, **bti))
+        if guarded:
+            _run_dispatch(state_dir, _settled(tmp_path, sid, gtool, gout, **gti))
+        rc, out = _run_dispatch(state_dir, _pre(tmp_path, sid, tool, **ti))
+        if guarded:
+            assert row not in out, f"{row} still denies after its guard ran: {out}"
+        else:
+            decision = json.loads(out)
+            assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert row in decision["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_dispatch_undischarged_waiver_denies_until_an_end_is_named(tmp_path):
+    """Catch: a Write introducing a silencing directive with no end is denied. Pass: the same
+    directive with a tracked item beside it goes through."""
+    state_dir = _setup_state(tmp_path)
+    rc, out = _run_dispatch(state_dir, _pre(tmp_path, "w", "Write", file_path="src/x.py",
+                                            content=f"x = parse(raw)  {_H} noqa\n"))
+    decision = json.loads(out)
+    assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "gate.undischarged_waiver" in decision["hookSpecificOutput"]["permissionDecisionReason"]
+    rc, out = _run_dispatch(state_dir, _pre(tmp_path, "w", "Write", file_path="src/x.py",
+                                            content=f"x = parse(raw)  {_H} noqa  (until GH-7)\n"))
+    assert "gate.undischarged_waiver" not in out
+
+
+def test_pre_obligation_guard_older_than_the_history_window_still_pays(tmp_path):
+    """gate.unprobed_fanout denied a live dispatch whose Reads were more than an hour back: the
+    guard was read from `_select_recent`'s 1-hour window. It is read from every row the store
+    still holds now (retention, 1.5 h by default, is the remaining named bound)."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _settled(tmp_path, "old", "Read", "", file_path="/repo/p.py"))
+    import sqlite3
+    conn = sqlite3.connect(str(state_dir / "makoto.record.db"))
+    conn.execute("UPDATE events SET ts = strftime('%Y-%m-%dT%H:%M:%fZ','now','-70 minutes') "
+                 "WHERE session_id = 'old'")
+    conn.commit(); conn.close()
+    rc, out = _run_dispatch(state_dir, _pre(tmp_path, "old", "Task", prompt="go", description="x"))
+    assert "gate.unprobed_fanout" not in out
