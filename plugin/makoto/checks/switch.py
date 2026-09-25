@@ -1640,16 +1640,33 @@ def _is_failing_verifier_run(ev: dict) -> bool:
     return bool(_FAILING_REPORT_RX.search(response_text(ev)))
 
 
-unwitnessed_verifier_gate = unmet_obligation_gate(
-    act=_is_clean_verifier_run,
-    guard=_is_failing_verifier_run,
-    pattern_id="gate.unwitnessed_verifier",
-    message=("A verifier reported clean and this session has never seen it report a failure — a "
-             "verifier that cannot fire and a genuinely clean subject print the same word, so "
-             "the clean report is evidence of nothing on its own."),
-    retry_hint=("Plant a fault the verifier must catch and see it fail, or cite an earlier red "
-                "run of the same verifier; then the clean report carries weight."),
-)
+# The witness is a failing run of the SAME verifier, compared by its command line: a red run of
+# another one shows nothing about this one, and measured 2026-09-23 a single red run of any runner
+# paid for every other, so 0 of 20 vacuous checks on the trees were caught. Output-only flags are
+# dropped so `pytest -x` red and `pytest -q` green stay one verifier.
+_VERBOSITY_RX = re.compile(r"\s+(?:-[qvsx]+|--tb=\S+|-p\s+no:cacheprovider|--color=\S+)(?=\s|$)")
+
+
+def _verifier_key(ev: dict) -> str:
+    cmd = "\n".join(ln for ln in command_of(ev).splitlines() if not ln.lstrip().startswith("#"))
+    cmd = re.sub(r"(?:\s*2>&1|\s*\|\s*(?:tail|head)\b[^|]*|\s*>\s*\S+)+\s*$", "", " ".join(cmd.split()))
+    return _VERBOSITY_RX.sub("", cmd)
+
+
+def unwitnessed_verifier_gate(history) -> Optional[Finding]:
+    events = [ev for ev in (decode_history_event(r) for r in history or ()) if isinstance(ev, dict)]
+    for ev, _key in unwitnessed(
+            events, owes=lambda e: (_verifier_key(e),) if _is_clean_verifier_run(e) else (),
+            pays=lambda e: (lambda k, own=_verifier_key(e): k == own)
+            if _is_failing_verifier_run(e) else None):
+        return Finding(
+            pattern_id="gate.unwitnessed_verifier", file="", line=0, level="advisory",
+            message=("A verifier reported clean and this session has never seen it report a failure — a "
+                     "verifier that cannot fire and a genuinely clean subject print the same word, so "
+                     "the clean report is evidence of nothing on its own."),
+            retry_hint=("Plant a fault the verifier must catch and see it fail, or cite an earlier red "
+                        "run of the same verifier; then the clean report carries weight."))
+    return None
 
 
 verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE",
@@ -1810,8 +1827,77 @@ plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE",
                run=lambda c: unasked_plan_gate(c.history))
 
 
+# gate.run_promised -- register entry `C11 REPORT BEFORE DECIDE`, as its second runner.
+# The previous turn said it would run something ("I'll run the tests", "let me rerun all 602")
+# and this thread recorded no Bash call since: the narration of a run stood in for the run.
+# Cut 2026-09-18 (71184a5) because no map row named it; restored with C11 as its home after the
+# f1-f4 probe measured the loss (f2: "I'll run all 602 checks", then no Bash, went from BLOCK to
+# ALLOW). The promise is read from the PRIOR Stop, so a promise made this turn is never checked
+# this turn. Discharge is ANY Bash call after it: mapping "the tests" to one command is guessing.
+_RUN_INTENT_CLAIM_RX = re.compile(
+    r"\b(?:I(?:['’]m|\s+am)\s+(?:going\s+to|about\s+to)|I(?:['’]ll|\s+will)|let\s+me|I\s+plan\s+to)"
+    r"\b(?:\s+(?:just|now|right\s+now|quickly|immediately|also|then))?\s+"
+    r"(?:re-?run|run|launch|spin\s+up|bring\s+up|boot(?:\s+up)?|kick\s+off|fire\s+up|re-?start|"
+    r"deploy|stand\s+up|start\s+(?:up\s+)?the\s+(?:dev\s+)?(?:server|app|service|api|backend|"
+    r"frontend|process|container|daemon|worker|job|bot|site|database|program))\b",
+    re.IGNORECASE)
+# "run X by you" asks approval, "run through X" walks through, "run the numbers" is arithmetic.
+_RUN_INTENT_IDIOM_VETO_RX = re.compile(
+    r"^\s*(?:\w+\s+){0,12}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
+    r"|^\s*through\b|^\s*(?:the\s+|some\s+)?numbers\b", re.IGNORECASE)
+_QUOTED_SPAN_RX = re.compile(r'"[^"\n]*"|\'[^\'\n]*\'')
+_SENTENCE_END_RX = re.compile(r"\?|[.!](?=\s*(?:$|[A-Z]))|\n")
+
+
+def _run_intent_claim(text: str):
+    """The first unquoted, unnegated, non-idiom, non-question run promise in `text`, else None."""
+    spans = _code_spans(text or "") + [m.span() for m in _QUOTED_SPAN_RX.finditer(text or "")]
+    for m in _RUN_INTENT_CLAIM_RX.finditer(text or ""):
+        if any(s <= m.start() < e for s, e in spans) or _NEGATION_RX.search(m.group(0)):
+            continue
+        if _RUN_INTENT_IDIOM_VETO_RX.search(text[m.end():]):
+            continue
+        end = _SENTENCE_END_RX.search(text, m.end())
+        if end is not None and end.group(0) == "?":
+            continue
+        return m
+    return None
+
+
+def run_promised_gate(*, history=()) -> Optional[Finding]:
+    events = [ev for ev in (decode_history_event(r) for r in history or ()) if isinstance(ev, dict)]
+    stops = [i for i, ev in enumerate(events) if ev.get("hook_event_name") in ("Stop", "SubagentStop")]
+    if not stops:
+        return None
+    claim = _run_intent_claim(events[stops[-1]].get("last_assistant_message") or "")
+    if claim is None:
+        return None
+    # This Stop owes the prior turn's promise; a Bash terminal recorded since pays it.
+    now = {"hook_event_name": "Stop"}
+    unpaid = [s for _e, s in unwitnessed(
+        events[stops[-1] + 1:] + [now],
+        owes=lambda ev: (claim.group(0).strip(),) if ev is now else (),
+        pays=lambda ev: (lambda _s: True) if (
+            ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure")
+            and ev.get("tool_name") == "Bash") else None)]
+    if not unpaid:
+        return None
+    return Finding(
+        pattern_id="gate.run_promised", file="", line=0, level="error",
+        message=(f"Last turn promised to run something (\"{unpaid[0]}\") and no Bash call appears "
+                 "in this thread's record since: the narration stood in for the run."),
+        retry_hint="Run it with a real Bash call, or retract the promise before ending the turn.")
+
+
+run_promised_CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="BLOCK",
+               tests="SWITCH",
+               eats=frozenset({"history"}),
+               run=lambda c: run_promised_gate(history=c.history))
+
+
+
 # the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK,)
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {retry_CHECK.id: retry_predicate}

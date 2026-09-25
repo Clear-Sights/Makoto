@@ -215,6 +215,12 @@ def _scenario_unwitnessed_verifier(tmp_path):
     return _ctx(history=[_bash_row("pytest -q", "58 passed in 2.0s")])
 
 
+def _scenario_run_promised(tmp_path):
+    # fires: tests/predicates/test_run_promised.py::test_promise_with_no_run_blocks
+    return _ctx(history=[{"payload": {"hook_event_name": "Stop",
+                                      "last_assistant_message": "I'll run all 602 checks now."}}])
+
+
 def _scenario_unknown_ref_switch(tmp_path):
     # fires: tests/test_obligation_gates.py::test_unknown_ref_switch_fires_on_an_unprinted_ref
     return _ctx(history=[_bash_row("git checkout feature-x")])
@@ -308,6 +314,7 @@ _SCENARIOS = {
     "gate.undischarged_waiver": _scenario_undischarged_waiver,
     "gate.unread_structure": _scenario_unread_structure,
     "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,
+    "gate.run_promised": _scenario_run_promised,
     "gate.unknown_ref_switch": _scenario_unknown_ref_switch,
     "gate.unobserved_destruction": _scenario_unobserved_destruction,
     "gate.relaunched_unchanged": _scenario_relaunched_unchanged,
