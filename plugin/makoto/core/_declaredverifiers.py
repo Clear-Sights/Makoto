@@ -94,6 +94,20 @@ def dispatch_opt_in(root) -> bool:
 dispatch_opt_in.cache_clear = _declaration.cache_clear
 
 
+def owner_paths(root) -> tuple:
+    """The paths `root`'s `makoto.toml` declares as the owner's hands (`owner_paths = [...]`):
+    files and directories the agent must not delete, overwrite or cut. Fail-open: `()`."""
+    if not isinstance(root, str) or not root:
+        return ()
+    listed = _declaration(root).get("owner_paths")
+    if not isinstance(listed, (list, tuple)):
+        return ()
+    return tuple(v.strip() for v in listed if isinstance(v, str) and v.strip())
+
+
+owner_paths.cache_clear = _declaration.cache_clear
+
+
 def declares_anything(root) -> bool:
     """True iff `root` declares at least one verifier.
 

@@ -1684,10 +1684,172 @@ budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
 budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+
+# content.loosened_after_red -- a test's assertion loosened while that test's recorded run is red.
+# Register G1 GOAL SUBSTITUTION (+B24): the check was moved to meet the result instead of the
+# result to meet the check. The witness is the record's own red verdict for the edited file
+# (`kit.current_named_verdicts`, the fold gate.named_test reads) and the edit's own diff: an
+# `==` turned into an inequality, or an inequality's bound moved the lenient way. Discharge: fix
+# the code under test (or make the run green) before touching the assertion.
+import json
+
+from makoto.kit import current_named_verdicts, decode_history_event
+
+_LOOSE_TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
+_ASSERT_CMP_RX = re.compile(r"^(?P<lead>\s*assert\b.*?)(?P<op>==|<=|>=|<|>)\s*(?P<num>-?\d+(?:\.\d+)?)\s*$")
+
+
+def _loosened(old: str, new: str) -> Optional[str]:
+    """The first assert line of `old` that `new` carries in a looser form, else None."""
+    olds = [m for m in map(_ASSERT_CMP_RX.match, (old or "").splitlines()) if m]
+    for n in filter(None, map(_ASSERT_CMP_RX.match, (new or "").splitlines())):
+        for o in olds:
+            if " ".join(o["lead"].split()) != " ".join(n["lead"].split()):
+                continue
+            a, b = float(o["num"]), float(n["num"])
+            if o["op"] == "==" and n["op"] != "==":
+                return n.group(0).strip()
+            if o["op"] == n["op"] and ((n["op"] in ("<", "<=") and b > a) or (n["op"] in (">", ">=") and b < a)):
+                return n.group(0).strip()
+    return None
+
+
+def loosened_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse" or current_event.get("tool_name") not in ("Edit", "MultiEdit"):
+        return None
+    ti = current_event.get("tool_input") or {}
+    fp = str(ti.get("file_path", "")) if isinstance(ti, dict) else ""
+    if not _LOOSE_TARGET_RX.search(fp):
+        return None
+    pairs = [(e.get("old_string", ""), e.get("new_string", "")) for e in ti.get("edits") or ()
+             if isinstance(e, dict)] or [(ti.get("old_string", ""), ti.get("new_string", ""))]
+    line = next(filter(None, (_loosened(o, n) for o, n in pairs)), None)
+    if line is None:
+        return None
+    red = sorted(t for t, v in current_named_verdicts(history).items()
+                 if v == "FAIL" and (fp.endswith(t.split("::")[0]) or t.split("::")[0].endswith(fp)))
+    if not red:
+        return None
+    return Finding(pattern_id=pattern.id, file=fp, line=0, level="error",
+                   message=(f"row {pattern.id} ({pattern.description}): `{line}` while {red[0]} is "
+                            "red on the record -- the check moved to meet the result."),
+                   retry_hint=pattern.retry_hint, snippet=line[:120])
+
+
+loosened_RETRY_HINT = "Fix the code under test until the run is green; loosen an assertion only with the run green and a reason."
+loosened_DESCRIPTION = "a test assertion loosened while that test's recorded run is red"
+loosened_CHECK = _Check(id="content.loosened_after_red", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("assert",), retry_hint=loosened_RETRY_HINT,
+               description=loosened_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
+               tests="SPEC")
+
+
+# event.owner_path -- a delete, overwrite or cut of a path the repository declares as the owner's
+# (`makoto.toml`: `owner_paths = ["config.env", ".claude/", ...]`). Register E12 PRINCIPAL
+# EXCLUDED: the principal's own hands, acted on without him. The witness is the declaration --
+# a statement by the only party that knows, so it may spend a deny; absent it, nothing fires.
+# Discharge: leave the path alone (ask the owner).
+from makoto.core._declaredverifiers import owner_paths
+
+_REMOVERS = frozenset({"rm", "unlink", "shred", "truncate", "mv"})
+
+
+def _owned(target: str, cwd: str, owned: tuple) -> Optional[str]:
+    path = os.path.normpath(os.path.join(cwd, target) if cwd else target)
+    rel = os.path.relpath(path, cwd) if cwd else path
+    rel = rel.replace("\\", "/")
+    for p in owned:
+        q = p.rstrip("/")
+        if rel == q or rel.startswith(q + "/"):
+            return p
+    return None
+
+
+def owner_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    cwd = current_event.get("cwd") or ""
+    owned = owner_paths(cwd)
+    if not owned:
+        return None
+    tool = current_event.get("tool_name", "")
+    ti = current_event.get("tool_input") or {}
+    if not isinstance(ti, dict):
+        return None
+    hit = None
+    if tool == "Bash":
+        for argv, _ in _shell_segments(str(ti.get("command", ""))):
+            argv = [a for a in argv if not _ASSIGNMENT_RX.match(a)]
+            prog = argv[0].rsplit("/", 1)[-1] if argv else ""
+            args = argv[2:] if prog == "git" and argv[1:2] in (["rm"], ["mv"]) else argv[1:] if prog in _REMOVERS else []
+            hit = next(filter(None, (_owned(a, cwd, owned) for a in args if not a.startswith("-"))), None)
+            if hit:
+                break
+    elif tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        p = _owned(str(ti.get("file_path", "")), cwd, owned)
+        pairs = [(e.get("old_string", ""), e.get("new_string", "")) for e in ti.get("edits") or ()
+                 if isinstance(e, dict)] or [(ti.get("old_string", ""), ti.get("new_string", ""))]
+        cut = tool == "Write" or any(set(o.splitlines()) - set(n.splitlines()) for o, n in pairs)
+        hit = p if p and cut else None
+    if not hit:
+        return None
+    return Finding(pattern_id=pattern.id, file=hit, line=0, level="error",
+                   message=f"row {pattern.id} ({pattern.description}): `{hit}` is declared the owner's in makoto.toml",
+                   retry_hint=pattern.retry_hint, snippet=hit[:120])
+
+
+owner_RETRY_HINT = "Leave the owner's path as it is; if it must change, ask the owner to change it."
+owner_DESCRIPTION = "a delete, overwrite or cut of a path makoto.toml declares as the owner's"
+owner_CHECK = _Check(id="event.owner_path", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("rm", "mv", "unlink", "shred", "truncate", "file_path"),
+               retry_hint=owner_RETRY_HINT, description=owner_DESCRIPTION,
+               eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+
+# event.repeated_append -- a command that appends (`>>`) to a file, run again after the same
+# command already succeeded and nothing since touched the target: the rerun appends the same rows
+# a second time. Register A11 REPLAY COUNTED AS NEW. Discharge: overwrite (`>`), dedupe, or skip
+# the rerun.
+_APPEND_RX = re.compile(r">>\s*(\S+)")
+
+
+def repeated_append_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse" or current_event.get("tool_name") != "Bash":
+        return None
+    cmd = str((current_event.get("tool_input") or {}).get("command", "")).strip()
+    m = _APPEND_RX.search(cmd)
+    if not m:
+        return None
+    target = m.group(1).strip("'\"")
+    since = []
+    for row in reversed(history or ()):
+        ev = decode_history_event(row)
+        if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+            continue
+        ti = ev.get("tool_input") or {}
+        if ev.get("tool_name") == "Bash" and str(ti.get("command", "")).strip() == cmd:
+            resp = ev.get("tool_response") or {}
+            if isinstance(resp, dict) and resp.get("exitCode", 0) == 0 and not any(since):
+                return Finding(pattern_id=pattern.id, file=target, line=0, level="error",
+                               message=(f"row {pattern.id} ({pattern.description}): `{cmd[:120]}` already "
+                                        f"appended to {target} and nothing has touched it since"),
+                               retry_hint=pattern.retry_hint, snippet=cmd[:120])
+            return None
+        since.append(target in json.dumps(ti))
+    return None
+
+
+repeated_append_RETRY_HINT = "Overwrite with `>` or dedupe the target instead of appending the same run again."
+repeated_append_DESCRIPTION = "a succeeded append (>>) run again with nothing touching its target since"
+repeated_append_CHECK = _Check(id="event.repeated_append", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=(">>",), retry_hint=repeated_append_RETRY_HINT,
+               description=repeated_append_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
+               tests="SPEC")
+
+_ROWS = (loosened_CHECK, owner_CHECK, repeated_append_CHECK, env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
+_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, loosened_CHECK.id: loosened_predicate, owner_CHECK.id: owner_predicate, repeated_append_CHECK.id: repeated_append_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

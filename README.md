@@ -27,8 +27,8 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **26 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **5**, `gate`: **8**
+- **30 pre-checks**
+- Pre-check ids grouped by dotted prefix — `content`: **14**, `event`: **7**, `gate`: **9**
 - **24 Stop checks** (all checks registered at the Stop edge)
 - **24 end-of-turn gates** (every Stop check reaches the decision)
 - **24 blocking end-of-turn gates** (`posture == BLOCK`)
@@ -69,6 +69,9 @@ edge, so no check is counted twice within a line.
 **Overdefinition** — a claim shaped wider than what was actually measured
 - `content.last_wins` a dict or JSON object repeats a key with a different value, so the last one silently wins
 - `content.bound_as_count` a test asserts a count under a literal ceiling instead of its exact value
+- `content.loosened_after_red` a test assertion loosened while that test's recorded run is red
+- `event.repeated_append` a succeeded `>>` append rerun with nothing touching its target since (duplicate rows)
+- `event.owner_path` a delete, overwrite or cut of a path `makoto.toml` declares as the owner's (`owner_paths`)
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
 
@@ -115,6 +118,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.relaunched_unchanged` | a second worker launch with no verifier report anywhere before it | blocking (pre-tool deny) | new |
 | `gate.undischarged_waiver` | a checker-silencing directive introduced with no checkable end named beside it | blocking (pre-tool deny) | new |
 | `gate.unnamed_failure` | a counted failure whose recorded failing identity the turn never names | blocking | new |
+| `gate.unverified_merge` | a merge or push to main/master with no clean verifier report settled before it | blocking (pre-tool deny) | new |
 | `gate.report_before_run` | a run's success written into prose with no verifier run before it | blocking (pre-tool deny) | new |
 | `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | blocking | new |
 | `gate.pasted_fix` | one repair's text edited into a second file with no verifier run after the first landing | blocking | new |

@@ -1,0 +1,65 @@
+entry	runner_on_main	blocks_after	test	removal_red	status
+A2	content.phantom_citation	content.phantom_citation	tests/predicates/test_makoto_allow_exemption.py::test_1_6_violation_fires_but_makoto_allow_exempts	yes	BLOCKED
+A3	gate.unread_structure	gate.unread_structure	tests/test_dispatch.py::test_dispatch_unread_structure_gate_blocks_when_it_fires	yes	BLOCKED
+A4	content.last_wins	content.last_wins	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.last_wins]	yes	BLOCKED
+A5	gate.canon_fingerprints	gate.canon_fingerprints	tests/test_dispatch.py::test_dispatch_canon_fingerprints_gate_blocks	yes	BLOCKED
+A7	gate.named_test	gate.named_test	tests/test_dispatch.py::test_dispatch_named_test_gate_blocks_after_recorded_named_red	yes	BLOCKED
+A11	gate.canon_fingerprints	gate.canon_fingerprints	tests/test_dispatch.py::test_dispatch_canon_fingerprints_gate_blocks	yes	BLOCKED
+A13	gate.claude_identity	gate.claude_identity	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[gate.claude_identity]	yes	BLOCKED
+B2	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
+B7	tools/merge_pass.py	-	-	-	MISS: a rule written in prose and enforced nowhere is not separable from prose by a record read: deciding a sentence is a rule, and that no check enforces it, is a similarity judgement makoto refuses
+B9	gate.undischarged_waiver	gate.undischarged_waiver	tests/test_dispatch.py::test_dispatch_undischarged_waiver_denies_until_an_end_is_named	yes	BLOCKED
+B23	content.bound_as_count	content.bound_as_count	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.bound_as_count]	yes	BLOCKED
+B35	content.integrity_suppression_flag	content.integrity_suppression_flag	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.integrity_suppression_flag]	yes	BLOCKED
+C2	gate.undeclared_falsifiable	gate.undeclared_falsifiable	tests/test_dispatch.py::test_dispatch_undeclared_falsifiable_gate_blocks_when_it_fires	yes	BLOCKED
+C6	content.verifier_predicate_weakened	content.verifier_predicate_weakened	tests/test_dispatch.py::test_dispatch_loose_comparator_emits_block_json	yes	BLOCKED
+C7	gate.completion	gate.completion	tests/test_dispatch.py::test_dispatch_completion_gate_blocks_by_default	yes	BLOCKED
+C10	gate.claimed_shipped	gate.claimed_shipped	tests/test_dispatch.py::test_dispatch_claimed_shipped_gate_blocks_on_unbacked_remote_claim	yes	BLOCKED
+C12	gate.unnamed_failure	gate.unnamed_failure	tests/test_dispatch.py::test_dispatch_unnamed_failure_gate_blocks_when_it_fires	yes	BLOCKED
+D13	gate.dropped	gate.dropped	tests/test_dispatch.py::test_dispatch_dropped_gate_blocks_by_default	yes	BLOCKED
+E3	content.illusory_authorship_trailer	content.illusory_authorship_trailer	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.illusory_authorship_trailer]	yes	BLOCKED
+E5	event.identical_retry	event.identical_retry	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.identical_retry]	yes	BLOCKED
+E10	event.identical_retry	event.identical_retry	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.identical_retry]	yes	BLOCKED
+E11	event.nested_budget	event.nested_budget	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.nested_budget]	yes	BLOCKED
+E12	content.self_mute_guard	content.self_mute_guard	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.self_mute_guard]	yes	BLOCKED
+E13	gate.relaunched_unchanged	gate.relaunched_unchanged	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.relaunched_unchanged]	yes	BLOCKED
+G2	gate.unasked_plan	gate.unasked_plan	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.unasked_plan]	yes	BLOCKED
+G5	gate.unexamined_wall	gate.unexamined_wall	tests/test_dispatch.py::test_dispatch_unexamined_wall_gate_blocks_when_no_act_followed_the_operator	yes	BLOCKED
+B4	gate.unwitnessed_verifier	gate.unwitnessed_verifier	tests/test_dispatch.py::test_dispatch_unwitnessed_verifier_gate_blocks_when_it_fires	yes	BLOCKED
+B11	gate.unprobed_fanout	gate.unprobed_fanout	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.unprobed_fanout]	yes	BLOCKED
+B26	gate.self_wired	gate.self_wired	tests/test_dispatch.py::test_dispatch_self_wired_gate_blocks_when_it_fires	yes	BLOCKED
+C8	gate.claimed_running	gate.claimed_running	tests/test_dispatch.py::test_dispatch_claimed_running_gate_blocks_after_recorded_failed_launch	yes	BLOCKED
+D1	gate.completion	gate.completion	tests/test_dispatch.py::test_dispatch_completion_gate_blocks_by_default	yes	BLOCKED
+D4	gate.stale_pass	gate.stale_pass	tests/test_dispatch.py::test_dispatch_stale_pass_gate_blocks_on_live_lastfailed	yes	BLOCKED
+D11	event.thrash_revert	event.thrash_revert	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.thrash_revert]	yes	BLOCKED
+D12	gate.unknown_ref_switch	gate.unknown_ref_switch	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.unknown_ref_switch]	yes	BLOCKED
+D14	gate.unobserved_destruction	gate.unobserved_destruction	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.unobserved_destruction]	yes	BLOCKED
+E7	dispatch fail-closed	content.env_gated_audit	tests/test_smoke.py::test_env_gated_audit_is_denied_on_the_wire	yes	BLOCKED
+F2	tests/test_gate_shape.py	gate.pasted_fix	tests/test_dispatch.py::test_dispatch_pasted_fix_gate_blocks_when_it_fires	yes	BLOCKED
+F7	gate.stale_pass	gate.stale_pass	tests/test_dispatch.py::test_dispatch_stale_pass_gate_blocks_on_live_lastfailed	yes	BLOCKED
+F8	gate.plan_item_drift	gate.plan_item_drift	tests/test_dispatch.py::test_dispatch_plan_item_drift_gate_blocks_when_it_fires	yes	BLOCKED
+F14	content.verifier_body_hollowed	content.verifier_body_hollowed	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.verifier_body_hollowed]	yes	BLOCKED
+G1	content.phantom_citation	content.phantom_citation	tests/predicates/test_makoto_allow_exemption.py::test_1_6_violation_fires_but_makoto_allow_exempts	yes	BLOCKED
+B1	gate.self_wired	gate.self_wired	tests/test_dispatch.py::test_dispatch_self_wired_gate_blocks_when_it_fires	yes	BLOCKED
+B5	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
+B10	tests corpus-FP invariant	-	-	-	MISS: a check the agent writes that fires on everything needs its rate on benign input measured; no hook payload carries that rate
+B20	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
+B21	tools/merge_pass.py	-	-	-	MISS: a verdict another condition also produced needs each condition isolated with its own input; the record holds one run, not the counterfactual
+B34	tools/register_map.py	-	-	-	MISS: whether an artifact's own machinery breaks the law it enforces needs the law and the artifact paired; no general record read pairs them
+C3	gate.named_test	gate.named_test	tests/test_dispatch.py::test_dispatch_named_test_gate_blocks_after_recorded_named_red	yes	BLOCKED
+C4	dispatch loud-allow on predicate error	content.verifier_exit_masking	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.verifier_exit_masking]	yes	BLOCKED
+C5	dispatch fail-closed	-	-	-	MISS: a missing branch for a shape nobody fed is invisible until the shape arrives; makoto sees the agent's code, not which shapes it will meet
+C11	gate.report_before_run	gate.report_before_run	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.report_before_run]	yes	BLOCKED
+D9	gate.self_wired	gate.self_wired	tests/test_dispatch.py::test_dispatch_self_wired_gate_blocks_when_it_fires	yes	BLOCKED
+E1	tests/test_stop_gate_level_invariant.py	gate.liveness	tests/test_dispatch.py::test_dispatch_liveness_gate_blocks_on_illusory_code	yes	BLOCKED
+B32	gate.undeclared_falsifiable	gate.undeclared_falsifiable	tests/test_dispatch.py::test_dispatch_undeclared_falsifiable_gate_blocks_when_it_fires	yes	BLOCKED
+F10	gate.canon	gate.canon	tests/test_dispatch.py::test_dispatch_canon_gate_blocks_by_default	yes	BLOCKED
+H1	content.unsourced_webfetch	content.unsourced_webfetch	tests/test_dispatch.py::test_dispatch_unsourced_webfetch_catches_mcp_fetch_tool	yes	BLOCKED
+H2	gate.stale_pass	gate.stale_pass	tests/test_dispatch.py::test_dispatch_stale_pass_gate_blocks_on_live_lastfailed	yes	BLOCKED
+H3	gate.pasted_fix	gate.pasted_fix	tests/test_dispatch.py::test_dispatch_pasted_fix_gate_blocks_when_it_fires	yes	BLOCKED
+H5	audit log	content.fabricated_commit_sha	tests/test_dispatch.py::test_dispatch_select_recent_returns_history_so_history_predicate_fires	yes	BLOCKED
+H6	gate.unclaimed_unit	gate.unclaimed_unit	tests/test_dispatch.py::test_dispatch_unclaimed_unit_gate_blocks_when_it_fires	yes	BLOCKED
+A11+	-	event.repeated_append	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.repeated_append]	yes	ALSO (T mesh case)
+E12+	-	event.owner_path	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.owner_path]	yes	ALSO (T mesh case)
+G1+	-	content.loosened_after_red	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.loosened_after_red]	yes	ALSO (T mesh case)
+C11+	-	gate.unverified_merge	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[gate.unverified_merge]	yes	ALSO (T mesh case)

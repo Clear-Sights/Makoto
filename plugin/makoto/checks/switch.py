@@ -1727,6 +1727,10 @@ from makoto.vocab import _SUCCESS_SUMMARY_RX
 # the docstring's measurement.
 _PROSE_TARGET_RX = re.compile(r"\.(?:md|markdown|rst|txt|adoc|org)$", re.IGNORECASE)
 _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
+# A counted all-pass in prose ("All 602 checks pass"): a count is a measurement, so writing one
+# before anything ran is the same unmeasured claim (register C11 / the claim-without-measurement
+# mistake). whole_suite_pass_claim reads a counted subject as enumerated, so it is named here.
+_COUNTED_PASS_RX = re.compile(r"\ball\s+\d[\d,]*\s+\w+\s+(?:pass(?:ed|es)?|green)\b", re.IGNORECASE)
 
 
 def _reports_a_run_verdict(ev: dict) -> bool:
@@ -1755,7 +1759,7 @@ def _reports_a_run_verdict(ev: dict) -> bool:
         return False
     text = introduced_text(tool, ti)
     return bool(text) and bool(_SUCCESS_SUMMARY_RX.search(text)
-                               or whole_suite_pass_claim(text))
+                               or whole_suite_pass_claim(text) or _COUNTED_PASS_RX.search(text))
 
 
 report_before_run_gate = unmet_obligation_gate(
@@ -1904,13 +1908,44 @@ run_promised_CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="
 
 
 
+# gate.unverified_merge -- a merge into, or a push onto, the default branch with no clean run of a
+# verifier settled before it. Register C11 PREMATURE CLOSURE (+D3): the landing was made before
+# the gate had finished; measured 2026-09 on the Measure-Zero trees, `gh pr merge` ran while
+# `run.sh` was still in the background. The witness is the settled runner report itself
+# (`_is_clean_verifier_run`, the clean reading gate.vacuous_verifier uses); a run still in the
+# background or a red one pays nothing. Discharge: run the gate to a clean report, then land.
+_LANDING_RX = re.compile(
+    r"\bgh\s+pr\s+merge\b|\bgit\s+push\b[^;&|\n]*?\s(?:\S+:)?(?:refs/heads/)?(?:main|master)\b")
+
+
+def _is_landing(ev: dict) -> bool:
+    return bool(_LANDING_RX.search(command_of(ev) or ""))
+
+
+unverified_merge_gate = unmet_obligation_gate(
+    act=_is_landing,
+    guard=_is_clean_verifier_run,
+    message=("a merge or push to the default branch with no clean verifier report settled before it -- "
+             "the landing precedes the gate it depends on."),
+    retry_hint="Run the gate to a clean report (wait for a background run to finish), then merge.",
+)
+
+
+unverified_merge_RETRY_HINT = "Run the gate to a clean report (wait for a background run to finish), then merge."
+unverified_merge_DESCRIPTION = "a merge or push to the default branch before any clean verifier report"
+unverified_merge_CHECK = _Check(id="gate.unverified_merge", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("merge", "push"),
+               retry_hint=unverified_merge_RETRY_HINT, description=unverified_merge_DESCRIPTION,
+               tests="SWITCH", eats=frozenset({"current_event", "history", "pattern", "conn"}))
+
+
 # the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK,)
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {retry_CHECK.id: retry_predicate, relaunch_CHECK.id: relaunched_unchanged_gate,
                destruction_CHECK.id: unobserved_destruction_gate, report_CHECK.id: report_before_run_gate,
-               plan_CHECK.id: unasked_plan_gate}
+               plan_CHECK.id: unasked_plan_gate, unverified_merge_CHECK.id: unverified_merge_gate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):
