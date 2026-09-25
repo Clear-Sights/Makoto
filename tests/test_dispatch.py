@@ -546,6 +546,21 @@ def test_dispatch_green_claim_gate_blocks_after_recorded_red_run(tmp_path):
     assert "test" in decision["reason"].lower()
 
 
+def test_dispatch_run_promised_gate_blocks_after_an_unkept_promise(tmp_path):
+    """A turn that ends promising a run, then a turn that ends with no Bash call recorded between:
+    the second Stop is blocked by gate.run_promised (f2 of the f1-f4 probe)."""
+    state_dir = _setup_state(tmp_path)
+    first = {"hook_event_name": "Stop", "session_id": "rp", "cwd": str(tmp_path),
+             "last_assistant_message": "I'll run all 602 checks now."}
+    _run_dispatch(state_dir, first)
+    second = dict(first, last_assistant_message="Done.")
+    rc, out = _run_dispatch(state_dir, second)
+    assert out, "gate.run_promised must block the Stop after an unkept run promise"
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.run_promised" in decision["reason"]
+
+
 def test_dispatch_green_claim_silent_after_green_run(tmp_path):
     """control: the SAME green claim but the recorded run PASSED -> no contradiction -> no block."""
     state_dir = _setup_state(tmp_path)
@@ -1728,6 +1743,7 @@ def test_no_shadow_gate_every_gate_blocks():
                           # the second obligation batch, same day and same tier
                           "gate.unread_structure",
                           "gate.unwitnessed_verifier",
+                          "gate.run_promised",       # C11: a promised run with no Bash since
                           "gate.unknown_ref_switch",
                           "gate.unobserved_destruction",
                           "gate.relaunched_unchanged",

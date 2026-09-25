@@ -84,6 +84,10 @@ _MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE
 _TEST_RUNNER_RX = re.compile(
     r"\b("
     r"pytest|py\.test|python[0-9.]*\s+-m\s+(?:pytest|unittest)|-m\s+unittest|"
+    # A script kept under a tests/ directory, run by its interpreter: how the trees run their own
+    # checks (`python3 zero/tests/probe.py G`, `bash zero/tests/run.sh`). Without it those runs are
+    # no verifier at all and a vacuous one among them is never asked for a red run (0 of 20).
+    r"(?:python[0-9.]*|bash|sh)\s+(?:\S*/)?tests?/\S+?\.(?:py|sh)|"
     r"nox|tox|"
     r"jest|vitest|mocha|ava|jasmine|"
     r"go\s+test|cargo\s+(?:test|nextest)|"
