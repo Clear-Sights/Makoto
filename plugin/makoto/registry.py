@@ -139,8 +139,7 @@ def _iter_modules(directory: Path):
 def scan(*, package_dir: Optional[Path] = None) -> dict:
     """`{file_stem: CHECK-or-None}` for every candidate file in `package_dir` (defaults to the
     real `checks/` package). `None` means the file failed to produce a valid,
-    loader-discoverable `CHECK` -- an orphan module, in `gate.undeclared_falsifiable`'s
-    vocabulary. Never raises: an import failure is recorded as `None`, not propagated."""
+    loader-discoverable `CHECK` -- an orphan module. Never raises: an import failure is recorded as `None`, not propagated."""
     directory = package_dir or _PACKAGE_DIR
     return {stem: _primary_check(mod) for stem, mod in _iter_modules(directory)}
 

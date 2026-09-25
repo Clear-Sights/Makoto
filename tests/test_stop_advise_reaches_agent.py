@@ -1,5 +1,5 @@
 """Focused pin for the Stop/SubagentStop ADVISE spirit gap: `verdict._STOP_WIRE` used to carry
-only BLOCK, so an ADVISE-tier Stop gate (18 of them — gate.unread_structure, gate.unasked_plan,
+only BLOCK, so an ADVISE-tier Stop gate (18 of them — gate.synthetic_advisory, gate.unasked_plan,
 etc.) fired, was recorded to audit.jsonl, and then rendered `{}` on the wire — invisible to the
 agent inside the turn. Falsifier: python -m pytest tests/test_stop_advise_reaches_agent.py -q
 
@@ -15,7 +15,7 @@ from makoto import dispatch
 from makoto.vocab import Finding
 
 
-def _advise_finding(pattern_id="gate.unread_structure"):
+def _advise_finding(pattern_id="gate.synthetic_advisory"):
     return Finding(pattern_id=pattern_id, file="", line=0, level="advisory",
                    message=f"row {pattern_id}: no prior structure read", source_event_id=1)
 
@@ -34,7 +34,7 @@ def test_stop_advise_with_stop_hook_active_false_yields_block_carrying_row_id(mo
     body = json.loads(out)
     assert body["decision"] == "block"
     assert body["hookEventName"] == "Stop"
-    assert "gate.unread_structure" in body["reason"]
+    assert "gate.synthetic_advisory" in body["reason"]
 
 
 def test_stop_advise_with_stop_hook_active_true_yields_nothing(monkeypatch):

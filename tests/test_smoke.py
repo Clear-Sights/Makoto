@@ -45,8 +45,8 @@ def test_install_wires_hooks_and_records_manifest(tmp_path, monkeypatch):
     from makoto.install import cmd_install
     assert cmd_install() == 0
     settings = json.loads((fake_home / ".claude" / "settings.json").read_text())
-    from makoto.checks.otherPoint import _missing_makoto_events
-    assert _missing_makoto_events(settings.get("hooks", {})) == [], \
+    from makoto.substrate.wiring import event_wired
+    assert all(event_wired(settings.get("hooks", {}), e) for e in ("PreToolUse", "PostToolUse", "Stop")), \
         "install must wire every required event to makoto dispatch"
 
 

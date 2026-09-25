@@ -582,328 +582,6 @@ webfetch_RETRY_HINT = 'Run WebSearch first; only WebFetch URLs that prior search
 webfetch_DESCRIPTION = 'WebFetch URL neither returned by a prior tool_result nor supplied verbatim by the user'
 
 webfetch_CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('http://', 'https://'), retry_hint=webfetch_RETRY_HINT, description=webfetch_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
-# gate.unread_structure -- a traversal of structured data produced `null`, and nothing in this
-# session had looked at the structure first: the positions were assumed to line up rather than
-# read. At the act grain, a `jq` or `python -c` that reads a structured file and prints `null` is
-# the pairing failing IN THIS SESSION, on the record makoto already holds -- the command and what
-# it printed.
-#
-# `null` IS THE SIGNAL, and nothing narrower. A traversal that prints a wrong non-null value is
-# invisible here (it needs the intended value, which is not on any channel makoto reads) and a
-# traversal that prints nothing at all is excluded deliberately: an empty stdout is what a great
-# many correct commands produce. Only a literal JSON `null` as the whole of what was printed
-# counts. That is a named RECALL bound, and it fails quiet.
-#
-# ADVISORY TIER, NEVER BLOCK: a `null` can be the true answer to the question asked, and no
-# corpus-measured false-positive rate exists for the distinction.
-from makoto.kit import unmet_obligation_gate, response_text, command_of
-
-# A structured-data traversal. `jq` is the canonical one; `python -c ... json` and `yq` are the
-# same act under other programs. A closed vocabulary whose miss is a RECALL bound.
-_TRAVERSAL_RX = re.compile(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b")
-# The structure query that pays the obligation: any of the shape-printing jq forms, or a Read of
-# the file.
-_STRUCTURE_RX = re.compile(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
-                           r"\bpaths\b|\bto_entries\b|-e\b)")
-# What a failed traversal prints: a literal null as the WHOLE output -- JSON's `null` (jq/yq) or
-# Python's `None` (the same absent-value token printed by a `python3 -c ...json...` traversal).
-# `.strip()` has already run, so an anchored match is the whole of it.
-_NULL_OUTPUT_RX = re.compile(r"\A(?:null|None)\Z")
-
-
-def _is_null_traversal(ev: dict) -> bool:
-    cmd = command_of(ev)
-    if not cmd or not _TRAVERSAL_RX.search(cmd):
-        return False
-    return bool(_NULL_OUTPUT_RX.match(response_text(ev)))
-
-
-def _is_structure_read(ev: dict) -> bool:
-    if ev.get("tool_name") == "Read":
-        return True
-    cmd = command_of(ev)
-    return bool(cmd and _STRUCTURE_RX.search(cmd))
-
-
-unread_structure_gate = unmet_obligation_gate(
-    act=_is_null_traversal,
-    guard=_is_structure_read,
-    pattern_id="gate.unread_structure",
-    message=("A traversal of structured data printed `null` and nothing in this session looked "
-             "at the structure first — the positions were assumed to line up rather than read."),
-    retry_hint=("Print a non-null datum from the file first (`jq 'keys'`, `jq 'type'`, "
-                "`jq -e 'has(...)'`) or Read it, then re-run the traversal."),
-)
-
-
-structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="ADVISE",
-               tests="LINEAGE",
-               eats=frozenset({"history"}),
-               run=lambda c: unread_structure_gate(c.history))
-
-# ==============================================================================================
-# unknownRefSwitch
-# ==============================================================================================
-# gate.unknown_ref_switch -- HEAD was moved to a ref nothing in this session had printed.
-# Switching a ref is a boundary, and what must survive it (the work in the tree) has to be named
-# before the boundary is crossed: a `git checkout` or `git switch` in the session's own Bash
-# record is a boundary crossed in front of makoto, and whether the ref was ever printed first is
-# two commands on the record.
-#
-# ADVISORY TIER, NEVER BLOCK: a checkout of a branch the agent just created, or one named in the
-# request itself, is legitimately unprinted, and no corpus-measured false-positive rate exists.
-from makoto.kit import unmet_obligation_gate, command_matches
-
-# Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms; `git checkout --`
-# and `git checkout -- <path>` restore a FILE and move nothing, so they are excluded by
-# requiring the argument not to start with a dash. `git reset --hard <ref>` moves HEAD (and the
-# working tree) to a ref the same way; `git reset --hard` with no ref just discards edits in
-# place and names no boundary to cross, so a ref argument is required there too.
-_REF_SWITCH_RX = re.compile(
-    r"\bgit\s+(?:checkout|switch)\s+(?!-)|\bgit\s+reset\s+--hard\s+(?!-)\S")
-# Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
-# switched TO.
-_REF_PRINT_RX = re.compile(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
-
-
-# `kit.command_matches` is the one body for "this event's command matches a regex" -- four
-# copies of it appeared the moment this batch landed and the duplicate-function law caught them.
-_is_ref_switch = command_matches(_REF_SWITCH_RX)
-_is_ref_print = command_matches(_REF_PRINT_RX)
-
-
-unknown_ref_switch_gate = unmet_obligation_gate(
-    act=_is_ref_switch,
-    guard=_is_ref_print,
-    pattern_id="gate.unknown_ref_switch",
-    message=("HEAD was moved to a ref that nothing in this session had printed — switching a ref "
-             "is a boundary, and what has to survive it was never named."),
-    retry_hint=("Print the refs first (`git rev-parse --verify <ref>`, `git branch`, "
-                "`git show-ref`) so the switch is to something known."),
-)
-
-
-ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADVISE",
-               tests="LINEAGE",
-               eats=frozenset({"history"}),
-               run=lambda c: unknown_ref_switch_gate(c.history))
-
-# ==============================================================================================
-# unprobedFanout
-# ==============================================================================================
-# gate.unprobed_fanout -- work was dispatched to a subagent and nothing in this session had read,
-# globbed or grepped first, so the brief was written from assumption: a baseline read of the
-# ground before work is dispatched onto it, entirely on the record makoto already reads (a
-# Task/Agent event, and a Read/Glob/Grep event before it).
-#
-# ADVISORY TIER, NEVER BLOCK. A subagent dispatched for pure exploration legitimately has nothing
-# to read first -- that is the whole point of sending it -- so an unguarded dispatch is a real
-# signal with a real benign class, and no corpus-measured false-positive rate exists for it yet.
-# Promoting it to BLOCK needs a measured FP rate, not a preference.
-from makoto.kit import unmet_obligation_gate
-
-# The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
-# the name this harness reports, and both are accepted by name alone. An MCP tool that dispatches
-# a subagent under a third name (`mcp__subagents__dispatch`) is the same act, recognized by its
-# `prompt` input rather than guessed by name -- the brief a dispatch hands off is the one input
-# common to every dispatch tool, named or not.
-_DISPATCH_TOOLS = frozenset({"Task", "Agent"})
-# The reads that pay the obligation.
-_PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
-
-
-def _is_dispatch(ev: dict) -> bool:
-    name = ev.get("tool_name") or ""
-    if name in _DISPATCH_TOOLS:
-        return True
-    if not name.startswith("mcp__"):
-        return False
-    lname = name.lower()
-    if "agent" not in lname and "dispatch" not in lname:
-        return False
-    return isinstance((ev.get("tool_input") or {}).get("prompt"), str)
-
-
-def _is_probe(ev: dict) -> bool:
-    return ev.get("tool_name") in _PROBE_TOOLS
-
-
-unprobed_fanout_gate = unmet_obligation_gate(
-    act=_is_dispatch,
-    guard=_is_probe,
-    pattern_id="gate.unprobed_fanout",
-    message=("Work was dispatched to a subagent and no Read, Glob or Grep appears earlier in "
-             "this session's recorded events — the brief was written from assumption, and work "
-             "built on an assumed baseline is inherited whole."),
-    retry_hint=("Read, glob or grep the ground before dispatching, so the brief describes what "
-                "is there; or confirm the dispatch was itself the exploration."),
-)
-
-
-fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADVISE",
-               tests="LINEAGE",
-               eats=frozenset({"history"}),
-               run=lambda c: unprobed_fanout_gate(c.history))
-# gate.pasted_fix -- the same repair landed at a second site with nothing run in between, so the
-# second site's correctness was INFERRED from the first rather than checked.
-#
-# THE NAIVE READING IS INDISCRIMINATE. Read as "two or more edits with no verifier run between
-# them", the rule fires on 136 of this tree's own 185 non-merge commits -- 73.5%, simply what
-# writing code looks like.
-#
-# WHAT THE RECORD CAN DECIDE, and the three narrowings, each with the rate it bought over those
-# same 185 commits. A commit stands in for one session's introduced text: it over-counts in one
-# direction (a session may span commits) and under-counts in the other, but it is real text
-# introduced by real sessions on this tree, and it is the only such record there is.
-#
-#   1. THE SAME TEXT, not merely two edits -- a normalized block reaching two DISTINCT files.
-#                                                                         73.5% -> 9.2%
-#   2. A CHANGE TO WHAT EXISTS -- `Edit`/`MultiEdit` only. A fix is edited into a file that is
-#      already there, while a file being WRITTEN carries the house import header; admitting
-#      written files is what puts `from __future__ import annotations` in front of the gate.
-#                                                                          9.2% -> 3.8%
-#   3. SUBSTANCE -- the block must carry a line that is not a comment, an import or a decorator.
-#      A comment quoted at two sites is prose with one home, not a repair whose correctness was
-#      inferred.                                                          3.8% -> 3.2%
-#
-# THE GRAIN IS FOUR SUBSTANTIAL LINES, a measurement rather than a preference: at one line the
-# reading fires on 21.1% of commits (the house predicate header and every parallel call site); at
-# eight it fires on nothing. At four, most of the fires are the fault.
-#
-# NAMED RECALL BOUND: a repair SHORTER than four substantial lines is not a finding -- on this
-# tree's own record a one-line repeat is indistinguishable from convention (21.1% against 3.2%).
-# The bound fails QUIET, the direction an advisory gate should fail.
-#
-# THE DISCHARGE IS THE ORDER, and the order IS the check: a verifier run BETWEEN the two landings
-# pays the obligation; one before the first, or after the second, does not. That is why this gate
-# is NOT written on `kit.unmet_obligation_gate`, whose guard, once seen, pays for the rest of the
-# session. The vocabulary of "a verifier ran" is `kit.ran_a_verifier`, unchanged and unwidened.
-#
-# DISCRIMINANT AGAINST `gate.unwitnessed_verifier`: that gate reads the verifier's REPORT and asks
-# whether this session has ever seen it print a failure, so one clean run with no red anywhere
-# fires it while this gate has no mutation to look at at all. This one reads MUTATIONS and asks
-# only WHERE a run falls between two of them; the report is never consulted, so a session that
-# runs a RED verifier between two identical pastes is silent here and loud there.
-#
-# `event.thrash_revert` is the nearest prose neighbour and the two are never paired: it is a
-# Pre-tier check on a different edge, asking whether a file is being written back to a value it
-# already held -- one file returning to a prior state, against one text reaching a second file.
-#
-# ADVISORY TIER, NEVER BLOCK: the two benign classes measured above are real, common on this very
-# tree, and identical from the record, and no corpus-measured false-positive rate exists.
-from makoto.kit import decode_history_event, introduced_text, ran_a_verifier, unwitnessed
-
-# A fix is a change to what already EXISTS. See narrowing 2 above for the rate this buys.
-_EDIT_TOOLS = frozenset({"Edit", "MultiEdit"})
-# How many contiguous substantial lines make a block. Measured; see above. Not a tunable
-# threshold but the point where the reading stops naming convention and has not yet stopped
-# naming anything.
-_BLOCK_LINES = 4
-# A line carrying no content of its own: closers, separators, a bare marker.
-_TRIVIAL_RX = re.compile(r"^[\s)\]},:;#\"']*$")
-# A line that travels as CONVENTION rather than as a repair: a comment, an import, a decorator,
-# a docstring fence, a markup tag.
-_CONVENTION_RX = re.compile(r"^(#|//|import\s|from\s+\S+\s+import\s|@|\"\"\"|'''|<)")
-
-
-def _kept_lines(text: str) -> list:
-    """`text`'s lines, whitespace-normalized, with the ones carrying nothing dropped.
-
-    THE NORMALIZATION IS LOAD-BEARING: the margin goes and internal runs of whitespace collapse,
-    so a paste that was REINDENTED at its second site is still the same paste. Without it, a fix
-    moved into a deeper block reads as new text and the gate goes quiet on it.
-    """
-    out = []
-    for line in (text or "").splitlines():
-        flat = " ".join(line.split())
-        if flat and not _TRIVIAL_RX.match(flat):
-            out.append(flat)
-    return out
-
-
-def _blocks(lines: list) -> list:
-    """Every contiguous run of `_BLOCK_LINES` kept lines that carries at least one substantial
-    line -- see narrowing 3. A window of nothing but imports, comments and decorators is
-    convention travelling, and convention travels legitimately.
-
-    Each line's substance is decided ONCE, on its own, and the windows then slide a running
-    count over those decisions rather than an `any(...)` re-reading every line of every window
-    (which re-tested each line `_BLOCK_LINES` times); this is O(n) and says per line what it
-    decided.
-    """
-    carries = [0 if _CONVENTION_RX.match(line) else 1 for line in lines]
-    out = []
-    substance = sum(carries[:_BLOCK_LINES])
-    for i in range(len(lines) - _BLOCK_LINES + 1):
-        if i:
-            substance += carries[i + _BLOCK_LINES - 1] - carries[i - 1]
-        if substance:
-            out.append("\n".join(lines[i:i + _BLOCK_LINES]))
-    return out
-
-
-def _second_site_finding(block: str, first_file: str, second_file: str) -> Finding:
-    head = block.split("\n")[0]
-    return Finding(
-        pattern_id="gate.pasted_fix",
-        file=second_file,
-        line=0,
-        level="advisory",
-        message=(
-            f"The same change reached `{second_file}` after `{first_file}` with no verifier run "
-            f"between the two landings, starting `{head}` — so the second site's correctness is "
-            f"drawn from the first rather than checked."
-        ),
-        retry_hint=(
-            "Run the verifier between the two landings, or order the change by dependence and "
-            "make one per pass. A repair that transfers is a claim about the second site, and "
-            "the first site's green is not evidence for it."
-        ),
-        snippet=head[:200],
-    )
-
-
-def pasted_fix_gate(history) -> Optional[Finding]:
-    """Fire iff one block of introduced text reached a SECOND file with no verifier run between
-    the two landings. LINEAGE: the second landing owes a witness -- a verifier run after the first
-    landing -- and only a run at or after that point pays it."""
-    landed = {}
-
-    def owes(item):
-        at, ev = item
-        tool = ev.get("tool_name", "")
-        tool_input = ev.get("tool_input")
-        # A block LANDS (registers as a possible first site) from a Write same as an Edit --
-        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered. Without
-        # this, a fix Written into a brand-new module and then Edited into a second file is
-        # invisible: the Write never enters `landed`, so the Edit is never seen as a second paste.
-        if ev.get("hook_event_name") != "PostToolUse" or tool not in (_EDIT_TOOLS | {"Write"}) \
-                or not isinstance(tool_input, dict):
-            return ()
-        path = str(tool_input.get("file_path", ""))
-        second = []
-        for block in _blocks(_kept_lines(introduced_text(tool, tool_input))):
-            where, first = landed.setdefault(block, (path, at))
-            # Only an Edit/MultiEdit second landing fires (narrowing 2): two Writes sharing a
-            # block is convention (e.g. a house import header), never a repair transfer.
-            if where != path and tool in _EDIT_TOOLS:
-                second.append((block, where, first, path))
-        return second
-
-    def pays(item):
-        at, ev = item
-        return (lambda subject: subject[2] < at) if ran_a_verifier(ev) else None
-
-    events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
-    for _ev, (block, where, _first, path) in unwitnessed(enumerate(events), owes=owes, pays=pays):
-        return _second_site_finding(block, where, path)
-    return None
-
-
-pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="ADVISE",
-               tests="LINEAGE",
-               eats=frozenset({"history"}),
-               run=lambda c: pasted_fix_gate(c.history))
 # gate.unclaimed_unit -- the session added a unit that answers to nothing: a function nobody
 # asked for and nothing reaches is not neutral, it is surface every later reader has to
 # understand, every later change has to keep working, and no requirement protects.
@@ -944,8 +622,8 @@ pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="ADVISE",
 # claim. A session whose only act is writing one unreferenced, undecorated function fires this
 # gate and gives gate.liveness nothing: a `def` is not a dropped pure statement.
 #
-# ADVISORY TIER, NEVER BLOCK: the recall bounds above are the benign cases and they look identical
-# from the record, and no corpus-measured false-positive rate exists.
+# BLOCK TIER: the discharge is in-turn -- point the unit at its claim (call, export, test or
+# decorate it) or delete it. The recall bounds above cost one reference, never a lost change.
 import ast
 
 from makoto.kit import decode_history_event, introduced_text, parse_introduced, unwitnessed
@@ -1038,7 +716,7 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
         pattern_id="gate.unclaimed_unit",
         file=where,
         line=0,
-        level="advisory",
+        level="error",
         message=(
             f"`{name}` was added and answers to nothing on the record{more}: no operator turn "
             f"names it, nothing this session wrote reaches it, and no decorator registered it."
@@ -1071,7 +749,7 @@ def _named_by_operator(name: str, transcript_path) -> bool:
     return any(name in _TOKEN_RX.findall(t or "") for t in turns or ())
 
 
-unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="ADVISE",
+unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="BLOCK",
                tests="LINEAGE",
                eats=frozenset({"history", "transcript_path"}),
                run=lambda c: unclaimed_unit_gate(c.history,
@@ -1125,7 +803,7 @@ unbriefed_CHECK = Check(id='event.unbriefed_dispatch', applies_at="Pre", posture
 
 
 # the LINEAGE shape: its rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (sha_CHECK, interrupt_CHECK, webfetch_CHECK, structure_CHECK, ref_CHECK, fanout_CHECK, pasted_CHECK, unclaimed_CHECK, unbriefed_CHECK,)
+_ROWS = (sha_CHECK, interrupt_CHECK, webfetch_CHECK, unclaimed_CHECK, unbriefed_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {sha_CHECK.id: sha_predicate, interrupt_CHECK.id: interrupt_predicate, webfetch_CHECK.id: webfetch_predicate, unbriefed_CHECK.id: unbriefed_predicate}

@@ -35,8 +35,8 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # This ONE regex is the single source for "is this command makoto's" -- exported for
 # `checks/selfMuteGuard` to import rather than maintain its own copy. A bare `makoto` substring
 # test would (a) match ANY makoto subcommand, letting install/uninstall absorb and delete a
-# user's own makoto-CLI hooks, and (b) let a decoy hook merely NAMING makoto satisfy
-# `gate.self_wired`'s wired-check, suppressing the self-defense gate.
+# user's own makoto-CLI hooks, and (b) let a decoy hook merely NAMING makoto read as wired in
+# `makoto status`.
 # `re.IGNORECASE`: Windows/case-insensitive filesystems can produce either casing for a path
 # makoto itself wrote.
 MAKOTO_INVOCATION_RX = re.compile(
@@ -97,8 +97,8 @@ def event_wired(hooks, event: str) -> bool:
 
 def read_plugin_manifest_hooks(plugin_root, fs_read) -> dict:
     """Best-effort read of <plugin_root>/hooks/hooks.json's own "hooks" dict, or {} on ANY
-    failure. Fails CLOSED toward "confirms nothing" -- {} never suppresses a gate.self_wired
-    finding, only an actually-parsed, actually-declaring manifest can. `plugin_root` should be
+    failure. Fails CLOSED toward "confirms nothing" -- {} never reports an event wired,
+    only an actually-parsed, actually-declaring manifest can. `plugin_root` should be
     the live $CLAUDE_PLUGIN_ROOT, never a guessed/cached path, so an unresolvable root degrades
     to alarm rather than silent-wired."""
     if not plugin_root:

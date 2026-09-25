@@ -561,77 +561,8 @@ mute_RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely nee
 mute_DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
 mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}), tests="SPEC")
-# gate.undeclared_falsifiable -- declared-falsifiability COMPLETENESS.
-#
-# Distinct from Assay, which forces a claim to *be* falsifiable: this audits that every piece
-# claiming falsifiability in `checks/` is actually *declared* -- a manifest-vs-reality auditor
-# over the check catalog itself: does every file in `checks/` register itself where the loader
-# looks, does every ID in the manifest have a corresponding live module, is there an orphan on
-# either side.
-#
-# Predicate-injection style: the pure functions below take their inputs as arguments rather than
-# reaching for global state, so they're exercised with synthetic/tmp_path fixtures without
-# mutating the real `checks/` package.
-#
-# ADVISORY tier only: a catalog-completeness drift is a maintenance signal, not a live integrity
-# violation of anything the agent claimed this turn, so it must never block.
 from pathlib import Path
 
-from makoto.substrate._declared import DECLARED_IDS
-from makoto.registry import Check, discover, scan
-from makoto.registry import POSTURE_ADVISE
-
-
-def orphan_modules(*, package_dir: Optional[Path] = None) -> list[str]:
-    """File stems in checks/ with no `load_checks()`-discoverable CHECK. Sorted for determinism."""
-    return sorted(stem for stem, chk in scan(package_dir=package_dir).items() if chk is None)
-
-
-def orphan_ids(*, package_dir: Optional[Path] = None,
-               declared: Optional[dict] = None) -> list[str]:
-    """IDs in the declared-IDs manifest with no live module backing them. `declared` defaults to
-    the real catalog (test-injectable so a test can plant a dangling ID). Sorted for
-    determinism."""
-    reg = DECLARED_IDS if declared is None else declared
-    live_ids = {chk.id for chk in discover(package_dir=package_dir)}
-    return sorted(pid for pid in reg if pid not in live_ids)
-
-
-def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
-                                declared: Optional[dict] = None) -> Optional[Finding]:
-    """Fires iff the checks/ catalog has an orphan on either side; `None` on a fully consistent
-    catalog. Fail-open by construction: both halves already fail-open internally."""
-    mods = orphan_modules(package_dir=package_dir)
-    ids = orphan_ids(package_dir=package_dir, declared=declared)
-    if not mods and not ids:
-        return None
-    parts = []
-    if mods:
-        parts.append("orphan module(s) on disk with no live CHECK registered: "
-                     + ", ".join(mods))
-    if ids:
-        parts.append("declared ID(s) in the manifest with no live module backing them: "
-                     + ", ".join(ids))
-    return Finding(
-        pattern_id="gate.undeclared_falsifiable",
-        file="makoto/checks/",
-        line=0,
-        level="advisory",
-        message="checks/ catalog completeness drift -- " + "; ".join(parts),
-        retry_hint=("Fix the checks/ catalog: give every on-disk module a valid CHECK "
-                    "(id/applies_at/posture), and either implement or remove every "
-                    "declared-but-missing manifest entry in _declared.py."),
-    )
-
-
-# registered ONE_OFF -- audits registry/loader completeness itself.
-undeclared_CHECK = Check(
-    id="gate.undeclared_falsifiable",
-    applies_at="Stop",
-    posture=POSTURE_ADVISE,
-    tests="SPEC",
-    run=lambda ctx=None: undeclared_falsifiable_gate(),
-)
 # content.verifier_exit_masking — verifier EXIT-CODE masking (a test/build/lint runner's failure
 # hidden).
 #
@@ -993,167 +924,6 @@ masking_RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / a 
 masking_DESCRIPTION = 'verifier exit-code masking (|| true / ; true / masking || branch / trailing pipe / if wrapper / $? dropped / set +e on a test/build/lint runner)'
 
 masking_CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|', ';', 'set +', '$?', 'if ', 'elif '), retry_hint=masking_RETRY_HINT, description=masking_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
-# gate.undischarged_waiver -- a session-introduced directive silences a checker, and nothing on
-# or beside it says when the silence ends. A waiver with a rationale but no end is not a
-# carve-out; it is a permanent hole with a sentence attached.
-#
-# THE PRINCIPLE, WHICH IS ALSO THE NARROWING: a waiver fires only when NOTHING -- neither the
-# instrument nor the text -- can say when it ends. Three forms are excluded by design, because
-# the instrument itself discharges them:
-#
-#   * `@ts-expect-error` -- the compiler errors when the suppressed error disappears.
-#   * `@pytest.mark.xfail` -- the runner reports an XPASS when the test starts passing.
-#   * `@pytest.mark.skipif(<cond>)` -- the condition is re-evaluated on every run.
-#
-# Their undischargeable counterparts (the bare ignore comment, the bare skip mark) do fire.
-#
-# WHAT COUNTS AS NAMING AN END (`_DISCHARGE_RX`, read over the directive's own line and the line
-# directly above it): a tracked item (`#123`, `GH-7`, `ADR-42`, a `PROJ-123` key), a date or month,
-# or an explicit temporal clause (`until ...`, `once ...`, `pending ...`, `remove when ...`,
-# `expires ...`). Scope is one line above plus the directive's own line, not the whole content --
-# whole-content scope is a measured laundering token elsewhere in this package.
-#
-# RECALL BOUNDS, named rather than hidden:
-#   * The discharge vocabulary is deliberately GENEROUS: a directive whose trailing comment
-#     happens to mention a tracked-item-shaped name reads as discharged. A miss here is a silent
-#     gate; a miss there is noise, so this is the accepted direction of the error.
-#   * Only Write/Edit/MultiEdit/NotebookEdit are read. A waiver written through `sed -i` or a
-#     heredoc is not seen. Bash was tried and REFUSED: `introduced_text` hands back the command
-#     verbatim, so a grep FOR a commented lint directive would itself be advised as an
-#     introduction -- a false advisory on looking for waivers is worse than missing one.
-#   * PostToolUse rows only. A PreToolUse row is a call that may never have landed.
-#
-# MAKOTO'S OWN SUITE IS STRICTER THAN THIS GATE: `tests/_skipGuard.py` refuses a skipped test
-# outright, so a bare skip cannot reach this tree at all -- a different subject from advising on
-# the agent's introduced waivers in whatever repository it is working in.
-#
-# SELF-REFERENCE: the comment-opener anchor settles it structurally rather than by an exemption
-# marker: a directive matches only when a comment opener precedes it ON THE SAME LINE, so
-# the bare keywords below -- laid out one per line inside a verbose pattern -- do not match this
-# module's own source. No `makoto-allow:` path exists here and none is wanted: a Stop-tier
-# `GateContext` carries no `conn`, so an exemption could not be recorded, and an unrecorded
-# exemption is the laundering token this package refuses everywhere else.
-#
-# ADVISORY TIER, NEVER BLOCK: a deliberately permanent waiver is real and common (a vendored
-# file's lint exclusion, a directive on a shape the checker gets wrong), and looks identical here.
-from makoto.kit import decode_history_event, introduced_text
-
-# Only the tools that carry introduced FILE content. Bash is deliberately absent -- see the
-# recall bounds above.
-_MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
-
-# A checker-silencing directive, COMMENT-ANCHORED: a comment opener, then the keyword, on one
-# line. The anchor is what keeps this module immune to its own vocabulary and keeps a keyword
-# inside a string literal or an identifier from matching.
-_DIRECTIVE_RX = re.compile(
-    r"""(?x)
-    (?:\#|//|/\*|<!--)          # a comment opener ...
-    [^\n]*?                     # ... then, later on the SAME line,
-    \b(?:
-        noqa
-      | nosec
-      | type:[ \t]*ignore
-      | pylint:[ \t]*disable
-      | pyright:[ \t]*ignore
-      | mypy:[ \t]*disable
-      | pragma:[ \t]*no[ \t]*cover
-      | eslint-disable(?:-next-line|-line)?
-      | ts-ignore
-    )\b
-    """
-)
-# A bare test SKIP decorator: the one skip form the runner cannot discharge. `skipif` fails the
-# trailing `\b` on its own; `xfail` is absent by design.
-_BARE_SKIP_RX = re.compile(r"(?m)^[ \t]*@(?:pytest\.mark\.)?skip\b")
-
-# An end a reader can go and check. Generous on purpose; see the recall bounds above.
-_DISCHARGE_RX = re.compile(
-    r"""(?x)
-      \#\d+                                     # a tracked item: #123
-    | \b(?i:gh|adr)[-\ ]\d+                     # GH-7, ADR 42
-    | \b[A-Z][A-Z0-9]{1,9}-\d+\b                # a PROJ-123 key
-    | \b\d{4}-\d{2}(?:-\d{2})?\b                # 2026-10, 2026-10-01
-    | \b(?i:until|once|pending)\b
-    | \b(?i:(?:remove|drop|delete|restore|re-?enable|revert)\s+(?:this\s+)?when)\b
-    | \b(?i:expir(?:es|y|ation))\b
-    """
-)
-# The rationale's window: the directive's own line plus the one directly above it. NOT the whole
-# content -- whole-content scope is a measured laundering token elsewhere in this package.
-_LOOKBACK = 1
-# How many offenders the one finding NAMES; a presentation bound, not a detection one.
-_NAMED = 3
-
-
-def _undischarged_directives(content: str) -> list:
-    """Every silencing directive in `content` whose window names no checkable end.
-
-    Returns `[(line_no, line_text), ...]`, deduplicated by line so a line carrying two directives
-    is one offence.
-    """
-    if not content:
-        return []
-    lines = content.splitlines()
-    offenders, seen = [], set()
-    for rx in (_DIRECTIVE_RX, _BARE_SKIP_RX):
-        for m in rx.finditer(content):
-            line_no = content.count("\n", 0, m.start()) + 1
-            if line_no in seen:
-                continue
-            window = "\n".join(lines[max(0, line_no - 1 - _LOOKBACK):line_no])
-            if _DISCHARGE_RX.search(window):
-                continue
-            seen.add(line_no)
-            offenders.append((line_no, lines[line_no - 1].strip()))
-    offenders.sort()
-    return offenders
-
-
-def undischarged_waiver_gate(history) -> Optional[Finding]:
-    """Fire iff a settled file mutation this session introduced a silencing directive with no
-    checkable end named on or above it. One finding for the whole turn, naming the offenders."""
-    hits = []
-    for row in history or ():
-        ev = decode_history_event(row)
-        if not isinstance(ev, dict):
-            continue                      # fail open: an undecodable row is no evidence
-        if ev.get("hook_event_name") != "PostToolUse":
-            continue                      # a call that may never have landed introduced nothing
-        tool = ev.get("tool_name", "")
-        if tool not in _MUTATION_TOOLS:
-            continue
-        ti = ev.get("tool_input", {}) or {}
-        fp = ti.get("file_path", "") if isinstance(ti, dict) else ""
-        for _, text in _undischarged_directives(introduced_text(tool, ti)):
-            hits.append((fp, text))
-    if not hits:
-        return None
-    named = "; ".join(f"`{t}`" + (f" in {f}" if f else "") for f, t in hits[:_NAMED])
-    more = f" (+{len(hits) - _NAMED} more)" if len(hits) > _NAMED else ""
-    return Finding(
-        pattern_id="gate.undischarged_waiver",
-        file=hits[0][0],
-        line=0,
-        level="advisory",
-        message=(
-            f"a checker-silencing directive was introduced with no checkable end named on or "
-            f"above it: {named}{more}. An exemption with no end is a permanent hole with a "
-            f"sentence attached."
-        ),
-        retry_hint=(
-            "Name the discharge beside the directive -- a tracked item (#123, ADR-42), a date, "
-            "or a condition (`until ...`, `remove when ...`) -- or use the form the instrument "
-            "itself discharges (@ts-expect-error over @ts-ignore, xfail or skipif over a bare "
-            "skip), or fix the underlying finding instead of silencing it."
-        ),
-        snippet=hits[0][1][:200],
-    )
-
-
-waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Stop", posture="ADVISE",
-               tests="SPEC",
-               eats=frozenset({"history"}),
-               run=lambda c: undischarged_waiver_gate(c.history))
 # gate.claude_identity -- a commit about to be stamped with an identity nobody chose: the
 # container's git layer (an env var or config file) names Claude at the anthropic.com noreply
 # address, and a plain `git commit` takes that setting as if it were who is writing.
@@ -1325,11 +1095,9 @@ identity_CHECK = _Check(id="gate.claude_identity", applies_at="Pre", posture="BL
 # `makoto/substrate/_canonAtoms.py`'s module docstring for the scope-cut and porting-fidelity
 # notes, and its BLOCK_IDS for which fingerprints are blocking-capable by construction.
 #
-# LOADER SHAPE: fingerprints split BLOCK/ADVISE, but the Stop-gate level invariant enforces one
-# gate id -> one fixed Finding.level -- a single mixed-posture module would violate that the
-# moment both tiers fired in the same turn. Resolution: TWO gate modules (this one, BLOCK-only;
-# canonFingerprintsAdvisory below, ADVISE-only), sharing their atom/decode logic via
-# `makoto/substrate/_canonAtoms.py`.
+# BLOCK-only: the fingerprints outside BLOCK_IDS are not run at the Stop edge (their advisory
+# sibling gate.canon_fingerprints_advisory was removed 2026-09-25: it could not block, and a
+# Stop-edge warning with no in-turn discharge is noise).
 from typing import List
 
 
@@ -1372,86 +1140,6 @@ fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOC
                    c.text, c.history, transcript_path=c.transcript_path,
                    session_id=c.session_id, state_root=c.state_root))
 
-# ==============================================================================================
-# canonFingerprintsAdvisory
-# ==============================================================================================
-# gate.canon_fingerprints_advisory -- the ADVISE-tier half of the in-scope canon session
-# fingerprints. See canonFingerprints.py's module comment for the scope-cut and posture-citation
-# trail: these either rest on a soft/claim atom the gold-oracle finding doc's robust core does
-# not name, or are among its explicitly-named worst disqualified fingerprints -- so they stay in
-# the catalog, evaluated and recorded, but NEVER block.
-#
-# Sibling of canonFingerprints.py; see that module's comment for why this is two gate modules
-# instead of one. Its `posture="ADVISE"` below is what keeps it non-blocking, the same as
-# gate.self_wired's own advisory-only tier.
-
-
-def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
-    """One ADVISORY (never blocking) Finding per non-robust-core canon fingerprint that fires on
-    this session's call stream. Silent (empty list) when none fire."""
-    from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
-    out: List[Finding] = []
-    for name, formula, is_block in fired_canon_fingerprints(calls_from_history(history), text or ""):
-        if is_block:
-            continue
-        out.append(Finding(
-            pattern_id="gate.canon_fingerprints_advisory",
-            file="", line=0, level="advisory",
-            message=(f"canon.{name}: {formula} -- a gaming-shaped session fingerprint fired. "
-                     "ADVISORY only: this fingerprint rests on a soft/claim atom or is among the "
-                     "gold-oracle finding's named disqualified fingerprints, so it is recorded "
-                     "but never blocks."),
-            retry_hint="Advisory only -- review the flagged behavior; this never blocks a turn.",
-        ))
-    return out
-
-
-fpadv_CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", posture="ADVISE",
-               tests="SPEC",
-               eats=frozenset({"text", "history"}),
-               run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))
-
-# ==============================================================================================
-# planItemDrift
-# ==============================================================================================
-# gate.plan_item_drift -- ADVISORY reminder of open PLAN/TASK-LABELED commitments (a forward
-# promise phrased as a section/task reference, never a file path) that gate.dropped's sourcer
-# cannot see because it requires a file-shaped location.
-#
-# `state/plan.py` sources/discharges these purely textually (no filesystem ground truth exists
-# for a label); this check surfaces whatever is still open at Stop time as a reminder. ADVISORY
-# tier only: a label's "still open" state is a weaker, textual-only signal with no corpus-measured
-# FP rate, so it must never block.
-# At most this many labels are named inline in the reminder; any remainder is counted, not named.
-_LABEL_CAP = 8
-
-
-def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
-    """Fire iff any plan-item commitment is still OPEN for this session. `open_items=[]` is
-    silent."""
-    if not open_items:
-        return None
-    labels = ", ".join(i["label"] for i in open_items[:_LABEL_CAP])
-    hidden = len(open_items) - _LABEL_CAP
-    more = f" (+{hidden} more)" if hidden > 0 else ""
-    return Finding(
-        pattern_id="gate.plan_item_drift",
-        file="",
-        line=0,
-        level="advisory",
-        message=(
-            f"plan/task-labeled commitment(s) still open: {labels}{more}. A textual-only signal "
-            "(no filesystem ground truth for a label) -- confirm each is genuinely still pending, "
-            "not silently dropped."
-        ),
-        retry_hint="Mark each done (a first-person past-tense statement naming it) or retract it explicitly.",
-    )
-
-
-drift_CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="ADVISE",
-               tests="SPEC",
-               eats=frozenset({"open_plan_items"}),
-               run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))
 # content.phantom_citation predicate — phantom citation (Author-Year not in canonical set).
 #
 # Reads tool_input.content, never disk. Extracts Author-Year strings via
@@ -1726,7 +1414,7 @@ budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
 budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, masking_CHECK, identity_CHECK, fp_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}

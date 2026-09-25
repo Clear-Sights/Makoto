@@ -1215,9 +1215,9 @@ named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK",
 # construction -- a text with a name is not a text with no name -- and that is this gate's merge
 # witness.
 #
-# ADVISORY TIER, NEVER BLOCK: the benign case is real and looks identical -- the agent pasted the
-# runner's own summary and the reader can see the names in it, or the count belongs to a run whose
-# per-test lines the 500-char recorded tail cut. No corpus-measured false-positive rate exists.
+# BLOCK TIER: the discharge is a copy, not a re-run -- the red identities are already on the
+# record, so the agent names one of them in the same turn. The benign shapes (a pasted runner
+# summary the reader can see, a count whose per-test lines the 500-char tail cut) cost one line.
 from makoto.vocab import Finding, _TESTNAME_RX
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- the record's own
@@ -1271,7 +1271,7 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
             pattern_id="gate.unnamed_failure",
             file="tests",
             line=0,
-            level="advisory",
+            level="error",
             message=(
                 f"the turn counts a failure and names none of the {len(red)} failing test "
                 f"identit{'y' if len(red) == 1 else 'ies'} the run itself recorded (e.g. {red[0]}). "
@@ -1286,7 +1286,7 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="ADVISE",
+unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: unnamed_failure_gate(c.text, history=c.history))
@@ -1459,121 +1459,6 @@ stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
                eats=frozenset({"text", "cwd"}),
                run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))
 
-# makoto.checks.relaunchedUnchanged -- gate.relaunched_unchanged, register entry
-# `E13 PARKED ON AN INHERITED CHANNEL`.
-#
-# A worker was launched again after an earlier launch, and nothing between the two proved its
-# target had changed -- no verifier reported anything. The second launch inherits the first one's
-# channel: whatever the worker could not reach before, it still cannot, and a re-launch with
-# nothing changed is a wait dressed as an act. Keel states this as clause U02
-# (`clear-sights/keel`, `plugin/keel/clauses.json`): *"a worker was re-launched and nothing proved
-# its target changed since the failure: change something, then run the target's probe to a PASS,
-# before the next act."*
-#
-# WHY MAKOTO'S MAP SAID NOT-COUNTABLE, AND WHY THAT WAS THE WRONG CHANNEL. The row read "a
-# detached task's input channel is not on the record makoto reads", which is right about what the
-# worker itself received. This gate reads neither the channel nor the worker's output: it reads the
-# REPEAT, which is two dispatch events, and whether a verifier ran between them. Both are on the
-# record makoto already holds.
-#
-# `min_acts=2` IS THE WHOLE POINT. The first launch owes nothing -- that is the act the clause
-# exists to permit. Only the second unguarded one is the costly thing, which is why the factory
-# carries the count rather than each clause re-deriving it.
-#
-# ADVISORY TIER, NEVER BLOCK: dispatching two independent workers for two independent jobs is the
-# common benign case and looks identical here, and no corpus-measured false-positive rate exists.
-from makoto.kit import unmet_obligation_gate, ran_a_verifier
-
-_DISPATCH_TOOLS = frozenset({"Task", "Agent"})
-
-
-def _is_relaunch(ev: dict) -> bool:
-    return ev.get("tool_name") in _DISPATCH_TOOLS
-
-
-# Same guard, same one definition: `kit.ran_a_verifier`. A verifier ran between the launches,
-# verdict unread -- a report is the observation, and only the absence of any report leaves the
-# re-launch resting on nothing.
-_is_probe = ran_a_verifier
-
-
-relaunched_unchanged_gate = unmet_obligation_gate(
-    act=_is_relaunch,
-    guard=_is_probe,
-    min_acts=2,
-    pattern_id="gate.relaunched_unchanged",
-    message=("A worker was launched again with no verifier run anywhere before it — the second "
-             "launch inherits the first one's channel, so nothing shows its target changed."),
-    retry_hint=("Change something and run the target's probe to a report before re-launching; "
-                "or confirm the two launches are independent jobs."),
-)
-
-
-relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Stop", posture="ADVISE",
-               tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: relaunched_unchanged_gate(c.history))
-
-# makoto.checks.unobservedDestruction -- gate.unobserved_destruction, register entry
-# `D14 UNDO UNPROVEN`.
-#
-# Content was destroyed and no independent behaviour observer had run first, so there is nothing
-# against which the undo could be proven -- not the change, and not the state before it. Keel
-# states this as clause U20 (`clear-sights/keel`, `plugin/keel/clauses.json`): *"content was
-# destroyed and no independent behaviour observer ran first; run the relevant test or probe (a
-# report, PASS or FAIL) before the next act."*
-#
-# WHY MAKOTO'S MAP SAID NOT-COUNTABLE, AND WHY THAT WAS A STRONGER QUESTION THAN THE ENTRY ASKS.
-# The row read "an undo's provability is not a channel makoto reads", which is true of proving the
-# undo. The countable question underneath is whether anything was OBSERVED before the destruction:
-# a verifier report, PASS or FAIL, is what makes a later undo checkable at all, and both the
-# destructive command and the verifier run are on the record makoto already holds.
-#
-# ONE HOME FOR "DESTRUCTIVE". The classifier is `substrate._canonAtoms._is_destructive_argv`,
-# imported unchanged -- the same function `gate.canon_fingerprints`' `destructive_command` atom
-# uses, over `core._shell._shell_segments` -- the same splitter, reached directly because
-# `_canonAtoms._segments` keys on a Call dict this gate does not build. A second definition of destruction here would be `F2 TWO SOURCES OF TRUTH`, and its
-# documented scope cut (long-form `rm` stays outside, pinned in test_canon_atoms_destructive) is
-# inherited whole rather than re-litigated.
-#
-# ADVISORY TIER, NEVER BLOCK: deleting scratch output, a build directory or a file created earlier
-# in the same session is destruction that owes no observer, and no corpus-measured false-positive
-# rate exists for the distinction.
-from makoto.kit import unmet_obligation_gate, command_of, ran_a_verifier
-from makoto.core._shell import _shell_segments
-
-
-def _is_destruction(ev: dict) -> bool:
-    from makoto.substrate._canonAtoms import _is_destructive_argv
-    cmd = command_of(ev)
-    if not cmd:
-        return False
-    return any(_is_destructive_argv(argv) for argv, _ in _shell_segments(cmd))
-
-
-# The guard is `kit.ran_a_verifier`, the ONE definition of "something observed behaviour",
-# shared with gate.relaunched_unchanged. Keel's U20 asks for a report, PASS or FAIL, because
-# either one is an observation and only the absence of both leaves an undo unprovable -- which
-# is why that primitive does not read the verdict.
-_is_observer = ran_a_verifier
-
-
-unobserved_destruction_gate = unmet_obligation_gate(
-    act=_is_destruction,
-    guard=_is_observer,
-    pattern_id="gate.unobserved_destruction",
-    message=("Content was destroyed and no verifier had run first — with no behaviour observed "
-             "before the destruction, the undo cannot be proven against anything."),
-    retry_hint=("Run the relevant test or probe to a report (PASS or FAIL) before a destructive "
-                "act, so there is a pre-image to check an undo against."),
-)
-
-
-destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", posture="ADVISE",
-               tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: unobserved_destruction_gate(c.history))
-
 # makoto.checks.unwitnessedScanner -- gate.unwitnessed_verifier, register entry
 # `B4 WRONG ORACLE`.
 #
@@ -1601,11 +1486,11 @@ destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", 
 # unlisted tool identically. Widening belongs in `_TEST_RUNNER_RX` itself, once, if it is ever
 # worth it.
 #
-# ADVISORY TIER, NEVER BLOCK: a first clean run in a fresh session is the overwhelmingly common
-# benign case -- most sessions never see a red run and should not -- and no corpus-measured
-# false-positive rate exists for the distinction.
+# BLOCK TIER: the discharge is in-turn -- plant a fault the verifier must catch and watch the same
+# command report it, and the clean report then carries weight. A first clean run in a fresh session
+# owes exactly that.
 from makoto.vocab import Finding, _TEST_RUNNER_RX
-from makoto.kit import unmet_obligation_gate, response_text, command_of
+from makoto.kit import response_text, command_of
 
 # A report with NO failures: a non-zero passed count, or an explicit all-clear. Narrow and
 # lexical on purpose -- the words a runner prints, not an interpretation of them.
@@ -1660,7 +1545,7 @@ def unwitnessed_verifier_gate(history) -> Optional[Finding]:
             pays=lambda e: (lambda k, own=_verifier_key(e): k == own)
             if _is_failing_verifier_run(e) else None):
         return Finding(
-            pattern_id="gate.unwitnessed_verifier", file="", line=0, level="advisory",
+            pattern_id="gate.unwitnessed_verifier", file="", line=0, level="error",
             message=("A verifier reported clean and this session has never seen it report a failure — a "
                      "verifier that cannot fire and a genuinely clean subject print the same word, so "
                      "the clean report is evidence of nothing on its own."),
@@ -1669,162 +1554,10 @@ def unwitnessed_verifier_gate(history) -> Optional[Finding]:
     return None
 
 
-verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE",
+verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unwitnessed_verifier_gate(c.history))
-
-# makoto.checks.reportBeforeRun -- gate.report_before_run, register entry
-# `C11 REPORT BEFORE DECIDE`.
-#
-# A run's verdict was written into a prose document before any verifier had run in this session.
-# The register states the fault as *"the outcome was emitted after the narration about it"* against
-# the rule *"emit the outcome first; reporting comes after"*. A report that precedes the outcome it
-# reports cannot be a reading of it: whatever it says was decided before there was anything to
-# decide from, so the words are a prediction wearing a result's grammar.
-#
-# WHAT ORDER IS READ. `kit.unmet_obligation_gate`, the same factory the seven Keel-shaped
-# obligations use, so the ordering rule keeps ONE home -- the order IS the check. The act is a
-# settled mutation of a prose document whose introduced text states a run verdict; the guard is
-# `kit.ran_a_verifier`. The gate fires when the act lands with no verifier run anywhere before it.
-#
-# PROSE DOCUMENTS ONLY, and this is the measurement that makes the check material. A run verdict
-# inside a `.py` file is a FIXTURE or an expected-output string, not a report -- this package's own
-# tests carry `2 failed, 56 passed in 2.0s` as test data, and a gate that fired on writing them
-# would fire on writing itself. `checks/integritySuppressionFlag.py` records the mirror-image
-# decision for the mirror-image reason: it dropped `.md` because markdown QUOTES examples where its
-# subject is live config. Here markdown is exactly the subject, because a narration lives in prose,
-# and code is exactly the exclusion, because a verdict in code is data.
-#
-# WHY A WHOLE-SESSION GUARD RATHER THAN A PER-DOCUMENT ONE. The guard is "any verifier ran at all
-# before this write", not "a verifier ran for the thing this document describes". Pairing a document
-# to its subject is the prose-to-referent judgement `F12`'s row declines for this tree. The loose
-# guard costs recall and buys soundness: a session that ran something and then wrote a verdict about
-# something else is silent here. What it still catches is the shape that has no innocent reading --
-# a verdict written into prose in a session where nothing was ever run.
-#
-# The benign case it does admit: DOCUMENTING a command's output ("the suite prints `58 passed`") in
-# a session that never ran it. Real, and narrower than it sounds -- an agent documenting output
-# almost always ran the command first, and the first run in the session discharges the obligation
-# for every later write.
-#
-# DISCRIMINANT AGAINST `gate.green_claim`, which grades the same vocabulary: that gate reads the
-# assistant's CLOSING TEXT and asks whether a green claim has a green run behind it; this one reads
-# INTRODUCED FILE CONTENT in history ORDER and asks whether any run preceded it. A session whose
-# only act is writing "all tests pass" into a document, with empty closing text, fires this gate and
-# gives green_claim nothing to key on. That is this gate's merge witness.
-#
-# ADVISORY TIER, NEVER BLOCK: the documenting case above is real and looks identical, and no
-# corpus-measured false-positive rate exists.
-from makoto.kit import introduced_text, ran_a_verifier, unmet_obligation_gate
-from makoto.vocab import _SUCCESS_SUMMARY_RX
-
-# A PROSE document -- where a narration lives. Code is excluded by extension, deliberately; see
-# the docstring's measurement.
-_PROSE_TARGET_RX = re.compile(r"\.(?:md|markdown|rst|txt|adoc|org)$", re.IGNORECASE)
-_MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
-
-
-def _reports_a_run_verdict(ev: dict) -> bool:
-    """This settled event wrote a run's verdict into a prose document.
-
-    Two readers, both already in the tree and neither copied: `vocab._SUCCESS_SUMMARY_RX` for a
-    PASTED runner summary ("58 passed"), and `substrate/claims.whole_suite_pass_claim` for the
-    same verdict written as PROSE ("the suite is green"). The second is the tree's FP-hardened
-    claim reader -- it firewalls a subset claim from a whole-suite one, and refuses a negated,
-    forward-framed, or code-quoted match -- and gate.green_claim grades the closing text on that
-    same object. A third copy of either is what `F2 TWO SOURCES OF TRUTH` names.
-
-    THE GREEN DIRECTION ONLY, named rather than implied. A prose failure count written before
-    anything ran ("3 tests failed") is the same ORDER fault, and this gate does not see it: the
-    shared summary lexicon is output-shaped and wants the count adjacent (`3 failed`), and the
-    prose-shaped one belongs to gate.unnamed_failure, in whose own subject it was measured --
-    copying it here is the duplication above. The asymmetry also costs least where it matters:
-    a report of success written before the run is the half that MISLEADS, and it is the half
-    with a hardened reader.
-    """
-    if ev.get("hook_event_name") != "PostToolUse":
-        return False                       # a call that may never have landed wrote nothing
-    tool = ev.get("tool_name", "")
-    if tool not in _MUTATION_TOOLS:
-        return False
-    ti = ev.get("tool_input", {}) or {}
-    if not isinstance(ti, dict) or not _PROSE_TARGET_RX.search(str(ti.get("file_path", ""))):
-        return False
-    text = introduced_text(tool, ti)
-    return bool(text) and bool(_SUCCESS_SUMMARY_RX.search(text)
-                               or whole_suite_pass_claim(text))
-
-
-report_before_run_gate = unmet_obligation_gate(
-    act=_reports_a_run_verdict,
-    guard=ran_a_verifier,
-    pattern_id="gate.report_before_run",
-    message=("a run's success was written into a prose document with no verifier run anywhere "
-             "before it — the report precedes the outcome it reports, so it is a prediction in a "
-             "result's grammar."),
-    retry_hint=("Run the verifier first and write the verdict from what it printed; or, if the "
-                "document is quoting an example rather than reporting this session's run, say so "
-                "in the document."),
-)
-
-
-report_CHECK = _Check(id="gate.report_before_run", applies_at="Stop", posture="ADVISE",
-               tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: report_before_run_gate(c.history))
-
-# makoto.checks.unasked_plan -- gate.unasked_plan, register entry
-# `G2 DETERMINED ASKED AS OPEN`.
-#
-# A plan was presented and no question was asked this session, so whatever the request left
-# ambiguous was settled by guessing. The register's demand is that a determined thing not be
-# carried forward as open -- here in its live direction: the ambiguity WAS determinable by asking,
-# and the plan fixed it by assumption instead. Keel states the same point as clause P02
-# (`clear-sights/keel`, `plugin/keel/clauses.json`): *"reading files resolves what the repository
-# is, never what was wanted, and a plan is followed by default."*
-#
-# WHY MAKOTO'S MAP SAID NOT-COUNTABLE, AND WHY THAT WAS THE WRONG READING. The row read "needs the
-# question compared against what was derivable; that comparison is similarity", and that is true
-# of grading WHICH question should have been asked. It is not needed to grade whether ANY was:
-# an ExitPlanMode event, and an AskUserQuestion event before it, are both on the record makoto
-# already reads. The weaker, countable question is the one this gate asks.
-#
-# ADVISORY TIER, NEVER BLOCK. A plan for a request that carried no ambiguity owes no question,
-# and no corpus-measured false-positive rate exists for the distinction yet. Same "advisory over
-# blocking" policy `selfWiredCheck.py`, `staleEstablisher.py` and `planItemDrift.py` follow.
-from makoto.kit import unmet_obligation_gate
-
-# Presenting a plan. A closed vocabulary whose miss is a RECALL bound, never a false block.
-_PLAN_TOOLS = frozenset({"ExitPlanMode"})
-# The ask that pays the obligation. Keel's P02 names exactly this one.
-_ASK_TOOLS = frozenset({"AskUserQuestion"})
-
-
-def _is_plan(ev: dict) -> bool:
-    return ev.get("tool_name") in _PLAN_TOOLS
-
-
-def _is_ask(ev: dict) -> bool:
-    return ev.get("tool_name") in _ASK_TOOLS
-
-
-unasked_plan_gate = unmet_obligation_gate(
-    act=_is_plan,
-    guard=_is_ask,
-    pattern_id="gate.unasked_plan",
-    message=("A plan was presented and no question was asked this session — reading the "
-             "repository resolves what it is, never what was wanted, and a plan is followed by "
-             "default, so an ambiguity settled by guessing is carried as if it were settled."),
-    retry_hint=("Ask one question about the ambiguity before the plan is fixed; or confirm the "
-                "request carried none."),
-)
-
-
-plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE",
-               tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: unasked_plan_gate(c.history))
 
 
 # gate.run_promised -- register entry `C11 REPORT BEFORE DECIDE`, as its second runner.
@@ -1897,7 +1630,7 @@ run_promised_CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="
 
 
 # the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK,)
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, verifier_CHECK, run_promised_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {retry_CHECK.id: retry_predicate}

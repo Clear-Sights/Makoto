@@ -141,9 +141,9 @@ def test_stop_advise_renders_nothing_once_already_reactivated():
 
 
 def test_stop_advise_detail_overrides_constant_reason():
-    d = posture.Decision(posture.ADVISE, detail="row gate.unread_structure: no prior read")
+    d = posture.Decision(posture.ADVISE, detail="row gate.synthetic_advisory: no prior read")
     body = dispatch_posture("Stop", d, "Stop")
-    assert "gate.unread_structure" in body["reason"]
+    assert "gate.synthetic_advisory" in body["reason"]
 
 
 # --- Post edge: structurally can never deny/block, only ADVISE or {} ----------------------------

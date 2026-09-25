@@ -15,7 +15,6 @@ main() is the thin orchestrator. Each stage is a small helper:
 Knight-Leveson: stdlib only (sqlite3). NO LLM, NO HTTP. The validator hot
 path's imports are deliberately narrow."""
 from __future__ import annotations
-import hashlib
 import importlib
 import json
 import math
@@ -785,42 +784,11 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
         sid = payload.get("session_id", "")
         _ledger.record_update(conn, payload, event_id=event_id,
                               session_id=sid, root=state_dir)
-        # TaskCreate/TaskUpdate are the plan-item store's ground truth; this remains fail-open.
-        if payload.get("tool_name") in ("TaskCreate", "TaskUpdate"):
-            from makoto.state import plan as _plan_items
-            _plan_items.record_task_event(conn, sid, payload)
     except Exception as exc:
         print(f"makoto.dispatch: ledger update failed (non-fatal): {exc}",
               file=sys.stderr)
         _dispatch_fact(state_dir, "exception", f"ledger update failed: {type(exc).__name__}: {exc}",
                        blocked=False, ids=_ids_from_payload(payload))
-
-
-def _unread(conn, session_id: str, findings: list[Finding]) -> list[Finding]:
-    """Drop the ADVISE findings this session's agent already read at an earlier stop, word for word.
-
-    An advisory gets one bounce per turn, and nothing else stopped the next turn repeating it: one
-    scratch `rm -rf` kept gate.unobserved_destruction and gate.unwitnessed_verifier bouncing on
-    eight later stops of one session (2026-09-25), and gate.unprobed_fanout /
-    gate.relaunched_unchanged did the same on every coordinator turn. A repeat tells the agent
-    nothing it has not read, and no act can satisfy it. The key is everything the agent is shown,
-    so a new occurrence still bounces; a BLOCK finding is never dropped; the audit row still
-    records every fire. A store fault keeps the bounce."""
-    kept = []
-    for f in findings:
-        if f.level == "advisory":
-            key = "advised:" + hashlib.sha256(json.dumps(
-                [session_id, f.pattern_id, f.file, f.line, f.snippet, f.message]).encode()).hexdigest()
-            try:
-                fresh = conn.execute("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)",
-                                     [key, f.pattern_id]).rowcount
-                conn.commit()
-            except Exception:
-                fresh = 1
-            if not fresh:
-                continue
-        kept.append(f)
-    return kept
 
 
 def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
@@ -845,8 +813,6 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     blocking = list(findings)
     if _gates_enabled():
         blocking += gate_findings
-    if hook_event in ("Stop", "SubagentStop") and payload.get("stop_hook_active") is not True:
-        blocking = _unread(conn, payload.get("session_id", ""), blocking)
     _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"),
                   stop_hook_active=payload.get("stop_hook_active") is True)
     _record_audit(state_dir, findings + gate_findings, payload)
