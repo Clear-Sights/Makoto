@@ -2344,3 +2344,37 @@ def test_dispatch_unrun_count_claim_gate_blocks_a_count_with_no_run(tmp_path):
     decision = json.loads(out)
     assert decision["decision"] == "block"
     assert "gate.unrun_count_claim: the reply says" in decision["reason"]
+
+
+def _unwitnessed_after(tmp_path, sid, runs):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    state_dir = _setup_state(tmp_path)
+    for cmd, out in runs:
+        _run_dispatch(state_dir, _post_bash(tmp_path, sid, cmd, out))
+    rc, out = _run_dispatch(state_dir, {"hook_event_name": "Stop", "session_id": sid, "cwd": str(tmp_path),
+                                        "last_assistant_message": "Done."})
+    return "gate.unwitnessed_verifier" in (out or "")
+
+
+_RED = ("cd /r && PYTHONPATH=$PWD/plugin python -m pytest -q -p no:cacheprovider 2>&1 | tail -6", "1 failed, 40 passed")
+
+
+def test_unwitnessed_verifier_keys_the_segment_so_a_masked_red_plain_run_pays_a_compound_clean_one(tmp_path):
+    """The verifier is the runner SEGMENT with its `cd`, not the whole compound command; and a red
+    run whose exit `| tail` masked still reports "1 failed", so it pays."""
+    clean = ("cd /r && git fetch -q; PYTHONPATH=$PWD/plugin python -m pytest -q | tail -1; python3 -c 'print(1)'",
+             "41 passed")
+    assert _unwitnessed_after(tmp_path / "unpaid", "seg0", [clean]), "catch: a clean run with no red run is owed"
+    assert not _unwitnessed_after(tmp_path / "paid", "seg1", [_RED, clean]), "the plain red run pays the compound one"
+
+
+def test_unwitnessed_verifier_still_owes_another_dir_or_another_test_path(tmp_path):
+    assert _unwitnessed_after(tmp_path / "dir", "seg2", [_RED, ("cd /other && python -m pytest -q", "41 passed")])
+    assert _unwitnessed_after(tmp_path / "path", "seg3",
+                              [_RED, ("cd /r && python -m pytest -q tests/test_a.py", "3 passed")])
+
+
+def test_unwitnessed_verifier_does_not_read_a_heredoc_body_or_a_grep_pattern_as_a_run(tmp_path):
+    runs = [("python3 - <<EOF\nimport subprocess  # runs pytest -q later\nprint('OK')\nEOF", "OK"),
+            ("grep -n 'pytest' tests/test_a.py", "3: PASS")]
+    assert not _unwitnessed_after(tmp_path, "seg4", runs)

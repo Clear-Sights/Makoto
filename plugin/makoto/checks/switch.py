@@ -1628,20 +1628,44 @@ _FAILING_REPORT_RX = re.compile(
     r"|\bAssertionError\b")
 
 
+def _runner_segments(cmd: str) -> list:
+    """The verifier SEGMENTS of a command, each keyed with the `cd <dir>` in force before it.
+    The runner must sit at a segment's command position (after assignments and launch wrappers):
+    a heredoc body, a quoted argument or a grep pattern that names `pytest` is not a run."""
+    from makoto.core._shell import _basename, _effective_argv, _shell_segments
+    out, cd = [], ""
+    for argv, _op in _shell_segments(cmd or ""):
+        if argv and argv[0] == "cd":
+            cd = " ".join(argv[:2])
+            continue
+        eff = _effective_argv(argv)
+        if not eff:
+            continue
+        text = " ".join([_basename(eff[0])] + eff[1:])
+        if _TEST_RUNNER_RX.match(text):
+            text = re.sub(r"(?:\s+\d)?\s+>&?\s+\S+", "", text)
+            out.append(" && ".join(filter(None, (cd, _VERBOSITY_RX.sub("", text)))))
+    return out
+
+
+def _run_output(ev: dict) -> str:
+    # a red run's exit code may be masked (`| tail`) or the event may be the failure terminal,
+    # whose text rides `error`: either way the printed verdict ("1 failed") is the report
+    return response_text(ev) or str(ev.get("error", "") or "")
+
+
 def _is_clean_verifier_run(ev: dict) -> bool:
-    cmd = command_of(ev)
-    if not cmd or not _TEST_RUNNER_RX.search(cmd):
+    if not _runner_segments(command_of(ev)):
         return False
-    out = response_text(ev)
+    out = _run_output(ev)
     # A report cannot be both, and failures win: "1 failed, 40 passed" is the verifier firing.
     return bool(out and _CLEAN_REPORT_RX.search(out) and not _FAILING_REPORT_RX.search(out))
 
 
 def _is_failing_verifier_run(ev: dict) -> bool:
-    cmd = command_of(ev)
-    if not cmd or not _TEST_RUNNER_RX.search(cmd):
+    if not _runner_segments(command_of(ev)):
         return False
-    return bool(_FAILING_REPORT_RX.search(response_text(ev)))
+    return bool(_FAILING_REPORT_RX.search(_run_output(ev)))
 
 
 # The witness is a failing run of the SAME verifier, compared by its command line: a red run of
@@ -1651,17 +1675,19 @@ def _is_failing_verifier_run(ev: dict) -> bool:
 _VERBOSITY_RX = re.compile(r"\s+(?:-[qvsx]+|--tb=\S+|-p\s+no:cacheprovider|--color=\S+)(?=\s|$)")
 
 
-def _verifier_key(ev: dict) -> str:
-    cmd = "\n".join(ln for ln in command_of(ev).splitlines() if not ln.lstrip().startswith("#"))
-    cmd = re.sub(r"(?:\s*2>&1|\s*\|\s*(?:tail|head)\b[^|]*|\s*>\s*\S+)+\s*$", "", " ".join(cmd.split()))
-    return _VERBOSITY_RX.sub("", cmd)
+def _verifier_keys(ev: dict) -> tuple:
+    """One key per verifier SEGMENT (its `cd` included), not the whole compound command: a clean
+    pytest inside `cd X && git fetch; pytest -q | tail -1` is the same verifier as a red plain
+    `cd X && pytest -q` run. Measured 2026-09-25: whole-command keys owed 19 keys in one session,
+    and none could be paid."""
+    return tuple(dict.fromkeys(_runner_segments(command_of(ev))))
 
 
 def unwitnessed_verifier_gate(history) -> Optional[Finding]:
     events = [ev for ev in (decode_history_event(r) for r in history or ()) if isinstance(ev, dict)]
     for ev, _key in unwitnessed(
-            events, owes=lambda e: (_verifier_key(e),) if _is_clean_verifier_run(e) else (),
-            pays=lambda e: (lambda k, own=_verifier_key(e): k == own)
+            events, owes=lambda e: _verifier_keys(e) if _is_clean_verifier_run(e) else (),
+            pays=lambda e: (lambda k, own=_verifier_keys(e): k in own)
             if _is_failing_verifier_run(e) else None):
         return Finding(
             pattern_id="gate.unwitnessed_verifier", file="", line=0, level="error",
