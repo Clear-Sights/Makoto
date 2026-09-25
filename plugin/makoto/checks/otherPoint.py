@@ -1320,12 +1320,157 @@ thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 from makoto.registry import Check
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
+# event.unpinned_input -- refuses a dispatch whose READ paths carry no @<12+ hex> content hash,
+# and a Bash call with timeout > 120000 ms unless it verifies pins (sha256sum -c) or names
+# path@hash.
+from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines as _dispatch_brief_lines
+from makoto.core._declaredverifiers import dispatch_opt_in
+
+_PINNED_READ_RX = re.compile(r"^\S+@[0-9a-fA-F]{12,}$")
+_SHA256SUM_CHECK_RX = re.compile(r"\bsha256sum\b[^\n]*(?:-[A-Za-z]*c\b|--check\b)")
+_PATH_AT_HASH_RX = re.compile(r"\S+@[0-9a-fA-F]{12,}\b")
+_LONG_TIMEOUT_MS = 120000
+
+
+def unpinned_owes(ev: dict):
+    if ev.get("hook_event_name") != "PreToolUse":
+        return ()
+    tool = ev.get("tool_name") or ""
+    ti = ev.get("tool_input")
+    if not isinstance(ti, dict):
+        return ()
+    if tool in DISPATCH_TOOL_NAMES:
+        prompt = ti.get("prompt")
+        if not isinstance(prompt, str):
+            return ()
+        reads = _dispatch_brief_lines(prompt)["READ"]
+        return tuple(r for r in reads if r and not _PINNED_READ_RX.match(r))
+    if tool == "Bash":
+        timeout = ti.get("timeout")
+        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or timeout <= _LONG_TIMEOUT_MS:
+            return ()
+        command = str(ti.get("command", "") or "")
+        if not command or _SHA256SUM_CHECK_RX.search(command) or _PATH_AT_HASH_RX.search(command):
+            return ()
+        return (command,)
+    return ()
+
+
+def unpinned_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if not dispatch_opt_in(current_event.get("cwd")):
+        return None
+    for _ev, subject in unwitnessed((current_event,), owes=unpinned_owes):
+        return Finding(
+            pattern_id=pattern.id, file="", line=0, level="error",
+            message=(f"row {pattern.id} ({pattern.description}): {subject!r} carries no "
+                     "@<12+ hex> content pin, and this run is expensive enough that a stale "
+                     "input would be true for the input read then, not the one on disk now."),
+            retry_hint=pattern.retry_hint,
+            snippet=str(subject)[:200],
+        )
+    return None
+
+
+unpinned_RETRY_HINT = ('Pin every dispatch READ path with `@<12+ hex>` (its content hash), or, '
+                       'for a long Bash run, verify pins first (`sha256sum -c <manifest>`) or '
+                       'name the input as `path@hash` in the command.')
+unpinned_DESCRIPTION = ('dispatch READ path or long-timeout Bash call names no @<12+ hex> '
+                        'content pin (opt-in: makoto.toml `dispatch = true`)')
+
+unpinned_CHECK = _Check(id='event.unpinned_input', applies_at="Pre", posture="BLOCK",
+             predicate_module=__name__, keywords=('Agent', 'Task', 'Bash'),
+             retry_hint=unpinned_RETRY_HINT, description=unpinned_DESCRIPTION,
+             eats=frozenset({"current_event", "pattern"}), tests="OTHER_POINT")
+
+# gate.unpaid_acceptance -- fires when done was claimed but a prior-turn dispatch's ACCEPTANCE
+# command never later ran to exit 0. Walks history newest-first so a later payment is already
+# witnessed by the time the earlier dispatch that owes it is reached. Excludes this-turn
+# dispatches (worker may still be in flight) and takes its own one bounce on stop_hook_active,
+# since BLOCK gets no automatic wire-level suppression there.
+from makoto.state.ledger import last_operator_turn_ts as _last_operator_turn_ts
+from makoto.state.ledger import _event_instant as _op_event_instant
+from makoto.substrate._canonAtoms import _row_ts as _op_row_ts
+
+
+def _decorated_events(history):
+    """`history` rows decoded, each carrying its raw `ts` under `_ts` (decode_history_row drops it)."""
+    out = []
+    for row in history or ():
+        ev = decode_history_row(row)
+        if not isinstance(ev, dict):
+            continue
+        ev = dict(ev)
+        ev["_ts"] = _op_row_ts(row)
+        out.append(ev)
+    return out
+
+
+def _acceptance_owed(ev: dict, *, since_instant):
+    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in DISPATCH_TOOL_NAMES:
+        return ()
+    if since_instant is None:
+        return ()              # no operator-turn boundary at all -- nothing PROVEN prior-turn
+    ts = _op_event_instant(ev.get("_ts"))
+    if ts is None or ts >= since_instant:
+        return ()              # this turn's own dispatch -- the worker may still be in flight
+    ti = ev.get("tool_input")
+    prompt = ti.get("prompt") if isinstance(ti, dict) else None
+    if not isinstance(prompt, str):
+        return ()
+    return tuple(" ".join(a.split()) for a in _dispatch_brief_lines(prompt)["ACCEPTANCE"] if a)
+
+
+def _acceptance_paid(ev: dict):
+    if ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
+        return None
+    ti = ev.get("tool_input")
+    command = ti.get("command") if isinstance(ti, dict) else None
+    if not isinstance(command, str) or not command:
+        return None
+    if not _response_succeeded(ev.get("tool_response")):
+        return None
+    paid_command = " ".join(command.split())
+    return lambda owed: owed == paid_command
+
+
+def unpaid_acceptance_gate(history, *, transcript_path=None) -> Optional[Finding]:
+    since_instant = None
+    if transcript_path:
+        try:
+            since = _last_operator_turn_ts(transcript_path)
+        except Exception:
+            since = None
+        if since is not None:
+            since_instant = _op_event_instant(since)
+    events = _decorated_events(history)
+
+    def owes(ev):
+        return _acceptance_owed(ev, since_instant=since_instant)
+
+    for _ev, command in unwitnessed(reversed(events), owes=owes, pays=_acceptance_paid):
+        return Finding(
+            pattern_id="gate.unpaid_acceptance", file="", line=0, level="error",
+            message=(f"A dispatch's ACCEPTANCE command ({command!r}) is unpaid: done was claimed "
+                     "but no later run of that exact command exited 0."),
+            retry_hint=("Run the dispatch's own ACCEPTANCE command and let it exit 0 before "
+                        "claiming the work done, or retract the claim."),
+        )
+    return None
+
+
+unpaid_CHECK = _Check(id="gate.unpaid_acceptance", applies_at="Stop", posture="BLOCK",
+              tests="OTHER_POINT",
+              eats=frozenset({"history", "cwd", "transcript_path", "stop_hook_active"}),
+              run=lambda c: (None if c.stop_hook_active else
+                             (unpaid_acceptance_gate(c.history, transcript_path=c.transcript_path)
+                              if dispatch_opt_in(c.cwd) else None)))
+
 
 # the OTHER_POINT shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK,)
+_ROWS = (shipped_CHECK, completion_CHECK, dropped_CHECK, wired_CHECK, consent_CHECK, thrash_CHECK, unpinned_CHECK, unpaid_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {thrash_CHECK.id: thrash_predicate}
+_PREDICATES = {thrash_CHECK.id: thrash_predicate, unpinned_CHECK.id: unpinned_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

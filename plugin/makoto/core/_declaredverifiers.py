@@ -38,6 +38,8 @@ from functools import lru_cache
 
 DECLARATION_BASENAME = "makoto.toml"
 DECLARATION_KEY = "verifiers"
+# The opt-in key the dispatch-discipline rows gate on -- same file, same reader.
+DISPATCH_KEY = "dispatch"
 
 _EMPTY: tuple[frozenset, frozenset] = (frozenset(), frozenset())
 
@@ -52,32 +54,44 @@ def _tail(word: str) -> str:
 
 
 @lru_cache(maxsize=16)
-def declared_verifiers(root: str) -> tuple[frozenset, frozenset]:
-    """`(tokens, tails)` declared by `root`'s `makoto.toml`, or two empty sets.
-
-    Memoised per root: the file is read once per process per root. Call `cache_clear()` when a
-    test writes a declaration under a root this process has already asked about.
-    """
+def _declaration(root: str) -> dict:
+    """`root`'s `makoto.toml`, decoded once, or `{}`. Memoised per root; call `cache_clear()` after a test writes one."""
     if not root:
-        return _EMPTY
+        return {}
     path = os.path.join(root, DECLARATION_BASENAME)
     try:
         if not os.path.isfile(path):
             # isfile, not exists: a FIFO or device node here would block the read and wedge the hook.
-            return _EMPTY
+            return {}
         import tomllib
         with open(path, "rb") as handle:
             # Binary: tomllib decodes UTF-8 itself, so the platform default encoding is never consulted.
             data = tomllib.load(handle)
     except Exception:
-        return _EMPTY
-    if not isinstance(data, dict):
-        return _EMPTY
-    listed = data.get(DECLARATION_KEY)
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def declared_verifiers(root: str) -> tuple[frozenset, frozenset]:
+    """`(tokens, tails)` declared by `root`'s `makoto.toml`, or two empty sets."""
+    listed = _declaration(root).get(DECLARATION_KEY)
     if not isinstance(listed, (list, tuple)):
         return _EMPTY
     tokens = frozenset(v for v in listed if isinstance(v, str) and v.strip())
     return (tokens, frozenset(_tail(v) for v in tokens))
+
+
+declared_verifiers.cache_clear = _declaration.cache_clear
+
+
+def dispatch_opt_in(root) -> bool:
+    """True iff `root`'s `makoto.toml` declares `dispatch = true`. Fail-open: unreadable/absent reads as not opted in."""
+    if not isinstance(root, str) or not root:
+        return False
+    return _declaration(root).get(DISPATCH_KEY) is True
+
+
+dispatch_opt_in.cache_clear = _declaration.cache_clear
 
 
 def declares_anything(root) -> bool:
