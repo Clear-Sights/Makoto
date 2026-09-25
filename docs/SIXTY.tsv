@@ -7,7 +7,7 @@ A7	gate.named_test	gate.named_test	tests/test_dispatch.py::test_dispatch_named_t
 A11	gate.canon_fingerprints	gate.canon_fingerprints	tests/test_dispatch.py::test_dispatch_canon_fingerprints_gate_blocks	yes	BLOCKED
 A13	gate.claude_identity	gate.claude_identity	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[gate.claude_identity]	yes	BLOCKED
 B2	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
-B7	tools/merge_pass.py	-	-	-	MISS: a rule written in prose and enforced nowhere is not separable from prose by a record read: deciding a sentence is a rule, and that no check enforces it, is a similarity judgement makoto refuses
+B7	tools/merge_pass.py	hooks.json prompt: makoto B7	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B7]	yes	BLOCKED (model-judged; the judgement cannot run offline, so the test pins the entry: present, scoped, fix line in its prompt; live-probed 2026-09-25: denied)
 B9	gate.undischarged_waiver	gate.undischarged_waiver	tests/test_dispatch.py::test_dispatch_undischarged_waiver_denies_until_an_end_is_named	yes	BLOCKED
 B23	content.bound_as_count	content.bound_as_count	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.bound_as_count]	yes	BLOCKED
 B35	content.integrity_suppression_flag	content.integrity_suppression_flag	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.integrity_suppression_flag]	yes	BLOCKED
@@ -42,13 +42,13 @@ F14	content.verifier_body_hollowed	content.verifier_body_hollowed	tests/test_pre
 G1	content.phantom_citation	content.phantom_citation	tests/predicates/test_makoto_allow_exemption.py::test_1_6_violation_fires_but_makoto_allow_exempts	yes	BLOCKED
 B1	gate.self_wired	gate.self_wired	tests/test_dispatch.py::test_dispatch_self_wired_gate_blocks_when_it_fires	yes	BLOCKED
 B5	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
-B10	tests corpus-FP invariant	-	-	-	MISS: a check the agent writes that fires on everything needs its rate on benign input measured; no hook payload carries that rate
+B10	tests corpus-FP invariant	hooks.json prompt: makoto B10	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B10]	yes	BLOCKED (model-judged; test pins the entry, not the judgement)
 B20	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
-B21	tools/merge_pass.py	-	-	-	MISS: a verdict another condition also produced needs each condition isolated with its own input; the record holds one run, not the counterfactual
-B34	tools/register_map.py	-	-	-	MISS: whether an artifact's own machinery breaks the law it enforces needs the law and the artifact paired; no general record read pairs them
+B21	tools/merge_pass.py	hooks.json prompt: makoto B21	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B21]	yes	BLOCKED (model-judged; test pins the entry, not the judgement)
+B34	tools/register_map.py	hooks.json prompt: makoto B34	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B34]	yes	BLOCKED (model-judged; test pins the entry, not the judgement)
 C3	gate.named_test	gate.named_test	tests/test_dispatch.py::test_dispatch_named_test_gate_blocks_after_recorded_named_red	yes	BLOCKED
 C4	dispatch loud-allow on predicate error	content.verifier_exit_masking	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.verifier_exit_masking]	yes	BLOCKED
-C5	dispatch fail-closed	-	-	-	MISS: a missing branch for a shape nobody fed is invisible until the shape arrives; makoto sees the agent's code, not which shapes it will meet
+C5	dispatch fail-closed	content.fallthrough_match	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.fallthrough_match]	yes	BLOCKED
 C11	gate.report_before_run	gate.report_before_run	tests/test_dispatch.py::test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs[gate.report_before_run]	yes	BLOCKED
 D9	gate.self_wired	gate.self_wired	tests/test_dispatch.py::test_dispatch_self_wired_gate_blocks_when_it_fires	yes	BLOCKED
 E1	tests/test_stop_gate_level_invariant.py	gate.liveness	tests/test_dispatch.py::test_dispatch_liveness_gate_blocks_on_illusory_code	yes	BLOCKED
@@ -63,3 +63,7 @@ A11+	-	event.repeated_append	tests/test_pre_rows_deny_through_dispatch.py::test_
 E12+	-	event.owner_path	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.owner_path]	yes	ALSO (T mesh case)
 G1+	-	content.loosened_after_red	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.loosened_after_red]	yes	ALSO (T mesh case)
 C11+	-	gate.unverified_merge	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[gate.unverified_merge]	yes	ALSO (T mesh case)
+A13+	-	event.regime_unnamed	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[event.regime_unnamed]	yes	ALSO (T mesh case; opt-in require_regime)
+G1+	-	gate.unworded_close	tests/test_dispatch.py::test_dispatch_unworded_close_gate_blocks_a_close_citing_no_owner_row	yes	ALSO (T mesh case; opt-in words_file)
+C11+	-	gate.unrun_count_claim	tests/test_dispatch.py::test_dispatch_unrun_count_claim_gate_blocks_a_count_with_no_run	yes	ALSO (T mesh case)
+E12+	-	event.owner_path (owner's own words)	tests/test_pre_rows_deny_through_dispatch.py::test_owner_path_reads_the_owners_own_words	yes	ALSO (T mesh case)

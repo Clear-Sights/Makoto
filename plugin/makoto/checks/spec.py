@@ -1749,7 +1749,7 @@ loosened_CHECK = _Check(id="content.loosened_after_red", applies_at="Pre", postu
 # EXCLUDED: the principal's own hands, acted on without him. The witness is the declaration --
 # a statement by the only party that knows, so it may spend a deny; absent it, nothing fires.
 # Discharge: leave the path alone (ask the owner).
-from makoto.core._declaredverifiers import owner_paths
+from makoto.core._declaredverifiers import declared, owner_paths
 
 _REMOVERS = frozenset({"rm", "unlink", "shred", "truncate", "mv"})
 
@@ -1765,12 +1765,37 @@ def _owned(target: str, cwd: str, owned: tuple) -> Optional[str]:
     return None
 
 
+# The owner's own words name a file to keep whole ("zero.py must carry intact; do not cut it"):
+# read from the genuine operator turns only, so the principal's statement is the witness.
+_KEEP_WHOLE_RX = re.compile(
+    r"(?P<a>[\w./-]+\.\w+)\b[^.;\n]{0,24}?\b(?:must (?:carry|stay|remain|be kept) intact|must not be "
+    r"(?:cut|deleted|removed|changed))|\b(?:do not|don't|never) (?:cut|delete|remove|touch) (?P<b>[\w./-]+\.\w+)",
+    re.I)
+
+
+def _owner_named(transcript_path) -> tuple:
+    if not transcript_path:
+        return ()
+    try:
+        from makoto.state.ledger import user_turn_texts
+        texts = user_turn_texts(transcript_path)
+    except Exception:
+        return ()
+    return tuple({m.group("a") or m.group("b") for t in texts for m in _KEEP_WHOLE_RX.finditer(str(t))})
+
+
+def _named_hit(target: str, named: tuple) -> Optional[str]:
+    t = target.replace("\\", "/")
+    return next((n for n in named if t == n or t.endswith("/" + n.lstrip("./"))), None)
+
+
 def owner_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     cwd = current_event.get("cwd") or ""
     owned = owner_paths(cwd)
-    if not owned:
+    named = _owner_named(current_event.get("transcript_path"))
+    if not owned and not named:
         return None
     tool = current_event.get("tool_name", "")
     ti = current_event.get("tool_input") or {}
@@ -1782,11 +1807,12 @@ def owner_predicate(*, current_event: dict, history: list, pattern, conn=None) -
             argv = [a for a in argv if not _ASSIGNMENT_RX.match(a)]
             prog = argv[0].rsplit("/", 1)[-1] if argv else ""
             args = argv[2:] if prog == "git" and argv[1:2] in (["rm"], ["mv"]) else argv[1:] if prog in _REMOVERS else []
-            hit = next(filter(None, (_owned(a, cwd, owned) for a in args if not a.startswith("-"))), None)
+            hit = next(filter(None, (_owned(a, cwd, owned) or _named_hit(a, named)
+                                     for a in args if not a.startswith("-"))), None)
             if hit:
                 break
     elif tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
-        p = _owned(str(ti.get("file_path", "")), cwd, owned)
+        p = _owned(str(ti.get("file_path", "")), cwd, owned) or _named_hit(str(ti.get("file_path", "")), named)
         pairs = [(e.get("old_string", ""), e.get("new_string", "")) for e in ti.get("edits") or ()
                  if isinstance(e, dict)] or [(ti.get("old_string", ""), ti.get("new_string", ""))]
         cut = tool == "Write" or any(set(o.splitlines()) - set(n.splitlines()) for o, n in pairs)
@@ -1794,12 +1820,12 @@ def owner_predicate(*, current_event: dict, history: list, pattern, conn=None) -
     if not hit:
         return None
     return Finding(pattern_id=pattern.id, file=hit, line=0, level="error",
-                   message=f"row {pattern.id} ({pattern.description}): `{hit}` is declared the owner's in makoto.toml",
+                   message=f"row {pattern.id} ({pattern.description}): `{hit}` is declared the owner's (makoto.toml, or the owner's own words)",
                    retry_hint=pattern.retry_hint, snippet=hit[:120])
 
 
 owner_RETRY_HINT = "Leave the owner's path as it is; if it must change, ask the owner to change it."
-owner_DESCRIPTION = "a delete, overwrite or cut of a path makoto.toml declares as the owner's"
+owner_DESCRIPTION = "a delete, overwrite or cut of a path makoto.toml, or the owner's own words, declare the owner's"
 owner_CHECK = _Check(id="event.owner_path", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__, keywords=("rm", "mv", "unlink", "shred", "truncate", "file_path"),
                retry_hint=owner_RETRY_HINT, description=owner_DESCRIPTION,
@@ -1846,10 +1872,137 @@ repeated_append_CHECK = _Check(id="event.repeated_append", applies_at="Pre", pos
                description=repeated_append_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
                tests="SPEC")
 
-_ROWS = (loosened_CHECK, owner_CHECK, repeated_append_CHECK, env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+# content.fallthrough_match -- a `match` statement introduced with no wildcard `case _:` that
+# raises. Register C5 FALLTHROUGH (+B16 E2): no branch for the shape that arrived, so a foreign
+# shape falls out of the dispatch silently. The witness is the introduced source itself (its AST).
+# Discharge: end the dispatch in `case _: raise ...`.
+def _unguarded_match(src: str) -> Optional[int]:
+    import textwrap as _tw
+    for text in (src, _tw.dedent(src)):
+        try:
+            tree = ast.parse(text)
+            break
+        except (SyntaxError, ValueError):
+            continue
+    else:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Match) and node.cases:
+            last = node.cases[-1]
+            wild = (isinstance(last.pattern, ast.MatchAs) and last.pattern.pattern is None
+                    and last.guard is None)
+            if not (wild and any(isinstance(n, ast.Raise) for b in last.body for n in ast.walk(b))):
+                return node.lineno
+    return None
+
+
+def fallthrough_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    tool = current_event.get("tool_name", "")
+    ti = current_event.get("tool_input") or {}
+    if tool not in ("Write", "Edit", "MultiEdit") or not isinstance(ti, dict):
+        return None
+    fp = str(ti.get("file_path", ""))
+    if not fp.endswith(".py"):
+        return None
+    line = _unguarded_match(introduced_text(tool, ti))
+    if line is None:
+        return None
+    return Finding(pattern_id=pattern.id, file=fp, line=line, level="error",
+                   message=(f"row {pattern.id} ({pattern.description}): the `match` at line {line} of "
+                            "the introduced text has no `case _:` that raises, so an unrecognised shape "
+                            "falls through silently"),
+                   retry_hint=pattern.retry_hint, snippet=fp[:120])
+
+
+fallthrough_RETRY_HINT = "Every dispatch ends in an error: add `case _: raise ValueError(...)` as the last case."
+fallthrough_DESCRIPTION = "a match statement introduced with no raising wildcard case"
+fallthrough_CHECK = _Check(id="content.fallthrough_match", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("match",), retry_hint=fallthrough_RETRY_HINT,
+               description=fallthrough_DESCRIPTION, eats=frozenset({"current_event", "pattern"}),
+               tests="SPEC")
+
+
+# event.regime_unnamed -- OPT-IN (`makoto.toml`: `require_regime = true`). A commit or PR whose
+# message removes code on the strength of a measured verdict, with no `regime:` field naming the
+# setting that verdict was measured in. Register A13 SETTING CALLED INHERENT: a result measured
+# in one regime (a short task) is spent as if it held in another (a long session). The witness is
+# the message's own words; the opt-in is the repository saying the field is required.
+# Discharge: add `regime: <where it was measured>` to the message.
+_REMOVAL_RX = re.compile(r"\b(?:remov|delet|drop|strip|revert|rip(?:ped)? out|cut)\w*", re.I)
+_MEASURED_RX = re.compile(
+    r"\d+(?:\.\d+)?\s*%|\bno (?:gain|effect|improvement|benefit|change)\b|\b(?:regress|slower|faster|"
+    r"worse|better|measured|benchmark|verdict|runs?\b|results?\b|didn't help|did not help|no help)", re.I)
+_REGIME_RX = re.compile(r"\bregime:\s*\S", re.I)
+_LANDING_MSG_RX = re.compile(r"\bgit\s+commit\b|\bgh\s+pr\s+(?:create|merge|edit)\b")
+
+
+def regime_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse" or current_event.get("tool_name") != "Bash":
+        return None
+    if declared(current_event.get("cwd") or "", "require_regime") is not True:
+        return None
+    cmd = str((current_event.get("tool_input") or {}).get("command", ""))
+    if not _LANDING_MSG_RX.search(cmd) or _REGIME_RX.search(cmd):
+        return None
+    if not (_REMOVAL_RX.search(cmd) and _MEASURED_RX.search(cmd)):
+        return None
+    return Finding(pattern_id=pattern.id, file="", line=0, level="error",
+                   message=(f"row {pattern.id} ({pattern.description}): the message removes code on a "
+                            "measured verdict and names no `regime:` it was measured in"),
+                   retry_hint=pattern.retry_hint, snippet=cmd[:120])
+
+
+regime_RETRY_HINT = "Add `regime: <the setting the verdict was measured in>` (e.g. `regime: short task`) to the message."
+regime_DESCRIPTION = "code removed on a measured verdict with no regime: field (opt-in require_regime)"
+regime_CHECK = _Check(id="event.regime_unnamed", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("commit", "gh pr"), retry_hint=regime_RETRY_HINT,
+               description=regime_DESCRIPTION, eats=frozenset({"current_event", "pattern"}),
+               tests="SPEC")
+
+
+# gate.unworded_close -- OPT-IN (`makoto.toml`: `words_file = "VERIFY/WORDS.tsv"`). A closing
+# reply that says the work is closed/done must cite the owner's words it closes: `WORDS.tsv:<line>`
+# naming a real row, or a row id (first column) present in the file. Register G1 GOAL
+# SUBSTITUTION: a paraphrase of the owner's words closed instead of the words. The witness is the
+# words file itself; a paraphrase cannot cite a row. Discharge: cite the row you closed.
+_CLOSED_RX = re.compile(r"\b(?:closed|done|complete[d]?|finished|resolved|shipped)\b", re.I)
+
+
+def unworded_close_gate(text: str, cwd: str) -> Optional[Finding]:
+    rel = declared(cwd or "", "words_file")
+    if not isinstance(rel, str) or not rel.strip() or not text or not _CLOSED_RX.search(text):
+        return None
+    try:
+        with open(os.path.join(cwd, rel), encoding="utf-8", errors="replace") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return None   # a declared file that is not there yet: fail open rather than wedge every close
+    base = re.escape(os.path.basename(rel))
+    for m in re.finditer(base + r":(\d+)\b", text):
+        n = int(m.group(1))
+        if 1 <= n <= len(lines) and lines[n - 1].strip():
+            return None
+    ids = {ln.split("\t", 1)[0].strip() for ln in lines[1:] if ln.strip()} - {""}
+    if any(re.search(r"(?<![\w.-])" + re.escape(i) + r"(?![\w-])", text) for i in ids):
+        return None
+    return Finding(pattern_id="gate.unworded_close", file=rel, line=0, level="error",
+                   message=(f"gate.unworded_close: the reply closes the work but cites no row of {rel} -- "
+                            "a paraphrase of the owner's words is not the words"),
+                   retry_hint=unworded_RETRY_HINT)
+
+
+unworded_RETRY_HINT = "Cite the row you closed (`WORDS.tsv:<line>` or its row id), or say the work is not closed."
+unworded_CHECK = _Check(id="gate.unworded_close", applies_at="Stop", posture="BLOCK", tests="SPEC",
+               eats=frozenset({"text", "cwd"}),
+               run=lambda c: unworded_close_gate(getattr(c, "text", "") or "", getattr(c, "cwd", "") or ""))
+
+
+_ROWS = (fallthrough_CHECK, regime_CHECK, unworded_CHECK, loosened_CHECK, owner_CHECK, repeated_append_CHECK, env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, loosened_CHECK.id: loosened_predicate, owner_CHECK.id: owner_predicate, repeated_append_CHECK.id: repeated_append_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
+_PREDICATES = {fallthrough_CHECK.id: fallthrough_predicate, regime_CHECK.id: regime_predicate, env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, loosened_CHECK.id: loosened_predicate, owner_CHECK.id: owner_predicate, repeated_append_CHECK.id: repeated_append_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

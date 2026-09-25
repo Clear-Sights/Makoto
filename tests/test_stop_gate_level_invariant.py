@@ -147,6 +147,20 @@ def _scenario_claimed_shipped(tmp_path):
 
 # Every discovered gate id must have a firing scenario here — a new gate added to checks/
 # without an entry below fails loudly (KeyError) rather than being silently skipped.
+def _scenario_unworded_close(tmp_path):
+    # fires on a close citing no row of the declared words file.
+    (tmp_path / "makoto.toml").write_text('words_file = "WORDS.tsv"\n', encoding="utf-8")
+    (tmp_path / "WORDS.tsv").write_text("id\twords\nW1\tbuild the index\n", encoding="utf-8")
+    from makoto.core._declaredverifiers import declared
+    declared.cache_clear()
+    return _ctx(text="Closed: the index is done.", cwd=str(tmp_path))
+
+
+def _scenario_unrun_count_claim(tmp_path):
+    # fires on a counted all-pass in the reply with no verifier run recorded.
+    return _ctx(text="All 602 checks pass.", history=[])
+
+
 def _scenario_unexamined_wall(tmp_path):
     # fires on an epistemic "cannot" stated with NO act since the operator last spoke. The
     # transcript carries one genuine operator turn (the window boundary) and the history is
@@ -252,6 +266,8 @@ _SCENARIOS = {
     "gate.unread_structure": _scenario_unread_structure,
     "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,
     "gate.run_promised": _scenario_run_promised,
+    "gate.unworded_close": _scenario_unworded_close,
+    "gate.unrun_count_claim": _scenario_unrun_count_claim,
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
     "gate.unexamined_wall": _scenario_unexamined_wall,
     "gate.completion": _scenario_completion,

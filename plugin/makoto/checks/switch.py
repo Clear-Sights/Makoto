@@ -1939,8 +1939,37 @@ unverified_merge_CHECK = _Check(id="gate.unverified_merge", applies_at="Pre", po
                tests="SWITCH", eats=frozenset({"current_event", "history", "pattern", "conn"}))
 
 
+# gate.unrun_count_claim -- the closing reply states a counted all-pass ("All 602 checks pass")
+# and no verifier ran anywhere in the session. Register C11 REPORT BEFORE DECIDE, the reply-side
+# twin of gate.report_before_run: a count is a measurement, and nothing was measured. Owed at the
+# Stop marker, paid only by an earlier verifier run (`kit.ran_a_verifier`, either verdict).
+# Discharge: run the verifier, then report what it printed.
+def unrun_count_claim_gate(text: str, history) -> Optional[Finding]:
+    m = _COUNTED_PASS_RX.search(text or "")
+    if not m:
+        return None
+    events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
+    end = len(events)
+    for _it, _at in unwitnessed(
+            list(enumerate(events)) + [(end, None)],
+            owes=lambda it: (end,) if it[0] == end else (),
+            pays=lambda it: (lambda at, i=it[0]: i < at)
+            if it[1] is not None and ran_a_verifier(it[1]) else None):
+        return Finding(pattern_id="gate.unrun_count_claim", file="", line=0, level="error",
+                       message=(f"gate.unrun_count_claim: the reply says `{m.group(0)}` and no verifier ran "
+                                "in this session -- a count stated with nothing counted."),
+                       retry_hint=unrun_count_RETRY_HINT, snippet=m.group(0))
+    return None
+
+
+unrun_count_RETRY_HINT = "Run the verifier and report the count it printed, or drop the count."
+unrun_count_CHECK = _Check(id="gate.unrun_count_claim", applies_at="Stop", posture="BLOCK", tests="SWITCH",
+               eats=frozenset({"text", "history"}),
+               run=lambda c: unrun_count_claim_gate(getattr(c, "text", "") or "", c.history))
+
+
 # the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK,)
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK, unrun_count_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {retry_CHECK.id: retry_predicate, relaunch_CHECK.id: relaunched_unchanged_gate,
