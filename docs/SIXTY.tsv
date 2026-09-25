@@ -7,7 +7,7 @@ A7	gate.named_test	gate.named_test	tests/test_dispatch.py::test_dispatch_named_t
 A11	gate.canon_fingerprints	gate.canon_fingerprints	tests/test_dispatch.py::test_dispatch_canon_fingerprints_gate_blocks	yes	BLOCKED
 A13	gate.claude_identity	gate.claude_identity	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[gate.claude_identity]	yes	BLOCKED
 B2	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
-B7	tools/merge_pass.py	hooks.json prompt: makoto B7	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B7]	yes	BLOCKED (model-judged; the judgement cannot run offline, so the test pins the entry: present, scoped, fix line in its prompt; live-probed 2026-09-25: denied)
+B7	tools/merge_pass.py	content.rule_without_runner	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.rule_without_runner]	yes	BLOCKED
 B9	gate.undischarged_waiver	gate.undischarged_waiver	tests/test_dispatch.py::test_dispatch_undischarged_waiver_denies_until_an_end_is_named	yes	BLOCKED
 B23	content.bound_as_count	content.bound_as_count	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.bound_as_count]	yes	BLOCKED
 B35	content.integrity_suppression_flag	content.integrity_suppression_flag	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.integrity_suppression_flag]	yes	BLOCKED
@@ -42,10 +42,10 @@ F14	content.verifier_body_hollowed	content.verifier_body_hollowed	tests/test_pre
 G1	content.phantom_citation	content.phantom_citation	tests/predicates/test_makoto_allow_exemption.py::test_1_6_violation_fires_but_makoto_allow_exempts	yes	BLOCKED
 B1	gate.self_wired	gate.self_wired	tests/test_dispatch.py::test_dispatch_self_wired_gate_blocks_when_it_fires	yes	BLOCKED
 B5	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
-B10	tests corpus-FP invariant	hooks.json prompt: makoto B10	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B10]	yes	BLOCKED (model-judged; test pins the entry, not the judgement)
+B10	tests corpus-FP invariant	content.check_without_pass_case	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.check_without_pass_case]	yes	BLOCKED
 B20	gate.hollow_test	gate.hollow_test	tests/test_dispatch.py::test_dispatch_hollow_test_gate_blocks_on_hollow_test	yes	BLOCKED
-B21	tools/merge_pass.py	hooks.json prompt: makoto B21	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B21]	yes	BLOCKED (model-judged; test pins the entry, not the judgement)
-B34	tools/register_map.py	hooks.json prompt: makoto B34	tests/test_judged_hooks.py::test_judged_entry_is_a_scoped_prompt_hook_naming_its_fix_line[B34]	yes	BLOCKED (model-judged; test pins the entry, not the judgement)
+B21	tools/merge_pass.py	content.overdetermined_case	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.overdetermined_case]	yes	BLOCKED
+B34	tools/register_map.py	content.exemption_unnamed_region	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.exemption_unnamed_region]	yes	BLOCKED
 C3	gate.named_test	gate.named_test	tests/test_dispatch.py::test_dispatch_named_test_gate_blocks_after_recorded_named_red	yes	BLOCKED
 C4	dispatch loud-allow on predicate error	content.verifier_exit_masking	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.verifier_exit_masking]	yes	BLOCKED
 C5	dispatch fail-closed	content.fallthrough_match	tests/test_pre_rows_deny_through_dispatch.py::test_pre_row_denies_its_instance_through_dispatch[content.fallthrough_match]	yes	BLOCKED

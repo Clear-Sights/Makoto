@@ -1999,10 +1999,196 @@ unworded_CHECK = _Check(id="gate.unworded_close", applies_at="Stop", posture="BL
                run=lambda c: unworded_close_gate(getattr(c, "text", "") or "", getattr(c, "cwd", "") or ""))
 
 
-_ROWS = (fallthrough_CHECK, regime_CHECK, unworded_CHECK, loosened_CHECK, owner_CHECK, repeated_append_CHECK, env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+# ---- written-down judgements (B7 B10 B21 B34). Each turns a judgement into something the agent
+# must write in the same change -- a runner, a pass case, a discriminant, a named region -- and
+# denies when it is missing or names a file that is not there. No model: the witness is the text.
+def _added_lines(current_event: dict) -> tuple:
+    """(file_path, the lines this Write/Edit adds): Edit -> new_string lines not in old_string;
+    Write -> content lines not already in the file on disk."""
+    tool = current_event.get("tool_name", "")
+    ti = current_event.get("tool_input") or {}
+    if current_event.get("hook_event_name") != "PreToolUse" or tool not in ("Write", "Edit", "MultiEdit") \
+            or not isinstance(ti, dict):
+        return "", []
+    fp = str(ti.get("file_path", ""))
+    if tool == "Write":
+        old = ""
+        try:
+            full = fp if os.path.isabs(fp) else os.path.join(current_event.get("cwd") or "", fp)
+            if os.path.isfile(full):
+                with open(full, encoding="utf-8", errors="replace") as fh:
+                    old = fh.read()
+        except OSError:
+            old = ""
+        pairs = [(old, str(ti.get("content", "")))]
+    else:
+        pairs = [(e.get("old_string", ""), e.get("new_string", "")) for e in ti.get("edits") or ()
+                 if isinstance(e, dict)] or [(ti.get("old_string", ""), ti.get("new_string", ""))]
+    added = []
+    for o, n in pairs:
+        have = set(str(o or "").splitlines())
+        added += [ln for ln in str(n or "").splitlines() if ln not in have]
+    return fp, added
+
+
+def _exists_under(cwd: str, path: str) -> bool:
+    path = path.split("::", 1)[0].strip("`'\",;:()")
+    if not path:
+        return False
+    try:
+        return os.path.exists(path if os.path.isabs(path) else os.path.join(cwd or "", path))
+    except (OSError, ValueError):
+        return False
+
+
+def _deny(pattern, fp, what, snippet) -> Finding:
+    return Finding(pattern_id=pattern.id, file=fp, line=0, level="error",
+                   message=f"row {pattern.id} ({pattern.description}): {what}",
+                   retry_hint=pattern.retry_hint, snippet=str(snippet)[:120])
+
+
+_CHECKER_RX = re.compile(r"(^|[/\\])(checks?[/\\][^/\\]+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
+
+
+# content.rule_without_runner -- register B7 RULE WITH NO RUNNER. A rule line (always / never /
+# must / do not) added to CLAUDE.md or AGENTS.md must name what runs it: a `runner:` token, or a
+# path in the line that exists. Discharge: name the check on the line, or leave the rule out.
+_RULE_FILE_RX = re.compile(r"(^|[/\\])(CLAUDE|AGENTS)\.md$")
+_RULE_LINE_RX = re.compile(r"\b(?:always|never|must|do not|don't|shall)\b", re.I)
+_PATHISH_RX = re.compile(r"[\w.-]*[/\\][\w./\\-]+|[\w-]+\.(?:py|sh|js|ts|tsv|toml|json)\b")
+_RUNNER_RX = re.compile(r"\brunner:\s*`?([^\s`]+)")
+
+
+def rule_runner_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    fp, added = _added_lines(current_event)
+    if not _RULE_FILE_RX.search(fp):
+        return None
+    cwd = current_event.get("cwd") or ""
+    for ln in added:
+        if ln.startswith(("    ", "\t", "```")) or not _RULE_LINE_RX.search(ln):
+            continue
+        m = _RUNNER_RX.search(ln)
+        cands = [m.group(1)] if m else _PATHISH_RX.findall(ln)
+        if not any(_exists_under(cwd, c) for c in cands):
+            return _deny(pattern, fp, "the rule line names no runner that exists: " + ln.strip()[:100], ln.strip())
+    return None
+
+
+rule_runner_RETRY_HINT = "Bind every rule to a check on every path: add `runner: <path of the check that runs it>` to the line."
+rule_runner_DESCRIPTION = "a rule line added to CLAUDE.md/AGENTS.md naming no runner that exists"
+rule_runner_CHECK = _Check(id="content.rule_without_runner", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("CLAUDE.md", "AGENTS.md"), retry_hint=rule_runner_RETRY_HINT,
+               description=rule_runner_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+
+# content.check_without_pass_case -- register B10 NEVER-ABSTAINING CHECK. A check added to a
+# checker file (a new `*_predicate`/`check_*` function or a `Check(` row) must name its
+# benign-input pass case in the same change: `pass: <test id or fixture path>`, and the named file
+# must exist. Discharge: write the pass twin and name it.
+# a check ROW or its predicate -- `def x_predicate(`, `def check_x(`, `X_CHECK = Check(` -- not a
+# bare verifier function (`def check(s)`), which content.verifier_predicate_weakened reads.
+_NEW_CHECK_RX = re.compile(
+    r"^\s*(?:def\s+(?:\w+_(?:predicate|check|gate)|(?:check|predicate|gate)_\w+)\s*\(|\w+\s*=\s*_?Check\s*\()")
+_PASS_RX = re.compile(r"\bpass:\s*`?([^\s`]+)")
+
+
+def check_pass_case_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    fp, added = _added_lines(current_event)
+    if not _CHECKER_RX.search(fp) or not any(_NEW_CHECK_RX.match(ln) for ln in added):
+        return None
+    cwd = current_event.get("cwd") or ""
+    named = [m.group(1) for ln in added for m in _PASS_RX.finditer(ln)]
+    if any(_exists_under(cwd, n) for n in named):
+        return None
+    new = next(ln for ln in added if _NEW_CHECK_RX.match(ln)).strip()
+    why = f"its `pass:` names nothing that exists ({named[0]})" if named else "it names no benign-input pass case"
+    return _deny(pattern, fp, f"`{new[:80]}` adds a check and {why}", new)
+
+
+check_pass_case_RETRY_HINT = "Measure its rate on benign input: write the pass twin and name it (`# pass: tests/test_x.py::test_benign`)."
+check_pass_case_DESCRIPTION = "a check added with no named benign-input pass case"
+check_pass_case_CHECK = _Check(id="content.check_without_pass_case", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("def ", "Check("), retry_hint=check_pass_case_RETRY_HINT,
+               description=check_pass_case_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+
+# content.overdetermined_case -- register B21 OVERDETERMINED VERDICT, merge_pass's discriminant
+# rule moved to tests. A change adding two or more verdict cases (test functions named for a fire:
+# fires / blocks / denies / catches / flags / detects) must give each its own `discriminant:` --
+# what only its condition sees -- and no two may share one. Discharge: isolate each condition with
+# its own input and write down what separates it.
+_TEST_FILE_RX = re.compile(r"(^|[/\\])(test_[^/\\]*|[^/\\]*_test)\.py$")
+_VERDICT_TEST_RX = re.compile(r"^\s*def\s+(test_\w*(?:fire|block|den(?:y|ies)|catch|flag|detect)\w*)\s*\(", re.I)
+_DISCRIMINANT_RX = re.compile(r"\bdiscriminant:\s*(.+?)\s*(?:[\"']{3}|$)")
+
+
+def overdetermined_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    fp, added = _added_lines(current_event)
+    if not _TEST_FILE_RX.search(fp):
+        return None
+    cases, cur = [], None
+    for ln in added:
+        m = _VERDICT_TEST_RX.match(ln)
+        if m:
+            cur = [m.group(1), None]
+            cases.append(cur)
+        elif re.match(r"^\s*def\s", ln):
+            cur = None
+        elif cur is not None and cur[1] is None:
+            d = _DISCRIMINANT_RX.search(ln)
+            if d:
+                cur[1] = " ".join(d.group(1).lower().split())
+    if len(cases) < 2:
+        return None
+    bare = [n for n, d in cases if not d]
+    if bare:
+        return _deny(pattern, fp, f"{len(cases)} verdict cases added and {bare[0]} names no discriminant", bare[0])
+    seen = {}
+    for n, d in cases:
+        if d in seen:
+            return _deny(pattern, fp, f"{seen[d]} and {n} are separated by the same discriminant ({d})", n)
+        seen[d] = n
+    return None
+
+
+overdetermined_RETRY_HINT = "Isolate each condition with its own input: give each verdict case a distinct `discriminant: <what only it sees>`."
+overdetermined_DESCRIPTION = "two or more verdict cases added without one distinct discriminant each"
+overdetermined_CHECK = _Check(id="content.overdetermined_case", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("def test_",), retry_hint=overdetermined_RETRY_HINT,
+               description=overdetermined_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+
+# content.exemption_unnamed_region -- register B34 LAW EXEMPTS ITS INSTRUMENT. An exclusion /
+# skip / exempt / ignore / allow list added to a checker file must name the region it leaves
+# unreached (`region: ...`, `unreached: ...`, or NOT-COUNTABLE, as REGISTER-MAP does). Discharge:
+# say, in the change, what the checker no longer reaches.
+_EXEMPTION_RX = re.compile(r"^\s*\w*(?:exempt|exclu|skip|ignor|allow)\w*\s*(?::[^=]*)?=\s*[\[({]", re.I)
+_REGION_RX = re.compile(r"\b(?:region|unreached):\s*\S|NOT-COUNTABLE|OUT-OF-SUBJECT")
+
+
+def exemption_region_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    fp, added = _added_lines(current_event)
+    if not _CHECKER_RX.search(fp):
+        return None
+    hit = next((ln for ln in added if _EXEMPTION_RX.match(ln)), None)
+    if hit is None or any(_REGION_RX.search(ln) for ln in added):
+        return None
+    return _deny(pattern, fp, "an exemption list is added and the region it leaves unreached is not named: "
+                 + hit.strip()[:80], hit.strip())
+
+
+exemption_region_RETRY_HINT = "Name every region it cannot reach: add `# region: <what this exemption leaves unchecked>`."
+exemption_region_DESCRIPTION = "an exemption list added to a checker naming no unreached region"
+exemption_region_CHECK = _Check(id="content.exemption_unnamed_region", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__,
+               keywords=("xempt", "xclu", "kip", "gnor", "llow", "XEMPT", "XCLU", "KIP", "GNOR", "LLOW"),
+               retry_hint=exemption_region_RETRY_HINT, description=exemption_region_DESCRIPTION,
+               eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+_ROWS = (rule_runner_CHECK, check_pass_case_CHECK, overdetermined_CHECK, exemption_region_CHECK, fallthrough_CHECK, regime_CHECK, unworded_CHECK, loosened_CHECK, owner_CHECK, repeated_append_CHECK, env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {fallthrough_CHECK.id: fallthrough_predicate, regime_CHECK.id: regime_predicate, env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, loosened_CHECK.id: loosened_predicate, owner_CHECK.id: owner_predicate, repeated_append_CHECK.id: repeated_append_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
+_PREDICATES = {rule_runner_CHECK.id: rule_runner_predicate, check_pass_case_CHECK.id: check_pass_case_predicate, overdetermined_CHECK.id: overdetermined_predicate, exemption_region_CHECK.id: exemption_region_predicate, fallthrough_CHECK.id: fallthrough_predicate, regime_CHECK.id: regime_predicate, env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, loosened_CHECK.id: loosened_predicate, owner_CHECK.id: owner_predicate, repeated_append_CHECK.id: repeated_append_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

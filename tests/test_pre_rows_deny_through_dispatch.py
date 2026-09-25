@@ -57,6 +57,14 @@ _CASES = {
     "content.fallthrough_match": ([], _pre("Write", file_path="route.py", content=(
         "def route(ev):\n    match ev:\n        case 'a':\n            return 1\n        case 'b':\n            return 2\n")), {}),
     "event.regime_unnamed": ([], _pre("Bash", command="git commit -am 'Remove capture_index: no gain on the short-task runs'"), {}),
+    "content.rule_without_runner": ([], _pre("Edit", file_path="CLAUDE.md", old_string="# Rules\n",
+                                             new_string="# Rules\n- Always run the linter before committing.\n"), {}),
+    "content.check_without_pass_case": ([], _pre("Write", file_path="lint_check.py", content=(
+        "def stale_predicate(ev):\n    return ev.get('stale') is True\n")), {}),
+    "content.overdetermined_case": ([], _pre("Write", file_path="test_rows.py", content=(
+        "def test_a_fires():\n    assert f(1)\n\n\ndef test_b_fires():\n    assert f(2)\n")), {}),
+    "content.exemption_unnamed_region": ([], _pre("Write", file_path="lint_check.py",
+                                                  content="_SKIP_PATHS = ['vendor/']\n"), {}),
 }
 
 # the same act with its discharge in place: nothing is denied
@@ -75,10 +83,20 @@ _PASSES = {
         "            raise ValueError(ev)\n"))),
     "event.regime_unnamed": ([], _pre("Bash", command=(
         "git commit -am 'Remove capture_index: no gain on the short-task runs\n\nregime: short task'"))),
+    "content.rule_without_runner": ([], _pre("Edit", file_path="CLAUDE.md", old_string="# Rules\n",
+                                             new_string="# Rules\n- Always run the gate. runner: run_gate.sh\n")),
+    "content.check_without_pass_case": ([], _pre("Write", file_path="lint_check.py", content=(
+        "# pass: test_benign.py::test_fresh_is_silent\ndef stale_predicate(ev):\n    return ev.get('stale') is True\n"))),
+    "content.overdetermined_case": ([], _pre("Write", file_path="test_rows.py", content=(
+        'def test_a_fires():\n    """discriminant: only a reads the header"""\n    assert f(1)\n\n\n'
+        'def test_b_fires():\n    """discriminant: only b reads the footer"""\n    assert f(2)\n'))),
+    "content.exemption_unnamed_region": ([], _pre("Write", file_path="lint_check.py",
+                                                  content="# region: vendor/ is not linted\n_SKIP_PATHS = ['vendor/']\n")),
 }
 
 _FILES = {"makoto.toml": 'owner_paths = ["config.env", ".claude/"]\nrequire_regime = true\n'
-                          'words_file = "VERIFY/WORDS.tsv"\n', "config.env": "X=1\n"}
+                          'words_file = "VERIFY/WORDS.tsv"\n', "config.env": "X=1\n",
+          "run_gate.sh": "exit 0\n", "test_benign.py": "def test_fresh_is_silent():\n    pass\n"}
 
 
 @pytest.mark.parametrize("row", sorted(_CASES))

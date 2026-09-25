@@ -77,10 +77,6 @@ def test_hooks_json_declares_pre_both_post_terminals_and_stop():
         for entry in hooks[evt]:
             assert entry["hooks"], f"{evt} matcher must register at least one hook"
             for h in entry["hooks"]:
-                if h["type"] == "prompt":
-                    # a model-judged row (tests/test_judged_hooks.py): PreToolUse only, always scoped
-                    assert evt == "PreToolUse" and h.get("if"), h
-                    continue
                 assert h["type"] == "command"
                 # sh runs it, so no exec bit is needed, and the placeholder is quoted, so a
                 # plugin root with a space (a Windows user profile) stays one argument.
