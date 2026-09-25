@@ -1,7 +1,7 @@
-"""gate.self_wired — advisory-only partial-strip detection of makoto's own hook wiring, checked
+"""gate.self_wired — partial-strip (BLOCK since 2026-09-25) detection of makoto's own hook wiring, checked
 across BOTH `.claude/settings.json` and (2026-07-22) the plugin's own hooks/hooks.json manifest.
 Fires iff PreToolUse/PostToolUse/Stop is missing a makoto-dispatching entry from NEITHER source
-while settings.json otherwise parses; never blocks (level='advisory', not 'error'). Documented
+while settings.json otherwise parses; blocks (level='error'). Documented
 blind spot: an edit that strips ALL THREE from BOTH sources simultaneously disables this check in
 the same instant it would have fired for the settings.json-only case (Claude Code reloads
 hooks.json live, not once at session start), so it provides ZERO coverage against that canonical
@@ -38,7 +38,7 @@ def test_one_event_missing_fires_advisory_naming_it():
     f = self_wired_gate(_reader(_settings(stop=False)))
     assert f is not None
     assert f.pattern_id == "gate.self_wired"
-    assert f.level == "advisory"          # never "error" — advisory over blocking (condition c)
+    assert f.level == "error"          # never "error" — advisory over blocking (condition c)
     assert "Stop" in f.message
     assert "PreToolUse" not in f.message and "PostToolUse" not in f.message
 
@@ -115,7 +115,7 @@ def test_entry_dispatches_to_makoto_matches_install_semantics():
 def test_check_export_shape():
     assert CHECK.id == "gate.self_wired"
     assert CHECK.applies_at == "Stop"
-    assert CHECK.posture == "ADVISE"
+    assert CHECK.posture == "BLOCK"
 
 
 def test_check_run_adapter_delegates_to_self_wired_gate():
@@ -169,7 +169,7 @@ def test_plugin_manifest_also_missing_the_event_still_fires():
                          plugin_fs_read=_reader(_plugin_manifest(stop=False)))
     assert f is not None
     assert "Stop" in f.message
-    assert f.level == "advisory"
+    assert f.level == "error"
 
 
 def test_all_events_wired_by_plugin_manifest_alone_no_finding():

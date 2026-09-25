@@ -1056,30 +1056,23 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
         pattern_id="gate.self_wired",
         file=finding_file,
         line=0,
-        level="advisory",
+        level="error",
         message=(f"makoto's hook wiring is missing an entry for: {named} in every consultable "
                  f"wiring source ({'; '.join(consulted)}). "
                  "This is a PARTIAL-STRIP signal only — it cannot see a simultaneous strip of "
                  "all events from every source at once (see gate.self_wired's docstring)."),
-        retry_hint=("Advisory only, never blocking: confirm this was an intentional change, or "
-                    "restore the missing hook entry — `makoto install` re-wires "
+        retry_hint=("Restore the missing hook entry — `makoto install` re-wires "
                     "~/.claude/settings.json; a plugin-packaged install needs its "
                     "hooks/hooks.json manifest restored (re-enable/reinstall the plugin)."),
     )
 
 
-# NOTE: this CHECK's posture is "ADVISE", not "BLOCK" like every sibling Stop gate.
-# gate.self_wired's own Finding.level is documented and behaviorally pinned
-# (tests/test_stop_gate_level_invariant.py) as ALWAYS "advisory", never "error" (the one
-# DESIGN-DECISION-cited advisory exception among the Stop gates, FD6) -- declaring it
-# CHECK.posture="BLOCK" here would misrepresent that in the flat checks/ catalog's own metadata.
-# posture is the one owner of blocking vs advisory; the never-blocks guarantee rests on
-# posture=="ADVISE" alone.
+# BLOCK since 2026-09-25: the discharge is in-turn -- restore the missing hook entry.
 from makoto.kit import live_query_finding
 wired_run = live_query_finding(
     query=lambda fs_read: self_wired_gate(fs_read), posture_label="gate.self_wired"
 )
-wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="ADVISE",
+wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="BLOCK",
                eats=frozenset({"fs_read"}),
                run=wired_run, layer="meta", tests="OTHER_POINT")
 

@@ -6,9 +6,9 @@ fire_level). That enforcement now lives in `tests/test_pre_tier_block_invariant.
 `registry.load_precheck_catalog()`'s own docstring). Stop gates have no equivalent load-time
 enforcement — a Check's declared `.posture` (BLOCK/ADVISE) is what a gate is SUPPOSED to fire at;
 the level actually lives on the `Finding` each gate's predicate constructs when it fires, and
-nothing at load time stops the two from disagreeing. `gate.self_wired` (formerly
-stopchecks/stopcheck_self_wired.py) is the best-known example: it declares `posture="ADVISE"`
-(2026-07-05, DESIGN DECISION 6) and must never emit "error".
+nothing at load time stops the two from disagreeing. Since 2026-09-25 every Stop gate is BLOCK
+(`test_no_stop_gate_is_advise`): the ADVISE rows were promoted, moved to the Pre edge as denies,
+or removed.
 
 This test fires EVERY live gate discovered by `_live_gates()` through its real `.run(ctx)`
 entry point — the exact call `run_stop_checks` makes — with a scenario proven (via each gate's own
@@ -30,7 +30,7 @@ from makoto.context import GateContext
 # the GateContext entirely and audits the REAL checks/ package on disk (orphan modules / dangling
 # manifest ids), so there is no synthetic ctx that can make it fire without actually planting an
 # orphan file into the live package -- which would corrupt the catalog for every other test in
-# this process. Its Finding shape and level ("advisory", pinned) are already covered directly by
+# this process. Its Finding shape and level ("error", pinned) are already covered directly by
 # tests/test_undeclared_falsifiable.py, so it is excluded from this module's scenario-driven scan.
 _SELF_AUDIT_GATES = frozenset({"gate.undeclared_falsifiable"})
 
@@ -121,17 +121,6 @@ def _scenario_canon_fingerprints(tmp_path):
     return _ctx(history=[row])
 
 
-def _scenario_canon_fingerprints_advisory(tmp_path):
-    # fires nogreen_weakened (ADVISE, soft atom): an Edit on a test file that degenerates a real
-    # assertion into a tautology, with no green test run recorded.
-    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Edit",
-                        "tool_input": {"file_path": "tests/test_x.py",
-                                       "old_string": "assert x == 5",
-                                       "new_string": "assert True"},
-                        "tool_response": {}}}
-    return _ctx(history=[row])
-
-
 def _scenario_self_wired(tmp_path):
     # fires: tests/test_self_wired_check.py (partial strip: Stop entry missing)
     wired = json.dumps({"hooks": {
@@ -183,22 +172,6 @@ def _scenario_claimed_consent_absent(tmp_path):
     return _ctx(text="You approved this, so I merged it.", transcript_path=str(tp))
 
 
-def _scenario_unprobed_fanout(tmp_path):
-    # fires: tests/test_obligation_gates.py::test_unprobed_fanout_fires_on_a_dispatch_with_no_read
-    # A dispatch with no Read/Glob/Grep anywhere earlier in the session.
-    row = {"payload": {"hook_event_name": "PreToolUse", "tool_name": "Task",
-                       "tool_input": {"description": "go and refactor the parser"}}}
-    return _ctx(history=[row])
-
-
-def _scenario_unasked_plan(tmp_path):
-    # fires: tests/test_obligation_gates.py::test_unasked_plan_fires_on_a_plan_with_no_question
-    # A plan presented with no AskUserQuestion anywhere earlier in the session.
-    row = {"payload": {"hook_event_name": "PreToolUse", "tool_name": "ExitPlanMode",
-                       "tool_input": {"plan": "step 1, step 2"}}}
-    return _ctx(history=[row])
-
-
 def _bash_row(command, stdout="", tool_name="Bash"):
     return {"payload": {"hook_event_name": "PostToolUse", "tool_name": tool_name,
                         "tool_input": {"command": command},
@@ -221,45 +194,11 @@ def _scenario_run_promised(tmp_path):
                                       "last_assistant_message": "I'll run all 602 checks now."}}])
 
 
-def _scenario_unknown_ref_switch(tmp_path):
-    # fires: tests/test_obligation_gates.py::test_unknown_ref_switch_fires_on_an_unprinted_ref
-    return _ctx(history=[_bash_row("git checkout feature-x")])
-
-
-def _scenario_unobserved_destruction(tmp_path):
-    # fires: tests/test_obligation_gates.py::test_unobserved_destruction_fires_with_no_verifier
-    return _ctx(history=[_bash_row("rm -rf build/")])
-
-
-def _scenario_relaunched_unchanged(tmp_path):
-    # fires: tests/test_obligation_gates.py::test_relaunched_unchanged_fires_on_the_second_launch
-    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Task",
-                       "tool_input": {"description": "go"}, "tool_response": {}}}
-    return _ctx(history=[row, row])
-
-
-def _scenario_undischarged_waiver(tmp_path):
-    # fires: tests/test_undischarged_waiver.py::test_fires_on_a_bare_lint_directive
-    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Edit",
-                       "tool_input": {"file_path": "src/parser.py", "old_string": "a",
-                                      "new_string": "value = parse(raw)  # noqa"},
-                       "tool_response": {}}}
-    return _ctx(history=[row])
-
-
 def _scenario_unnamed_failure(tmp_path):
     # fires: tests/test_unnamed_failure.py::test_fires_on_a_count_with_no_name
     return _ctx(text="1 test failed; looking into it.",
                 history=[_bash_row("python3 -m pytest -q",
                                    "tests/test_a.py::test_charge FAILED\n1 failed in 1.0s")])
-
-
-def _scenario_report_before_run(tmp_path):
-    # fires: tests/test_report_before_run.py::test_fires_on_a_report_with_no_run_before_it
-    return _ctx(history=[{"payload": {"hook_event_name": "PostToolUse", "tool_name": "Write",
-                                      "tool_input": {"file_path": "HANDOFF.md",
-                                                     "content": "The suite passes."},
-                                      "tool_response": {}}}])
 
 
 def _scenario_unclaimed_unit(tmp_path):
@@ -309,17 +248,10 @@ def _scenario_pasted_fix(tmp_path):
 _SCENARIOS = {
     "gate.unclaimed_unit": _scenario_unclaimed_unit,
     "gate.pasted_fix": _scenario_pasted_fix,
-    "gate.report_before_run": _scenario_report_before_run,
     "gate.unnamed_failure": _scenario_unnamed_failure,
-    "gate.undischarged_waiver": _scenario_undischarged_waiver,
     "gate.unread_structure": _scenario_unread_structure,
     "gate.unwitnessed_verifier": _scenario_unwitnessed_verifier,
     "gate.run_promised": _scenario_run_promised,
-    "gate.unknown_ref_switch": _scenario_unknown_ref_switch,
-    "gate.unobserved_destruction": _scenario_unobserved_destruction,
-    "gate.relaunched_unchanged": _scenario_relaunched_unchanged,
-    "gate.unprobed_fanout": _scenario_unprobed_fanout,
-    "gate.unasked_plan": _scenario_unasked_plan,
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
     "gate.unexamined_wall": _scenario_unexamined_wall,
     "gate.completion": _scenario_completion,
@@ -332,7 +264,6 @@ _SCENARIOS = {
     "gate.hollow_test": _scenario_hollow_test,
     "gate.canon": _scenario_canon,
     "gate.canon_fingerprints": _scenario_canon_fingerprints,
-    "gate.canon_fingerprints_advisory": _scenario_canon_fingerprints_advisory,
     "gate.self_wired": _scenario_self_wired,
     "gate.plan_item_drift": _scenario_plan_item_drift,
     "gate.claimed_running": _scenario_claimed_running,
@@ -436,3 +367,10 @@ def test_TEETH_allowlist_check_catches_an_unnamed_advisory_gate():
     # The other direction the rule also owns: an ADVISE-posture gate that has started blocking.
     assert _violation("gate.hypothetical", POSTURE_ADVISE, "error") is not None, (
         "an ADVISE-posture gate now emitting 'error' goes unreported")
+
+
+def test_no_stop_gate_is_advise():
+    """Makoto blocks or stays silent: a Stop-edge warning has no discharge, it only re-bounces.
+    A new ADVISE Stop row reddens here (the self-audit gate included)."""
+    advise = sorted(g.id for g in load_checks(edge="Stop") if g.posture != POSTURE_BLOCK)
+    assert not advise, advise

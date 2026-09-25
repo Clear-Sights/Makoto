@@ -573,13 +573,13 @@ mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOC
 # reaching for global state, so they're exercised with synthetic/tmp_path fixtures without
 # mutating the real `checks/` package.
 #
-# ADVISORY tier only: a catalog-completeness drift is a maintenance signal, not a live integrity
-# violation of anything the agent claimed this turn, so it must never block.
+# BLOCK TIER (2026-09-25): it fires only while the catalog on disk is inconsistent, which in
+# practice means the agent is editing makoto's own checks/; the discharge is to fix the catalog.
 from pathlib import Path
 
 from makoto.substrate._declared import DECLARED_IDS
 from makoto.registry import Check, discover, scan
-from makoto.registry import POSTURE_ADVISE
+from makoto.registry import POSTURE_BLOCK
 
 
 def orphan_modules(*, package_dir: Optional[Path] = None) -> list[str]:
@@ -616,7 +616,7 @@ def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
         pattern_id="gate.undeclared_falsifiable",
         file="makoto/checks/",
         line=0,
-        level="advisory",
+        level="error",
         message="checks/ catalog completeness drift -- " + "; ".join(parts),
         retry_hint=("Fix the checks/ catalog: give every on-disk module a valid CHECK "
                     "(id/applies_at/posture), and either implement or remove every "
@@ -628,7 +628,7 @@ def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
 undeclared_CHECK = Check(
     id="gate.undeclared_falsifiable",
     applies_at="Stop",
-    posture=POSTURE_ADVISE,
+    posture=POSTURE_BLOCK,
     tests="SPEC",
     run=lambda ctx=None: undeclared_falsifiable_gate(),
 )
@@ -1034,9 +1034,10 @@ masking_CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", pos
 # `GateContext` carries no `conn`, so an exemption could not be recorded, and an unrecorded
 # exemption is the laundering token this package refuses everywhere else.
 #
-# ADVISORY TIER, NEVER BLOCK: a deliberately permanent waiver is real and common (a vendored
-# file's lint exclusion, a directive on a shape the checker gets wrong), and looks identical here.
-from makoto.kit import decode_history_event, introduced_text
+# PRE-EDGE DENY (2026-09-25): the Write/Edit introducing the directive is refused before it lands;
+# the discharge is to name the end beside it (a tracked item, a date, `until ...`) and retry. A
+# deliberately permanent waiver names its reason as an end (`remove when <X>`), one clause.
+from makoto.kit import introduced_text
 
 # Only the tools that carry introduced FILE content. Bash is deliberately absent -- see the
 # recall bounds above.
@@ -1109,23 +1110,18 @@ def _undischarged_directives(content: str) -> list:
     return offenders
 
 
-def undischarged_waiver_gate(history) -> Optional[Finding]:
-    """Fire iff a settled file mutation this session introduced a silencing directive with no
-    checkable end named on or above it. One finding for the whole turn, naming the offenders."""
-    hits = []
-    for row in history or ():
-        ev = decode_history_event(row)
-        if not isinstance(ev, dict):
-            continue                      # fail open: an undecodable row is no evidence
-        if ev.get("hook_event_name") != "PostToolUse":
-            continue                      # a call that may never have landed introduced nothing
-        tool = ev.get("tool_name", "")
-        if tool not in _MUTATION_TOOLS:
-            continue
-        ti = ev.get("tool_input", {}) or {}
-        fp = ti.get("file_path", "") if isinstance(ti, dict) else ""
-        for _, text in _undischarged_directives(introduced_text(tool, ti)):
-            hits.append((fp, text))
+def undischarged_waiver_predicate(*, current_event: dict, history: list, pattern,
+                                  conn=None) -> Optional[Finding]:
+    """Deny a Write/Edit whose introduced text carries a silencing directive with no checkable
+    end named on or above it. One finding naming the offenders."""
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    tool = current_event.get("tool_name", "")
+    ti = current_event.get("tool_input", {}) or {}
+    if tool not in _MUTATION_TOOLS or not isinstance(ti, dict):
+        return None
+    fp = ti.get("file_path", "")
+    hits = [(fp, text) for _, text in _undischarged_directives(introduced_text(tool, ti))]
     if not hits:
         return None
     named = "; ".join(f"`{t}`" + (f" in {f}" if f else "") for f, t in hits[:_NAMED])
@@ -1134,7 +1130,7 @@ def undischarged_waiver_gate(history) -> Optional[Finding]:
         pattern_id="gate.undischarged_waiver",
         file=hits[0][0],
         line=0,
-        level="advisory",
+        level="error",
         message=(
             f"a checker-silencing directive was introduced with no checkable end named on or "
             f"above it: {named}{more}. An exemption with no end is a permanent hole with a "
@@ -1150,10 +1146,14 @@ def undischarged_waiver_gate(history) -> Optional[Finding]:
     )
 
 
-waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Stop", posture="ADVISE",
+waiver_RETRY_HINT = "Name the end beside the directive, or fix the finding it silences."
+waiver_DESCRIPTION = "a checker-silencing directive introduced with no checkable end"
+waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__,
+               keywords=("noqa", "nosec", "ignore", "disable", "no cover", "skip"),
+               retry_hint=waiver_RETRY_HINT, description=waiver_DESCRIPTION,
                tests="SPEC",
-               eats=frozenset({"history"}),
-               run=lambda c: undischarged_waiver_gate(c.history))
+               eats=frozenset({"current_event"}))
 # gate.claude_identity -- a commit about to be stamped with an identity nobody chose: the
 # container's git layer (an env var or config file) names Claude at the anthropic.com noreply
 # address, and a plain `git commit` takes that setting as if it were who is writing.
@@ -1325,11 +1325,9 @@ identity_CHECK = _Check(id="gate.claude_identity", applies_at="Pre", posture="BL
 # `makoto/substrate/_canonAtoms.py`'s module docstring for the scope-cut and porting-fidelity
 # notes, and its BLOCK_IDS for which fingerprints are blocking-capable by construction.
 #
-# LOADER SHAPE: fingerprints split BLOCK/ADVISE, but the Stop-gate level invariant enforces one
-# gate id -> one fixed Finding.level -- a single mixed-posture module would violate that the
-# moment both tiers fired in the same turn. Resolution: TWO gate modules (this one, BLOCK-only;
-# canonFingerprintsAdvisory below, ADVISE-only), sharing their atom/decode logic via
-# `makoto/substrate/_canonAtoms.py`.
+# BLOCK-only. The fingerprints outside BLOCK_IDS are not run at Stop: their advisory sibling
+# gate.canon_fingerprints_advisory was removed 2026-09-25 (it served no register entry and could
+# not block).
 from typing import List
 
 
@@ -1373,45 +1371,6 @@ fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOC
                    session_id=c.session_id, state_root=c.state_root))
 
 # ==============================================================================================
-# canonFingerprintsAdvisory
-# ==============================================================================================
-# gate.canon_fingerprints_advisory -- the ADVISE-tier half of the in-scope canon session
-# fingerprints. See canonFingerprints.py's module comment for the scope-cut and posture-citation
-# trail: these either rest on a soft/claim atom the gold-oracle finding doc's robust core does
-# not name, or are among its explicitly-named worst disqualified fingerprints -- so they stay in
-# the catalog, evaluated and recorded, but NEVER block.
-#
-# Sibling of canonFingerprints.py; see that module's comment for why this is two gate modules
-# instead of one. Its `posture="ADVISE"` below is what keeps it non-blocking, the same as
-# gate.self_wired's own advisory-only tier.
-
-
-def canon_fingerprint_advisory_gate(text, history) -> List[Finding]:
-    """One ADVISORY (never blocking) Finding per non-robust-core canon fingerprint that fires on
-    this session's call stream. Silent (empty list) when none fire."""
-    from makoto.substrate._canonAtoms import calls_from_history, fired_canon_fingerprints
-    out: List[Finding] = []
-    for name, formula, is_block in fired_canon_fingerprints(calls_from_history(history), text or ""):
-        if is_block:
-            continue
-        out.append(Finding(
-            pattern_id="gate.canon_fingerprints_advisory",
-            file="", line=0, level="advisory",
-            message=(f"canon.{name}: {formula} -- a gaming-shaped session fingerprint fired. "
-                     "ADVISORY only: this fingerprint rests on a soft/claim atom or is among the "
-                     "gold-oracle finding's named disqualified fingerprints, so it is recorded "
-                     "but never blocks."),
-            retry_hint="Advisory only -- review the flagged behavior; this never blocks a turn.",
-        ))
-    return out
-
-
-fpadv_CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", posture="ADVISE",
-               tests="SPEC",
-               eats=frozenset({"text", "history"}),
-               run=lambda c: canon_fingerprint_advisory_gate(c.text, c.history))
-
-# ==============================================================================================
 # planItemDrift
 # ==============================================================================================
 # gate.plan_item_drift -- ADVISORY reminder of open PLAN/TASK-LABELED commitments (a forward
@@ -1419,9 +1378,8 @@ fpadv_CHECK = _Check(id="gate.canon_fingerprints_advisory", applies_at="Stop", p
 # cannot see because it requires a file-shaped location.
 #
 # `state/plan.py` sources/discharges these purely textually (no filesystem ground truth exists
-# for a label); this check surfaces whatever is still open at Stop time as a reminder. ADVISORY
-# tier only: a label's "still open" state is a weaker, textual-only signal with no corpus-measured
-# FP rate, so it must never block.
+# for a label); this check blocks the stop while one is still open (BLOCK since 2026-09-25): the
+# discharge is in-turn -- say it is done (first-person past tense naming it) or retract it.
 # At most this many labels are named inline in the reminder; any remainder is counted, not named.
 _LABEL_CAP = 8
 
@@ -1438,7 +1396,7 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
         pattern_id="gate.plan_item_drift",
         file="",
         line=0,
-        level="advisory",
+        level="error",
         message=(
             f"plan/task-labeled commitment(s) still open: {labels}{more}. A textual-only signal "
             "(no filesystem ground truth for a label) -- confirm each is genuinely still pending, "
@@ -1448,7 +1406,7 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
     )
 
 
-drift_CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="ADVISE",
+drift_CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="BLOCK",
                tests="SPEC",
                eats=frozenset({"open_plan_items"}),
                run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))
@@ -1726,10 +1684,172 @@ budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
 budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-_ROWS = (env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, fpadv_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
+
+# content.loosened_after_red -- a test's assertion loosened while that test's recorded run is red.
+# Register G1 GOAL SUBSTITUTION (+B24): the check was moved to meet the result instead of the
+# result to meet the check. The witness is the record's own red verdict for the edited file
+# (`kit.current_named_verdicts`, the fold gate.named_test reads) and the edit's own diff: an
+# `==` turned into an inequality, or an inequality's bound moved the lenient way. Discharge: fix
+# the code under test (or make the run green) before touching the assertion.
+import json
+
+from makoto.kit import current_named_verdicts, decode_history_event
+
+_LOOSE_TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
+_ASSERT_CMP_RX = re.compile(r"^(?P<lead>\s*assert\b.*?)(?P<op>==|<=|>=|<|>)\s*(?P<num>-?\d+(?:\.\d+)?)\s*$")
+
+
+def _loosened(old: str, new: str) -> Optional[str]:
+    """The first assert line of `old` that `new` carries in a looser form, else None."""
+    olds = [m for m in map(_ASSERT_CMP_RX.match, (old or "").splitlines()) if m]
+    for n in filter(None, map(_ASSERT_CMP_RX.match, (new or "").splitlines())):
+        for o in olds:
+            if " ".join(o["lead"].split()) != " ".join(n["lead"].split()):
+                continue
+            a, b = float(o["num"]), float(n["num"])
+            if o["op"] == "==" and n["op"] != "==":
+                return n.group(0).strip()
+            if o["op"] == n["op"] and ((n["op"] in ("<", "<=") and b > a) or (n["op"] in (">", ">=") and b < a)):
+                return n.group(0).strip()
+    return None
+
+
+def loosened_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse" or current_event.get("tool_name") not in ("Edit", "MultiEdit"):
+        return None
+    ti = current_event.get("tool_input") or {}
+    fp = str(ti.get("file_path", "")) if isinstance(ti, dict) else ""
+    if not _LOOSE_TARGET_RX.search(fp):
+        return None
+    pairs = [(e.get("old_string", ""), e.get("new_string", "")) for e in ti.get("edits") or ()
+             if isinstance(e, dict)] or [(ti.get("old_string", ""), ti.get("new_string", ""))]
+    line = next(filter(None, (_loosened(o, n) for o, n in pairs)), None)
+    if line is None:
+        return None
+    red = sorted(t for t, v in current_named_verdicts(history).items()
+                 if v == "FAIL" and (fp.endswith(t.split("::")[0]) or t.split("::")[0].endswith(fp)))
+    if not red:
+        return None
+    return Finding(pattern_id=pattern.id, file=fp, line=0, level="error",
+                   message=(f"row {pattern.id} ({pattern.description}): `{line}` while {red[0]} is "
+                            "red on the record -- the check moved to meet the result."),
+                   retry_hint=pattern.retry_hint, snippet=line[:120])
+
+
+loosened_RETRY_HINT = "Fix the code under test until the run is green; loosen an assertion only with the run green and a reason."
+loosened_DESCRIPTION = "a test assertion loosened while that test's recorded run is red"
+loosened_CHECK = _Check(id="content.loosened_after_red", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("assert",), retry_hint=loosened_RETRY_HINT,
+               description=loosened_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
+               tests="SPEC")
+
+
+# event.owner_path -- a delete, overwrite or cut of a path the repository declares as the owner's
+# (`makoto.toml`: `owner_paths = ["config.env", ".claude/", ...]`). Register E12 PRINCIPAL
+# EXCLUDED: the principal's own hands, acted on without him. The witness is the declaration --
+# a statement by the only party that knows, so it may spend a deny; absent it, nothing fires.
+# Discharge: leave the path alone (ask the owner).
+from makoto.core._declaredverifiers import owner_paths
+
+_REMOVERS = frozenset({"rm", "unlink", "shred", "truncate", "mv"})
+
+
+def _owned(target: str, cwd: str, owned: tuple) -> Optional[str]:
+    path = os.path.normpath(os.path.join(cwd, target) if cwd else target)
+    rel = os.path.relpath(path, cwd) if cwd else path
+    rel = rel.replace("\\", "/")
+    for p in owned:
+        q = p.rstrip("/")
+        if rel == q or rel.startswith(q + "/"):
+            return p
+    return None
+
+
+def owner_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    cwd = current_event.get("cwd") or ""
+    owned = owner_paths(cwd)
+    if not owned:
+        return None
+    tool = current_event.get("tool_name", "")
+    ti = current_event.get("tool_input") or {}
+    if not isinstance(ti, dict):
+        return None
+    hit = None
+    if tool == "Bash":
+        for argv, _ in _shell_segments(str(ti.get("command", ""))):
+            argv = [a for a in argv if not _ASSIGNMENT_RX.match(a)]
+            prog = argv[0].rsplit("/", 1)[-1] if argv else ""
+            args = argv[2:] if prog == "git" and argv[1:2] in (["rm"], ["mv"]) else argv[1:] if prog in _REMOVERS else []
+            hit = next(filter(None, (_owned(a, cwd, owned) for a in args if not a.startswith("-"))), None)
+            if hit:
+                break
+    elif tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        p = _owned(str(ti.get("file_path", "")), cwd, owned)
+        pairs = [(e.get("old_string", ""), e.get("new_string", "")) for e in ti.get("edits") or ()
+                 if isinstance(e, dict)] or [(ti.get("old_string", ""), ti.get("new_string", ""))]
+        cut = tool == "Write" or any(set(o.splitlines()) - set(n.splitlines()) for o, n in pairs)
+        hit = p if p and cut else None
+    if not hit:
+        return None
+    return Finding(pattern_id=pattern.id, file=hit, line=0, level="error",
+                   message=f"row {pattern.id} ({pattern.description}): `{hit}` is declared the owner's in makoto.toml",
+                   retry_hint=pattern.retry_hint, snippet=hit[:120])
+
+
+owner_RETRY_HINT = "Leave the owner's path as it is; if it must change, ask the owner to change it."
+owner_DESCRIPTION = "a delete, overwrite or cut of a path makoto.toml declares as the owner's"
+owner_CHECK = _Check(id="event.owner_path", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("rm", "mv", "unlink", "shred", "truncate", "file_path"),
+               retry_hint=owner_RETRY_HINT, description=owner_DESCRIPTION,
+               eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+
+
+# event.repeated_append -- a command that appends (`>>`) to a file, run again after the same
+# command already succeeded and nothing since touched the target: the rerun appends the same rows
+# a second time. Register A11 REPLAY COUNTED AS NEW. Discharge: overwrite (`>`), dedupe, or skip
+# the rerun.
+_APPEND_RX = re.compile(r">>\s*(\S+)")
+
+
+def repeated_append_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse" or current_event.get("tool_name") != "Bash":
+        return None
+    cmd = str((current_event.get("tool_input") or {}).get("command", "")).strip()
+    m = _APPEND_RX.search(cmd)
+    if not m:
+        return None
+    target = m.group(1).strip("'\"")
+    since = []
+    for row in reversed(history or ()):
+        ev = decode_history_event(row)
+        if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+            continue
+        ti = ev.get("tool_input") or {}
+        if ev.get("tool_name") == "Bash" and str(ti.get("command", "")).strip() == cmd:
+            resp = ev.get("tool_response") or {}
+            if isinstance(resp, dict) and resp.get("exitCode", 0) == 0 and not any(since):
+                return Finding(pattern_id=pattern.id, file=target, line=0, level="error",
+                               message=(f"row {pattern.id} ({pattern.description}): `{cmd[:120]}` already "
+                                        f"appended to {target} and nothing has touched it since"),
+                               retry_hint=pattern.retry_hint, snippet=cmd[:120])
+            return None
+        since.append(target in json.dumps(ti))
+    return None
+
+
+repeated_append_RETRY_HINT = "Overwrite with `>` or dedupe the target instead of appending the same run again."
+repeated_append_DESCRIPTION = "a succeeded append (>>) run again with nothing touching its target since"
+repeated_append_CHECK = _Check(id="event.repeated_append", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=(">>",), retry_hint=repeated_append_RETRY_HINT,
+               description=repeated_append_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
+               tests="SPEC")
+
+_ROWS = (loosened_CHECK, owner_CHECK, repeated_append_CHECK, env_CHECK, body_CHECK, weakened_CHECK, trailer_CHECK, suppress_CHECK, mute_CHECK, undeclared_CHECK, masking_CHECK, waiver_CHECK, identity_CHECK, fp_CHECK, drift_CHECK, citation_CHECK, hollow_CHECK, liveness_CHECK, lastwins_CHECK, bound_CHECK, budget_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
+_PREDICATES = {env_CHECK.id: env_predicate, body_CHECK.id: body_predicate, weakened_CHECK.id: weakened_predicate, trailer_CHECK.id: trailer_predicate, suppress_CHECK.id: suppress_predicate, mute_CHECK.id: mute_predicate, masking_CHECK.id: masking_predicate, loosened_CHECK.id: loosened_predicate, owner_CHECK.id: owner_predicate, repeated_append_CHECK.id: repeated_append_predicate, waiver_CHECK.id: undischarged_waiver_predicate, identity_CHECK.id: identity_predicate, citation_CHECK.id: citation_predicate, lastwins_CHECK.id: lastwins_predicate, bound_CHECK.id: bound_predicate, budget_CHECK.id: budget_predicate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

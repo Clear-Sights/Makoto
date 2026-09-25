@@ -739,45 +739,61 @@ def command_matches(rx: re.Pattern):
 ran_a_verifier = command_matches(_TEST_RUNNER_RX)
 
 
-def unmet_obligation_gate(*, act, guard, message, retry_hint, pattern_id,
-                          level="advisory", min_acts=1) -> Callable[..., Optional[Finding]]:
-    """Build a Stop-edge OBLIGATION gate: a costly act ran this session and no qualifying guard
-    preceded it.
+_SETTLED = ("PostToolUse", "PostToolUseFailure")
 
-    Every other check in this catalog holds the assistant's STATEMENT against the record. An
-    obligation holds an ACT against a guard that had to come first: no statement is needed and
-    none is read, so a turn that says nothing at all can still owe.
 
-    `act` and `guard` are predicates over ONE decoded history event -- the full dict, not
-    `iter_tool_events`' (name, command, response) triple, so a caller can read the `tool_input`
-    keys that triple drops. ORDER IS THE WHOLE CHECK: a guard seen before the act pays it for
-    the rest of the session, and a guard seen after does not, because the act already ran on
-    unknown ground. `min_acts` fires only from the Nth unguarded act onward, for a clause whose
-    costly thing is the REPEAT rather than the first one.
+def _session_rows(conn, session_id, history):
+    """Every row of this session the store still holds, oldest first -- not `_select_recent`'s
+    1-hour window.
 
-    One O(history) pass and no store: the obligation is a pure function of the event sequence,
-    so it cannot go stale and has no write path to get wrong; a derived obligation needs
-    neither a table nor a reconcile.
+    An obligation's guard pays for the rest of the session, so a guard older than the window
+    still paid: measured 2026-09-25, gate.unprobed_fanout denied a dispatch whose Reads were an
+    hour back. NAMED BOUND: the store itself prunes rows past MAKOTO_EVENT_RETENTION_HOURS (1.5 h
+    by default), so a guard older than that is still unseen. Falls back to `history` when there
+    is no store to read (tests, a store fault)."""
+    if conn is None or not session_id:
+        return history or ()
+    try:
+        return conn.execute("SELECT id, ts, event_type, cwd, payload FROM events "
+                            "WHERE session_id = ? ORDER BY id", [session_id]).fetchall()
+    except Exception:
+        return history or ()
 
-    NAMED RECALL BOUND: history is `_select_recent`'s rolling window, so an act older than the
-    window reads as never having happened. Same bound `claimedRunningAbsent` documents for its
-    own evidence, and it fails OPEN -- the gate goes quiet, never louder.
+
+def unmet_obligation_gate(*, act, guard, message, retry_hint,
+                          min_acts=1) -> Callable[..., Optional[Finding]]:
+    """Build a Pre-edge OBLIGATION deny: this call is a costly act and no qualifying guard ran
+    earlier in the session.
+
+    Every other check holds the assistant's STATEMENT against the record. An obligation holds an
+    ACT against a guard that had to come first, so it is decided where the act is about to run:
+    the deny's discharge is to run the guard and retry, which a Stop-edge reading of the same
+    order could never offer (the act had already run).
+
+    `act` and `guard` are predicates over ONE decoded event dict. Only SETTLED rows of history
+    (PostToolUse / PostToolUseFailure) count as a guard or as an earlier act: a PreToolUse row is
+    a call that may never have landed, and counting it twice made one launch read as two.
+    `min_acts` fires only from the Nth unguarded act onward (the current call included), for a
+    clause whose costly thing is the REPEAT. A guard pays every later act in the session.
     """
-    def _run(history) -> Optional[Finding]:
+    def _obligation(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+        if not act(current_event):
+            return None
+        rows = _session_rows(conn, current_event.get("session_id", ""), history)
         # fail open: an undecodable row could be the guard, so it is skipped, never an act
-        events = (ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict))
+        events = [ev for ev in map(decode_history_event, rows) if isinstance(ev, dict)
+                  and ev.get("hook_event_name") in _SETTLED] + [current_event]
         unpaid = [ev for ev, _ in unwitnessed(
             events, owes=lambda ev: (ev,) if act(ev) else (),
-            pays=lambda ev: (lambda _s: True) if guard(ev) else None)]
-        if len(unpaid) < min_acts:
+            pays=lambda ev: (lambda _s: True) if ev is not current_event and guard(ev) else None)]
+        if len(unpaid) < min_acts or unpaid[-1] is not current_event:
             return None
-        offender = unpaid[-1]
         return Finding(
-            pattern_id=pattern_id, file="", line=0, level=level,
+            pattern_id=pattern.id, file="", line=0, level="error",
             message=message, retry_hint=retry_hint,
-            snippet=str(offender.get("tool_name", ""))[:200],
+            snippet=str(current_event.get("tool_name", ""))[:200],
         )
-    return _run
+    return _obligation
 
 
 def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Finding]]:
@@ -788,14 +804,14 @@ def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Findin
             result = query(c.plan)
             if result is None or isinstance(result, Finding):
                 return result
-            return Finding(pattern_id=posture_label, file="", line=0, level="advisory",
+            return Finding(pattern_id=posture_label, file="", line=0, level="error",
                            message=f"{posture_label}: {result}")
     elif input_name == "fs_read":
         def _check(c):
             result = query(c.fs_read)
             if result is None or isinstance(result, Finding):
                 return result
-            return Finding(pattern_id=posture_label, file="", line=0, level="advisory",
+            return Finding(pattern_id=posture_label, file="", line=0, level="error",
                            message=f"{posture_label}: {result}")
     else:
         raise TypeError("live query parameter must be named 'plan' or 'fs_read'")

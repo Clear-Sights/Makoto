@@ -106,7 +106,7 @@ def test_fires_on_a_count_with_no_name():
     finding = unnamed_failure_gate("2 tests failed; looking into it.", history=_red_history())
     assert finding is not None
     assert finding.pattern_id == "gate.unnamed_failure"
-    assert finding.level == "advisory"
+    assert finding.level == "error"
     assert "test_charge" in finding.message, "the finding must name the identity that was dropped"
 
 

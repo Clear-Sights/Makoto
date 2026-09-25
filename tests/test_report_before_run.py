@@ -9,7 +9,22 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks.switch import report_CHECK as CHECK, _reports_a_run_verdict, report_before_run_gate
+from makoto.kit import decode_history_event
+from makoto.checks.switch import report_CHECK as CHECK, _reports_a_run_verdict
+from makoto.checks import switch
+
+
+def report_before_run_gate(rows):
+    """The Pre-edge row, judging each recorded call as it was about to run (history before it)."""
+    rows = list(rows or ())
+    for i, row in enumerate(rows):
+        ev = decode_history_event(row)
+        if isinstance(ev, dict):
+            finding = switch.report_before_run_gate(
+                current_event=dict(ev, hook_event_name="PreToolUse"), history=rows[:i], pattern=CHECK)
+            if finding is not None:
+                return finding
+    return None
 
 
 def _prose_write(path, content, tool_name="Write"):
@@ -32,7 +47,7 @@ def test_fires_on_a_report_with_no_run_before_it():
     finding = report_before_run_gate([_prose_write("HANDOFF.md", "The suite passes.")])
     assert finding is not None
     assert finding.pattern_id == "gate.report_before_run"
-    assert finding.level == "advisory"
+    assert finding.level == "error"
 
 
 def test_silent_when_the_run_came_first():
@@ -110,10 +125,14 @@ def test_prose_with_no_verdict_at_all():
 
 # ---- the shape and the named bounds ----------------------------------------------------------
 
-def test_a_pretooluse_row_wrote_nothing():
-    row = _prose_write("HANDOFF.md", "The suite passes.")
-    row["payload"]["hook_event_name"] = "PreToolUse"
-    assert report_before_run_gate([row]) is None
+def test_a_pretooluse_verifier_row_is_not_a_run():
+    """Only a SETTLED verifier row pays: a PreToolUse row is a run that may never have happened."""
+    run = _run()
+    run["payload"]["hook_event_name"] = "PreToolUse"
+    assert switch.report_before_run_gate(
+        current_event=dict(_prose_write("HANDOFF.md", "The suite passes.")["payload"],
+                           hook_event_name="PreToolUse"),
+        history=[run], pattern=CHECK) is not None
 
 
 def test_bash_is_not_a_report_channel_and_the_TARGET_gate_is_why():

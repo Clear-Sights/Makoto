@@ -30,7 +30,7 @@ def test_fires_on_a_unit_nothing_reaches():
     finding = unclaimed_unit_gate([_unit_write(BARE)])
     assert finding is not None
     assert finding.pattern_id == "gate.unclaimed_unit"
-    assert finding.level == "advisory"
+    assert finding.level == "error"
     assert "helper" in finding.message, "the finding must name the unit"
     assert finding.file == "src/helpers.py"
 

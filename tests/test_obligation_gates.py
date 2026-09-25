@@ -7,14 +7,38 @@ text is empty in every case below, on purpose: a turn that says nothing at all c
 """
 from __future__ import annotations
 
-from makoto.kit import unmet_obligation_gate
-from makoto.checks.lineage import unprobed_fanout_gate
-from makoto.checks.switch import unasked_plan_gate
+from types import SimpleNamespace
+
+from makoto.kit import decode_history_event, unmet_obligation_gate
+from makoto.checks import lineage, switch
 from makoto.checks.lineage import unread_structure_gate
 from makoto.checks.switch import unwitnessed_verifier_gate
-from makoto.checks.lineage import unknown_ref_switch_gate
-from makoto.checks.switch import unobserved_destruction_gate
-from makoto.checks.switch import relaunched_unchanged_gate
+
+
+def _at_pre(predicate, row_id):
+    """Judge each recorded call as the Pre-edge row would have, when it was about to run: the call
+    is the current event and every row before it is history. Returns the first denial."""
+    pattern = SimpleNamespace(id=row_id)
+
+    def _gate(rows):
+        rows = list(rows or ())
+        for i, row in enumerate(rows):
+            ev = decode_history_event(row)
+            if not isinstance(ev, dict):
+                continue
+            current = dict(ev, hook_event_name="PreToolUse")
+            finding = predicate(current_event=current, history=rows[:i], pattern=pattern)
+            if finding is not None:
+                return finding
+        return None
+    return _gate
+
+
+unprobed_fanout_gate = _at_pre(lineage.unprobed_fanout_gate, "gate.unprobed_fanout")
+unknown_ref_switch_gate = _at_pre(lineage.unknown_ref_switch_gate, "gate.unknown_ref_switch")
+unasked_plan_gate = _at_pre(switch.unasked_plan_gate, "gate.unasked_plan")
+unobserved_destruction_gate = _at_pre(switch.unobserved_destruction_gate, "gate.unobserved_destruction")
+relaunched_unchanged_gate = _at_pre(switch.relaunched_unchanged_gate, "gate.relaunched_unchanged")
 
 
 def _row(tool_name, **ti):
@@ -28,7 +52,7 @@ def test_unprobed_fanout_fires_on_a_dispatch_with_no_read():
     f = unprobed_fanout_gate([_row("Task", description="refactor the parser")])
     assert f is not None
     assert f.pattern_id == "gate.unprobed_fanout"
-    assert f.level == "advisory"
+    assert f.level == "error"
 
 
 def test_unprobed_fanout_is_silent_when_a_read_came_first():
@@ -79,7 +103,7 @@ def test_unasked_plan_fires_on_a_plan_with_no_question():
     f = unasked_plan_gate([_row("ExitPlanMode", plan="step 1, step 2")])
     assert f is not None
     assert f.pattern_id == "gate.unasked_plan"
-    assert f.level == "advisory"
+    assert f.level == "error"
 
 
 def test_unasked_plan_is_silent_when_a_question_came_first():
@@ -116,17 +140,17 @@ def test_each_gate_is_silent_on_the_other_s_witness_input():
 
 def test_factory_fails_open_on_an_undecodable_row():
     """An undecodable row could BE the guard, so it must never push the gate toward firing."""
-    g = unmet_obligation_gate(
+    g = _at_pre(unmet_obligation_gate(
         act=lambda ev: ev.get("tool_name") == "A", guard=lambda ev: ev.get("tool_name") == "G",
-        pattern_id="gate.test", message="m", retry_hint="r")
+        message="m", retry_hint="r"), "gate.test")
     assert g(["not a row at all", {"no": "payload"}]) is None
 
 
 def test_factory_min_acts_fires_only_from_the_nth_unguarded_act():
     """For a clause whose costly thing is the REPEAT rather than the first one (Keel's U02)."""
-    g = unmet_obligation_gate(
+    g = _at_pre(unmet_obligation_gate(
         act=lambda ev: ev.get("tool_name") == "A", guard=lambda ev: ev.get("tool_name") == "G",
-        pattern_id="gate.test", message="m", retry_hint="r", min_acts=2)
+        message="m", retry_hint="r", min_acts=2), "gate.test")
     assert g([_row("A")]) is None
     assert g([_row("A"), _row("A")]) is not None
 
@@ -134,9 +158,9 @@ def test_factory_min_acts_fires_only_from_the_nth_unguarded_act():
 def test_factory_a_guard_pays_every_later_act_in_the_session():
     """Keel's window is `session` and its subject is `session_id`: one guard pays the session,
     not one act. A per-act obligation would be a different clause and would need its own row."""
-    g = unmet_obligation_gate(
+    g = _at_pre(unmet_obligation_gate(
         act=lambda ev: ev.get("tool_name") == "A", guard=lambda ev: ev.get("tool_name") == "G",
-        pattern_id="gate.test", message="m", retry_hint="r")
+        message="m", retry_hint="r"), "gate.test")
     assert g([_row("G"), _row("A"), _row("A"), _row("A")]) is None
 
 # ---- the second batch: one register entry each ------------------------------------------------
@@ -151,7 +175,7 @@ def _bash(command, stdout=""):
 
 def test_unread_structure_fires_on_a_null_traversal():
     f = unread_structure_gate([_bash("jq '.a.b' config.json", "null")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 def test_unread_structure_is_silent_after_a_structure_query():
@@ -180,14 +204,14 @@ def test_unread_structure_fires_on_a_python_none_traversal():
     f = unread_structure_gate([_bash(
         "python3 -c \"import json; d=json.load(open('data.json')); print(d.get('x'))\"",
         "None")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 # gate.unwitnessed_verifier (register B4 WRONG ORACLE)
 
 def test_unwitnessed_verifier_fires_on_a_first_clean_run():
     f = unwitnessed_verifier_gate([_bash("pytest -q", "58 passed in 2.0s")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 def test_unwitnessed_verifier_is_silent_once_the_verifier_has_been_seen_failing():
@@ -216,7 +240,7 @@ def test_unwitnessed_verifier_is_silent_on_a_command_that_is_not_a_verifier():
 
 def test_unknown_ref_switch_fires_on_an_unprinted_ref():
     f = unknown_ref_switch_gate([_bash("git checkout feature-x")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 def test_unknown_ref_switch_is_silent_after_the_refs_were_printed():
@@ -239,7 +263,7 @@ def test_unknown_ref_switch_fires_on_a_reset_hard_to_an_unprinted_ref():
     """`git reset --hard <ref>` moves HEAD to a ref the same way a checkout/switch does -- the
     same boundary under a third verb, not just checkout/switch."""
     f = unknown_ref_switch_gate([_bash("git reset --hard origin/some-unprinted-ref")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 def test_unknown_ref_switch_ignores_a_bare_reset_hard():
@@ -251,7 +275,7 @@ def test_unknown_ref_switch_ignores_a_bare_reset_hard():
 
 def test_unobserved_destruction_fires_with_no_verifier():
     f = unobserved_destruction_gate([_bash("rm -rf build/")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 def test_unobserved_destruction_is_silent_after_a_verifier_ran():
@@ -283,7 +307,7 @@ def test_relaunched_unchanged_is_silent_on_a_single_launch():
 
 def test_relaunched_unchanged_fires_on_the_second_launch():
     f = relaunched_unchanged_gate([_row("Task"), _row("Task")])
-    assert f is not None and f.level == "advisory"
+    assert f is not None and f.level == "error"
 
 
 def test_relaunched_unchanged_is_silent_after_a_verifier_ran():
@@ -301,3 +325,20 @@ def test_relaunched_unchanged_is_distinct_from_unprobed_fanout():
     assert unprobed_fanout_gate(with_read) is None
     without_read = [_row("Task"), _row("Task")]
     assert unprobed_fanout_gate(without_read) is not None
+
+
+# gate.unread_structure owes on the LATEST traversal only (BLOCK since 2026-09-25)
+
+def test_unread_structure_is_discharged_by_reading_then_rerunning():
+    """The discharge the deny names: read the structure, then re-run the traversal. Before, the
+    first unread null held every later stop even after both were done."""
+    null = _bash("jq '.items[0].id' data.json", "null")
+    assert unread_structure_gate([null]) is not None
+    read = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Read",
+                        "tool_input": {"file_path": "data.json"}, "tool_response": {}}}
+    assert unread_structure_gate([null, read, _bash("jq '.items[0].id' data.json", "null")]) is None
+    assert unread_structure_gate([null, read, _bash("jq '.data[0].id' data.json", "7")]) is None
+
+
+def test_unread_structure_a_later_null_with_no_read_still_fires():
+    assert unread_structure_gate([_bash("jq '.a' x.json", "1"), _bash("jq '.b' x.json", "null")]) is not None

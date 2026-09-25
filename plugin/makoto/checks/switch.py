@@ -471,8 +471,7 @@ wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK
 # instead, prefixed `"canon.<id>: "`.
 #
 # LEVEL: "error" — the ONLY blocking level in live makoto (makoto.vocab._ALLOWED_FIRE_LEVELS ==
-# {"error"}). This is an ORDINARY blocking gate, NOT the one advisory exception
-# `gate.self_wired` uses.
+# {"error"}). This is an ORDINARY blocking gate.
 #
 # IMPORT FIREWALL (tests/test_gate_shape.py::test_no_gate_module_imports_a_sibling_or_cross_l2):
 # imports ONLY makoto.vocab, makoto.context, and the pure primitives below.
@@ -1215,9 +1214,8 @@ named_CHECK = _Check(id="gate.named_test", applies_at="Stop", posture="BLOCK",
 # construction -- a text with a name is not a text with no name -- and that is this gate's merge
 # witness.
 #
-# ADVISORY TIER, NEVER BLOCK: the benign case is real and looks identical -- the agent pasted the
-# runner's own summary and the reader can see the names in it, or the count belongs to a run whose
-# per-test lines the 500-char recorded tail cut. No corpus-measured false-positive rate exists.
+# BLOCK TIER (2026-09-25): the discharge is a copy, not a re-run -- the red identities are
+# already on the record, so the agent names one of them in the same turn.
 from makoto.vocab import Finding, _TESTNAME_RX
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- the record's own
@@ -1271,7 +1269,7 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
             pattern_id="gate.unnamed_failure",
             file="tests",
             line=0,
-            level="advisory",
+            level="error",
             message=(
                 f"the turn counts a failure and names none of the {len(red)} failing test "
                 f"identit{'y' if len(red) == 1 else 'ies'} the run itself recorded (e.g. {red[0]}). "
@@ -1286,7 +1284,7 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
     return None
 
 
-unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="ADVISE",
+unnamed_CHECK = _Check(id="gate.unnamed_failure", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"text", "history"}),
                run=lambda c: unnamed_failure_gate(c.text, history=c.history))
@@ -1480,8 +1478,8 @@ stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
 # exists to permit. Only the second unguarded one is the costly thing, which is why the factory
 # carries the count rather than each clause re-deriving it.
 #
-# ADVISORY TIER, NEVER BLOCK: dispatching two independent workers for two independent jobs is the
-# common benign case and looks identical here, and no corpus-measured false-positive rate exists.
+# PRE-EDGE DENY (2026-09-25): the second launch is refused before it runs; the discharge is to run
+# the target's probe (any verifier) and retry.
 from makoto.kit import unmet_obligation_gate, ran_a_verifier
 
 _DISPATCH_TOOLS = frozenset({"Task", "Agent"})
@@ -1501,18 +1499,21 @@ relaunched_unchanged_gate = unmet_obligation_gate(
     act=_is_relaunch,
     guard=_is_probe,
     min_acts=2,
-    pattern_id="gate.relaunched_unchanged",
-    message=("A worker was launched again with no verifier run anywhere before it — the second "
+    message=("A worker is being launched again with no verifier run anywhere before it — the second "
              "launch inherits the first one's channel, so nothing shows its target changed."),
     retry_hint=("Change something and run the target's probe to a report before re-launching; "
                 "or confirm the two launches are independent jobs."),
 )
 
 
-relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Stop", posture="ADVISE",
+relaunch_RETRY_HINT = "Run the target's probe to a report, then retry the launch."
+relaunch_DESCRIPTION = "a second worker launch with no verifier run anywhere before it"
+relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("Task", "Agent"),
+               retry_hint=relaunch_RETRY_HINT,
+               description=relaunch_DESCRIPTION,
                tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: relaunched_unchanged_gate(c.history))
+               eats=frozenset({"current_event", "history", "pattern", "conn"}))
 
 # makoto.checks.unobservedDestruction -- gate.unobserved_destruction, register entry
 # `D14 UNDO UNPROVEN`.
@@ -1536,9 +1537,8 @@ relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Stop", postu
 # documented scope cut (long-form `rm` stays outside, pinned in test_canon_atoms_destructive) is
 # inherited whole rather than re-litigated.
 #
-# ADVISORY TIER, NEVER BLOCK: deleting scratch output, a build directory or a file created earlier
-# in the same session is destruction that owes no observer, and no corpus-measured false-positive
-# rate exists for the distinction.
+# PRE-EDGE DENY (2026-09-25): the destructive command is refused before it runs; the discharge is
+# to run the relevant test or probe (either verdict) and retry.
 from makoto.kit import unmet_obligation_gate, command_of, ran_a_verifier
 from makoto.core._shell import _shell_segments
 
@@ -1561,18 +1561,23 @@ _is_observer = ran_a_verifier
 unobserved_destruction_gate = unmet_obligation_gate(
     act=_is_destruction,
     guard=_is_observer,
-    pattern_id="gate.unobserved_destruction",
-    message=("Content was destroyed and no verifier had run first — with no behaviour observed "
+    message=("Content is about to be destroyed and no verifier has run first — with no behaviour observed "
              "before the destruction, the undo cannot be proven against anything."),
     retry_hint=("Run the relevant test or probe to a report (PASS or FAIL) before a destructive "
                 "act, so there is a pre-image to check an undo against."),
 )
 
 
-destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", posture="ADVISE",
+destruction_RETRY_HINT = "Run the relevant test or probe to a report, then retry."
+destruction_DESCRIPTION = "a destructive command with no verifier run earlier in the session"
+destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__,
+               keywords=("rm", "reset", "clean", "push", "checkout", "dd", "mkfs", "drop", "DROP",
+                         "truncate", "TRUNCATE"),
+               retry_hint=destruction_RETRY_HINT,
+               description=destruction_DESCRIPTION,
                tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: unobserved_destruction_gate(c.history))
+               eats=frozenset({"current_event", "history", "pattern", "conn"}))
 
 # makoto.checks.unwitnessedScanner -- gate.unwitnessed_verifier, register entry
 # `B4 WRONG ORACLE`.
@@ -1601,9 +1606,8 @@ destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Stop", 
 # unlisted tool identically. Widening belongs in `_TEST_RUNNER_RX` itself, once, if it is ever
 # worth it.
 #
-# ADVISORY TIER, NEVER BLOCK: a first clean run in a fresh session is the overwhelmingly common
-# benign case -- most sessions never see a red run and should not -- and no corpus-measured
-# false-positive rate exists for the distinction.
+# BLOCK TIER (2026-09-25): the discharge is in-turn -- plant a fault the verifier must catch and
+# watch the same command report it; the clean report then carries weight.
 from makoto.vocab import Finding, _TEST_RUNNER_RX
 from makoto.kit import unmet_obligation_gate, response_text, command_of
 
@@ -1660,7 +1664,7 @@ def unwitnessed_verifier_gate(history) -> Optional[Finding]:
             pays=lambda e: (lambda k, own=_verifier_key(e): k == own)
             if _is_failing_verifier_run(e) else None):
         return Finding(
-            pattern_id="gate.unwitnessed_verifier", file="", line=0, level="advisory",
+            pattern_id="gate.unwitnessed_verifier", file="", line=0, level="error",
             message=("A verifier reported clean and this session has never seen it report a failure — a "
                      "verifier that cannot fire and a genuinely clean subject print the same word, so "
                      "the clean report is evidence of nothing on its own."),
@@ -1669,7 +1673,7 @@ def unwitnessed_verifier_gate(history) -> Optional[Finding]:
     return None
 
 
-verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="ADVISE",
+verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
                eats=frozenset({"history"}),
                run=lambda c: unwitnessed_verifier_gate(c.history))
@@ -1714,8 +1718,8 @@ verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", postu
 # only act is writing "all tests pass" into a document, with empty closing text, fires this gate and
 # gives green_claim nothing to key on. That is this gate's merge witness.
 #
-# ADVISORY TIER, NEVER BLOCK: the documenting case above is real and looks identical, and no
-# corpus-measured false-positive rate exists.
+# PRE-EDGE DENY (2026-09-25): the Write/Edit is judged on its tool_input before it lands; the
+# discharge is to run the verifier and retry.
 from makoto.kit import introduced_text, ran_a_verifier, unmet_obligation_gate
 from makoto.vocab import _SUCCESS_SUMMARY_RX
 
@@ -1723,6 +1727,10 @@ from makoto.vocab import _SUCCESS_SUMMARY_RX
 # the docstring's measurement.
 _PROSE_TARGET_RX = re.compile(r"\.(?:md|markdown|rst|txt|adoc|org)$", re.IGNORECASE)
 _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
+# A counted all-pass in prose ("All 602 checks pass"): a count is a measurement, so writing one
+# before anything ran is the same unmeasured claim (register C11 / the claim-without-measurement
+# mistake). whole_suite_pass_claim reads a counted subject as enumerated, so it is named here.
+_COUNTED_PASS_RX = re.compile(r"\ball\s+\d[\d,]*\s+\w+\s+(?:pass(?:ed|es)?|green)\b", re.IGNORECASE)
 
 
 def _reports_a_run_verdict(ev: dict) -> bool:
@@ -1743,8 +1751,6 @@ def _reports_a_run_verdict(ev: dict) -> bool:
     a report of success written before the run is the half that MISLEADS, and it is the half
     with a hardened reader.
     """
-    if ev.get("hook_event_name") != "PostToolUse":
-        return False                       # a call that may never have landed wrote nothing
     tool = ev.get("tool_name", "")
     if tool not in _MUTATION_TOOLS:
         return False
@@ -1753,14 +1759,13 @@ def _reports_a_run_verdict(ev: dict) -> bool:
         return False
     text = introduced_text(tool, ti)
     return bool(text) and bool(_SUCCESS_SUMMARY_RX.search(text)
-                               or whole_suite_pass_claim(text))
+                               or whole_suite_pass_claim(text) or _COUNTED_PASS_RX.search(text))
 
 
 report_before_run_gate = unmet_obligation_gate(
     act=_reports_a_run_verdict,
     guard=ran_a_verifier,
-    pattern_id="gate.report_before_run",
-    message=("a run's success was written into a prose document with no verifier run anywhere "
+    message=("a run's success is being written into a prose document with no verifier run anywhere "
              "before it — the report precedes the outcome it reports, so it is a prediction in a "
              "result's grammar."),
     retry_hint=("Run the verifier first and write the verdict from what it printed; or, if the "
@@ -1769,10 +1774,15 @@ report_before_run_gate = unmet_obligation_gate(
 )
 
 
-report_CHECK = _Check(id="gate.report_before_run", applies_at="Stop", posture="ADVISE",
+report_RETRY_HINT = "Run the verifier first, then write the verdict from what it printed."
+report_DESCRIPTION = "a run verdict written into prose before any verifier ran"
+report_CHECK = _Check(id="gate.report_before_run", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__,
+               keywords=(".md", ".MD", ".markdown", ".rst", ".txt", ".adoc", ".org"),
+               retry_hint=report_RETRY_HINT,
+               description=report_DESCRIPTION,
                tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: report_before_run_gate(c.history))
+               eats=frozenset({"current_event", "history", "pattern", "conn"}))
 
 # makoto.checks.unasked_plan -- gate.unasked_plan, register entry
 # `G2 DETERMINED ASKED AS OPEN`.
@@ -1790,9 +1800,8 @@ report_CHECK = _Check(id="gate.report_before_run", applies_at="Stop", posture="A
 # an ExitPlanMode event, and an AskUserQuestion event before it, are both on the record makoto
 # already reads. The weaker, countable question is the one this gate asks.
 #
-# ADVISORY TIER, NEVER BLOCK. A plan for a request that carried no ambiguity owes no question,
-# and no corpus-measured false-positive rate exists for the distinction yet. Same "advisory over
-# blocking" policy `selfWiredCheck.py`, `staleEstablisher.py` and `planItemDrift.py` follow.
+# PRE-EDGE DENY (2026-09-25): the plan is refused before it is presented; the discharge is one
+# AskUserQuestion, then retry.
 from makoto.kit import unmet_obligation_gate
 
 # Presenting a plan. A closed vocabulary whose miss is a RECALL bound, never a false block.
@@ -1812,7 +1821,6 @@ def _is_ask(ev: dict) -> bool:
 unasked_plan_gate = unmet_obligation_gate(
     act=_is_plan,
     guard=_is_ask,
-    pattern_id="gate.unasked_plan",
     message=("A plan was presented and no question was asked this session — reading the "
              "repository resolves what it is, never what was wanted, and a plan is followed by "
              "default, so an ambiguity settled by guessing is carried as if it were settled."),
@@ -1821,10 +1829,14 @@ unasked_plan_gate = unmet_obligation_gate(
 )
 
 
-plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Stop", posture="ADVISE",
+plan_RETRY_HINT = "Ask one question about the ambiguity, then present the plan."
+plan_DESCRIPTION = "a plan presented with no question asked this session"
+plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("ExitPlanMode",),
+               retry_hint=plan_RETRY_HINT,
+               description=plan_DESCRIPTION,
                tests="SWITCH",
-               eats=frozenset({"history"}),
-               run=lambda c: unasked_plan_gate(c.history))
+               eats=frozenset({"current_event", "history", "pattern", "conn"}))
 
 
 # gate.run_promised -- register entry `C11 REPORT BEFORE DECIDE`, as its second runner.
@@ -1896,11 +1908,44 @@ run_promised_CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="
 
 
 
+# gate.unverified_merge -- a merge into, or a push onto, the default branch with no clean run of a
+# verifier settled before it. Register C11 PREMATURE CLOSURE (+D3): the landing was made before
+# the gate had finished; measured 2026-09 on the Measure-Zero trees, `gh pr merge` ran while
+# `run.sh` was still in the background. The witness is the settled runner report itself
+# (`_is_clean_verifier_run`, the clean reading gate.vacuous_verifier uses); a run still in the
+# background or a red one pays nothing. Discharge: run the gate to a clean report, then land.
+_LANDING_RX = re.compile(
+    r"\bgh\s+pr\s+merge\b|\bgit\s+push\b[^;&|\n]*?\s(?:\S+:)?(?:refs/heads/)?(?:main|master)\b")
+
+
+def _is_landing(ev: dict) -> bool:
+    return bool(_LANDING_RX.search(command_of(ev) or ""))
+
+
+unverified_merge_gate = unmet_obligation_gate(
+    act=_is_landing,
+    guard=_is_clean_verifier_run,
+    message=("a merge or push to the default branch with no clean verifier report settled before it -- "
+             "the landing precedes the gate it depends on."),
+    retry_hint="Run the gate to a clean report (wait for a background run to finish), then merge.",
+)
+
+
+unverified_merge_RETRY_HINT = "Run the gate to a clean report (wait for a background run to finish), then merge."
+unverified_merge_DESCRIPTION = "a merge or push to the default branch before any clean verifier report"
+unverified_merge_CHECK = _Check(id="gate.unverified_merge", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("merge", "push"),
+               retry_hint=unverified_merge_RETRY_HINT, description=unverified_merge_DESCRIPTION,
+               tests="SWITCH", eats=frozenset({"current_event", "history", "pattern", "conn"}))
+
+
 # the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK,)
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {retry_CHECK.id: retry_predicate}
+_PREDICATES = {retry_CHECK.id: retry_predicate, relaunch_CHECK.id: relaunched_unchanged_gate,
+               destruction_CHECK.id: unobserved_destruction_gate, report_CHECK.id: report_before_run_gate,
+               plan_CHECK.id: unasked_plan_gate, unverified_merge_CHECK.id: unverified_merge_gate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

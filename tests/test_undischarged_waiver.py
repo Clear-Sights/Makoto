@@ -16,7 +16,16 @@ from __future__ import annotations
 
 import pytest
 
-from makoto.checks.spec import waiver_CHECK as CHECK, _undischarged_directives, undischarged_waiver_gate
+from makoto.checks.spec import waiver_CHECK as CHECK, _undischarged_directives, undischarged_waiver_predicate
+
+
+def undischarged_waiver_gate(rows):
+    """The Pre-edge row judged over each call in turn (it denies the call that introduces it)."""
+    for row in rows or ():
+        finding = undischarged_waiver_predicate(current_event=row["payload"], history=[], pattern=CHECK)
+        if finding is not None:
+            return finding
+    return None
 
 H = "#"          # a comment opener, assembled
 SL = "//"
@@ -24,7 +33,7 @@ SL = "//"
 
 def _mutation_row(new_string: str, file_path: str = "src/parser.py", tool_name: str = "Edit"):
     key = {"Edit": "new_string", "Write": "content"}.get(tool_name, "new_string")
-    return {"payload": {"hook_event_name": "PostToolUse", "tool_name": tool_name,
+    return {"payload": {"hook_event_name": "PreToolUse", "tool_name": tool_name,
                         "tool_input": {"file_path": file_path, key: new_string},
                         "tool_response": {}}}
 
@@ -116,7 +125,7 @@ def test_fires_on_a_bare_lint_directive():
     finding = undischarged_waiver_gate([_mutation_row(f"value = parse(raw)  {H} noqa")])
     assert finding is not None
     assert finding.pattern_id == "gate.undischarged_waiver"
-    assert finding.level == "advisory"
+    assert finding.level == "error"
     assert finding.file == "src/parser.py"
 
 
@@ -125,10 +134,10 @@ def test_silent_on_an_empty_session():
     assert undischarged_waiver_gate(None) is None
 
 
-def test_a_pretooluse_row_introduced_nothing():
-    """A PreToolUse row is a call that may never have landed. Only settled mutations count."""
+def test_a_settled_row_is_not_judged_again():
+    """The deny happens at PreToolUse; a PostToolUse row already landed and is not re-judged."""
     row = _mutation_row(f"value = parse(raw)  {H} noqa")
-    row["payload"]["hook_event_name"] = "PreToolUse"
+    row["payload"]["hook_event_name"] = "PostToolUse"
     assert undischarged_waiver_gate([row]) is None
 
 
@@ -139,7 +148,7 @@ def test_bash_is_not_read_and_that_is_the_measured_tradeoff():
     gate stays silent because Bash is not a mutation tool here."""
     command = f"grep -n '{H} noqa' src/"
     assert _undischarged_directives(command), "the scanner does match it; only the tool gate excludes it"
-    row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
+    row = {"payload": {"hook_event_name": "PreToolUse", "tool_name": "Bash",
                        "tool_input": {"command": command}, "tool_response": {"stdout": ""}}}
     assert undischarged_waiver_gate([row]) is None
 

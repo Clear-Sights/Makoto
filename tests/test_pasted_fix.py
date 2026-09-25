@@ -43,7 +43,7 @@ def test_fires_when_the_same_repair_reaches_a_second_file():
     finding = pasted_fix_gate([_landing("src/reader.py"), _landing("src/writer.py")])
     assert finding is not None
     assert finding.pattern_id == "gate.pasted_fix"
-    assert finding.level == "advisory"
+    assert finding.level == "error"
     assert finding.file == "src/writer.py", "the finding belongs at the UNCHECKED second site"
     assert "src/reader.py" in finding.message, "the finding must name the site it was drawn from"
 
@@ -75,10 +75,12 @@ def test_a_run_before_the_first_landing_does_not_discharge_it():
                             _landing("src/writer.py")]) is not None
 
 
-def test_a_run_after_both_landings_does_not_discharge_it():
+def test_a_run_after_both_landings_discharges_it():
+    """BLOCK since 2026-09-25: the in-turn discharge. A run after the second landing checks the
+    second site too; before, nothing done after the fire could pay it."""
     assert pasted_fix_gate([_landing("src/reader.py"),
                             _landing("src/writer.py"),
-                            _run("python3 -m pytest -q")]) is not None
+                            _run("python3 -m pytest -q")]) is None
 
 
 def test_a_command_that_is_not_a_verifier_does_not_discharge_it():

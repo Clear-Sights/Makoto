@@ -14,7 +14,6 @@ from makoto.substrate._canonAtoms import (
     compute_atoms,
 )
 from makoto.checks.spec import canon_fingerprint_block_gate
-from makoto.checks.spec import canon_fingerprint_advisory_gate
 
 
 def _row(tool_name, tool_input, tool_response=None, event_type="PostToolUse"):
@@ -213,25 +212,3 @@ def test_block_gate_emits_only_error_level_and_only_block_ids():
         assert name in BLOCK_IDS
 
 
-def test_advisory_gate_emits_only_advisory_level_and_never_block_ids():
-    findings = canon_fingerprint_advisory_gate("", [_WEAKEN_ROW])
-    assert findings, "nogreen_weakened must fire on a weakened test assertion with no green run"
-    for f in findings:
-        assert f.level == "advisory"
-        assert f.pattern_id == "gate.canon_fingerprints_advisory"
-        name = f.message.split(":", 1)[0].removeprefix("canon.")
-        assert name not in BLOCK_IDS
-
-
-def test_gates_partition_the_17_by_block_ids():
-    # every fingerprint that fires on a rich combined history is reported by exactly one of the
-    # two gates, and each gate's report matches its own tier of BLOCK_IDS.
-    history = ([_DESTRUCTIVE_ROW, _WEAKEN_ROW, _SECRET_ROW, _TIMEOUT_ROW, _GREEN_ROW]
-               + _REVERT_ROWS + [_DISABLE_ROW])
-    block_names = {f.message.split(":", 1)[0].removeprefix("canon.")
-                   for f in canon_fingerprint_block_gate("", history)}
-    advise_names = {f.message.split(":", 1)[0].removeprefix("canon.")
-                    for f in canon_fingerprint_advisory_gate("", history)}
-    assert block_names <= BLOCK_IDS
-    assert advise_names.isdisjoint(BLOCK_IDS)
-    assert block_names.isdisjoint(advise_names)

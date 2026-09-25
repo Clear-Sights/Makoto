@@ -13,7 +13,7 @@ That publication claim is deliberately bounded: Shipped plugin — installable a
 **Integrity**, as this tool uses the word, is exactly that agreement: a claim the agent made this
 turn is matched by the record of the deed it names. Nothing wider — not correctness, not code
 quality, not whether the deed was a good idea. A gate that only flags a communication-quality
-issue, never a contradiction against the record, is deliberately ADVISE tier for that reason.
+issue, never a contradiction against the record, does not belong here: makoto blocks or stays silent.
 `makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is the lexical half of the same idea — the word-set
 naming integrity concepts *in a subject's code* — and is not a second definition of this one.
 
@@ -27,12 +27,12 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 <!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
 
-- **19 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **13**, `event`: **5**, `gate`: **1**
-- **32 Stop checks** (all checks registered at the Stop edge)
-- **32 end-of-turn gates** (every Stop check reaches the decision)
-- **16 blocking end-of-turn gates** (`posture == BLOCK`)
-- **16 advisory end-of-turn gates** (`posture == ADVISE`)
+- **30 pre-checks**
+- Pre-check ids grouped by dotted prefix — `content`: **14**, `event`: **7**, `gate`: **9**
+- **24 Stop checks** (all checks registered at the Stop edge)
+- **24 end-of-turn gates** (every Stop check reaches the decision)
+- **24 blocking end-of-turn gates** (`posture == BLOCK`)
+- **0 advisory end-of-turn gates** (`posture == ADVISE`)
 
 <!-- END GENERATED: check-counts -->
 
@@ -69,6 +69,9 @@ edge, so no check is counted twice within a line.
 **Overdefinition** — a claim shaped wider than what was actually measured
 - `content.last_wins` a dict or JSON object repeats a key with a different value, so the last one silently wins
 - `content.bound_as_count` a test asserts a count under a literal ceiling instead of its exact value
+- `content.loosened_after_red` a test assertion loosened while that test's recorded run is red
+- `event.repeated_append` a succeeded `>>` append rerun with nothing touching its target since (duplicate rows)
+- `event.owner_path` a delete, overwrite or cut of a path `makoto.toml` declares as the owner's (`owner_paths`)
 
 **End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
 
@@ -83,8 +86,8 @@ The **certification** column uses the following labels, each naming its own deno
 - **replayed** — a corpus replay ran but is inconclusive by the gate's own admission (the honest
   corpus almost never carries the triggering precondition), so certification rests instead on
   held-out adversarial RED fixtures plus that near-vacuous corpus-FP check.
-- **advisory** — uncertifiable by design or not yet corpus-measured; recorded to the audit log,
-  never emitted as a block decision.
+- **new** — promoted to blocking 2026-09-25 (or added since); not yet corpus-measured. Each names an
+  in-turn discharge, so a false fire costs one act, never a stuck turn.
 
 | Check id | One-line trigger | Fire | Certification |
 |---|---|---|---|
@@ -104,22 +107,22 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |
 | `gate.canon` | last call ended in an unresolved direct error, or a byte-identical stuck retry loop | blocking | replayed |
 | `gate.canon_fingerprints` | ported canon fingerprints in the robust core established by gold-oracle certification | blocking | established |
-| `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | advisory | advisory |
-| `gate.canon_fingerprints_advisory` | the advisory remainder (soft/claim atoms or gold-disqualified) | advisory | advisory |
-| `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | advisory | advisory |
-| `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | advisory | advisory |
-| `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | advisory | advisory |
-| `gate.unread_structure` | a traversal of structured data that printed `null` with no structure read before it | advisory | advisory |
-| `gate.unwitnessed_verifier` | a verifier reporting clean that has never been seen reporting a failure | advisory | advisory |
-| `gate.unknown_ref_switch` | HEAD moved to a ref nothing in the session had printed | advisory | advisory |
-| `gate.unobserved_destruction` | content destroyed with no verifier report before it | advisory | advisory |
-| `gate.relaunched_unchanged` | a second worker launch with no verifier report anywhere before it | advisory | advisory |
-| `gate.undischarged_waiver` | a checker-silencing directive introduced with no checkable end named beside it | advisory | advisory |
-| `gate.unnamed_failure` | a counted failure whose recorded failing identity the turn never names | advisory | advisory |
-| `gate.report_before_run` | a run's success written into prose with no verifier run before it | advisory | advisory |
-| `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | advisory | advisory |
-| `gate.pasted_fix` | one repair's text edited into a second file with no verifier run between the two landings | advisory | advisory |
-| `gate.undeclared_falsifiable` | the checks/ catalog itself has an orphan module or a dangling manifest id | advisory | advisory |
+| `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | blocking | new |
+| `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | blocking | new |
+| `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | blocking (pre-tool deny) | new |
+| `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | blocking (pre-tool deny) | new |
+| `gate.unread_structure` | the latest traversal of structured data printed `null` with no structure read before it | blocking | new |
+| `gate.unwitnessed_verifier` | a verifier reporting clean that has never been seen reporting a failure | blocking | new |
+| `gate.unknown_ref_switch` | HEAD moved to a ref nothing in the session had printed | blocking (pre-tool deny) | new |
+| `gate.unobserved_destruction` | content destroyed with no verifier report before it | blocking (pre-tool deny) | new |
+| `gate.relaunched_unchanged` | a second worker launch with no verifier report anywhere before it | blocking (pre-tool deny) | new |
+| `gate.undischarged_waiver` | a checker-silencing directive introduced with no checkable end named beside it | blocking (pre-tool deny) | new |
+| `gate.unnamed_failure` | a counted failure whose recorded failing identity the turn never names | blocking | new |
+| `gate.unverified_merge` | a merge or push to main/master with no clean verifier report settled before it | blocking (pre-tool deny) | new |
+| `gate.report_before_run` | a run's success written into prose with no verifier run before it | blocking (pre-tool deny) | new |
+| `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | blocking | new |
+| `gate.pasted_fix` | one repair's text edited into a second file with no verifier run after the first landing | blocking | new |
+| `gate.undeclared_falsifiable` | the checks/ catalog itself has an orphan module or a dangling manifest id | blocking | new |
 
 Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
 

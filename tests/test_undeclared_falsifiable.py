@@ -79,16 +79,15 @@ def test_gate_reports_both_orphan_kinds_together(tmp_path):
     f = undeclared_falsifiable_gate(package_dir=tmp_path, declared=declared)
     assert f is not None
     assert f.pattern_id == "gate.undeclared_falsifiable"
-    assert f.level == "advisory"
+    assert f.level == "error"
     assert "unregistered" in f.message
     assert "x.ghost" in f.message
 
 
-def test_gate_is_advisory_never_blocking():
-    # Never "error" -- per this repo's advisory-over-blocking standing policy, same tier as
-    # gate.self_wired.
-    from makoto.registry import POSTURE_ADVISE
-    assert CHECK.posture == POSTURE_ADVISE
+def test_gate_blocks():
+    # BLOCK since 2026-09-25: the discharge (fix the catalog) is in-turn.
+    from makoto.registry import POSTURE_BLOCK
+    assert CHECK.posture == POSTURE_BLOCK
 
 
 # ---- the real, live catalog: this check auditing itself ------------------------------------

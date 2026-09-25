@@ -594,9 +594,10 @@ webfetch_CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", postu
 # many correct commands produce. Only a literal JSON `null` as the whole of what was printed
 # counts. That is a named RECALL bound, and it fails quiet.
 #
-# ADVISORY TIER, NEVER BLOCK: a `null` can be the true answer to the question asked, and no
-# corpus-measured false-positive rate exists for the distinction.
-from makoto.kit import unmet_obligation_gate, response_text, command_of
+# ONLY THE LATEST TRAVERSAL COUNTS (BLOCK since 2026-09-25): it owes iff it printed null and no
+# structure read precedes it. The discharge is in-turn -- read the structure, then re-run the
+# traversal -- so an early null that was since read around no longer holds every later stop.
+from makoto.kit import response_text, command_of, decode_history_event, unwitnessed
 
 # A structured-data traversal. `jq` is the canonical one; `python -c ... json` and `yq` are the
 # same act under other programs. A closed vocabulary whose miss is a RECALL bound.
@@ -611,11 +612,9 @@ _STRUCTURE_RX = re.compile(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|
 _NULL_OUTPUT_RX = re.compile(r"\A(?:null|None)\Z")
 
 
-def _is_null_traversal(ev: dict) -> bool:
+def _is_traversal(ev: dict) -> bool:
     cmd = command_of(ev)
-    if not cmd or not _TRAVERSAL_RX.search(cmd):
-        return False
-    return bool(_NULL_OUTPUT_RX.match(response_text(ev)))
+    return ev.get("hook_event_name") == "PostToolUse" and bool(cmd and _TRAVERSAL_RX.search(cmd))
 
 
 def _is_structure_read(ev: dict) -> bool:
@@ -625,18 +624,30 @@ def _is_structure_read(ev: dict) -> bool:
     return bool(cmd and _STRUCTURE_RX.search(cmd))
 
 
-unread_structure_gate = unmet_obligation_gate(
-    act=_is_null_traversal,
-    guard=_is_structure_read,
-    pattern_id="gate.unread_structure",
-    message=("A traversal of structured data printed `null` and nothing in this session looked "
-             "at the structure first — the positions were assumed to line up rather than read."),
-    retry_hint=("Print a non-null datum from the file first (`jq 'keys'`, `jq 'type'`, "
-                "`jq -e 'has(...)'`) or Read it, then re-run the traversal."),
-)
+def unread_structure_gate(history) -> Optional[Finding]:
+    """Fire iff the session's latest traversal printed null and no structure read precedes it."""
+    events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
+    last = max((i for i, ev in enumerate(events) if _is_traversal(ev)), default=None)
+    if last is None or not _NULL_OUTPUT_RX.match(response_text(events[last])):
+        return None
+    end = len(events)
+    for _it, _at in unwitnessed(
+            list(enumerate(events)) + [(end, None)],
+            owes=lambda it: (last,) if it[0] == end else (),
+            pays=lambda it: (lambda at, i=it[0]: i < at)
+            if it[1] is not None and _is_structure_read(it[1]) else None):
+        return Finding(
+            pattern_id="gate.unread_structure", file="", line=0, level="error",
+            message=("A traversal of structured data printed `null` and nothing in this session "
+                     "looked at the structure first — the positions were assumed to line up "
+                     "rather than read."),
+            retry_hint=("Print a non-null datum from the file first (`jq 'keys'`, `jq 'type'`, "
+                        "`jq -e 'has(...)'`) or Read it, then re-run the traversal."),
+            snippet=command_of(events[last])[:200])
+    return None
 
 
-structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="ADVISE",
+structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture="BLOCK",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: unread_structure_gate(c.history))
@@ -650,8 +661,8 @@ structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture=
 # record is a boundary crossed in front of makoto, and whether the ref was ever printed first is
 # two commands on the record.
 #
-# ADVISORY TIER, NEVER BLOCK: a checkout of a branch the agent just created, or one named in the
-# request itself, is legitimately unprinted, and no corpus-measured false-positive rate exists.
+# PRE-EDGE DENY (2026-09-25): the switch is refused before HEAD moves; the discharge is to print
+# the refs (`git branch`, `git rev-parse --verify <ref>`) and retry.
 from makoto.kit import unmet_obligation_gate, command_matches
 
 # Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms; `git checkout --`
@@ -675,18 +686,21 @@ _is_ref_print = command_matches(_REF_PRINT_RX)
 unknown_ref_switch_gate = unmet_obligation_gate(
     act=_is_ref_switch,
     guard=_is_ref_print,
-    pattern_id="gate.unknown_ref_switch",
-    message=("HEAD was moved to a ref that nothing in this session had printed — switching a ref "
+    message=("HEAD is about to move to a ref that nothing in this session had printed — switching a ref "
              "is a boundary, and what has to survive it was never named."),
     retry_hint=("Print the refs first (`git rev-parse --verify <ref>`, `git branch`, "
                 "`git show-ref`) so the switch is to something known."),
 )
 
 
-ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADVISE",
+ref_RETRY_HINT = "Print the refs first, then retry the switch."
+ref_DESCRIPTION = "HEAD moved to a ref nothing in this session printed"
+ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("checkout", "switch", "reset"),
+               retry_hint=ref_RETRY_HINT,
+               description=ref_DESCRIPTION,
                tests="LINEAGE",
-               eats=frozenset({"history"}),
-               run=lambda c: unknown_ref_switch_gate(c.history))
+               eats=frozenset({"current_event", "history", "pattern", "conn"}))
 
 # ==============================================================================================
 # unprobedFanout
@@ -696,10 +710,9 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Stop", posture="ADV
 # ground before work is dispatched onto it, entirely on the record makoto already reads (a
 # Task/Agent event, and a Read/Glob/Grep event before it).
 #
-# ADVISORY TIER, NEVER BLOCK. A subagent dispatched for pure exploration legitimately has nothing
-# to read first -- that is the whole point of sending it -- so an unguarded dispatch is a real
-# signal with a real benign class, and no corpus-measured false-positive rate exists for it yet.
-# Promoting it to BLOCK needs a measured FP rate, not a preference.
+# PRE-EDGE DENY (2026-09-25): the dispatch is refused before it launches; the discharge is one
+# Read, Glob or Grep of the ground, then retry. The guard is read from the whole session, not the
+# 1-hour window (`kit._session_rows`): Reads older than the window used to go unseen.
 from makoto.kit import unmet_obligation_gate
 
 # The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
@@ -731,8 +744,7 @@ def _is_probe(ev: dict) -> bool:
 unprobed_fanout_gate = unmet_obligation_gate(
     act=_is_dispatch,
     guard=_is_probe,
-    pattern_id="gate.unprobed_fanout",
-    message=("Work was dispatched to a subagent and no Read, Glob or Grep appears earlier in "
+    message=("Work is being dispatched to a subagent and no Read, Glob or Grep appears earlier in "
              "this session's recorded events — the brief was written from assumption, and work "
              "built on an assumed baseline is inherited whole."),
     retry_hint=("Read, glob or grep the ground before dispatching, so the brief describes what "
@@ -740,10 +752,14 @@ unprobed_fanout_gate = unmet_obligation_gate(
 )
 
 
-fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADVISE",
+fanout_RETRY_HINT = "Read, glob or grep the ground, then retry the dispatch."
+fanout_DESCRIPTION = "a subagent dispatch with no Read, Glob or Grep earlier in the session"
+fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Pre", posture="BLOCK",
+               predicate_module=__name__, keywords=("prompt",),
+               retry_hint=fanout_RETRY_HINT,
+               description=fanout_DESCRIPTION,
                tests="LINEAGE",
-               eats=frozenset({"history"}),
-               run=lambda c: unprobed_fanout_gate(c.history))
+               eats=frozenset({"current_event", "history", "pattern", "conn"}))
 # gate.pasted_fix -- the same repair landed at a second site with nothing run in between, so the
 # second site's correctness was INFERRED from the first rather than checked.
 #
@@ -774,8 +790,9 @@ fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADV
 # tree's own record a one-line repeat is indistinguishable from convention (21.1% against 3.2%).
 # The bound fails QUIET, the direction an advisory gate should fail.
 #
-# THE DISCHARGE IS THE ORDER, and the order IS the check: a verifier run BETWEEN the two landings
-# pays the obligation; one before the first, or after the second, does not. That is why this gate
+# THE DISCHARGE: a verifier run after the FIRST landing pays -- between the two landings, or after
+# the second, since that run checks the second site too (2026-09-25; before, only a run between
+# them paid, so nothing in-turn could discharge a fire). A run before the first does not. That is why this gate
 # is NOT written on `kit.unmet_obligation_gate`, whose guard, once seen, pays for the rest of the
 # session. The vocabulary of "a verifier ran" is `kit.ran_a_verifier`, unchanged and unwidened.
 #
@@ -789,8 +806,7 @@ fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Stop", posture="ADV
 # Pre-tier check on a different edge, asking whether a file is being written back to a value it
 # already held -- one file returning to a prior state, against one text reaching a second file.
 #
-# ADVISORY TIER, NEVER BLOCK: the two benign classes measured above are real, common on this very
-# tree, and identical from the record, and no corpus-measured false-positive rate exists.
+# BLOCK TIER: the discharge is one verifier run, in-turn.
 from makoto.kit import decode_history_event, introduced_text, ran_a_verifier, unwitnessed
 
 # A fix is a change to what already EXISTS. See narrowing 2 above for the rate this buys.
@@ -848,7 +864,7 @@ def _second_site_finding(block: str, first_file: str, second_file: str) -> Findi
         pattern_id="gate.pasted_fix",
         file=second_file,
         line=0,
-        level="advisory",
+        level="error",
         message=(
             f"The same change reached `{second_file}` after `{first_file}` with no verifier run "
             f"between the two landings, starting `{head}` — so the second site's correctness is "
@@ -895,12 +911,17 @@ def pasted_fix_gate(history) -> Optional[Finding]:
         return (lambda subject: subject[2] < at) if ran_a_verifier(ev) else None
 
     events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
-    for _ev, (block, where, _first, path) in unwitnessed(enumerate(events), owes=owes, pays=pays):
+    # Every second landing is owed at the END of the record, so a run after it can still pay.
+    pending = [s for it in enumerate(events) for s in owes(it)]
+    end = (len(events), {})
+    for _ev, (block, where, _first, path) in unwitnessed(
+            list(enumerate(events)) + [end], owes=lambda it: pending if it is end else (),
+            pays=pays):
         return _second_site_finding(block, where, path)
     return None
 
 
-pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="ADVISE",
+pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="BLOCK",
                tests="LINEAGE",
                eats=frozenset({"history"}),
                run=lambda c: pasted_fix_gate(c.history))
@@ -944,8 +965,8 @@ pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="ADVISE",
 # claim. A session whose only act is writing one unreferenced, undecorated function fires this
 # gate and gives gate.liveness nothing: a `def` is not a dropped pure statement.
 #
-# ADVISORY TIER, NEVER BLOCK: the recall bounds above are the benign cases and they look identical
-# from the record, and no corpus-measured false-positive rate exists.
+# BLOCK TIER: the discharge is in-turn -- point the unit at its claim (call, export, test or
+# decorate it) or delete it.
 import ast
 
 from makoto.kit import decode_history_event, introduced_text, parse_introduced, unwitnessed
@@ -1038,7 +1059,7 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
         pattern_id="gate.unclaimed_unit",
         file=where,
         line=0,
-        level="advisory",
+        level="error",
         message=(
             f"`{name}` was added and answers to nothing on the record{more}: no operator turn "
             f"names it, nothing this session wrote reaches it, and no decorator registered it."
@@ -1071,7 +1092,7 @@ def _named_by_operator(name: str, transcript_path) -> bool:
     return any(name in _TOKEN_RX.findall(t or "") for t in turns or ())
 
 
-unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="ADVISE",
+unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="BLOCK",
                tests="LINEAGE",
                eats=frozenset({"history", "transcript_path"}),
                run=lambda c: unclaimed_unit_gate(c.history,
@@ -1128,7 +1149,7 @@ unbriefed_CHECK = Check(id='event.unbriefed_dispatch', applies_at="Pre", posture
 _ROWS = (sha_CHECK, interrupt_CHECK, webfetch_CHECK, structure_CHECK, ref_CHECK, fanout_CHECK, pasted_CHECK, unclaimed_CHECK, unbriefed_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
-_PREDICATES = {sha_CHECK.id: sha_predicate, interrupt_CHECK.id: interrupt_predicate, webfetch_CHECK.id: webfetch_predicate, unbriefed_CHECK.id: unbriefed_predicate}
+_PREDICATES = {sha_CHECK.id: sha_predicate, interrupt_CHECK.id: interrupt_predicate, webfetch_CHECK.id: webfetch_predicate, unbriefed_CHECK.id: unbriefed_predicate, ref_CHECK.id: unknown_ref_switch_gate, fanout_CHECK.id: unprobed_fanout_gate}
 
 
 def predicate(*, current_event: dict, history: list, pattern, conn=None):

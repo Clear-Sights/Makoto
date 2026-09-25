@@ -92,7 +92,7 @@ def test_reopens_a_retracted_item_on_re_promise():
 def test_drift_gate_advisory_lists_open_items():
     f = plan_item_drift_gate([{"commitment_key": "k", "label": "section:9.3", "description": "d"}])
     assert f is not None
-    assert f.level == "advisory"
+    assert f.level == "error"
     assert "section:9.3" in f.message
 
 
