@@ -1423,20 +1423,22 @@ def test_dispatch_self_wired_gate_never_blocks_even_when_it_fires(tmp_path):
 def test_dispatch_plan_item_drift_gate_never_blocks_even_when_it_fires(tmp_path):
     """Behavioral pin, same shape as gate.self_wired's: gate.plan_item_drift (2026-07-09) fires
     (audited) but never blocks, even when a plan/task-labeled commitment is left open across
-    two Stop turns."""
+    two Stop turns. It bounces at the first stop that finds the commitment open; the second stop
+    shows the agent the same words, so it is audited and does not bounce again."""
     state_dir = _setup_state(tmp_path)
     first = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
              "last_assistant_message": "I'll finish §9.3 after this push."}
     rc, out = _run_dispatch(state_dir, first)
-    second = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
-              "last_assistant_message": "Moving on to other work for now."}
-    rc, out = _run_dispatch(state_dir, second)
     assert out, "gate.plan_item_drift (ADVISE) must reach the agent as a Stop block when it fires"
     decision = json.loads(out)
     assert decision["decision"] == "block"
     assert "gate.plan_item_drift" in decision["reason"]
+    second = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
+              "last_assistant_message": "Moving on to other work for now."}
+    rc, out = _run_dispatch(state_dir, second)
+    assert out == ""
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert any("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows), \
+    assert sum("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows) == 2, \
         "the advisory fire must still be audited so it leaves a forensic trail"
 
 
@@ -2434,3 +2436,36 @@ def test_every_stop_gate_finding_reaches_the_decision(monkeypatch, capsys, state
     assert drive(any_gate[0]), (
         f"{any_gate[0]}'s finding produced no decision through _evaluate_and_gate; every "
         f"Stop-edge finding must reach it now")
+
+
+def test_dispatch_advisory_read_once_does_not_bounce_every_later_stop(tmp_path):
+    """An ADVISE finding the agent already read at an earlier stop, word for word, does not bounce
+    again: measured 2026-09-25 on one thread, one scratch `rm -rf` kept gate.unobserved_destruction
+    and gate.unwitnessed_verifier bouncing on eight later stops, none of which could satisfy it.
+    The fire is still audited each time; only the repeat bounce is dropped. A BLOCK repeats."""
+    state_dir = _setup_state(tmp_path)
+    for fp in ("src/parser.py", "tests/test_parser.py"):
+        _run_dispatch(state_dir, {"hook_event_name": "PostToolUse", "session_id": "reread",
+                                  "cwd": str(tmp_path), "tool_name": "Edit",
+                                  "tool_input": {"file_path": fp,
+                                                 "old_string": "a", "new_string": "b"},
+                                  "tool_response": {}})
+    _run_dispatch(state_dir, _post_bash(tmp_path, "reread", "rm -rf build/"))
+    first = {"hook_event_name": "Stop", "session_id": "reread", "cwd": str(tmp_path),
+             "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, first)
+    assert out and json.loads(out)["decision"] == "block", "the first stop still bounces"
+    rc, out = _run_dispatch(state_dir, dict(first, last_assistant_message="Answered."))
+    assert out == "", "the same advisory, already read, must not bounce a later turn's stop"
+    rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
+    assert sum("gate.unobserved_destruction" in r.get("pattern_fires", []) for r in rows) == 2
+    # Another session reads nothing from this one.
+    _run_dispatch(state_dir, _post_bash(tmp_path, "other", "rm -rf build/"))
+    rc, out = _run_dispatch(state_dir, dict(first, session_id="other"))
+    assert out and json.loads(out)["decision"] == "block"
+    # A BLOCK finding repeats on every stop.
+    block = {"hook_event_name": "Stop", "session_id": "reread", "cwd": str(tmp_path),
+             "last_assistant_message": "Done - added rate limiting to src/nonexistent_zzz.py"}
+    for _ in range(2):
+        rc, out = _run_dispatch(state_dir, block)
+        assert out and "src/nonexistent_zzz.py" in json.loads(out)["reason"]
