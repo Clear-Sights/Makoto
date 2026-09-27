@@ -273,6 +273,23 @@ H6  FUNCTION DRAWN FROM NO CLAIM
   > one source claim per unit, or delete it
 
 
+===== 5 - THE DISPATCH =================
+I1  UNBRIEFED DISPATCH
+    a worker sent without what it reads, what it may write, and what pays it
+  > refuse an Agent/Task call whose prompt lacks READ:, WRITE: and ACCEPTANCE: lines
+    plants: E/i1_catch (Agent, bare prose), E/i1_reword (Task, "Reads:" loose label); pass E/i1_pass
+
+I2  UNPINNED INPUT
+    an expensive run true for the input it read then, not the one on disk now
+  > refuse a dispatch whose READ paths carry no @<12+ hex> content hash, and a Bash call with
+    timeout > 120000 ms unless the same command verifies pins (sha256sum -c) or names path@hash
+    plants: E/i2_catch (READ without hash), E/i2_reword (Bash, 600000 ms, unpinned); pass E/i2_pass
+I3  UNPAID ACCEPTANCE
+    done claimed while the dispatch's ACCEPTANCE command never exited 0
+  > at Stop, each dispatch's ACCEPTANCE is owed; only a later Bash run of that exact command with
+    exit 0 pays it (kit.unwitnessed: owes = dispatch, pays = that run)
+    plants: E/i3_catch (never ran), E/i3_reword (ran, failed); pass E/i3_pass
+
 ===== MERGES MADE HERE (each proven) ===
 Survivor's fix alone catches the dropped
 entry's trip. Survivor picked by fix.
@@ -348,6 +365,35 @@ Not merged, tried:
     into H3 (a cap names no cause); B9
     into H2 (a waiver is static).
 
+C7: trip, a generator truncates its
+  output file and then crashes
+  (MESH/target/Mesh.v, 0 bytes). Same
+  fix; its producer-side form is write
+  to a temp file, then rename.
+B20: trip, a check loosened after it
+  went red (C16). Editing the check
+  instead of the subject changes nothing
+  the check guards. Same fix.
+D8: trip, a short-job verdict applied to
+  long sessions (DetIO capture_index
+  removed in 473a4ff). Same fix:
+  exercise at real magnitude, in the
+  shipped form.
+A11: trip, duplicate rows from repeated
+  check runs. Same fix: count distinct
+  content, not records.
+G1: trip, a claim stated but never
+  measured. Same fix: set each claim
+  beside what it rests on.
+F8: trip, Makoto re-bounced the same
+  advisory on 8 later stops. Same fix
+  (makoto PR #95): suppress while
+  unchanged.
+B10: trip, Makoto fired on scratch
+  cleanup, on guard code and on the
+  compaction summary, 11 false of 30
+  fires. Same fix: measure its rate on
+  benign input.
 
 ===== FAMILIES ==========================
 Filed by what the checker needs, not by
