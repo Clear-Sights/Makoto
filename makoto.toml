@@ -15,3 +15,8 @@
 verifiers = [
     "eval/replay.py",
 ]
+
+# owner_paths: paths the agent may not delete, overwrite or cut (event.owner_path), root-relative.
+# docs/REGISTER.md is the vendored register.
+owner_paths = [".claude/", "commit_gate.sh", "pre-push", "config.env", "ACCEPTED.tsv", "REGISTER.md",
+               ".git/hooks/pre-push", "docs/REGISTER.md"]

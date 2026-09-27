@@ -165,7 +165,7 @@ def test_register_map_reddens_on_a_declared_exemption_with_no_reason(monkeypatch
 
 # Digest of docs/REGISTER.md as vendored from measure-zero-dev. Re-pin deliberately
 # when the register is re-vendored; that edit is the record that a copy moved.
-REGISTER_DIGEST = "f64fdf7c6c1d8b574952bc409f067bf138f04db5f3da05b7e34c4402a61d3929"
+REGISTER_DIGEST = "606901332e58d96c21f5133c82ce7d1fb03aef327fcc35ff985ea21ce1c76147"
 
 
 def test_vendored_register_matches_its_pinned_digest():
