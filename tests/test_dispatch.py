@@ -2199,6 +2199,8 @@ def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch,
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
     D.main()
     capsys.readouterr()
+    # a fresh state dir: the notice shows once per session, and this test is about accumulation
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path / "second"))
     D.main()
     assert len(D._notices) == 1, f"notices accumulated across calls: {D._notices!r}"
 

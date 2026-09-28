@@ -184,7 +184,7 @@ def _dispatch_fact(state_dir: Path, stage: str, reason: str, *, blocked: bool,
         # the line is bad; losing the notice and the audit row behind it is worse, so both durable
         # records below run either way.
         pass
-    if not blocked and stage in _NOTICE_STAGES:
+    if not blocked and stage in _NOTICE_STAGES and _first_notice(state_dir, (ids or {}).get("session_id"), stage):
         _notices.append(f"[{stage}] {reason}")
     try:
         audit.append_error(state_dir, event_id=None, pattern_id=f"dispatch.{stage}",
@@ -215,6 +215,24 @@ _stdout_written = False
 # Set when the decision write itself raised. Distinct from `_stdout_written`, which only says the
 # wire was CLAIMED -- see `_emit_decision`.
 _decision_write_failed = False
+
+
+def _first_notice(state_dir, session_id, stage) -> bool:
+    """A can't-evaluate notice reaches the user ONCE per session and stage; the stderr line and the
+    audit row still record every call. Measured 2026-09-28 (attack round three): the notice rode
+    about 45 tool calls of one session, the same line each time, and cost more than it told.
+    Best-effort: an unwritable marker degrades to notifying again, never to silence."""
+    try:
+        marker_dir = Path(state_dir) / "notice_shown"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        key = "".join(c if c.isalnum() or c in "-_" else "_" for c in f"{session_id or 'nosession'}.{stage}")[:120]
+        marker = marker_dir / key
+        if marker.exists():
+            return False
+        marker.write_text("shown\n", encoding="utf-8")
+    except Exception:
+        pass
+    return True
 
 
 def _emit_notices() -> None:

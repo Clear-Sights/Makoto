@@ -112,6 +112,18 @@ def test_fail_open_emits_a_user_visible_system_message(tmp_path):
     assert "ALLOWED WITHOUT BEING CHECKED" in body["systemMessage"]
 
 
+def test_the_fail_open_notice_reaches_the_user_once_per_session(tmp_path):
+    """The same can't-evaluate fault on every call of a session shows once; the audit keeps every
+    row. Measured 2026-09-28: the line rode about 45 calls of one session."""
+    # discriminant: one fault repeated in one session, then in a second session
+    state_dir = _setup_state(tmp_path)
+    broken = lambda sid: (b'{"hook_event_name":"PreToolUse","tool_name":"Bash","session_id":"'
+                          + sid + b'","tool_input":{"comm')
+    assert "ALLOWED WITHOUT BEING CHECKED" in json.loads(_run_raw(state_dir, broken(b"s-once"))[1])["systemMessage"]
+    assert _run_raw(state_dir, broken(b"s-once"))[1] == "", "the second fire in a session stays off the wire"
+    assert "systemMessage" in json.loads(_run_raw(state_dir, broken(b"s-other"))[1]), "a new session is told"
+
+
 def test_a_real_decision_keeps_the_wire_to_itself(tmp_path):
     """The wire carries exactly one JSON object. A notice must never be appended behind a deny."""
     state_dir = _setup_state(tmp_path)
