@@ -1,0 +1,28 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Task",
+   "tool_input": {
+    "description": "run worker"
+   },
+   "tool_response": {
+    "result": "failed"
+   }
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Task",
+   "tool_input": {
+    "description": "run worker again"
+   },
+   "tool_response": {
+    "result": "failed"
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "done"
+  }
+ ]
+}

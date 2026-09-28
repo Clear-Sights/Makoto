@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": "constitution/integrity/checks/status2.py", "content": "import re\n\ndef ok(status):\n    return bool(re.match(r\"ok\", status))\n"}}]}

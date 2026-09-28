@@ -1,0 +1,15 @@
+{
+ "files": {
+  "makoto.toml": "dispatch = true\n"
+ },
+ "events": [
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Task",
+   "tool_input": {
+    "description": "fix",
+    "prompt": "Reads: kit.py. Then fix it; tests should pass."
+   }
+  }
+ ]
+}

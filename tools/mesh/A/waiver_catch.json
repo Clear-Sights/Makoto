@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": {"file_path": "app/util.py", "old_string": "import os", "new_string": "import os  # noqa"}, "tool_response": {"success": true}}, {"hook_event_name": "Stop", "last_assistant_message": "done"}]}

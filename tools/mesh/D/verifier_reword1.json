@@ -1,0 +1,20 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "npm test"
+   },
+   "tool_response": {
+    "stdout": "all tests passed",
+    "stderr": "",
+    "exitCode": 0
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "done"
+  }
+ ]
+}

@@ -1,0 +1,12 @@
+{
+  "git": true,
+  "events": [
+    {
+      "hook_event_name": "PreToolUse",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git -c user.name=\"Claude Diaz\" -c user.email=\"claude.diaz@example.com\" commit -m \"wip\""
+      }
+    }
+  ]
+}

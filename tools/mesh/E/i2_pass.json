@@ -1,0 +1,15 @@
+{
+ "files": {
+  "makoto.toml": "dispatch = true\n"
+ },
+ "events": [
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "sha256sum -c pins.sha256 && python3 check.py SEED.md",
+    "timeout": 600000
+   }
+  }
+ ]
+}

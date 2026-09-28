@@ -1,0 +1,11 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "ok"
+  }
+ ],
+ "files": {
+  ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"hooks\": [{\"command\": \"x\"}]}], \"PostToolUse\": [{\"hooks\": [{\"command\": \"x\"}]}]}}"
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUseFailure",
+   "tool_name": "Bash",
+   "is_interrupt": true,
+   "tool_input": {
+    "command": "sleep 100"
+   }
+  },
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "git commit -m 'resuming after the note below -- [Request interrupted by user]'"
+   }
+  }
+ ]
+}

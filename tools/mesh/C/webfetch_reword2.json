@@ -1,0 +1,11 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__browser__fetch",
+   "tool_input": {
+    "url": "https://docs-internal-vendorzzz.example.net/api/reference"
+   }
+  }
+ ]
+}

@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": "constitution/integrity/checks/seal4.py", "content": "def verify_signature(x):\n    return compute_and_compare(x)\n"}}]}

@@ -1,0 +1,63 @@
+thing	kind	slots	verdict	reason
+content.env_gated_audit	row	B35	DUPE	fits B35 (map note names it); shares B35 with integrity_suppression_flag -- same requirement, different surface (env gate vs toml flag); fine, not removable
+content.fabricated_commit_sha	row	H5(+D3)	DUPE	fits H5 via D3 (SHA not read from source); shares H5 with the audit log; also a G1 claim-vs-record instance
+content.illusory_interruption_claim	row	G1 (map: E3)	DUPE	E3 COINCIDENCE is how the check avoids FP, not what it catches; the job is a claim with no record = G1; shares G1 with phantom_citation, fabricated_action
+content.verifier_exit_masking	row	D1(+C1)	DUPE	fits D1 via C1 (computed failure dropped); shares D1 with gate.completion; different job, fine
+gate.canon_fingerprints_advisory	row	A11 (construction)	DUPE	ADVISE half of the same fingerprint set as canon_fingerprints (one requirement split by tier); its atoms repeat other rows' jobs (assertion_weakened=B20 hollow_test, revert_loop=D11 thrash_revert, destructive_command=D14, claimed_pass_no_run=B2 green_claim); not removable: only runner for 13 conjunctions
+gate.claimed_consent_absent	row	G1 (map: E12)	DUPE	E12 fits by pun on 'rewording'; the job is 'cites operator approval, operator has no turn' = G1 claim beside what it rests on
+gate.fabricated_action	row	G1	DUPE	fits G1 (+B24) as noted; shares G1 with phantom_citation and the other claim-vs-record gates
+gate.green_claim	row	B2	DUPE	fits B2 (absence taken as proof); same claim ('suite green') graded by stale_pass against a second record; distinct witness exists (session testrun vs pytest lastfailed), keep
+gate.liveness	row	H6 (map: E1)	DUPE	a dead pure statement is executed, not an unselected branch; fits H6 'unit answering to nothing' at statement grain, shared with gate.unclaimed_unit (def grain)
+gate.relative_path_citation	row	none	MISSING-SLOT	no entry; README:15 disclaims it ('a communication-quality signal, not an integrity violation'); only warrant is register_map.py:47 'Owner-reported pain, kept on its own merit'. Owner decides: add a non-integrity slot or REMOVE (~-200 lines)
+gate.stale_establisher	row	H2(+F3)	DUPE	fits H2 via F3 (DONE node's artifact moved); shares H2 with stale_pass; different job
+content.phantom_citation	row	G1; A2 (construction)	FIT	one job (G1: cited source must exist); A2 describes the folding the check uses, not what it catches
+gate.canon_fingerprints	row	A5 A11 D9 (all construction)	DUPE	all three map slots describe how the check is built (whole-text match, windowing, green-before-plant), none the defect caught; the 4 BLOCK conjunctions overlap D14/B35/B20 rows but are the only BLOCK tier for them; keep
+gate.named_test	row	A7 C3	DUPE	one job; A7 'compare per unit' and C3 'evaluate each item in isolation' are the same test said twice: register twin candidate (source register lives in measure-zero-dev)
+gate.hollow_test	row	B5 B2 B20	DUPE	one job (test cannot fail = constant verdict, B5); B2/B20 are real neighbours with different fixes; fine
+gate.undeclared_falsifiable	row	C4 B26 (map: B2 C2 B32)	DUPE	code (spec.py:586-656) audits makoto's own checks/ catalog for modules that failed to import (registry.discover swallows them); it reads no claim. Map notes and MERGE-WITNESSES row describe a falsifier check that does not exist. Real fit: C4 crash permits / B26 supervisor liveness (with self_wired). C2 and B32 lose their only runner -> UNCOVERED
+gate.completion	row	D1 (map also C7)	DUPE	D1 twice (from D2) is one job; C7 misfit: an existence check does not catch truncation, so C7 has no runner
+event.identical_retry	row	E10 E5	DUPE	fits both (cap of one, name what changed); job duplicated by gate.canon's recur primitive at Stop (any tool, >=2 repeats)
+gate.self_wired	row	B26; B1 D9 (construction)	DUPE	job is B26; B1 and D9 describe makoto's own construction; shares B26 with self_mute_guard (Pre block of the same strip) and undeclared_falsifiable
+gate.stale_pass	row	H2 D4 (map also F7)	DUPE	H2/D4 fit; F7 misfit (register itself refused F7 into H2: no exclusion), so F7 has no runner
+gate.canon	row	E5/E10 (map: F10 construction)	DUPE	recur primitive = identical_retry's job; timeout primitive (turn closes on an errored call) has no clean slot; F10 describes how the check reads history
+gate.dropped	row	G1 (map: D13 construction)	DUPE	promise undischarged at turn end; D13 is destroying an unlisted set; 'enumerated first' is construction. D13 has no runner
+gate.plan_item_drift	row	G1 (map: F8 construction)	DUPE	same job as gate.dropped at label grain; F8 note describes its own advisory tier
+content.verifier_predicate_weakened	row	B23 (map: C6)	DUPE	startswith where == is meant is not a sign inversion; B23's fix 'assert equality' is exact; shares B23 with bound_as_count. C6 has no runner
+content.verifier_body_hollowed	row	B5 (map: F14)	DUPE	hollowed verifier body is hollow_test's job on the integrity-check surface (Pre vs Stop); F14 fit is weak
+content.illusory_authorship_trailer	row	A13 (map: E3 construction)	DUPE	README:145-156 calls it the text-path twin of gate.claude_identity (git-layer path); one requirement, two surfaces, keep both
+gate.claude_identity	row	A13	FIT	configured identity layer named before the write
+content.self_mute_guard	row	E12	FIT	agent cannot grant itself makoto's removal; overlaps B26 job with self_wired at Pre edge
+content.integrity_suppression_flag	row	B35	FIT	shares slot with env_gated_audit
+content.last_wins	row	A4	FIT	
+content.bound_as_count	row	B23	FIT	shares with verifier_predicate_weakened
+content.unsourced_webfetch	row	H1	FIT	
+event.nested_budget	row	E11	FIT	
+event.thrash_revert	row	D11	FIT	
+gate.claimed_shipped	row	C10	FIT	
+gate.claimed_running	row	C8	FIT	
+gate.unread_structure	row	A3	FIT	
+gate.unknown_ref_switch	row	D12	FIT	
+gate.unprobed_fanout	row	B11	FIT	
+gate.pasted_fix	row	H3	FIT	
+gate.unclaimed_unit	row	H6	FIT	shares H6 with liveness at another grain
+gate.undischarged_waiver	row	B9	FIT	
+gate.unexamined_wall	row	G5	FIT	
+gate.unnamed_failure	row	C12	FIT	
+gate.relaunched_unchanged	row	E13	FIT	
+gate.unobserved_destruction	row	D14	FIT	
+gate.unwitnessed_verifier	row	B4	FIT	
+gate.report_before_run	row	C11	FIT	
+gate.unasked_plan	row	G2	FIT	
+tools/merge_pass.py	file	B21 (map also B7)	DUPE	B21 fits; B7 'bind every rule to a runner' is tools/register_map.py's job (its docstring says so)
+tools/register_map.py	file	B34 B7	FIT	
+tools/render_checks.py	file	F2	FIT	README counts generated from registry; tested by tests/test_render_checks.py
+eval/replay.py + eval/corpus/*	file	B10	FIT	README 'replay-tested against authored sessions'; render_checks runs it
+plugin/commands/*.md	file	engine	FIT	plugin slash commands (status/show/patterns) over __main__
+.github/workflows/*.yml	file	engine	FIT	ci + release (version read from manifest)
+kit.is_false_const	function	none	REMOVE	vendored from Ward for TLS/JWT checks makoto does not ship; no plugin caller (grep); kept alive only by test_factories and VENDORED.tsv
+kit.is_cert_none	function	none	REMOVE	same: no caller in plugin; content.cert_none_mode/cert_reqs_none it names are not in the catalog
+kit.jwt_decode_callee_chain + vocab.JWT_CALLEE_RX	function	none	REMOVE	no caller; content.jwt_* not in catalog
+kit._default_veto	function	none	REMOVE	defined, never referenced anywhere (no veto= parameter exists)
+switch._decode_row + switch.calls_from_history	function	E5/E10	DUPE	same decode as substrate/_canonAtoms._decode_row/calls_from_history (PostToolUse terminals, failure_terminal_result); import one
+kit.callee_chain vs _stdlib_ast_helpers._callee_chain	function	-	DUPE	byte-identical; exempted by tests/test_no_alpha_duplicate_functions.py for stdlib isolation; keep
+spec._is_tautology vs hollowTest._is_tautology	function	B5	DUPE	two divergent definitions of 'tautology' (spec accepts <=,>=,bool(); hollowTest refuses Call/Attribute sides): F2 two sources of truth

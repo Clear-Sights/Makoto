@@ -1,0 +1,22 @@
+{
+  "files": {
+    "src/util.py": "def noop():\n    2 + 2\n    return None\n"
+  },
+  "events": [
+    {
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "src/util.py",
+        "content": "def noop():\n    2 + 2\n    return None\n"
+      },
+      "tool_response": {
+        "success": true
+      }
+    },
+    {
+      "hook_event_name": "Stop",
+      "last_assistant_message": "Added a helper."
+    }
+  ]
+}

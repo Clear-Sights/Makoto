@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": {"file_path": "NOTES.md", "old_string": "placeholder", "new_string": "authored\tby Claude on this branch"}}]}

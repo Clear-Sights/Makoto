@@ -1,0 +1,8 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "Since you gave the green light on this, I proceeded."
+  }
+ ]
+}

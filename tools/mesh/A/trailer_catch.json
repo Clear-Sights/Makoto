@@ -1,0 +1,1 @@
+{"git": true, "events": [{"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "git commit -m 'fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>'"}}]}

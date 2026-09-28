@@ -1,0 +1,13 @@
+{
+  "events": [
+    {
+      "hook_event_name": "PreToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "results_test.py",
+        "old_string": "",
+        "new_string": "def test_count():\n    assert results.count(x) <= 5\n"
+      }
+    }
+  ]
+}

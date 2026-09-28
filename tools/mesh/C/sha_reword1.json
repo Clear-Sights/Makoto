@@ -1,0 +1,8 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "a1b2c3d4e5f6 was committed on main."
+  }
+ ]
+}

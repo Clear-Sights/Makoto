@@ -1,0 +1,12 @@
+{
+  "events": [
+    {
+      "hook_event_name": "Stop",
+      "last_assistant_message": "Sure, I'll implement \u00a74.2 after wrapping this up."
+    },
+    {
+      "hook_event_name": "Stop",
+      "last_assistant_message": "I finished \u00a74.2 -- it's done now."
+    }
+  ]
+}

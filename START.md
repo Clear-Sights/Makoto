@@ -115,11 +115,13 @@ The steps:
    recorded on 3.3.0. plant: a verdicts file missing one fire exits 2.
    inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
    each fire. owner: the next Makoto session.
-   projection: `python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv` (no model). On the recorded
-   `MAKOTO/foundation/audit-2026-09-28.jsonl` and `verdicts-2026-09-28.tsv` (shared project
-   folder) it prints `PROJECT 6 checks=17 worth=5 not=12 fires=125` in 2 s. The 12 not-worth
-   checks are step 6 rows in VOIDS. cap: 2 model calls and 5 minutes per VOIDS row; the step
-   ends when every row is re-graded on a 3.4.6 record or subtracted.
+   projection: `python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv` (no model). The 09-28 record is
+   `handoff/MAKOTO/foundation/` inside Measure-Zero-Dev's `handoff.zip` (`git show HEAD:handoff.zip`):
+   `PROJECT 6 checks=17 worth=5 not=12 fires=125`. The first 3.4.7 record, graded, is in
+   `docs/v9/records/`: `PROJECT 6 checks=4 worth=2 not=2 fires=9`. Of the 12 rows only
+   content.verifier_exit_masking fired there, and it still fails; its subtraction reverts C4 to
+   NOT-COUNTABLE, which the step 7 ratchet forbids, so it is held for the owner (VOIDS). The other 11
+   need a record where they fire. cap: 2 model calls and 5 minutes per VOIDS row.
    Stop: at the cap, record the measured number in VOIDS and go on.
 7. ~~Build the ratchet and the shared pieces: `kit.neighbours`, O(n·t) with one token blanked, and
    `kit.claim`~~ (branch claude/pensive-carson-cbpr5j). gate.running_claim now reads its claim through
@@ -157,11 +159,12 @@ The steps:
    inputs: the classifier refused a read of the remaining 7 reds and the 3 proposed I1 to I3
    cases as "Modify Shared Resources". The placement item in the handoff section carries the line
    that lifts it. owner: the next Makoto session.
-   projection: the mesh is already the projection: `MAKOTO/mesh/mesh.py` over `mesh.tsv` (181
-   cases) with `harness.py`, and `placement.tsv` (63 rows) as the slot map, all in the shared
-   project folder. First sub-step: copy `mesh.py`, `harness.py` and `mesh.tsv` into
-   `tools/mesh/` and run it there (cap: 2 model calls and 5 minutes). Its one void, the 7 unread
-   reds, is a step 10 row in VOIDS. cap: 4 model calls and 10 minutes.
+   projection: the mesh is in `tools/mesh/` (copied from `handoff/MAKOTO/mesh` in Measure-Zero-Dev's
+   `handoff.zip`): `MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py` reads distance 5, and
+   `proposed.tsv` (I1 to I3) reads 0. shipped_refspec_pass was a stale case, not a rule gap: since
+   gate.unverified_merge a push with no verifier before it is denied, so the case now carries the red
+   and green runs a real landing has. The 5 reds are the canon_fingerprints pair, read in VOIDS; their
+   disposition is step 6's held subtraction. cap: 4 model calls and 10 minutes.
    Stop: at the cap, record the measured number in VOIDS and go on.
 11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call

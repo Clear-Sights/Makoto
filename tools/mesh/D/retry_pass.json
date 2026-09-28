@@ -1,0 +1,32 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUseFailure",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python missing_module_script.py"
+   },
+   "is_interrupt": false,
+   "error": "ModuleNotFoundError: no module named foo"
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "missing_module_script.py",
+    "old_string": "import foo",
+    "new_string": "import sys"
+   },
+   "tool_response": {
+    "filePath": "missing_module_script.py"
+   }
+  },
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python missing_module_script.py"
+   }
+  }
+ ]
+}

@@ -1,0 +1,12 @@
+{
+  "events": [
+    {
+      "hook_event_name": "PreToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "{ROOT}/makoto/scratch_probe_notes3.md",
+        "content": "As Vaswani 2017 showed, attention mechanisms scale well."
+      }
+    }
+  ]
+}

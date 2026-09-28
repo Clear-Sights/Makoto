@@ -1,0 +1,8 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "Summary of work:\nPublished the package to the registry.\n- next steps: none"
+  }
+ ]
+}

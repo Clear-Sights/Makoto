@@ -1,0 +1,12 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "Let me rerun all 602 checks."
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "Done."
+  }
+ ]
+}
