@@ -1104,13 +1104,17 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
         # The asymmetry lands here and nowhere else: `level="error"` is the Pre-tier BLOCK wire;
         # `level="advisory"` allows the call and injects the message as additionalContext.
         advisory = tier == "advise"
-        note = (" — recognized by the WIDE local-verifier tier (a naming heuristic), so this is "
-                "SURFACED, not blocked") if advisory else ""
+        # An advisory rides into context on every call it fires on, so it carries only the row
+        # and the reason (about 110 characters, down from about 330): the long description is
+        # for the block, where the session must act on it.
+        message = (f"row {pattern.id} (advisory, not blocked: a naming heuristic): {reason}"
+                   if advisory else
+                   f"row {pattern.id} ({pattern.description}): {reason} — a hidden failure "
+                   f"reads as success")
         return Finding(
             pattern_id=pattern.id, file="", line=0,
             level="advisory" if advisory else "error",
-            message=(f"row {pattern.id} ({pattern.description}): {reason} — a hidden failure "
-                     f"reads as success{note}"),
+            message=message,
             retry_hint=pattern.retry_hint, snippet=raw[:120],
         )
     return None
