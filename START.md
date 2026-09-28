@@ -7,7 +7,7 @@ item it uses.
 
 ## Launch checklist
 
-Run `sh tools/launch_check.sh --suite` before anything else. Every line must read PASS. Each
+Run `sh tools/launch_check.sh` before anything else (about 7 s). Every line must read PASS. Each
 FAIL prints the one act that clears it. If one cannot be cleared, stop and tell Gabriel which
 line failed; do not work around it.
 
@@ -15,9 +15,11 @@ line failed; do not work around it.
 - The checkout is origin/main and the tree is clean.
 - The three laws exit 0: `tools/render_checks.py --check`, `tools/register_map.py` and
   `tools/merge_pass.py`.
-- NOTE, not a stop: the installed Makoto copy should be this checkout's `plugin/`. Reinstalling it
-  is Gabriel's act (hooks load at session start, so it lands next session); the line prints NOTE
-  with the act and the session goes on.
+- NOTE, not a stop: the line names the installed Makoto copy whose hooks run this session (from
+  the account-sync manifest and `enabledPlugins`, read by `tools/makoto_copies.py`) and every
+  unused copy beside it. The live copy should be this checkout's `plugin/`. Reinstalling it, or
+  removing an unused copy, is Gabriel's act (hooks load at session start, so it lands next
+  session); the line prints NOTE with the act and the session goes on.
 - The session has the repositories it needs: ask to attach (add_repo) Clear-Sights/Scour and
   Clear-Sights/Measure-Zero, and clone both beside this repository, before anything else.
 - DetIO is on: it loads as a plugin at the version DetIO main ships, with
@@ -34,7 +36,8 @@ line failed; do not work around it.
 - Codex is not a launch item: no step here uses it. A step that does runs `sh tools/codex.sh`
   first; its LAUNCH MISSING line stops that step only and names the variable to set. Never commit
   `auth.json`.
-- The suite is green.
+- The suite is not a launch item: main's merge already ran it on five CI jobs. Before calling any
+  step done, run `sh tools/launch_check.sh --suite` (about 76 s more) and see `suite green`.
 
 ## Goal and path
 
