@@ -40,6 +40,18 @@ for inst in "$HOME"/.claude/plugins/synced/*/makoto "$HOME"/.claude/plugins/cach
 done
 [ "$found" = 1 ] || fail "Makoto installed for this account" "install the Makoto plugin from https://github.com/Clear-Sights/Makoto, then start a new session"
 
+# DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. Read the
+# installed copy's own version line; the act that clears a miss is the install, then a new session.
+detio=""
+for inst in "$HOME"/.claude/plugins/synced/*/detio "$HOME"/.claude/plugins/cache/*/detio/*; do
+  [ -f "$inst/.claude-plugin/plugin.json" ] && { detio="$inst"; break; }
+done
+if [ -n "$detio" ]; then
+  pass "DetIO installed ($("$PY" -c "import json; print(json.load(open('$detio/.claude-plugin/plugin.json'))['version'])") at $detio)"
+else
+  fail "DetIO installed" "claude plugin marketplace add Clear-Sights/DetIO && claude plugin install detio@detio, then start a NEW session"
+fi
+
 if [ "${1:-}" = "--suite" ]; then
   if PYTHONPATH="$PWD/plugin" "$PY" -m pytest -q -p no:cacheprovider >/dev/null 2>&1; then pass "suite green"
   else fail "suite green" "PYTHONPATH=\$PWD/plugin $PY -m pytest -q -p no:cacheprovider"; fi

@@ -17,6 +17,8 @@ line failed; do not work around it.
   `tools/merge_pass.py`.
 - Every installed Makoto copy is this checkout's `plugin/`, both version and content. Hooks load
   at session start, so a reinstall needs a new session.
+- DetIO is installed, and the line prints its version (0.3.6 at DetIO main d203b99 on
+  2026-09-28). Hooks load at session start, so an install needs a new session.
 - The suite is green.
 
 ## Goal and path
@@ -38,7 +40,9 @@ Every row is held to three bars, and a row lands only with all three green:
 
 Makoto is done when all three hold:
 
-- `python3 tools/register_map.py` prints 77 RUNNER and 0 NOT-COUNTABLE.
+- `python3 tools/register_map.py` prints RUNNER for every entry whose set a hook event can
+  decide, each by one check whose predicate is the entry's effect; every NOT-COUNTABLE row names
+  the fact no hook event carries (59 RUNNER and 18 NOT-COUNTABLE on 2026-09-28).
 - Every fired check passes worth.py on a fresh live record.
 - The launch checklist passes.
 
@@ -81,7 +85,7 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
    each fire. owner: the next Makoto session.
 7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
-   check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
+   check: a test pins the NOT-COUNTABLE count at 18, and the count only falls. plant: flip any
    RUNNER row back and the test reads red. inputs: the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
 8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
