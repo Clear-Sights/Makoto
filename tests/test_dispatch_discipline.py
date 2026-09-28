@@ -1,4 +1,4 @@
-"""PROPOSED-REGISTER-ROWS.md's dispatch-discipline rows -- I1/event.unbriefed_dispatch,
+"""docs/REGISTER.md's dispatch rows -- I1/event.unbriefed_dispatch,
 I2/event.unpinned_input, I3/gate.unpaid_acceptance. All three are opt-in: silent unless the
 session's own working tree declares `dispatch = true` in its `makoto.toml`.
 """
