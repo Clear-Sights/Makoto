@@ -124,7 +124,7 @@ The steps:
    inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
    each fire. owner: the next Makoto session.
    projection: `python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv` (no model). The 09-28 record is
-   `handoff/MAKOTO/foundation/` inside Measure-Zero-Dev's `handoff.zip` (`git show HEAD:handoff.zip`):
+   `docs/v9/records/audit-3.3.0-2026-09-28.jsonl` with `docs/v9/records/verdicts-3.3.0-2026-09-28.tsv`:
    `PROJECT 6 checks=17 worth=5 not=12 fires=125`. The first 3.4.7 record, graded, is in
    `docs/v9/records/`: `PROJECT 6 checks=4 worth=2 not=2 fires=9`. Of the 12 rows only
    content.verifier_exit_masking fired there, and it still fails; its subtraction reverts C4 to
