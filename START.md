@@ -127,30 +127,29 @@ The steps:
    `tests/test_kit_shared.py`. plant: flip any RUNNER row back and the ratchet reads red; a pairwise
    loop in `kit.neighbours`, or no negation filter in `kit.claim`, and its test reads red.
    inputs: `docs/FOUNDATION-14.md`, "Shared pieces". owner: done.
-8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
-   commit each. Each commit lowers the pin by 1.
+8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28 and G3,
+   cheapest first, one commit each. Each commit lowers the pin by 1. A6 and E8 landed on branch
+   claude/pensive-carson-cbpr5j as gate.gradient_collapse and gate.option_interaction (pin 18 to 16);
+   `tests/test_gradient_collapse.py` and `tests/test_option_interaction.py` keep the 14 witnessed
+   defects two Codex gpt-6-astra reads found in them.
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
    inputs: each row's owes and paid-by are defined in the table. What each row still needs is
    its measured false rate on real sessions, and the corpus for that exists:
    `tools/corpus.py` over the transcripts in `~/.claude/projects/`. B14's benefit verbs and D8's
    narrowing flags are settled by those corpus fires. Cheapest way: convert the corpus once and
-   replay it once for all 14 rows and step 11's thresholds together, never once per row. Write the
-   rows with the cheaper executor, each briefed with its catch test as ACCEPTANCE, and accept a row
-   only on your own run of that test. owner: the next Makoto session.
+   replay it once for all remaining rows and step 11's thresholds together, never once per row.
+   Accept a row only on your own run of its catch test. owner: the next Makoto session.
    projection: `python3 tools/project.py 8` (no model) parses each row's v9 line with the
    evaluator: `PROJECT 8 lines=14 parsed=2 refused=12`. The 12 refused are step 8 rows in VOIDS and
-   wait on step 13's language; A6 and E8 go through the corpus replay now. cap: 8 model calls and
-   15 minutes per row.
+   wait on step 13's language. cap: 8 model calls and 15 minutes per row.
    Stop: at the cap, record the measured number in VOIDS and go on.
-9. Cut the per-call start cost of about 0.19 s for Pre plus Post.
-   check: a latency reading of the Pre and Post shim time, with a bound. plant: a module-level
-   compile added back reads red.
-   inputs: which cut to make, lazy regex compiles or a resident process, is unmeasured. Measure
-   the lazy-compile cut first, because it is the smaller change. owner: the next Makoto session.
-   projection: none needed; this is a measurement (`python3 -X importtime` on the Pre shim), not
-   research. cap: 4 model calls and 10 minutes.
-   Stop: at the cap, record the measured number in VOIDS and go on.
+9. ~~Cut the per-call start cost~~ (branch claude/pensive-carson-cbpr5j). Module-level patterns are
+   `vocab._lazy_re`, compiled on first use: one Pre compiles 23 patterns instead of 206.
+   check: `tests/test_hook_latency.py::test_no_module_level_regex_compile_outside_core` and
+   `::test_one_pre_compiles_few_patterns` (bound 40). plant: a module-level `re.compile` added
+   back reads red; both read red on 6cff354. inputs: `python3 -X importtime` on the Pre shim.
+   owner: done.
 10. Close the shared mesh (`MAKOTO/mesh`), which reads distance 7 after the harness fix.
    check: the mesh reads distance 0, with every triple giving catch red and pass green.
    plant: `MAKOTO/foundation/harness.orig.py` reads 19.

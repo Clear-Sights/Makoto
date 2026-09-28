@@ -53,3 +53,15 @@ def test_non_string_content_is_no_decision_not_a_crash():
     assert gate([_row("src/score.py", {"value": "t"})]) is None
     assert gate([_row("src/score.py", {"edits": [{"old_string": "a", "new_string": {"v": "t"}}]},
                       tool="MultiEdit")]) is None
+
+
+@pytest.mark.parametrize("code", ["y = 1.0 if s >= 0.9 else 0.0", "y = 1 if enabled and s >= 0.9 else 0",
+                                  "y = int(s > 0.9 and ok)", "y = ((p > 0.5) & m).astype(int)"])
+def test_second_round_collapses_fire(code):
+    assert gate([_row("src/score.py", code)]) is not None
+
+
+def test_a_number_written_as_a_string_pays_and_a_huge_int_does_not_crash():
+    assert gate([_row("src/score.py", "y = 1 if s >= 0.9 else 0"),
+                 _row("tests/test_score.py", 'assert score(float("0.9")) == 1')]) is None
+    assert gate([_row("tests/test_int.py", 'assert int("' + "9" * 400 + '") == ' + "9" * 400)]) is None

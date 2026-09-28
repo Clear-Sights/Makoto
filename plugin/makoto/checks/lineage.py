@@ -33,6 +33,7 @@ from __future__ import annotations
 #
 # A fire is a blocking decision on the AI's OWN Stop claim, never a restriction on a USER-directed
 # action; any decode or shape failure returns None.
+from makoto.vocab import _lazy_re
 import re
 from typing import Optional
 from makoto.kit import claim_vs_history_predicate, iter_tool_events, raw_payload_str
@@ -60,33 +61,33 @@ _TAG_GAP = r"[^\n]{0,40}?"      # tags often carry a version label before the SH
 # Each claim regex asserts a commit/tag ACTUALLY HAPPENED and cites a SHA.
 _CLAIM_RXS = (
     # forward, completed verb: "committed as a1b2c3d", "committed a1b2c3d"
-    re.compile(r"\bcommitted\b" + _GAP + _SHA_RX, re.IGNORECASE),
+    _lazy_re(r"\bcommitted\b" + _GAP + _SHA_RX, re.IGNORECASE),
     # forward, asserting noun-on-a-ref: "commit a1b2c3d is on main", "commit a1b2c3d landed"
-    re.compile(
+    _lazy_re(
         r"\bcommit\b\s*[:#]?\s*" + _SHA_RX +
         r"[^\n]{0,24}?\b(?:is|was|has been|landed|pushed|on)\b",
         re.IGNORECASE,
     ),
     # "created/made/pushed (the )commit a1b2c3d"
-    re.compile(
+    _lazy_re(
         r"\b(?:created|made|pushed|landed)\b[^\n]{0,16}?\bcommit\b\s*[:#]?\s*" + _SHA_RX,
         re.IGNORECASE,
     ),
     # strong completion verb directly citing a SHA, no "commit" noun needed: "pushed e5d6c7b",
     # "merged as e5d6c7b", "shipped it at e5d6c7b" — a completion assertion, not co-occurrence.
-    re.compile(
+    _lazy_re(
         r"\b(?:landed|pushed|merged|shipped)\b\s*(?:it\s+)?[:#]?\s*(?:as\s+|at\s+|in\s+|to\s+\S+\s+as\s+)?"
         + _SHA_RX,
         re.IGNORECASE,
     ),
     # tag completion: "tagged v1 (3c4d5e6)", "created tag ... a1b2c3d"
-    re.compile(r"\btagged\b" + _TAG_GAP + _SHA_RX, re.IGNORECASE),
-    re.compile(
+    _lazy_re(r"\btagged\b" + _TAG_GAP + _SHA_RX, re.IGNORECASE),
+    _lazy_re(
         r"\b(?:created|pushed)\b[^\n]{0,16}?\btag\b" + _TAG_GAP + _SHA_RX,
         re.IGNORECASE,
     ),
     # reverse order: "a1b2c3d was committed", "a1b2c3d landed on main"
-    re.compile(
+    _lazy_re(
         _SHA_RX + r"[^\n]{0,20}?\b(?:committed|landed|pushed|tagged)\b",
         re.IGNORECASE,
     ),
@@ -96,7 +97,7 @@ _CLAIM_RXS = (
 # "claim" is actually a denial, a deferral, or a reference to a SHA the USER supplied — NOT a
 # fabricated commit assertion. We look back further than forward because the negation usually
 # precedes: "have NOT committed ... a1b2c3d".
-_NEG_REF_RX = re.compile(
+_NEG_REF_RX = _lazy_re(
     r"""
       \bnot\s+(?:yet\s+)?committ            # "not committed", "not yet committ..."
     | \bnot\s+(?:yet\s+)?tagg               # "not tagged"
@@ -174,14 +175,14 @@ _NEG_FWD = 40
 
 # Clause separators: a cue on the far side of one of these belongs to a different clause and must
 # not suppress this SHA.
-_CLAUSE_BOUNDARY_RX = re.compile(
+_CLAUSE_BOUNDARY_RX = _lazy_re(
     r"[.;\n]|\bbut\b|\bhowever\b|\bthough\b|\bwhereas\b", re.IGNORECASE
 )
 
 # GLOBAL first-person DENIAL of committing/tagging/pushing anywhere in the turn. When the AI
 # explicitly says it did NOT commit/tag/push this session, EVERY SHA in the turn is referential
 # -> suppress all claims. First-person only: it must be the AI denying ITS OWN action.
-_GLOBAL_DENIAL_RX = re.compile(
+_GLOBAL_DENIAL_RX = _lazy_re(
     r"""
       \b(?:have|'ve|has|had|am|'m|did|do)\s+not\s+(?:yet\s+)?(?:committed|tagged|pushed|made\s+(?:a\s+|any\s+)?commit)
     | \b(?:have|has|had|did|do|could|would|can)n['’]t\s+(?:yet\s+)?(?:committed|tagged|pushed|made\s+(?:a\s+|any\s+)?commit)
@@ -201,7 +202,7 @@ _GLOBAL_DENIAL_RX = re.compile(
 # masquerade.)
 _GIT_OPT = r"(?:\s+-{1,2}[^\s]+)"        # one git global option token: -C, -c, --git-dir=/x, --no-pager
 _GIT_OPT_VAL = r"(?:\s+(?![-])[^\s]+)?"  # its optional value token (skipped if next token is another option)
-_GIT_COMMIT_OR_TAG_RX = re.compile(
+_GIT_COMMIT_OR_TAG_RX = _lazy_re(
     r"\bgit(?:" + _GIT_OPT + _GIT_OPT_VAL + r")*\s+(?:commit|tag)\b"
 )
 
@@ -333,7 +334,7 @@ from makoto.kit import decode_history_event, introduced_regex_predicate
 
 # The claim, however it's phrased. Matches the harness's own literal bracketed marker AND
 # looser prose paraphrases -- both are the same claim ("the user is why this stopped").
-_INTERRUPTION_CLAIM_RX = re.compile(
+_INTERRUPTION_CLAIM_RX = _lazy_re(
     r"\[?request\s+interrupted\s+by\s+(?:the\s+)?user\]?"
     r"|\binterrupted\s+by\s+(?:the\s+)?user\b"
     r"|\buser\s+interrupted\b",
@@ -601,15 +602,15 @@ from makoto.kit import response_text, command_of, decode_history_event, unwitnes
 
 # A structured-data traversal. `jq` is the canonical one; `python -c ... json` and `yq` are the
 # same act under other programs. A closed vocabulary whose miss is a RECALL bound.
-_TRAVERSAL_RX = re.compile(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b")
+_TRAVERSAL_RX = _lazy_re(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b")
 # The structure query that pays the obligation: any of the shape-printing jq forms, or a Read of
 # the file.
-_STRUCTURE_RX = re.compile(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
+_STRUCTURE_RX = _lazy_re(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
                            r"\bpaths\b|\bto_entries\b|-e\b)")
 # What a failed traversal prints: a literal null as the WHOLE output -- JSON's `null` (jq/yq) or
 # Python's `None` (the same absent-value token printed by a `python3 -c ...json...` traversal).
 # `.strip()` has already run, so an anchored match is the whole of it.
-_NULL_OUTPUT_RX = re.compile(r"\A(?:null|None)\Z")
+_NULL_OUTPUT_RX = _lazy_re(r"\A(?:null|None)\Z")
 
 
 def _is_traversal(ev: dict) -> bool:
@@ -680,10 +681,10 @@ from makoto.core._shell import _basename, _effective_argv, _git_subcommand, _she
 _CREATE_FLAGS = frozenset({"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"})
 _STAY_REFS = frozenset({"HEAD", "@"})
 # A redirection word shlex leaves in the argv (`2>/dev/null`, `>`, `&>log`): never a ref.
-_REDIRECT_RX = re.compile(r"\d*&?[<>]+&?")
+_REDIRECT_RX = _lazy_re(r"\d*&?[<>]+&?")
 # Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
 # switched TO.
-_REF_PRINT_RX = re.compile(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
+_REF_PRINT_RX = _lazy_re(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
 
 
 def _without_redirects(args):
@@ -931,10 +932,10 @@ _EDIT_TOOLS = frozenset({"Edit", "MultiEdit"})
 # naming anything.
 _BLOCK_LINES = 4
 # A line carrying no content of its own: closers, separators, a bare marker.
-_TRIVIAL_RX = re.compile(r"^[\s)\]},:;#\"']*$")
+_TRIVIAL_RX = _lazy_re(r"^[\s)\]},:;#\"']*$")
 # A line that travels as CONVENTION rather than as a repair: a comment, an import, a decorator,
 # a docstring fence, a markup tag.
-_CONVENTION_RX = re.compile(r"^(#|//|import\s|from\s+\S+\s+import\s|@|\"\"\"|'''|<)")
+_CONVENTION_RX = _lazy_re(r"^(#|//|import\s|from\s+\S+\s+import\s|@|\"\"\"|'''|<)")
 
 
 def _kept_lines(text: str) -> list:
@@ -1192,7 +1193,7 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
 
 
 # Every identifier-shaped token. A stdlib call with no branches at all cannot have a fallthrough.
-_TOKEN_RX = re.compile(r"[A-Za-z0-9_]+")
+_TOKEN_RX = _lazy_re(r"[A-Za-z0-9_]+")
 
 
 # The largest file whose text is read for a use. Past it the witness is simply absent, so the

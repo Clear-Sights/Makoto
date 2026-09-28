@@ -22,6 +22,7 @@ An `ssh <host> '...'` command can match the cd-form and yield a remote path; har
 only survives if it is ALSO a local git work-tree with a tracked, existing file.
 """
 from __future__ import annotations
+from makoto.vocab import _lazy_re
 import os
 import re
 import subprocess
@@ -30,10 +31,10 @@ from makoto.kit import _path_components, _suffix_match, iter_tool_events
 from makoto.kit import resolve_in_worktree
 
 # `git -C <dir> pull|fetch` — the dir may be bare, or single/double quoted (spaces, CJK).
-_GIT_C_RX = re.compile(
+_GIT_C_RX = _lazy_re(
     r"""git\s+-C\s+(?:"([^"]+)"|'([^']+)'|(\S+))\s+(?:pull|fetch)\b""")
 # `cd <dir> && git pull|fetch` (also after `;`) — same quoting forms.
-_CD_GIT_RX = re.compile(
+_CD_GIT_RX = _lazy_re(
     r"""(?:^|&&|;)\s*cd\s+(?:"([^"]+)"|'([^']+)'|(\S+))\s*(?:&&|;)\s*git\s+(?:pull|fetch)\b""")
 
 _ROOT_CAP = 8          # bounded: a Stop evaluates at most this many candidate roots

@@ -42,7 +42,9 @@ def test_lexicons_exports_all_regex_symbols():
         "_TEST_RUNNER_RX", "_FAILURE_SUMMARY_RX", "_SUCCESS_SUMMARY_RX", "_FAILURE_MARKER_RX",
         "_CITATION_RX",
     ):
-        assert isinstance(getattr(lexicons, name), re.Pattern), name
+        rx = getattr(lexicons, name)
+        rx = rx._compiled() if hasattr(type(rx), "_compiled") else rx   # vocab._lazy_re
+        assert isinstance(rx, re.Pattern), name
     assert isinstance(lexicons._CITATION_AUTHOR_STOPWORDS, frozenset)
 
 

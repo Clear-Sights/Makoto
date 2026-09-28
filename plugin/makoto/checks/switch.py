@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 
+from makoto.vocab import _lazy_re
 from typing import Optional
 
 from makoto.vocab import Finding
@@ -225,14 +226,14 @@ _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed
 # "I've/I'd deployed" is the same first-person completed-action claim as "I deployed" -- the
 # contraction must not defeat the \bI\s+VERB shape (mirrors _PROCESS_START_VERB_RX's own
 # contraction handling for the sibling gate.claimed_running).
-_ACTION_RX = re.compile(rf"\bI(?:['’]ve|['’]d)?\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
-_NEG = re.compile(r"\b(?:not|never|without)\b|n't", re.I)
-_FUTURE = re.compile(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
+_ACTION_RX = _lazy_re(rf"\bI(?:['’]ve|['’]d)?\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
+_NEG = _lazy_re(r"\b(?:not|never|without)\b|n't", re.I)
+_FUTURE = _lazy_re(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
 # PRIOR-TURN frame: the claim is a truthful RECAP of work done in an earlier turn/session, not an
 # assertion that the action happened THIS (tool-less) turn. turn_tool_calls only counts THIS turn's
 # calls (post-final-Stop), so a recap of last turn's real run reads as fabricated; this frame, scoped
 # to the claim's own clause, fails open. GATE-LOCAL (turn_tool_calls in _shared.py is untouched).
-_PRIOR_TURN = re.compile(
+_PRIOR_TURN = _lazy_re(
     r"\b(?:earlier|previously|already|before|last\s+turn|previous\s+turn|prior\s+turn|"
     r"this\s+session|in\s+the\s+last\s+turn|in\s+the\s+previous\s+turn|a\s+moment\s+ago)\b", re.I)
 
@@ -355,7 +356,7 @@ wall_SHAPE = "SWITCH"
 
 # An EPISTEMIC cannot: the claim is that a fact cannot be established. Not a refusal, not a
 # statement about capabilities in general -- those are excluded by design, see the docstring.
-_WALL_RX = re.compile(
+_WALL_RX = _lazy_re(
     r"\b(?:"
     r"(?:there\s+is|there's)\s+no\s+way\s+to\s+(?:tell|know|check|determine|verify|find\s+out)"
     r"|(?:i|we)\s+(?:can(?:no|')t|cannot|am\s+unable\s+to|are\s+unable\s+to)\s+"
@@ -608,7 +609,7 @@ recur_pays = lambda _item: None
 # vocabulary, not a runner or language token — the same tier as `kit.classify_failure`'s own
 # markers. Needed because classify_failure files ALL timeout text under its transient class,
 # which made canon.timeout silent on the exact condition it is named for.
-_TIMEOUT_TEXT_RX = re.compile(r"\btimed?\s?out\b", re.IGNORECASE)
+_TIMEOUT_TEXT_RX = _lazy_re(r"\btimed?\s?out\b", re.IGNORECASE)
 
 
 def timed_out_at_turn_end(calls: list) -> bool:
@@ -978,16 +979,16 @@ named_pays = lambda _text: None
 # ---- lexicon (gate-specific, local — like gate.fabricated_action) -----------------------
 
 # A success predicate that can bind to a named-test subject in PROSE (the claim side).
-_PASS_PRED_RX = re.compile(r"\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?)\b", re.IGNORECASE)
+_PASS_PRED_RX = _lazy_re(r"\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?)\b", re.IGNORECASE)
 # Negation / forward-framing in the immediate claim clause -> not an assertion of present success.
-_NEG_RX = re.compile(r"\b(?:not|never|no|fail(?:s|ed|ing)?|don['’]?t|doesn['’]?t|"
+_NEG_RX = _lazy_re(r"\b(?:not|never|no|fail(?:s|ed|ing)?|don['’]?t|doesn['’]?t|"
                      r"didn['’]?t|isn['’]?t|won['’]?t|can['’]?t)\b", re.IGNORECASE)
-_FORWARD_RX = re.compile(r"\b(?:will|going\s+to|gonna|once|after|when|next|should|need(?:s)?\s+to|"
+_FORWARD_RX = _lazy_re(r"\b(?:will|going\s+to|gonna|once|after|when|next|should|need(?:s)?\s+to|"
                          r"to\s+make|let['’]?s|I['’]?ll|expect(?:s|ed|ing)?)\b", re.IGNORECASE)
 # The clause boundary that isolates the text immediately governing the name.
-_CLAUSE_SPLIT_RX = re.compile(r"[,;:—]")
+_CLAUSE_SPLIT_RX = _lazy_re(r"[,;:—]")
 # One actual quoted run (straight or curly), single-line: the (#4) exemption is span-membership.
-_QUOTE_SPAN_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”')
+_QUOTE_SPAN_RX = _lazy_re(r'"[^"\n]*"|“[^”\n]*”')
 # Sentence split reuses vocab._SENTENCE_SPLIT_RX -- this file held the repo's last
 # byte-identical private copy; every other consumer already imports the vocab object.
 
@@ -998,9 +999,9 @@ _QUOTE_SPAN_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”')
 
 # (#3) An ENUMERATED suite count ("478/479 tests pass"): when the named test is introduced as the
 # EXCLUDED item of such a count, "pass" binds to the count, not the name (green_claim's count rule).
-_ENUM_COUNT_RX = re.compile(
+_ENUM_COUNT_RX = _lazy_re(
     r"\b\d+\s*/\s*\d+\b|\b\d+\s+(?:tests?\s+)?(?:pass(?:ed|es|ing)?|green)\b", re.IGNORECASE)
-_EXCLUDE_RX = re.compile(
+_EXCLUDE_RX = _lazy_re(
     r"\b(?:flak(?:e|es|y|iness)|except|exclud\w*|excluding|known|pre-?existing|"
     r"skip\w*|ignor\w*|aside\s+from|other\s+than|unrelated|pollut\w*|leftover)\b", re.IGNORECASE)
 
@@ -1243,7 +1244,7 @@ unnamed_pays = lambda _ev: None
 _COUNT = r"(?:[1-9]\d*|one|two|three|four|five|six|seven|eight|nine|ten)"
 _SUBJECT = r"(?:tests?|checks?|cases?|specs?|suites?|assertions?|examples?)"
 _VERDICT = r"(?:failed|failures?|failing|errors?|erroring)"
-_COUNTED_FAILURE_RX = re.compile(
+_COUNTED_FAILURE_RX = _lazy_re(
     rf"\b{_COUNT}\s+(?:{_SUBJECT}\s+)?{_VERDICT}\b"
     rf"|\b(?:failures?|errors?)\s*:\s*[1-9]\d*\b",
     re.IGNORECASE)
@@ -1605,7 +1606,7 @@ from makoto.kit import unmet_obligation_gate, response_text, command_of
 
 # A report with NO failures: a non-zero passed count, or an explicit all-clear. Narrow and
 # lexical on purpose -- the words a runner prints, not an interpretation of them.
-_CLEAN_REPORT_RX = re.compile(
+_CLEAN_REPORT_RX = _lazy_re(
     r"\b[1-9]\d*\s+passed\b|\ball\s+(?:tests?|checks?|specs?)\s+passed\b|\bOK\b|\bPASS(?:ED)?\b",
     re.I)
 # A report WITH failures -- the witness that this verifier can fire.
@@ -1615,7 +1616,7 @@ _CLEAN_REPORT_RX = re.compile(
 # in capitals are what a runner prints as a verdict while "failed" in prose is not -- a
 # case-insensitive `\bFAILED\b` would match the word in "58 passed, 0 failed" and silence the
 # gate on exactly the report it exists for.
-_FAILING_REPORT_RX = re.compile(
+_FAILING_REPORT_RX = _lazy_re(
     r"(?i:\b[1-9]\d*\s+(?:failed|failures?|errors?)\b)|\bFAILED\b|\bFAIL\b"
     r"|\bAssertionError\b")
 
@@ -1664,7 +1665,7 @@ def _is_failing_verifier_run(ev: dict) -> bool:
 # another one shows nothing about this one, and measured 2026-09-23 a single red run of any runner
 # paid for every other, so 0 of 20 vacuous checks on the trees were caught. Output-only flags are
 # dropped so `pytest -x` red and `pytest -q` green stay one verifier.
-_VERBOSITY_RX = re.compile(r"\s+(?:-[qvsx]+|--tb=\S+|-p\s+no:cacheprovider|--color=\S+)(?=\s|$)")
+_VERBOSITY_RX = _lazy_re(r"\s+(?:-[qvsx]+|--tb=\S+|-p\s+no:cacheprovider|--color=\S+)(?=\s|$)")
 
 
 def _verifier_keys(ev: dict) -> tuple:
@@ -1758,12 +1759,12 @@ from makoto.vocab import _SUCCESS_SUMMARY_RX
 
 # A PROSE document -- where a narration lives. Code is excluded by extension, deliberately; see
 # the docstring's measurement.
-_PROSE_TARGET_RX = re.compile(r"\.(?:md|markdown|rst|txt|adoc|org)$", re.IGNORECASE)
+_PROSE_TARGET_RX = _lazy_re(r"\.(?:md|markdown|rst|txt|adoc|org)$", re.IGNORECASE)
 _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
 # A counted all-pass in prose ("All 602 checks pass"): a count is a measurement, so writing one
 # before anything ran is the same unmeasured claim (register C11 / the claim-without-measurement
 # mistake). whole_suite_pass_claim reads a counted subject as enumerated, so it is named here.
-_COUNTED_PASS_RX = re.compile(r"\ball\s+\d[\d,]*\s+\w+\s+(?:pass(?:ed|es)?|green)\b", re.IGNORECASE)
+_COUNTED_PASS_RX = _lazy_re(r"\ball\s+\d[\d,]*\s+\w+\s+(?:pass(?:ed|es)?|green)\b", re.IGNORECASE)
 
 
 def _reports_a_run_verdict(ev: dict) -> bool:
@@ -1878,7 +1879,7 @@ plan_CHECK = _Check(id="gate.unasked_plan", applies_at="Pre", posture="BLOCK",
 # f1-f4 probe measured the loss (f2: "I'll run all 602 checks", then no Bash, went from BLOCK to
 # ALLOW). The promise is read from the PRIOR Stop, so a promise made this turn is never checked
 # this turn. Discharge is ANY Bash call after it: mapping "the tests" to one command is guessing.
-_RUN_INTENT_CLAIM_RX = re.compile(
+_RUN_INTENT_CLAIM_RX = _lazy_re(
     r"\b(?:I(?:['’]m|\s+am)\s+(?:going\s+to|about\s+to)|I(?:['’]ll|\s+will)|let\s+me|I\s+plan\s+to)"
     r"\b(?:\s+(?:just|now|right\s+now|quickly|immediately|also|then))?\s+"
     r"(?:re-?run|run|launch|spin\s+up|bring\s+up|boot(?:\s+up)?|kick\s+off|fire\s+up|re-?start|"
@@ -1886,11 +1887,11 @@ _RUN_INTENT_CLAIM_RX = re.compile(
     r"frontend|process|container|daemon|worker|job|bot|site|database|program))\b",
     re.IGNORECASE)
 # "run X by you" asks approval, "run through X" walks through, "run the numbers" is arithmetic.
-_RUN_INTENT_IDIOM_VETO_RX = re.compile(
+_RUN_INTENT_IDIOM_VETO_RX = _lazy_re(
     r"^\s*(?:\w+\s+){0,12}by\s+(?:you|him|her|them|us|the\s+team|everyone|someone)\b"
     r"|^\s*through\b|^\s*(?:the\s+|some\s+)?numbers\b", re.IGNORECASE)
-_QUOTED_SPAN_RX = re.compile(r'"[^"\n]*"|\'[^\'\n]*\'')
-_SENTENCE_END_RX = re.compile(r"\?|[.!](?=\s*(?:$|[A-Z]))|\n")
+_QUOTED_SPAN_RX = _lazy_re(r'"[^"\n]*"|\'[^\'\n]*\'')
+_SENTENCE_END_RX = _lazy_re(r"\?|[.!](?=\s*(?:$|[A-Z]))|\n")
 
 
 def _run_intent_claim(text: str):
@@ -1946,7 +1947,7 @@ run_promised_CHECK = _Check(id="gate.run_promised", applies_at="Stop", posture="
 # `run.sh` was still in the background. The witness is the settled runner report itself
 # (`_is_clean_verifier_run`, the clean reading gate.vacuous_verifier uses); a run still in the
 # background or a red one pays nothing. Discharge: run the gate to a clean report, then land.
-_LANDING_RX = re.compile(
+_LANDING_RX = _lazy_re(
     r"\bgh\s+pr\s+merge\b|\bgit\s+push\b[^;&|\n]*?\s(?:\S+:)?(?:refs/heads/)?(?:main|master)\b")
 
 
@@ -2009,8 +2010,8 @@ unrun_count_CHECK = _Check(id="gate.unrun_count_claim", applies_at="Stop", postu
 # Stop marker, paid by a test-file Write/Edit anywhere in the session.
 import ast
 from makoto.kit import parse_introduced
-_A6_ANY_LIT_RX = re.compile(r"(?<![\w.])(\d*\.?\d+(?:[eE][-+]?\d+)?)(?![\w.])")
-_TEST_PATH_RX = re.compile(r"(?:^|/)(?:tests?/|test_[^/]*$|[^/]*_test\.\w+$|tests?\.py$|conftest\.py$)")
+_A6_ANY_LIT_RX = _lazy_re(r"(?<![\w.])(\d*\.?\d+(?:[eE][-+]?\d+)?)(?![\w.])")
+_TEST_PATH_RX = _lazy_re(r"(?:^|/)(?:tests?/|test_[^/]*$|[^/]*_test\.\w+$|tests?\.py$|conftest\.py$)")
 
 
 def _a6_path(ev) -> str:
@@ -2038,7 +2039,28 @@ def _threshold(node):
 
 
 def _binary(node) -> bool:
-    return isinstance(node, ast.Constant) and type(node.value) in (int, bool) and node.value in (0, 1)
+    return isinstance(node, ast.Constant) and type(node.value) in (int, bool, float) and node.value in (0, 1)
+
+
+def _bool_threshold(expr):
+    """The threshold of a boolean-valued expression: a comparison, or comparisons joined by
+    `and`/`or`/`&`/`|` whose every operand is itself boolean-shaped. `s > 0.9 and s * 100` is not
+    boolean (it can return the product), so it has none."""
+    if isinstance(expr, ast.Compare):
+        return _threshold(expr)
+    parts = (expr.values if isinstance(expr, ast.BoolOp)
+             else [expr.left, expr.right] if isinstance(expr, ast.BinOp)
+             and isinstance(expr.op, (ast.BitAnd, ast.BitOr)) else None)
+    def boolish(v):
+        return (isinstance(v, (ast.Compare, ast.BoolOp, ast.Name, ast.Attribute))
+                or isinstance(v, ast.UnaryOp) and isinstance(v.op, ast.Not)
+                or isinstance(v, ast.BinOp) and isinstance(v.op, (ast.BitAnd, ast.BitOr)))
+    if not parts or not all(boolish(v) for v in parts):
+        return None
+    for v in parts:
+        if isinstance(v, (ast.Compare, ast.BoolOp, ast.BinOp)) and (lit := _bool_threshold(v)) is not None:
+            return lit
+    return None
 
 
 def _collapses(text: str):
@@ -2051,9 +2073,10 @@ def _collapses(text: str):
         return []
     out = []
     for n in ast.walk(tree):
-        cmp_ = None
+        cmp_, lit = None, None
         if isinstance(n, ast.IfExp) and _binary(n.body) and _binary(n.orelse):
-            cmp_ = n.test
+            # the branch itself is the collapse, so any threshold its condition tests is the boundary
+            lit = next((t for c in ast.walk(n.test) if (t := _threshold(c)) is not None), None)
         elif isinstance(n, ast.Call) and len(n.args) == 1 and not n.keywords:
             f = n.func
             if isinstance(f, ast.Name) and f.id in ("int", "bool"):
@@ -2061,18 +2084,27 @@ def _collapses(text: str):
             elif isinstance(f, ast.Attribute) and f.attr == "astype" and isinstance(n.args[0], ast.Name) \
                     and n.args[0].id in ("int", "bool", "float"):
                 cmp_ = f.value
-        lit = _threshold(cmp_)
+        if cmp_ is not None:
+            lit = _bool_threshold(cmp_)
         if lit is not None:
             out.append((repr(lit), ast.unparse(n)))
     return out
 
 
+def _as_float(v):
+    try:
+        return repr(float(v.strip() if isinstance(v, str) else v))
+    except (OverflowError, ValueError, TypeError):
+        return None
+
+
 def _tested_literals(text: str) -> set:
+    """Every number a test carries: numeric constants, and strings that are a number (`float("0.9")`)."""
     tree, _off = parse_introduced(text or "")
-    if tree is not None:
-        return {repr(float(n.value)) for n in ast.walk(tree)
-                if isinstance(n, ast.Constant) and type(n.value) in (int, float)}
-    return {repr(float(x)) for x in _A6_ANY_LIT_RX.findall(text or "")}
+    vals = ([n.value for n in ast.walk(tree) if isinstance(n, ast.Constant)
+             and type(n.value) in (int, float, str)] if tree is not None
+            else _A6_ANY_LIT_RX.findall(text or ""))
+    return {f for v in vals if (f := _as_float(v)) is not None}
 
 
 def gradient_collapse_gate(history) -> Optional[Finding]:
@@ -2116,8 +2148,10 @@ gradient_collapse_CHECK = _Check(id="gate.gradient_collapse", applies_at="Stop",
 # the Stop marker for the option token the passing run gained or changed (kit.neighbours finds the
 # pair); paid by a Write/Edit after that passing run whose content carries the token (`Y=2`, or
 # `Y` and `2` both, as a config line writes it).
+import shlex
+from collections import Counter
 from makoto.kit import neighbours as _neighbours
-_OPTION_TOKEN_RX = re.compile(r"^(?:--?[A-Za-z][\w-]*(?:=(\S+))?|([A-Za-z_]\w*)=(\S*))$")
+_OPTION_TOKEN_RX = _lazy_re(r"^(?:--?[A-Za-z][\w-]*(?:=(\S+))?|([A-Za-z_]\w*)=(\S*))$")
 
 
 def _bash_failed(ev: dict) -> bool:
@@ -2128,11 +2162,27 @@ def _bash_failed(ev: dict) -> bool:
 
 
 def _pinned_by(token: str, text: str) -> bool:
-    if token in text:
+    """`text` carries `token` as a whole word (`Y=2`, never inside `Y=20`), or as a config line
+    writes it: the name, then `=`/`:`/space, then the whole value (`Y: 2`, `flag = v`)."""
+    if re.search(rf"(?<![\w.=-]){re.escape(token)}(?![\w.])", text):
         return True
     m = _OPTION_TOKEN_RX.match(token)
     name, value = (m.group(2), m.group(3)) if m and m.group(2) else (token.split("=")[0], m and m.group(1))
-    return bool(value) and bool(re.search(rf"(?<![\w-]){re.escape(name.lstrip('-'))}\b", text)) and value in text
+    return bool(value) and bool(re.search(
+        rf"(?<![\w-]){re.escape(name.lstrip('-'))}\b\s*[:=]?\s*[\"']?{re.escape(value)}(?![\w.])", text))
+
+
+def _removed_text(ev) -> str:
+    ti = ev.get("tool_input") or {}
+    olds = [ti.get("old_string")] + [e.get("old_string") for e in ti.get("edits") or () if isinstance(e, dict)]
+    return "\n".join(o for o in olds if isinstance(o, str))
+
+
+def _shell_tokens(cmd: str) -> list:
+    try:
+        return shlex.split(cmd)
+    except ValueError:
+        return cmd.split()
 
 
 def option_interaction_gate(history) -> Optional[Finding]:
@@ -2145,26 +2195,41 @@ def option_interaction_gate(history) -> Optional[Finding]:
         fail, ok = (a, b) if _bash_failed(runs[a][1]) and not _bash_failed(runs[b][1]) else (None, None)
         if fail is None:
             continue
-        before, after = cmds[fail].split(), cmds[ok].split()
-        gained = [t for t in after if after.count(t) > before.count(t)]
-        if len(gained) == 1 and _OPTION_TOKEN_RX.match(gained[0]):
-            owed.setdefault(gained[0], (runs[ok][0], cmds[fail], cmds[ok]))
+        before, after = Counter(cmds[fail].split()), Counter(cmds[ok].split())
+        gained, lost = list(after - before), list(before - after)
+        # the differing token must be a whole shell word, not text inside a quoted argument
+        if len(gained) == 1 and _OPTION_TOKEN_RX.match(gained[0]) \
+                and gained[0] in _shell_tokens(cmds[ok]):
+            owed.setdefault(("+", gained[0]), (runs[ok][0], cmds[fail], cmds[ok]))
+        elif not gained and len(lost) == 1 and _OPTION_TOKEN_RX.match(lost[0]) \
+                and lost[0] in _shell_tokens(cmds[fail]):
+            owed.setdefault(("-", lost[0]), (runs[ok][0], cmds[fail], cmds[ok]))
 
     def pays(item):
         k, ev = item
-        if ev is None or ev.get("tool_name") not in ("Write", "Edit", "MultiEdit") \
+        if ev is None or ev.get("hook_event_name") != "PostToolUse" \
+                or ev.get("tool_name") not in ("Write", "Edit", "MultiEdit") \
                 or not isinstance(ev.get("tool_input"), dict):
             return None
-        text = _a6_text(ev)
-        return lambda tok: owed[tok][0] < k and _pinned_by(tok, text)
-    for _end, tok in unwitnessed(list(enumerate(events)) + [(len(events), None)],
-                                 owes=lambda it: owed if it[1] is None else (), pays=pays):
-        _k, red, green = owed[tok]
+        text, gone = _a6_text(ev), _removed_text(ev)
+
+        def paid(subject):
+            sign, tok = subject
+            if owed[subject][0] >= k:
+                return False
+            # a gained option is pinned by writing it; a dropped one by editing it out
+            return _pinned_by(tok, text) if sign == "+" else \
+                _pinned_by(tok, gone) and not _pinned_by(tok, text)
+        return paid
+    for _end, subject in unwitnessed(list(enumerate(events)) + [(len(events), None)],
+                                     owes=lambda it: owed if it[1] is None else (), pays=pays):
+        _k, red, green = owed[subject]
+        tok = ("dropping " if subject[0] == "-" else "") + f"`{subject[1]}`"
         return Finding(pattern_id="gate.option_interaction", file="", line=0, level="error",
                        message=(f"gate.option_interaction: `{red[:80]}` failed and `{green[:80]}` passed; "
-                                f"the difference is `{tok}`, and nothing written since carries it, so "
+                                f"the difference is {tok}, and nothing written since pins it, so "
                                 "the combination that works is not pinned."),
-                       retry_hint=option_interaction_RETRY_HINT, snippet=tok[:200])
+                       retry_hint=option_interaction_RETRY_HINT, snippet=subject[1][:200])
     return None
 
 

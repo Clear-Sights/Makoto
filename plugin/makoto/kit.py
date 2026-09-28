@@ -8,6 +8,7 @@ Stdlib only; no HTTP, no LLM (Knight-Leveson hot-path invariant). Imports only L
 """
 from __future__ import annotations
 
+from makoto.vocab import _lazy_re
 import ast
 import json
 import os
@@ -71,7 +72,7 @@ def normalize_path(p: str) -> str:
 # path still matches: the path token is found wherever it sits, backticks or not.
 # Well-known extensionless files that ARE locations (so "created the Dockerfile" binds).
 _DOTLESS_FILES = r"Makefile|Dockerfile|README|LICENSE|CHANGELOG|Gemfile|Procfile|CODEOWNERS"
-_LOC_RX = re.compile(
+_LOC_RX = _lazy_re(
     r"(?<![\w])"                                                     # left boundary
     r"(?:"
     r"(?:/|~/|\./|\.\./)?(?:[\w.\-]+/)*[\w.\-]+\.(?:" + _PATH_EXT + r")"  # path + known ext
@@ -707,7 +708,7 @@ def command_of(ev: dict) -> str:
 # Dispatch-brief grammar: the READ:/WRITE:/ACCEPTANCE: labels a worker prompt carries. Shared by
 # event.unbriefed_dispatch, event.unpinned_input and gate.unpaid_acceptance.
 _BRIEF_LABELS = ("READ", "WRITE", "ACCEPTANCE")
-_BRIEF_LINE_RX = re.compile(r"(?m)^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$")
+_BRIEF_LINE_RX = _lazy_re(r"(?m)^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$")
 # The two dispatch-tool names the register names literally.
 DISPATCH_TOOL_NAMES = frozenset({"Agent", "Task"})
 
@@ -833,13 +834,13 @@ def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Findin
 # grant merely by waiting), not of external timing/state. Each is a real, specific runtime-error
 # shape, not a vague "sounds bad" heuristic.
 _DETERMINISTIC_MARKERS = (
-    re.compile(r"SyntaxError", re.IGNORECASE),
-    re.compile(r"No such file or directory"),
-    re.compile(r"Permission denied"),
-    re.compile(r"ModuleNotFoundError|ImportError"),
-    re.compile(r"command not found"),
-    re.compile(r"is not recognized as an internal or external command"),
-    re.compile(r"NameError|AttributeError"),
+    _lazy_re(r"SyntaxError", re.IGNORECASE),
+    _lazy_re(r"No such file or directory"),
+    _lazy_re(r"Permission denied"),
+    _lazy_re(r"ModuleNotFoundError|ImportError"),
+    _lazy_re(r"command not found"),
+    _lazy_re(r"is not recognized as an internal or external command"),
+    _lazy_re(r"NameError|AttributeError"),
 )
 
 # Markers whose PRESENCE means the failure is plausibly time/external-state dependent -- a retry
@@ -847,19 +848,19 @@ _DETERMINISTIC_MARKERS = (
 # byte-identical input. Presence of either class wins its own side; presence of BOTH is ambiguous
 # (fails to None, never guessed).
 _TRANSIENT_MARKERS = (
-    re.compile(r"\bconnection (?:refused|error|reset|closed|aborted)\b", re.IGNORECASE),
-    re.compile(
+    _lazy_re(r"\bconnection (?:refused|error|reset|closed|aborted)\b", re.IGNORECASE),
+    _lazy_re(
         r"\b(?:ECONNRESET|ECONNREFUSED|ECONNABORTED|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|EPIPE)\b",
         re.IGNORECASE),
-    re.compile(r"\bnetwork (?:error|is unreachable)\b", re.IGNORECASE),
-    re.compile(r"\bfetch failed\b", re.IGNORECASE),
-    re.compile(r"\btimed? ?out\b", re.IGNORECASE),
-    re.compile(r"Temporary failure in name resolution"),
-    re.compile(r"\b(?:502|503|504)\b"),
-    re.compile(r"\b429\b"),
-    re.compile(r"rate limit", re.IGNORECASE),
-    re.compile(r"try again", re.IGNORECASE),
-    re.compile(r"still (?:running|pending|in progress)", re.IGNORECASE),
+    _lazy_re(r"\bnetwork (?:error|is unreachable)\b", re.IGNORECASE),
+    _lazy_re(r"\bfetch failed\b", re.IGNORECASE),
+    _lazy_re(r"\btimed? ?out\b", re.IGNORECASE),
+    _lazy_re(r"Temporary failure in name resolution"),
+    _lazy_re(r"\b(?:502|503|504)\b"),
+    _lazy_re(r"\b429\b"),
+    _lazy_re(r"rate limit", re.IGNORECASE),
+    _lazy_re(r"try again", re.IGNORECASE),
+    _lazy_re(r"still (?:running|pending|in progress)", re.IGNORECASE),
 )
 
 
@@ -921,9 +922,9 @@ def current_named_verdicts(history) -> dict:
 
 # ---- shared discharge/suffix-match helpers ---------------------------------------------------
 _BIND_BEFORE = 70
-_KNOWN_PATH_EXT_RX = re.compile(r"(?:" + _PATH_EXT + r")\Z", re.IGNORECASE)
+_KNOWN_PATH_EXT_RX = _lazy_re(r"(?:" + _PATH_EXT + r")\Z", re.IGNORECASE)
 _LOCAL_GIT_TIMEOUT = 0.75
-_PUSH_BRANCH_RX = re.compile(
+_PUSH_BRANCH_RX = _lazy_re(
     # Filler tokens between "to"/"branch" and the ref name ("pushed to branch X",
     # "pushed to the remote branch X") are skipped, not captured: capturing the literal
     # word after the first "to" verified refs like `refs/heads/branch` that cannot exist,

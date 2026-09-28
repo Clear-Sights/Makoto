@@ -11,6 +11,7 @@ cmd_install handles BOTH state-dir setup and settings.json wiring, for when
 automatically, so cmd_install is the only makoto command needed otherwise.
 """
 from __future__ import annotations
+from makoto.vocab import _lazy_re
 import json
 import os
 import re
@@ -160,7 +161,7 @@ _CONV_END = "<!-- makoto-managed:conventions:end -->"
 
 # The managed block, start through end marker. Shared by both halves so the writer and the
 # remover can't drift apart on what text counts as the block.
-_CONV_BLOCK_RX = re.compile(re.escape(_CONV_START) + r".*?" + re.escape(_CONV_END), re.S)
+_CONV_BLOCK_RX = _lazy_re(re.escape(_CONV_START) + r".*?" + re.escape(_CONV_END), re.S)
 
 
 def _strip_conventions_block(text: str) -> str:

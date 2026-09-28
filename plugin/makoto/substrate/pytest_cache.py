@@ -14,6 +14,7 @@ FAILED, never re-run green — pytest rewrites the cache on every run, so the re
 latest-wins with no makoto bookkeeping. stdlib json/re/os only.
 """
 from __future__ import annotations
+from makoto.vocab import _lazy_re
 import json
 import os
 import re
@@ -25,7 +26,7 @@ import re
 # silent — truncation can only SILENCE, never false-fire), never a crawl.
 _MAX_ENTRIES = 50
 _MAX_READ_BYTES = 256 * 1024
-_NAME_RX = re.compile(r"[A-Za-z_]\w*\Z")
+_NAME_RX = _lazy_re(r"[A-Za-z_]\w*\Z")
 
 
 def _node_exists(cwd: str, node: str) -> bool:

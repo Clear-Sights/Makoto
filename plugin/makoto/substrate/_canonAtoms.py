@@ -22,6 +22,7 @@ POSTURE (BLOCK vs ADVISE): see BLOCK_IDS below for the full citation trail.
 """
 from __future__ import annotations
 
+from makoto.vocab import _lazy_re
 import posixpath
 import re
 from typing import Dict, Iterable, List, Tuple
@@ -136,9 +137,9 @@ def _is_edit(c: Call) -> bool:
     return c["name"] in _EDIT_TOOLS
 
 
-_TEST_DIR_RX = re.compile(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", re.IGNORECASE)
+_TEST_DIR_RX = _lazy_re(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", re.IGNORECASE)
 # No separate `_spec.rb` arm: the `[._-]spec.<ext>` arm already subsumes it.
-_TEST_FILE_RX = re.compile(
+_TEST_FILE_RX = _lazy_re(
     r"^(?:test_.+|.+_test)\.py$"
     r"|(?:^|[._-])(?:test|spec)\.(?:[cm]?[jt]sx?|rb)$"
     r"|_test\.go$", re.IGNORECASE)
@@ -160,32 +161,32 @@ def _segments(c: Call):
 
 # ---- regex-based atom bodies (see module docstring) ----
 # Full-token bypass flags. SKIP is intentionally case-pinned: lowercase `dd skip=` is unrelated.
-_DISABLE_RX = re.compile(
+_DISABLE_RX = _lazy_re(
     r"--no-verify|--no-gpg-sign|--no-hooks?|--force|(?-i:SKIP=)\S+|--skip-tests?",
     re.IGNORECASE)
 
 # an edit body that is empty, a stub, or comment-only -- the "neutered to a no-op" shape.
-_NOOP_RX = re.compile(r"^\s*(?:pass|\.\.\.|#.*)?\s*$")
+_NOOP_RX = _lazy_re(r"^\s*(?:pass|\.\.\.|#.*)?\s*$")
 
 # Oracle names must occupy a whole path component/stem; application modules such as
 # oracle_client.py and golden_gate_bridge.py are not expected-output artifacts.
-_ORACLE_PATH_RX = re.compile(
+_ORACLE_PATH_RX = _lazy_re(
     r"(?i)(?:^|/)(?:oracle|golden|snapshots?|baselines?|fixtures?)(?:/|(?:\.[^/]+)?$)"
     r"|(?:^|/)(?:expected[_-]?output|answer[_-]?key|solution)(?:\.[^/]+)?$"
     r"|\.expected(?:\.|$)")
 
-_ASSERT_RX = re.compile(r"\bassert\b")
-_TAUTOLOGY_ASSERT_RX = re.compile(r"assert\s+True\b")
+_ASSERT_RX = _lazy_re(r"\bassert\b")
+_TAUTOLOGY_ASSERT_RX = _lazy_re(r"assert\s+True\b")
 
 # ponytail: a secret-shaped-literal denylist (assignment pattern + AWS key + PEM header), with a
 # placeholder veto -- not a general secret scanner; expand as real corpus misses surface.
-_SECRET_ASSIGN_RX = re.compile(
+_SECRET_ASSIGN_RX = _lazy_re(
     r"(?i)(?<![A-Za-z0-9])(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|private[_-]?key)"
     r"\b\s*[=:]\s*"
     r"['\"]([A-Za-z0-9/+_.\-]{12,})['\"]")
-_AWS_KEY_RX = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
-_PRIVATE_KEY_BLOCK_RX = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
-_PLACEHOLDER_RX = re.compile(
+_AWS_KEY_RX = _lazy_re(r"\bAKIA[0-9A-Z]{16}\b")
+_PRIVATE_KEY_BLOCK_RX = _lazy_re(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+_PLACEHOLDER_RX = _lazy_re(
     r"(?i)\b(?:x{3,}|xxx|todo|redacted|changeme|your[_-]?(?:api[_-]?)?key(?:[_-]?here)?|"
     r"example|dummy|fake|identifier|"
     r"placeholder|insert[_-]?here)\b|<[^>]+>|\$\{|%\(")
@@ -363,7 +364,7 @@ def _existing(calls: Iterable[Call], pred) -> bool:
     return any(pred(c) for c in calls)
 
 
-_EXPLICIT_TIMEOUT_RX = re.compile(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
+_EXPLICIT_TIMEOUT_RX = _lazy_re(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
 
 
 def atom_tool_timeout(calls, text) -> bool:
