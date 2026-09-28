@@ -7,6 +7,7 @@ name the current version and the current content; every version appears once. Ch
 the digest stops matching; re-pin under the same version and the duplicate reads red."""
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -14,12 +15,18 @@ PLUGIN = REPO / "plugin"
 PIN = REPO / "docs" / "PLUGIN-DIGEST.tsv"
 
 
-def digest(root=PLUGIN):
+def _tracked(root):
+    """The files git carries under root: what a sync delivers. A walk of the directory would also
+    read what the checkout grew, and CI's `pip install -e .` grows plugin/makoto.egg-info."""
+    out = subprocess.run(["git", "ls-files", "-z", "--", "."], cwd=root, capture_output=True, check=True)
+    return [root / f for f in out.stdout.decode().split("\0") if f]
+
+
+def digest(root=PLUGIN, files=None):
     h = hashlib.sha256()
     # sorted by the posix string: WindowsPath ordering folds case, so it would digest differently
-    for p in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
-        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc":
-            h.update(p.relative_to(root).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
+    for p in sorted(_tracked(root) if files is None else files, key=lambda p: p.relative_to(root).as_posix()):
+        h.update(p.relative_to(root).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
     return h.hexdigest()[:16]
 
 
@@ -47,7 +54,11 @@ def test_plant_a_content_change_reads_red(tmp_path):
     import shutil
     copy = tmp_path / "plugin"
     shutil.copytree(PLUGIN, copy, ignore=shutil.ignore_patterns("__pycache__"))
-    before = digest(copy)
+    files = [copy / p.relative_to(PLUGIN) for p in _tracked(PLUGIN)]
+    before = digest(copy, files)
+    (copy / "makoto.egg-info").mkdir()
+    (copy / "makoto.egg-info" / "PKG-INFO").write_text("grown by the checkout")
+    assert digest(copy, files) == before, "an untracked file must not move the digest"
     (copy / ".claude-plugin" / "plugin.json").write_text(
         (copy / ".claude-plugin" / "plugin.json").read_text() + " ")
-    assert digest(copy) != before
+    assert digest(copy, files) != before
