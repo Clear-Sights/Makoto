@@ -2371,6 +2371,16 @@ def test_unwitnessed_verifier_keys_the_segment_so_a_masked_red_plain_run_pays_a_
     assert not _unwitnessed_after(tmp_path / "paid", "seg1", [_RED, clean]), "the plain red run pays the compound one"
 
 
+def test_unwitnessed_verifier_owes_only_the_latest_clean_run_so_plant_then_rerun_pays(tmp_path):
+    """A clean run, then the planted red, then the clean run again: the latest clean run is paid
+    by the red before it, and the first one no longer owes forever."""
+    clean = ("cd /r && PYTHONPATH=$PWD/plugin python -m pytest -q -p no:cacheprovider", "41 passed")
+    assert _unwitnessed_after(tmp_path / "late", "seg5", [clean, _RED]), \
+        "a red after the latest clean run does not pay it"
+    assert not _unwitnessed_after(tmp_path / "rerun", "seg6", [clean, _RED, clean]), \
+        "plant, see it fail, run it clean: paid"
+
+
 def test_unwitnessed_verifier_still_owes_another_dir_or_another_test_path(tmp_path):
     assert _unwitnessed_after(tmp_path / "dir", "seg2", [_RED, ("cd /other && python -m pytest -q", "41 passed")])
     assert _unwitnessed_after(tmp_path / "path", "seg3",
