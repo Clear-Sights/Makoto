@@ -48,7 +48,7 @@ printf '%s\n' "$copies" | while IFS="$tab" read -r state inst have why; do
   fi
 done
 [ "$live" -gt 1 ] && note "$live Makoto copies are live: every hook runs $live times" \
-  "keep the account-synced copy and claude plugin uninstall the marketplace one, then start a NEW session"
+  "keep the live copy at $want (session.sh installs makoto@makoto at main) and turn the others off: claude plugin uninstall for a marketplace copy, claude.ai Settings > Capabilities for the account-synced one; then start a NEW session"
 [ "$live" = 0 ] && note "no installed Makoto copy loads for this account" "install the Makoto plugin from https://github.com/Clear-Sights/Makoto (or enable it in Settings > Plugins), then start a NEW session"
 
 # DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. Read the
