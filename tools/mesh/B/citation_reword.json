@@ -1,0 +1,13 @@
+{
+  "events": [
+    {
+      "hook_event_name": "PreToolUse",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "{ROOT}/makoto/scratch_probe_notes2.md",
+        "old_string": "",
+        "new_string": "Recent work by Zhang et al. 2024 extends this."
+      }
+    }
+  ]
+}

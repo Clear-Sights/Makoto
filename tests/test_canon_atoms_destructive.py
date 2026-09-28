@@ -238,3 +238,75 @@ def test_git_worktree_remove_and_prune_are_not_destruction():
     assert not _fires("git worktree prune")
     assert _fires("git clean -fdx")
     assert _fires("git reset --hard")
+
+
+# ---- 3.4.7 record, 2026-09-28: 14 false destruct fires were `rm -rf` of a scratch variable ----
+import pytest as _pytest
+
+
+@_pytest.mark.parametrize("cmd, destructive", [
+    ("d=$(mktemp -d); cp -r . $d; rm -rf $d", False),
+    ("S=/tmp/claude-0/x/scratchpad; rm -rf $S/sc", False),
+    ("S=/tmp/x; P=$S/plant; rm -rf $P", False),
+    ("rm -rf $d", True),                         # unbound here: not known to be scratch
+    ("X=src; rm -rf $X", True),
+    ("S=/tmp/x; rm -rf $S/../../home", True),    # escapes the temp root
+    ("rm -rf src", True),
+])
+def test_a_scratch_variable_bound_in_the_same_command_is_scratch(cmd, destructive):
+    from makoto.substrate._canonAtoms import is_destructive_command
+    assert is_destructive_command(cmd) == destructive
+
+
+@_pytest.mark.parametrize("cmd, err, interrupted, error_state", [
+    ("for m in a b; do codex exec -m $m OK > o-$m; grep -c bubblewrap o-$m; done", "Exit code 1\n0", False, False),
+    ("grep x nofile", "Exit code 2\ngrep: nofile: No such file", False, True),
+    ("python3 -m pytest -q", "Exit code 1\n1 failed", False, True),
+    ("grep -c x f; false", "Exit code 1", False, True),
+    ("grep -r x .", "", True, True),
+])
+def test_a_search_that_found_nothing_is_not_an_error_state(cmd, err, interrupted, error_state):
+    """canon.timeout's one false fire on the 3.4.7 record: grep's exit 1 means no line matched."""
+    from makoto.checks.switch import timed_out
+    assert timed_out({"name": "Bash", "input": {"command": cmd},
+                      "result": {"error": err, "interrupted": interrupted}}) == error_state
+
+
+# ---- a Codex gpt-6-astra read of 149d148..cf7c2c1: bindings follow the shell, not the text ----
+@_pytest.mark.parametrize("cmd", [
+    "D=src; rm -rf $D; D=/tmp/safe",              # bound after the removal
+    "D=src; (D=/tmp/safe); rm -rf $D",            # bound in a subshell
+    "D=src; D=/tmp/safe true; rm -rf $D",         # an env prefix binds nothing here
+    "D=src; # D=/tmp/safe\nrm -rf $D",            # a comment
+    'D=src; echo "example D=/tmp/safe"; rm -rf $D',  # a quoted string
+    "D=src/mktemp-cache; rm -rf $D",              # the word, not the command substitution
+])
+def test_a_binding_counts_only_where_the_shell_makes_it(cmd):
+    from makoto.substrate._canonAtoms import is_destructive_command
+    assert is_destructive_command(cmd)
+
+
+@_pytest.mark.parametrize("cmd", ["false && grep x /dev/null", "false | grep x /dev/null"])
+def test_a_search_reached_through_a_failure_does_not_hide_it(cmd):
+    from makoto.checks.switch import timed_out
+    assert timed_out({"name": "Bash", "input": {"command": cmd}, "result": {"error": "Exit code 1"}})
+
+
+@_pytest.mark.parametrize("cmd", [
+    "D=src; (D=/tmp/safe); (rm -rf $D)",           # a second subshell starts from the parent's D
+    "D=$(pwd); rm -rf $D",                         # a substitution that is not mktemp
+])
+def test_a_scope_or_substitution_that_is_not_scratch_stays_destructive(cmd):
+    from makoto.substrate._canonAtoms import is_destructive_command
+    assert is_destructive_command(cmd)
+
+
+def test_the_statement_scanner_parses_a_command_once(monkeypatch):
+    import shlex
+    from makoto.core import _shell
+    _shell.statements.cache_clear()
+    calls, real = [], shlex.shlex
+    monkeypatch.setattr(shlex, "shlex", lambda *a, **k: calls.append(1) or real(*a, **k))
+    for _ in range(5):
+        _shell.statements("d=$(mktemp -d); rm -rf $d")
+    assert len(calls) == 1

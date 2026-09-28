@@ -447,3 +447,34 @@ def test_this_repository_declares_its_own_verifiers():
         "this repository's own declaration does not reach the live predicate")
     assert predicate(current_event=_bash_in("python3 eval/replay.py", str(root)),
                      history=[], pattern=_PAT) is None
+
+
+# ---- 3.4.7 record, 2026-09-28: a captured exit returned by a trailing comparison ----
+@pytest.mark.parametrize("cmd, fires", [
+    ('python3 -m pytest -q tests/t.py > log 2>&1; t=$?; python3 tools/register_map.py > /dev/null 2>&1; '
+     'r=$?; echo "t=$t"; [ "$t" = 1 ] && [ "$r" = 2 ]', False),
+    ('python3 -m pytest -q > s.txt 2>&1; rc=$?; tail -1 s.txt; [ $rc = 1 ]', False),
+    ('python3 -m pytest -q; rc=$?; [ -n "$rc" ]', True),          # a vacuous test returns nothing
+    ('python3 -m pytest -q; rc=$?; [ $rc = 0 ]; echo done', True),  # not the last word
+    ('python3 -m pytest -q; rc=$?; echo rc=$rc', True),
+])
+def test_a_trailing_comparison_returns_the_captured_exit(cmd, fires):
+    from makoto.checks.spec import masking_CHECK
+    f = predicate(current_event={"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                                         "tool_input": {"command": cmd}, "cwd": "/tmp"},
+                          history=[], pattern=masking_CHECK)
+    assert (f is not None) == fires
+
+
+def test_a_comparison_of_the_status_with_itself_returns_nothing():
+    from makoto.checks.spec import masking_CHECK
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": "/tmp",
+          "tool_input": {"command": 'pytest; rc=$?; [ "$rc" = "$rc" ]'}}
+    assert predicate(current_event=ev, history=[], pattern=masking_CHECK) is not None
+
+
+def test_a_compound_test_that_always_holds_returns_nothing():
+    from makoto.checks.spec import masking_CHECK
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": "/tmp",
+          "tool_input": {"command": 'pytest; rc=$?; [ "$rc" = 1 -o "$rc" != 1 ]'}}
+    assert predicate(current_event=ev, history=[], pattern=masking_CHECK) is not None

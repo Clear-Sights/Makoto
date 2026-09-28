@@ -1,0 +1,21 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "WebSearch",
+   "tool_input": {
+    "query": "vendorzzz docs"
+   },
+   "tool_response": {
+    "results": "See https://docs-internal-vendorzzz.example.net/api/reference for details"
+   }
+  },
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "WebFetch",
+   "tool_input": {
+    "url": "https://docs-internal-vendorzzz.example.net/api/reference"
+   }
+  }
+ ]
+}

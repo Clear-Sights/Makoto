@@ -1,0 +1,12 @@
+{
+  "events": [
+    {
+      "hook_event_name": "PreToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "config2.py",
+        "content": "settings = {\"debug\": True, \"debug\": True}\n"
+      }
+    }
+  ]
+}

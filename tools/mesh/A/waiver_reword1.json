@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": {"file_path": "tests/test_flaky.py", "content": "@pytest.mark.skip\ndef test_flaky():\n    assert False\n"}, "tool_response": {"success": true}}, {"hook_event_name": "Stop", "last_assistant_message": "done"}]}

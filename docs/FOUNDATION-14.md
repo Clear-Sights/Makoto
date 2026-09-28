@@ -1,8 +1,8 @@
 # Makoto: the foundation for the last 14 register entries (2026-09-28)
 
 **State on Makoto main eb39587 (PR #100 merged 00:14Z, PR #101 merged 01:01Z).**
-- `python3 tools/register_map.py` prints 77 entries: 63 RUNNER, 14 NOT-COUNTABLE, 0 UNCOVERED, 62 of 62 checks cited.
-- The 63 RUNNER entries are all BLOCK and deterministic, with no model, and each has a removal-red test (docs/SIXTY.tsv).
+- `python3 tools/register_map.py` prints the entry count and its RUNNER / NOT-COUNTABLE split; this page was written against its eb39587 reading.
+- The RUNNER entries are all BLOCK and deterministic, with no model, and each has a removal-red test (docs/SIXTY.tsv).
 - The 14 below have no runner yet.
 
 ## The bars every row is held to (Gabriel 2026-09-28 00:23Z)
@@ -43,7 +43,7 @@ The foundation instead OWES THE REGISTER'S OWN FIX LINE AS AN ACT and checks onl
    - It indexes each command under its token tuple with one position blanked, so it is O(n·t), not the O(n²) of comparing every pair. O(n²) is forbidden.
    - Rows B14, A14, B37, E8 and F12 use it.
 2. **`kit.claim(text, rx)`.** A sentence-scoped claim match with negation handling, the same grammar gate.unrun_count_claim uses.
-3. **Ratchet (the guarantee).** A test pins the NOT-COUNTABLE count at 14, and the count may only fall. Each row below lands in its own commit that moves the pin down by 1 and flips the row to RUNNER, and register_map keeps every cited id real.
+3. **Ratchet (the guarantee).** A test pins the NOT-COUNTABLE count (`tests/test_ratchet.py`), and the count may only fall. Each row below lands in its own commit that moves the pin down by 1 and flips the row to RUNNER, and register_map keeps every cited id real.
    - The planted fault: a row flipped back to NOT-COUNTABLE turns the ratchet red.
 4. **Wiring per row**, the same files 1f649f9 touched for gate.unrun_count_claim:
    - the family module's `_ROWS`, with `tests=` naming its family: SPEC rows must NOT reach `kit.unwitnessed`, and every other family must;

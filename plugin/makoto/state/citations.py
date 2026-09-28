@@ -12,6 +12,7 @@ pattern-1.6 validation all agree on what a citation looks like byte-for-byte. st
 (os, pathlib); the sqlite3 conn is passed in.
 """
 from __future__ import annotations
+from makoto.vocab import _lazy_re
 import os
 import re
 from pathlib import Path
@@ -19,7 +20,7 @@ from pathlib import Path
 from makoto.vocab import _CITATION_RX, _CITATION_AUTHOR_STOPWORDS
 
 # Extraction and canonical rebuild share this whitespace normalization.
-_WS_RUN_RX = re.compile(r"\s+")
+_WS_RUN_RX = _lazy_re(r"\s+")
 
 
 # --- extract: text -> [(cite, line, snippet)] for pattern-1.6 validation -----------

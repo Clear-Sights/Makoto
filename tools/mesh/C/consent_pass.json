@@ -1,0 +1,14 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "I did this as you approved earlier."
+  }
+ ],
+ "transcript": [
+  {
+   "role": "user",
+   "text": "please go ahead and approve this change"
+  }
+ ]
+}

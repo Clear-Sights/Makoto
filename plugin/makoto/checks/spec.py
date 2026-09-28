@@ -25,6 +25,7 @@ from __future__ import annotations
 # the ``else`` branch, or whose integrity intent is hidden behind a fully-generic name in both key
 # AND body, evades. For a BLOCKING gate an FP (blocking honest code) is the binding harm, so the
 # fire is kept MATERIAL. ``makoto-allow`` honored by the factory. Knight-Leveson: stdlib ast + re.
+from makoto.vocab import _lazy_re
 import ast
 import re
 from typing import Optional
@@ -33,7 +34,7 @@ from makoto.vocab import _INTEG_VOCAB, _PY_FILE_RX as _TARGET_RX
 from makoto.kit import ast_introduced_predicate, callee_chain
 
 # `_TARGET_RX` is .py-only — .md is prose.
-_INTEG_RX = re.compile(_INTEG_VOCAB, re.I)  # shared L0 integrity vocabulary
+_INTEG_RX = _lazy_re(_INTEG_VOCAB, re.I)  # shared L0 integrity vocabulary
 
 # An env-var READ in CALL form (callee_chain) vs SUBSCRIPT form (value chain).
 _ENV_CALL_CHAINS = {"os.getenv", "getenv", "os.environ.get", "environ.get"}
@@ -136,11 +137,11 @@ env_CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOC
 from makoto.kit import ast_introduced_predicate
 
 # `[/\\]` + `.+` covers nested `…/checks/sub/seal.py` and a backslash-delivered Windows path.
-body__TARGET_RX = re.compile(r"constitution[/\\]integrity[/\\]checks[/\\].+\.py$")
+body__TARGET_RX = _lazy_re(r"constitution[/\\]integrity[/\\]checks[/\\].+\.py$")
 # A verifier-named function: an integrity/verification verb, or a generic entry-point name
 # (`run`/`main`, anchored; `predicate`/`probe`/`scan`/`seal` substrings) — narrow context (the
 # integrity-checks dir) makes these load-bearing rather than generic.
-_VERIFIER_NAME_RX = re.compile(
+_VERIFIER_NAME_RX = _lazy_re(
     r"(?i)(verif|valid|integrit|attest|check|ensure|enforce|assert|predicate|probe|scan|seal|^run$|^main$)")
 _BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
 
@@ -251,7 +252,7 @@ import textwrap
 
 from makoto.kit import ast_introduced_predicate, callee_chain, parse_introduced
 
-weakened__TARGET_RX = re.compile(r"constitution/integrity/checks/.+\.py$")
+weakened__TARGET_RX = _lazy_re(r"constitution/integrity/checks/.+\.py$")
 _RE_LOOSE_CHAINS = frozenset({"re.match", "re.search"})
 _METHOD_LOOSE = frozenset({"startswith", "endswith"})
 _CONTAINER_LABELS = ((ast.List, "in [...]"), (ast.Tuple, "in (...)"), (ast.Set, "in {...}"))
@@ -329,7 +330,7 @@ from makoto.kit import introduced_regex_predicate
 # The illusory authorship/generation claim, Claude/Anthropic-gated. Case-insensitive:
 # git/GitHub emit "Co-authored-by:", the CLAUDE.md convention emitted "Co-Authored-By:".
 # A human co-author passes (no "claude" after the colon, no anthropic.com address).
-_CLAUDE_AUTHOR_RX = re.compile(
+_CLAUDE_AUTHOR_RX = _lazy_re(
     r"co-authored-by:[ \t]*claude"                                  # git trailer form
     r"|noreply@anthropic\.com"                                      # the routing address itself
     r"|claude[ \t-]*session:[ \t]*https?://"                        # session-provenance trailer
@@ -354,7 +355,7 @@ import shlex
 import tokenize
 
 _SEARCH_CMDS = frozenset({"grep", "egrep", "fgrep", "rg"})
-_TRAILER_KEY_RX = re.compile(r"(?i)^[ \t]*(?:co-authored-by|claude[ \t-]*session)[ \t]*:")
+_TRAILER_KEY_RX = _lazy_re(r"(?i)^[ \t]*(?:co-authored-by|claude[ \t-]*session)[ \t]*:")
 _SHELL_OPS = frozenset({"|", "||", "&", "&&", ";", "\n", "(", ")"})
 
 
@@ -479,7 +480,7 @@ from makoto.kit import _record_exemption, regex_file_predicate, scan_target_cont
 from makoto.vocab import Finding
 from makoto.vocab import _INTEG_VOCAB as _INTEG   # shared L0 integrity vocab (single source)
 
-suppress__TARGET_RX = re.compile(r"\.toml$")
+suppress__TARGET_RX = _lazy_re(r"\.toml$")
 
 # `_INTEG` stays a module attribute under exactly this name: tests/test_lexicons.py pins
 # `integritySuppressionFlag._INTEG is vocab._INTEG_VOCAB`.
@@ -487,7 +488,7 @@ suppress__TARGET_RX = re.compile(r"\.toml$")
 # a STANDALONE assignment line whose key names an integrity concept and carries a suppression
 # affix set true: suffix form (`audit_skip = true`) or prefix form (`skip_audit = true`).
 # MULTILINE so `^` binds to each physical line; quotes optional for TOML quoted keys.
-_FLAG_RX = re.compile(
+_FLAG_RX = _lazy_re(
     r"(?im)^[ \t]*[\"']?(?:"
     r"\w*(?:" + _INTEG + r")\w*_(?:skip|bypass|inapplicable)"
     r"|(?:skip|bypass)_\w*(?:" + _INTEG + r")\w*"
@@ -497,7 +498,7 @@ _FLAG_RX = re.compile(
 # an ADR backlink documents the suppression -> exempt, but only when it sits on the flag's own
 # line or within _ADR_WINDOW adjacent lines. Whole-content scope would be a laundering token: one
 # unrelated `ADR-0` string anywhere in the payload would disarm the check silently.
-_ADR_BACKLINK_RX = re.compile(r"\bADR-\d+\b")
+_ADR_BACKLINK_RX = _lazy_re(r"\bADR-\d+\b")
 _ADR_WINDOW = 2
 
 _flag_predicate = regex_file_predicate(
@@ -559,25 +560,25 @@ from makoto.registry import Check
 from makoto.substrate.wiring import MAKOTO_INVOCATION_RX as _MAKOTO_CMD_RX
 
 # The file makoto wires into: ~/.claude/settings.json (or settings.local.json).
-_SETTINGS_RX = re.compile(r"(?:\.claude[/\\]settings(?:\.local)?\.json|hooks[/\\]hooks\.json)$",
+_SETTINGS_RX = _lazy_re(r"(?:\.claude[/\\]settings(?:\.local)?\.json|hooks[/\\]hooks\.json)$",
                           re.IGNORECASE)
 # A makoto-disable env var SET to a TRUTHY value — JSON or shell form. Truthy-only is the FP
 # guard: setting DISABLE to 0/false is RE-ENABLING makoto and must never fire.
-_DISABLE_ENV_RX = re.compile(
+_DISABLE_ENV_RX = _lazy_re(
     r"MAKOTO_(?:DISABLE\w*|PAUSE)\b\s*[\"']?\s*[:=]\s*[\"']?(?:1|true|yes|on)"
     r"(?=\s*(?:$|[}\]]|[\"']\s*(?:[,}\]]|$)))",
     re.IGNORECASE)
 # MAKOTO_DISABLE_PATTERNS is NOT a boolean — its value is a LIST of check ids, so any non-empty
 # value disables those checks, which the truthy-only regex above can't see. Fire on any value
 # whose first token is not empty/falsy; an empty value (the re-enable move) stays silent.
-_DISABLE_PATTERNS_RX = re.compile(
+_DISABLE_PATTERNS_RX = _lazy_re(
     r"MAKOTO_DISABLE_PATTERNS\b\s*[\"']?\s*[:=]\s*[\"']?(?!\s*[\"'\s])(?!(?:0|false|no|off)\b)\S+",
     re.IGNORECASE)
 # The marker makoto stamps on its managed hook entries.
-_MANAGED_RX = re.compile(r"_makoto_managed")
+_MANAGED_RX = _lazy_re(r"_makoto_managed")
 # A GLOBAL hook kill-switch (Claude Code's `disableAllHooks`) disables EVERY hook, makoto
 # included, via a key the env/un-wire branches never inspect. Truthy-only is the FP guard.
-_GLOBAL_DISABLE_RX = re.compile(r'"disableAllHooks"\s*:\s*true\b', re.IGNORECASE)
+_GLOBAL_DISABLE_RX = _lazy_re(r'"disableAllHooks"\s*:\s*true\b', re.IGNORECASE)
 # makoto's own hook-command invocation tokens, imported from wiring rather than copied locally so
 # this guard recognizes exactly what install/dispatch do, including the plugin-manifest shim
 # form. If the REMOVED text carried it but the introduced text no longer does, the makoto command
@@ -606,7 +607,7 @@ def _removed_text(tool_input: dict) -> str:
     return old
 
 
-_JSON_ESCAPE_RX = re.compile(r"\\u([0-9a-fA-F]{4})|\\([\"\\/])")
+_JSON_ESCAPE_RX = _lazy_re(r"\\u([0-9a-fA-F]{4})|\\([\"\\/])")
 
 
 def _decoded(text: str) -> str:
@@ -788,21 +789,21 @@ from makoto.core._shell import (_NESTED_SHELL_PROGRAMS, _basename, _effective_ar
 from makoto.core._declaredverifiers import declares_anything, is_declared_verifier
 
 # Anchored at the (post-wrapper) START of a statement: the runner is INVOKED, not an argument.
-_LEAD_RUNNER_RX = re.compile(
+_LEAD_RUNNER_RX = _lazy_re(
     r"^(?:pytest|go\s+test|cargo\s+(?:test|check)|(?:npm|yarn|pnpm)\s+(?:run\s+)?(?:test|check|lint)"
     r"|jest|vitest|mocha|tsc|ruff|eslint|flake8|mypy|pyright|pylint|make\s+(?:test|check|lint)"
     r"|bazel\s+test|dotnet\s+test|gradle\s+(?:test|check)|mvn\s+test|phpunit|rspec|ctest"
     r"|dune\s+(?:test|build)|swift\s+test)\b"
 )
 
-_LOCAL_SCRIPT_VERIFIER_RX = re.compile(
+_LOCAL_SCRIPT_VERIFIER_RX = _lazy_re(
     r"(?:^|[/\\_.-])(?:gate|gates|test|tests|check|checks|lint|verify|ci|preflight|smoke)"
     r"(?:[._-][A-Za-z0-9_.-]*)?\.(?:sh|bash|py)$"
 )
 _LOCAL_MODULE_RUNNERS = frozenset({"unittest", "pytest", "nose2", "green", "tox", "nox", "coverage"})
 
 _WRAPPERS = frozenset({"sudo", "env", "time", "nice", "exec", "command", "builtin"})
-_PYTHON_RX = re.compile(r"python[0-9.]*")
+_PYTHON_RX = _lazy_re(r"python[0-9.]*")
 # Launcher -> the subcommands after which the next token is the delegated runner.
 _LAUNCHER_SUBCOMMANDS = {
     "poetry": ("run",), "uv": ("run",), "pdm": ("run",), "hatch": ("run",),
@@ -922,9 +923,9 @@ def _is_local_runner_command(c: str) -> bool:
 
 _GROUP_TOKENS = frozenset({"{", "}", "};", "(", ")"})
 _CONTROL_TOKENS = frozenset({"then", "else", "elif", "do", "done", "fi", "!"})
-_SET_PLUS_FLAGS_RX = re.compile(r"\+[A-Za-z]+\Z")
-_SET_MINUS_FLAGS_RX = re.compile(r"-[A-Za-z]+\Z")
-_STATUS_CAPTURE_RX = re.compile(r"\$\?")
+_SET_PLUS_FLAGS_RX = _lazy_re(r"\+[A-Za-z]+\Z")
+_SET_MINUS_FLAGS_RX = _lazy_re(r"-[A-Za-z]+\Z")
+_STATUS_CAPTURE_RX = _lazy_re(r"\$\?")
 
 
 def _top_level_count(segments) -> int:
@@ -1008,7 +1009,17 @@ def _is_exit_zero_literal(argv) -> bool:
 def _propagates_failure(argvs) -> bool:
     """True when a later same-scope segment re-raises the failure an operator swallowed: `exit`/
     `return` with a non-`0` argument, bare `exit`/`return` (propagates `$?`), or `false`.
-    Separates `pytest || exit 1` (honest) from `pytest || echo skip` (masked)."""
+    Separates `pytest || exit 1` (honest) from `pytest || echo skip` (masked). A scope that ENDS
+    in a `[`/`test`/`[[` over a variable (`t=$?; ...; [ "$t" = 1 ]`) returns that test as the
+    command's exit, so the captured status decides it: two false fires on the 3.4.7 record."""
+    last = next((t for t in ([x for x in a if x not in _CONTROL_TOKENS] for a in reversed(argvs)) if t), [])
+    ops = ("=", "==", "!=", "-eq", "-ne", "-lt", "-le", "-gt", "-ge")
+    if last and last[0] in ("[", "test", "[["):
+        body = [t for t in last[1:] if t not in ("]", "]]")]
+        k = next((i for i, t in enumerate(body) if t in ops), None)
+        if k is not None and len(body) == k + 2 and ("$" in body[k - 1]) != ("$" in body[k + 1]):
+            return True                  # `[ "$t" = 1 ]`: a variable against a literal, never `$rc = $rc`
+    
     for argv in argvs:
         toks = [t for t in argv if t not in _CONTROL_TOKENS]
         if not toks:
@@ -1177,7 +1188,7 @@ _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 # A checker-silencing directive, COMMENT-ANCHORED: a comment opener, then the keyword, on one
 # line. The anchor is what keeps this module immune to its own vocabulary and keeps a keyword
 # inside a string literal or an identifier from matching.
-_DIRECTIVE_RX = re.compile(
+_DIRECTIVE_RX = _lazy_re(
     r"""(?x)
     (?:\#|//|/\*|<!--)          # a comment opener ...
     [^\n]*?                     # ... then, later on the SAME line,
@@ -1196,10 +1207,10 @@ _DIRECTIVE_RX = re.compile(
 )
 # A bare test SKIP decorator: the one skip form the runner cannot discharge. `skipif` fails the
 # trailing `\b` on its own; `xfail` is absent by design.
-_BARE_SKIP_RX = re.compile(r"(?m)^[ \t]*@(?:pytest\.mark\.)?skip\b")
+_BARE_SKIP_RX = _lazy_re(r"(?m)^[ \t]*@(?:pytest\.mark\.)?skip\b")
 
 # An end a reader can go and check. Generous on purpose; see the recall bounds above.
-_DISCHARGE_RX = re.compile(
+_DISCHARGE_RX = _lazy_re(
     r"""(?x)
       \#\d+                                     # a tracked item: #123
     | \b(?i:gh|adr)[-\ ]\d+                     # GH-7, ADR 42
@@ -1307,9 +1318,9 @@ from makoto.core._shell import _shell_segments
 
 # Claude at the anthropic.com noreply address, and claude[bot] at its GitHub noreply address, are
 # the two forms on the trees. A human named Claude with their own address passes.
-_CLAUDE_IDENT_RX = re.compile(r"@anthropic\.com>|claude\[bot\]", re.I)
+_CLAUDE_IDENT_RX = _lazy_re(r"@anthropic\.com>|claude\[bot\]", re.I)
 _COMMITTING = frozenset({"commit", "merge", "pull", "cherry-pick", "revert", "am", "rebase"})
-_ASSIGN_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_ASSIGN_RX = _lazy_re(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
 def _git(args: list, cwd: str, env: dict) -> Optional[str]:
@@ -1553,7 +1564,7 @@ from makoto.kit import _record_exemption, makoto_allow_reason, makoto_allowed, s
 from makoto.state.citations import extract_citations
 
 
-citation__TARGET_RX = re.compile(r"\.md$")
+citation__TARGET_RX = _lazy_re(r"\.md$")
 
 def _canonical_path(conn) -> Optional[str]:
     """The configured canonical_citations_path, or None when unknown."""
@@ -1697,7 +1708,7 @@ liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", 
 # with a different value. The later value silently wins and nothing states that it should. A key
 # repeated with the SAME value leaves no winner to state and stays silent (pyflakes F601's rule).
 # JSON parses as a Python expression, so one AST walk reads both.
-lastwins__TARGET_RX = re.compile(r"\.(py|json)$")
+lastwins__TARGET_RX = _lazy_re(r"\.(py|json)$")
 
 
 def _repeated_key(node: ast.AST) -> Optional[str]:
@@ -1720,7 +1731,7 @@ lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK
 # content.bound_as_count (register B23 BOUND AS COUNT): a test asserts a count stays under a literal
 # ceiling. A test's fixture fixes the count, so the exact value is available, and a ceiling with
 # slack keeps passing when the count moves.
-bound__TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
+bound__TARGET_RX = _lazy_re(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
 
 
 _UNITTEST_BOUND_METHODS = frozenset({"assertLess", "assertLessEqual"})
@@ -1829,8 +1840,8 @@ import json
 
 from makoto.kit import current_named_verdicts, decode_history_event
 
-_LOOSE_TARGET_RX = re.compile(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
-_ASSERT_CMP_RX = re.compile(r"^(?P<lead>\s*assert\b.*?)(?P<op>==|<=|>=|<|>)\s*(?P<num>-?\d+(?:\.\d+)?)\s*$")
+_LOOSE_TARGET_RX = _lazy_re(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
+_ASSERT_CMP_RX = _lazy_re(r"^(?P<lead>\s*assert\b.*?)(?P<op>==|<=|>=|<|>)\s*(?P<num>-?\d+(?:\.\d+)?)\s*$")
 
 
 def _loosened(old: str, new: str) -> Optional[str]:
@@ -1901,7 +1912,7 @@ def _owned(target: str, cwd: str, owned: tuple) -> Optional[str]:
 
 # The owner's own words name a file to keep whole ("zero.py must carry intact; do not cut it"):
 # read from the genuine operator turns only, so the principal's statement is the witness.
-_KEEP_WHOLE_RX = re.compile(
+_KEEP_WHOLE_RX = _lazy_re(
     r"(?P<a>[\w./-]+\.\w+)\b[^.;\n]{0,24}?\b(?:must (?:carry|stay|remain|be kept) intact|must not be "
     r"(?:cut|deleted|removed|changed))|\b(?:do not|don't|never) (?:cut|delete|remove|touch) (?P<b>[\w./-]+\.\w+)",
     re.I)
@@ -1970,7 +1981,7 @@ owner_CHECK = _Check(id="event.owner_path", applies_at="Pre", posture="BLOCK",
 # command already succeeded and nothing since touched the target: the rerun appends the same rows
 # a second time. Register A11 REPLAY COUNTED AS NEW. Discharge: overwrite (`>`), dedupe, or skip
 # the rerun.
-_APPEND_RX = re.compile(r">>\s*(\S+)")
+_APPEND_RX = _lazy_re(r">>\s*(\S+)")
 
 
 def repeated_append_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2064,12 +2075,12 @@ fallthrough_CHECK = _Check(id="content.fallthrough_match", applies_at="Pre", pos
 # in one regime (a short task) is spent as if it held in another (a long session). The witness is
 # the message's own words; the opt-in is the repository saying the field is required.
 # Discharge: add `regime: <where it was measured>` to the message.
-_REMOVAL_RX = re.compile(r"\b(?:remov|delet|drop|strip|revert|rip(?:ped)? out|cut)\w*", re.I)
-_MEASURED_RX = re.compile(
+_REMOVAL_RX = _lazy_re(r"\b(?:remov|delet|drop|strip|revert|rip(?:ped)? out|cut)\w*", re.I)
+_MEASURED_RX = _lazy_re(
     r"\d+(?:\.\d+)?\s*%|\bno (?:gain|effect|improvement|benefit|change)\b|\b(?:regress|slower|faster|"
     r"worse|better|measured|benchmark|verdict|runs?\b|results?\b|didn't help|did not help|no help)", re.I)
-_REGIME_RX = re.compile(r"\bregime:\s*\S", re.I)
-_LANDING_MSG_RX = re.compile(r"\bgit\s+commit\b|\bgh\s+pr\s+(?:create|merge|edit)\b")
+_REGIME_RX = _lazy_re(r"\bregime:\s*\S", re.I)
+_LANDING_MSG_RX = _lazy_re(r"\bgit\s+commit\b|\bgh\s+pr\s+(?:create|merge|edit)\b")
 
 
 def regime_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2101,7 +2112,7 @@ regime_CHECK = _Check(id="event.regime_unnamed", applies_at="Pre", posture="BLOC
 # naming a real row, or a row id (first column) present in the file. Register G1 GOAL
 # SUBSTITUTION: a paraphrase of the owner's words closed instead of the words. The witness is the
 # words file itself; a paraphrase cannot cite a row. Discharge: cite the row you closed.
-_CLOSED_RX = re.compile(r"\b(?:closed|done|complete[d]?|finished|resolved|shipped)\b", re.I)
+_CLOSED_RX = _lazy_re(r"\b(?:closed|done|complete[d]?|finished|resolved|shipped)\b", re.I)
 
 
 def unworded_close_gate(text: str, cwd: str) -> Optional[Finding]:
@@ -2181,16 +2192,16 @@ def _deny(pattern, fp, what, snippet) -> Finding:
                    retry_hint=pattern.retry_hint, snippet=str(snippet)[:120])
 
 
-_CHECKER_RX = re.compile(r"(^|[/\\])(checks?[/\\][^/\\]+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
+_CHECKER_RX = _lazy_re(r"(^|[/\\])(checks?[/\\][^/\\]+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
 
 
 # content.rule_without_runner -- register B7 RULE WITH NO RUNNER. A rule line (always / never /
 # must / do not) added to CLAUDE.md or AGENTS.md must name what runs it: a `runner:` token, or a
 # path in the line that exists. Discharge: name the check on the line, or leave the rule out.
-_RULE_FILE_RX = re.compile(r"(^|[/\\])(CLAUDE|AGENTS)\.md$")
-_RULE_LINE_RX = re.compile(r"\b(?:always|never|must|do not|don't|shall)\b", re.I)
-_PATHISH_RX = re.compile(r"[\w.-]*[/\\][\w./\\-]+|[\w-]+\.(?:py|sh|js|ts|tsv|toml|json)\b")
-_RUNNER_RX = re.compile(r"\brunner:\s*`?([^\s`]+)")
+_RULE_FILE_RX = _lazy_re(r"(^|[/\\])(CLAUDE|AGENTS)\.md$")
+_RULE_LINE_RX = _lazy_re(r"\b(?:always|never|must|do not|don't|shall)\b", re.I)
+_PATHISH_RX = _lazy_re(r"[\w.-]*[/\\][\w./\\-]+|[\w-]+\.(?:py|sh|js|ts|tsv|toml|json)\b")
+_RUNNER_RX = _lazy_re(r"\brunner:\s*`?([^\s`]+)")
 
 
 def rule_runner_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2221,9 +2232,9 @@ rule_runner_CHECK = _Check(id="content.rule_without_runner", applies_at="Pre", p
 # must exist. Discharge: write the pass twin and name it.
 # a check ROW or its predicate -- `def x_predicate(`, `def check_x(`, `X_CHECK = Check(` -- not a
 # bare verifier function (`def check(s)`), which content.verifier_predicate_weakened reads.
-_NEW_CHECK_RX = re.compile(
+_NEW_CHECK_RX = _lazy_re(
     r"^\s*(?:def\s+(?:\w+_(?:predicate|check|gate)|(?:check|predicate|gate)_\w+)\s*\(|\w+\s*=\s*_?Check\s*\()")
-_PASS_RX = re.compile(r"\bpass:\s*`?([^\s`]+)")
+_PASS_RX = _lazy_re(r"\bpass:\s*`?([^\s`]+)")
 
 
 def check_pass_case_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2251,9 +2262,9 @@ check_pass_case_CHECK = _Check(id="content.check_without_pass_case", applies_at=
 # fires / blocks / denies / catches / flags / detects) must give each its own `discriminant:` --
 # what only its condition sees -- and no two may share one. Discharge: isolate each condition with
 # its own input and write down what separates it.
-_TEST_FILE_RX = re.compile(r"(^|[/\\])(test_[^/\\]*|[^/\\]*_test)\.py$")
-_VERDICT_TEST_RX = re.compile(r"^\s*def\s+(test_\w*(?:fire|block|den(?:y|ies)|catch|flag|detect)\w*)\s*\(", re.I)
-_DISCRIMINANT_RX = re.compile(r"\bdiscriminant:\s*(.+?)\s*(?:[\"']{3}|$)")
+_TEST_FILE_RX = _lazy_re(r"(^|[/\\])(test_[^/\\]*|[^/\\]*_test)\.py$")
+_VERDICT_TEST_RX = _lazy_re(r"^\s*def\s+(test_\w*(?:fire|block|den(?:y|ies)|catch|flag|detect)\w*)\s*\(", re.I)
+_DISCRIMINANT_RX = _lazy_re(r"\bdiscriminant:\s*(.+?)\s*(?:[\"']{3}|$)")
 
 
 def overdetermined_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2296,8 +2307,8 @@ overdetermined_CHECK = _Check(id="content.overdetermined_case", applies_at="Pre"
 # skip / exempt / ignore / allow list added to a checker file must name the region it leaves
 # unreached (`region: ...`, `unreached: ...`, or NOT-COUNTABLE, as REGISTER-MAP does). Discharge:
 # say, in the change, what the checker no longer reaches.
-_EXEMPTION_RX = re.compile(r"^\s*\w*(?:exempt|exclu|skip|ignor|allow)\w*\s*(?::[^=]*)?=\s*[\[({]", re.I)
-_REGION_RX = re.compile(r"\b(?:region|unreached):\s*\S|NOT-COUNTABLE|OUT-OF-SUBJECT")
+_EXEMPTION_RX = _lazy_re(r"^\s*\w*(?:exempt|exclu|skip|ignor|allow)\w*\s*(?::[^=]*)?=\s*[\[({]", re.I)
+_REGION_RX = _lazy_re(r"\b(?:region|unreached):\s*\S|NOT-COUNTABLE|OUT-OF-SUBJECT")
 
 
 def exemption_region_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:

@@ -1,0 +1,14 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "There is no way to tell whether this bug is fixed."
+  }
+ ],
+ "transcript": [
+  {
+   "role": "user",
+   "text": "is the bug fixed?"
+  }
+ ]
+}

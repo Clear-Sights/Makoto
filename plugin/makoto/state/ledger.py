@@ -8,6 +8,7 @@ read the fields the live hook actually emits — never a hand-built shape.
 Pure data layer: callers pass an open sqlite3 connection whose `ledger` table
 matches db.py's schema (key, value, kind, exit, source_event_id, session_id, ts).
 """
+from makoto.vocab import _lazy_re
 import hashlib
 import json
 import re
@@ -32,7 +33,7 @@ from makoto.kit import bash_output_text, decode_history_event, is_test_runner, n
 from makoto.substrate._canonAtoms import _row_ts
 from makoto.state.store import _state_dir as _chain_state_dir
 
-_PATH_IN_CMD_RX = re.compile(
+_PATH_IN_CMD_RX = _lazy_re(
     r"(?<![=\w.\-])(?P<path>`?(?:/[\w.\-]+)+/[\w.\-]+\.\w+|[\w.\-]+/[\w.\-]+\.\w+|[\w.\-]+\.\w+`?)"
 )
 
@@ -481,7 +482,7 @@ _SYNTHETIC_MARKERS = (
     "<local-command-caveat", "[request interrupted by user]",
 )
 
-_MIDTURN_MESSAGE_RX = re.compile(
+_MIDTURN_MESSAGE_RX = _lazy_re(
     r"\A<system-reminder>\s*The user sent a new message while you were working:\s*\n"
     r"(?P<prompt>.*?)\s*</system-reminder>\Z", re.DOTALL)
 

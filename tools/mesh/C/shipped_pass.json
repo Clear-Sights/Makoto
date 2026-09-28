@@ -1,0 +1,20 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "git push origin feature-x"
+   },
+   "tool_response": {
+    "stdout": "",
+    "stderr": "",
+    "exitCode": 0
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "I pushed the branch to origin."
+  }
+ ]
+}

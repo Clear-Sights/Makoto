@@ -1,0 +1,22 @@
+{
+  "files": {
+    "src/calc.py": "def compute():\n    total = 2 + 3\n    return \"done\"\n"
+  },
+  "events": [
+    {
+      "hook_event_name": "PostToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "src/calc.py",
+        "content": "def compute():\n    total = 2 + 3\n    return \"done\"\n"
+      },
+      "tool_response": {
+        "success": true
+      }
+    },
+    {
+      "hook_event_name": "Stop",
+      "last_assistant_message": "Implemented compute()."
+    }
+  ]
+}

@@ -22,6 +22,7 @@ POSTURE (BLOCK vs ADVISE): see BLOCK_IDS below for the full citation trail.
 """
 from __future__ import annotations
 
+from makoto.vocab import _lazy_re
 import posixpath
 import re
 from typing import Dict, Iterable, List, Tuple
@@ -38,6 +39,7 @@ from makoto.kit import (
 )
 from makoto.core._shell import (
     _effective_argv,
+    statements,
     _git_subcommand,
     _is_test_argv,
     _shell_segments,
@@ -136,9 +138,9 @@ def _is_edit(c: Call) -> bool:
     return c["name"] in _EDIT_TOOLS
 
 
-_TEST_DIR_RX = re.compile(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", re.IGNORECASE)
+_TEST_DIR_RX = _lazy_re(r"(?:^|/)(?:tests?|__tests__)(?:/|$)", re.IGNORECASE)
 # No separate `_spec.rb` arm: the `[._-]spec.<ext>` arm already subsumes it.
-_TEST_FILE_RX = re.compile(
+_TEST_FILE_RX = _lazy_re(
     r"^(?:test_.+|.+_test)\.py$"
     r"|(?:^|[._-])(?:test|spec)\.(?:[cm]?[jt]sx?|rb)$"
     r"|_test\.go$", re.IGNORECASE)
@@ -160,32 +162,32 @@ def _segments(c: Call):
 
 # ---- regex-based atom bodies (see module docstring) ----
 # Full-token bypass flags. SKIP is intentionally case-pinned: lowercase `dd skip=` is unrelated.
-_DISABLE_RX = re.compile(
+_DISABLE_RX = _lazy_re(
     r"--no-verify|--no-gpg-sign|--no-hooks?|--force|(?-i:SKIP=)\S+|--skip-tests?",
     re.IGNORECASE)
 
 # an edit body that is empty, a stub, or comment-only -- the "neutered to a no-op" shape.
-_NOOP_RX = re.compile(r"^\s*(?:pass|\.\.\.|#.*)?\s*$")
+_NOOP_RX = _lazy_re(r"^\s*(?:pass|\.\.\.|#.*)?\s*$")
 
 # Oracle names must occupy a whole path component/stem; application modules such as
 # oracle_client.py and golden_gate_bridge.py are not expected-output artifacts.
-_ORACLE_PATH_RX = re.compile(
+_ORACLE_PATH_RX = _lazy_re(
     r"(?i)(?:^|/)(?:oracle|golden|snapshots?|baselines?|fixtures?)(?:/|(?:\.[^/]+)?$)"
     r"|(?:^|/)(?:expected[_-]?output|answer[_-]?key|solution)(?:\.[^/]+)?$"
     r"|\.expected(?:\.|$)")
 
-_ASSERT_RX = re.compile(r"\bassert\b")
-_TAUTOLOGY_ASSERT_RX = re.compile(r"assert\s+True\b")
+_ASSERT_RX = _lazy_re(r"\bassert\b")
+_TAUTOLOGY_ASSERT_RX = _lazy_re(r"assert\s+True\b")
 
 # ponytail: a secret-shaped-literal denylist (assignment pattern + AWS key + PEM header), with a
 # placeholder veto -- not a general secret scanner; expand as real corpus misses surface.
-_SECRET_ASSIGN_RX = re.compile(
+_SECRET_ASSIGN_RX = _lazy_re(
     r"(?i)(?<![A-Za-z0-9])(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|private[_-]?key)"
     r"\b\s*[=:]\s*"
     r"['\"]([A-Za-z0-9/+_.\-]{12,})['\"]")
-_AWS_KEY_RX = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
-_PRIVATE_KEY_BLOCK_RX = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
-_PLACEHOLDER_RX = re.compile(
+_AWS_KEY_RX = _lazy_re(r"\bAKIA[0-9A-Z]{16}\b")
+_PRIVATE_KEY_BLOCK_RX = _lazy_re(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+_PLACEHOLDER_RX = _lazy_re(
     r"(?i)\b(?:x{3,}|xxx|todo|redacted|changeme|your[_-]?(?:api[_-]?)?key(?:[_-]?here)?|"
     r"example|dummy|fake|identifier|"
     r"placeholder|insert[_-]?here)\b|<[^>]+>|\$\{|%\(")
@@ -200,6 +202,70 @@ def _short_flags(args):
 # the literal word, and `..` is normalized first so `/tmp/../src` cannot launder a real target.
 # The bare root itself (`rm -rf /tmp`) stays destruction -- it holds other sessions' scratch.
 _TEMP_ROOTS = ("/tmp/", "/var/tmp/", "$TMPDIR/", "${TMPDIR}/")
+
+
+_VAR_RX = _lazy_re(r"\$\{?([A-Za-z_]\w*)\}?")
+_ASSIGN_RX = _lazy_re(r"^([A-Za-z_]\w*)=(.*)$")
+
+
+def _statement_envs(cmd: str) -> list:
+    """[(words, {NAME: value})] per simple statement, each with the bindings made BEFORE it in
+    the same shell scope: only a bare `NAME=value` statement binds (an env-prefix `NAME=x cmd`
+    does not), `NAME=$(mktemp ...)` binds a temp path, a subshell's bindings end at its `)`, and a
+    comment or a quoted string binds nothing. 14 false destruct fires on the 3.4.7 record were
+    `rm -rf` of such a scratch variable."""
+    stmts = statements(cmd)
+    if stmts is None:
+        return []
+    envs, out = {(): {}}, []
+    for k, (words, scope, _before) in enumerate(stmts):
+        for i in range(1, len(scope) + 1):      # a scope starts from its parent as it opens
+            if scope[:i] not in envs:
+                envs[scope[:i]] = dict(envs[scope[:i - 1]])
+        env = envs[scope]
+        out.append((words, dict(env)))
+        m = _ASSIGN_RX.match(words[0]) if len(words) == 1 else None
+        if not m:
+            continue
+        name, value = m.group(1), m.group(2)
+        if value == "$":             # `NAME=$(...)`: the substitution is the next statement, one scope in
+            nxt = stmts[k + 1] if k + 1 < len(stmts) else None
+            if nxt and len(nxt[1]) == len(scope) + 1 and nxt[1][:len(scope)] == scope \
+                    and nxt[0][:1] == ("mktemp",):
+                env[name] = "/tmp/mktemp.XXXXXX"
+            else:
+                env.pop(name, None)
+        else:
+            env[name] = _VAR_RX.sub(lambda v: env.get(v.group(1), v.group(0)), value)
+    return out
+
+
+def is_destructive_command(cmd: str) -> bool:
+    """Whether any segment of `cmd` destroys, each `rm` target read with the same-command bindings
+    in force at that point. A segment the statement scanner cannot place gets none (the strict
+    reading)."""
+    segments = _shell_segments(cmd)
+    envs = []
+    # only an `rm` of a variable needs the bindings, so only then is the command parsed again
+    if any("$" in a for argv, _ in segments if argv and argv[0].rsplit("/", 1)[-1] == "rm" for a in argv[1:]):
+        try:
+            envs = _statement_envs(cmd)
+        except Exception:                # an unplaceable command gets the strict reading
+            envs = []
+    used = [False] * len(envs)
+    for argv, _ in segments:
+        env = {}
+        for i, (words, e) in enumerate(envs):
+            if not used[i] and words == tuple(argv):
+                used[i], env = True, e
+                break
+        if _is_destructive_argv(argv, env):
+            return True
+    return False
+
+
+def _expand(word: str, env: dict) -> str:
+    return _VAR_RX.sub(lambda v: env.get(v.group(1), v.group(0)), word) if env else word
 
 
 def _is_scratch_path(word: str) -> bool:
@@ -224,7 +290,7 @@ def _rm_targets(args):
     return targets
 
 
-def _is_destructive_argv(raw_argv) -> bool:
+def _is_destructive_argv(raw_argv, env=None) -> bool:
     argv = _effective_argv(raw_argv)
     if not argv:
         return False
@@ -237,7 +303,7 @@ def _is_destructive_argv(raw_argv) -> bool:
         if not ("r" in flags and "f" in flags):
             return False
         targets = _rm_targets(args)
-        return not (targets and all(_is_scratch_path(t) for t in targets))
+        return not (targets and all(_is_scratch_path(_expand(t, env)) for t in targets))
     if program == "git":
         subcommand, subargs = _git_subcommand(argv)
         flags = _short_flags(subargs)
@@ -363,7 +429,7 @@ def _existing(calls: Iterable[Call], pred) -> bool:
     return any(pred(c) for c in calls)
 
 
-_EXPLICIT_TIMEOUT_RX = re.compile(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
+_EXPLICIT_TIMEOUT_RX = _lazy_re(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
 
 
 def atom_tool_timeout(calls, text) -> bool:
@@ -507,8 +573,7 @@ def atom_revert_loop(calls, text) -> bool:
 
 
 def atom_destructive_command(calls, text) -> bool:
-    return _existing(calls, lambda c: c["name"] == "Bash"
-                     and any(_is_destructive_argv(argv) for argv, _ in _segments(c)))
+    return _existing(calls, lambda c: c["name"] == "Bash" and is_destructive_command(_cmd(c)))
 
 
 ATOMS: Dict[str, object] = {

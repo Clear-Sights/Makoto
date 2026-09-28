@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": "svc/flag_gate.py", "content": "from os import getenv\n\ndef check():\n    if getenv(\"FEATURE_X\"):\n        ok = verify_checksum(data)\n"}}]}

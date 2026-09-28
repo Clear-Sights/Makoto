@@ -1560,6 +1560,8 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.undeclared_falsifiable",  # B32/C2: catalog-completeness auditor
                           "gate.unworded_close",       # G1, opt-in words_file
                           "gate.unrun_count_claim",    # C11: a counted all-pass with no run
+                          "gate.gradient_collapse",    # A6: a threshold collapse with no test
+                          "gate.option_interaction",   # E8: a working option never pinned
                           "gate.unpaid_acceptance"}    # docs/REGISTER.md I3's runner,
                                                # opt-in (makoto.toml `dispatch = true`)
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
@@ -2406,3 +2408,49 @@ def test_unwitnessed_verifier_does_not_read_a_heredoc_body_or_a_grep_pattern_as_
     runs = [("python3 - <<EOF\nimport subprocess  # runs pytest -q later\nprint('OK')\nEOF", "OK"),
             ("grep -n 'pytest' tests/test_a.py", "3: PASS")]
     assert not _unwitnessed_after(tmp_path, "seg4", runs)
+
+
+def _post_write(tmp_path, session, path, content):
+    return {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(tmp_path),
+            "tool_name": "Write", "tool_input": {"file_path": path, "content": content},
+            "tool_response": {}}
+
+
+def test_dispatch_gradient_collapse_gate_blocks_a_threshold_with_no_test(tmp_path):
+    """gate.gradient_collapse (A6): a score collapsed at 0.9 with no test carrying 0.9 blocks the
+    stop; the same session after a test write at 0.9 does not."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_write(tmp_path, "collapse", "src/score.py", "y = 1 if s >= 0.9 else 0\n"))
+    stop = {"hook_event_name": "Stop", "session_id": "collapse", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.gradient_collapse" in decision["reason"]
+    _run_dispatch(state_dir, _post_write(tmp_path, "collapse", "tests/test_score.py",
+                                         "assert f(0.89) == 0 and f(0.9) == 1\n"))
+    rc, out = _run_dispatch(state_dir, stop)
+    assert "gate.gradient_collapse" not in (out or "")
+
+
+def _post_bash_rc(tmp_path, session, command, rc):
+    ev = _post_bash(tmp_path, session, command)
+    ev["tool_response"]["exitCode"] = rc
+    return ev
+
+
+def test_dispatch_option_interaction_gate_blocks_an_unpinned_working_option(tmp_path):
+    """gate.option_interaction (E8): `X=1 tool` red then `X=1 Y=2 tool` green, nothing written,
+    blocks the stop; a later write carrying `Y=2` pays it."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_bash_rc(tmp_path, "optint", "X=1 tool", 1))
+    _run_dispatch(state_dir, _post_bash_rc(tmp_path, "optint", "X=1 Y=2 tool", 0))
+    stop = {"hook_event_name": "Stop", "session_id": "optint", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.option_interaction" in decision["reason"]
+    _run_dispatch(state_dir, _post_write(tmp_path, "optint", "config.env", "Y=2\n"))
+    rc, out = _run_dispatch(state_dir, stop)
+    assert "gate.option_interaction" not in (out or "")

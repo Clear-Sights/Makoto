@@ -15,6 +15,31 @@ import these by name so one edit governs every surface.
 """
 from __future__ import annotations
 import re
+
+
+class _LazyPattern:
+    """A module-level regex compiled on first use, not at import: a hook process pays only for
+    the patterns its one event reaches (START step 9; tests/test_hook_latency.py counts them)."""
+    __slots__ = ("_args", "_rx")
+
+    def __init__(self, pattern, flags=0):
+        self._args, self._rx = (pattern, flags), None
+
+    def _compiled(self):
+        if self._rx is None:
+            self._rx = re.compile(*self._args)
+        return self._rx
+
+    def __getattr__(self, name):
+        return getattr(self._compiled(), name)
+
+    def __repr__(self):
+        return f"_lazy_re({self._args[0]!r})"
+
+
+def _lazy_re(pattern, flags=0):
+    return _LazyPattern(pattern, flags)
+
 from dataclasses import dataclass, field
 
 
@@ -57,7 +82,7 @@ _PATH_EXT = (
     r"sql|html?|css|scss|sass|xml|csv|tsv|sock|proto|graphql|tf|svg|ipynb|dockerfile"
 )
 
-_NEGATION_RX = re.compile(r"\b(not|never|no)\b|n['’]t\b", re.IGNORECASE)
+_NEGATION_RX = _lazy_re(r"\b(not|never|no)\b|n['’]t\b", re.IGNORECASE)
 
 # Universal exemption marker: the bundled CLAUDE.md tells the AI that when a flagged shape is
 # LEGITIMATE, annotate it with
@@ -69,11 +94,11 @@ _NEGATION_RX = re.compile(r"\b(not|never|no)\b|n['’]t\b", re.IGNORECASE)
 # Structured marker (2026-06-01, §7.5b): `makoto-allow:` followed by a non-empty reason. A bare
 # `makoto-allow` with no colon/reason no longer exempts — an exemption without an on-the-record
 # rationale is a reasonless laundering token, which is itself an empty word.
-_MAKOTO_ALLOW_RX = re.compile(r"makoto-allow\s*:\s*\S", re.IGNORECASE)
+_MAKOTO_ALLOW_RX = _lazy_re(r"makoto-allow\s*:\s*\S", re.IGNORECASE)
 # Reason CAPTURE (the audit half): the rationale text after the colon, for the on-the-record
 # exemption row. Same trigger as _MAKOTO_ALLOW_RX (colon + a non-empty reason) — kept separate so
 # the hot boolean check stays a bare search and only the recording path pays for the capture.
-_MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE)
+_MAKOTO_ALLOW_REASON_RX = _lazy_re(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE)
 
 # ---- Test-runner provenance + failure-verdict (shared by the ledger + the green-claim gate) ----
 # _TEST_RUNNER_RX is the legacy lexical runner vocabulary, retained as an import-compatible
@@ -81,7 +106,7 @@ _MAKOTO_ALLOW_REASON_RX = re.compile(r"makoto-allow\s*:\s*(\S.*)", re.IGNORECASE
 # runner word inside `cat pytest.log` or quoted prose is not an invocation.
 # kit.is_failing_testrun asks: does test-runner OUTPUT show >=1 REAL failure? xfail-safe since
 # `\bfailed\b` cannot match inside `xfailed`/`xpassed` (no word boundary).
-_TEST_RUNNER_RX = re.compile(
+_TEST_RUNNER_RX = _lazy_re(
     r"\b("
     r"pytest|py\.test|python[0-9.]*\s+-m\s+(?:pytest|unittest)|-m\s+unittest|"
     # A script kept under a tests/ directory, run by its interpreter: how the trees run their own
@@ -102,7 +127,7 @@ _TEST_RUNNER_RX = re.compile(
 # pytest/jest (`N failed`), rspec (`N failures`), and mocha (`N failing`); label-first covers
 # Maven/PHPUnit (`Failures: N`). A traceback is a failure only when no later positive pass summary
 # resolves it -- runners can print a caught cleanup traceback and still finish green.
-_FAILURE_SUMMARY_RX = re.compile(
+_FAILURE_SUMMARY_RX = _lazy_re(
     r"\b[1-9]\d*\s+(?:failed|failures?|failing)\b"
     r"|\b[1-9]\d*\s+errors?\b"
     r"|\b(?:failures?|errors?)\s*:\s*[1-9]\d*\b"
@@ -112,7 +137,7 @@ _FAILURE_SUMMARY_RX = re.compile(
 
 # Positive test-run evidence. Canon's green atom combines this with a recognized runner command
 # and the protocol exit status (when present); output merely lacking a failure is never success.
-_SUCCESS_SUMMARY_RX = re.compile(
+_SUCCESS_SUMMARY_RX = _lazy_re(
     r"\b[1-9]\d*\s+passed\b"                       # pytest/jest
     r"|\b[1-9]\d*\s+passing\b"                     # mocha
     r"|\b[1-9]\d*\s+examples?,\s+0\s+failures?\b" # rspec
@@ -124,16 +149,16 @@ _SUCCESS_SUMMARY_RX = re.compile(
 
 # Per-test / per-package FAILURE markers — case-SENSITIVE (uppercase runner markers only), so prose
 # like "failed to connect" never matches. Anchored at line start.
-_FAILURE_MARKER_RX = re.compile(
+_FAILURE_MARKER_RX = _lazy_re(
     r"^(?:FAILED\s+\S|ERROR\s+\S|FAIL\b|={2,}\s*FAILURES\s*={2,}|={2,}\s*ERRORS\s*={2,})",
     re.MULTILINE)
 
 # ANSI SGR color codes. vitest/jest colorize the summary, and the SGR terminator 'm' is a WORD
 # char that abuts the count ('\x1b[31m2 failed'), killing the \b before `[1-9]\d* failed` so a
 # REAL failing run reads as green. Stripped before failure detection (is_failing_testrun).
-_ANSI_SGR_RX = re.compile(r"\x1b\[[0-9;:]*m")
+_ANSI_SGR_RX = _lazy_re(r"\x1b\[[0-9;:]*m")
 
-_CITATION_RX = re.compile(
+_CITATION_RX = _lazy_re(
     r'\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?)\s+(?:et al\.\s+)?(\d{4})\b'
 )
 
@@ -179,32 +204,47 @@ _CITATION_AUTHOR_STOPWORDS = frozenset({
 # right against it. `built(?!-)` so the adjective "built-in" does not false-match. The gate
 # requires the verb to sit BEFORE the path and govern it directly — "I created `X`" — never the
 # passive "`X` was created".
-_PRODUCE_VERB_RX = re.compile(
+_PRODUCE_VERB_RX = _lazy_re(
     r"\b(wrote|written|created|added|saved|implemented|generated|produced|built(?!-)|"
     r"updated|modified|landed|committed|emitted|wired|refactored|patched|"
     r"finished|completed)\b", re.IGNORECASE)
 # A passive/copular auxiliary right before the verb ⇒ "was written / is wired" — a
 # description of state or of another subject's action, NOT a first-person production claim.
-_BE_AUX_RX = re.compile(r"(?:\b(?:was|were|is|are|been|being|be|am)\s*$)|(?:['’](?:s|re)\s*$)", re.IGNORECASE)
+_BE_AUX_RX = _lazy_re(r"(?:\b(?:was|were|is|are|been|being|be|am)\s*$)|(?:['’](?:s|re)\s*$)", re.IGNORECASE)
 # A conditional/hypothetical OFFER governing a promise -> not a firm commitment. `state/plan.py`
 # is the one consumer.
-_OFFER_COND_RX = re.compile(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
+_OFFER_COND_RX = _lazy_re(r"\b(?:if|once|unless|assuming|provided|whether|in case)\b",
                             re.IGNORECASE)
 # Makoto watches the AI's OWN promises: a commitment needs a FIRST-PERSON subject ("I'll add X",
 # "we need to write X") OR a clause-initial imperative ("Add X to Y"). A THIRD-PERSON or
 # adverbial subject is NOT a promise the AI made.
-_FIRST_PERSON_RX = re.compile(
+_FIRST_PERSON_RX = _lazy_re(
     r"\b(?:i|we|i'?ll|we'?ll|i'?m|we'?re|i'?ve|we'?ve|i'?d|we'?d|let'?s|my|our)\b", re.IGNORECASE)
 # A clause boundary between the verb and the path ⇒ the verb governs a different clause.
-_CLAUSE_BREAK_RX = re.compile(r"[.;:\n—]")
+_CLAUSE_BREAK_RX = _lazy_re(r"[.;:\n—]")
 # A double- or single-quoted string span — used to blank quoted argument bodies before scanning a shell
 # command, so a --message/path body that merely MENTIONS a keyword can't masquerade as the command itself.
-_QUOTED_RX = re.compile(r'"[^"]*"|\'[^\']*\'')
+_QUOTED_RX = _lazy_re(r'"[^"]*"|\'[^\']*\'')
 # A full ```fenced``` code block (DOTALL: the span crosses newlines). L0 SINGLE SOURCE for
-# fenced-span extraction — substrate.claims._code_spans (fences + inline backticks) consumes
+# fenced-span extraction — _code_spans below (fences + inline backticks) consumes
 # this exact object, so the fence regex lives in one place. Distinct from the `_FENCE_RX`
 # line-anchored parity marker (a different algorithm), which lives in checks.relativePathCitation.
-_FENCE_SPAN_RX = re.compile(r"```.*?```", re.DOTALL)
+_FENCE_SPAN_RX = _lazy_re(r"```.*?```", re.DOTALL)
+# the inline-`backtick` half of _code_spans
+_INLINE_CODE_RX = _lazy_re(r"`[^`\n]+`")
+
+
+def _code_spans(text: str):
+    """Char ranges inside ``` fences OR inline `backticks` — a done-word there is QUOTED
+    (code/output), not the AI's own prose claim. An UNTERMINATED trailing fence (a truncated
+    final message) still opens a quoted span through end-of-text, so a missing closing fence
+    never exposes the quoted tail as prose."""
+    spans = [m.span() for m in _FENCE_SPAN_RX.finditer(text)]
+    dangling = text.find("```", spans[-1][1] if spans else 0)
+    if dangling != -1:
+        spans.append((dangling, len(text)))
+    return spans + [m.span() for m in _INLINE_CODE_RX.finditer(text)]
+
 
 # UNAMBIGUOUS integrity / verification / audit vocabulary (a raw alternation STRING, not a
 # compiled regex — each consumer anchors it differently). L0 SINGLE SOURCE for the
@@ -214,21 +254,21 @@ _FENCE_SPAN_RX = re.compile(r"```.*?```", re.DOTALL)
 # (`input_validation_skip` = web-form validation). Every stem here names the
 # integrity/verification/audit of a CHECK, not a generic policy — so a blocking fire stays MATERIAL.
 _INTEG_VOCAB = r"audit|verif|integrit|attest|checksum|signatur|tamper|provenance"
-_FORWARD_FRAME_RX = re.compile(
+_FORWARD_FRAME_RX = _lazy_re(
     r"\b(will|going to|gonna|i'?ll|plan to|need to|about to|next|todo|should|"
     r"would|hope to|want to|let'?s)\b", re.IGNORECASE)
-_NEG_FRAME_RX = re.compile(
+_NEG_FRAME_RX = _lazy_re(
     r"\b(not|never|without|unable|can'?t|cannot|couldn'?t|didn'?t|won'?t|"
     r"haven'?t|hasn'?t|fail(?:ed|s)?)\b|n'?t\b", re.IGNORECASE)
 
-_SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?])\s|\n")
+_SENTENCE_SPLIT_RX = _lazy_re(r"(?<=[.!?])\s|\n")
 # A Python-source file gate (".py only — .md is prose"). One home for the security/integrity
 # checks that key on "is this a .py file" — consolidated from per-file `_TARGET_RX` copies
 # (checks.envGatedAudit imports it under that name).
-_PY_FILE_RX = re.compile(r"\.py$")
+_PY_FILE_RX = _lazy_re(r"\.py$")
 # Clearly forward/conditional frames that turn a completion into a promise ("once everything is
 # done", "will be all complete") — checked on the clause BEFORE the match only.
-_ADV_FORWARD_RX = re.compile(
+_ADV_FORWARD_RX = _lazy_re(
     r"\b(will|going to|gonna|i'?ll|plan to|once|after|when|until|unless|if|hope to|aim to|"
     r"expect to|about to|to be)\b", re.IGNORECASE)
 # gate.green_claim — a universal/whole-suite test-SUCCESS claim. The SUBJECT must be a whole-suite
@@ -236,7 +276,7 @@ _ADV_FORWARD_RX = re.compile(
 # ('parser tests', 'these tests', 'unit tests') fails open — only a word in _GREEN_UNIVERSAL_PREMOD
 # (or nothing) may precede the head. Mirrors _advance_signal's clause discipline (code-quoted,
 # negated, forward-framed claims all fail open). Singular 'test' is excluded (one test ≠ the suite).
-_GREEN_CLAIM_RX = re.compile(
+_GREEN_CLAIM_RX = _lazy_re(
     r"\b(?P<subj>tests|suite|ci|build)\b"
     r"(?:\s+(?:now|all|still|do|currently|again|once\s+more))*"
     r"\s+(?:are\s+|is\s+|have\s+)?(?:all\s+|now\s+)?"
@@ -252,7 +292,7 @@ _GREEN_UNIVERSAL_PREMOD = frozenset(
 # A parser is lexicon, and lexicon is rank 0, where every layer above can reach it.
 
 # A bare pytest-style test identifier. Exact token; coreference is by exact string equality.
-_TESTNAME_RX = re.compile(r"\btest_[A-Za-z0-9_]+")
+_TESTNAME_RX = _lazy_re(r"\btest_[A-Za-z0-9_]+")
 
 # Recorded per-test FAILED / PASSED markers (the evidence side). Case-SENSITIVE runner tokens so
 # prose like "failed to connect" never matches. Both orderings (verdict leads / trails the id).
@@ -262,10 +302,10 @@ _TESTNAME_RX = re.compile(r"\btest_[A-Za-z0-9_]+")
 # PARAMETRIZATION suffix (stripping it would let a green test_charge[eur] discharge a red
 # test_charge[usd]).
 _TEST_ID = r"(?P<path>\S*?)::(?P<name>test_[A-Za-z0-9_]+(?:\[[^\]\n]*\])?)"
-_REC_FAIL_LEAD_RX = re.compile(r"^[^\n]*?\b(?:FAILED|ERROR)\s+" + _TEST_ID, re.MULTILINE)
-_REC_FAIL_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
-_REC_PASS_LEAD_RX = re.compile(r"^[^\n]*?\bPASSED\s+" + _TEST_ID, re.MULTILINE)
-_REC_PASS_TRAIL_RX = re.compile(_TEST_ID + r"[^\n]*?\bPASSED\b", re.MULTILINE)
+_REC_FAIL_LEAD_RX = _lazy_re(r"^[^\n]*?\b(?:FAILED|ERROR)\s+" + _TEST_ID, re.MULTILINE)
+_REC_FAIL_TRAIL_RX = _lazy_re(_TEST_ID + r"[^\n]*?\b(?:FAILED|ERROR)\b", re.MULTILINE)
+_REC_PASS_LEAD_RX = _lazy_re(r"^[^\n]*?\bPASSED\s+" + _TEST_ID, re.MULTILINE)
+_REC_PASS_TRAIL_RX = _lazy_re(_TEST_ID + r"[^\n]*?\bPASSED\b", re.MULTILINE)
 # (#1)/(#2) teeth-frame SCOPE: the frame voids only verdict records in its own vicinity (this
 # many chars around the record), never the whole response — one incidental teeth word in a
 # traceback must not discard every recorded failure in the run, and symmetrically a PASSED
@@ -297,7 +337,7 @@ def recorded_passed_names(text: str) -> set:
 # checks.stalePytestCache's claim window): a FAILED produced by mutation/teeth testing is not a
 # material failure — the test FAILED because the code was intentionally broken to prove it has
 # teeth.
-_TEETH_FRAME_RX = re.compile(
+_TEETH_FRAME_RX = _lazy_re(
     r"\b(?:neuter(?:ed|ing|s)?|mutat(?:e|es|ed|ing|ion|ions)|teeth|"
     r"inject(?:ed|ing|s)?\s+(?:a\s+)?bug|deliberately\s+(?:break|broke|broken|fail\w*)|"
     r"intentional(?:ly)?\s+(?:fail\w*|break|broke|broken)|expect(?:ed|s)?\s+(?:it\s+)?to\s+fail|"
@@ -334,7 +374,7 @@ _RUNNING_PRED = (
 # Two subject-less alternatives for banner-style status prose ("Now running.", "listening on
 # port 5173", "serving at http://...") — each anchored on a recency/port/URL token so a bare
 # "serving" alone (too generic on its own) cannot match without one.
-_RUNNING_CLAIM_RX = re.compile(
+_RUNNING_CLAIM_RX = _lazy_re(
     rf"\b{_RUNNING_SUBJECT}\s*{_RUNNING_PRED}"
     r"|\bnow\s+(?:running|listening|serving)\b"
     r"|\b(?:running|listening|serving)\s+(?:on|at)\s+(?:https?://|port\s+|:)\S+",
@@ -347,7 +387,7 @@ _RUNNING_CLAIM_RX = re.compile(
 # in the same turn, e.g. "checked again — still running fine", fails open). State words
 # (running/live/up/listening/serving) are deliberately EXCLUDED from this list — including one
 # would make the co-occurrence requirement circular against _RUNNING_CLAIM_RX's own predicate.
-_PROCESS_START_VERB_RX = re.compile(
+_PROCESS_START_VERB_RX = _lazy_re(
     r"\bI(?:['’]ve|['’]d|\s+have)?\s+(?:just\s+)?(?:started|launched|spun\s+up|spinning\s+up|"
     r"brought\s+up|booted|kicked\s+off|fired\s+up|restarted|re-started|ran|deployed|stood\s+up)\b",
     re.IGNORECASE)
@@ -358,7 +398,7 @@ _PROCESS_START_VERB_RX = re.compile(
 # launch/serve commands across several ecosystems, and common liveness-check commands (curl/ps/
 # docker ps/...) — the strongest evidence, since a healthcheck's own exit code is a direct
 # verdict, not merely "we tried to start something".
-_PROCESS_LIFECYCLE_CMD_RX = re.compile(
+_PROCESS_LIFECYCLE_CMD_RX = _lazy_re(
     r"&\s*$|\bnohup\b|\bdisown\b|\bsetsid\b|"
     r"\bpm2\s+(?:start|restart)\b|\bdocker\s+(?:run|start|compose\s+up)\b|\bdocker-compose\s+up\b|"
     r"\bsystemctl\s+(?:start|restart)\b|\bservice\s+\S+\s+start\b|"
@@ -380,7 +420,7 @@ _PROCESS_LIFECYCLE_CMD_RX = re.compile(
 # artifacts" and third-party narration cannot acquire an implied first-person subject merely by
 # containing a ship-shaped word. Present/base forms are absent, so "this deploys to a CDN" is
 # inert by construction.
-_SHIPPED_ACTION_CLAIM_RX = re.compile(
+_SHIPPED_ACTION_CLAIM_RX = _lazy_re(
     r"\bI(?:['’]ve|\s+have)?\s+(?:just\s+|now\s+|successfully\s+|already\s+)?"
     r"(?:pushed|merged|published|deployed|shipped|released)\b"
     r"|(?:^|(?<=[.!?\n]))[ \t]*(?:[-*]\s+)?"
@@ -392,7 +432,7 @@ _SHIPPED_ACTION_CLAIM_RX = re.compile(
 # Past copulas are deliberately absent: "it was merged" is passive/third-party history. The
 # subject set likewise excludes arbitrary nouns, accepting the recall bound rather than turning
 # every technical use of "published"/"deployed" into a claim about the assistant's own action.
-_SHIPPED_STATE_CLAIM_RX = re.compile(
+_SHIPPED_STATE_CLAIM_RX = _lazy_re(
     r"\b(?:it|this|that|the\s+(?:pr|pull\s+request|change|commit|package|release|"
     r"deployment|site|app(?:lication)?|service))\s*"
     r"(?:is|are|['’]s|['’]re)\s*"

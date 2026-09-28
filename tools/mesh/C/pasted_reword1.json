@@ -1,0 +1,31 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "mod_c.py",
+    "content": "def clean(value):\n    if not isinstance(value, str):\n        raise TypeError('value must be a string')\n    value = value.strip().lower()\n    return value"
+   },
+   "tool_response": {
+    "filePath": "mod_c.py"
+   }
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "mod_d.py",
+    "old_string": "old_d",
+    "new_string": "if not isinstance(value, str):\n    raise TypeError('value must be a string')\nvalue = value.strip().lower()\nreturn value"
+   },
+   "tool_response": {
+    "filePath": "mod_d.py"
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "done"
+  }
+ ]
+}

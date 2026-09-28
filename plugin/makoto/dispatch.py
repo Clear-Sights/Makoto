@@ -40,6 +40,7 @@ from makoto.state.audit import AuditRow
 from makoto import kit as factories
 from makoto.registry import load_checks, load_precheck_catalog
 from makoto.context import GateContext, _history_for_agent, run_stop_checks
+from makoto.substrate import facts
 
 
 _EVENT_MAP = {
@@ -1086,6 +1087,14 @@ def _dispatch() -> int:
         # to prevent.
         payload_raw = json.dumps(payload, ensure_ascii=False)
         _note_host_dialect(state_dir, payload.get("session_id"), dialect_notes, host_event)
+    # The read ledger (START step 13): a settled Read/Write/Edit is stored with the hash of the file
+    # as this session saw it, so a later citation of a file that changed since is a line to evaluate.
+    try:
+        stamped = facts.stamp(payload)
+    except Exception:          # the ledger is evidence, never a reason to lose the event
+        stamped = None
+    if stamped is not None:
+        payload, payload_raw = stamped, json.dumps(stamped, ensure_ascii=False)
     db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):
         _dispatch_fact(state_dir, "db_init_failed", "lazy DB init failed", blocked=False,

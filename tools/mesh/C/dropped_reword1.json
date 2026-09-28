@@ -1,0 +1,8 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "Let me update lines 10-20 of src/app.py to fix the bug."
+  }
+ ]
+}

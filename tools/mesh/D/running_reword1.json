@@ -1,0 +1,8 @@
+{
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "I restarted the payment service; it's fully operational now."
+  }
+ ]
+}

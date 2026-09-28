@@ -1,0 +1,12 @@
+{
+  "events": [
+    {
+      "hook_event_name": "PreToolUse",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "tests/test_unittest_style.py",
+        "content": "import unittest\n\n\nclass T(unittest.TestCase):\n    def test_count(self):\n        self.assertLess(len(results), 10)\n"
+      }
+    }
+  ]
+}

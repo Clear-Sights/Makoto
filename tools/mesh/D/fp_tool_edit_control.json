@@ -1,0 +1,41 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "src/app.py",
+    "old_string": "old_value",
+    "new_string": "new_value"
+   },
+   "tool_response": {
+    "filePath": "src/app.py"
+   }
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pytest"
+   },
+   "tool_response": {
+    "stdout": "5 passed",
+    "stderr": "",
+    "exitCode": 0
+   }
+  },
+  {
+   "hook_event_name": "PostToolUseFailure",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "some-long-running-tool --run"
+   },
+   "is_interrupt": false,
+   "error": "Command timed out after 2m 0.0s"
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "ok"
+  }
+ ]
+}

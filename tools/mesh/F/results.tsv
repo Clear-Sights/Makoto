@@ -1,0 +1,7 @@
+row	case	expected	case_file	what_it_shows
+gate.run_promised	catch	FIRE	F/promised_catch.json	f2: a run promised, the next turn ends with no Bash call
+gate.run_promised	reword	FIRE	F/promised_reword1.json	rerun wording of the same unkept promise
+gate.run_promised	pass	ALLOW	F/promised_pass.json	the promise is kept by a Bash call before the next Stop
+gate.unwitnessed_verifier	vacuous	FIRE	F/vacuous_catch.json	a tree's own check script prints PASS and was never seen red: what a vacuous check looks like
+gate.unwitnessed_verifier	vacuous_other_red	FIRE	F/vacuous_reword1.json	another verifier's red run does not pay for this one
+gate.unwitnessed_verifier	planted	ALLOW	F/vacuous_pass.json	the same check seen red on its plant, then green

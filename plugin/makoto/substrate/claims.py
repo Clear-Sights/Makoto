@@ -4,49 +4,35 @@ whole_suite_pass_claim gates a Stop payload's final message for a whole-suite gr
 Imports L0 only.
 """
 from __future__ import annotations
+from makoto.vocab import _lazy_re
 import re
 from makoto.vocab import (
     _NEGATION_RX,
-    _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
+    _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _INLINE_CODE_RX, _code_spans, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
 )
 
-# `_INLINE_CODE_RX` is the inline-`backtick` half of _code_spans (the fenced half is the L0
-# single source).
-_INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 # The head's pre-modifier run: the CONTIGUOUS whitespace-separated word tokens immediately before
 # the subject head, anchored at the head (\Z under endpos). Any non-word char — sentence
 # punctuation, a colon, a checkbox bracket, a newline — terminates the run, so the walk-back
 # respects exactly the clause/line boundaries the negation veto respects and a previous
 # sentence's last word can never masquerade as the head's modifier.
-_PREMOD_RUN_RX = re.compile(r"(?:\w+[ \t]+)+\Z")
+_PREMOD_RUN_RX = _lazy_re(r"(?:\w+[ \t]+)+\Z")
 # Right boundary for the success predicate: the predicate must sit at a clause boundary (end of
 # line/text, any punctuation, or a coordinating word), NOT flow into a content noun. 'the build
 # passes ARGUMENTS to pytest' / 'the tests pass RATE' is the verb/noun used attributively, not a
 # whole-suite green claim.
-_PRED_TRAIL_RX = re.compile(
+_PRED_TRAIL_RX = _lazy_re(
     r"(?=[^\S\n]*(?:$|\n|[^\w\s]|"
     r"(?:and|but|so|now|already|then|yet|finally|here|there|up|too|also|again|"
     r"across\s+the\s+board)\b))",
     re.IGNORECASE)
 # Post-match negation window terminator: the claim's own clause only.
-_POST_CLAUSE_RX = re.compile(r"[,;.!?\n]|—|–")
+_POST_CLAUSE_RX = _lazy_re(r"[,;.!?\n]|—|–")
 
 
 # ---- whole-suite pass-claim signal ----
-# _code_spans is pure text parsing; lib must not import stopchecks (layering), so both stopcheck
-# consumers (advance, green_claim) re-import it from here.
-
-
-def _code_spans(text: str):
-    """Char ranges inside ``` fences OR inline `backticks` — a done-word there is QUOTED
-    (code/output), not the AI's own prose claim. An UNTERMINATED trailing fence (a truncated
-    final message) still opens a quoted span through end-of-text, so a missing closing fence
-    never exposes the quoted tail as prose."""
-    spans = [m.span() for m in _FENCE_SPAN_RX.finditer(text)]
-    dangling = text.find("```", spans[-1][1] if spans else 0)
-    if dangling != -1:
-        spans.append((dangling, len(text)))
-    return spans + [m.span() for m in _INLINE_CODE_RX.finditer(text)]
+# _code_spans lives in vocab (kit.claim needs it below the substrate layer); the stopcheck
+# consumers (advance, green_claim) still import it from here.
 
 
 def whole_suite_pass_claim(text: str):

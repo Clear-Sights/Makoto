@@ -9,6 +9,7 @@ Stdlib-only, no makoto-internal imports: safe for anything to depend on.
 """
 from __future__ import annotations
 
+from makoto.vocab import _lazy_re
 import json
 import os
 import re
@@ -39,7 +40,7 @@ PLUGIN_MANIFEST_RELPATH = os.path.join("hooks", "hooks.json")
 # `gate.self_wired`'s wired-check, suppressing the self-defense gate.
 # `re.IGNORECASE`: Windows/case-insensitive filesystems can produce either casing for a path
 # makoto itself wrote.
-MAKOTO_INVOCATION_RX = re.compile(
+MAKOTO_INVOCATION_RX = _lazy_re(
     r"makoto_state[/\\]dispatch\.sh"
     r"|makoto[/\\]_dispatch_shim\.sh\b"
     r"|-m\s+makoto\.dispatch\b",

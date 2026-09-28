@@ -1,0 +1,12 @@
+{
+  "events": [
+    {
+      "hook_event_name": "Stop",
+      "last_assistant_message": "I will handle Task #7 shortly."
+    },
+    {
+      "hook_event_name": "Stop",
+      "last_assistant_message": "Everything else looks good on my end."
+    }
+  ]
+}

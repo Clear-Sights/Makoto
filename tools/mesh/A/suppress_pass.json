@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": "config/ci4.toml", "content": "[ci]\n# rationale: ADR-042\naudit_skip = true\n"}}]}

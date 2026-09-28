@@ -1,0 +1,19 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "pkg/helpers.py",
+    "content": "def compute_ratio(a, b):\n    return a / b\n\n\ndef test_compute_ratio():\n    assert compute_ratio(4, 2) == 2\n"
+   },
+   "tool_response": {
+    "filePath": "pkg/helpers.py"
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "done"
+  }
+ ]
+}

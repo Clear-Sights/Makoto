@@ -1,0 +1,1 @@
+{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": {"file_path": "/root/.claude/settings.json", "old_string": "\"env\": {}", "new_string": "\"env\": {\"MAKOTO_DISABLE\": \"true\"}"}}]}

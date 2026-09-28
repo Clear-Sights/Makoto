@@ -7,6 +7,7 @@ Stdlib only; no LLM, no HTTP.
 """
 from __future__ import annotations
 
+from makoto.vocab import _lazy_re
 import hashlib
 import re
 from typing import Optional
@@ -30,17 +31,17 @@ from makoto.vocab import _OFFER_COND_RX, _FIRST_PERSON_RX
 
 # A plan/task label: "§9", "§9.3", "Task #19", "task 19". Word-bounded so it never swallows a
 # surrounding sentence.
-_LABEL_RX = re.compile(r"(§\s?\d+(?:\.\d+)*|\btask\s*#?\s?\d+\b)", re.IGNORECASE)
-_FORWARD_VERB_RX = re.compile(
+_LABEL_RX = _lazy_re(r"(§\s?\d+(?:\.\d+)*|\btask\s*#?\s?\d+\b)", re.IGNORECASE)
+_FORWARD_VERB_RX = _lazy_re(
     r"\b(?:finish(?:ing)?|complet(?:e|ing)|do(?:ing)?|handl(?:e|ing)|tackl(?:e|ing)|"
     r"wrap(?:ping)?\s+up|clos(?:e|ing)\s+out|address(?:ing)?|resolv(?:e|ing)|"
     r"get(?:ting)?\s+to|work(?:ing)?\s+on|pick(?:ing)?\s+up|start(?:ing)?)\b",
     re.IGNORECASE)
-_PAST_VERB_RX = re.compile(
+_PAST_VERB_RX = _lazy_re(
     r"\b(?:finish(?:ed)|complet(?:ed)|done(?:\s+with)?|handl(?:ed)|tackl(?:ed)|"
     r"wrapp?ed\s+up|closed\s+out|address(?:ed)|resolv(?:ed)|landed|shipped)\b",
     re.IGNORECASE)
-_NEGATED_RX = re.compile(
+_NEGATED_RX = _lazy_re(
     r"\b(?:do not|don'?t|won'?t|will not|will never|never|not going to|never going to|"
     r"not planning to|no longer|skip(?:ping)?|never\s?mind|dropping|drop(?:ped)?|"
     r"not\s+(?:doing|finishing|completing|going\s+to))\b",
@@ -50,16 +51,16 @@ _BIND_AFTER = 40
 # A negation immediately governing a past verb ("is not done yet", "isn't finished", "hasn't
 # been completed"): a copular/auxiliary negation before the participle means the item is
 # explicitly UNFINISHED -- neither a completion nor a retraction, so the item stays open.
-_NEG_BEFORE_VERB_RX = re.compile(
+_NEG_BEFORE_VERB_RX = _lazy_re(
     r"\b(?:not|never|isn'?t|aren'?t|wasn'?t|weren'?t|hasn'?t|haven'?t|hadn'?t|ain'?t)"
     r"(?:\s+(?:been|yet|quite|fully|completely|entirely|actually|really))*\s+$",
     re.IGNORECASE)
 # The verb is line-initial after at most a bullet/number marker -> an imperative plan bullet
 # ("- start §9.3", "1. finish §9.3"). Same line-initial convention the cut store used.
-_LINE_INITIAL_RX = re.compile(r"^[\s\-*•>\d.)\]]*$")
+_LINE_INITIAL_RX = _lazy_re(r"^[\s\-*•>\d.)\]]*$")
 # First sentence terminator after the label -- a '?' there marks an interrogative ("Should I
 # start §9.3?"), which is an offer for approval, never a firm promise.
-_SENT_END_RX = re.compile(r"[.!?\n]")
+_SENT_END_RX = _lazy_re(r"[.!?\n]")
 
 
 def _normalize_label(raw: str) -> str:

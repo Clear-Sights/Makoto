@@ -94,3 +94,55 @@ def test_plant_a_slow_check_reddens_the_bound():
     t = time.perf_counter()
     _run_stop(_history(10), extra=(Slow,))
     assert time.perf_counter() - t >= STOP_BOUND_S
+
+
+# ---- the per-call start cost (START step 9) ----
+# A module-level `re.compile` is paid by every hook process whether or not its one event reaches
+# the pattern. Measured 2026-09-28 through the real shim, median of 15: Pre 0.122 s -> 0.081 s and
+# Post 0.082 s -> 0.068 s once module-level patterns became `vocab._lazy_re`; one Pre compiled 206
+# patterns before and 23 after. core/ sits below vocab in the layout and keeps its few eager ones.
+import ast as _ast
+import os as _os
+import subprocess as _subprocess
+import sys as _sys
+from pathlib import Path as _Path
+
+_PKG = _Path(__file__).resolve().parent.parent / "plugin" / "makoto"
+_EAGER_ALLOWED = {"core/_shell.py", "core/wire.py"}
+PRE_COMPILE_BOUND = 40
+
+
+def _module_level_compiles(src: str) -> int:
+    tree = _ast.parse(src)
+    inner = {id(m) for n in _ast.walk(tree)
+             if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.Lambda))
+             for m in _ast.walk(n)}
+    return sum(1 for n in _ast.walk(tree) if isinstance(n, _ast.Call) and id(n) not in inner
+               and isinstance(n.func, _ast.Attribute) and n.func.attr == "compile"
+               and isinstance(n.func.value, _ast.Name) and n.func.value.id == "re")
+
+
+def test_no_module_level_regex_compile_outside_core():
+    eager = {p.relative_to(_PKG).as_posix(): c for p in _PKG.rglob("*.py")
+             if (c := _module_level_compiles(p.read_text(encoding="utf-8")))}
+    assert set(eager) <= _EAGER_ALLOWED, eager
+
+
+def test_plant_a_module_level_compile_reads_red():
+    assert _module_level_compiles("import re\nX = re.compile('a')\n") == 1
+    assert _module_level_compiles("import re\ndef f():\n    return re.compile('a')\n") == 0
+
+
+def test_one_pre_compiles_few_patterns(tmp_path):
+    ev = {"hook_event_name": "PreToolUse", "session_id": "latency", "cwd": str(tmp_path),
+          "tool_name": "Bash", "tool_input": {"command": "ls"}}
+    probe = ("import re, runpy, sys\nreal, n = re._compile, [0]\n"
+             "def counting(p, f):\n    n[0] += 1\n    return real(p, f)\n"
+             "re._compile = counting\n"
+             "try:\n    runpy.run_module('makoto.dispatch', run_name='__main__')\n"
+             "except SystemExit:\n    pass\nprint(n[0], file=sys.stderr)\n")
+    r = _subprocess.run([_sys.executable, "-c", probe], input=json.dumps(ev), text=True,
+                        capture_output=True, cwd=_PKG.parent,
+                        env={**_os.environ, "MAKOTO_STATE_DIR": str(tmp_path / "state")})
+    count = int(r.stderr.strip().splitlines()[-1])
+    assert count <= PRE_COMPILE_BOUND, count

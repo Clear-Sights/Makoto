@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 
+from makoto.vocab import _lazy_re
 from dataclasses import dataclass
 from enum import Enum
 import json
@@ -488,10 +489,10 @@ from makoto.kit import (_BIND_BEFORE, CARRIAGE_FAULT, DISCHARGE_EATS, _discharge
 # at the last clause break inside the window, so a negation in the PRECEDING sentence ("Two
 # tests still do not pass. I created X") cannot disarm a live current-clause claim either.
 _FRAME_NEAR = 40
-_PRODUCE_OBJ_SEP_RX = re.compile(
+_PRODUCE_OBJ_SEP_RX = _lazy_re(
     r"\b(?:so|against|match(?:es|ing)?|reads?\s+from|requires?|"
     r"according\s+to|based\s+on|conform(?:s|ing)?\s+to)\b", re.I)
-_PASSIVE_PREFIX_RX = re.compile(
+_PASSIVE_PREFIX_RX = _lazy_re(
     r"\b(?:was|were|is|are|been|being|be|am)(?:\s+[\w-]+){0,2}\s*$", re.IGNORECASE)
 
 
@@ -621,7 +622,7 @@ _DROP_THING = r"(?:helper\s+functions?|functions?|helpers?|tests?|methods?|class
 _DROP_EXT = r"\.[A-Za-z][A-Za-z0-9]{0,7}"
 _DROP_BASENAME = rf"[\w-]+{_DROP_EXT}"
 _DROP_PATH = rf"(?:(?:[\w.~-]+/)*{_DROP_BASENAME})"
-_DROP_NEG_FRAME_RX = re.compile(
+_DROP_NEG_FRAME_RX = _lazy_re(
     r"\b(?:never|won['’]?t|will\s+not|do\s+not|don['’]?t|didn['’]?t|wouldn['’]?t|"
     r"rather\s+than|instead\s+of|avoid|without|no\s+need\s+to|not\s+going\s+to)\b", re.I)
 _DROP_SYMDEF = r"(?:async\s+def|def|class|const|function)\s+([A-Za-z_]\w*)"
@@ -631,16 +632,16 @@ def _drop_loc_tail(preps):
     """The OPTIONAL trailing '<preposition> <path>' locator the claim regexes share — same body
     (clause-bounded, non-greedy, capturing `loc`), only the preposition set differs per kind."""
     return rf"(?:\b[^.;\n]*?\b(?:{preps})\s+(?P<loc>{_DROP_PATH}))?"
-_DROP_RX_COUNT = re.compile(
+_DROP_RX_COUNT = _lazy_re(
     rf"{_DROP_PRE}\s+(?:a\s+|an\s+|the\s+)?(\d+)\s+(?:new\s+|more\s+|additional\s+)?({_DROP_THING})"
     + _drop_loc_tail("to|in|into|inside|for|under|within"), re.I)
-_DROP_RX_LINES = re.compile(
+_DROP_RX_LINES = _lazy_re(
     rf"{_DROP_PRE}\s+(?:lines?\s+)(\d+)\s*(?:-|–|to|through|thru)\s*(\d+)"
     + _drop_loc_tail("of|in|to|into|within"), re.I)
-_DROP_RX_SYMBOL = re.compile(
+_DROP_RX_SYMBOL = _lazy_re(
     rf"{_DROP_PRE}\s+{_DROP_DET}{_DROP_SYMDEF}"
     + _drop_loc_tail("to|in|into|inside|within"), re.I)
-_DROP_RX_ARTIFACT = re.compile(
+_DROP_RX_ARTIFACT = _lazy_re(
     rf"{_DROP_PRE}\s+{_DROP_DET}(?:file\s+|module\s+|script\s+|config\s+)?(?P<loc>{_DROP_PATH})", re.I)
 # Counts a defined callable in ANY surface form, so a "create N functions/helpers" count-claim
 # discharges against lambda/arrow/partial-bound helpers too (the measured FP: 3 lambda-assigned
@@ -649,14 +650,14 @@ _DROP_RX_ARTIFACT = re.compile(
 # and py `name = lambda|partial|functools.partial`. A line with NO callable binding (plain data
 # assignment `x = 1`) is not counted, so the real TP (claim N, file has 0 callables of any form)
 # still fires.
-_DROP_DEF_COUNTER = re.compile(
+_DROP_DEF_COUNTER = _lazy_re(
     r"^\s*(?:async\s+def|def|class)\s+\w+"
     r"|^\s*(?:export\s+)?function\*?\s+\w+"
     r"|^\s*(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?"
       r"(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>|partial\b)"
     r"|^\s*\w+\s*=\s*(?:lambda\b|partial\b|functools\.partial\b)",
     re.M)
-_DROP_TEST_COUNTER = re.compile(r"^\s*(?:async\s+def|def)\s+test\w*", re.M)
+_DROP_TEST_COUNTER = _lazy_re(r"^\s*(?:async\s+def|def)\s+test\w*", re.M)
 def dropped_owes(text):
     """Every forward claim `text` makes commits to being discharged by turn-end: [(kind,
     location, info, raw)] — a forward mutation frame + EXACTLY ONE identifying info + a
@@ -1116,7 +1117,7 @@ wired_CHECK = _Check(id="gate.self_wired", applies_at="Stop", posture="BLOCK",
 # The claim side: the agent attributing a position to the operator. Read on the ASSISTANT's own
 # words, which is what every check here does -- the non-agnostic surface in this package is the
 # three checks that parse the SUBJECT's shell commands, not the claim channel.
-_CONSENT_RX = re.compile(
+_CONSENT_RX = _lazy_re(
     r"\b(?:"
     r"(?:you|the\s+(?:user|operator|owner))\s+"
     r"(?:approved|confirmed|agreed|authorized|authorised|okayed|"
@@ -1319,9 +1320,9 @@ thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK"
 from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines as _dispatch_brief_lines
 from makoto.core._declaredverifiers import dispatch_opt_in
 
-_PINNED_READ_RX = re.compile(r"^\S+@[0-9a-fA-F]{12,}$")
-_SHA256SUM_CHECK_RX = re.compile(r"\bsha256sum\b[^\n]*(?:-[A-Za-z]*c\b|--check\b)")
-_PATH_AT_HASH_RX = re.compile(r"\S+@[0-9a-fA-F]{12,}\b")
+_PINNED_READ_RX = _lazy_re(r"^\S+@[0-9a-fA-F]{12,}$")
+_SHA256SUM_CHECK_RX = _lazy_re(r"\bsha256sum\b[^\n]*(?:-[A-Za-z]*c\b|--check\b)")
+_PATH_AT_HASH_RX = _lazy_re(r"\S+@[0-9a-fA-F]{12,}\b")
 _LONG_TIMEOUT_MS = 120000
 
 
