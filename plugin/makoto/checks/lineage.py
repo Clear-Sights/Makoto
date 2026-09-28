@@ -714,6 +714,7 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Pre", posture="BLOC
 # Read, Glob or Grep of the ground, then retry. The guard is read from the whole session, not the
 # 1-hour window (`kit._session_rows`): Reads older than the window used to go unseen.
 from makoto.kit import unmet_obligation_gate
+from makoto.core._shell import _basename, _effective_argv, _shell_segments
 
 # The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
 # the name this harness reports, and both are accepted by name alone. An MCP tool that dispatches
@@ -723,6 +724,13 @@ from makoto.kit import unmet_obligation_gate
 _DISPATCH_TOOLS = frozenset({"Task", "Agent"})
 # The reads that pay the obligation.
 _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
+# The same read under Bash: a segment whose command position runs one of these read-only readers
+# (`sed -n 1,80p f.py`, `grep -n x f.py`, `cat f`) looked at the ground exactly as Read/Grep would.
+# `sed` counts only under `-n` (its `-i` edits in place) and `find` only without an action that
+# writes or runs something (`-delete`, `-exec*`, `-ok*`, `-fprint*`). A closed vocabulary whose
+# miss is a RECALL bound: the gate still fires on a reader it does not name.
+_BASH_READERS = frozenset({"cat", "head", "tail", "grep", "egrep", "fgrep", "rg", "ls", "wc"})
+_FIND_WRITING_ACTIONS = ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fls")
 
 
 def _is_dispatch(ev: dict) -> bool:
@@ -737,8 +745,25 @@ def _is_dispatch(ev: dict) -> bool:
     return isinstance((ev.get("tool_input") or {}).get("prompt"), str)
 
 
+def _is_reader_argv(argv) -> bool:
+    eff = _effective_argv(argv)
+    if not eff:
+        return False
+    prog, args = _basename(eff[0]), eff[1:]
+    if prog in _BASH_READERS:
+        return True
+    if prog == "sed":
+        return "-n" in args and not any(a.startswith(("-i", "--in-place")) for a in args)
+    if prog == "find":
+        return not any(a.startswith(_FIND_WRITING_ACTIONS) for a in args)
+    return False
+
+
 def _is_probe(ev: dict) -> bool:
-    return ev.get("tool_name") in _PROBE_TOOLS
+    if ev.get("tool_name") in _PROBE_TOOLS:
+        return True
+    cmd = command_of(ev) if ev.get("tool_name") == "Bash" else ""
+    return bool(cmd) and any(_is_reader_argv(argv) for argv, _op in _shell_segments(cmd))
 
 
 unprobed_fanout_gate = unmet_obligation_gate(

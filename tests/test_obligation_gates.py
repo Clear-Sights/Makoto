@@ -97,6 +97,26 @@ def test_unprobed_fanout_catches_a_dispatch_tool_named_neither_task_nor_agent():
     assert f.pattern_id == "gate.unprobed_fanout"
 
 
+def test_unprobed_fanout_accepts_a_bash_reader_as_the_probe():
+    """The false fire this pins: the ground was read with Bash (`sed -n`, `grep -n`, `cat`,
+    `head`, `rg`, `ls`, `find`, `wc`) rather than the Read/Glob/Grep tools, and the dispatch
+    was still denied as unprobed."""
+    # discriminant: the probe is a settled Bash call whose segment runs a read-only reader
+    for cmd in ("sed -n 1,80p f.py", "grep -n x f.py", "cat f", "head -20 f.py", "tail f.log",
+                "rg parse src/", "ls -la", "find . -name '*.py'", "wc -l f.py",
+                "cd /repo && sed -n 1,40p a.py | head"):
+        assert unprobed_fanout_gate([_row("Bash", command=cmd),
+                                     _row("Task", description="refactor the parser")]) is None, cmd
+
+
+def test_unprobed_fanout_does_not_accept_a_bash_writer_as_the_probe():
+    # discriminant: the Bash call runs a program that writes or a reader in a writing mode
+    for cmd in ("sed -i s/a/b/ f.py", "find . -delete", "find . -exec rm {} +", "make build",
+                "echo cat f"):
+        assert unprobed_fanout_gate([_row("Bash", command=cmd),
+                                     _row("Task", description="refactor the parser")]) is not None, cmd
+
+
 # ---- gate.unasked_plan (register G2 DETERMINED ASKED AS OPEN) ---------------------------------
 
 def test_unasked_plan_fires_on_a_plan_with_no_question():
