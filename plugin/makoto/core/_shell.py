@@ -6,6 +6,7 @@ unrelated programs never become executable evidence.
 """
 from __future__ import annotations
 
+import functools
 import re
 import shlex
 
@@ -99,7 +100,17 @@ def _normalize_segment_argv(argv):
 
 
 def _shell_segments(command: str):
-    """Return ``[(argv, following_operator)]`` for literal shell command segments."""
+    """Return ``[(argv, following_operator)]`` for literal shell command segments.
+
+    Parsed once per distinct command: every Stop re-reads the session's commands through many
+    atoms and checks, and shlex dominated the Stop edge (measured 2026-09-28: 36,000 parses for
+    1,200 recorded events, 2.1 s of a 3.1 s Stop). Callers get fresh lists, so none can alter the
+    cached parse."""
+    return [(list(argv), op) for argv, op in _parsed_segments(command or "")]
+
+
+@functools.lru_cache(maxsize=4096)
+def _parsed_segments(command: str):
     try:
         lexer = shlex.shlex(command or "", posix=True, punctuation_chars="|;&<>\n")
         lexer.whitespace_split = True
@@ -110,7 +121,7 @@ def _shell_segments(command: str):
         lexer.whitespace = " \t\r"
         tokens = list(lexer)
     except (TypeError, ValueError):
-        return []
+        return ()
     segments, current = [], []
 
     def close_segment(operator):
@@ -196,7 +207,7 @@ def _shell_segments(command: str):
                 expanded.append((argv, operator))
         else:
             expanded.append((argv, operator))
-    return expanded
+    return tuple((tuple(argv), op) for argv, op in expanded)
 
 
 def _git_subcommand(argv):

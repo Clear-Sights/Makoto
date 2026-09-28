@@ -1339,15 +1339,18 @@ def canon_fingerprint_block_gate(text, history, *, transcript_path=None, session
     from makoto.substrate._canonAtoms import BLOCK_IDS, _row_ts, calls_from_history, fired_canon_fingerprints
     history = operator_window(history, transcript_path)
     out: List[Finding] = []
+    fired_by_window = {}   # fingerprints sharing a window share one atom pass (usually all four)
     for name in sorted(BLOCK_IDS):
         since = _event_instant(last_fired_ts(name, session_id=session_id, root=state_root))
         # Each fingerprint has its own boundary. Calls at the firing are already covered;
         # retain undated evidence because it cannot establish which window it belongs to.
-        window = [row for row in history
-                  if since is None or (ts := _event_instant(_row_ts(row))) is None or ts > since]
-        formula = next((formula for fired_name, formula, _ in
-                        fired_canon_fingerprints(calls_from_history(window), text or "")
-                        if fired_name == name), None)
+        kept = tuple(i for i, row in enumerate(history)
+                     if since is None or (ts := _event_instant(_row_ts(row))) is None or ts > since)
+        if kept not in fired_by_window:
+            window = [history[i] for i in kept]
+            fired_by_window[kept] = {fired_name: formula for fired_name, formula, _ in
+                                     fired_canon_fingerprints(calls_from_history(window), text or "")}
+        formula = fired_by_window[kept].get(name)
         if formula is None:
             continue
         out.append(Finding(
