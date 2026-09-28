@@ -57,6 +57,9 @@ fi
 if sout="$(sh tools/scour.sh 2>&1)"; then pass "scour at its pin ($(printf '%s\n' "$sout" | grep '^SCOUR entries=' | head -1))"
 else fail "scour at its pin" "$(printf '%s\n' "$sout" | grep '^LAUNCH MISSING' | head -1)"; fi
 
+if cout="$(sh tools/codex.sh 2>&1)"; then pass "codex logged in"
+else fail "codex logged in" "$(printf '%s\n' "$cout" | grep '^LAUNCH MISSING' | head -1)"; fi
+
 if [ "${1:-}" = "--suite" ]; then
   if PYTHONPATH="$PWD/plugin" "$PY" -m pytest -q -p no:cacheprovider >/dev/null 2>&1; then pass "suite green"
   else fail "suite green" "PYTHONPATH=\$PWD/plugin $PY -m pytest -q -p no:cacheprovider"; fi
