@@ -15,21 +15,25 @@ line failed; do not work around it.
 - The checkout is origin/main and the tree is clean.
 - The three laws exit 0: `tools/render_checks.py --check`, `tools/register_map.py` and
   `tools/merge_pass.py`.
-- Every installed Makoto copy is this checkout's `plugin/`, both version and content. Hooks load
-  at session start, so a reinstall needs a new session.
+- NOTE, not a stop: the installed Makoto copy should be this checkout's `plugin/`. Reinstalling it
+  is Gabriel's act (hooks load at session start, so it lands next session); the line prints NOTE
+  with the act and the session goes on.
 - The session has the repositories it needs: ask to attach (add_repo) Clear-Sights/Scour and
   Clear-Sights/Measure-Zero, and clone both beside this repository, before anything else.
 - DetIO is on: it loads as a plugin at the version DetIO main ships, with
   `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
   installed in this session", and the launch line prints the installed version. Installed but
   disabled reads missing. If it is missing, stop and tell Gabriel.
-- Scour, pinned at 45cd655 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
+- Scour, pinned at 8707054 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
   and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
   LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
   step done.
-- Codex is logged in: `sh tools/codex.sh` prints "codex logged in". When it is not, the script
-  writes `$CODEX_AUTH_JSON` to `~/.codex/auth.json` (mode 600) and checks again; a LAUNCH MISSING
-  line names the variable to set in the environment settings. Never commit `auth.json`.
+- The skills cheap-execution and adversarial-review are loaded: the line reads each one's
+  SKILL.md under `~/.claude/skills`. Every step is run the cheap-execution way, and every "done"
+  follows an adversarial-review round.
+- Codex is not a launch item: no step here uses it. A step that does runs `sh tools/codex.sh`
+  first; its LAUNCH MISSING line stops that step only and names the variable to set. Never commit
+  `auth.json`.
 - The suite is green.
 
 ## Goal and path
@@ -137,7 +141,7 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     the MERGE-WITNESSES rule.
     check: a test that reads the count off the register file and fails on any typed count that
     disagrees. plant: type a wrong count into README.md and the test reads red.
-    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at 45cd655
+    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at 8707054
     and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
 13. One evaluator of the register's predicate lines, script only, at Pre in milliseconds (his
