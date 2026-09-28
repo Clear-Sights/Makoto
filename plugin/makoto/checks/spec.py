@@ -1980,11 +1980,22 @@ def budget_predicate(*, current_event: dict, history: list, pattern, conn=None) 
 _TIMED_OUT_RX = re.compile(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
 
 
-def _stopped_by_its_limit(ev: dict) -> bool:
+def _stopped_by_its_limit(ev: dict, limit_ms: int) -> bool:
+    """The call ran for its whole limit: elapsed wall time between its Pre and its Post (recorded by
+    `substrate.effect`) reached the limit, or the host itself marked it stopped. Either fact alone
+    suffices; a missing mark never hides a measured overrun."""
+    from makoto.substrate import effect
     if ev.get("tool_name") != "Bash" or ev.get("hook_event_name") not in ("PostToolUse", "PostToolUseFailure"):
         return False
+    elapsed = effect.of(ev).get("elapsed_ms")
+    if isinstance(elapsed, int) and elapsed >= limit_ms - _LIMIT_SLACK_MS:
+        return True
     tr = ev.get("tool_response") if isinstance(ev.get("tool_response"), dict) else {}
     return tr.get("interrupted") is True or bool(_TIMED_OUT_RX.search(str(ev.get("error") or "")))
+
+
+# The host kills at the limit; the Post that records it lands a little after, never before.
+_LIMIT_SLACK_MS = 1000
 
 
 def _stopped_and_retried(current_event, asked, history, pattern, conn) -> Optional[Finding]:
@@ -1997,12 +2008,12 @@ def _stopped_and_retried(current_event, asked, history, pattern, conn) -> Option
         if ev.get("tool_name") != "Bash" or (ti.get("command") or "") != cmd \
                 or ev.get("hook_event_name") not in ("PostToolUse", "PostToolUseFailure"):
             continue
-        if not _stopped_by_its_limit(ev):
-            return None
         try:
             before = int(ti.get("timeout") or default)
         except (TypeError, ValueError):
             before = default
+        if not _stopped_by_its_limit(ev, before):
+            return None
         if asked > before:
             return None
         return Finding(

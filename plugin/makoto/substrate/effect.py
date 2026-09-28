@@ -24,6 +24,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 EMPTY_BLOB = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
@@ -219,6 +220,7 @@ def record_pre(state_dir, payload) -> None:
     if not key:
         return
     snap = snapshot(payload.get("cwd"), Path(state_dir) / "effect" / "index")
+    snap["t"] = time.time()
     p = _slot(state_dir, key)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(snap), encoding="utf-8")
@@ -240,7 +242,10 @@ def read_post(state_dir, payload):
         p.unlink()
     except OSError:
         pass
-    return diff(pre, post)
+    out = diff(pre, post)
+    if isinstance(pre.get("t"), (int, float)):
+        out["elapsed_ms"] = int((time.time() - pre["t"]) * 1000)
+    return out
 
 
 def of(ev) -> dict:

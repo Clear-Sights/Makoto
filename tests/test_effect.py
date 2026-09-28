@@ -163,3 +163,14 @@ def test_e11_a_retry_under_the_limit_that_stopped_it_is_denied_and_a_larger_one_
     assert "event.nested_budget" in s.next("Bash", {"command": "job"})
     assert "event.nested_budget" not in s.next("Bash", {"command": "job", "timeout": 600000})
     assert "event.nested_budget" not in s.next("Bash", {"command": "other"})
+
+
+def test_e11_a_call_that_ran_its_whole_limit_is_read_from_elapsed_time_not_its_error_text(tmp_path, monkeypatch):
+    s = Session(tmp_path)
+    limit = 1500  # ms: the call's own limit, which it ran out
+    s.call(tool_input={"command": "job", "timeout": limit}, effect=lambda r: __import__("time").sleep(1.6),
+           response={"stdout": "", "exitCode": 143})
+    assert "event.nested_budget" in s.next("Bash", {"command": "job", "timeout": limit})
+    t = Session(tmp_path / "fast")
+    t.call(tool_input={"command": "job", "timeout": limit}, response={"stdout": "", "exitCode": 1})
+    assert "event.nested_budget" not in t.next("Bash", {"command": "job", "timeout": limit})
