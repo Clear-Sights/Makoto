@@ -16,7 +16,7 @@ the jsonl files directly), so this module carries no readers.
 """
 from __future__ import annotations
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import field, asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -42,6 +42,9 @@ class AuditRow:
     oversight_clamp: dict | None = None    # {"active", "configured_mode", "permission_mode"}
     #   when posture.is_oversight_clamped fired for this event, else None. Additive: existing
     #   readers use dict.get, so old rows without this key parse fine.
+    withheld: list[str] = field(default_factory=list)   # check ids that fired but were not re-sent:
+    #   the agent was shown the same finding word for word and ran no tool since (dispatch._unchanged).
+    #   Additive, like oversight_clamp.
 
 
 def _append_jsonl(state_root: Path, filename: str, obj: dict) -> None:

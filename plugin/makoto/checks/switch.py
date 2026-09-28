@@ -1684,9 +1684,18 @@ def _verifier_keys(ev: dict) -> tuple:
 
 
 def unwitnessed_verifier_gate(history) -> Optional[Finding]:
+    """Only the LATEST clean run of each verifier owes, as in gate.unread_structure: a witness pays
+    only later runs, so a clean run from before the first red could never be paid, and the gate
+    re-blocked every stop until the store aged it out (measured 2026-09-28: four keys owed after
+    each had been planted red and run clean again). Plant, see it fail, run it clean: paid."""
     events = [ev for ev in (decode_history_event(r) for r in history or ()) if isinstance(ev, dict)]
+    last = {}   # verifier key -> the latest clean run of it
+    for e in events:
+        if _is_clean_verifier_run(e):
+            for k in _verifier_keys(e):
+                last[k] = e
     for ev, _key in unwitnessed(
-            events, owes=lambda e: _verifier_keys(e) if _is_clean_verifier_run(e) else (),
+            events, owes=lambda e: tuple(k for k in _verifier_keys(e) if last.get(k) is e),
             pays=lambda e: (lambda k, own=_verifier_keys(e): k in own)
             if _is_failing_verifier_run(e) else None):
         return Finding(
