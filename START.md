@@ -24,7 +24,7 @@ line failed; do not work around it.
   `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
   installed in this session", and the launch line prints the installed version. Installed but
   disabled reads missing. If it is missing, stop and tell Gabriel.
-- Scour, pinned at 8707054 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
+- Scour, pinned at efd27e9 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
   and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
   LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
   step done.
@@ -141,7 +141,7 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     the MERGE-WITNESSES rule.
     check: a test that reads the count off the register file and fails on any typed count that
     disagrees. plant: type a wrong count into README.md and the test reads red.
-    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at 8707054
+    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at efd27e9
     and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
 13. One evaluator of the register's predicate lines, script only, at Pre in milliseconds (his

@@ -2,7 +2,7 @@
 # Launch row: Scour at its pin, run over this tree with the register at its pin.
 # Exit 0: Scour printed its verdict line (its findings are the work list, in the detail file).
 # Any other exit: stop and report the printed LAUNCH MISSING line.
-SCOUR_PIN=8707054
+SCOUR_PIN=efd27e9
 REGISTER_PIN=c544c4e
 here=$(cd "$(dirname "$0")/.." && pwd)
 name=$(basename "$here")
