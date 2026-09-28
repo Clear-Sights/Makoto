@@ -46,7 +46,7 @@ def _fires(cmd, cwd):
     "git commit --author='Ann <ann@example.org>' -m x",     # committer still Claude
     f"env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL git {HUMAN} commit -m x",  # committer env left
     "cd . && git merge topic",
-    "# keel-guard: U08\ngit cherry-pick abc",
+    "# guard: U08\ngit cherry-pick abc",
 ])
 def test_commit_as_claude_fires(repo, cmd):
     work, _ = repo

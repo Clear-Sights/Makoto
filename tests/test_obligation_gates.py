@@ -167,7 +167,7 @@ def test_factory_fails_open_on_an_undecodable_row():
 
 
 def test_factory_min_acts_fires_only_from_the_nth_unguarded_act():
-    """For a clause whose costly thing is the REPEAT rather than the first one (Keel's U02)."""
+    """For a clause whose costly thing is the REPEAT rather than the first one (the relaunch rule)."""
     g = _at_pre(unmet_obligation_gate(
         act=lambda ev: ev.get("tool_name") == "A", guard=lambda ev: ev.get("tool_name") == "G",
         message="m", retry_hint="r", min_acts=2), "gate.test")
@@ -176,7 +176,7 @@ def test_factory_min_acts_fires_only_from_the_nth_unguarded_act():
 
 
 def test_factory_a_guard_pays_every_later_act_in_the_session():
-    """Keel's window is `session` and its subject is `session_id`: one guard pays the session,
+    """The relaunch rule's window is `session` and its subject is `session_id`: one guard pays the session,
     not one act. A per-act obligation would be a different clause and would need its own row."""
     g = _at_pre(unmet_obligation_gate(
         act=lambda ev: ev.get("tool_name") == "A", guard=lambda ev: ev.get("tool_name") == "G",
@@ -334,7 +334,7 @@ def test_unobserved_destruction_is_silent_after_a_verifier_ran():
 
 
 def test_unobserved_destruction_takes_either_verdict_as_the_observation():
-    """Keel's U20 asks for a report, PASS or FAIL: either is a behaviour observation, and only
+    """The destruction rule asks for a report, PASS or FAIL: either is a behaviour observation, and only
     the absence of both leaves an undo unprovable."""
     assert unobserved_destruction_gate([_bash("pytest -q", "1 failed"),
                                         _bash("rm -rf build/")]) is None

@@ -88,6 +88,16 @@ def state_dir(tmp_path):
     return _setup_state(tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def _own_home(tmp_path_factory, monkeypatch):
+    """Every test runs under a home of its own: checks that read ~/.claude (gate.self_wired reads
+    the home settings) must see the test's fixture, never the machine running the suite, whose
+    settings may wire an older Makoto and block every Stop. Subprocesses inherit it."""
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+
 def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tuple[int, str]:
     """Invoke the dispatcher and fail loudly if its subprocess crashes."""
     env = os.environ.copy()

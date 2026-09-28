@@ -25,6 +25,5 @@
 ## Files to copy in or clone rows needed
 - Scour clone (`Clear-Sights/Scour`): probes.declined() and REGISTER-MAP.tsv are the two halves of step 2.
 - Measure-Zero clone: zero/resources/REGISTER.md is the register file; this repo's map derives from it.
-- Courthouse (`Clear-Sights/Courthouse` README): Ward = act, Keel = sequence, Makoto = statement; install as one trio in
-  every launch checklist. Keel OVERLAPS.tsv is the declared-overlap form for step 2's table.
+- Courthouse (`Clear-Sights/Courthouse` README): Ward = act, Makoto = statement; install both in every launch checklist.
 - Strong-Skills tools/treegen.py: skills generated from the register; the same generation replaces typed counts here.

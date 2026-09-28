@@ -6,6 +6,8 @@ cd "$(dirname "$0")/.." || exit 2
 fails=0
 pass() { printf 'PASS  %s\n' "$1"; }
 fail() { printf 'FAIL  %s\n      -> %s\n' "$1" "$2"; fails=$((fails + 1)); }
+# A NOTE is an act only Gabriel can take (a plugin install lands next session): shown, never red.
+note() { printf 'NOTE  %s\n      -> %s\n' "$1" "$2"; }
 
 PY="${MAKOTO_PYTHON:-python3}"
 if "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
@@ -34,11 +36,11 @@ for inst in "$HOME"/.claude/plugins/synced/*/makoto "$HOME"/.claude/plugins/cach
   if [ "$have" = "$want" ] && diff -rq --exclude=__pycache__ plugin "$inst" >/dev/null 2>&1; then
     pass "installed copy $inst is this checkout ($have)"
   else
-    fail "installed copy $inst is this checkout (installed $have, repo $want)" \
+    note "installed copy $inst is this checkout (installed $have, repo $want)" \
       "reinstall Makoto from the marketplace (Settings > Plugins, or claude plugin update makoto), then start a NEW session: hooks load at session start"
   fi
 done
-[ "$found" = 1 ] || fail "Makoto installed for this account" "install the Makoto plugin from https://github.com/Clear-Sights/Makoto, then start a new session"
+[ "$found" = 1 ] || note "Makoto installed for this account" "install the Makoto plugin from https://github.com/Clear-Sights/Makoto, then start a new session"
 
 # DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. Read the
 # installed copy's own version line; the act that clears a miss is the install, then a new session.
@@ -57,8 +59,11 @@ fi
 if sout="$(sh tools/scour.sh 2>&1)"; then pass "scour at its pin ($(printf '%s\n' "$sout" | grep '^SCOUR entries=' | head -1))"
 else fail "scour at its pin" "$(printf '%s\n' "$sout" | grep '^LAUNCH MISSING' | head -1)"; fi
 
-if cout="$(sh tools/codex.sh 2>&1)"; then pass "codex logged in"
-else fail "codex logged in" "$(printf '%s\n' "$cout" | grep '^LAUNCH MISSING' | head -1)"; fi
+for skill in cheap-execution adversarial-review; do
+  hit=""; for f in "$HOME"/.claude/skills/"$skill"/SKILL.md "$HOME"/.claude/skills/*/*/"$skill"/SKILL.md; do [ -f "$f" ] && hit="$f"; done
+  if [ -n "$hit" ]; then pass "skill $skill loaded"
+  else fail "skill $skill loaded" "enable the $skill skill for this account (claude.ai Settings > Capabilities > Skills), then start a NEW session"; fi
+done
 
 if [ "${1:-}" = "--suite" ]; then
   if PYTHONPATH="$PWD/plugin" "$PY" -m pytest -q -p no:cacheprovider >/dev/null 2>&1; then pass "suite green"
