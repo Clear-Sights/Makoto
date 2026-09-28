@@ -52,7 +52,11 @@ step	item	void	measured_by	cap_model_calls	cap_minutes
 8	F6	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
 8	B28	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
 8	G3	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-10	mesh	7 reds unread: the classifier refused the read as Modify Shared Resources	START step 10	4	10
+10	mesh	7 reds unread: the classifier refused the read as Modify Shared Resources; and on 2026-09-28 the inputs were not in the session: mesh.py, harness.py, mesh.tsv and placement.tsv are on no disk path, in no history of Makoto, makoto-dev, DetIO, Scour or Measure-Zero, and in no in-scope GitHub repository	find / -name mesh.tsv; git log --all -- "*mesh.tsv" in each clone; GitHub code search filename:mesh.tsv	4	10
 11	J1	no step-row reader exists: nothing to project from	docs/CONDUCT.md J1	4	10
 11	J6	no PreCompact event is recorded: nothing to project from	docs/CONDUCT.md J6	4	10
 14	SR1	no model yet names all 6 findings: best is Opus 5.5 at 2/6 (Haiku 4.5 1/6, Sonnet 5 0/6); M13 needs a run	scour.gate.judgment replay of tests/fixtures/attack/findings.tsv at the tools/scour.sh pin, 2026-09-28	120	45
+11	J2	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
+11	J3	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
+11	J7	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
+11	J8	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10

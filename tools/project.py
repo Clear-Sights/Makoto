@@ -4,7 +4,7 @@ no network. Prints one `PROJECT <step> ...` line and exits 0 when it ran; exits 
 `LAUNCH MISSING` line naming the act when an input is absent.
 
 usage: python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv
-       python3 tools/project.py 8|13 [REV]      (REV holds the evaluator; default 504f2c5)
+       python3 tools/project.py 8|11|13 [REV]   (REV holds the evaluator; default 504f2c5)
        python3 tools/project.py 12
 """
 from __future__ import annotations
@@ -48,10 +48,10 @@ def evaluator(rev: str):
     return mod
 
 
-def parse_lines(entries: set[str] | None, rev: str) -> tuple[int, list[tuple[str, str]]]:
+def parse_lines(entries: set[str] | None, rev: str, table: str = "predicates.tsv") -> tuple[int, list[tuple[str, str]]]:
     L = evaluator(rev)
     total, refused = 0, []
-    for r in rows(V9 / "predicates.tsv"):
+    for r in rows(V9 / table):
         if len(r) < 3 or (entries is not None and r[0] not in entries):
             continue
         total += 1
@@ -76,7 +76,8 @@ def step6(audit: str, verdicts: str) -> None:
 
 
 def step_lines(step: str, rev: str) -> None:
-    total, refused = parse_lines(set(STEP8) if step == "8" else None, rev)
+    total, refused = parse_lines(set(STEP8) if step == "8" else None, rev,
+                                 "conduct-lines.tsv" if step == "11" else "predicates.tsv")
     print(f"PROJECT {step} lines={total} parsed={total - len(refused)} refused={len(refused)} rev={rev}")
     for ent, why in refused:
         print(f"VOID {step}\t{ent}\t{why[:100]}")
@@ -101,7 +102,7 @@ if __name__ == "__main__":
         sys.exit(__doc__)
     if args[0] == "6" and len(args) == 3:
         step6(args[1], args[2])
-    elif args[0] in ("8", "13"):
+    elif args[0] in ("8", "11", "13"):
         step_lines(args[0], args[1] if len(args) > 1 else EVALUATOR_REV)
     elif args[0] == "12":
         step12()

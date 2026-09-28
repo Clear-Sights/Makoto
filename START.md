@@ -171,9 +171,9 @@ The steps:
     input that does not exist yet. The inputs that do not exist yet are the step-row reader (J1),
     the names index (J4), the mesh slot map (J5) and a recorded PreCompact event (J6).
     owner: the next Makoto session, after step 7's kit.neighbours.
-    projection: first sub-step, write `docs/v9/conduct-lines.tsv` (one v9 line per J row, from
-    `docs/CONDUCT.md`) and add `python3 tools/project.py 11` to parse it the way step 13 does
-    (cap: 4 model calls and 10 minutes). J4's names index exists as Scour's names ledger
+    projection: `python3 tools/project.py 11` parses `docs/v9/conduct-lines.tsv` (one v9 line per J
+    row): `PROJECT 11 lines=8 parsed=4 refused=4`. J2, J3, J7 and J8 need a `count(X[, reset]) >= N`
+    construct the language lacks; they are step 11 rows in VOIDS and wait on step 13. J4's names index exists as Scour's names ledger
     (`sh tools/scour.sh` prints `names=`), and J5's slot map as `MAKOTO/mesh/placement.tsv`. J1 (no
     step-row reader) and J6 (no recorded PreCompact event) have nothing to project from; they are
     step 11 rows in VOIDS. cap: 4 model calls and 10 minutes per row.
