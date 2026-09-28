@@ -16,7 +16,8 @@ PIN = REPO / "docs" / "PLUGIN-DIGEST.tsv"
 
 def digest(root=PLUGIN):
     h = hashlib.sha256()
-    for p in sorted(root.rglob("*")):
+    # sorted by the posix string: WindowsPath ordering folds case, so it would digest differently
+    for p in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
         if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc":
             h.update(p.relative_to(root).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
     return h.hexdigest()[:16]
