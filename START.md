@@ -153,19 +153,16 @@ The steps:
    `::test_one_pre_compiles_few_patterns` (bound 40). plant: a module-level `re.compile` added
    back reads red; both read red on 6cff354. inputs: `python3 -X importtime` on the Pre shim.
    owner: done.
-10. Close the shared mesh (`MAKOTO/mesh`), which reads distance 7 after the harness fix.
-   check: the mesh reads distance 0, with every triple giving catch red and pass green.
-   plant: `MAKOTO/foundation/harness.orig.py` reads 19.
-   inputs: the classifier refused a read of the remaining 7 reds and the 3 proposed I1 to I3
-   cases as "Modify Shared Resources". The placement item in the handoff section carries the line
-   that lifts it. owner: the next Makoto session.
-   projection: the mesh is in `tools/mesh/` (copied from `handoff/MAKOTO/mesh` in Measure-Zero-Dev's
-   `handoff.zip`): `MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py` reads distance 5, and
-   `proposed.tsv` (I1 to I3) reads 0. shipped_refspec_pass was a stale case, not a rule gap: since
-   gate.unverified_merge a push with no verifier before it is denied, so the case now carries the red
-   and green runs a real landing has. The 5 reds are the canon_fingerprints pair, read in VOIDS; their
-   disposition is step 6's held subtraction. cap: 4 model calls and 10 minutes.
-   Stop: at the cap, record the measured number in VOIDS and go on.
+10. ~~Close the shared mesh~~ (branch claude/pensive-carson-cbpr5j). `tools/mesh/` (from
+   `handoff/MAKOTO/mesh` in Measure-Zero-Dev's `handoff.zip`) reads distance 0 over 154 cases and 44
+   roots, and `proposed.tsv` (I1 to I3) reads 0. The last reds were stale cases, not rule gaps: a
+   push with no verifier is now denied at Pre (gate.unverified_merge), `pytest || true` is caught
+   first at Pre (content.verifier_exit_masking), the advisory tier was removed 2026-09-25, and a
+   scratch `rm -rf` is exempt by design (the catch is now `rm -rf build` after a red run, with
+   scratch and mktemp pass cases).
+   check: `MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py` prints `distance 0`. plant:
+   `handoff/MAKOTO/foundation/harness.orig.py` as harness.py reads 17. inputs: `tools/mesh/`.
+   owner: done.
 11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
     loops. Some of the conduct Gabriel requires is already live (the entries named in that file).

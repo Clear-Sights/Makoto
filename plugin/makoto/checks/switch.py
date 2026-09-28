@@ -517,7 +517,24 @@ def timed_out(c: Call) -> bool:
     normal, not a timeout — exit_code buys no true positive here and costs false ones). Presence
     test (`is not None`), not truthiness: `self_error_code` reports a present-but-falsy `error`
     field as `""`, which is still an error state (see its docstring)."""
-    return interrupted(c) or self_error_code(c) is not None
+    return interrupted(c) or (self_error_code(c) is not None and not _grep_found_nothing(c))
+
+
+_SEARCHERS = frozenset({"grep", "egrep", "fgrep", "rg", "ag"})
+_SHELL_CLOSERS = frozenset({"done", "fi", "esac", "}", ")"})
+
+
+def _grep_found_nothing(c: Call) -> bool:
+    """`Exit code 1` from a command whose last real word is a search: grep's documented `no line
+    matched`, a result, not an error (2 is grep's error). One false canon.timeout on the 3.4.7
+    record was `...; grep -c bubblewrap log; done` counting 0, the answer sought."""
+    err = str(self_error_code(c) or "")
+    if not re.match(r"Exit code 1\b", err):
+        return False
+    from makoto.core._shell import _shell_segments
+    segs = [argv for argv, _op in _shell_segments(str((c.get("input") or {}).get("command", "")))
+            if argv and argv[0] not in _SHELL_CLOSERS]
+    return bool(segs) and segs[-1][0].rsplit("/", 1)[-1] in _SEARCHERS
 
 
 # ---- sequence-aware primitives (read a span of the call stream, not one call) ----------------
@@ -1538,11 +1555,12 @@ from makoto.core._shell import _shell_segments
 
 
 def _is_destruction(ev: dict) -> bool:
-    from makoto.substrate._canonAtoms import _is_destructive_argv
+    from makoto.substrate._canonAtoms import _is_destructive_argv, scratch_env
     cmd = command_of(ev)
     if not cmd:
         return False
-    return any(_is_destructive_argv(argv) for argv, _ in _shell_segments(cmd))
+    env = scratch_env(cmd)
+    return any(_is_destructive_argv(argv, env) for argv, _ in _shell_segments(cmd))
 
 
 # The guard is `kit.ran_a_verifier`, the ONE definition of "something observed behaviour",

@@ -238,3 +238,37 @@ def test_git_worktree_remove_and_prune_are_not_destruction():
     assert not _fires("git worktree prune")
     assert _fires("git clean -fdx")
     assert _fires("git reset --hard")
+
+
+# ---- 3.4.7 record, 2026-09-28: 14 false destruct fires were `rm -rf` of a scratch variable ----
+import pytest as _pytest
+
+
+@_pytest.mark.parametrize("cmd, destructive", [
+    ("d=$(mktemp -d); cp -r . $d; rm -rf $d", False),
+    ("S=/tmp/claude-0/x/scratchpad; rm -rf $S/sc", False),
+    ("S=/tmp/x; P=$S/plant; rm -rf $P", False),
+    ("rm -rf $d", True),                         # unbound here: not known to be scratch
+    ("X=src; rm -rf $X", True),
+    ("S=/tmp/x; rm -rf $S/../../home", True),    # escapes the temp root
+    ("rm -rf src", True),
+])
+def test_a_scratch_variable_bound_in_the_same_command_is_scratch(cmd, destructive):
+    from makoto.core._shell import _shell_segments
+    from makoto.substrate._canonAtoms import _is_destructive_argv, scratch_env
+    env = scratch_env(cmd)
+    assert any(_is_destructive_argv(a, env) for a, _ in _shell_segments(cmd)) == destructive
+
+
+@_pytest.mark.parametrize("cmd, err, interrupted, error_state", [
+    ("for m in a b; do codex exec -m $m OK > o-$m; grep -c bubblewrap o-$m; done", "Exit code 1\n0", False, False),
+    ("grep x nofile", "Exit code 2\ngrep: nofile: No such file", False, True),
+    ("python3 -m pytest -q", "Exit code 1\n1 failed", False, True),
+    ("grep -c x f; false", "Exit code 1", False, True),
+    ("grep -r x .", "", True, True),
+])
+def test_a_search_that_found_nothing_is_not_an_error_state(cmd, err, interrupted, error_state):
+    """canon.timeout's one false fire on the 3.4.7 record: grep's exit 1 means no line matched."""
+    from makoto.checks.switch import timed_out
+    assert timed_out({"name": "Bash", "input": {"command": cmd},
+                      "result": {"error": err, "interrupted": interrupted}}) == error_state
