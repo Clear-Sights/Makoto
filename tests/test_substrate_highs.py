@@ -54,3 +54,24 @@ def test_the_meta_floor_binds_when_a_meta_finding_ties_an_ordinary_one(tmp_path)
             "file_path": str(repo / ".claude" / "settings.json"), "content": body}),
             extra_env={"MAKOTO_MODE": mode})[1]
         assert '"permissionDecision": "ask"' in wire or '"permissionDecision": "deny"' in wire, (mode, wire)
+
+
+def test_a_settings_key_is_read_decoded_whatever_escapes_spell_it(tmp_path):
+    # The host reads settings as JSON, so an escaped spelling of a key is the same key.
+    esc = "MAKOTO\\u005fDISABLE\\u005fGATES"
+    cases = (("Write", {"content": '{"env": {"%s": "1"}}' % esc}),
+             ("Edit", {"old_string": '"env": {}', "new_string": '"env": {"%s": "\\u0031"}' % esc}),
+             ("Write", {"content": '{"disable\\u0041llHooks": true}'}))
+    for i, (tool, ti) in enumerate(cases):
+        (tmp_path / str(i)).mkdir()
+        state = _setup_state(tmp_path / str(i))
+        repo = tmp_path / str(i) / "repo"
+        repo.mkdir()
+        wire = _run_dispatch(state, _event(repo, 1, "PreToolUse", tool_name=tool, tool_input=dict(
+            ti, file_path=str(repo / ".claude" / "settings.json"))))[1]
+        assert "content.self_mute_guard" in wire, (i, wire)
+    (tmp_path / "off").mkdir()
+    state = _setup_state(tmp_path / "off")
+    wire = _run_dispatch(state, _event(tmp_path, 9, "PreToolUse", tool_name="Write", tool_input={
+        "file_path": str(tmp_path / ".claude" / "settings.json"), "content": '{"env": {"%s": "0"}}' % esc}))[1]
+    assert "content.self_mute_guard" not in wire
