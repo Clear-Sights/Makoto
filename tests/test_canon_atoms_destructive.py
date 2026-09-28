@@ -290,3 +290,23 @@ def test_a_binding_counts_only_where_the_shell_makes_it(cmd):
 def test_a_search_reached_through_a_failure_does_not_hide_it(cmd):
     from makoto.checks.switch import timed_out
     assert timed_out({"name": "Bash", "input": {"command": cmd}, "result": {"error": "Exit code 1"}})
+
+
+@_pytest.mark.parametrize("cmd", [
+    "D=src; (D=/tmp/safe); (rm -rf $D)",           # a second subshell starts from the parent's D
+    "D=$(pwd); rm -rf $D",                         # a substitution that is not mktemp
+])
+def test_a_scope_or_substitution_that_is_not_scratch_stays_destructive(cmd):
+    from makoto.substrate._canonAtoms import is_destructive_command
+    assert is_destructive_command(cmd)
+
+
+def test_the_statement_scanner_parses_a_command_once(monkeypatch):
+    import shlex
+    from makoto.core import _shell
+    _shell.statements.cache_clear()
+    calls, real = [], shlex.shlex
+    monkeypatch.setattr(shlex, "shlex", lambda *a, **k: calls.append(1) or real(*a, **k))
+    for _ in range(5):
+        _shell.statements("d=$(mktemp -d); rm -rf $d")
+    assert len(calls) == 1

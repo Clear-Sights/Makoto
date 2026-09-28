@@ -74,20 +74,19 @@ def _seen_paths(payload: dict) -> list:
         stmts = statements(command_of(payload) or "")
         if stmts is None:
             return []
-        cwds, out = [payload.get("cwd") or "."], []
-        for words, depth, _before in stmts[:64]:
-            while len(cwds) <= depth:
-                cwds.append(cwds[-1])
-            del cwds[depth + 1:]         # a subshell's `cd` ends at its `)`
+        cwds, out = {(): payload.get("cwd") or "."}, []
+        for words, scope, _before in stmts[:64]:
+            for i in range(1, len(scope) + 1):  # a subshell starts in its parent's directory
+                cwds.setdefault(scope[:i], cwds[scope[:i - 1]])
             if words[0] == "cd":
                 dest = [w for w in words[1:] if w != "--"][:1]
                 if dest:
-                    cwds[depth] = dest[0] if os.path.isabs(dest[0]) else os.path.join(cwds[depth], dest[0])
+                    cwds[scope] = dest[0] if os.path.isabs(dest[0]) else os.path.join(cwds[scope], dest[0])
                 continue
             for w in words[1:]:
                 if w.startswith("-"):
                     continue
-                full = w if os.path.isabs(w) else os.path.join(cwds[depth], w)
+                full = w if os.path.isabs(w) else os.path.join(cwds[scope], w)
                 try:
                     if os.path.isfile(full):
                         out.append(full)

@@ -536,7 +536,7 @@ def _grep_found_nothing(c: Call) -> bool:
              if x[0][0] not in _SHELL_CLOSERS]
     if not stmts:
         return False
-    words, _depth, before = stmts[-1]
+    words, _scope, before = stmts[-1]
     # it ran on its own: not the tail of a pipe (`false | grep`), not reached through `&&`/`||`
     return words[0].rsplit("/", 1)[-1] in _SEARCHERS and before in (None, ";", "\n", "(")
 

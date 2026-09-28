@@ -179,3 +179,11 @@ def test_cd_follows_the_shell(tmp_path):
 
 def test_a_fenced_example_is_not_a_claim():
     assert F.read_claim("```text\nAll tests passed.\n```") == {}
+
+
+def test_a_second_subshell_starts_from_the_parents_directory(tmp_path):
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "a.py").write_text("ROOT")
+    (tmp_path / "sub" / "a.py").write_text("SUB")
+    got = F.stamp(_post("Bash", {"command": "(cd sub); (cat a.py)"}, tmp_path))
+    assert sorted(got[F.SEEN_KEY]) == [str(tmp_path / "a.py")]

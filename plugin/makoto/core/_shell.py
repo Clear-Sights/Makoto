@@ -300,9 +300,9 @@ _SEPARATORS = frozenset({";", "&&", "||", "|", "&", "|&", ";;", "\n"})
 
 @functools.lru_cache(maxsize=4096)
 def statements(command: str):
-    """[(words, depth, op_before)] for each simple statement of `command`, in execution order:
-    split on ; && || | & and newline, comments dropped, quoted text one word, and each `(` or `$(`
-    one level deeper. None when the command does not tokenize. The scanner the read ledger's `cd`
+    """[(words, scope, op_before)] for each simple statement of `command`, in execution order:
+    split on ; && || | & and newline, comments dropped, quoted text one word; `scope` is the path
+    of subshell ids (`(` or `$(`) the statement runs in, so two sibling subshells are two scopes. None when the command does not tokenize. The scanner the read ledger's `cd`
     and the destructive reading's same-command bindings share."""
     try:
         lex = shlex.shlex(command or "", posix=True, punctuation_chars=";&|()\n")
@@ -311,17 +311,21 @@ def statements(command: str):
         toks = list(lex)
     except ValueError:
         return None
-    out, cur, depth, before = [], [], 0, None
+    out, cur, stack, before, opened = [], [], [], None, 0
     for t in toks:
         if t and set(t) <= set(";&|()\n"):
             # shlex keeps a punctuation run whole (`);`): read it char by char
             for piece in re.findall(r"[()]|[;&|\n]+", t):
                 if cur:
-                    out.append((tuple(cur), depth, before))
+                    out.append((tuple(cur), tuple(stack), before))
                 cur, before = [], piece
-                depth = max(0, depth + (1 if piece == "(" else -1 if piece == ")" else 0))
+                if piece == "(":
+                    opened += 1
+                    stack.append(opened)     # each subshell its own scope, siblings apart
+                elif piece == ")" and stack:
+                    stack.pop()
             continue
         cur.append(t)
     if cur:
-        out.append((tuple(cur), depth, before))
+        out.append((tuple(cur), tuple(stack), before))
     return tuple(out)             # cached: callers share it, so nothing in it can change

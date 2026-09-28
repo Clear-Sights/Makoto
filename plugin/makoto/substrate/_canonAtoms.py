@@ -217,20 +217,21 @@ def _statement_envs(cmd: str) -> list:
     stmts = statements(cmd)
     if stmts is None:
         return []
-    envs, out = [{}], []
-    for k, (words, depth, _before) in enumerate(stmts):
-        while len(envs) <= depth:
-            envs.append(dict(envs[-1]))
-        del envs[depth + 1:]
-        env = envs[depth]
+    envs, out = {(): {}}, []
+    for k, (words, scope, _before) in enumerate(stmts):
+        for i in range(1, len(scope) + 1):      # a scope starts from its parent as it opens
+            if scope[:i] not in envs:
+                envs[scope[:i]] = dict(envs[scope[:i - 1]])
+        env = envs[scope]
         out.append((words, dict(env)))
         m = _ASSIGN_RX.match(words[0]) if len(words) == 1 else None
         if not m:
             continue
         name, value = m.group(1), m.group(2)
-        if value == "$":             # `NAME=$(...)`: the substitution is the next, deeper statement
+        if value == "$":             # `NAME=$(...)`: the substitution is the next statement, one scope in
             nxt = stmts[k + 1] if k + 1 < len(stmts) else None
-            if nxt and nxt[1] == depth + 1 and nxt[0][:1] == ("mktemp",):
+            if nxt and len(nxt[1]) == len(scope) + 1 and nxt[1][:len(scope)] == scope \
+                    and nxt[0][:1] == ("mktemp",):
                 env[name] = "/tmp/mktemp.XXXXXX"
             else:
                 env.pop(name, None)

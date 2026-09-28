@@ -471,3 +471,10 @@ def test_a_comparison_of_the_status_with_itself_returns_nothing():
     ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": "/tmp",
           "tool_input": {"command": 'pytest; rc=$?; [ "$rc" = "$rc" ]'}}
     assert predicate(current_event=ev, history=[], pattern=masking_CHECK) is not None
+
+
+def test_a_compound_test_that_always_holds_returns_nothing():
+    from makoto.checks.spec import masking_CHECK
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": "/tmp",
+          "tool_input": {"command": 'pytest; rc=$?; [ "$rc" = 1 -o "$rc" != 1 ]'}}
+    assert predicate(current_event=ev, history=[], pattern=masking_CHECK) is not None
