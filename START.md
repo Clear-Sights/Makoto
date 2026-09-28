@@ -112,18 +112,21 @@ The steps:
    recorded on 3.3.0. plant: a verdicts file missing one fire exits 2.
    inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
    each fire. owner: the next Makoto session.
-   projection (run 2026-09-28, 2 s, no model): `python3 tools/worth.py` over the recorded
-   audit `MAKOTO/foundation/audit-2026-09-28.jsonl` with `verdicts-2026-09-28.tsv` (shared
-   project folder) reads `WORTH checks=17 worth=5 not=12 fires=125`. The 12 not-worth checks are
-   step 6 rows in VOIDS; each is re-graded on a 3.4.6 record or subtracted. cap: one session's
-   record, no model.
+   projection: `python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv` (no model). On the recorded
+   `MAKOTO/foundation/audit-2026-09-28.jsonl` and `verdicts-2026-09-28.tsv` (shared project
+   folder) it prints `PROJECT 6 checks=17 worth=5 not=12 fires=125` in 2 s. The 12 not-worth
+   checks are step 6 rows in VOIDS. cap: 2 model calls and 5 minutes per VOIDS row; the step
+   ends when every row is re-graded on a 3.4.6 record or subtracted.
+   Stop: at the cap, record the measured number in VOIDS and go on.
 7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
    check: a test pins the NOT-COUNTABLE count at 18, and the count only falls. plant: flip any
    RUNNER row back and the test reads red. inputs: the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
    projection: none needed. The ratchet is one test over `python3 tools/register_map.py`'s count,
-   and kit.neighbours and kit.claim are specified in "Shared pieces"; nothing here is research.
+   and kit.neighbours and kit.claim are specified in "Shared pieces". cap: 10 model calls and 30
+   minutes for the step.
+   Stop: at the cap, record the measured number in VOIDS and go on.
 8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
    commit each. Each commit lowers the pin by 1.
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
@@ -135,17 +138,19 @@ The steps:
    replay it once for all 14 rows and step 11's thresholds together, never once per row. Write the
    rows with the cheaper executor, each briefed with its catch test as ACCEPTANCE, and accept a row
    only on your own run of that test. owner: the next Makoto session.
-   projection: each row's v9 line (`docs/v9/predicates.tsv`) run through step 13's evaluator over
-   one corpus replay, giving a fire count per row with no model. 12 of the 14 lines do not parse
-   yet (step 8 rows in VOIDS), so this projection lands after step 13's language covers them; A6
-   and E8 can be projected now. cap: one corpus conversion and one replay for all 14 rows.
+   projection: `python3 tools/project.py 8` (no model) parses each row's v9 line with the
+   evaluator: `PROJECT 8 lines=14 parsed=2 refused=12`. The 12 refused are step 8 rows in VOIDS and
+   wait on step 13's language; A6 and E8 go through the corpus replay now. cap: 8 model calls and
+   15 minutes per row.
+   Stop: at the cap, record the measured number in VOIDS and go on.
 9. Cut the per-call start cost of about 0.19 s for Pre plus Post.
    check: a latency reading of the Pre and Post shim time, with a bound. plant: a module-level
    compile added back reads red.
    inputs: which cut to make, lazy regex compiles or a resident process, is unmeasured. Measure
    the lazy-compile cut first, because it is the smaller change. owner: the next Makoto session.
    projection: none needed; this is a measurement (`python3 -X importtime` on the Pre shim), not
-   research.
+   research. cap: 4 model calls and 10 minutes.
+   Stop: at the cap, record the measured number in VOIDS and go on.
 10. Close the shared mesh (`MAKOTO/mesh`), which reads distance 7 after the harness fix.
    check: the mesh reads distance 0, with every triple giving catch red and pass green.
    plant: `MAKOTO/foundation/harness.orig.py` reads 19.
@@ -153,8 +158,11 @@ The steps:
    cases as "Modify Shared Resources". The placement item in the handoff section carries the line
    that lifts it. owner: the next Makoto session.
    projection: the mesh is already the projection: `MAKOTO/mesh/mesh.py` over `mesh.tsv` (181
-   cases) with `harness.py`, and `placement.tsv` (63 rows) as the slot map. Its one void, the 7
-   unread reds, is a step 10 row in VOIDS and waits on the placement line that lifts the refusal.
+   cases) with `harness.py`, and `placement.tsv` (63 rows) as the slot map, all in the shared
+   project folder. First sub-step: copy `mesh.py`, `harness.py` and `mesh.tsv` into
+   `tools/mesh/` and run it there (cap: 2 model calls and 5 minutes). Its one void, the 7 unread
+   reds, is a step 10 row in VOIDS. cap: 4 model calls and 10 minutes.
+   Stop: at the cap, record the measured number in VOIDS and go on.
 11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
     loops. Some of the conduct Gabriel requires is already live (the entries named in that file).
@@ -164,10 +172,13 @@ The steps:
     input that does not exist yet. The inputs that do not exist yet are the step-row reader (J1),
     the names index (J4), the mesh slot map (J5) and a recorded PreCompact event (J6).
     owner: the next Makoto session, after step 7's kit.neighbours.
-    projection: each J row written as a v9 line and replayed over the step 8 corpus replay. J4's
-    names index exists now as Scour's names ledger (`sh tools/scour.sh` prints `names=`), and J5's
-    slot map as `MAKOTO/mesh/placement.tsv`. J1 (no step-row reader) and J6 (no recorded PreCompact
-    event) have nothing to project from; they are step 11 rows in VOIDS. cap: the shared replay.
+    projection: first sub-step, write `docs/v9/conduct-lines.tsv` (one v9 line per J row, from
+    `docs/CONDUCT.md`) and add `python3 tools/project.py 11` to parse it the way step 13 does
+    (cap: 4 model calls and 10 minutes). J4's names index exists as Scour's names ledger
+    (`sh tools/scour.sh` prints `names=`), and J5's slot map as `MAKOTO/mesh/placement.tsv`. J1 (no
+    step-row reader) and J6 (no recorded PreCompact event) have nothing to project from; they are
+    step 11 rows in VOIDS. cap: 4 model calls and 10 minutes per row.
+    Stop: at the cap, record the measured number in VOIDS and go on.
 12. One count and one owner per register entry (`docs/PRIOR-ART.md` items 1, 2 and 7). Derive the
     entry count from the register file by script, so no document types it. Join
     `docs/REGISTER-MAP.tsv` with Scour's declined() reasons into one table that names, per entry,
@@ -178,9 +189,10 @@ The steps:
     inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at efd27e9
     and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
-    projection: the join already exists as data. `docs/v9/owners.tsv` names an owner for all 77
-    entries (scour 2, makoto 38, both 25, none 12); the step checks it against
-    `docs/REGISTER-MAP.tsv` and Scour's declined() reasons and adds the count test. No void.
+    projection: `python3 tools/project.py 12` (no model) joins `docs/v9/owners.tsv` with
+    `docs/REGISTER-MAP.tsv`: `PROJECT 12 entries=77 both=25 makoto=38 none=12 scour=2 map_only=0
+    owners_only=0`. No void. cap: 6 model calls and 15 minutes for the count test.
+    Stop: at the cap, record the measured number in VOIDS and go on.
 13. One evaluator of the register's predicate lines, script only, at Pre in milliseconds (his
     rulings 2026-09-28 02:56Z and 03:27Z: no after-the-fact reading, no model). Start from branch
     `claude/register-evaluator` (504f2c5: `substrate/line.py` parses and evaluates the v9 language,
@@ -193,8 +205,9 @@ The steps:
     and its entry's plant reads red.
     inputs: the v9 lines in `docs/v9/predicates.tsv`, and the attack's case list, copied into the
     repository when the step starts. owner: the next Makoto session.
-    projection (run 2026-09-28, under 1 s, no model): `line.parse` at 504f2c5 over
-    `docs/v9/predicates.tsv` parses 48 of 77 lines. The 29 it refuses are step 13 rows in VOIDS,
-    each naming the construct the language lacks (`refs(...)`, set difference, `exists n`,
-    `contains`, `decorated`). Filling those is this step's work, in VOIDS order. cap: the language
-    grows only by constructs a refused line needs.
+    projection: `python3 tools/project.py 13` (no model; it reads the evaluator out of git at
+    504f2c5) prints `PROJECT 13 lines=77 parsed=48 refused=29` in under 1 s. The 29 refused are
+    step 13 rows in VOIDS, each naming the construct the language lacks (`refs(...)`, set
+    difference, `exists n`, `contains`, `decorated`); fill them in VOIDS order. cap: 6 model calls
+    and 10 minutes per row.
+    Stop: at the cap, record the measured number in VOIDS and go on.
