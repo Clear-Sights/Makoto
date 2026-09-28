@@ -745,6 +745,22 @@ def _is_runner_command(c: str) -> bool:
     return bool(_LEAD_RUNNER_RX.match(" ".join(_leading_tokens(c))))
 
 
+# Flags that turn a runner call into a query of the tool (`pytest --version`): no test executes, so
+# there is no verifier exit to mask. `-V` is deliberately absent — it is `ctest`'s VERBOSE flag.
+_INFO_FLAGS = frozenset({"--version", "--help", "-h"})
+
+
+def _is_informational(lead_text: str) -> bool:
+    """True iff the statement carries an info flag ahead of any `--` (after `--`, flags belong to
+    the delegated script, which may still run tests: `npm test -- --help`)."""
+    for tok in _leading_tokens(lead_text):
+        if tok == "--":
+            return False
+        if tok in _INFO_FLAGS:
+            return True
+    return False
+
+
 def _declares_this_verifier(lead_text: str, root) -> bool:
     """True iff this statement's leading program is one `root`'s `makoto.toml` declares.
 
@@ -932,6 +948,8 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
         if_wrapped = argv[0] in ("if", "elif")
         lead = argv[1:] if if_wrapped else argv
         lead_text = " ".join(lead)
+        if _is_informational(lead_text):
+            continue                         # `pytest --version`: a query, not a verifier run
         if _is_runner_command(lead_text):
             here = "block"
         elif declares and _declares_this_verifier(lead_text, declared_root):
