@@ -51,18 +51,28 @@ done
   "keep the live copy at $want (session.sh installs makoto@makoto at main) and turn the others off: claude plugin uninstall for a marketplace copy, claude.ai Settings > Capabilities for the account-synced one; then start a NEW session"
 [ "$live" = 0 ] && note "no installed Makoto copy loads for this account" "install the Makoto plugin from https://github.com/Clear-Sights/Makoto (or enable it in Settings > Plugins), then start a NEW session"
 
-# DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. Read the
-# installed copy's own version line; the act that clears a miss is the install, then a new session.
-detio="" dver=""
-for inst in "$HOME"/.claude/plugins/synced/*/detio "$HOME"/.claude/plugins/cache/*/detio/*; do
-  [ -f "$inst/.claude-plugin/plugin.json" ] || continue
-  v="$("$PY" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["version"])' "$inst/.claude-plugin/plugin.json" 2>/dev/null)"
-  [ -n "$v" ] && { detio="$inst"; dver="$v"; break; }
-done
-if [ -n "$dver" ]; then
-  pass "DetIO installed ($dver at $detio)"
+# DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. The live copy is
+# the one Claude Code loads (tools/makoto_copies.py, read for detio: the synced manifest's generation
+# or enabledPlugins), its hooks need CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1, and its version must be the
+# one DetIO main ships (read off a blobless clone of main). Each miss clears only in a NEW session.
+dlive="$("$PY" tools/makoto_copies.py "$HOME" detio | grep '^live' | head -n 1)"
+dpath="$(printf '%s\n' "$dlive" | cut -f2)" dver="$(printf '%s\n' "$dlive" | cut -f3)"
+dtmp="$(mktemp -d)"
+dmain=""
+if timeout 60 git clone -q --depth 1 --filter=blob:none --no-checkout https://github.com/Clear-Sights/DetIO "$dtmp/d" >/dev/null 2>&1; then
+  dmain="$(git -C "$dtmp/d" show HEAD:.claude-plugin/plugin.json | "$PY" -c 'import json, sys; print(json.load(sys.stdin)["version"])' 2>/dev/null)"
+fi
+rm -rf "$dtmp"
+if [ -z "$dver" ]; then
+  fail "DetIO loads this session" "claude plugin marketplace add Clear-Sights/DetIO && claude plugin install detio@detio (or enable it in Settings > Plugins), then start a NEW session"
+elif [ "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS:-}" != 1 ]; then
+  fail "DetIO hooks run (CLAUDE_CODE_ENABLE_FUNCTION_HOOKS is not 1)" "set CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 in the environment, then start a NEW session"
+elif [ -z "$dmain" ]; then
+  note "DetIO $dver loads; DetIO main's version could not be read" "check network access to github.com/Clear-Sights/DetIO"
+elif [ "$dver" != "$dmain" ]; then
+  fail "DetIO loads $dver but main ships $dmain ($dpath)" "update DetIO (claude plugin update detio@detio, or re-sync the account copy in claude.ai Settings > Capabilities), then start a NEW session"
 else
-  fail "DetIO installed" "claude plugin marketplace add Clear-Sights/DetIO && claude plugin install detio@detio, then start a NEW session"
+  pass "DetIO $dver loads at main's version with hooks on ($dpath)"
 fi
 
 if sout="$(sh tools/scour.sh 2>&1)"; then pass "scour at its pin ($(printf '%s\n' "$sout" | grep '^SCOUR entries=' | head -1))"

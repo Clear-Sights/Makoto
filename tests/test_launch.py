@@ -86,3 +86,16 @@ def test_a_synced_copy_and_an_enabled_marketplace_copy_are_both_live(tmp_path):
     (tmp_path / ".claude" / "settings.json").write_text(json.dumps({"enabledPlugins": {"makoto@makoto": True}}))
     assert _states(tmp_path) == {"synced/org/makoto~g2": ("live", "3.4.5"),
                                  "cache/makoto/makoto/3.4.6": ("live", "3.4.6")}
+
+
+def test_the_live_detio_copy_is_read_by_the_same_rules(tmp_path):
+    """Launch reads DetIO's live copy the way it reads Makoto's: an account-synced `detio~g2` is the
+    copy that loads (a `synced/*/detio` glob missed it), and a leftover generation is unused."""
+    org = tmp_path / ".claude" / "plugins" / "synced" / "org"
+    _copy(org / "detio~g2", "0.3.7")
+    _copy(org / "detio", "0.3.5")
+    (org / "manifest.json").write_text(json.dumps({"plugins": [{"name": "detio", "generation": 2}]}))
+    states = {p.relative_to(tmp_path / ".claude" / "plugins").as_posix(): (s, v)
+              for s, p, v, _ in mc.copies(tmp_path, "detio")}
+    assert states == {"synced/org/detio~g2": ("live", "0.3.7"), "synced/org/detio": ("unused", "0.3.5")}
+    assert _states(tmp_path) == {}

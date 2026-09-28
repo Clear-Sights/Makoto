@@ -75,3 +75,46 @@ def test_every_open_step_names_its_check_inputs_and_owner():
     steps = open_steps((REPO / "START.md").read_text(encoding="utf-8"))
     missing = [(n, f) for n, b in steps.items() for f in ("check:", "inputs:", "owner:") if f not in b]
     assert not missing, missing
+
+
+INPUTS = re.compile(r"\binputs?:\s*(.*?)(?=\s(?:owner|check|plant|cap|projection|Stop|after|cost):|\Z)", re.S)
+ITEMS = re.compile(r",\s*(?:and\s+)?|;\s*|\s+and\s+(?=(?:the|a|an)\b)")
+DESCRIBED = re.compile(r"(?<!in )\b(?:the|a|an)\s+(?:[\w'-]+\s+){0,3}(?:case list|list|table)\b", re.I)
+PATHLIKE = re.compile(r"`[^`]+`|[\w.-]+/[\w./-]+|\b[\w-]+\.(?:md|tsv|py|sh|txt|json|jsonl)\b")
+CLONE = re.compile(r"clone of `[\w.-]+/([\w.-]+)`")
+LAUNCH_CLONES = ("Scour", "Measure-Zero")   # the launch checklist clones these beside the repository
+
+
+def unclosed_inputs(text: str, root: Path = REPO) -> list[tuple[str, str]]:
+    """Inputs of open steps that a launched session cannot open: a document named by description
+    ("the attack's case list"), or a path this repository does not carry. Paths under `~` are the
+    running session's; paths in a clause naming a launch clone are that clone's."""
+    bad = []
+    for n, body in open_steps(text).items():
+        for clause in (" ".join(c.split()) for c in INPUTS.findall(body)):
+            bad += [(n, i) for i in ITEMS.split(clause) if DESCRIBED.search(i) and not PATHLIKE.search(i)]
+            clone = CLONE.search(clause)
+            if clone:
+                bad += [] if clone.group(1) in LAUNCH_CLONES else [(n, clone.group(0))]
+                continue
+            words = (w.rstrip(".,:;") for span in re.findall(r"`([^`]+)`", clause) for w in span.split())
+            bad += [(n, w) for w in words if ("/" in w or re.search(r"\.[A-Za-z0-9]{1,6}$", w))
+                    and not w.startswith(("~", "/", "$", "-", "http")) and "<" not in w and not (root / w).exists()]
+    return bad
+
+
+def test_every_open_input_is_a_path_the_session_can_open():
+    """Closure (Launch rows, 2026-09-28): the attack's case list was named, not cited, and lived only
+    in the project folder a launched session cannot see."""
+    text = (REPO / "START.md").read_text(encoding="utf-8")
+    assert len(INPUTS.findall(text)) >= 5
+    assert unclosed_inputs(text) == []
+
+
+def test_the_closure_check_reads_red_on_its_plants():
+    text = (REPO / "START.md").read_text(encoding="utf-8")
+    cited = "the round-nine cases in\n    `docs/attack-round-nine.md`."
+    assert cited in text
+    assert unclosed_inputs(text.replace(cited, "the attack's case list, copied in later."))
+    assert unclosed_inputs(text.replace(cited, "the cases in `docs/attack-round-ten.md`."))
+    assert unclosed_inputs(text.replace("clone of `Clear-Sights/Scour`", "clone of `Clear-Sights/Elsewhere`"))

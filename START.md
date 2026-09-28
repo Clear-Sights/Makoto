@@ -26,8 +26,10 @@ line failed; do not work around it.
   one open item is step 14 here.
 - DetIO is on: it loads as a plugin at the version DetIO main ships, with
   `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
-  installed in this session", and the launch line prints the installed version. Installed but
-  disabled reads missing. If it is missing, stop and tell Gabriel.
+  installed in this session", and the launch line reads the live copy (the one Claude Code loads,
+  `tools/makoto_copies.py HOME detio`) against the version on DetIO main and checks the hooks
+  variable. Installed but disabled reads missing. If it is missing or behind main, stop and tell
+  Gabriel.
 - Scour, pinned at efd27e9 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
   and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
   LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
@@ -119,10 +121,11 @@ The steps:
    rather than narrowed or joined by a new one.
    check: `python3 tools/worth.py AUDIT.jsonl VERDICTS.tsv` exits 0 over every fire
    recorded on 3.3.0. plant: a verdicts file missing one fire exits 2.
-   inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
-   each fire. owner: the next Makoto session.
+   inputs: the 3.3.0 audit with a verdict for each fire, `docs/v9/records/audit-3.3.0-2026-09-28.jsonl`
+   and `docs/v9/records/verdicts-3.3.0-2026-09-28.tsv`; a fresh live record is the running
+   session's `~/.makoto/audit.jsonl`. owner: the next Makoto session.
    projection: `python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv` (no model). The 09-28 record is
-   `handoff/MAKOTO/foundation/` inside Measure-Zero-Dev's `handoff.zip` (`git show HEAD:handoff.zip`):
+   `docs/v9/records/audit-3.3.0-2026-09-28.jsonl` with `docs/v9/records/verdicts-3.3.0-2026-09-28.tsv`:
    `PROJECT 6 checks=17 worth=5 not=12 fires=125`. The first 3.4.7 record, graded, is in
    `docs/v9/records/`: `PROJECT 6 checks=4 worth=2 not=2 fires=9`. Of the 12 rows only
    content.verifier_exit_masking fired there, and it still fails; its subtraction reverts C4 to
@@ -144,8 +147,11 @@ The steps:
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
    inputs: each row's owes and paid-by are defined in the table. What each row still needs is
-   its measured false rate on real sessions, and the corpus for that exists:
-   `tools/corpus.py` over the transcripts in `~/.claude/projects/`. B14's benefit verbs and D8's
+   its measured false rate on real sessions: `tools/corpus.py` over the transcripts in
+   `~/.claude/projects/`. A fresh container holds no earlier sessions, so the step makes its own
+   input: the running session's transcript (`~/.claude/projects/<cwd>/<session>.jsonl`, written
+   from the first turn) is the floor, and `ls ~/.claude/projects/*/*.jsonl | wc -l` is counted
+   first. A row with no fires on that floor records `fires=0` in VOIDS at the cap. B14's benefit verbs and D8's
    narrowing flags are settled by those corpus fires. Cheapest way: convert the corpus once and
    replay it once for all remaining rows and step 11's thresholds together, never once per row.
    Accept a row only on your own run of its catch test. owner: the next Makoto session.
@@ -167,7 +173,7 @@ The steps:
    scratch `rm -rf` is exempt by design (the catch is now `rm -rf build` after a red run, with
    scratch and mktemp pass cases).
    check: `MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py` prints `distance 0`. plant:
-   `handoff/MAKOTO/foundation/harness.orig.py` as harness.py reads 17. inputs: `tools/mesh/`.
+   `tools/mesh/harness.orig.py` as harness.py reads 17. inputs: `tools/mesh/`.
    owner: done.
 11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
