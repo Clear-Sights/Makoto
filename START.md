@@ -226,7 +226,9 @@ The steps:
     line (cap: 2 model calls and 5 minutes); until then launch stays at efd27e9, the pin last run.
     Measured 2026-09-28, curated (one unit, its seams, its ledger rows, one question per call,
     memory and thinking off, about 930 tokens fixed per call): Haiku 4.5 1/6 at 82k+144k tokens
-    (37+72 calls); Sonnet 5 0/6 at 109k+193k; Opus 5.5 2/6 asked only the 8 unit-questions the
+    (37+72 calls); Sonnet 5 0/6 at 109k+193k; Codex gpt-6-astra (high effort, `tools/codex_reader.py`,
+    2026-09-28 22:1xZ) 3/6 at 1.75M+3.21M mostly cached (M11; M12 and S2 in kind; not H9, M13, S1);
+    Opus 5.5 2/6 asked only the 8 unit-questions the
     findings sit on, 277k (153k output with thinking off); uncurated Opus 0/6 at 35k+51k. Warm on an
     unchanged tree: 0 calls; one planted change: 1 call, 1.6k. Misses: H9, M12 and S1 fully or in
     part; M13 needs a run, so no tool-less reader can catch it. Open this step only when a new model
