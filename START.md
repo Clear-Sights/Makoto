@@ -57,7 +57,8 @@ The row designs are in `docs/FOUNDATION-14.md`.
    - scratch cleanup read as destruction;
    - a compaction SubagentStop read as a claim;
    - a Bash read-only reader not counted as the probe;
-   - a newly created branch read as an unknown ref.
+   - a newly created branch read as an unknown ref;
+   - a unit used in the file it landed in read as unclaimed.
 
    check: the per-check tests in each commit. plant: revert any one commit and its test reads
    red. inputs: none open. owner: done.
