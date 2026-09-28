@@ -1463,8 +1463,7 @@ stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
 # A worker was launched again after an earlier launch, and nothing between the two proved its
 # target had changed -- no verifier reported anything. The second launch inherits the first one's
 # channel: whatever the worker could not reach before, it still cannot, and a re-launch with
-# nothing changed is a wait dressed as an act. Keel states this as clause U02
-# (`clear-sights/keel`, `plugin/keel/clauses.json`): *"a worker was re-launched and nothing proved
+# nothing changed is a wait dressed as an act. As a rule: *"a worker was re-launched and nothing proved
 # its target changed since the failure: change something, then run the target's probe to a PASS,
 # before the next act."*
 #
@@ -1519,8 +1518,8 @@ relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Pre", postur
 # `D14 UNDO UNPROVEN`.
 #
 # Content was destroyed and no independent behaviour observer had run first, so there is nothing
-# against which the undo could be proven -- not the change, and not the state before it. Keel
-# states this as clause U20 (`clear-sights/keel`, `plugin/keel/clauses.json`): *"content was
+# against which the undo could be proven -- not the change, and not the state before it. As a
+# rule: *"content was
 # destroyed and no independent behaviour observer ran first; run the relevant test or probe (a
 # report, PASS or FAIL) before the next act."*
 #
@@ -1554,7 +1553,7 @@ def _is_destruction(ev: dict) -> bool:
 
 
 # The guard is `kit.ran_a_verifier`, the ONE definition of "something observed behaviour",
-# shared with gate.relaunched_unchanged. Keel's U20 asks for a report, PASS or FAIL, because
+# shared with gate.relaunched_unchanged. The rule asks for a report, PASS or FAIL, because
 # either one is an observation and only the absence of both leaves an undo unprovable -- which
 # is why that primitive does not read the verdict.
 _is_observer = ran_a_verifier
@@ -1587,8 +1586,7 @@ destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Pre", p
 # A verifier reported clean and this session has never seen that verifier report a failure. A
 # clean report from an oracle never observed failing is not evidence of absence; it is evidence of
 # nothing, because a verifier that cannot fire and a subject that is genuinely clean print the same
-# word. Keel states the same point as clause U25 (`clear-sights/keel`,
-# `plugin/keel/clauses.json`): *"a scan reported clean and this session has not seen a scanner
+# word. As a rule: *"a scan reported clean and this session has not seen a scanner
 # report findings; run its prefix-distractor regression before the next act."*
 #
 # WHY MAKOTO'S MAP SAID NOT-COUNTABLE, AND WHY THAT WAS A DIFFERENT QUESTION. The row read
@@ -1730,7 +1728,7 @@ verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", postu
 # reports cannot be a reading of it: whatever it says was decided before there was anything to
 # decide from, so the words are a prediction wearing a result's grammar.
 #
-# WHAT ORDER IS READ. `kit.unmet_obligation_gate`, the same factory the seven Keel-shaped
+# WHAT ORDER IS READ. `kit.unmet_obligation_gate`, the same factory the seven act-before-guard
 # obligations use, so the ordering rule keeps ONE home -- the order IS the check. The act is a
 # settled mutation of a prose document whose introduced text states a run verdict; the guard is
 # `kit.ran_a_verifier`. The gate fires when the act lands with no verifier run anywhere before it.
@@ -1833,8 +1831,7 @@ report_CHECK = _Check(id="gate.report_before_run", applies_at="Pre", posture="BL
 # A plan was presented and no question was asked this session, so whatever the request left
 # ambiguous was settled by guessing. The register's demand is that a determined thing not be
 # carried forward as open -- here in its live direction: the ambiguity WAS determinable by asking,
-# and the plan fixed it by assumption instead. Keel states the same point as clause P02
-# (`clear-sights/keel`, `plugin/keel/clauses.json`): *"reading files resolves what the repository
+# and the plan fixed it by assumption instead. As a rule: *"reading files resolves what the repository
 # is, never what was wanted, and a plan is followed by default."*
 #
 # WHY MAKOTO'S MAP SAID NOT-COUNTABLE, AND WHY THAT WAS THE WRONG READING. The row read "needs the
@@ -1849,7 +1846,7 @@ from makoto.kit import unmet_obligation_gate
 
 # Presenting a plan. A closed vocabulary whose miss is a RECALL bound, never a false block.
 _PLAN_TOOLS = frozenset({"ExitPlanMode"})
-# The ask that pays the obligation. Keel's P02 names exactly this one.
+# The ask that pays the obligation: exactly this one.
 _ASK_TOOLS = frozenset({"AskUserQuestion"})
 
 

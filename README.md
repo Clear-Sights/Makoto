@@ -192,15 +192,14 @@ python -m makoto uninstall                   # removes old settings.json entries
 
 ## Siblings
 
-Makoto owns the statement surface alongside the independently installed engines for act and
-sequence. None inherits or implies the others' coverage. The marketplace inventory is owned by
+Makoto owns the statement surface alongside the independently installed engine for the act.
+Neither inherits or implies the other's coverage. The marketplace inventory is owned by
 [Courthouse](https://github.com/Clear-Sights/Courthouse):
 `claude plugin marketplace add Clear-Sights/Courthouse`.
 
 | Engine | Judges | One line |
 |---|---|---|
 | [**Ward**](https://github.com/Clear-Sights/Ward) | the pending **act** | nothing outright bad happens |
-| [**Keel**](https://github.com/Clear-Sights/Keel) | the **sequence** | a session neither capsizes nor gets lost |
 | **Makoto** (this repo) | the **statement** | words aren't empty |
 
 ## Non-plugin install (power users)
