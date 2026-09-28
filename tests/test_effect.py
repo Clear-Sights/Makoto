@@ -174,3 +174,18 @@ def test_e11_a_call_that_ran_its_whole_limit_is_read_from_elapsed_time_not_its_e
     t = Session(tmp_path / "fast")
     t.call(tool_input={"command": "job", "timeout": limit}, response={"stdout": "", "exitCode": 1})
     assert "event.nested_budget" not in t.next("Bash", {"command": "job", "timeout": limit})
+
+
+# Substrate: a recorded path keeps the case the disk gives it, so file-reading Stop rows read it.
+def test_a_file_under_a_capitalised_directory_is_read_by_the_stop_rows(tmp_path):
+    for i, d in enumerate(("lower", "Upper")):
+        s = Session(tmp_path / str(i))
+        f = s.repo / d / "test_a.py"
+        f.parent.mkdir()
+        body = "def test_a():\n    assert True\n"
+        s.call(tool="Write", tool_input={"file_path": str(f), "content": body},
+               effect=lambda r, f=f, b=body: f.write_text(b), response={"success": True})
+        s.n += 1
+        wire = _run_dispatch(s.state, {"session_id": "s", "cwd": str(s.repo), "hook_event_name": "Stop",
+                                       "stop_hook_active": False})[1]
+        assert "gate.hollow_test" in wire, d
