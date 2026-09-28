@@ -54,3 +54,15 @@ def test_a_claim_restated_after_its_block_blocks_again(tmp_path):
                    "gate.unrun_count_claim")
     assert not _blocks(_run_dispatch(state, _stop(tmp_path, "c", "I have not run the checks.", active=True))[1],
                        "gate.unrun_count_claim")
+
+
+def test_a_check_the_session_never_satisfies_still_lets_the_session_end(tmp_path):
+    # discriminant: the same unpayable claim restated at every stop, far past the bound
+    from makoto.dispatch import STOP_BLOCK_BOUND
+    state = _setup_state(tmp_path)
+    outs = [_run_dispatch(state, _stop(tmp_path, "b", "All 602 checks pass.", active=i > 0))[1]
+            for i in range(8)]
+    blocked = [_blocks(o, "gate.unrun_count_claim") for o in outs]
+    assert blocked == [True] * STOP_BLOCK_BOUND + [False] * (8 - STOP_BLOCK_BOUND), \
+        "a check blocks a session's stops a bounded number of times"
+    assert "gate.unrun_count_claim" in json.loads(outs[-1])["systemMessage"], "the let-through still prints the finding"

@@ -831,6 +831,40 @@ def _unchanged(conn, session_id: str, findings: list[Finding]) -> list[Finding]:
     return seen
 
 
+# A check blocks the stops of one session at most this many times; after that its finding is
+# printed and the stop goes through. Gabriel 2026-09-28 01:16Z: no precaution may force the model
+# into endless churn; it must go long without going forever. Measured the same day: the old
+# gate.unwitnessed_verifier blocked one session's stops for hours with nothing that could pay it.
+STOP_BLOCK_BOUND = 3
+
+
+def _spent(conn, session_id: str, findings: list[Finding]) -> list[Finding]:
+    """The findings whose check has already blocked this session's stops STOP_BLOCK_BOUND times.
+    Counts only blocks that went out; a store fault spends nothing (the finding blocks)."""
+    out = []
+    for f in findings:
+        key = "blocks:" + hashlib.sha256(json.dumps([session_id, f.pattern_id]).encode()).hexdigest()
+        try:
+            row = conn.execute("SELECT value FROM config WHERE key = ?", [key]).fetchone()
+            if row is not None and int(row[0]) >= STOP_BLOCK_BOUND:
+                out.append(f)
+        except Exception:
+            continue
+    return out
+
+
+def _count_blocks(conn, session_id: str, findings: list[Finding]) -> None:
+    for pid in {f.pattern_id for f in findings}:
+        key = "blocks:" + hashlib.sha256(json.dumps([session_id, pid]).encode()).hexdigest()
+        try:
+            row = conn.execute("SELECT value FROM config WHERE key = ?", [key]).fetchone()
+            conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
+                         [key, str(int(row[0]) + 1 if row else 1)])
+            conn.commit()
+        except Exception:
+            continue
+
+
 def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     """PreToolUse / Stop / SubagentStop — and the wildcard law for any event without its own
     row: keyword-prefiltered predicates, plus the Stop gates where the event carries a
@@ -866,8 +900,17 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
                 standing = set()
             withheld = [f for f in withheld if (f.pattern_id, f.message) in standing]
         blocking = [f for f in blocking if not any(f is w for w in withheld)]
+        spent = _spent(conn, payload.get("session_id", ""), blocking)
+        blocking = [f for f in blocking if not any(f is x for x in spent)]
+        withheld += spent
+        if spent and not blocking:
+            sys.stdout.write(json.dumps({"systemMessage": "makoto: let through, each already blocked "
+                                         f"{STOP_BLOCK_BOUND} stops this session: "
+                                         + "; ".join(_named(f) for f in spent)}))
     _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"),
                   stop_hook_active=payload.get("stop_hook_active") is True)
+    if hook_event in ("Stop", "SubagentStop") and blocking and _gates_enabled():
+        _count_blocks(conn, payload.get("session_id", ""), blocking)
     _record_audit(state_dir, findings + gate_findings, payload,
                   withheld=sorted({f.pattern_id for f in withheld} - {f.pattern_id for f in blocking}))
 
