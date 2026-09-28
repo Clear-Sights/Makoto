@@ -40,6 +40,23 @@ for inst in "$HOME"/.claude/plugins/synced/*/makoto "$HOME"/.claude/plugins/cach
 done
 [ "$found" = 1 ] || fail "Makoto installed for this account" "install the Makoto plugin from https://github.com/Clear-Sights/Makoto, then start a new session"
 
+# DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. Read the
+# installed copy's own version line; the act that clears a miss is the install, then a new session.
+detio="" dver=""
+for inst in "$HOME"/.claude/plugins/synced/*/detio "$HOME"/.claude/plugins/cache/*/detio/*; do
+  [ -f "$inst/.claude-plugin/plugin.json" ] || continue
+  v="$("$PY" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["version"])' "$inst/.claude-plugin/plugin.json" 2>/dev/null)"
+  [ -n "$v" ] && { detio="$inst"; dver="$v"; break; }
+done
+if [ -n "$dver" ]; then
+  pass "DetIO installed ($dver at $detio)"
+else
+  fail "DetIO installed" "claude plugin marketplace add Clear-Sights/DetIO && claude plugin install detio@detio, then start a NEW session"
+fi
+
+if sout="$(sh tools/scour.sh 2>&1)"; then pass "scour at its pin ($(printf '%s\n' "$sout" | grep '^SCOUR entries=' | head -1))"
+else fail "scour at its pin" "$(printf '%s\n' "$sout" | grep '^LAUNCH MISSING' | head -1)"; fi
+
 if [ "${1:-}" = "--suite" ]; then
   if PYTHONPATH="$PWD/plugin" "$PY" -m pytest -q -p no:cacheprovider >/dev/null 2>&1; then pass "suite green"
   else fail "suite green" "PYTHONPATH=\$PWD/plugin $PY -m pytest -q -p no:cacheprovider"; fi

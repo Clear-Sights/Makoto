@@ -617,7 +617,7 @@ def _meta_check_ids() -> frozenset:
     return frozenset(c.id for c in load_checks() if c.layer == "meta")
 
 
-def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -> str:
+def _finding_layer(outcome: str, findings: list[Finding], mode: str, permission_mode) -> str:
     """The `layer` to hand `verdict.apply` for the worst finding -- \"meta\" iff the finding came
     from a meta-layer check AND the fold is on the one branch where the meta floor can bind (a
     raw BLOCK under LOOSE/SILENT with no oversight clamp). Everywhere else it returns \"object\",
@@ -627,9 +627,18 @@ def _finding_layer(outcome: str, finding: Finding, mode: str, permission_mode) -
     if (outcome == verdict.BLOCK
             and mode in (verdict.LOOSE, verdict.SILENT)
             and not verdict.is_oversight_clamped(permission_mode)
-            and finding.pattern_id in _meta_check_ids()):
+            and _any_meta_block(findings)):
         return "meta"
     return "object"
+
+
+def _any_meta_block(findings: list[Finding]) -> bool:
+    """Whether any BLOCK-level finding came from a meta-layer check. The floor binds on the decision,
+    not on whichever finding ranked first: a meta finding tied with an object one at BLOCK rank was
+    softened with it, so a write that mutes the gates passed under LOOSE/SILENT when it also carried
+    an ordinary fault."""
+    meta = _meta_check_ids()
+    return any(_OUTCOME_FOR_LEVEL.get(f.level) == verdict.BLOCK and f.pattern_id in meta for f in findings)
 
 
 def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
@@ -658,9 +667,9 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         hint = _jit_hint(finding)
         if hint:
             detail = f"{detail}\n{hint}"
-    if hook_event in ("Stop", "SubagentStop"):
-        # A stop gets one bounce, so every finding rides it; the worst alone hid its siblings.
-        detail = "\n".join([detail] + [_named(f) for f in findings if f is not finding])
+    # Every finding rides the one decision, on every edge: the worst alone hid its siblings, so a
+    # second fault surfaced only after the first was fixed, one bounce per fault.
+    detail = "\n".join([detail] + [_named(f) for f in findings if f is not finding])
     # The fold itself is DECISION machinery: a raise out of `posture`/`_finding_layer`/`apply`
     # (e.g. a malformed host value, or `_meta_check_ids` -> `load_checks` failing on the
     # LOOSE/SILENT+BLOCK branch) used to unwind through this function into `_dispatch`'s
@@ -672,7 +681,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
         mode = verdict.posture()
         folded = verdict.apply(verdict.Decision(outcome, detail), mode,
                                permission_mode=permission_mode,
-                               layer=_finding_layer(outcome, finding, mode, permission_mode))
+                               layer=_finding_layer(outcome, findings, mode, permission_mode))
     except Exception as exc:
         mode = verdict.DEFAULT_POSTURE
         folded = verdict.Decision(
@@ -691,7 +700,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
     if (hook_event in ("Stop", "SubagentStop") and outcome == verdict.BLOCK
             and str(folded) == verdict.ASK):
         try:
-            is_meta = finding.pattern_id in _meta_check_ids()
+            is_meta = _any_meta_block(findings)
         except Exception:
             is_meta = True          # catalog unloadable: decision machinery -> fail closed
         if is_meta:

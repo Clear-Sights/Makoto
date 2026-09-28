@@ -41,9 +41,40 @@ def _is_scratch(p, cwd) -> bool:
     if not cwd:
         return False                                         # working dir unknown -> never suppress (FN-safe)
     rp = os.path.realpath(str(p))
-    if _under(rp, os.path.realpath(str(cwd))):
+    if _under(rp.lower(), os.path.realpath(str(cwd)).lower()):
         return False                                         # inside the working dir -> in scope
+    # (compared case-folded: ledger keys are folded, so on a case-insensitive disk the folded key
+    # names the file but realpath keeps the fold, and `.../T/...` vs `.../t/...` read as outside;
+    # folding can only widen scope, never skip a file)
     return any(_under(rp, r) for r in _SCRATCH_ROOTS)        # outside cwd AND in a scratch root -> stray scratch
+
+
+def on_disk(p: str) -> str:
+    """The path as the filesystem spells it. Ledger keys are case-folded for equality
+    (`kit.normalize_path`), so a key under `Measure-Zero/` reads as `measure-zero/` and names no
+    file on a case-sensitive disk. Each component that does not exist as written is replaced by
+    the one directory entry equal to it case-insensitively; none or several leaves `p` as it was."""
+    if not p or os.path.exists(p):
+        return p
+    head, parts = p, []
+    while head and not os.path.exists(head):
+        head, tail = os.path.split(head)
+        if not tail:
+            return p
+        parts.append(tail)
+    for part in reversed(parts):
+        exact = os.path.join(head, part)
+        if os.path.exists(exact):
+            head = exact                                  # spelled as written: never re-guessed
+            continue
+        try:
+            hits = [e for e in os.listdir(head or ".") if e.lower() == part.lower()]
+        except OSError:
+            return p
+        if len(hits) != 1:
+            return p
+        head = os.path.join(head, hits[0])
+    return head
 
 
 def _read(fs_read, p):
@@ -83,7 +114,8 @@ def iter_touched_python_sources(touched, cwd, fs_read):
             continue
         if not cwd and not os.path.isabs(str(p)):
             continue
-        real_p = p if os.path.isabs(str(p)) else os.path.join(cwd, p)
+        joined = p if os.path.isabs(str(p)) else os.path.join(cwd, p)
+        real_p = on_disk(joined)
         if _is_scratch(real_p, cwd):
             continue
         try:
@@ -92,4 +124,4 @@ def iter_touched_python_sources(touched, cwd, fs_read):
             continue
         if not isinstance(src, str):
             continue
-        yield p, src
+        yield (real_p if real_p != joined else p), src

@@ -606,6 +606,21 @@ def _removed_text(tool_input: dict) -> str:
     return old
 
 
+_JSON_ESCAPE_RX = re.compile(r"\\u([0-9a-fA-F]{4})|\\([\"\\/])")
+
+
+def _decoded(text: str) -> str:
+    """Settings text as the host reads it, not as it is spelled. A settings file is JSON, and a key
+    or value written with JSON escapes (`\\u005f` for `_`) decodes to the same setting, so the
+    readings below run over the decoded document: a whole file is parsed and re-serialized; a
+    fragment (an Edit's new_string) has its string escapes decoded in place."""
+    import json as _json
+    try:
+        return _json.dumps(_json.loads(text), ensure_ascii=False)
+    except (ValueError, TypeError):
+        return _JSON_ESCAPE_RX.sub(lambda m: chr(int(m.group(1), 16)) if m.group(1) else m.group(2), text)
+
+
 def mute_predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
@@ -614,9 +629,9 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
     fp = ti.get("file_path", "") or ""
     if not _SETTINGS_RX.search(fp):
         return None                                   # not a Claude settings file -> inert
-    new_content = scan_target_content(ti)             # the INTRODUCED text (never old_string)
+    new_content = _decoded(scan_target_content(ti))   # the INTRODUCED text (never old_string)
 
-    removed = _removed_text(ti)                       # text being REMOVED/REPLACED (Edit/MultiEdit)
+    removed = _decoded(_removed_text(ti))             # text being REMOVED/REPLACED (Edit/MultiEdit)
     reason = None
     snippet = ""
     m = _DISABLE_ENV_RX.search(new_content) or _DISABLE_PATTERNS_RX.search(new_content)
@@ -654,7 +669,7 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
 mute_RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 mute_DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
-mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'settings.local.json', 'hooks.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 # gate.undeclared_falsifiable -- declared-falsifiability COMPLETENESS.
 #
 # Distinct from Assay, which forces a claim to *be* falsifiable: this audits that every piece

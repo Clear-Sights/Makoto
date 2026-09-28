@@ -17,6 +17,16 @@ line failed; do not work around it.
   `tools/merge_pass.py`.
 - Every installed Makoto copy is this checkout's `plugin/`, both version and content. Hooks load
   at session start, so a reinstall needs a new session.
+- The session has the repositories it needs: ask to attach (add_repo) Clear-Sights/Scour and
+  Clear-Sights/Measure-Zero, and clone both beside this repository, before anything else.
+- DetIO is on: it loads as a plugin at the version DetIO main ships, with
+  `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
+  installed in this session", and the launch line prints the installed version. Installed but
+  disabled reads missing. If it is missing, stop and tell Gabriel.
+- Scour, pinned at 45cd655 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
+  and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
+  LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
+  step done.
 - The suite is green.
 
 ## Goal and path
@@ -38,7 +48,9 @@ Every row is held to three bars, and a row lands only with all three green:
 
 Makoto is done when all three hold:
 
-- `python3 tools/register_map.py` prints 77 RUNNER and 0 NOT-COUNTABLE.
+- `python3 tools/register_map.py` prints RUNNER for every entry whose set a hook event can
+  decide, each by one check whose predicate is the entry's effect; every NOT-COUNTABLE row names
+  the fact no hook event carries (59 RUNNER and 18 NOT-COUNTABLE on 2026-09-28).
 - Every fired check passes worth.py on a fresh live record.
 - The launch checklist passes.
 
@@ -81,7 +93,7 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
    each fire. owner: the next Makoto session.
 7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
-   check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
+   check: a test pins the NOT-COUNTABLE count at 18, and the count only falls. plant: flip any
    RUNNER row back and the test reads red. inputs: the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
 8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
@@ -122,15 +134,18 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     the MERGE-WITNESSES rule.
     check: a test that reads the count off the register file and fails on any typed count that
     disagrees. plant: type a wrong count into README.md and the test reads red.
-    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` and
-    `Clear-Sights/Measure-Zero`, each at a pinned sha taken when the step starts. The join is a
+    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at 45cd655
+    and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
-13. Replace per-case recognizers with one mechanism per family (`docs/MECHANISM.md`). A case
-    outside a list must never be ignored: record each command's effect as a Pre/Post tree digest
-    rather than guessing it from names; read a verifier's verdict from its exit code; route prose
-    claims through one claim reader; identify tools by the shape of their input.
-    check: the attacker's violating cases (a case a live row claims but misses) turn red, and the
-    count of module-level lists under `plugin/makoto` falls. plant: one attacker case that the old
-    per-case hook passes reads red under the mechanism.
-    inputs: the attacker's cases; the digest's per-call cost, measured against the 2 s bound;
-    tools/corpus.py for the false rate. owner: the next Makoto session, after steps 7 and 8.
+13. One evaluator of the register's predicate lines, script only, at Pre in milliseconds (his
+    rulings 2026-09-28 02:56Z and 03:27Z: no after-the-fact reading, no model). Start from branch
+    `claude/register-evaluator` (504f2c5: `substrate/line.py` parses and evaluates the v9 language,
+    38 tests, every v9 line parses). Add a read ledger (path to content hash when the session read
+    it) so lineage and drift are lines; a claim reader as a word table plus regexes; one config file
+    of named sets; then ONE check that runs every line and retires each entry's old check as its
+    line lands. An entry with no line is not claimed and names its missing fact.
+    check: every round-nine escape (the attack's per-entry cases) is a plant in `tests/` that reads
+    red on main and green here, and each claimed entry has exactly one line. plant: delete one line
+    and its entry's plant reads red.
+    inputs: the v9 lines (Measure-Zero-Dev handoff, registry v9 section) and the attack's case list,
+    copied into the repository when the step starts. owner: the next Makoto session.
