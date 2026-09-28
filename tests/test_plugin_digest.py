@@ -56,8 +56,7 @@ def test_plant_a_content_change_reads_red(tmp_path):
     shutil.copytree(PLUGIN, copy, ignore=shutil.ignore_patterns("__pycache__"))
     files = [copy / p.relative_to(PLUGIN) for p in _tracked(PLUGIN)]
     before = digest(copy, files)
-    (copy / "makoto.egg-info").mkdir()
-    (copy / "makoto.egg-info" / "PKG-INFO").write_text("grown by the checkout")
+    (copy / "untracked-plant.txt").write_text("grown by the checkout")
     assert digest(copy, files) == before, "an untracked file must not move the digest"
     (copy / ".claude-plugin" / "plugin.json").write_text(
         (copy / ".claude-plugin" / "plugin.json").read_text() + " ")
