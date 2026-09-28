@@ -214,9 +214,14 @@ The steps:
     refs(), set difference, exists n, count(), contains and field values (`tests/test_line.py`), and
     the read ledger, fact builder and claim reader (`substrate/facts.py`; the dispatcher stamps each
     seen file's hash, `tests/test_facts.py`). The 8 refused are not lines (VOIDS names each missing
-    fact). Two things wait: the round-nine case list, which is in no repository this session could
-    read (VOIDS `attack-cases`), and whether a weaker reading the map calls "not claimed" (G2, B4, F10)
-    may be claimed by a line, which is the owner's call. cap: 6 model calls and 10 minutes per row.
+    fact). Owner's rulings (2026-09-28): G2, B4 and F10 stay unclaimed; each needs a fact no hook
+    carries, and a live check covers its weaker reading (G2: gate.unasked_plan; B4:
+    gate.unwitnessed_verifier; F10: gate.canon). The proving set is the round-nine list in the project
+    folder's `HANDOFF/sections/attack.md` ("Attack round nine", 21 escapes over E3, E12, E11, C4, D14,
+    and "round nine b", 58 entries), each case rebuilt from its shape as a plant red on main; each
+    check's own test file is only the no-regression bar. That section is not in `handoff.zip` (its
+    copy ends at round six), so it has to be brought into this repository first (VOIDS
+    `attack-cases`). cap: 6 model calls and 10 minutes per row.
     Stop: at the cap, record the measured number in VOIDS and go on.
 14. Scour's judge (moved from Scour's handoff, row SR1): make Scour's reader catch what
     adversarial-review catches, so adversarial-review can leave the launch rows. Replay both rounds
