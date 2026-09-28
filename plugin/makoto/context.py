@@ -111,6 +111,19 @@ def _history_for_agent(history, stop_payload: dict) -> list:
     return scoped
 
 
+def _is_compaction_stop(payload: dict) -> bool:
+    """True iff ``payload`` is Claude Code's context-COMPACTION SubagentStop: the ``agent_type``
+    key is present but empty, and ``agent_id`` is absent or empty. A real subagent carries a
+    non-empty agent_type (e.g. "general-purpose") and an agent_id; a payload without the
+    agent_type key at all is not this shape and is checked as before."""
+    if not isinstance(payload, dict) or payload.get("hook_event_name") != "SubagentStop":
+        return False
+    if payload.get("agent_type", None) != "":
+        return False
+    agent_id = payload.get("agent_id")
+    return agent_id is None or (isinstance(agent_id, str) and not agent_id.strip())
+
+
 def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
     """Source + evaluate the completion / advance / green_claim gates for a Stop event.
 
@@ -136,6 +149,10 @@ def run_stop_checks(conn, payload: dict, history=(), *, root=None) -> list:
         # absence read as green. Text-reading gates see "" and are naturally silent (no claim,
         # no finding), so this widens nothing for them.
         text = payload.get("last_assistant_message") or ""
+        if _is_compaction_stop(payload):
+            # A compaction summary restates earlier turns' work; it is no claim of this turn, so
+            # every text-reading gate sees "" (no claim) and no commitment is sourced from it.
+            text = ""
         sid = payload.get("session_id", "")
         cwd = payload.get("cwd") or os.getcwd()
         from makoto.state import ledger as _ledger
