@@ -146,8 +146,11 @@ The steps:
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
    inputs: each row's owes and paid-by are defined in the table. What each row still needs is
-   its measured false rate on real sessions, and the corpus for that exists:
-   `tools/corpus.py` over the transcripts in `~/.claude/projects/`. B14's benefit verbs and D8's
+   its measured false rate on real sessions: `tools/corpus.py` over the transcripts in
+   `~/.claude/projects/`. A fresh container holds no earlier sessions, so the step makes its own
+   input: the running session's transcript (`~/.claude/projects/<cwd>/<session>.jsonl`, written
+   from the first turn) is the floor, and `ls ~/.claude/projects/*/*.jsonl | wc -l` is counted
+   first. A row with no fires on that floor records `fires=0` in VOIDS at the cap. B14's benefit verbs and D8's
    narrowing flags are settled by those corpus fires. Cheapest way: convert the corpus once and
    replay it once for all remaining rows and step 11's thresholds together, never once per row.
    Accept a row only on your own run of its catch test. owner: the next Makoto session.
