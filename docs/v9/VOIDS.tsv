@@ -1,57 +1,57 @@
-step	item	void	measured_by
-13	A2	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	G1	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	H1	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	H5	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	D4	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	F7	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	H2	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	H6	line outside the evaluator's language (scour): expected an operator after decorated, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B36	line outside the evaluator's language (scour): expected a term, found None	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	A14	line outside the evaluator's language (scour): trailing '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	E9	line outside the evaluator's language (scour): expected an operator after body.calls, found 'contains'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	H4	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	C4	line outside the evaluator's language (gate): trailing 'of'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	E12	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B1	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B26	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	D9	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	F10	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B10	line outside the evaluator's language (gate): expected an operator after any, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B14	line outside the evaluator's language (gate): expected an operator after claim.helps, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	D8	line outside the evaluator's language (gate): cannot read '<real.size or run.fo'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B28	line outside the evaluator's language (gate): expected a term, found None	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B7	line outside the evaluator's language (kernel): expected an operator after zero.py:, found 'a'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B37	line outside the evaluator's language (kernel): cannot read '>0 (two units share '	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	F6	line outside the evaluator's language (kernel): expected an operator after zero.py:, found 'removal'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	A5	line outside the evaluator's language (judgment): expected an operator after Q:, found 'does'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	G3	line outside the evaluator's language (judgment): expected an operator after Q:, found 'does'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	B18	line outside the evaluator's language (judgment): expected an operator after Q:, found 'was'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-13	F12	line outside the evaluator's language (judgment): expected an operator after Q:, found 'which'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv
-6	gate.unwitnessed_verifier	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.unprobed_fanout	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.unclaimed_unit	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.unobserved_destruction	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	content.verifier_exit_masking	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.unknown_ref_switch	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	content.illusory_authorship_trailer	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.undischarged_waiver	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.canon_fingerprints_advisory	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.canon_fingerprints	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.completion	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-6	gate.fabricated_action	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv
-8	B36	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	H4	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	E9	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	D8	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	B14	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	F12	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	A14	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	B18	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	B37	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	F6	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	B28	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-8	G3	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13
-10	mesh	7 reds unread: the classifier refused the read as Modify Shared Resources	START step 10
-11	J1	no step-row reader exists: nothing to project from	docs/CONDUCT.md J1
-11	J6	no PreCompact event is recorded: nothing to project from	docs/CONDUCT.md J6
+step	item	void	measured_by	cap_model_calls	cap_minutes
+13	A2	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	G1	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	H1	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	H5	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	D4	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	F7	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	H2	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	H6	line outside the evaluator's language (scour): expected an operator after decorated, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B36	line outside the evaluator's language (scour): expected a term, found None	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	A14	line outside the evaluator's language (scour): trailing '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	E9	line outside the evaluator's language (scour): expected an operator after body.calls, found 'contains'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	H4	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	C4	line outside the evaluator's language (gate): trailing 'of'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	E12	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B1	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B26	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	D9	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	F10	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B10	line outside the evaluator's language (gate): expected an operator after any, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B14	line outside the evaluator's language (gate): expected an operator after claim.helps, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	D8	line outside the evaluator's language (gate): cannot read '<real.size or run.fo'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B28	line outside the evaluator's language (gate): expected a term, found None	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B7	line outside the evaluator's language (kernel): expected an operator after zero.py:, found 'a'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B37	line outside the evaluator's language (kernel): cannot read '>0 (two units share '	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	F6	line outside the evaluator's language (kernel): expected an operator after zero.py:, found 'removal'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	A5	line outside the evaluator's language (judgment): expected an operator after Q:, found 'does'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	G3	line outside the evaluator's language (judgment): expected an operator after Q:, found 'does'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	B18	line outside the evaluator's language (judgment): expected an operator after Q:, found 'was'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	F12	line outside the evaluator's language (judgment): expected an operator after Q:, found 'which'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+6	gate.unwitnessed_verifier	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.unprobed_fanout	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.unclaimed_unit	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.unobserved_destruction	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	content.verifier_exit_masking	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.unknown_ref_switch	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	content.illusory_authorship_trailer	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.undischarged_waiver	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.canon_fingerprints_advisory	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.canon_fingerprints	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.completion	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+6	gate.fabricated_action	fails worth-it on the 2026-09-28 audit: re-grade on a 3.4.6 record, else subtract	tools/worth.py on MAKOTO/foundation audit-2026-09-28.jsonl + verdicts-2026-09-28.tsv	2	5
+8	B36	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	H4	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	E9	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	D8	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	B14	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	F12	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	A14	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	B18	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	B37	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	F6	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	B28	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	G3	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+10	mesh	7 reds unread: the classifier refused the read as Modify Shared Resources	START step 10	4	10
+11	J1	no step-row reader exists: nothing to project from	docs/CONDUCT.md J1	4	10
+11	J6	no PreCompact event is recorded: nothing to project from	docs/CONDUCT.md J6	4	10
