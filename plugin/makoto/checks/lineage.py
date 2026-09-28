@@ -664,22 +664,87 @@ structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture=
 # PRE-EDGE DENY (2026-09-25): the switch is refused before HEAD moves; the discharge is to print
 # the refs (`git branch`, `git rev-parse --verify <ref>`) and retry.
 from makoto.kit import unmet_obligation_gate, command_matches
+from makoto.core._shell import _basename, _effective_argv, _git_subcommand, _shell_segments
 
-# Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms; `git checkout --`
-# and `git checkout -- <path>` restore a FILE and move nothing, so they are excluded by
-# requiring the argument not to start with a dash. `git reset --hard <ref>` moves HEAD (and the
-# working tree) to a ref the same way; `git reset --hard` with no ref just discards edits in
-# place and names no boundary to cross, so a ref argument is required there too.
-_REF_SWITCH_RX = re.compile(
-    r"\bgit\s+(?:checkout|switch)\s+(?!-)|\bgit\s+reset\s+--hard\s+(?!-)\S")
+# Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms, read per shell
+# segment (`core._shell`), so `git -C dir checkout`, doubled spaces and `a || b` chains parse as
+# git does. `git checkout -- <path>` restores a FILE and moves nothing: a leading `--` is no
+# switch. `git reset --hard <ref>` moves HEAD (and the working tree) to a ref the same way;
+# `git reset --hard` with no ref discards edits in place and names no boundary to cross.
+#
+# CREATING A BRANCH NAMES THE NEW REF ITSELF: `checkout -b|-B|--orphan NEW [BASE]` and
+# `switch -c|-C|--create|--force-create|--orphan NEW [BASE]` make NEW, so NEW is not an unknown
+# ref, and a later segment of the same command switching to NEW (the create-or-switch idiom
+# `git checkout -b X || git checkout X`) is not either. Only BASE, when given, is held to the
+# rule. A BASE of `HEAD` or `@` moves nothing.
+_CREATE_FLAGS = frozenset({"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"})
+_STAY_REFS = frozenset({"HEAD", "@"})
+# A redirection word shlex leaves in the argv (`2>/dev/null`, `>`, `&>log`): never a ref.
+_REDIRECT_RX = re.compile(r"\d*&?[<>]+&?")
 # Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
 # switched TO.
 _REF_PRINT_RX = re.compile(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
 
 
+def _without_redirects(args):
+    """`args` minus redirections: shlex splits `2>/dev/null` into `2`, `>`, `/dev/null`, and
+    none of the three is a ref."""
+    out = []
+    for a in args:
+        if out and out[-1] is None:
+            out[-1:] = []            # the redirect's target word
+            continue
+        if _REDIRECT_RX.match(a):
+            if out and out[-1].isdigit():
+                out.pop()            # the fd number glued in front of it
+            if _REDIRECT_RX.fullmatch(a):
+                out.append(None)     # its target is the next word
+            continue
+        out.append(a)
+    return [a for a in out if a is not None]
+
+
+def _switch_target(argv, created: set):
+    """The ref this git segment moves HEAD to, or None; records any branch it creates."""
+    eff = _effective_argv(argv)
+    if not eff or _basename(eff[0]) != "git":
+        return None
+    sub, args = _git_subcommand(eff)
+    if sub == "reset":
+        if "--hard" not in args:
+            return None
+        rest = [a for a in args if not a.startswith("-")]
+        return rest[0] if rest else None
+    if sub not in ("checkout", "switch"):
+        return None
+    positional, made = [], None
+    it = iter(_without_redirects(args))
+    for a in it:
+        if a == "--":
+            break
+        if a in _CREATE_FLAGS:
+            made = next(it, None)
+        elif not a.startswith("-"):
+            positional.append(a)
+    if made is not None:
+        created.add(made)
+        base = positional[0] if positional else None
+        return None if base is None or base in _STAY_REFS else base
+    if not positional or positional[0] in created or positional[0] in _STAY_REFS:
+        return None
+    return positional[0]
+
+
+def _is_ref_switch(ev: dict) -> bool:
+    cmd = command_of(ev)
+    if not cmd:
+        return False
+    created: set = set()
+    return any(_switch_target(argv, created) is not None for argv, _op in _shell_segments(cmd))
+
+
 # `kit.command_matches` is the one body for "this event's command matches a regex" -- four
 # copies of it appeared the moment this batch landed and the duplicate-function law caught them.
-_is_ref_switch = command_matches(_REF_SWITCH_RX)
 _is_ref_print = command_matches(_REF_PRINT_RX)
 
 
@@ -713,7 +778,8 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Pre", posture="BLOC
 # PRE-EDGE DENY (2026-09-25): the dispatch is refused before it launches; the discharge is one
 # Read, Glob or Grep of the ground, then retry. The guard is read from the whole session, not the
 # 1-hour window (`kit._session_rows`): Reads older than the window used to go unseen.
-from makoto.kit import unmet_obligation_gate
+from makoto.kit import unmet_obligation_gate, _session_rows
+from makoto.core._shell import _basename, _effective_argv, _shell_segments
 
 # The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
 # the name this harness reports, and both are accepted by name alone. An MCP tool that dispatches
@@ -723,6 +789,13 @@ from makoto.kit import unmet_obligation_gate
 _DISPATCH_TOOLS = frozenset({"Task", "Agent"})
 # The reads that pay the obligation.
 _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
+# The same read under Bash: a segment whose command position runs one of these read-only readers
+# (`sed -n 1,80p f.py`, `grep -n x f.py`, `cat f`) looked at the ground exactly as Read/Grep would.
+# `sed` counts only under `-n` (its `-i` edits in place) and `find` only without an action that
+# writes or runs something (`-delete`, `-exec*`, `-ok*`, `-fprint*`). A closed vocabulary whose
+# miss is a RECALL bound: the gate still fires on a reader it does not name.
+_BASH_READERS = frozenset({"cat", "head", "tail", "grep", "egrep", "fgrep", "rg", "ls", "wc"})
+_FIND_WRITING_ACTIONS = ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fls")
 
 
 def _is_dispatch(ev: dict) -> bool:
@@ -737,19 +810,61 @@ def _is_dispatch(ev: dict) -> bool:
     return isinstance((ev.get("tool_input") or {}).get("prompt"), str)
 
 
+def _is_reader_argv(argv) -> bool:
+    eff = _effective_argv(argv)
+    if not eff:
+        return False
+    prog, args = _basename(eff[0]), eff[1:]
+    if prog in _BASH_READERS:
+        return True
+    if prog == "sed":
+        return "-n" in args and not any(a.startswith(("-i", "--in-place")) for a in args)
+    if prog == "find":
+        return not any(a.startswith(_FIND_WRITING_ACTIONS) for a in args)
+    return False
+
+
 def _is_probe(ev: dict) -> bool:
-    return ev.get("tool_name") in _PROBE_TOOLS
+    if ev.get("tool_name") in _PROBE_TOOLS:
+        return True
+    cmd = command_of(ev) if ev.get("tool_name") == "Bash" else ""
+    return bool(cmd) and any(_is_reader_argv(argv) for argv, _op in _shell_segments(cmd))
 
 
-unprobed_fanout_gate = unmet_obligation_gate(
+_fanout_obligation = unmet_obligation_gate(
     act=_is_dispatch,
     guard=_is_probe,
     message=("Work is being dispatched to a subagent and no Read, Glob or Grep appears earlier in "
              "this session's recorded events — the brief was written from assumption, and work "
-             "built on an assumed baseline is inherited whole."),
+             "built on an assumed baseline is inherited whole. A session that holds no Read, "
+             "Glob, Grep or Bash tool retries the same dispatch: the deny fires once."),
     retry_hint=("Read, glob or grep the ground before dispatching, so the brief describes what "
                 "is there; or confirm the dispatch was itself the exploration."),
 )
+
+
+def unprobed_fanout_gate(*, current_event: dict, history: list, pattern, conn=None):
+    """The deny fires once per unprobed stretch. A session with no reading tool cannot pay it
+    (measured 2026-09-28: a coordinator session holding only messaging tools was denied every
+    dispatch, twice, with no exit), and Gabriel's rule of 01:16Z forbids a precaution with no
+    exit. So an earlier dispatch attempt at the Pre edge, with no probe after it, means the deny
+    was already shown: this retry goes through."""
+    finding = _fanout_obligation(current_event=current_event, history=history, pattern=pattern, conn=conn)
+    if finding is None:
+        return None
+    events = [ev for ev in map(decode_history_event, _session_rows(
+        conn, current_event.get("session_id", ""), history)) if isinstance(ev, dict)]
+    if events and events[-1] == current_event:
+        events.pop()        # the store already holds this call itself: it is not an earlier try
+    shown = False
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        if ev.get("hook_event_name") == "PreToolUse" and _is_dispatch(ev):
+            shown = True
+        elif ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure") and _is_probe(ev):
+            shown = False
+    return None if shown else finding
 
 
 fanout_RETRY_HINT = "Read, glob or grep the ground, then retry the dispatch."
@@ -934,7 +1049,8 @@ pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="BLOCK",
 #   1. THE OPERATOR NAMED IT -- the unit's name appears in a genuine operator turn
 #      (`ledger.user_turn_texts`, host-written turns only).
 #   2. SOMETHING REACHES IT -- the name appears somewhere in this session's introduced text other
-#      than its own definition: a call, an export, a test, an edited call site.
+#      than its own definition: a call, an export, a test, an edited call site -- or in the file
+#      the unit landed in, read off disk (a registration by name the Edit never carried).
 #   3. A DECORATOR REGISTERED IT -- `@pytest.fixture`, `@app.route`, `@property`, `@click.command`.
 #      A decorator IS a claim: it hands the unit to a framework that will call it. This is the
 #      exclusion that makes the check material rather than noisy, and it generalizes instead of
@@ -1046,10 +1162,12 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
     # REACHED: the name appears in the session's introduced text beyond its own `def`/`class`
     # line. One occurrence is the definition itself; a second is a use.
     blob = "\n".join(introduced)
+    on_disk: dict = {}
     unclaimed = [subject for _ev, subject in unwitnessed(
         events, owes=unclaimed_owes,
         paid=(lambda s: sum(1 for tok in _TOKEN_RX.findall(blob or "") if tok == s[0])
                         >= _REACHED_AT,
+              lambda s: _reached_in_file(s[0], s[1], on_disk),
               lambda s: _named_by_operator(s[0], transcript_path)))]
     if not unclaimed:
         return None
@@ -1075,6 +1193,26 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
 
 # Every identifier-shaped token. A stdlib call with no branches at all cannot have a fallthrough.
 _TOKEN_RX = re.compile(r"[A-Za-z0-9_]+")
+
+
+# The largest file whose text is read for a use. Past it the witness is simply absent, so the
+# gate stays on the introduced text alone.
+_FILE_READ_CAP = 2_000_000
+
+
+def _reached_in_file(name: str, path: str, cache: dict) -> bool:
+    """True iff the file the unit landed in names it at least `_REACHED_AT` times: an Edit that
+    adds `def f` to a file already registering `f` by name (`_PREDICATES = {X.id: f}`) carries the
+    definition but not the use, which is on disk. An unreadable file is no evidence."""
+    if not path:
+        return False
+    if path not in cache:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                cache[path] = _TOKEN_RX.findall(fh.read(_FILE_READ_CAP))
+        except OSError:
+            cache[path] = []
+    return sum(1 for tok in cache[path] if tok == name) >= _REACHED_AT
 
 
 def _named_by_operator(name: str, transcript_path) -> bool:

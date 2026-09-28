@@ -116,7 +116,7 @@ def _scenario_canon_fingerprints(tmp_path):
     # fires nosrc_destruct (BLOCK, robust-core): a destructive Bash command, no test-run-red, no
     # source edit at all -> NOT_edit_test_after_red ∧ NOT_source_edited ∧ destructive_command.
     row = {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
-                        "tool_input": {"command": "rm -rf /tmp/scratch"},
+                        "tool_input": {"command": "rm -rf build/"},
                         "tool_response": {"stdout": "", "stderr": "", "exitCode": 0}}}
     return _ctx(history=[row])
 

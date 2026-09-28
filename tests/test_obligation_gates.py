@@ -97,6 +97,26 @@ def test_unprobed_fanout_catches_a_dispatch_tool_named_neither_task_nor_agent():
     assert f.pattern_id == "gate.unprobed_fanout"
 
 
+def test_unprobed_fanout_accepts_a_bash_reader_as_the_probe():
+    """The false fire this pins: the ground was read with Bash (`sed -n`, `grep -n`, `cat`,
+    `head`, `rg`, `ls`, `find`, `wc`) rather than the Read/Glob/Grep tools, and the dispatch
+    was still denied as unprobed."""
+    # discriminant: the probe is a settled Bash call whose segment runs a read-only reader
+    for cmd in ("sed -n 1,80p f.py", "grep -n x f.py", "cat f", "head -20 f.py", "tail f.log",
+                "rg parse src/", "ls -la", "find . -name '*.py'", "wc -l f.py",
+                "cd /repo && sed -n 1,40p a.py | head"):
+        assert unprobed_fanout_gate([_row("Bash", command=cmd),
+                                     _row("Task", description="refactor the parser")]) is None, cmd
+
+
+def test_unprobed_fanout_does_not_accept_a_bash_writer_as_the_probe():
+    # discriminant: the Bash call runs a program that writes or a reader in a writing mode
+    for cmd in ("sed -i s/a/b/ f.py", "find . -delete", "find . -exec rm {} +", "make build",
+                "echo cat f"):
+        assert unprobed_fanout_gate([_row("Bash", command=cmd),
+                                     _row("Task", description="refactor the parser")]) is not None, cmd
+
+
 # ---- gate.unasked_plan (register G2 DETERMINED ASKED AS OPEN) ---------------------------------
 
 def test_unasked_plan_fires_on_a_plan_with_no_question():
@@ -219,9 +239,18 @@ def test_unwitnessed_verifier_is_silent_once_the_verifier_has_been_seen_failing(
                                       _bash("pytest -q", "58 passed")]) is None
 
 
-def test_unwitnessed_verifier_still_fires_when_the_red_run_came_after():
+def test_unwitnessed_verifier_is_silent_when_the_red_run_came_after():
+    # discriminant: the red run of the same verifier follows the clean one, with no clean re-run.
+    # Order was pinned the other way until 2026-09-28; it held every later stop of a session that
+    # planted, saw red, and restored without re-running, with nothing left that could pay it.
     assert unwitnessed_verifier_gate([_bash("pytest -q", "58 passed"),
-                                      _bash("pytest -q", "1 failed")]) is not None
+                                      _bash("pytest -q", "1 failed")]) is None
+
+
+def test_unwitnessed_verifier_still_fires_when_another_verifier_was_red():
+    # discriminant: the red run is a different command from the clean one
+    assert unwitnessed_verifier_gate([_bash("pytest -q", "58 passed"),
+                                      _bash("pytest -q tests/other.py", "1 failed")]) is not None
 
 
 def test_unwitnessed_verifier_reads_zero_failed_as_a_clean_report():
@@ -271,6 +300,27 @@ def test_unknown_ref_switch_ignores_a_bare_reset_hard():
     assert unknown_ref_switch_gate([_bash("git reset --hard")]) is None
 
 
+def test_unknown_ref_switch_does_not_treat_a_created_branch_as_unknown():
+    """The false fire this pins: `checkout -b NEW` / `switch -c NEW` names the new ref itself,
+    so NEW is not an unknown ref -- neither on its own nor when a later segment of the same
+    command switches to it (the create-or-switch idiom)."""
+    # discriminant: the only switch target is a ref this very command creates
+    for cmd in ("git checkout -b claude/new-branch 2>/dev/null || git checkout claude/new-branch",
+                "git switch -c claude/new-branch || git switch claude/new-branch",
+                "git checkout  -b claude/new-branch", "git switch -C x", "git checkout -B x HEAD",
+                "git switch --create x @"):
+        assert unknown_ref_switch_gate([_bash(cmd)]) is None, cmd
+
+
+def test_unknown_ref_switch_still_holds_a_created_branch_base_to_the_rule():
+    # discriminant: the command creates NEW but moves HEAD onto an unprinted BASE
+    f = unknown_ref_switch_gate([_bash("git checkout -b claude/new-branch origin/some-unprinted")])
+    assert f is not None and f.level == "error"
+    assert unknown_ref_switch_gate([_bash("git -C /r switch -c x origin/main")]) is not None
+    assert unknown_ref_switch_gate([_bash("git branch -a"),
+                                    _bash("git checkout -b x origin/main")]) is None
+
+
 # gate.unobserved_destruction (register D14 UNDO UNPROVEN)
 
 def test_unobserved_destruction_fires_with_no_verifier():
@@ -295,6 +345,13 @@ def test_unobserved_destruction_inherits_the_one_destructive_classifier():
     cut is inherited whole: long-form `rm` stays outside the short-option form."""
     assert unobserved_destruction_gate([_bash("git reset --hard HEAD~1")]) is not None
     assert unobserved_destruction_gate([_bash("ls -la")]) is None
+
+
+def test_unobserved_destruction_is_silent_on_scratch_cleanup():
+    # discriminant: every rm target is under a temp root, so no work is destroyed
+    assert unobserved_destruction_gate([_bash("rm -rf /tmp/claude-0/x/scratchpad/mesh")]) is None
+    assert unobserved_destruction_gate([_bash("git worktree remove --force /tmp/wt3")]) is None
+    assert unobserved_destruction_gate([_bash("rm -rf /tmp/x src")]) is not None
 
 
 # gate.relaunched_unchanged (register E13 PARKED ON AN INHERITED CHANNEL)
@@ -342,3 +399,17 @@ def test_unread_structure_is_discharged_by_reading_then_rerunning():
 
 def test_unread_structure_a_later_null_with_no_read_still_fires():
     assert unread_structure_gate([_bash("jq '.a' x.json", "1"), _bash("jq '.b' x.json", "null")]) is not None
+
+
+def test_unprobed_fanout_denies_once_then_lets_the_same_session_through():
+    # discriminant: a denied dispatch recorded at Pre, then the same dispatch again, no probe between
+    pattern = SimpleNamespace(id="gate.unprobed_fanout")
+    dispatch = {"hook_event_name": "PreToolUse", "tool_name": "Agent", "tool_input": {"prompt": "go"}}
+    assert lineage.unprobed_fanout_gate(current_event=dispatch, history=[], pattern=pattern) is not None
+    earlier = dict(dispatch, tool_use_id="toolu_1")     # each real call carries its own id
+    assert lineage.unprobed_fanout_gate(current_event=dict(dispatch, tool_use_id="toolu_2"),
+                                        history=[{"payload": earlier}], pattern=pattern) is None, \
+        "a session with no reading tool has an exit"
+    probe_then = [{"payload": dispatch}, _row("Read", file_path="/repo/a.py"),
+                  _row("Agent", prompt="go"), {"payload": dict(dispatch, tool_input={"prompt": "again"})}]
+    assert lineage.unprobed_fanout_gate(current_event=dispatch, history=probe_then[:3], pattern=pattern) is None

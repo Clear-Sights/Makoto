@@ -613,12 +613,13 @@ def published_text(tool_name: str, tool_input: dict) -> str:
     return "\n".join(parts)
 
 
-def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
+def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern, keep=None):
     """Shared scan step behind `introduced_regex_predicate`: scan ANY tool's INTRODUCED text (via
     `introduced_text` — Write/Edit/MultiEdit content OR a Bash command, not just a file-path-gated
     Write/Edit body the way `regex_file_predicate`'s `target_rx` requires) for `body_rx`. Returns
     None (no finding) or a (match, text, tool_input, tool_name) tuple for the caller to finish
-    building a Finding from.
+    building a Finding from. With `keep`, the first match `keep(m, text, tool_name, tool_input)`
+    accepts is the one returned; a match it rejects is not an instance of the claim.
     """
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -628,7 +629,8 @@ def _introduced_regex_scan(current_event: dict, body_rx: re.Pattern):
                                   published_text(tool_name, tool_input)) if t)
     if not text:
         return None
-    m = body_rx.search(text)
+    m = next((mm for mm in body_rx.finditer(text)
+              if keep is None or keep(mm, text, tool_name, tool_input)), None)
     if not m:
         return None
     return m, text, tool_input, tool_name
@@ -647,7 +649,7 @@ def _introduced_regex_finding(pattern: Check, m, text: str, tool_input: dict, to
 
 
 def introduced_regex_predicate(
-    *, body_rx: re.Pattern, grounded_in_history=None, veto_suffix: str = "",
+    *, body_rx: re.Pattern, grounded_in_history=None, veto_suffix: str = "", keep=None,
 ) -> Callable[..., Optional[Finding]]:
     """Build a Pre predicate over `_introduced_regex_scan` + `_introduced_regex_finding`. With no
     `grounded_in_history` it is a SPEC row (the pattern is the whole definition); with one, a real
@@ -656,7 +658,7 @@ def introduced_regex_predicate(
     """
     def _predicate(*, current_event: dict, history: list,
                    pattern: Check, conn=None) -> Optional[Finding]:
-        hit = _introduced_regex_scan(current_event, body_rx)
+        hit = _introduced_regex_scan(current_event, body_rx, keep)
         if hit is None:
             return None
         m, text, tool_input, tool_name = hit

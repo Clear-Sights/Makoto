@@ -838,7 +838,7 @@ def test_dispatch_canon_fingerprints_gate_blocks(tmp_path):
     robust-core, blocking-capable fingerprint) and BLOCKS at Stop by default."""
     state_dir = _setup_state(tmp_path)
     post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "canon_fp_block",
-            "cwd": str(tmp_path), "tool_input": {"command": "rm -rf /tmp/scratch"},
+            "cwd": str(tmp_path), "tool_input": {"command": "rm -rf build/"},
             "tool_response": {"stdout": "", "stderr": "", "exitCode": 0}}
     rc, out = _run_dispatch(state_dir, post)
     assert rc == 0 and out == ""
@@ -2199,6 +2199,8 @@ def test_main_does_not_inherit_the_previous_calls_notices(tmp_path, monkeypatch,
     monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path))
     D.main()
     capsys.readouterr()
+    # a fresh state dir: the notice shows once per session, and this test is about accumulation
+    monkeypatch.setenv("MAKOTO_STATE_DIR", str(tmp_path / "second"))
     D.main()
     assert len(D._notices) == 1, f"notices accumulated across calls: {D._notices!r}"
 
@@ -2293,6 +2295,18 @@ def test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs(tmp_path, r
             assert row in decision["hookSpecificOutput"]["permissionDecisionReason"]
 
 
+def test_dispatch_unprobed_fanout_has_an_exit_for_a_session_with_no_reading_tool(tmp_path):
+    """Catch: the first unprobed dispatch is denied. Pass: the same dispatch retried, with nothing
+    read between, goes through: a session holding no Read, Glob, Grep or Bash has an exit."""
+    # discriminant: two Pre dispatches through the real store, no probe between them
+    state_dir = _setup_state(tmp_path)
+    first = dict(_pre(tmp_path, "c", "Agent", prompt="go", description="x"), tool_use_id="toolu_1")
+    out = _run_dispatch(state_dir, first)[1]
+    assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    out = _run_dispatch(state_dir, dict(first, tool_use_id="toolu_2"))[1]
+    assert "gate.unprobed_fanout" not in out, out
+
+
 def test_dispatch_undischarged_waiver_denies_until_an_end_is_named(tmp_path):
     """Catch: a Write introducing a silencing directive with no end is denied. Pass: the same
     directive with a tracked item beside it goes through."""
@@ -2371,12 +2385,13 @@ def test_unwitnessed_verifier_keys_the_segment_so_a_masked_red_plain_run_pays_a_
     assert not _unwitnessed_after(tmp_path / "paid", "seg1", [_RED, clean]), "the plain red run pays the compound one"
 
 
-def test_unwitnessed_verifier_owes_only_the_latest_clean_run_so_plant_then_rerun_pays(tmp_path):
-    """A clean run, then the planted red, then the clean run again: the latest clean run is paid
-    by the red before it, and the first one no longer owes forever."""
+def test_unwitnessed_verifier_is_paid_by_a_red_run_in_either_order(tmp_path):
+    """A clean run, then the planted red, with or without the clean run again: the red shows the
+    verifier can fire, which is the whole claim, so neither clean run owes."""
+    # discriminant: the red of the same verifier comes after the only clean run
     clean = ("cd /r && PYTHONPATH=$PWD/plugin python -m pytest -q -p no:cacheprovider", "41 passed")
-    assert _unwitnessed_after(tmp_path / "late", "seg5", [clean, _RED]), \
-        "a red after the latest clean run does not pay it"
+    assert not _unwitnessed_after(tmp_path / "late", "seg5", [clean, _RED]), \
+        "a red after the clean run pays it"
     assert not _unwitnessed_after(tmp_path / "rerun", "seg6", [clean, _RED, clean]), \
         "plant, see it fail, run it clean: paid"
 

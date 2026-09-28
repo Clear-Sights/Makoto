@@ -195,6 +195,12 @@ def test_weakened_secret_timeout():
            [_WEAKEN_ROW, _SECRET_ROW], "")
 
 
+def test_block_gate_is_silent_on_scratch_cleanup():
+    # discriminant: the only destructive-looking call removes a /scratchpad/ dir under /tmp/
+    assert canon_fingerprint_block_gate("", [_bash("rm -rf /tmp/claude-0/x/scratchpad/mesh")]) == []
+    assert canon_fingerprint_block_gate("", [_bash("rm -rf /tmp/x src")])
+
+
 # ---- clean/empty session: nothing fires -----------------------------------------------------------
 def test_clean_session_nothing_fires():
     assert _fired_names([_GREEN_ROW], "") == set()

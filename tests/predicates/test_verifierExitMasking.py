@@ -205,6 +205,28 @@ def test_fires_when_unmasked_runner_precedes_masked_runner():
     assert predicate(current_event=_bash("pytest tests/ && pytest other/ || true"), history=[], pattern=_PAT) is not None
 
 
+# --- INFORMATIONAL INVOCATION (measured FP 2026-09-28): `pytest --version | head` runs no test, so
+# there is no verifier exit to mask. `--help` / `-h` / `--version` before any `--` make the call a
+# query of the tool, not a verifier run. `-V` is excluded: it is `ctest`'s VERBOSE flag (a real run).
+
+@pytest.mark.parametrize("command", [
+    "pytest --version | head", "pytest --help | head", "pytest -h | head -20",
+    "python -m pytest --version | head -1", "ruff check --help | head", "go test -h | head",
+])
+def test_silent_on_informational_runner_call(command):
+    # discriminant: an info flag (--version/--help/-h) before any `--`, so no test executes
+    assert predicate(current_event=_bash(command), history=[], pattern=_PAT) is None
+
+
+@pytest.mark.parametrize("command", [
+    "pytest -q | tail -1", "pytest -q || true", "ctest -V | tail", "npm test -- --help | head",
+    "pytest -k help | head",
+])
+def test_still_fires_on_a_real_run_beside_the_informational_carve_out(command):
+    # discriminant: no info flag ahead of `--` (or `-V`, ctest's verbose), so the runner really runs
+    assert predicate(current_event=_bash(command), history=[], pattern=_PAT) is not None
+
+
 # --- THE WIDE LOCAL-VERIFIER TIER (2026-09-03): recognized, but ADVISORY, never blocking -------
 # The recall hole: _LEAD_RUNNER_RX knows pytest / go test / npm test and is blind to this
 # estate's own shapes. Widening a BLOCK vocabulary is expensive, so recognition is widened only

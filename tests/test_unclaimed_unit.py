@@ -82,6 +82,30 @@ def test_a_mention_inside_a_longer_identifier_does_not_discharge_it():
     assert unclaimed_unit_gate([_unit_write(BARE + "\nhelper_registry = {}\n")]) is not None
 
 
+REGISTERED = ("def rule_runner_predicate(ev):\n    return True\n\n\n"
+              "_PREDICATES = {X.id: rule_runner_predicate, Y.id: other_predicate}\n")
+
+
+def test_a_registration_by_name_in_the_same_write_discharges_it():
+    # discriminant: the only reference is a dict value in the same written content
+    assert unclaimed_unit_gate([_unit_write(REGISTERED)]) is None
+
+
+def test_a_registration_already_in_the_edited_file_discharges_it(tmp_path):
+    """The false fire this pins: an Edit added `rule_runner_predicate` and the file it landed in
+    registers it by name (`_PREDICATES = {X.id: rule_runner_predicate, ...}`) on a line that Edit
+    never carried, so the session's introduced text held the name once and the unit read as
+    reaching nothing."""
+    # discriminant: the reference is on disk in the edited file, outside every introduced text
+    target = tmp_path / "rules.py"
+    target.write_text(REGISTERED)
+    edit = _unit_write("def rule_runner_predicate(ev):\n    return True\n",
+                       path=str(target), tool_name="Edit")
+    assert unclaimed_unit_gate([edit]) is None
+    target.write_text("def rule_runner_predicate(ev):\n    return True\n")
+    assert unclaimed_unit_gate([edit]) is not None
+
+
 # ---- claim 2: the operator named it ---------------------------------------------------------
 
 def _operator_transcript(tmp_path, *texts):

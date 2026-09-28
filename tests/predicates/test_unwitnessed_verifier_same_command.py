@@ -21,7 +21,6 @@ PROBE = "python3 zero/tests/probe.py G"
     [_run(PROBE, "G PASS")],                                          # a tree's own check script
     [_run("bash zero/tests/run.sh", "every test PASS")],
     [_run("pytest -q", "1 failed, 3 passed", 1), _run(PROBE, "G PASS")],  # another one's red
-    [_run(PROBE, "G PASS"), _run(PROBE, "G FAIL", 1)],                # red only after the clean run
 ])
 def test_clean_run_never_seen_red_fires(history):
     assert unwitnessed_verifier_gate(history) is not None
@@ -29,6 +28,7 @@ def test_clean_run_never_seen_red_fires(history):
 
 @pytest.mark.parametrize("history", [
     [_run(PROBE, "G FAIL", 1), _run(PROBE, "G PASS")],
+    [_run(PROBE, "G PASS"), _run(PROBE, "G FAIL", 1)],                # red after the clean run pays it too
     [_run("pytest -x", "1 failed", 1), _run("pytest -q | tail -n 3", "5 passed")],
     [_run("# keel-guard: U08\npytest", "1 failed", 1), _run("pytest 2>&1", "5 passed")],
     [_run("cat zero/tests/probe.py", "PASS")],                        # reading a check runs nothing

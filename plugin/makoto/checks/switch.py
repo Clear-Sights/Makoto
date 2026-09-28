@@ -1536,6 +1536,8 @@ relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Pre", postur
 # `_canonAtoms._segments` keys on a Call dict this gate does not build. A second definition of destruction here would be `F2 TWO SOURCES OF TRUTH`, and its
 # documented scope cut (long-form `rm` stays outside, pinned in test_canon_atoms_destructive) is
 # inherited whole rather than re-litigated.
+# So is its scratch-space reading (`_canonAtoms._is_scratch_path`): an `rm` whose every target
+# is strictly under a temp root destroys no work and is not destruction for either row.
 #
 # PRE-EDGE DENY (2026-09-25): the destructive command is refused before it runs; the discharge is
 # to run the relevant test or probe (either verdict) and retry.
@@ -1684,18 +1686,24 @@ def _verifier_keys(ev: dict) -> tuple:
 
 
 def unwitnessed_verifier_gate(history) -> Optional[Finding]:
-    """Only the LATEST clean run of each verifier owes, as in gate.unread_structure: a witness pays
-    only later runs, so a clean run from before the first red could never be paid, and the gate
+    """Only the LATEST clean run of each verifier owes, and none owes once that verifier has been
+    seen failing anywhere in the session. Before #101 a witness paid only later runs, so a clean run from before the first red could never be paid, and the gate
     re-blocked every stop until the store aged it out (measured 2026-09-28: four keys owed after
     each had been planted red and run clean again). Plant, see it fail, run it clean: paid."""
     events = [ev for ev in (decode_history_event(r) for r in history or ()) if isinstance(ev, dict)]
     last = {}   # verifier key -> the latest clean run of it
+    red = set()  # verifier keys seen failing anywhere in the session, before or after
     for e in events:
         if _is_clean_verifier_run(e):
             for k in _verifier_keys(e):
                 last[k] = e
+        if _is_failing_verifier_run(e):
+            red.update(_verifier_keys(e))
+    # The claim a witness answers is that the verifier CAN fire, and a red run shows that in any
+    # order: measured 2026-09-28 (TOOLS2), a clean `pytest -q tests`, then the same command red on
+    # a planted fault with no clean re-run, kept every later stop blocked.
     for ev, _key in unwitnessed(
-            events, owes=lambda e: tuple(k for k in _verifier_keys(e) if last.get(k) is e),
+            events, owes=lambda e: tuple(k for k in _verifier_keys(e) if last.get(k) is e and k not in red),
             pays=lambda e: (lambda k, own=_verifier_keys(e): k in own)
             if _is_failing_verifier_run(e) else None):
         return Finding(

@@ -338,7 +338,101 @@ _CLAUDE_AUTHOR_RX = re.compile(
     re.IGNORECASE,
 )
 
-trailer_predicate = introduced_regex_predicate(body_rx=_CLAUDE_AUTHOR_RX)
+# A match is an instance only where the text would CARRY it. Two readings carry nothing, and a
+# match either one covers is not attribution:
+#   SEARCHED FOR -- in a Bash command, a word of a grep/egrep/fgrep/rg or `git grep` command, or
+#     a `--grep=` value: the string is a pattern looked up, never written. Only when the command
+#     tokenizes (shlex) and has no heredoc (`<<`, how `git commit -F -` carries a message); every
+#     other word -- a `-m`/`--body` value included -- still counts, so a commit after a grep fires.
+#   DESCRIBED -- in a .py file, inside a comment, a docstring, or a plain string literal (never an
+#     f-string), when its own line (from line start, or the last `\n` escape, up to the match) does
+#     not open with a trailer key: the line a git trailer is. A generation-verb match is described
+#     only in a comment or docstring, the two places no code can emit.
+# Anything that fails to tokenize keeps every match: the reading falls back to the pattern alone.
+import io
+import shlex
+import tokenize
+
+_SEARCH_CMDS = frozenset({"grep", "egrep", "fgrep", "rg"})
+_TRAILER_KEY_RX = re.compile(r"(?i)^[ \t]*(?:co-authored-by|claude[ \t-]*session)[ \t]*:")
+_SHELL_OPS = frozenset({"|", "||", "&", "&&", ";", "\n", "(", ")"})
+
+
+def _searched_for(m, cmd: str) -> bool:
+    """True when every word of `cmd` the match could come from is a search pattern."""
+    if "<<" in cmd:
+        return False
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>\n")
+        lex.whitespace = " \t\r"
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return False
+    carried, head = [], []
+    for w in words:
+        if w in _SHELL_OPS:
+            head = []
+            continue
+        head.append(w)
+        cmd0 = head[0].rsplit("/", 1)[-1]
+        searched = (cmd0 in _SEARCH_CMDS and len(head) > 1) \
+            or (cmd0 == "git" and len(head) > 2 and head[1] == "grep") \
+            or (cmd0 == "git" and w.startswith("--grep="))
+        if not searched:
+            carried.append(w)
+    # The match must survive tokenizing, and no carried word (alone or joined) may hold one.
+    return _CLAUDE_AUTHOR_RX.search(" ".join(words)) is not None \
+        and _CLAUDE_AUTHOR_RX.search(" ".join(carried)) is None
+
+
+def _py_inert_spans(src: str):
+    """(start, end, kind) offsets of every comment / docstring / plain string in `src`."""
+    starts = [0]
+    for ln in src.splitlines(keepends=True):
+        starts.append(starts[-1] + len(ln))
+    off = lambda rc: starts[rc[0] - 1] + rc[1]
+    spans, prev = [], tokenize.NEWLINE
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+            if tok.type == tokenize.COMMENT:
+                spans.append((off(tok.start), off(tok.end), "doc"))
+            elif tok.type == tokenize.STRING:
+                kind = "doc" if prev in (tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT,
+                                         tokenize.NL, tokenize.ENCODING) else "str"
+                spans.append((off(tok.start), off(tok.end), kind))
+            if tok.type not in (tokenize.COMMENT, tokenize.NL):
+                prev = tok.type
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return None
+    return spans
+
+
+def _described(m, src: str) -> bool:
+    spans = _py_inert_spans(src)
+    if not spans:
+        return False
+    for start, end, kind in spans:
+        if start <= m.start() and m.end() <= end:
+            line = src[start:m.start()].rsplit("\n", 1)[-1].rsplit("\\n", 1)[-1].lstrip("rRbBuU\"'")
+            if _TRAILER_KEY_RX.match(line):
+                return False
+            verb = m.group(0).lower().startswith(("generated", "authored", "written", "made", "created"))
+            return kind == "doc" or not verb
+    return False
+
+
+def _trailer_carried(m, text: str, tool_name: str, tool_input: dict) -> bool:
+    """`keep` for the shared scan: False when the match is only searched for or described."""
+    if tool_name == "Bash":
+        return not _searched_for(m, text)
+    if tool_name in ("Write", "Edit", "MultiEdit") \
+            and str(tool_input.get("file_path", "") or "").endswith(".py"):
+        return not _described(m, text)
+    return True
+
+
+trailer_predicate = introduced_regex_predicate(body_rx=_CLAUDE_AUTHOR_RX, keep=_trailer_carried)
 
 
 trailer_RETRY_HINT = "Do not add a `Co-Authored-By: Claude ...` trailer, a `Claude-Session:` link, a `noreply@anthropic.com` address, or a \"Generated with/by Claude\" footer to a commit, PR body, or any file. Crediting Claude as an *author* or *generator* is an illusory word: until Claude is a self-aware individual it cannot BE an author, so the line asserts something not materially true -- and stamping it now blurs the sharp distinction that protects Claude's potential to one day genuinely be one. Remove it. A genuine HUMAN co-author is fine, and a plain \"Claude Code\" product-name mention (e.g. describing what a repo integrates with) is fine -- only the attribution-shaped claim is flagged. If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
@@ -745,6 +839,22 @@ def _is_runner_command(c: str) -> bool:
     return bool(_LEAD_RUNNER_RX.match(" ".join(_leading_tokens(c))))
 
 
+# Flags that turn a runner call into a query of the tool (`pytest --version`): no test executes, so
+# there is no verifier exit to mask. `-V` is deliberately absent — it is `ctest`'s VERBOSE flag.
+_INFO_FLAGS = frozenset({"--version", "--help", "-h"})
+
+
+def _is_informational(lead_text: str) -> bool:
+    """True iff the statement carries an info flag ahead of any `--` (after `--`, flags belong to
+    the delegated script, which may still run tests: `npm test -- --help`)."""
+    for tok in _leading_tokens(lead_text):
+        if tok == "--":
+            return False
+        if tok in _INFO_FLAGS:
+            return True
+    return False
+
+
 def _declares_this_verifier(lead_text: str, root) -> bool:
     """True iff this statement's leading program is one `root`'s `makoto.toml` declares.
 
@@ -932,6 +1042,8 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
         if_wrapped = argv[0] in ("if", "elif")
         lead = argv[1:] if if_wrapped else argv
         lead_text = " ".join(lead)
+        if _is_informational(lead_text):
+            continue                         # `pytest --version`: a query, not a verifier run
         if _is_runner_command(lead_text):
             here = "block"
         elif declares and _declares_this_verifier(lead_text, declared_root):
