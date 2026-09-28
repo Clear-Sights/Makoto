@@ -42,25 +42,23 @@ Makoto is done when all three hold:
 - Every fired check passes worth.py on a fresh live record.
 - The launch checklist passes.
 
-The row designs are in `docs/FOUNDATION-14.md`.
-
-## Steps
+The row designs are in `docs/FOUNDATION-14.md`. The steps:
 
 1. ~~Count register entries I1 to I3~~ (PR #100).
    check: `python3 tools/register_map.py` reads 0 UNCOVERED. plant: delete I3's row from
-   `docs/REGISTER-MAP.tsv` and it exits 1. inputs: none open. owner: done.
+   `docs/REGISTER-MAP.tsv` and it exits 1. inputs: `docs/REGISTER.md` part 5. owner: done.
 2. ~~Make Stop instantaneous, measure worth, withhold unchanged repeats, make the verifier gate
    payable~~ (PR #101).
    check: `tests/test_hook_latency.py`, `tests/test_worth.py` and `tests/test_stop_unchanged.py`.
-   plant: each file carries its own plant. inputs: none open. owner: done.
+   plant: each file carries its own plant. inputs: `tools/worth.py`. owner: done.
 3. ~~Fix the 7 deterministic false-fire classes~~ (PR #102; the classes are in its commit titles).
    check: the per-check tests in each commit. plant: revert any one commit and its test reads
-   red. inputs: none open. owner: done.
+   red. inputs: each check's own test file. owner: done.
 4. ~~Make the installed copy provably this checkout~~ (PR #102). The version moved to 3.3.0, and
    `docs/PLUGIN-DIGEST.tsv` pins its content.
    check: `tests/test_plugin_digest.py` and the launch checklist's installed-copy line.
    plant: change a byte under `plugin/` without a new pin row, and the test reads red.
-   inputs: none open. owner: done.
+   inputs: `docs/PLUGIN-DIGEST.tsv`. owner: done.
 5. ~~Give every blocking check an exit the session actually has~~ (PR #102): the stop bound
    `STOP_BLOCK_BOUND` (3), a single fanout deny, verifier witness in either order, and the
    fail-open notice shown once per session.
@@ -73,7 +71,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    plant: drop the spent filter in `dispatch._evaluate_and_gate`, and stop 4 blocks. Return the
    finding unconditionally in `lineage.unprobed_fanout_gate`, or drop `k not in red` in
    `switch.unwitnessed_verifier_gate`, and its test reads red.
-   inputs: none open. owner: done.
+   inputs: `plugin/makoto/dispatch.py`. owner: done.
 6. Re-grade worth on a fresh live record, then subtract (`docs/PRIOR-ART.md` item 4). Subtraction is the default: a check
    that still fails worth-it is removed, along with its register row reverting to NOT-COUNTABLE,
    rather than narrowed or joined by a new one.
@@ -84,7 +82,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
 7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
    check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
-   RUNNER row back and the test reads red. inputs: none open; the design is
+   RUNNER row back and the test reads red. inputs: the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
 8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
    commit each. Each commit lowers the pin by 1.
