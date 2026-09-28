@@ -74,3 +74,11 @@ def test_the_dispatcher_stores_the_stamp(tmp_path):
     rows = sqlite3.connect(str(tmp_path / "state" / "makoto.record.db")).execute(
         "select payload from events").fetchall()
     assert any(F.SEEN_KEY in r[0] for r in rows)
+
+
+def test_a_fifo_or_a_directory_is_never_read(tmp_path):
+    fifo = tmp_path / "pipe"
+    os.mkfifo(fifo)
+    assert F.file_hash(str(fifo)) is None                   # would block forever if opened
+    assert F.file_hash(str(tmp_path)) is None
+    assert F.stamp(_post("Read", {"file_path": str(fifo)}, tmp_path)) is None

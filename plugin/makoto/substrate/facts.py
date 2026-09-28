@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 
 import shlex
 
@@ -44,8 +45,11 @@ def _path_of(ev: dict) -> str | None:
 
 
 def file_hash(path: str):
+    """The file's hash, or None: only a regular file under the size cap is read, so a FIFO or a
+    device a call names can never block the hook."""
     try:
-        if os.path.getsize(path) > _MAX_HASHED:
+        st = os.stat(path)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > _MAX_HASHED:
             return None
         with open(path, "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()[:16]
