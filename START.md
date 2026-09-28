@@ -75,6 +75,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    - gate.unprobed_fanout denies once per unprobed stretch, and the same dispatch retried goes
      through. A seat with no Read, Glob, Grep or Bash tool could never pay it.
    - gate.unwitnessed_verifier is paid by a red run of the same verifier in either order.
+   - The fail-open notice ("allowed without being checked") shows once per session and stage.
 
    Past the stop bound, the finding is printed and the stop goes through. No precaution can
    force endless churn: the session goes long, never forever. Other Pre denials stay unbounded,
@@ -122,3 +123,12 @@ The row designs are in `docs/FOUNDATION-14.md`.
    inputs: the classifier refused a read of the remaining 7 reds and the 3 proposed I1 to I3
    cases as "Modify Shared Resources". The placement item in the handoff section carries the line
    that lifts it. owner: the next Makoto session.
+11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md`: off-path acts, hand repeats, serial
+    independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
+    loops. Some of the conduct Gabriel requires is already live (the entries named in that file).
+    These eight are not yet prevented.
+    check: register_map carries each J row as RUNNER. plant: the catch case in its table row.
+    inputs: the gap named on each row, which is a threshold to measure on `tools/corpus.py`, or an
+    input that does not exist yet. The inputs that do not exist yet are the step-row reader (J1),
+    the names index (J4), the mesh slot map (J5) and a recorded PreCompact event (J6).
+    owner: the next Makoto session, after step 7's kit.neighbours.
