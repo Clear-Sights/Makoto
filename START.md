@@ -17,8 +17,16 @@ line failed; do not work around it.
   `tools/merge_pass.py`.
 - Every installed Makoto copy is this checkout's `plugin/`, both version and content. Hooks load
   at session start, so a reinstall needs a new session.
-- DetIO is installed, and the line prints its version (0.3.6 at DetIO main d203b99 on
-  2026-09-28). Hooks load at session start, so an install needs a new session.
+- The session has the repositories it needs: ask to attach (add_repo) Clear-Sights/Scour and
+  Clear-Sights/Measure-Zero, and clone both beside this repository, before anything else.
+- DetIO is on: it loads as a plugin at the version DetIO main ships, with
+  `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
+  installed in this session", and the launch line prints the installed version. Installed but
+  disabled reads missing. If it is missing, stop and tell Gabriel.
+- Scour, pinned at 45cd655 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
+  and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
+  LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
+  step done.
 - The suite is green.
 
 ## Goal and path
@@ -126,8 +134,8 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     the MERGE-WITNESSES rule.
     check: a test that reads the count off the register file and fails on any typed count that
     disagrees. plant: type a wrong count into README.md and the test reads red.
-    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` and
-    `Clear-Sights/Measure-Zero`, each at a pinned sha taken when the step starts. The join is a
+    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at 45cd655
+    and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
 13. Replace per-case recognizers with one mechanism per family (`docs/MECHANISM.md`). A case
     outside a list must never be ignored: record each command's effect as a Pre/Post tree digest
