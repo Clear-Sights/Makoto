@@ -62,7 +62,8 @@ Makoto is done when all three hold:
 
 - `python3 tools/register_map.py` prints RUNNER for every entry whose set a hook event can
   decide, each by one check whose predicate is the entry's effect; every NOT-COUNTABLE row names
-  the fact no hook event carries (59 RUNNER and 18 NOT-COUNTABLE on 2026-09-28).
+  the fact no hook event carries (the split is read off that tool; `tests/test_ratchet.py` pins
+  the NOT-COUNTABLE count and lets it only fall).
 - Every fired check passes worth.py on a fresh live record.
 - The launch checklist passes.
 
@@ -123,7 +124,7 @@ The steps:
 7. ~~Build the ratchet and the shared pieces: `kit.neighbours`, O(n·t) with one token blanked, and
    `kit.claim`~~ (branch claude/pensive-carson-cbpr5j). gate.running_claim now reads its claim through
    `kit.claim`, and `_code_spans` moved down to `vocab` so kit can use it.
-   check: `tests/test_ratchet.py` (PIN = 18, read off `tools/register_map.py`) and
+   check: `tests/test_ratchet.py` (its PIN, read off `tools/register_map.py`, falls with each row) and
    `tests/test_kit_shared.py`. plant: flip any RUNNER row back and the ratchet reads red; a pairwise
    loop in `kit.neighbours`, or no negation filter in `kit.claim`, and its test reads red.
    inputs: `docs/FOUNDATION-14.md`, "Shared pieces". owner: done.
@@ -178,20 +179,18 @@ The steps:
     step-row reader) and J6 (no recorded PreCompact event) have nothing to project from; they are
     step 11 rows in VOIDS. cap: 4 model calls and 10 minutes per row.
     Stop: at the cap, record the measured number in VOIDS and go on.
-12. One count and one owner per register entry (`docs/PRIOR-ART.md` items 1, 2 and 7). Derive the
-    entry count from the register file by script, so no document types it. Join
-    `docs/REGISTER-MAP.tsv` with Scour's declined() reasons into one table that names, per entry,
-    the static probe (Scour), the dynamic runner (Makoto) or neither. Dedupe B7, B2, F2 and D1 by
-    the MERGE-WITNESSES rule.
-    check: a test that reads the count off the register file and fails on any typed count that
-    disagrees. plant: type a wrong count into README.md and the test reads red.
-    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at efd27e9
-    and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
-    script, not a reading. Neither is needed before this step. owner: the next Makoto session.
-    projection: `python3 tools/project.py 12` (no model) joins `docs/v9/owners.tsv` with
-    `docs/REGISTER-MAP.tsv`: `PROJECT 12 entries=77 both=25 makoto=38 none=12 scour=2 map_only=0
-    owners_only=0`. No void. cap: 6 model calls and 15 minutes for the count test.
-    Stop: at the cap, record the measured number in VOIDS and go on.
+12. ~~One count and one owner per register entry~~ (branch claude/pensive-carson-cbpr5j;
+    `docs/PRIOR-ART.md` items 1, 2 and 7). The count is read off `docs/REGISTER.md`, and the docs
+    that typed it now point at the tool. `python3 tools/owners.py` joins `docs/REGISTER-MAP.tsv`
+    with Scour's probes and declined() reasons at the `tools/scour.sh` pin into
+    `docs/v9/owners.tsv` (the committed copy had drifted: G2, B4, E1 and F10 were NOT-COUNTABLE in
+    the map and `makoto` or `both` in the table). `python3 tools/dedupe.py` runs B2, B7 and F2 both
+    ways: each side is silent on the other's catch case, so each is one entry's two facets (Scour
+    the tree, Makoto the event) and both stay; D1 is not a duplicate at the pin (Scour declines it).
+    check: `tests/test_register_count.py`, `tests/test_owners.py`; with the clones,
+    `python3 tools/owners.py` and `python3 tools/dedupe.py`. plant: a wrong count typed into
+    README.md reads red; a RUNNER flipped in the map reads red. inputs: the Scour and Measure-Zero
+    clones at the `tools/scour.sh` pins. owner: done.
 13. One evaluator of the register's predicate lines, script only, at Pre in milliseconds (his
     rulings 2026-09-28 02:56Z and 03:27Z: no after-the-fact reading, no model). Start from branch
     `claude/register-evaluator` (504f2c5: `substrate/line.py` parses and evaluates the v9 language,

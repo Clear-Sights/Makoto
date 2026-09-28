@@ -4,7 +4,7 @@ Copied from the handoff section (2026-09-28) so a session reads it here, not out
 
 ## Conduct his 01:10Z message requires, and what prevents it (01:30Z)
 
-Why 77 and not 74: the register had 74 entries. I1 to I3 (unbriefed dispatch, unpinned input, unpaid acceptance) were pasted in on 09-27 23:51Z from MAKOTO/REGISTER-PASTE.md (Makoto be2dbd9), and #100 counted them.
+Why Makoto's register is Measure-Zero's plus three: I1 to I3 (unbriefed dispatch, unpinned input, unpaid acceptance) were pasted in on 09-27 23:51Z from MAKOTO/REGISTER-PASTE.md (Makoto be2dbd9), and #100 counted them.
 
 "Live" means a deterministic check that BLOCKS today (Stop) or DENIES (Pre). "Defined" means a new entry with its owes/pays and the gap that stops it landing now. Every defined row is held to the same three bars as the rest (deterministic, under the latency bound, worth.py >= on the corpus).
 

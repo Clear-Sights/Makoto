@@ -63,7 +63,11 @@ def test_the_step_12_projection_runs_with_no_model_and_names_every_entry():
     out = subprocess.run([sys.executable, str(REPO / "tools/project.py"), "12"], capture_output=True,
                          text=True)
     assert out.returncode == 0, out.stderr
-    assert out.stdout.startswith("PROJECT 12 entries=77 "), out.stdout
+    sys.path.insert(0, str(REPO / "tools"))
+    import register_map
+    count = sum(1 for ln in register_map.REGISTER.read_text(encoding="utf-8").splitlines()
+                if register_map.ENTRY_RX.match(ln))
+    assert out.stdout.startswith(f"PROJECT 12 entries={count} "), out.stdout
 
 
 def test_every_open_step_names_its_check_inputs_and_owner():
