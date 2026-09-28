@@ -137,12 +137,15 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` at 45cd655
     and `Clear-Sights/Measure-Zero` at c544c4e, the pins `tools/scour.sh` names. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
-13. Replace per-case recognizers with one mechanism per family (`docs/MECHANISM.md`). A case
-    outside a list must never be ignored: record each command's effect as a Pre/Post tree digest
-    rather than guessing it from names; read a verifier's verdict from its exit code; route prose
-    claims through one claim reader; identify tools by the shape of their input.
-    check: the attacker's violating cases (a case a live row claims but misses) turn red, and the
-    count of module-level lists under `plugin/makoto` falls. plant: one attacker case that the old
-    per-case hook passes reads red under the mechanism.
-    inputs: the attacker's cases; the digest's per-call cost, measured against the 2 s bound;
-    tools/corpus.py for the false rate. owner: the next Makoto session, after steps 7 and 8.
+13. One evaluator of the register's predicate lines, script only, at Pre in milliseconds (his
+    rulings 2026-09-28 02:56Z and 03:27Z: no after-the-fact reading, no model). Start from branch
+    `claude/register-evaluator` (504f2c5: `substrate/line.py` parses and evaluates the v9 language,
+    38 tests, every v9 line parses). Add a read ledger (path to content hash when the session read
+    it) so lineage and drift are lines; a claim reader as a word table plus regexes; one config file
+    of named sets; then ONE check that runs every line and retires each entry's old check as its
+    line lands. An entry with no line is not claimed and names its missing fact.
+    check: every round-nine escape (the attack's per-entry cases) is a plant in `tests/` that reads
+    red on main and green here, and each claimed entry has exactly one line. plant: delete one line
+    and its entry's plant reads red.
+    inputs: the v9 lines (Measure-Zero-Dev handoff, registry v9 section) and the attack's case list,
+    copied into the repository when the step starts. owner: the next Makoto session.
