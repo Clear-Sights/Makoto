@@ -120,15 +120,13 @@ The steps:
    checks are step 6 rows in VOIDS. cap: 2 model calls and 5 minutes per VOIDS row; the step
    ends when every row is re-graded on a 3.4.6 record or subtracted.
    Stop: at the cap, record the measured number in VOIDS and go on.
-7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
-   blanked, and `kit.claim`.
-   check: a test pins the NOT-COUNTABLE count at 18, and the count only falls. plant: flip any
-   RUNNER row back and the test reads red. inputs: the design is
-   `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
-   projection: none needed. The ratchet is one test over `python3 tools/register_map.py`'s count,
-   and kit.neighbours and kit.claim are specified in "Shared pieces". cap: 10 model calls and 30
-   minutes for the step.
-   Stop: at the cap, record the measured number in VOIDS and go on.
+7. ~~Build the ratchet and the shared pieces: `kit.neighbours`, O(n·t) with one token blanked, and
+   `kit.claim`~~ (branch claude/pensive-carson-cbpr5j). gate.running_claim now reads its claim through
+   `kit.claim`, and `_code_spans` moved down to `vocab` so kit can use it.
+   check: `tests/test_ratchet.py` (PIN = 18, read off `tools/register_map.py`) and
+   `tests/test_kit_shared.py`. plant: flip any RUNNER row back and the ratchet reads red; a pairwise
+   loop in `kit.neighbours`, or no negation filter in `kit.claim`, and its test reads red.
+   inputs: `docs/FOUNDATION-14.md`, "Shared pieces". owner: done.
 8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
    commit each. Each commit lowers the pin by 1.
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;

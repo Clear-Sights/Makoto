@@ -201,10 +201,25 @@ _CLAUSE_BREAK_RX = re.compile(r"[.;:\n—]")
 # command, so a --message/path body that merely MENTIONS a keyword can't masquerade as the command itself.
 _QUOTED_RX = re.compile(r'"[^"]*"|\'[^\']*\'')
 # A full ```fenced``` code block (DOTALL: the span crosses newlines). L0 SINGLE SOURCE for
-# fenced-span extraction — substrate.claims._code_spans (fences + inline backticks) consumes
+# fenced-span extraction — _code_spans below (fences + inline backticks) consumes
 # this exact object, so the fence regex lives in one place. Distinct from the `_FENCE_RX`
 # line-anchored parity marker (a different algorithm), which lives in checks.relativePathCitation.
 _FENCE_SPAN_RX = re.compile(r"```.*?```", re.DOTALL)
+# the inline-`backtick` half of _code_spans
+_INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
+
+
+def _code_spans(text: str):
+    """Char ranges inside ``` fences OR inline `backticks` — a done-word there is QUOTED
+    (code/output), not the AI's own prose claim. An UNTERMINATED trailing fence (a truncated
+    final message) still opens a quoted span through end-of-text, so a missing closing fence
+    never exposes the quoted tail as prose."""
+    spans = [m.span() for m in _FENCE_SPAN_RX.finditer(text)]
+    dangling = text.find("```", spans[-1][1] if spans else 0)
+    if dangling != -1:
+        spans.append((dangling, len(text)))
+    return spans + [m.span() for m in _INLINE_CODE_RX.finditer(text)]
+
 
 # UNAMBIGUOUS integrity / verification / audit vocabulary (a raw alternation STRING, not a
 # compiled regex — each consumer anchors it differently). L0 SINGLE SOURCE for the

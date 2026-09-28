@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 from makoto.core._shell import _command_runs_tests
 from makoto.vocab import (
+    _ADV_FORWARD_RX, _NEGATION_RX, _SENTENCE_SPLIT_RX, _code_spans,  # kit.claim
     _TEST_RUNNER_RX,  # pinned by tests/test_lexicons.py
     _FAILURE_SUMMARY_RX,
     _FAILURE_MARKER_RX,
@@ -1102,3 +1103,71 @@ def turn_tool_calls(history) -> int:
         elif et == "PreToolUse":
             count += 1
     return count
+
+
+def neighbours(commands, k=1):
+    """[(i, j)], i < j, for every pair of `commands` differing by exactly one whitespace token:
+    one added, removed or changed. Identical commands are not neighbours. O(n*t) plus the pairs
+    returned, never O(n^2): repeats collapse to one distinct token tuple first, each tuple is keyed
+    by polynomial prefix and suffix hashes with one position blanked (a change) or deleted (an add
+    or a remove, matched against the whole hash of the shorter), and every candidate pair is then
+    compared token by token, so a hash collision can never add a pair."""
+    if k != 1:
+        raise ValueError("neighbours: only k=1 is defined")
+    mod, base = (1 << 61) - 1, 1_000_003
+    at = {}
+    for i, c in enumerate(commands):
+        at.setdefault(tuple((c or "").split()), []).append(i)
+    distinct = list(at)
+    blanked, whole, dels = {}, {}, []
+    for u, t in enumerate(distinct):
+        n = len(t)
+        hs = [hash(x) % mod for x in t]
+        pre, pw = [0] * (n + 1), [1] * (n + 1)
+        for q in range(n):
+            pre[q + 1] = (pre[q] * base + hs[q]) % mod
+            pw[q + 1] = pw[q] * base % mod
+        full = pre[n]
+        whole.setdefault((n, full), []).append(u)
+        for q in range(n):
+            suf = (full - pre[q + 1] * pw[n - 1 - q]) % mod          # hash of t[q+1:]
+            blanked.setdefault((n, q, pre[q], suf), []).append(u)
+            dels.append((u, n - 1, (pre[q] * pw[n - 1 - q] + suf) % mod))
+
+    def one_changed(x, y):
+        return len(x) == len(y) and sum(a != b for a, b in zip(x, y)) == 1
+
+    def one_removed(long, short):
+        q = next((q for q, (a, b) in enumerate(zip(long, short)) if a != b), len(short))
+        return long[q + 1:] == short[q:]
+
+    hits = set()
+    for us in blanked.values():
+        for a in range(len(us)):
+            for b in range(a + 1, len(us)):
+                if one_changed(distinct[us[a]], distinct[us[b]]):
+                    hits.add((us[a], us[b]))
+    for u, n, h in dels:
+        for v in whole.get((n, h), ()):
+            if one_removed(distinct[u], distinct[v]):
+                hits.add((u, v))
+    return sorted({(min(i, j), max(i, j)) for u, v in hits for i in at[distinct[u]] for j in at[distinct[v]]})
+
+
+def claim(text: str, rx: re.Pattern):
+    """The first match of `rx` in `text` that is the writer's own claim, else None: outside ```
+    fences and inline backticks, and with no negation or forward frame ('not', 'once', 'when',
+    'if') in its clause, walked back to the last sentence boundary within 70 characters. The
+    grammar gate.unrun_count_claim and gate.running_claim share."""
+    if not text:
+        return None
+    spans = _code_spans(text)
+    for m in rx.finditer(text):
+        a = m.start()
+        if any(s <= a < e for s, e in spans):
+            continue
+        clause = _SENTENCE_SPLIT_RX.split(text[max(0, a - 70):a])[-1]
+        if _NEGATION_RX.search(clause) or _ADV_FORWARD_RX.search(clause):
+            continue
+        return m
+    return None

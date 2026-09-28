@@ -9,7 +9,7 @@ from makoto.vocab import (
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
-from makoto.kit import decode_history_event, failure_terminal_result, unwitnessed
+from makoto.kit import claim, decode_history_event, failure_terminal_result, unwitnessed
 
 # gate.claimed_running's SHAPE (see plugin/makoto/kit.py's `unwitnessed`): SWITCH -- the witness
 # is a recorded act (a process-start/liveness-check Bash call) whose response was read.
@@ -79,15 +79,7 @@ def _running_claim(text: str):
     if not any(not any(s <= m.start() < e for s, e in spans)
                for m in _PROCESS_START_VERB_RX.finditer(text)):
         return None
-    for m in _RUNNING_CLAIM_RX.finditer(text):
-        a = m.start()
-        if any(s <= a < e for s, e in spans):
-            continue                                  # quoted/fenced -> not the agent's own prose claim
-        clause = _SENTENCE_SPLIT_RX.split(text[max(0, a - 70):a])[-1]
-        if _NEGATION_RX.search(clause) or _ADV_FORWARD_RX.search(clause):
-            continue                                  # 'won't be running' / 'once deployed, it is running'
-        return m
-    return None
+    return claim(text, _RUNNING_CLAIM_RX)   # 'won't be running' / 'once deployed, it is running'
 
 
 def _bash_postuse_calls(history):

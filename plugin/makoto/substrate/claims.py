@@ -7,12 +7,9 @@ from __future__ import annotations
 import re
 from makoto.vocab import (
     _NEGATION_RX,
-    _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
+    _FENCE_SPAN_RX, _GREEN_CLAIM_RX, _INLINE_CODE_RX, _code_spans, _SENTENCE_SPLIT_RX, _ADV_FORWARD_RX, _GREEN_UNIVERSAL_PREMOD,
 )
 
-# `_INLINE_CODE_RX` is the inline-`backtick` half of _code_spans (the fenced half is the L0
-# single source).
-_INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 # The head's pre-modifier run: the CONTIGUOUS whitespace-separated word tokens immediately before
 # the subject head, anchored at the head (\Z under endpos). Any non-word char — sentence
 # punctuation, a colon, a checkbox bracket, a newline — terminates the run, so the walk-back
@@ -33,20 +30,8 @@ _POST_CLAUSE_RX = re.compile(r"[,;.!?\n]|—|–")
 
 
 # ---- whole-suite pass-claim signal ----
-# _code_spans is pure text parsing; lib must not import stopchecks (layering), so both stopcheck
-# consumers (advance, green_claim) re-import it from here.
-
-
-def _code_spans(text: str):
-    """Char ranges inside ``` fences OR inline `backticks` — a done-word there is QUOTED
-    (code/output), not the AI's own prose claim. An UNTERMINATED trailing fence (a truncated
-    final message) still opens a quoted span through end-of-text, so a missing closing fence
-    never exposes the quoted tail as prose."""
-    spans = [m.span() for m in _FENCE_SPAN_RX.finditer(text)]
-    dangling = text.find("```", spans[-1][1] if spans else 0)
-    if dangling != -1:
-        spans.append((dangling, len(text)))
-    return spans + [m.span() for m in _INLINE_CODE_RX.finditer(text)]
+# _code_spans lives in vocab (kit.claim needs it below the substrate layer); the stopcheck
+# consumers (advance, green_claim) still import it from here.
 
 
 def whole_suite_pass_claim(text: str):
