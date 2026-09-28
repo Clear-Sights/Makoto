@@ -64,3 +64,10 @@ def test_the_step_12_projection_runs_with_no_model_and_names_every_entry():
                          text=True)
     assert out.returncode == 0, out.stderr
     assert out.stdout.startswith("PROJECT 12 entries=77 "), out.stdout
+
+
+def test_every_open_step_names_its_check_inputs_and_owner():
+    """A step with no `inputs:` leaves the next session guessing what to open first."""
+    steps = open_steps((REPO / "START.md").read_text(encoding="utf-8"))
+    missing = [(n, f) for n, b in steps.items() for f in ("check:", "inputs:", "owner:") if f not in b]
+    assert not missing, missing
