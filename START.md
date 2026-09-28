@@ -230,7 +230,10 @@ The steps:
     part; M13 needs a run, so no tool-less reader can catch it. Open this step only when a new model
     or a new fault class is in hand.
     check: 6 of 6 in `findings.tsv` named, scored by hand against its id column. plant: a finding
-    removed from the reader's input reads as a miss. owner: the next Makoto session.
+    removed from the reader's input reads as a miss.
+    inputs: a blobless clone of `Clear-Sights/Scour` at 2bface1 (its
+    `tests/fixtures/attack/findings.tsv`, the two attack rounds with their base and head commits,
+    and `scour/gate/judgment.py`), and a model name for `--model`. owner: the next Makoto session.
     projection: `python3 -m pytest -q tests/test_layers.py -k Judgment` in the Scour clone (no
     model): the reader command (READER in `scour/gate/judgment.py`) set to a script replays hot,
     warm and changed at 0 tokens, and a unit judged twice reads red. cap: 120 model calls (both

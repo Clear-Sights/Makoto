@@ -74,3 +74,15 @@ def test_a_marketplace_copy_is_live_only_when_enabled_at_its_recorded_path(tmp_p
 
 def test_no_install_names_no_copy(tmp_path):
     assert mc.copies(tmp_path) == []
+
+
+def test_a_synced_copy_and_an_enabled_marketplace_copy_are_both_live(tmp_path):
+    """The case session.sh can create (it installs makoto@makoto beside an account-synced copy):
+    both load, so every hook runs twice, and launch must say which one to keep."""
+    org = tmp_path / ".claude" / "plugins" / "synced" / "org"
+    _copy(org / "makoto~g2", "3.4.5")
+    (org / "manifest.json").write_text(json.dumps({"plugins": [{"name": "makoto", "generation": 2}]}))
+    _copy(tmp_path / ".claude" / "plugins" / "cache" / "makoto" / "makoto" / "3.4.6", "3.4.6")
+    (tmp_path / ".claude" / "settings.json").write_text(json.dumps({"enabledPlugins": {"makoto@makoto": True}}))
+    assert _states(tmp_path) == {"synced/org/makoto~g2": ("live", "3.4.5"),
+                                 "cache/makoto/makoto/3.4.6": ("live", "3.4.6")}
