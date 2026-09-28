@@ -664,22 +664,87 @@ structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture=
 # PRE-EDGE DENY (2026-09-25): the switch is refused before HEAD moves; the discharge is to print
 # the refs (`git branch`, `git rev-parse --verify <ref>`) and retry.
 from makoto.kit import unmet_obligation_gate, command_matches
+from makoto.core._shell import _basename, _effective_argv, _git_subcommand, _shell_segments
 
-# Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms; `git checkout --`
-# and `git checkout -- <path>` restore a FILE and move nothing, so they are excluded by
-# requiring the argument not to start with a dash. `git reset --hard <ref>` moves HEAD (and the
-# working tree) to a ref the same way; `git reset --hard` with no ref just discards edits in
-# place and names no boundary to cross, so a ref argument is required there too.
-_REF_SWITCH_RX = re.compile(
-    r"\bgit\s+(?:checkout|switch)\s+(?!-)|\bgit\s+reset\s+--hard\s+(?!-)\S")
+# Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms, read per shell
+# segment (`core._shell`), so `git -C dir checkout`, doubled spaces and `a || b` chains parse as
+# git does. `git checkout -- <path>` restores a FILE and moves nothing: a leading `--` is no
+# switch. `git reset --hard <ref>` moves HEAD (and the working tree) to a ref the same way;
+# `git reset --hard` with no ref discards edits in place and names no boundary to cross.
+#
+# CREATING A BRANCH NAMES THE NEW REF ITSELF: `checkout -b|-B|--orphan NEW [BASE]` and
+# `switch -c|-C|--create|--force-create|--orphan NEW [BASE]` make NEW, so NEW is not an unknown
+# ref, and a later segment of the same command switching to NEW (the create-or-switch idiom
+# `git checkout -b X || git checkout X`) is not either. Only BASE, when given, is held to the
+# rule. A BASE of `HEAD` or `@` moves nothing.
+_CREATE_FLAGS = frozenset({"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"})
+_STAY_REFS = frozenset({"HEAD", "@"})
+# A redirection word shlex leaves in the argv (`2>/dev/null`, `>`, `&>log`): never a ref.
+_REDIRECT_RX = re.compile(r"\d*&?[<>]+&?")
 # Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
 # switched TO.
 _REF_PRINT_RX = re.compile(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
 
 
+def _without_redirects(args):
+    """`args` minus redirections: shlex splits `2>/dev/null` into `2`, `>`, `/dev/null`, and
+    none of the three is a ref."""
+    out = []
+    for a in args:
+        if out and out[-1] is None:
+            out[-1:] = []            # the redirect's target word
+            continue
+        if _REDIRECT_RX.match(a):
+            if out and out[-1].isdigit():
+                out.pop()            # the fd number glued in front of it
+            if _REDIRECT_RX.fullmatch(a):
+                out.append(None)     # its target is the next word
+            continue
+        out.append(a)
+    return [a for a in out if a is not None]
+
+
+def _switch_target(argv, created: set):
+    """The ref this git segment moves HEAD to, or None; records any branch it creates."""
+    eff = _effective_argv(argv)
+    if not eff or _basename(eff[0]) != "git":
+        return None
+    sub, args = _git_subcommand(eff)
+    if sub == "reset":
+        if "--hard" not in args:
+            return None
+        rest = [a for a in args if not a.startswith("-")]
+        return rest[0] if rest else None
+    if sub not in ("checkout", "switch"):
+        return None
+    positional, made = [], None
+    it = iter(_without_redirects(args))
+    for a in it:
+        if a == "--":
+            break
+        if a in _CREATE_FLAGS:
+            made = next(it, None)
+        elif not a.startswith("-"):
+            positional.append(a)
+    if made is not None:
+        created.add(made)
+        base = positional[0] if positional else None
+        return None if base is None or base in _STAY_REFS else base
+    if not positional or positional[0] in created or positional[0] in _STAY_REFS:
+        return None
+    return positional[0]
+
+
+def _is_ref_switch(ev: dict) -> bool:
+    cmd = command_of(ev)
+    if not cmd:
+        return False
+    created: set = set()
+    return any(_switch_target(argv, created) is not None for argv, _op in _shell_segments(cmd))
+
+
 # `kit.command_matches` is the one body for "this event's command matches a regex" -- four
 # copies of it appeared the moment this batch landed and the duplicate-function law caught them.
-_is_ref_switch = command_matches(_REF_SWITCH_RX)
 _is_ref_print = command_matches(_REF_PRINT_RX)
 
 

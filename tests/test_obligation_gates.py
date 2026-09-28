@@ -291,6 +291,27 @@ def test_unknown_ref_switch_ignores_a_bare_reset_hard():
     assert unknown_ref_switch_gate([_bash("git reset --hard")]) is None
 
 
+def test_unknown_ref_switch_does_not_treat_a_created_branch_as_unknown():
+    """The false fire this pins: `checkout -b NEW` / `switch -c NEW` names the new ref itself,
+    so NEW is not an unknown ref -- neither on its own nor when a later segment of the same
+    command switches to it (the create-or-switch idiom)."""
+    # discriminant: the only switch target is a ref this very command creates
+    for cmd in ("git checkout -b claude/new-branch 2>/dev/null || git checkout claude/new-branch",
+                "git switch -c claude/new-branch || git switch claude/new-branch",
+                "git checkout  -b claude/new-branch", "git switch -C x", "git checkout -B x HEAD",
+                "git switch --create x @"):
+        assert unknown_ref_switch_gate([_bash(cmd)]) is None, cmd
+
+
+def test_unknown_ref_switch_still_holds_a_created_branch_base_to_the_rule():
+    # discriminant: the command creates NEW but moves HEAD onto an unprinted BASE
+    f = unknown_ref_switch_gate([_bash("git checkout -b claude/new-branch origin/some-unprinted")])
+    assert f is not None and f.level == "error"
+    assert unknown_ref_switch_gate([_bash("git -C /r switch -c x origin/main")]) is not None
+    assert unknown_ref_switch_gate([_bash("git branch -a"),
+                                    _bash("git checkout -b x origin/main")]) is None
+
+
 # gate.unobserved_destruction (register D14 UNDO UNPROVEN)
 
 def test_unobserved_destruction_fires_with_no_verifier():
