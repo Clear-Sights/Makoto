@@ -92,6 +92,12 @@ def _run_dispatch(state_dir, payload: dict, extra_env: dict | None = None) -> tu
     """Invoke the dispatcher and fail loudly if its subprocess crashes."""
     env = os.environ.copy()
     env["MAKOTO_STATE_DIR"] = str(state_dir)
+    # A home of the test's own: checks that read ~/.claude (gate.self_wired reads the home
+    # settings) must see the fixture, never the machine running the suite, whose settings may
+    # wire an older Makoto and block every Stop.
+    home = Path(state_dir).parent / "home"
+    home.mkdir(exist_ok=True)
+    env["HOME"] = env["USERPROFILE"] = str(home)
     if extra_env:
         env.update(extra_env)
     proc = subprocess.run(
