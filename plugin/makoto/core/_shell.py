@@ -293,26 +293,3 @@ def _command_runs_tests(command: str) -> bool:
 
 def _command_pushes_git(command: str) -> bool:
     return any(_is_git_push_argv(argv) for argv, _operator in _shell_segments(command))
-
-
-# The same read under Bash: a segment whose command position runs one of these read-only readers
-# (`sed -n 1,80p f.py`, `grep -n x f.py`, `cat f`) looked at the ground exactly as Read/Grep would.
-# `sed` counts only under `-n` (its `-i` edits in place) and `find` only without an action that
-# writes or runs something (`-delete`, `-exec*`, `-ok*`, `-fprint*`). A closed vocabulary whose
-# miss is a RECALL bound: the gate still fires on a reader it does not name.
-_BASH_READERS = frozenset({"cat", "head", "tail", "grep", "egrep", "fgrep", "rg", "ls", "wc"})
-_FIND_WRITING_ACTIONS = ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fls")
-
-
-def _is_reader_argv(argv) -> bool:
-    eff = _effective_argv(argv)
-    if not eff:
-        return False
-    prog, args = _basename(eff[0]), eff[1:]
-    if prog in _BASH_READERS:
-        return True
-    if prog == "sed":
-        return "-n" in args and not any(a.startswith(("-i", "--in-place")) for a in args)
-    if prog == "find":
-        return not any(a.startswith(_FIND_WRITING_ACTIONS) for a in args)
-    return False

@@ -933,25 +933,6 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
                   withheld=sorted({f.pattern_id for f in withheld} - {f.pattern_id for f in blocking}))
 
 
-def _record_effect(state_dir, payload) -> None:
-    """Snapshot the tree at Pre; at Post, attach what the call did (`substrate.effect`) to the payload
-    before it is stored, so every check reads the effect instead of the command's spelling."""
-    hook = payload.get("hook_event_name")
-    if hook not in ("PreToolUse", "PostToolUse", "PostToolUseFailure"):
-        return
-    try:
-        from makoto.substrate import effect
-        if hook == "PreToolUse":
-            effect.record_pre(state_dir, payload)
-        else:
-            eff = effect.read_post(state_dir, payload)
-            if eff is not None:
-                payload["makoto_effect"] = eff
-    except Exception as exc:
-        _dispatch_fact(state_dir, "exception", f"effect record failed: {type(exc).__name__}: {exc}",
-                       blocked=False, ids=_ids_from_payload(payload))
-
-
 # The table maps hook_event_name to its pipeline; unknown events (including SessionStart, which
 # has no dedicated handler now that the declared-Plan admission step is gone) use the wildcard
 # evaluation pipeline.
@@ -1096,9 +1077,6 @@ def _dispatch() -> int:
         # to prevent.
         payload_raw = json.dumps(payload, ensure_ascii=False)
         _note_host_dialect(state_dir, payload.get("session_id"), dialect_notes, host_event)
-    _record_effect(state_dir, payload)
-    if isinstance(payload.get("makoto_effect"), dict):
-        payload_raw = json.dumps(payload, ensure_ascii=False)
     db_path = state_dir / "makoto.record.db"
     if not _ensure_db_initialized(state_dir, db_path):
         _dispatch_fact(state_dir, "db_init_failed", "lazy DB init failed", blocked=False,

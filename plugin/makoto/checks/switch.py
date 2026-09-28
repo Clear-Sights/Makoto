@@ -1560,7 +1560,7 @@ def _is_destruction(ev: dict) -> bool:
 _is_observer = ran_a_verifier
 
 
-_predicted_destruction_gate = unmet_obligation_gate(
+unobserved_destruction_gate = unmet_obligation_gate(
     act=_is_destruction,
     guard=_is_observer,
     message=("Content is about to be destroyed and no verifier has run first — with no behaviour observed "
@@ -1570,51 +1570,12 @@ _predicted_destruction_gate = unmet_obligation_gate(
 )
 
 
-# THE EFFECT, NOT ITS SPELLING (2026-09-28). The classifier above predicts destruction from a
-# command's name, so `find -delete`, `truncate -s 0`, `: > f`, `shutil.rmtree` and a Write of
-# empty content all passed it. The destruction itself is read from `substrate.effect`: the tree before
-# and after every call, where a path whose content survives nowhere afterwards was destroyed,
-# whatever did it. The prediction stays for what the tree cannot show (a remote, a device, a
-# database, a path outside the repository), where the name is the only reading there is.
-def _observed_destruction(current_event, rows):
-    from makoto.substrate import effect
-    events = [ev for ev in map(decode_history_event, rows) if isinstance(ev, dict)
-              and ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure")]
-    last_observer = max((i for i, ev in enumerate(events) if _is_observer(ev)), default=-1)
-    owed = [(ev, eff) for i, ev in enumerate(events)
-            for eff in [effect.of(ev)] if eff.get("destroyed") and i > last_observer]
-    # a destruction with a verifier before it was observed; one after it pays it too
-    return [(ev, eff) for ev, eff in owed
-            if not any(_is_observer(e) for e in events[:events.index(ev)])]
-
-
-def unobserved_destruction_gate(*, current_event: dict, history: list, pattern, conn=None):
-    found = _predicted_destruction_gate(current_event=current_event, history=history,
-                                        pattern=pattern, conn=conn)
-    if found is not None or _is_observer(current_event):
-        return found
-    from makoto.kit import _session_rows
-    owed = _observed_destruction(current_event, _session_rows(conn, current_event.get("session_id", ""),
-                                                              history))
-    if not owed:
-        return None
-    ev, eff = owed[-1]
-    paths = " ".join(eff["destroyed"][:8])
-    return Finding(
-        pattern_id=pattern.id, file="", line=0, level="error",
-        message=(f"A call destroyed content ({paths}) and no verifier had run first, so nothing was "
-                 "observed against which an undo could be proven."),
-        retry_hint=(f"Its pre-image is recorded: `git -C {eff.get('root')} restore --source={eff.get('tree')} "
-                    f"-- {paths}` puts it back. Run the relevant test or probe to a report, then go on."),
-        snippet=paths[:200])
-
-
 destruction_RETRY_HINT = "Run the relevant test or probe to a report, then retry."
 destruction_DESCRIPTION = "a destructive command with no verifier run earlier in the session"
 destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__,
-               # every payload: an observed destruction is read from history, whatever this call says
-               keywords=("{",),
+               keywords=("rm", "reset", "clean", "push", "checkout", "dd", "mkfs", "drop", "DROP",
+                         "truncate", "TRUNCATE"),
                retry_hint=destruction_RETRY_HINT,
                description=destruction_DESCRIPTION,
                tests="SWITCH",
