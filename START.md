@@ -144,8 +144,8 @@ The steps:
    replay it once for all remaining rows and step 11's thresholds together, never once per row.
    Accept a row only on your own run of its catch test. owner: the next Makoto session.
    projection: `python3 tools/project.py 8` (no model) parses each row's v9 line with the
-   evaluator: `PROJECT 8 lines=14 parsed=2 refused=12`. The 12 refused are step 8 rows in VOIDS and
-   wait on step 13's language. cap: 8 model calls and 15 minutes per row.
+   evaluator: `PROJECT 8 lines=14 parsed=9 refused=5`. The 5 refused are not lines (Q: judgments and
+   Countdown kernel notes); the parsed ones name, in VOIDS, the facts they still lack. cap: 8 model calls and 15 minutes per row.
    Stop: at the cap, record the measured number in VOIDS and go on.
 9. ~~Cut the per-call start cost~~ (branch claude/pensive-carson-cbpr5j). Module-level patterns are
    `vocab._lazy_re`, compiled on first use: one Pre compiles 23 patterns instead of 206.
@@ -176,8 +176,8 @@ The steps:
     the names index (J4), the mesh slot map (J5) and a recorded PreCompact event (J6).
     owner: the next Makoto session, after step 7's kit.neighbours.
     projection: `python3 tools/project.py 11` parses `docs/v9/conduct-lines.tsv` (one v9 line per J
-    row): `PROJECT 11 lines=8 parsed=4 refused=4`. J2, J3, J7 and J8 need a `count(X[, reset]) >= N`
-    construct the language lacks; they are step 11 rows in VOIDS and wait on step 13. J4's names index exists as Scour's names ledger
+    row): `PROJECT 11 lines=8 parsed=8 refused=0` since step 13's count(); J2 to J8's remaining facts
+    and thresholds are step 11 rows in VOIDS. J4's names index exists as Scour's names ledger
     (`sh tools/scour.sh` prints `names=`), and J5's slot map as `MAKOTO/mesh/placement.tsv`. J1 (no
     step-row reader) and J6 (no recorded PreCompact event) have nothing to project from; they are
     step 11 rows in VOIDS. cap: 4 model calls and 10 minutes per row.
@@ -206,11 +206,14 @@ The steps:
     and its entry's plant reads red.
     inputs: the v9 lines in `docs/v9/predicates.tsv`, and the attack's case list, copied into the
     repository when the step starts. owner: the next Makoto session.
-    projection: `python3 tools/project.py 13` (no model; it reads the evaluator out of git at
-    504f2c5) prints `PROJECT 13 lines=77 parsed=48 refused=29` in under 1 s. The 29 refused are
-    step 13 rows in VOIDS, each naming the construct the language lacks (`refs(...)`, set
-    difference, `exists n`, `contains`, `decorated`); fill them in VOIDS order. cap: 6 model calls
-    and 10 minutes per row.
+    projection: `python3 tools/project.py 13` (no model; this checkout's evaluator) prints `PROJECT 13
+    lines=77 parsed=69 refused=8`. Landed on branch claude/pensive-carson-cbpr5j: the evaluator with
+    refs(), set difference, exists n, count(), contains and field values (`tests/test_line.py`), and
+    the read ledger, fact builder and claim reader (`substrate/facts.py`; the dispatcher stamps each
+    seen file's hash, `tests/test_facts.py`). The 8 refused are not lines (VOIDS names each missing
+    fact). Two things wait: the round-nine case list, which is in no repository this session could
+    read (VOIDS `attack-cases`), and whether a weaker reading the map calls "not claimed" (G2, B4, F10)
+    may be claimed by a line, which is the owner's call. cap: 6 model calls and 10 minutes per row.
     Stop: at the cap, record the measured number in VOIDS and go on.
 14. Scour's judge (moved from Scour's handoff, row SR1): make Scour's reader catch what
     adversarial-review catches, so adversarial-review can leave the launch rows. Replay both rounds

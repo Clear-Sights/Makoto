@@ -60,7 +60,7 @@ E12	gate	launch and (settings.disableAllHooks=true or settings.enabledPlugins.ma
 B1	gate	launch and not planted_event.fires
 B26	gate	launch and not planted_event.fires
 D9	gate	launch and not planted_event.fires
-F10	drift	event in {Pre,Stop} and exists n in refs(output) and source.read[n]!=tree[n].hash
+F10	drift	event in {Pre,Stop} and exists n in refs(output) and source.read[n] and tree[n].hash and source.read[n]!=tree[n].hash
 B10	gate	run=suite_on_clean_base and any(check=red)
 B21	gate	plant=row and reddened_rows!={row}
 B34	gate	run=gate_on_own_tree and verdict!=pass

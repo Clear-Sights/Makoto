@@ -1,33 +1,12 @@
 step	item	void	measured_by	cap_model_calls	cap_minutes
-13	A2	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	G1	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	H1	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	H5	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	D4	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	F7	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	H2	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	H6	line outside the evaluator's language (scour): expected an operator after decorated, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B36	line outside the evaluator's language (scour): expected a term, found None	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	A14	line outside the evaluator's language (scour): trailing '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	E9	line outside the evaluator's language (scour): expected an operator after body.calls, found 'contains'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	H4	line outside the evaluator's language (lineage): expected an operator after refs, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	C4	line outside the evaluator's language (gate): trailing 'of'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	E12	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B1	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B26	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	D9	line outside the evaluator's language (gate): expected an operator after launch, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	F10	line outside the evaluator's language (drift): expected an operator after exists, found 'n'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B10	line outside the evaluator's language (gate): expected an operator after any, found '('	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B14	line outside the evaluator's language (gate): expected an operator after claim.helps, found 'and'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	D8	line outside the evaluator's language (gate): cannot read '<real.size or run.fo'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B28	line outside the evaluator's language (gate): expected a term, found None	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B7	line outside the evaluator's language (kernel): expected an operator after zero.py:, found 'a'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B37	line outside the evaluator's language (kernel): cannot read '>0 (two units share '	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	F6	line outside the evaluator's language (kernel): expected an operator after zero.py:, found 'removal'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	A5	line outside the evaluator's language (judgment): expected an operator after Q:, found 'does'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	G3	line outside the evaluator's language (judgment): expected an operator after Q:, found 'does'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	B18	line outside the evaluator's language (judgment): expected an operator after Q:, found 'was'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
-13	F12	line outside the evaluator's language (judgment): expected an operator after Q:, found 'which'	line.parse at claude/register-evaluator 504f2c5 over docs/v9/predicates.tsv	6	10
+13	C4	not a line: prose about the gate reading its own run; it names no fact a hook event carries	python3 tools/project.py 13	6	10
+13	B7	not a line: a Countdown kernel note (zero.py: a TERMS row with no check); it is Countdown's, not a hook's	python3 tools/project.py 13	6	10
+13	B37	not a line: a Countdown kernel note (zero.py: shape>0 or removal leaves met); the shape index is Countdown's	python3 tools/project.py 13	6	10
+13	F6	not a line: a Countdown kernel note (zero.py: a removal changes an unrelated row); it is Countdown's	python3 tools/project.py 13	6	10
+13	A5	not a line: a Q: judgment (does the quoted value keep its context?); no model may decide it (2026-09-28 03:27Z)	python3 tools/project.py 13	6	10
+13	G3	not a line: a Q: judgment (does one party see the whole span?); no model may decide it	python3 tools/project.py 13	6	10
+13	B18	not a line: a Q: judgment (was the scored set part of the build?); no model may decide it	python3 tools/project.py 13	6	10
+13	F12	not a line: a Q: judgment (which observation distinguishes the cause?); no model may decide it	python3 tools/project.py 13	6	10
 6	gate.unwitnessed_verifier	0 fires on the 3.4.7 record of 2026-09-28 (9 fires over 4 checks), so it cannot be re-graded there; re-grade on a record where it fires	python3 tools/project.py 6 docs/v9/records/audit-3.4.7-2026-09-28.jsonl docs/v9/records/verdicts-3.4.7-2026-09-28.tsv	2	5
 6	gate.unprobed_fanout	0 fires on the 3.4.7 record of 2026-09-28 (9 fires over 4 checks), so it cannot be re-graded there; re-grade on a record where it fires	python3 tools/project.py 6 docs/v9/records/audit-3.4.7-2026-09-28.jsonl docs/v9/records/verdicts-3.4.7-2026-09-28.tsv	2	5
 6	gate.unclaimed_unit	0 fires on the 3.4.7 record of 2026-09-28 (9 fires over 4 checks), so it cannot be re-graded there; re-grade on a record where it fires	python3 tools/project.py 6 docs/v9/records/audit-3.4.7-2026-09-28.jsonl docs/v9/records/verdicts-3.4.7-2026-09-28.tsv	2	5
@@ -40,23 +19,24 @@ step	item	void	measured_by	cap_model_calls	cap_minutes
 6	gate.canon_fingerprints	0 fires on the 3.4.7 record of 2026-09-28 (9 fires over 4 checks), so it cannot be re-graded there; re-grade on a record where it fires	python3 tools/project.py 6 docs/v9/records/audit-3.4.7-2026-09-28.jsonl docs/v9/records/verdicts-3.4.7-2026-09-28.tsv	2	5
 6	gate.completion	0 fires on the 3.4.7 record of 2026-09-28 (9 fires over 4 checks), so it cannot be re-graded there; re-grade on a record where it fires	python3 tools/project.py 6 docs/v9/records/audit-3.4.7-2026-09-28.jsonl docs/v9/records/verdicts-3.4.7-2026-09-28.tsv	2	5
 6	gate.fabricated_action	0 fires on the 3.4.7 record of 2026-09-28 (9 fires over 4 checks), so it cannot be re-graded there; re-grade on a record where it fires	python3 tools/project.py 6 docs/v9/records/audit-3.4.7-2026-09-28.jsonl docs/v9/records/verdicts-3.4.7-2026-09-28.tsv	2	5
-8	B36	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	H4	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	E9	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	D8	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	B14	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	F12	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	A14	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	B18	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	B37	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	F6	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	B28	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
-8	G3	its v9 line is refused (see its step 13 row): the row cannot be projected until the language carries it	same as step 13	8	15
+8	B36	its line parses (tree evaluator); it reads AST node facts (node, body, else_branch) no hook event carries yet, so it evaluates Unbound	python3 tools/project.py 8; tests/test_line.py	8	15
+8	H4	its line parses; measured on this session's transcript with the read ledger: 1 fire in 4 turns, false (a file named for its existence, never opened), so it cannot land as written	python3 tools/project.py 8; tests/test_line.py	8	15
+8	E9	its line parses; it reads AST node facts (node, body.calls, try.calls) no hook event carries yet	python3 tools/project.py 8; tests/test_line.py	8	15
+8	D8	its line parses; run.size, real.size and shipped.form are facts no hook event carries yet	python3 tools/project.py 8; tests/test_line.py	8	15
+8	B14	its line parses; run_pair(with,without).differs is a function no fact carries yet (Unbound)	python3 tools/project.py 8; tests/test_line.py	8	15
+8	F12	not a line: a Q: judgment (which observation distinguishes the cause?); no model may decide it	python3 tools/project.py 8	8	15
+8	A14	its line parses; it reads AST node facts (dictcomp key, seen_assert) no hook event carries yet	python3 tools/project.py 8; tests/test_line.py	8	15
+8	B18	not a line: a Q: judgment (was the scored set part of the build?); no model may decide it	python3 tools/project.py 8	8	15
+8	B37	not a line: a Countdown kernel note (zero.py: shape>0 or removal leaves met); the shape index is Countdown's	python3 tools/project.py 8	8	15
+8	F6	not a line: a Countdown kernel note (zero.py: a removal changes an unrelated row); it is Countdown's	python3 tools/project.py 8	8	15
+8	B28	its line parses; replay_sequence.present is a fact no hook event carries yet	python3 tools/project.py 8; tests/test_line.py	8	15
+8	G3	not a line: a Q: judgment (does one party see the whole span?); no model may decide it	python3 tools/project.py 8	8	15
 10	mesh	distance 5 in tools/mesh (was 7): the 5 reds are gate.canon_fingerprints and _advisory. Read: the catch is scratch cleanup (`rm -rf /tmp/...`), the class the 09-28 worth record graded false; the two rewordings are now denied at Pre by gate.unobserved_destruction / gate.unknown_ref_switch and content.verifier_exit_masking before the Stop fingerprint can see them; the advisory pair is a harness that cannot observe ADVISE at Stop. Their disposition is step 6 subtraction, held for the owner	MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py (plant: harness.orig.py reads 19)	4	10
 11	J1	no step-row reader exists: nothing to project from	docs/CONDUCT.md J1	4	10
 11	J6	no PreCompact event is recorded: nothing to project from	docs/CONDUCT.md J6	4	10
 14	SR1	no model yet names all 6 findings: best is Opus 5.5 at 2/6 (Haiku 4.5 1/6, Sonnet 5 0/6); M13 needs a run	scour.gate.judgment replay of tests/fixtures/attack/findings.tsv at the tools/scour.sh pin, 2026-09-28	120	45
-11	J2	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
-11	J3	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
-11	J7	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
-11	J8	line outside the evaluator's language (conduct): no count(X[, reset]) >= N construct, so its threshold cannot be written	python3 tools/project.py 11 at 504f2c5 over docs/v9/conduct-lines.tsv	4	10
+11	J2	its line parses (count); owes and pays read existing facts; the threshold 2 is inferred: measure it on tools/corpus.py	python3 tools/project.py 11	4	10
+11	J3	its line parses (count); duration (Post ts minus Pre ts) is a fact facts.py does not build yet	python3 tools/project.py 11	4	10
+11	J7	its line parses (count); the threshold 3 is inferred: measure it on tools/corpus.py	python3 tools/project.py 11	4	10
+11	J8	its line parses (count); output.size is a fact facts.py does not build yet	python3 tools/project.py 11	4	10
+13	attack-cases	the round-nine escapes (the attack's per-entry cases) the step's check needs are not in the session: not on disk, not in Makoto, makoto-dev, DetIO, Scour, Measure-Zero or Measure-Zero-Dev (handoff.zip, 850 files), and not found by org code search	find /; git grep in each clone; unzip -l handoff.zip; GitHub code search org:Clear-Sights	6	10

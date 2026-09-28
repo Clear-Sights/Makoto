@@ -4,7 +4,7 @@ no network. Prints one `PROJECT <step> ...` line and exits 0 when it ran; exits 
 `LAUNCH MISSING` line naming the act when an input is absent.
 
 usage: python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv
-       python3 tools/project.py 8|11|13 [REV]   (REV holds the evaluator; default 504f2c5)
+       python3 tools/project.py 8|11|13 [REV]   (REV holds the evaluator; default this checkout)
        python3 tools/project.py 12
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 V9 = REPO / "docs" / "v9"
-EVALUATOR_REV = "504f2c5"
+EVALUATOR_REV = "tree"
 STEP8 = "B36 H4 E9 D8 B14 F12 A14 B18 B37 F6 B28 A6 G3 E8".split()
 
 
@@ -35,7 +35,12 @@ def rows(path: Path) -> list[list[str]]:
 
 
 def evaluator(rev: str):
-    """The evaluator module at `rev`, read out of git so no checkout of its branch is needed."""
+    """The evaluator module at `rev`, read out of git so no checkout of its branch is needed;
+    `tree` is the one in this checkout."""
+    if rev == "tree":
+        sys.path.insert(0, str(REPO / "plugin"))
+        from makoto.substrate import line
+        return line
     got = subprocess.run(["git", "-C", str(REPO), "show", f"{rev}:plugin/makoto/substrate/line.py"],
                          capture_output=True, text=True)
     if got.returncode:
