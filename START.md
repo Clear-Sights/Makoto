@@ -7,7 +7,7 @@ item it uses.
 
 ## Launch checklist
 
-Run `sh tools/launch_check.sh --suite` before anything else. Every line must read PASS. Each
+Run `sh tools/launch_check.sh` before anything else (about 7 s). Every line must read PASS. Each
 FAIL prints the one act that clears it. If one cannot be cleared, stop and tell Gabriel which
 line failed; do not work around it.
 
@@ -34,7 +34,8 @@ line failed; do not work around it.
 - Codex is not a launch item: no step here uses it. A step that does runs `sh tools/codex.sh`
   first; its LAUNCH MISSING line stops that step only and names the variable to set. Never commit
   `auth.json`.
-- The suite is green.
+- The suite is not a launch item: main's merge already ran it on five CI jobs. Before calling any
+  step done, run `sh tools/launch_check.sh --suite` (about 76 s more) and see `suite green`.
 
 ## Goal and path
 

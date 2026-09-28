@@ -1,6 +1,8 @@
 #!/bin/sh
 # Makoto launch checklist: every item PASS or FAIL, exit 0 only when all pass.
-# usage: sh tools/launch_check.sh [--suite]      (--suite also runs the full test suite, ~1 min)
+# usage: sh tools/launch_check.sh [--suite]
+# Launch runs it bare (~7 s). --suite adds the full test suite (~76 s): run that before calling a
+# step done, never at launch, where main's merge has already run it.
 # Each FAIL line names the one act that clears it. Nothing here edits anything.
 cd "$(dirname "$0")/.." || exit 2
 fails=0
