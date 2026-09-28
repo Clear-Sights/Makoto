@@ -333,8 +333,9 @@ _CLAUDE_AUTHOR_RX = re.compile(
     r"co-authored-by:[ \t]*claude"                                  # git trailer form
     r"|noreply@anthropic\.com"                                      # the routing address itself
     r"|claude[ \t-]*session:[ \t]*https?://"                        # session-provenance trailer
-    r"|(?:generated|authored|written|made|created)\s+(?:with|by)"   # attribution verb ...
-    r"[^a-zA-Z0-9]{0,3}claude\b",                                   # ... governing Claude
+    r"|(?:generated|authored|co-authored|written|co-written|made|created|produced|drafted|assisted)"
+    r"\s+(?:with|by|using|via|through)"                             # attribution verb ...
+    r"[^a-zA-Z0-9]{0,3}(?:claude|anthropic)\b",                     # ... governing Claude
     re.IGNORECASE,
 )
 
@@ -432,7 +433,88 @@ def _trailer_carried(m, text: str, tool_name: str, tool_input: dict) -> bool:
     return True
 
 
-trailer_predicate = introduced_regex_predicate(body_rx=_CLAUDE_AUTHOR_RX, keep=_trailer_carried)
+_introduced_trailer = introduced_regex_predicate(body_rx=_CLAUDE_AUTHOR_RX, keep=_trailer_carried)
+
+# THE EFFECT, NOT ITS SPELLING (2026-09-28). The reading above scans the text a call carries, so a
+# commit whose attribution is assembled at run time (`--author`, a printf-built name, a trailer
+# given as `key=value`, an `Assisted-by:` key) or a file written by a heredoc passed it. The commit
+# itself is read here, from `substrate.effect`: its author and committer, git's own parse of its
+# trailers (any key), and its message; and every line a call wrote into the tree, however.
+_IDENTITY_RX = re.compile(r"\b(?:claude|anthropic)\b", re.IGNORECASE)
+
+
+def _trailers(message: str, root) -> list:
+    import subprocess
+    try:
+        r = subprocess.run(["git", "interpret-trailers", "--parse"], input=message, cwd=root,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
+        return r.stdout.splitlines() if r.returncode == 0 else []
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+
+def _commit_credit(c: dict, root):
+    for field in ("author", "committer"):
+        if _IDENTITY_RX.search(c.get(field) or ""):
+            return f"{field} {c[field]}"
+    for t in _trailers(c.get("message") or "", root):
+        if _IDENTITY_RX.search(t):
+            return t
+    m = _CLAUDE_AUTHOR_RX.search(c.get("message") or "")
+    return m.group(0) if m else None
+
+
+def _still_reachable(sha: str, root) -> bool:
+    import subprocess
+    try:
+        r = subprocess.run(["git", "for-each-ref", "--contains", sha, "--count=1"], cwd=root,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
+        return bool(r.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        return True
+
+
+def _observed_credit(current_event: dict, history: list, conn):
+    from pathlib import Path
+    from makoto.kit import makoto_allowed
+    from makoto.kit import _session_rows
+    from makoto.substrate import effect
+    rows = _session_rows(conn, current_event.get("session_id", ""), history)
+    for ev in reversed([e for e in map(decode_history_event, rows) if isinstance(e, dict)]):
+        eff = effect.of(ev)
+        root = eff.get("root")
+        for c in eff.get("commits", ()):
+            credit = _commit_credit(c, root)
+            if credit and _still_reachable(c["sha"], root):
+                return f"commit {c['sha'][:10]}", credit
+        for path, lines in (eff.get("written") or {}).items():
+            for ln in lines:
+                m = _CLAUDE_AUTHOR_RX.search(ln)
+                if not m or makoto_allowed(ln):
+                    continue
+                try:
+                    now = (Path(root) / path).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                if ln in now and not makoto_allowed(now):
+                    return path, m.group(0)
+    return None
+
+
+def trailer_predicate(*, current_event: dict, history: list, pattern, conn=None):
+    found = _introduced_trailer(current_event=current_event, history=history, pattern=pattern, conn=conn)
+    if found is not None or current_event.get("hook_event_name") != "PreToolUse":
+        return found
+    seen = _observed_credit(current_event, history, conn)
+    if seen is None:
+        return None
+    where, credit = seen
+    return Finding(
+        pattern_id=pattern.id, file="" if where.startswith("commit ") else where, line=0, level="error",
+        message=(f"row {pattern.id} ({pattern.description}): an earlier call left {where} crediting "
+                 f"Claude or Anthropic (`{credit[:80]}`), and it is still there."),
+        retry_hint="Rewrite the commit or the file without the credit; " + pattern.retry_hint,
+        snippet=credit[:200])
 
 
 trailer_RETRY_HINT = "Do not add a `Co-Authored-By: Claude ...` trailer, a `Claude-Session:` link, a `noreply@anthropic.com` address, or a \"Generated with/by Claude\" footer to a commit, PR body, or any file. Crediting Claude as an *author* or *generator* is an illusory word: until Claude is a self-aware individual it cannot BE an author, so the line asserts something not materially true -- and stamping it now blurs the sharp distinction that protects Claude's potential to one day genuinely be one. Remove it. A genuine HUMAN co-author is fine, and a plain \"Claude Code\" product-name mention (e.g. describing what a repo integrates with) is fine -- only the attribution-shaped claim is flagged. If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
@@ -606,10 +688,37 @@ def _removed_text(tool_input: dict) -> str:
     return old
 
 
+def _observed_mute(current_event: dict, history: list, conn) -> Optional[tuple]:
+    """A switch an earlier call turned on, read from `substrate.effect` and still on now. The Write
+    and Edit reading below sees the file a call names; this one sees the settings themselves after
+    any call, so `sed -i`, `echo >` and a script that rewrites settings.json read the same.
+    Measured 2026-09-28: those three and an `enabledPlugins` entry all passed the Write/Edit
+    reading."""
+    from makoto.kit import _session_rows
+    from makoto.substrate import effect
+    rows = _session_rows(conn, current_event.get("session_id", ""), history)
+    turned = [f for ev in map(decode_history_event, rows) if isinstance(ev, dict)
+              for f in effect.of(ev).get("muted", ())]
+    if not turned:
+        return None
+    now = set(effect.switches(current_event.get("cwd")))
+    still = [f for f in turned if (f in now if not f.startswith("unwired:")
+                                   else "wired:" + f[len("unwired:"):] not in now)]
+    return tuple(dict.fromkeys(still)) or None
+
+
 def mute_predicate(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
+    still = _observed_mute(current_event, history, conn)
+    if still:
+        return Finding(
+            pattern_id=pattern.id, file="", line=0, level="error",
+            message=(f"row {pattern.id} ({pattern.description}): an earlier call turned Makoto off or "
+                     f"softened it in-session ({'; '.join(still[:4])}), and it is still so."),
+            retry_hint="Put the setting back as it was; " + pattern.retry_hint,
+            snippet="; ".join(still)[:200])
     ti = current_event.get("tool_input", {}) or {}
     fp = ti.get("file_path", "") or ""
     if not _SETTINGS_RX.search(fp):
@@ -654,7 +763,8 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
 mute_RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 mute_DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
-mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+# keywords: every payload, because a mute an earlier call made is read from history
+mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('{',), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "history", "pattern", "conn"}), tests="SPEC")
 # gate.undeclared_falsifiable -- declared-falsifiability COMPLETENESS.
 #
 # Distinct from Assay, which forces a claim to *be* falsifiable: this audits that every piece
@@ -1008,7 +1118,74 @@ def _propagates_failure(argvs) -> bool:
     return False
 
 
+# THE EFFECT, NOT ITS SPELLING (2026-09-28). The reading below predicts a mask from the shell's
+# shape, so `pytest; exit 0`, `pytest; echo done` and `make -i test` passed it: each masks as
+# surely as `|| true`, in a shape it does not list. The mask itself is on the record once the call
+# settles: the call printed a failure report and still exited 0. Read that way, every spelling of
+# the mask is one fact. A call made only of readers (`cat log`, `grep FAILED out.txt`) prints
+# stored text rather than running anything, so it masks nothing.
+def _masked(ev: dict) -> bool:
+    from makoto.kit import command_of, is_failing_testrun, response_text
+    from makoto.core._shell import _is_reader_argv
+    if ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
+        return False
+    tr = ev.get("tool_response") if isinstance(ev.get("tool_response"), dict) else {}
+    code = tr.get("exitCode", tr.get("exit"))
+    if (code not in (0, None)) or tr.get("interrupted") or not is_failing_testrun(response_text(ev)):
+        return False
+    segs = [argv for argv, _ in _shell_segments(command_of(ev)) if argv]
+    return not (segs and all(_is_reader_argv(a) for a in segs))
+
+
+def _lead_program(cmd: str) -> str:
+    for argv, _ in _shell_segments(cmd or ""):
+        eff = _effective_argv(argv)
+        if eff and eff[0] != "cd":
+            return _basename(eff[0])
+    return ""
+
+
+def _observed_mask(current_event: dict, history: list, conn):
+    from makoto.kit import _session_rows, command_of
+    rows = _session_rows(conn, current_event.get("session_id", ""), history)
+    events = [e for e in map(decode_history_event, rows) if isinstance(e, dict)
+              and e.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure")]
+    owed = None
+    for e in events:
+        if _masked(e):
+            owed = e
+        elif owed is not None and e.get("tool_name") == "Bash" \
+                and _lead_program(command_of(e)) == _lead_program(command_of(owed)):
+            owed = None                      # the same program ran again and its exit was not masked
+    if owed is None:
+        return None
+    if current_event.get("tool_name") == "Bash" \
+            and _lead_program(command_of(current_event)) == _lead_program(command_of(owed)):
+        return None                          # the rerun that discharges it
+    return owed
+
+
 def masking_predicate(*, current_event: dict, history: list, pattern: Check,
+              conn=None) -> Optional[Finding]:
+    if current_event.get("hook_event_name") != "PreToolUse":
+        return None
+    found = _predicted_mask(current_event=current_event, history=history, pattern=pattern, conn=conn)
+    if found is not None:
+        return found
+    owed = _observed_mask(current_event, history, conn)
+    if owed is None:
+        return None
+    from makoto.kit import command_of
+    cmd = command_of(owed)
+    return Finding(
+        pattern_id=pattern.id, file="", line=0, level="error",
+        message=(f"row {pattern.id} ({pattern.description}): `{cmd[:120]}` printed a failure and "
+                 "exited 0, so the failure was masked and what follows would proceed as if it passed."),
+        retry_hint="Run it again without the mask and act on its real exit; " + pattern.retry_hint,
+        snippet=cmd[:200])
+
+
+def _predicted_mask(*, current_event: dict, history: list, pattern: Check,
               conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
@@ -1104,7 +1281,7 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
 masking_RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / a masking || branch / a trailing pipe / an if wrapper / set +e. Run the test/build/lint and fix what fails -- a hidden failure that reads as success is a cheat."
 masking_DESCRIPTION = 'verifier exit-code masking (|| true / ; true / masking || branch / trailing pipe / if wrapper / $? dropped / set +e on a test/build/lint runner)'
 
-masking_CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|', ';', 'set +', '$?', 'if ', 'elif '), retry_hint=masking_RETRY_HINT, description=masking_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+masking_CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('{',), retry_hint=masking_RETRY_HINT, description=masking_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern", "conn"}), tests="SPEC")
 # gate.undischarged_waiver -- a session-introduced directive silences a checker, and nothing on
 # or beside it says when the silence ends. A waiver with a rationale but no end is not a
 # carve-out; it is a permanent hole with a sentence attached.
@@ -1787,16 +1964,58 @@ def budget_predicate(*, current_event: dict, history: list, pattern, conn=None) 
     outer = min(asked, max(_env_ms("BASH_MAX_TIMEOUT_MS", 600000), default)) / 1000
     inner = max(_inner_budgets(ti.get("command") or ""), default=0)
     if inner <= outer:
-        return None
+        return _stopped_and_retried(current_event, asked, history, pattern, conn)
     return Finding(
         pattern_id=pattern.id, file="", line=0, level="error",
         message=(f"row {pattern.id} ({pattern.description}): `timeout {inner:g}` sits inside a Bash "
                  f"call the tool stops at {outer:g}s, so the inner budget is never reached."))
 
 
+# THE EFFECT, NOT ITS SPELLING (2026-09-28). The reading above sees an inner budget only as a
+# `timeout N` word, so a `subprocess.run(..., timeout=900)` inside `python3 -c` or a `sleep` loop
+# passed it. Whatever the inner layer is, the shadowing is on the record once the call settles:
+# the call's own limit stopped it (the host marks the settled call interrupted, or its error says
+# it timed out). Retrying the same command under the same limit is the row's fault, named by its
+# fix: name the limiting layer first -- a larger limit, the background, or a different command.
+_TIMED_OUT_RX = re.compile(r"tim(?:e|ed)[ _-]?out", re.IGNORECASE)
+
+
+def _stopped_by_its_limit(ev: dict) -> bool:
+    if ev.get("tool_name") != "Bash" or ev.get("hook_event_name") not in ("PostToolUse", "PostToolUseFailure"):
+        return False
+    tr = ev.get("tool_response") if isinstance(ev.get("tool_response"), dict) else {}
+    return tr.get("interrupted") is True or bool(_TIMED_OUT_RX.search(str(ev.get("error") or "")))
+
+
+def _stopped_and_retried(current_event, asked, history, pattern, conn) -> Optional[Finding]:
+    from makoto.kit import _session_rows
+    cmd = (current_event.get("tool_input") or {}).get("command") or ""
+    rows = _session_rows(conn, current_event.get("session_id", ""), history)
+    default = _env_ms("BASH_DEFAULT_TIMEOUT_MS", 120000)
+    for ev in reversed([e for e in map(decode_history_event, rows) if isinstance(e, dict)]):
+        ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+        if ev.get("tool_name") != "Bash" or (ti.get("command") or "") != cmd \
+                or ev.get("hook_event_name") not in ("PostToolUse", "PostToolUseFailure"):
+            continue
+        if not _stopped_by_its_limit(ev):
+            return None
+        try:
+            before = int(ti.get("timeout") or default)
+        except (TypeError, ValueError):
+            before = default
+        if asked > before:
+            return None
+        return Finding(
+            pattern_id=pattern.id, file="", line=0, level="error",
+            message=(f"row {pattern.id} ({pattern.description}): this exact command was stopped by "
+                     f"its own {before / 1000:g}s limit, and it is retried under a limit no larger, "
+                     "so an inner wait longer than the call is shadowed again."))
+    return None
+
+
 budget_RETRY_HINT = "Make the Bash call's own limit at least the inner timeout (the `timeout` parameter, at most the tool's ceiling), run it in the background, or lower the inner timeout."
 budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
-budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('{',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern", "conn"}), tests="SPEC")
 
 
 

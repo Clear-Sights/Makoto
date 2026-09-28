@@ -232,4 +232,5 @@ def test_catalog_row_exists_and_matches():
     row = cat["content.self_mute_guard"]
     assert row.predicate_module == "makoto.checks.spec"
     assert row.posture.strip().upper() == "BLOCK"
-    assert "settings.json" in row.keywords
+    # every payload: a mute an earlier call made is read from history, whatever this call names
+    assert row.keywords == ("{",)
