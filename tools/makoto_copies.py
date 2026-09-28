@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Which installed Makoto copy's hooks run this session, and which copies are leftovers.
 
-usage: python3 tools/makoto_copies.py [HOME]
+usage: python3 tools/makoto_copies.py [HOME] [PLUGIN]   (PLUGIN defaults to makoto; launch reads detio too)
 prints one tab-separated line per installed copy:  live|unused <TAB> path <TAB> version <TAB> why
 
 Two ways a copy loads (read from the files Claude Code itself reads, nothing guessed):
@@ -36,29 +36,29 @@ def _vkey(name: str):
     return tuple(int(p) if p.isdigit() else -1 for p in name.split("."))
 
 
-def copies(home: Path) -> list[tuple[str, Path, str, str]]:
+def copies(home: Path, name: str = "makoto") -> list[tuple[str, Path, str, str]]:
     out = []
     plugins = home / ".claude" / "plugins"
     for org in sorted(p for p in (plugins / "synced").glob("*") if p.is_dir()):
-        found = sorted(p for p in org.glob("makoto*") if (p / ".claude-plugin" / "plugin.json").is_file())
+        found = sorted(p for p in org.glob(f"{name}*") if (p / ".claude-plugin" / "plugin.json").is_file())
         if not found:
             continue
         manifest = _json(org / "manifest.json") or {}
-        entry = next((e for e in manifest.get("plugins", []) if isinstance(e, dict) and e.get("name") == "makoto"), None)
+        entry = next((e for e in manifest.get("plugins", []) if isinstance(e, dict) and e.get("name") == name), None)
         gen = entry.get("generation") if entry else None
-        loads = None if entry is None else org / (f"makoto~g{gen}" if gen else "makoto")
+        loads = None if entry is None else org / (f"{name}~g{gen}" if gen else name)
         for c in found:
             if c == loads:
                 out.append(("live", c, _version(c), "account sync: the manifest lists this generation"))
             else:
-                why = "account sync: an older generation" if entry else "account sync: the manifest does not list makoto"
+                why = "account sync: an older generation" if entry else f"account sync: the manifest does not list {name}"
                 out.append(("unused", c, _version(c), why))
     settings = _json(home / ".claude" / "settings.json") or {}
     enabled = settings.get("enabledPlugins") or {}
     installed = (_json(plugins / "installed_plugins.json") or {}).get("plugins") or {}
-    for mkt in sorted(p for p in (plugins / "cache").glob("*") if (p / "makoto").is_dir()):
-        key = f"makoto@{mkt.name}"
-        found = sorted((p for p in (mkt / "makoto").glob("*") if (p / ".claude-plugin" / "plugin.json").is_file()),
+    for mkt in sorted(p for p in (plugins / "cache").glob("*") if (p / name).is_dir()):
+        key = f"{name}@{mkt.name}"
+        found = sorted((p for p in (mkt / name).glob("*") if (p / ".claude-plugin" / "plugin.json").is_file()),
                        key=lambda p: _vkey(p.name))
         if not found:
             continue
@@ -80,5 +80,5 @@ def copies(home: Path) -> list[tuple[str, Path, str, str]]:
 
 if __name__ == "__main__":
     home = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home()
-    for state, path, ver, why in copies(home):
+    for state, path, ver, why in copies(home, sys.argv[2] if len(sys.argv) > 2 else "makoto"):
         print(f"{state}\t{path}\t{ver}\t{why}")

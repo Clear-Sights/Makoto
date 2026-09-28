@@ -26,8 +26,10 @@ line failed; do not work around it.
   one open item is step 14 here.
 - DetIO is on: it loads as a plugin at the version DetIO main ships, with
   `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
-  installed in this session", and the launch line prints the installed version. Installed but
-  disabled reads missing. If it is missing, stop and tell Gabriel.
+  installed in this session", and the launch line reads the live copy (the one Claude Code loads,
+  `tools/makoto_copies.py HOME detio`) against the version on DetIO main and checks the hooks
+  variable. Installed but disabled reads missing. If it is missing or behind main, stop and tell
+  Gabriel.
 - Scour, pinned at efd27e9 with the register at Measure-Zero c544c4e: `sh tools/scour.sh` exits 0
   and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
   LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
