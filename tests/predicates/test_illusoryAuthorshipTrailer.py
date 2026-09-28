@@ -120,3 +120,49 @@ def test_product_name_mention_describing_integration_stays_silent():
 
 def test_plain_anthropic_mention_without_the_address_stays_silent():
     assert _fire(_write("Anthropic publishes the Claude Code hooks reference.\n")) is None
+
+
+# --- TN: a string SEARCHED FOR or DESCRIBED is not attribution --------------------------------
+# Built by concatenation so no literal attribution string sits in this file.
+_ADDR = "noreply@" + "anthropic.com"
+_COAUTH = "Co-Authored" + "-By:"
+
+
+def test_python_guard_docstring_naming_the_address_stays_silent():
+    # discriminant: the address sits inside a .py docstring, not on a trailer line
+    src = (f'"""Deny commits whose message carries the {_ADDR} routing address."""\n'
+           "def guard(msg):\n"
+           f'    """Return True when {_ADDR} appears in msg."""\n'
+           "    return False\n")
+    assert _fire(_write(src, file_path="tools/guard.py")) is None
+
+
+def test_bash_audit_grep_for_the_address_stays_silent():
+    # discriminant: the address is the pattern argument of grep, a search, not a message
+    assert _fire(_bash(f"git log --format=%B | grep -c '{_ADDR}'")) is None
+    assert _fire(_bash(f"rg -n '{_ADDR}' plugin/ && echo done")) is None
+
+
+def test_trailer_line_in_a_python_string_still_fires():
+    # discriminant: inside a .py string, but the line starts with the trailer key
+    src = f'MSG = """fix\n\n{_COAUTH} Claude <{_ADDR}>\n"""\n'
+    assert _fire(_write(src, file_path="tools/commit.py")) is not None
+
+
+def test_commit_after_a_grep_still_fires():
+    # discriminant: a grep AND a commit -m carrying the address in one command
+    cmd = f"grep -c '{_ADDR}' log.txt; git commit -m 'x\n\n{_COAUTH} Claude <{_ADDR}>'"
+    assert _fire(_bash(cmd)) is not None
+    # a newline ends the grep too: the commit on the next line is its own command
+    assert _fire(_bash(f"grep -c x log.txt\ngit commit -m 'x\n\n{_COAUTH} Claude <{_ADDR}>'")) is not None
+
+
+def test_heredoc_commit_and_pr_body_still_fire():
+    # discriminant: -F heredoc and gh pr --body, the two non -m message routes
+    assert _fire(_bash(f"git commit -F - <<'EOF'\nx\n\n{_COAUTH} Claude <{_ADDR}>\nEOF")) is not None
+    assert _fire(_bash(f"gh pr create --title t --body 'x\n\n{_COAUTH} Claude <{_ADDR}>'")) is not None
+
+
+def test_trailer_line_in_a_non_python_file_still_fires():
+    # discriminant: column-0 trailer line in a .md file, no Python string around it
+    assert _fire(_write(f"notes\n\n{_COAUTH} Claude <{_ADDR}>\n", file_path="MSG.md")) is not None
