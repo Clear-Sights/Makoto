@@ -217,8 +217,11 @@ The steps:
     adversarial-review catches, so adversarial-review can leave the launch rows. Replay both rounds
     in Scour's `tests/fixtures/attack/findings.tsv` (check out each head, pass its base) with
     `python3 -m scour.gate.judgment --on --diff BASE --model MODEL --store /tmp/verdicts.json
-    --ledger /tmp/scour-self.txt`, with `SCOUR_JUDGMENT_TOKENS` set, in the Scour clone at the pin
-    `tools/scour.sh` names. It writes only under `/tmp`, never to Scour's tree.
+    --ledger /tmp/scour-self.txt`, with `SCOUR_JUDGMENT_TOKENS` set, in the Scour clone at
+    2bface1fd0855b9c228be3ffb5d8cbaeb2044c5d (Scour #31; the reader it needs landed in #30). It
+    writes only under `/tmp`, never to Scour's tree. First sub-step: move `SCOUR_PIN` in
+    `tools/scour.sh` from efd27e9 to 2bface1 and see `sh tools/scour.sh` exit 0 with its verdict
+    line (cap: 2 model calls and 5 minutes); until then launch stays at efd27e9, the pin last run.
     Measured 2026-09-28, curated (one unit, its seams, its ledger rows, one question per call,
     memory and thinking off, about 930 tokens fixed per call): Haiku 4.5 1/6 at 82k+144k tokens
     (37+72 calls); Sonnet 5 0/6 at 109k+193k; Opus 5.5 2/6 asked only the 8 unit-questions the
