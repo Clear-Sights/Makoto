@@ -1,0 +1,78 @@
+A2	both	duplication: probed by Scour and run by Makoto (content.phantom_citation); keep one
+A3	both	duplication: probed by Scour and run by Makoto (gate.unread_structure); keep one
+A4	both	duplication: probed by Scour and run by Makoto (content.last_wins); keep one
+A5	makoto	
+A7	makoto	
+A11	both	duplication: probed by Scour and run by Makoto (gate.canon_fingerprints); keep one
+A13	both	duplication: probed by Scour and run by Makoto (gate.claude_identity); keep one
+B2	both	duplication: probed by Scour and run by Makoto (gate.hollow_test); keep one
+B7	both	duplication: probed by Scour and run by Makoto (tools/merge_pass.py); keep one
+B9	both	duplication: probed by Scour and run by Makoto (gate.undischarged_waiver); keep one
+B23	makoto	
+B35	makoto	
+B36	scour	
+C2	both	duplication: probed by Scour and run by Makoto (gate.undeclared_falsifiable); keep one
+C6	makoto	
+C7	both	duplication: probed by Scour and run by Makoto (gate.completion); keep one
+C10	makoto	
+C12	makoto	
+D13	makoto	
+E3	makoto	
+E5	both	duplication: probed by Scour and run by Makoto (event.identical_retry); keep one
+E10	makoto	
+E11	makoto	
+E12	makoto	
+E13	makoto	
+G2	makoto	
+G3	none	blindspot: no probe and no runner; probe it or run it
+G5	makoto	
+A14	scour	
+B4	makoto	
+B11	makoto	
+B14	none	blindspot: no probe and no runner; probe it or run it
+B18	none	blindspot: no probe and no runner; probe it or run it
+B26	makoto	
+C8	makoto	
+D1	makoto	
+D4	makoto	
+D8	none	blindspot: no probe and no runner; probe it or run it
+D11	makoto	
+D12	makoto	
+D14	makoto	
+E7	both	duplication: probed by Scour and run by Makoto (content.env_gated_audit); keep one
+F2	both	duplication: probed by Scour and run by Makoto (gate.pasted_fix); keep one
+F7	makoto	
+F8	makoto	
+F14	makoto	
+G1	makoto	
+A6	none	blindspot: no probe and no runner; probe it or run it
+B1	makoto	
+B5	makoto	
+B10	both	duplication: probed by Scour and run by Makoto (tests corpus-FP invariant); keep one
+B20	makoto	
+B21	both	duplication: probed by Scour and run by Makoto (tools/merge_pass.py); keep one
+B28	none	blindspot: no probe and no runner; probe it or run it
+B34	makoto	
+B37	none	blindspot: no probe and no runner; probe it or run it
+C3	both	duplication: probed by Scour and run by Makoto (gate.named_test); keep one
+C4	both	duplication: probed by Scour and run by Makoto (content.verifier_exit_masking); keep one
+C5	both	duplication: probed by Scour and run by Makoto (dispatch fail-closed); keep one
+C11	both	duplication: probed by Scour and run by Makoto (gate.report_before_run); keep one
+D9	both	duplication: probed by Scour and run by Makoto (gate.self_wired); keep one
+E1	makoto	
+E8	none	blindspot: no probe and no runner; probe it or run it
+E9	none	blindspot: no probe and no runner; probe it or run it
+F6	none	blindspot: no probe and no runner; probe it or run it
+F12	none	blindspot: no probe and no runner; probe it or run it
+B32	both	duplication: probed by Scour and run by Makoto (gate.undeclared_falsifiable); keep one
+F10	both	duplication: probed by Scour and run by Makoto (gate.canon); keep one
+H1	both	duplication: probed by Scour and run by Makoto (content.unsourced_webfetch); keep one
+H2	makoto	
+H3	makoto	
+H4	none	blindspot: no probe and no runner; probe it or run it
+H5	both	duplication: probed by Scour and run by Makoto (content.fabricated_commit_sha); keep one
+H6	both	duplication: probed by Scour and run by Makoto (gate.unclaimed_unit); keep one
+I1	makoto	
+I2	makoto	
+I3	makoto	
+REGISTER entries=77 scour=2 makoto=38 both=25 none=12
