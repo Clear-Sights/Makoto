@@ -55,3 +55,4 @@ step	item	void	measured_by	cap_model_calls	cap_minutes
 10	mesh	7 reds unread: the classifier refused the read as Modify Shared Resources	START step 10	4	10
 11	J1	no step-row reader exists: nothing to project from	docs/CONDUCT.md J1	4	10
 11	J6	no PreCompact event is recorded: nothing to project from	docs/CONDUCT.md J6	4	10
+14	SR1	no model yet names all 6 findings: best is Opus 5.5 at 2/6 (Haiku 4.5 1/6, Sonnet 5 0/6); M13 needs a run	scour.gate.judgment replay of tests/fixtures/attack/findings.tsv at the tools/scour.sh pin, 2026-09-28	120	45
