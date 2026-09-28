@@ -27,6 +27,9 @@ line failed; do not work around it.
   and prints Scour's verdict line. Its findings are the work list, not a launch failure; a
   LAUNCH MISSING line is red and names the act that clears it. Run it again before calling any
   step done.
+- Codex is logged in: `sh tools/codex.sh` prints "codex logged in". When it is not, the script
+  writes `$CODEX_AUTH_JSON` to `~/.codex/auth.json` (mode 600) and checks again; a LAUNCH MISSING
+  line names the variable to set in the environment settings. Never commit `auth.json`.
 - The suite is green.
 
 ## Goal and path

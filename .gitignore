@@ -9,3 +9,6 @@ build/
 docs/ASSUMPTIONS.tsv
 docs/LEDGER.tsv
 docs/ledger/
+
+# Codex login: written from $CODEX_AUTH_JSON at launch, never committed.
+auth.json
