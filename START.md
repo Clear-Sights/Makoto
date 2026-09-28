@@ -169,7 +169,7 @@ The steps:
    scratch `rm -rf` is exempt by design (the catch is now `rm -rf build` after a red run, with
    scratch and mktemp pass cases).
    check: `MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py` prints `distance 0`. plant:
-   `handoff/MAKOTO/foundation/harness.orig.py` as harness.py reads 17. inputs: `tools/mesh/`.
+   `tools/mesh/harness.orig.py` as harness.py reads 17. inputs: `tools/mesh/`.
    owner: done.
 11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
