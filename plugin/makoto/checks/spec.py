@@ -1013,9 +1013,13 @@ def _propagates_failure(argvs) -> bool:
     in a `[`/`test`/`[[` over a variable (`t=$?; ...; [ "$t" = 1 ]`) returns that test as the
     command's exit, so the captured status decides it: two false fires on the 3.4.7 record."""
     last = next((t for t in ([x for x in a if x not in _CONTROL_TOKENS] for a in reversed(argvs)) if t), [])
-    if last and last[0] in ("[", "test", "[[") and any("$" in t for t in last[1:]) and any(
-            t in ("=", "==", "!=", "-eq", "-ne", "-lt", "-le", "-gt", "-ge") for t in last[1:]):
-        return True
+    ops = ("=", "==", "!=", "-eq", "-ne", "-lt", "-le", "-gt", "-ge")
+    if last and last[0] in ("[", "test", "[["):
+        body = [t for t in last[1:] if t not in ("]", "]]")]
+        k = next((i for i, t in enumerate(body) if t in ops), None)
+        if k is not None and len(body) == k + 2 and ("$" in body[k - 1]) != ("$" in body[k + 1]):
+            return True                  # `[ "$t" = 1 ]`: a variable against a literal, never `$rc = $rc`
+    
     for argv in argvs:
         toks = [t for t in argv if t not in _CONTROL_TOKENS]
         if not toks:

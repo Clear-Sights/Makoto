@@ -293,3 +293,35 @@ def _command_runs_tests(command: str) -> bool:
 
 def _command_pushes_git(command: str) -> bool:
     return any(_is_git_push_argv(argv) for argv, _operator in _shell_segments(command))
+
+
+_SEPARATORS = frozenset({";", "&&", "||", "|", "&", "|&", ";;", "\n"})
+
+
+@functools.lru_cache(maxsize=4096)
+def statements(command: str):
+    """[(words, depth, op_before)] for each simple statement of `command`, in execution order:
+    split on ; && || | & and newline, comments dropped, quoted text one word, and each `(` or `$(`
+    one level deeper. None when the command does not tokenize. The scanner the read ledger's `cd`
+    and the destructive reading's same-command bindings share."""
+    try:
+        lex = shlex.shlex(command or "", posix=True, punctuation_chars=";&|()\n")
+        lex.whitespace = " \t\r"
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return None
+    out, cur, depth, before = [], [], 0, None
+    for t in toks:
+        if t and set(t) <= set(";&|()\n"):
+            # shlex keeps a punctuation run whole (`);`): read it char by char
+            for piece in re.findall(r"[()]|[;&|\n]+", t):
+                if cur:
+                    out.append((tuple(cur), depth, before))
+                cur, before = [], piece
+                depth = max(0, depth + (1 if piece == "(" else -1 if piece == ")" else 0))
+            continue
+        cur.append(t)
+    if cur:
+        out.append((tuple(cur), depth, before))
+    return tuple(out)             # cached: callers share it, so nothing in it can change

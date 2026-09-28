@@ -531,10 +531,14 @@ def _grep_found_nothing(c: Call) -> bool:
     err = str(self_error_code(c) or "")
     if not re.match(r"Exit code 1\b", err):
         return False
-    from makoto.core._shell import _shell_segments
-    segs = [argv for argv, _op in _shell_segments(str((c.get("input") or {}).get("command", "")))
-            if argv and argv[0] not in _SHELL_CLOSERS]
-    return bool(segs) and segs[-1][0].rsplit("/", 1)[-1] in _SEARCHERS
+    from makoto.core._shell import statements
+    stmts = [x for x in (statements(str((c.get("input") or {}).get("command", ""))) or ())
+             if x[0][0] not in _SHELL_CLOSERS]
+    if not stmts:
+        return False
+    words, _depth, before = stmts[-1]
+    # it ran on its own: not the tail of a pipe (`false | grep`), not reached through `&&`/`||`
+    return words[0].rsplit("/", 1)[-1] in _SEARCHERS and before in (None, ";", "\n", "(")
 
 
 # ---- sequence-aware primitives (read a span of the call stream, not one call) ----------------
@@ -1555,12 +1559,9 @@ from makoto.core._shell import _shell_segments
 
 
 def _is_destruction(ev: dict) -> bool:
-    from makoto.substrate._canonAtoms import _is_destructive_argv, scratch_env
+    from makoto.substrate._canonAtoms import is_destructive_command
     cmd = command_of(ev)
-    if not cmd:
-        return False
-    env = scratch_env(cmd)
-    return any(_is_destructive_argv(argv, env) for argv, _ in _shell_segments(cmd))
+    return bool(cmd) and is_destructive_command(cmd)
 
 
 # The guard is `kit.ran_a_verifier`, the ONE definition of "something observed behaviour",

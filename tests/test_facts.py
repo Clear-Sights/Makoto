@@ -165,3 +165,17 @@ def test_quotes_and_questions_are_not_clean_claims():
 
 def test_the_subject_comes_from_the_claim_sentence():
     assert F.read_claim("`pytest` failed. `npm test` passed.") == {"kind": "clean", "subject": "npm test"}
+
+
+def test_cd_follows_the_shell(tmp_path):
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "a.py").write_text("ROOT")
+    (tmp_path / "sub" / "a.py").write_text("SUB")
+    seen = lambda cmd: sorted(F.stamp(_post("Bash", {"command": cmd}, tmp_path))[F.SEEN_KEY])
+    assert seen("(cd sub); cat a.py") == [str(tmp_path / "a.py")]           # a subshell's cd ends
+    assert seen("echo ready\ncd sub\ncat a.py") == [str(tmp_path / "sub" / "a.py")]
+    assert seen("cd -- sub; cat a.py") == [str(tmp_path / "sub" / "a.py")]
+
+
+def test_a_fenced_example_is_not_a_claim():
+    assert F.read_claim("```text\nAll tests passed.\n```") == {}

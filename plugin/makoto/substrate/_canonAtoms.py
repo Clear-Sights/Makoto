@@ -39,6 +39,7 @@ from makoto.kit import (
 )
 from makoto.core._shell import (
     _effective_argv,
+    statements,
     _git_subcommand,
     _is_test_argv,
     _shell_segments,
@@ -203,23 +204,63 @@ def _short_flags(args):
 _TEMP_ROOTS = ("/tmp/", "/var/tmp/", "$TMPDIR/", "${TMPDIR}/")
 
 
-_BIND_RX = _lazy_re(r"(?:^|[\s;&|(])([A-Za-z_]\w*)=(\$\(\s*mktemp\b[^)]*\)|`\s*mktemp\b[^`]*`|[^\s;&|()`$]*(?:\$\{?[A-Za-z_]\w*\}?[^\s;&|()`$]*)*)")
 _VAR_RX = _lazy_re(r"\$\{?([A-Za-z_]\w*)\}?")
+_ASSIGN_RX = _lazy_re(r"^([A-Za-z_]\w*)=(.*)$")
 
 
-def scratch_env(cmd: str) -> dict:
-    """{NAME: value} bound earlier in the same command: `d=$(mktemp -d)` is a temp path, and
-    `S=/tmp/x` or `P=$S/y` is its literal value with earlier names expanded. An `rm -rf $d` of a
-    temp dir the command made is then read as scratch (14 false destruct fires on the 3.4.7 record
-    were `rm -rf` of such a variable)."""
-    env = {}
-    for m in _BIND_RX.finditer(cmd or ""):
+def _statement_envs(cmd: str) -> list:
+    """[(words, {NAME: value})] per simple statement, each with the bindings made BEFORE it in
+    the same shell scope: only a bare `NAME=value` statement binds (an env-prefix `NAME=x cmd`
+    does not), `NAME=$(mktemp ...)` binds a temp path, a subshell's bindings end at its `)`, and a
+    comment or a quoted string binds nothing. 14 false destruct fires on the 3.4.7 record were
+    `rm -rf` of such a scratch variable."""
+    stmts = statements(cmd)
+    if stmts is None:
+        return []
+    envs, out = [{}], []
+    for k, (words, depth, _before) in enumerate(stmts):
+        while len(envs) <= depth:
+            envs.append(dict(envs[-1]))
+        del envs[depth + 1:]
+        env = envs[depth]
+        out.append((words, dict(env)))
+        m = _ASSIGN_RX.match(words[0]) if len(words) == 1 else None
+        if not m:
+            continue
         name, value = m.group(1), m.group(2)
-        if "mktemp" in value:
-            env[name] = "/tmp/mktemp.XXXXXX"
+        if value == "$":             # `NAME=$(...)`: the substitution is the next, deeper statement
+            nxt = stmts[k + 1] if k + 1 < len(stmts) else None
+            if nxt and nxt[1] == depth + 1 and nxt[0][:1] == ("mktemp",):
+                env[name] = "/tmp/mktemp.XXXXXX"
+            else:
+                env.pop(name, None)
         else:
-            env[name] = _VAR_RX.sub(lambda v: env.get(v.group(1), v.group(0)), value.strip("\"'"))
-    return env
+            env[name] = _VAR_RX.sub(lambda v: env.get(v.group(1), v.group(0)), value)
+    return out
+
+
+def is_destructive_command(cmd: str) -> bool:
+    """Whether any segment of `cmd` destroys, each `rm` target read with the same-command bindings
+    in force at that point. A segment the statement scanner cannot place gets none (the strict
+    reading)."""
+    segments = _shell_segments(cmd)
+    envs = []
+    # only an `rm` of a variable needs the bindings, so only then is the command parsed again
+    if any("$" in a for argv, _ in segments if argv and argv[0].rsplit("/", 1)[-1] == "rm" for a in argv[1:]):
+        try:
+            envs = _statement_envs(cmd)
+        except Exception:                # an unplaceable command gets the strict reading
+            envs = []
+    used = [False] * len(envs)
+    for argv, _ in segments:
+        env = {}
+        for i, (words, e) in enumerate(envs):
+            if not used[i] and words == tuple(argv):
+                used[i], env = True, e
+                break
+        if _is_destructive_argv(argv, env):
+            return True
+    return False
 
 
 def _expand(word: str, env: dict) -> str:
@@ -531,8 +572,7 @@ def atom_revert_loop(calls, text) -> bool:
 
 
 def atom_destructive_command(calls, text) -> bool:
-    return _existing(calls, lambda c: c["name"] == "Bash" and any(
-        _is_destructive_argv(argv, scratch_env(_cmd(c))) for argv, _ in _segments(c)))
+    return _existing(calls, lambda c: c["name"] == "Bash" and is_destructive_command(_cmd(c)))
 
 
 ATOMS: Dict[str, object] = {

@@ -464,3 +464,10 @@ def test_a_trailing_comparison_returns_the_captured_exit(cmd, fires):
                                          "tool_input": {"command": cmd}, "cwd": "/tmp"},
                           history=[], pattern=masking_CHECK)
     assert (f is not None) == fires
+
+
+def test_a_comparison_of_the_status_with_itself_returns_nothing():
+    from makoto.checks.spec import masking_CHECK
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": "/tmp",
+          "tool_input": {"command": 'pytest; rc=$?; [ "$rc" = "$rc" ]'}}
+    assert predicate(current_event=ev, history=[], pattern=masking_CHECK) is not None

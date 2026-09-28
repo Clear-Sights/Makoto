@@ -13,8 +13,7 @@ import os
 import re
 import stat
 
-import shlex
-
+from makoto.core._shell import statements
 from makoto.kit import claim as _claim, command_of, is_test_runner, response_text
 from makoto.vocab import _lazy_re
 
@@ -72,28 +71,28 @@ def _seen_paths(payload: dict) -> list:
         p = _path_of(payload)
         return [p] if p else []
     if payload.get("tool_name") == "Bash":
-        try:
-            lex = shlex.shlex(command_of(payload) or "", posix=True, punctuation_chars=True)
-            lex.whitespace_split = True
-            words = list(lex)[:128]
-        except ValueError:
+        stmts = statements(command_of(payload) or "")
+        if stmts is None:
             return []
-        cwd, out, head = payload.get("cwd") or ".", [], True
-        for i, w in enumerate(words):
-            if w and set(w) <= set(";&|()"):
-                head = True              # the next word is a command, not an argument
+        cwds, out = [payload.get("cwd") or "."], []
+        for words, depth, _before in stmts[:64]:
+            while len(cwds) <= depth:
+                cwds.append(cwds[-1])
+            del cwds[depth + 1:]         # a subshell's `cd` ends at its `)`
+            if words[0] == "cd":
+                dest = [w for w in words[1:] if w != "--"][:1]
+                if dest:
+                    cwds[depth] = dest[0] if os.path.isabs(dest[0]) else os.path.join(cwds[depth], dest[0])
                 continue
-            if head and w == "cd" and i + 1 < len(words):
-                nxt = words[i + 1]
-                cwd = nxt if os.path.isabs(nxt) else os.path.join(cwd, nxt)
-            elif not head and not w.startswith("-"):
-                full = w if os.path.isabs(w) else os.path.join(cwd, w)
+            for w in words[1:]:
+                if w.startswith("-"):
+                    continue
+                full = w if os.path.isabs(w) else os.path.join(cwds[depth], w)
                 try:
                     if os.path.isfile(full):
                         out.append(full)
                 except ValueError:
                     pass
-            head = False
         return out
     return []
 
@@ -113,6 +112,7 @@ def stamp(payload: dict) -> dict | None:
 
 
 _QUOTED_RX = _lazy_re(r'"[^"\n]*"|“[^”\n]*”')
+_FENCED_RX = _lazy_re(r"```.*?(?:```|\Z)", re.S)
 _SENTENCES_RX = _lazy_re(r"(?<=[.!?])\s+|\n+")
 
 
@@ -120,7 +120,8 @@ def read_claim(text: str) -> dict:
     """{kind, subject} of the first claim sentence in `text`, by the word table; {} for none. A
     quoted sentence is not the writer's; a sentence ending in `?` is a question and nothing else;
     the subject is a runner command named in the same sentence."""
-    for sentence in _SENTENCES_RX.split(_QUOTED_RX.sub(" ", text or "")):
+    prose = _FENCED_RX.sub(" ", text or "")     # an example in a fence claims nothing
+    for sentence in _SENTENCES_RX.split(_QUOTED_RX.sub(" ", prose)):
         if not sentence.strip():
             continue
         if sentence.rstrip().endswith("?"):

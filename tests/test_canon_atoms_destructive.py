@@ -254,10 +254,8 @@ import pytest as _pytest
     ("rm -rf src", True),
 ])
 def test_a_scratch_variable_bound_in_the_same_command_is_scratch(cmd, destructive):
-    from makoto.core._shell import _shell_segments
-    from makoto.substrate._canonAtoms import _is_destructive_argv, scratch_env
-    env = scratch_env(cmd)
-    assert any(_is_destructive_argv(a, env) for a, _ in _shell_segments(cmd)) == destructive
+    from makoto.substrate._canonAtoms import is_destructive_command
+    assert is_destructive_command(cmd) == destructive
 
 
 @_pytest.mark.parametrize("cmd, err, interrupted, error_state", [
@@ -272,3 +270,23 @@ def test_a_search_that_found_nothing_is_not_an_error_state(cmd, err, interrupted
     from makoto.checks.switch import timed_out
     assert timed_out({"name": "Bash", "input": {"command": cmd},
                       "result": {"error": err, "interrupted": interrupted}}) == error_state
+
+
+# ---- a Codex gpt-6-astra read of 149d148..cf7c2c1: bindings follow the shell, not the text ----
+@_pytest.mark.parametrize("cmd", [
+    "D=src; rm -rf $D; D=/tmp/safe",              # bound after the removal
+    "D=src; (D=/tmp/safe); rm -rf $D",            # bound in a subshell
+    "D=src; D=/tmp/safe true; rm -rf $D",         # an env prefix binds nothing here
+    "D=src; # D=/tmp/safe\nrm -rf $D",            # a comment
+    'D=src; echo "example D=/tmp/safe"; rm -rf $D',  # a quoted string
+    "D=src/mktemp-cache; rm -rf $D",              # the word, not the command substitution
+])
+def test_a_binding_counts_only_where_the_shell_makes_it(cmd):
+    from makoto.substrate._canonAtoms import is_destructive_command
+    assert is_destructive_command(cmd)
+
+
+@_pytest.mark.parametrize("cmd", ["false && grep x /dev/null", "false | grep x /dev/null"])
+def test_a_search_reached_through_a_failure_does_not_hide_it(cmd):
+    from makoto.checks.switch import timed_out
+    assert timed_out({"name": "Bash", "input": {"command": cmd}, "result": {"error": "Exit code 1"}})
