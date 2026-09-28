@@ -207,8 +207,8 @@ The steps:
     check: every round-nine escape (the attack's per-entry cases) is a plant in `tests/` that reads
     red on main and green here, and each claimed entry has exactly one line. plant: delete one line
     and its entry's plant reads red.
-    inputs: the v9 lines in `docs/v9/predicates.tsv`, and the attack's case list, copied into the
-    repository when the step starts. owner: the next Makoto session.
+    inputs: the v9 lines in `docs/v9/predicates.tsv`, and the round-nine cases in
+    `docs/attack-round-nine.md`. owner: the next Makoto session.
     projection: `python3 tools/project.py 13` (no model; this checkout's evaluator) prints `PROJECT 13
     lines=77 parsed=69 refused=8`. Landed on branch claude/pensive-carson-cbpr5j: the evaluator with
     refs(), set difference, exists n, count(), contains and field values (`tests/test_line.py`), and
@@ -216,12 +216,10 @@ The steps:
     seen file's hash, `tests/test_facts.py`). The 8 refused are not lines (VOIDS names each missing
     fact). Owner's rulings (2026-09-28): G2, B4 and F10 stay unclaimed; each needs a fact no hook
     carries, and a live check covers its weaker reading (G2: gate.unasked_plan; B4:
-    gate.unwitnessed_verifier; F10: gate.canon). The proving set is the round-nine list in the project
-    folder's `HANDOFF/sections/attack.md` ("Attack round nine", 21 escapes over E3, E12, E11, C4, D14,
-    and "round nine b", 58 entries), each case rebuilt from its shape as a plant red on main; each
-    check's own test file is only the no-regression bar. That section is not in `handoff.zip` (its
-    copy ends at round six), so it has to be brought into this repository first (VOIDS
-    `attack-cases`). cap: 6 model calls and 10 minutes per row.
+    gate.unwitnessed_verifier; F10: gate.canon). The proving set is `docs/attack-round-nine.md`
+    ("Attack round nine", 21 escapes over E3, E12, E11, C4, D14, and "round nine b", 58 entries),
+    each case rebuilt from its shape as a plant red on main; each check's own test file is only the
+    no-regression bar. cap: 6 model calls and 10 minutes per row.
     Stop: at the cap, record the measured number in VOIDS and go on.
 14. Scour's judge (moved from Scour's handoff, row SR1): make Scour's reader catch what
     adversarial-review catches, so adversarial-review can leave the launch rows. Replay both rounds
