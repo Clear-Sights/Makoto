@@ -3,6 +3,9 @@
 One file for a session that picks Makoto up. Read it top to bottom. Do not read the history to
 rebuild it; what the history holds that matters is here or in the files it names.
 
+Nothing outside this repository is read at launch. Only two steps need an outside input, and
+each names its own: step 6 needs a live audit, and step 10 needs the shared mesh.
+
 ## Launch checklist
 
 Run `sh tools/launch_check.sh --suite` before anything else. Every line must read PASS. Each
@@ -67,13 +70,21 @@ The row designs are in `docs/FOUNDATION-14.md`.
    check: `tests/test_plugin_digest.py` and the launch checklist's installed-copy line.
    plant: change a byte under `plugin/` without a new pin row, and the test reads red.
    inputs: none open. owner: done.
-5. ~~Bound every stop check~~ (PR #102). A check blocks one session's stops at most
-   `STOP_BLOCK_BOUND` (3) times. After that its finding is printed and the stop goes through, so
-   no precaution can force endless churn: the session goes long, never forever. Pre denials stay
-   unbounded, because each one returns control and a bounded deny would let a destructive call
-   through.
-   check: `tests/test_stop_unchanged.py`, the test on a session that never satisfies its check.
-   plant: drop the spent filter in `dispatch._evaluate_and_gate`, and stop 4 blocks.
+5. ~~Give every blocking check an exit the session actually has~~ (PR #102).
+   - A check blocks one session's stops at most `STOP_BLOCK_BOUND` (3) times.
+   - gate.unprobed_fanout denies once per unprobed stretch, and the same dispatch retried goes
+     through. A seat with no Read, Glob, Grep or Bash tool could never pay it.
+   - gate.unwitnessed_verifier is paid by a red run of the same verifier in either order.
+
+   Past the stop bound, the finding is printed and the stop goes through. No precaution can
+   force endless churn: the session goes long, never forever. Other Pre denials stay unbounded,
+   because each returns control and a bounded deny would let a destructive call through.
+   check: `tests/test_stop_unchanged.py` (a session that never satisfies its check),
+   `tests/test_dispatch.py::test_dispatch_unprobed_fanout_has_an_exit_for_a_session_with_no_reading_tool`,
+   and `tests/test_obligation_gates.py::test_unwitnessed_verifier_is_silent_when_the_red_run_came_after`.
+   plant: drop the spent filter in `dispatch._evaluate_and_gate`, and stop 4 blocks. Return the
+   finding unconditionally in `lineage.unprobed_fanout_gate`, or drop `k not in red` in
+   `switch.unwitnessed_verifier_gate`, and its test reads red.
    inputs: none open. owner: done.
 6. Re-grade worth on a fresh live record, then subtract. Subtraction is the default: a check
    that still fails worth-it is removed, along with its register row reverting to NOT-COUNTABLE,
@@ -81,9 +92,8 @@ The row designs are in `docs/FOUNDATION-14.md`.
    check: `python3 tools/worth.py AUDIT.jsonl VERDICTS.tsv` exits 0 over every fire since
    3.3.0 was installed. plant: a verdicts file missing one fire exits 2.
    inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
-   each fire. The 09-23 to 09-28 record is in the shared folder under
-   `MAKOTO/foundation/audit-2026-09-28.jsonl` and `verdicts-2026-09-28.tsv`, and it reads 5 of
-   17 fired checks worth it, measured before steps 2 to 4. owner: the next Makoto session.
+   each fire. The 09-23 to 09-28 record reads 5 of 17 fired checks worth it, but it was measured
+   before steps 2 to 5 and is not needed. owner: the next Makoto session.
 7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
    check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
@@ -95,7 +105,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
    inputs: each row's owes and paid-by are defined in the table. What each row still needs is
    its measured false rate on real sessions, and the corpus for that exists:
-   `MAKOTO/foundation/corpus.py` over the transcripts in `~/.claude/projects/`. Two rows each
+   `tools/corpus.py` over the transcripts in `~/.claude/projects/`. Two rows each
    have one open vocabulary question:
    - B14: the benefit-verb list.
    - D8: the narrowing-flag list.
