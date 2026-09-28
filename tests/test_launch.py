@@ -38,7 +38,7 @@ def _copy(path: Path, version: str) -> Path:
 
 
 def _states(home: Path) -> dict[str, tuple[str, str]]:
-    return {str(p.relative_to(home / ".claude" / "plugins")): (state, ver) for state, p, ver, _ in mc.copies(home)}
+    return {p.relative_to(home / ".claude" / "plugins").as_posix(): (state, ver) for state, p, ver, _ in mc.copies(home)}
 
 
 def test_the_synced_generation_the_manifest_lists_is_live_and_the_rest_unused(tmp_path):
