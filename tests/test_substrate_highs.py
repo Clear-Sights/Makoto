@@ -38,3 +38,19 @@ def test_every_finding_rides_the_decision_not_only_the_worst(tmp_path):
     wire = _run_dispatch(state, _event(repo, 1, "PreToolUse", tool_name="Write", tool_input={
         "file_path": str(repo / ".claude" / "settings.json"), "content": body}))[1]
     assert "content.self_mute_guard" in wire and "content.illusory_authorship_trailer" in wire
+
+
+def test_the_meta_floor_binds_when_a_meta_finding_ties_an_ordinary_one(tmp_path):
+    # A softening posture floors a meta BLOCK to ASK; it used to read only the first finding at
+    # BLOCK rank, so a gate-muting write that also carried an ordinary fault passed.
+    body = ('{"env": {"MAKOTO_DISABLE_GATES": "1"}, '
+            f'"note": "Co-Authored-By: {_WHO} <noreply@anthrop' + 'ic.com>"}')
+    for mode in ("loose", "silent"):
+        (tmp_path / mode).mkdir()
+        state = _setup_state(tmp_path / mode)
+        repo = tmp_path / mode / "repo"
+        repo.mkdir()
+        wire = _run_dispatch(state, _event(repo, 1, "PreToolUse", tool_name="Write", tool_input={
+            "file_path": str(repo / ".claude" / "settings.json"), "content": body}),
+            extra_env={"MAKOTO_MODE": mode})[1]
+        assert '"permissionDecision": "ask"' in wire or '"permissionDecision": "deny"' in wire, (mode, wire)

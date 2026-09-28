@@ -42,12 +42,14 @@ done
 
 # DetIO is on in every handoff's launch: its hooks cut the tokens this work reads. Read the
 # installed copy's own version line; the act that clears a miss is the install, then a new session.
-detio=""
+detio="" dver=""
 for inst in "$HOME"/.claude/plugins/synced/*/detio "$HOME"/.claude/plugins/cache/*/detio/*; do
-  [ -f "$inst/.claude-plugin/plugin.json" ] && { detio="$inst"; break; }
+  [ -f "$inst/.claude-plugin/plugin.json" ] || continue
+  v="$("$PY" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["version"])' "$inst/.claude-plugin/plugin.json" 2>/dev/null)"
+  [ -n "$v" ] && { detio="$inst"; dver="$v"; break; }
 done
-if [ -n "$detio" ]; then
-  pass "DetIO installed ($("$PY" -c "import json; print(json.load(open('$detio/.claude-plugin/plugin.json'))['version'])") at $detio)"
+if [ -n "$dver" ]; then
+  pass "DetIO installed ($dver at $detio)"
 else
   fail "DetIO installed" "claude plugin marketplace add Clear-Sights/DetIO && claude plugin install detio@detio, then start a NEW session"
 fi

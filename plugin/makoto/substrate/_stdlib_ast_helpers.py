@@ -63,6 +63,10 @@ def on_disk(p: str) -> str:
             return p
         parts.append(tail)
     for part in reversed(parts):
+        exact = os.path.join(head, part)
+        if os.path.exists(exact):
+            head = exact                                  # spelled as written: never re-guessed
+            continue
         try:
             hits = [e for e in os.listdir(head or ".") if e.lower() == part.lower()]
         except OSError:
