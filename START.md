@@ -15,9 +15,11 @@ line failed; do not work around it.
 - The checkout is origin/main and the tree is clean.
 - The three laws exit 0: `tools/render_checks.py --check`, `tools/register_map.py` and
   `tools/merge_pass.py`.
-- NOTE, not a stop: the installed Makoto copy should be this checkout's `plugin/`. Reinstalling it
-  is Gabriel's act (hooks load at session start, so it lands next session); the line prints NOTE
-  with the act and the session goes on.
+- NOTE, not a stop: the line names the installed Makoto copy whose hooks run this session (from
+  the account-sync manifest and `enabledPlugins`, read by `tools/makoto_copies.py`) and every
+  unused copy beside it. The live copy should be this checkout's `plugin/`. Reinstalling it, or
+  removing an unused copy, is Gabriel's act (hooks load at session start, so it lands next
+  session); the line prints NOTE with the act and the session goes on.
 - The session has the repositories it needs: ask to attach (add_repo) Clear-Sights/Scour and
   Clear-Sights/Measure-Zero, and clone both beside this repository, before anything else.
 - DetIO is on: it loads as a plugin at the version DetIO main ships, with
