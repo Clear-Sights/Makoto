@@ -1,10 +1,9 @@
 # Makoto: start here
 
-One file for a session that picks Makoto up. Read it top to bottom. Do not read the history to
-rebuild it; what the history holds that matters is here or in the files it names.
-
-Nothing outside this repository is read at launch. Only two steps need an outside input, and
-each names its own: step 6 needs a live audit, and step 10 needs the shared mesh.
+Nothing outside this repository is read at launch. Three steps need an outside input, and
+each names its own: step 6 needs a live audit, step 10 the shared mesh, and step 12 two clones.
+Prior art from Gabriel's other repositories is in `docs/PRIOR-ART.md`; each step cites the
+item it uses.
 
 ## Launch checklist
 
@@ -37,7 +36,7 @@ Every row is held to three bars, and a row lands only with all three green:
 - **Worth it.** On its corpus replay, `tools/worth.py` reads catches at or above false fires
   plus repeats.
 
-Done means three things hold together:
+Makoto is done when all three hold:
 
 - `python3 tools/register_map.py` prints 77 RUNNER and 0 NOT-COUNTABLE.
 - Every fired check passes worth.py on a fresh live record.
@@ -54,15 +53,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    payable~~ (PR #101).
    check: `tests/test_hook_latency.py`, `tests/test_worth.py` and `tests/test_stop_unchanged.py`.
    plant: each file carries its own plant. inputs: none open. owner: done.
-3. ~~Deterministic fixes for the false fires~~ (PR #102). The fixed cases are:
-   - an informational runner call (`--version`, `--collect-only`) read as masking;
-   - a searched or described trailer string read as authorship;
-   - scratch cleanup read as destruction;
-   - a compaction SubagentStop read as a claim;
-   - a Bash read-only reader not counted as the probe;
-   - a newly created branch read as an unknown ref;
-   - a unit used in the file it landed in read as unclaimed.
-
+3. ~~Fix the 7 deterministic false-fire classes~~ (PR #102; the classes are in its commit titles).
    check: the per-check tests in each commit. plant: revert any one commit and its test reads
    red. inputs: none open. owner: done.
 4. ~~Make the installed copy provably this checkout~~ (PR #102). The version moved to 3.3.0, and
@@ -70,13 +61,9 @@ The row designs are in `docs/FOUNDATION-14.md`.
    check: `tests/test_plugin_digest.py` and the launch checklist's installed-copy line.
    plant: change a byte under `plugin/` without a new pin row, and the test reads red.
    inputs: none open. owner: done.
-5. ~~Give every blocking check an exit the session actually has~~ (PR #102).
-   - A check blocks one session's stops at most `STOP_BLOCK_BOUND` (3) times.
-   - gate.unprobed_fanout denies once per unprobed stretch, and the same dispatch retried goes
-     through. A seat with no Read, Glob, Grep or Bash tool could never pay it.
-   - gate.unwitnessed_verifier is paid by a red run of the same verifier in either order.
-   - The fail-open notice ("allowed without being checked") shows once per session and stage.
-
+5. ~~Give every blocking check an exit the session actually has~~ (PR #102): the stop bound
+   `STOP_BLOCK_BOUND` (3), a single fanout deny, verifier witness in either order, and the
+   fail-open notice shown once per session.
    Past the stop bound, the finding is printed and the stop goes through. No precaution can
    force endless churn: the session goes long, never forever. Other Pre denials stay unbounded,
    because each returns control and a bounded deny would let a destructive call through.
@@ -87,31 +74,26 @@ The row designs are in `docs/FOUNDATION-14.md`.
    finding unconditionally in `lineage.unprobed_fanout_gate`, or drop `k not in red` in
    `switch.unwitnessed_verifier_gate`, and its test reads red.
    inputs: none open. owner: done.
-6. Re-grade worth on a fresh live record, then subtract. Subtraction is the default: a check
+6. Re-grade worth on a fresh live record, then subtract (`docs/PRIOR-ART.md` item 4). Subtraction is the default: a check
    that still fails worth-it is removed, along with its register row reverting to NOT-COUNTABLE,
    rather than narrowed or joined by a new one.
-   check: `python3 tools/worth.py AUDIT.jsonl VERDICTS.tsv` exits 0 over every fire since
-   3.3.0 was installed. plant: a verdicts file missing one fire exits 2.
+   check: `python3 tools/worth.py AUDIT.jsonl VERDICTS.tsv` exits 0 over every fire
+   recorded on 3.3.0. plant: a verdicts file missing one fire exits 2.
    inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
-   each fire. The 09-23 to 09-28 record reads 5 of 17 fired checks worth it, but it was measured
-   before steps 2 to 5 and is not needed. owner: the next Makoto session.
+   each fire. owner: the next Makoto session.
 7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
    check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
    RUNNER row back and the test reads red. inputs: none open; the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
-8. Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
+8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
    commit each. Each commit lowers the pin by 1.
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
    inputs: each row's owes and paid-by are defined in the table. What each row still needs is
    its measured false rate on real sessions, and the corpus for that exists:
-   `tools/corpus.py` over the transcripts in `~/.claude/projects/`. Two rows each
-   have one open vocabulary question:
-   - B14: the benefit-verb list.
-   - D8: the narrowing-flag list.
-
-   Both are settled by the corpus fires, not by judgement. owner: the next Makoto session.
+   `tools/corpus.py` over the transcripts in `~/.claude/projects/`. B14's benefit verbs and D8's
+   narrowing flags are settled by those corpus fires. owner: the next Makoto session.
 9. Cut the per-call start cost of about 0.19 s for Pre plus Post.
    check: a latency reading of the Pre and Post shim time, with a bound. plant: a module-level
    compile added back reads red.
@@ -123,7 +105,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    inputs: the classifier refused a read of the remaining 7 reds and the 3 proposed I1 to I3
    cases as "Modify Shared Resources". The placement item in the handoff section carries the line
    that lifts it. owner: the next Makoto session.
-11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md`: off-path acts, hand repeats, serial
+11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
     loops. Some of the conduct Gabriel requires is already live (the entries named in that file).
     These eight are not yet prevented.
@@ -132,3 +114,12 @@ The row designs are in `docs/FOUNDATION-14.md`.
     input that does not exist yet. The inputs that do not exist yet are the step-row reader (J1),
     the names index (J4), the mesh slot map (J5) and a recorded PreCompact event (J6).
     owner: the next Makoto session, after step 7's kit.neighbours.
+12. One count and one owner per register entry (`docs/PRIOR-ART.md` items 1, 2 and 7). Derive the
+    entry count from the register file by script, so no document types it. Join
+    `docs/REGISTER-MAP.tsv` with Scour's declined() reasons into one table that names, per entry,
+    the static probe (Scour), the dynamic runner (Makoto) or neither. Dedupe B7, B2, F2 and D1 by
+    the MERGE-WITNESSES rule.
+    check: a test that reads the count off the register file and fails on any typed count that
+    disagrees. plant: type a wrong count into README.md and the test reads red.
+    inputs: clones of `Clear-Sights/Scour` and `Clear-Sights/Measure-Zero`, each at a pinned sha
+    taken when the step starts. Neither is needed before this step. owner: the next Makoto session.
