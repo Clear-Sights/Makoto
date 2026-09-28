@@ -189,3 +189,10 @@ def test_a_file_under_a_capitalised_directory_is_read_by_the_stop_rows(tmp_path)
         wire = _run_dispatch(s.state, {"session_id": "s", "cwd": str(s.repo), "hook_event_name": "Stop",
                                        "stop_hook_active": False})[1]
         assert "gate.hollow_test" in wire, d
+
+
+# Substrate: one decision names every finding, not only the worst.
+def test_every_finding_rides_the_decision_not_only_the_worst(tmp_path):
+    s = Session(tmp_path)
+    wire = s.call(effect=lambda r: ((r / "work.py").unlink(), _settings(r, {"env": {"MAKOTO_MODE": "silent"}})))
+    assert "gate.unobserved_destruction" in wire and "content.self_mute_guard" in wire
