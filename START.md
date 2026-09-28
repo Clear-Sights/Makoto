@@ -91,7 +91,10 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
    inputs: each row's owes and paid-by are defined in the table. What each row still needs is
    its measured false rate on real sessions, and the corpus for that exists:
    `tools/corpus.py` over the transcripts in `~/.claude/projects/`. B14's benefit verbs and D8's
-   narrowing flags are settled by those corpus fires. owner: the next Makoto session.
+   narrowing flags are settled by those corpus fires. Cheapest way: convert the corpus once and
+   replay it once for all 14 rows and step 11's thresholds together, never once per row. Write the
+   rows with the cheaper executor, each briefed with its catch test as ACCEPTANCE, and accept a row
+   only on your own run of that test. owner: the next Makoto session.
 9. Cut the per-call start cost of about 0.19 s for Pre plus Post.
    check: a latency reading of the Pre and Post shim time, with a bound. plant: a module-level
    compile added back reads red.
@@ -119,5 +122,6 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     the MERGE-WITNESSES rule.
     check: a test that reads the count off the register file and fails on any typed count that
     disagrees. plant: type a wrong count into README.md and the test reads red.
-    inputs: clones of `Clear-Sights/Scour` and `Clear-Sights/Measure-Zero`, each at a pinned sha
-    taken when the step starts. Neither is needed before this step. owner: the next Makoto session.
+    inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` and
+    `Clear-Sights/Measure-Zero`, each at a pinned sha taken when the step starts. The join is a
+    script, not a reading. Neither is needed before this step. owner: the next Makoto session.
