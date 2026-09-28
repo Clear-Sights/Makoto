@@ -14,10 +14,18 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEXT = (".md", ".txt", ".toml", ".json", ".yaml", ".yml", ".rst")
-_TYPED = re.compile(r"(?<![\w.-])(\d[\d,]*)\s+(?:register\s+)?(?:entries|blindspots|ids)\b(?!=)|\bentries=(\d+)\b",
-                    re.IGNORECASE)
+_TYPED = re.compile(r"(?<![\w.-])(\d[\d,]*)\s+(?:[A-Za-z-]+\s+){0,2}?(entries|blindspots|ids)\b(?!=)"
+                    r"|\bentries=(\d+)\b", re.IGNORECASE)
 _NARROWED = re.compile(r"\b(?:last|first|remaining|other|new|these|those|open|refused|parsed)\s+$",
                        re.IGNORECASE)
+_REGISTER_WORD = re.compile(r"\bregister\b|\bblindspots?\b", re.IGNORECASE)
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)|\n")
+
+
+def _sentence(text: str, start: int, end: int) -> str:
+    left = max((m.end() for m in _SENTENCE_END.finditer(text, 0, start)), default=0)
+    right = next((m.start() for m in _SENTENCE_END.finditer(text, end)), len(text))
+    return text[left:right]
 
 
 def register_count() -> int:
@@ -28,10 +36,15 @@ def register_count() -> int:
 
 
 def typed_counts(text: str):
+    """Counts whose subject is the register: `entries=N`, or `N [up to two words] entries|blindspots|
+    ids` in a sentence that names the register (blindspots are the register's own unit)."""
     for m in _TYPED.finditer(text):
         if _NARROWED.search(text[max(0, m.start() - 30):m.start()]):
             continue
-        yield int((m.group(1) or m.group(2)).replace(",", "")), m.group(0)
+        if m.group(3) is None and m.group(2).lower() != "blindspots" \
+                and not _REGISTER_WORD.search(_sentence(text, m.start(), m.end())):
+            continue
+        yield int((m.group(1) or m.group(3)).replace(",", "")), m.group(0)
 
 
 def disagreements(files, count):
@@ -61,3 +74,10 @@ def test_plant_a_wrong_count_in_readme_reads_red(tmp_path):
 def test_a_narrowed_count_is_not_the_register_count():
     assert list(typed_counts("the foundation for the last 14 register entries")) == []
     assert [n for n, _ in typed_counts("PROJECT 12 entries=5 both=2")] == [5]
+
+
+def test_the_kind_is_the_register_as_subject():
+    assert [n for n, _ in typed_counts("The register contains 80 total entries.")] == [80]
+    assert [n for n, _ in typed_counts("Makoto covers all 74 blindspots.")] == [74]
+    assert list(typed_counts("The cache contains 3 entries.")) == []
+    assert list(typed_counts("The register is long. The cache holds 3 entries.")) == []

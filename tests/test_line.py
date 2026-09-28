@@ -124,3 +124,57 @@ def test_the_fixture_register_fires_each_line_on_its_set_and_nowhere_else():
     x = ev(tool="Edit", args={"content": "y = f()  # hush"})
     assert L.holds(REGISTER["waiver"], x, [], NAMED)
     assert not L.holds(REGISTER["waiver"], dict(x, args={"content": "y = f()  # hush until the 3.5 release"}), [], NAMED)
+
+
+# ---- step 13's constructs: one plant each, a case that holds and its neighbour that must not ----
+
+def test_refs_minus_the_read_ledger_is_the_lineage_line():
+    line = "event in {Pre,Stop} and refs(output)-source.read!={}"
+    said = ev(event="Stop", output="fixed in src/a.py:12 and docs/B.md")
+    assert L.holds(line, {**said, "source": {"read": {"src/a.py": "h"}}}, [])
+    assert not L.holds(line, {**said, "source": {"read": {"src/a.py": "h", "docs/B.md": "h"}}}, [])
+
+
+def test_exists_binds_a_name_and_tree_hash_reads_the_file_now(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    now = L.file_hash(str(tmp_path / "a.py"))
+    line = "exists n in refs(output) and source.read[n]!=tree[n].hash"
+    said = ev(event="Stop", output="see a.py", cwd=str(tmp_path))
+    assert L.holds(line, {**said, "source": {"read": {"a.py": "stale"}}}, [])
+    assert not L.holds(line, {**said, "source": {"read": {"a.py": now}}}, [])
+
+
+def test_count_counts_events_since_the_last_reset():
+    line = "count(tool=Edit and path=$path, not tool=Edit or path!=$path)>=3"
+    edit = ev(tool="Edit", path="a.py")
+    assert L.holds(line, edit, [edit, edit, edit])
+    assert not L.holds(line, edit, [edit, ev(tool="Bash"), edit, edit])
+
+
+def test_contains_and_a_field_on_the_right():
+    assert L.holds("body.calls contains try.calls", {"body": {"calls": ["f", "g"]}, "try": {"calls": ["f"]}}, [])
+    assert not L.holds("body.calls contains try.calls", {"body": {"calls": ["g"]}, "try": {"calls": ["f"]}}, [])
+
+
+def test_a_bare_field_is_its_truth_and_strict_comparisons_hold():
+    assert L.holds("launch and not decorated", {"launch": True, "decorated": False}, [])
+    assert not L.holds("launch and not decorated", {"launch": True, "decorated": True}, [])
+    assert L.holds("shape>0", {"shape": 2}, []) and not L.holds("shape>0", {"shape": 0}, [])
+    assert L.holds("run.size<real.size", {"run": {"size": 3}, "real": {"size": 9}}, [])
+    assert not L.holds("run.size<real.size", {"run": {"size": 9}, "real": {"size": 9}}, [])
+
+
+def test_a_function_no_fact_carries_is_unbound_never_silently_false():
+    with pytest.raises(L.Unbound):
+        L.holds("any(check=red)", ev(), [])
+    with pytest.raises(L.Unbound):
+        L.holds("not run_pair(with,without).differs", ev(), [])
+
+
+@pytest.mark.parametrize("prose", [
+    "zero.py: a TERMS row with check column empty",
+    "Q: does any one party see the whole span the answer covers?",
+    "verdict=exit of the gate own run of each check; a reported exit is never read"])
+def test_prose_is_not_a_line(prose):
+    with pytest.raises(L.Malformed):
+        L.parse(prose)

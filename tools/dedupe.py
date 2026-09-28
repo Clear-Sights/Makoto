@@ -70,12 +70,10 @@ def makoto_fires(runner: str, files: dict) -> bool:
     """Drive the real dispatcher: each file arrives as a Pre then Post Write (or Edit), then a Stop."""
     tmp = Path(tempfile.mkdtemp())
     env = {**os.environ, "MAKOTO_STATE_DIR": str(tmp / "state"), "PYTHONPATH": str(REPO / "plugin")}
-    out = []
 
     def send(ev):
-        r = subprocess.run([sys.executable, "-m", "makoto.dispatch"], input=json.dumps(ev), text=True,
-                           capture_output=True, cwd=REPO / "plugin", env=env)
-        out.append(r.stdout + r.stderr)
+        subprocess.run([sys.executable, "-m", "makoto.dispatch"], input=json.dumps(ev), text=True,
+                       capture_output=True, cwd=REPO / "plugin", env=env)
     for rel, text in files.items():
         (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
         if isinstance(text, tuple):
@@ -91,7 +89,9 @@ def makoto_fires(runner: str, files: dict) -> bool:
         (tmp / rel).write_text(text, encoding="utf-8")
         send({**base, "hook_event_name": "PostToolUse", "tool_response": {}})
     send({"hook_event_name": "Stop", "session_id": "dedupe", "cwd": str(tmp), "last_assistant_message": "Done."})
-    return runner in "".join(out)
+    audit = tmp / "state" / "audit.jsonl"
+    rows = [json.loads(x) for x in audit.read_text(encoding="utf-8").splitlines()] if audit.is_file() else []
+    return any(runner in (r.get("pattern_fires") or ()) for r in rows)   # the recorded fire, never prose
 
 
 def scour_case(entry: str) -> dict:
