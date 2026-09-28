@@ -12,7 +12,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PIN = 18
+PIN = 17
 
 
 def _not_countable(map_path=None) -> int:

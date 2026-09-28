@@ -29,9 +29,9 @@ makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, an
 
 - **36 pre-checks**
 - Pre-check ids grouped by dotted prefix — `content`: **19**, `event`: **8**, `gate`: **9**
-- **26 Stop checks** (all checks registered at the Stop edge)
-- **26 end-of-turn gates** (every Stop check reaches the decision)
-- **26 blocking end-of-turn gates** (`posture == BLOCK`)
+- **27 Stop checks** (all checks registered at the Stop edge)
+- **27 end-of-turn gates** (every Stop check reaches the decision)
+- **27 blocking end-of-turn gates** (`posture == BLOCK`)
 - **0 advisory end-of-turn gates** (`posture == ADVISE`)
 
 <!-- END GENERATED: check-counts -->
@@ -127,6 +127,7 @@ The **certification** column uses the following labels, each naming its own deno
 | `gate.unverified_merge` | a merge or push to main/master with no clean verifier report settled before it | blocking (pre-tool deny) | new |
 | `gate.unworded_close` | a close citing no row of the owner's words file (opt-in `words_file`) | blocking | new |
 | `gate.unrun_count_claim` | a counted all-pass stated in the reply with no verifier run in the session | blocking | new |
+| `gate.gradient_collapse` | a score mapped onto 0/1 at a float threshold that no test written this session carries | blocking | new |
 | `gate.report_before_run` | a run's success written into prose with no verifier run before it | blocking (pre-tool deny) | new |
 | `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | blocking | new |
 | `gate.pasted_fix` | one repair's text edited into a second file with no verifier run after the first landing | blocking | new |

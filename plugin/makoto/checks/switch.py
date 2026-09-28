@@ -2001,7 +2001,76 @@ unrun_count_CHECK = _Check(id="gate.unrun_count_claim", applies_at="Stop", postu
 
 
 # the SWITCH shape's rows, and the one Pre entry dispatch calls for any of them
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK, unrun_count_CHECK,)
+# gate.gradient_collapse -- register A6 GRADIENT COLLAPSE. A Write/Edit maps a score onto 0/1 at a
+# float threshold (`1 if s >= 0.9 else 0`, `int(p > 0.5)`, `(p > 0.5).astype(int)`), and no test
+# file written this session carries that threshold, so the boundary the collapse puts there is
+# never exercised. The row does not judge whether the gradient mattered; it owes the register's
+# fix line as an act: a test write naming the same literal (docs/FOUNDATION-14.md). Owed at the
+# Stop marker, paid by a test-file Write/Edit anywhere in the session.
+_A6_LIT = r"(\d*\.\d+)"
+_A6_CMP = rf"[^\n()]*?(?:[<>]=?\s*{_A6_LIT}|{_A6_LIT}\s*[<>]=?)[^\n()]*?"
+_COLLAPSE_RXS = (
+    re.compile(rf"\b(?:[01]|True|False)\s+if\s+{_A6_CMP}\s+else\s+(?:[01]|True|False)\b"),
+    re.compile(rf"\b(?:int|bool)\(\s*{_A6_CMP}\s*\)"),
+    re.compile(rf"\(\s*{_A6_CMP}\s*\)\.astype\(\s*(?:int|bool|float)"),
+)
+_A6_ANY_LIT_RX = re.compile(r"(?<![\w.])(\d*\.\d+)(?![\w.])")
+_TEST_PATH_RX = re.compile(r"(?:^|/)(?:tests?/|test_[^/]*$|[^/]*_test\.\w+$)")
+
+
+def _collapses(text: str):
+    """[(literal, snippet)] for every float-threshold-to-binary mapping in `text`. A score lives in
+    (0, 1), so a literal outside it (a version, `vs_ver <= 12.0`) is not a threshold; a match after
+    `#` or a backtick on its line is a comment or a quoted example, not code."""
+    out, text = [], text or ""
+    for rx in _COLLAPSE_RXS:
+        for m in rx.finditer(text):
+            lead = text[text.rfind("\n", 0, m.start()) + 1:m.start()]
+            if "#" in lead or "`" in lead:
+                continue
+            for lit in m.groups():
+                if lit and 0 < float(lit) < 1:
+                    out.append((repr(float(lit)), m.group(0)))
+    return out
+
+
+def gradient_collapse_gate(history) -> Optional[Finding]:
+    events = [ev for ev in map(decode_history_event, history or ())
+              if isinstance(ev, dict) and ev.get("hook_event_name") == "PostToolUse"
+              and ev.get("tool_name") in ("Write", "Edit", "MultiEdit")
+              and isinstance(ev.get("tool_input"), dict)]
+    owed = {}
+    for ev in events:
+        if not _TEST_PATH_RX.search(str(ev["tool_input"].get("file_path", ""))):
+            for lit, snip in _collapses(introduced_text(ev["tool_name"], ev["tool_input"])):
+                owed.setdefault(lit, snip)
+
+    def pays(ev):
+        if ev is None or not _TEST_PATH_RX.search(str(ev["tool_input"].get("file_path", ""))):
+            return None
+        tested = {repr(float(x)) for x in _A6_ANY_LIT_RX.findall(
+            introduced_text(ev["tool_name"], ev["tool_input"]) or "")}
+        return lambda lit: lit in tested
+    # owed at the Stop marker, so a test written after the collapse still pays it
+    for _end, lit in unwitnessed(events + [None], owes=lambda ev: owed if ev is None else (),
+                                 pays=pays):
+        snip = owed[lit]
+        return Finding(pattern_id="gate.gradient_collapse", file="", line=0, level="error",
+                       message=(f"gate.gradient_collapse: `{snip.strip()[:80]}` maps a score onto "
+                                f"0/1 at {lit} and no test written this session carries {lit}, so "
+                                "the boundary it puts there is never exercised."),
+                       retry_hint=gradient_collapse_RETRY_HINT, snippet=snip[:200])
+    return None
+
+
+gradient_collapse_RETRY_HINT = ("Write a test asserting values either side of the threshold, or map "
+                                "the score without collapsing it.")
+gradient_collapse_CHECK = _Check(id="gate.gradient_collapse", applies_at="Stop", posture="BLOCK",
+               tests="SWITCH", eats=frozenset({"history"}),
+               run=lambda c: gradient_collapse_gate(c.history))
+
+
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK, unrun_count_CHECK, gradient_collapse_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {retry_CHECK.id: retry_predicate, relaunch_CHECK.id: relaunched_unchanged_gate,
