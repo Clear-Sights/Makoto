@@ -1024,7 +1024,8 @@ pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="BLOCK",
 #   1. THE OPERATOR NAMED IT -- the unit's name appears in a genuine operator turn
 #      (`ledger.user_turn_texts`, host-written turns only).
 #   2. SOMETHING REACHES IT -- the name appears somewhere in this session's introduced text other
-#      than its own definition: a call, an export, a test, an edited call site.
+#      than its own definition: a call, an export, a test, an edited call site -- or in the file
+#      the unit landed in, read off disk (a registration by name the Edit never carried).
 #   3. A DECORATOR REGISTERED IT -- `@pytest.fixture`, `@app.route`, `@property`, `@click.command`.
 #      A decorator IS a claim: it hands the unit to a framework that will call it. This is the
 #      exclusion that makes the check material rather than noisy, and it generalizes instead of
@@ -1136,10 +1137,12 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
     # REACHED: the name appears in the session's introduced text beyond its own `def`/`class`
     # line. One occurrence is the definition itself; a second is a use.
     blob = "\n".join(introduced)
+    on_disk: dict = {}
     unclaimed = [subject for _ev, subject in unwitnessed(
         events, owes=unclaimed_owes,
         paid=(lambda s: sum(1 for tok in _TOKEN_RX.findall(blob or "") if tok == s[0])
                         >= _REACHED_AT,
+              lambda s: _reached_in_file(s[0], s[1], on_disk),
               lambda s: _named_by_operator(s[0], transcript_path)))]
     if not unclaimed:
         return None
@@ -1165,6 +1168,26 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
 
 # Every identifier-shaped token. A stdlib call with no branches at all cannot have a fallthrough.
 _TOKEN_RX = re.compile(r"[A-Za-z0-9_]+")
+
+
+# The largest file whose text is read for a use. Past it the witness is simply absent, so the
+# gate stays on the introduced text alone.
+_FILE_READ_CAP = 2_000_000
+
+
+def _reached_in_file(name: str, path: str, cache: dict) -> bool:
+    """True iff the file the unit landed in names it at least `_REACHED_AT` times: an Edit that
+    adds `def f` to a file already registering `f` by name (`_PREDICATES = {X.id: f}`) carries the
+    definition but not the use, which is on disk. An unreadable file is no evidence."""
+    if not path:
+        return False
+    if path not in cache:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                cache[path] = _TOKEN_RX.findall(fh.read(_FILE_READ_CAP))
+        except OSError:
+            cache[path] = []
+    return sum(1 for tok in cache[path] if tok == name) >= _REACHED_AT
 
 
 def _named_by_operator(name: str, transcript_path) -> bool:
