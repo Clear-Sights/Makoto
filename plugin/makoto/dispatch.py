@@ -15,6 +15,7 @@ main() is the thin orchestrator. Each stage is a small helper:
 Knight-Leveson: stdlib only (sqlite3). NO LLM, NO HTTP. The validator hot
 path's imports are deliberately narrow."""
 from __future__ import annotations
+import hashlib
 import importlib
 import json
 import math
@@ -734,7 +735,7 @@ def _emit_decision(findings: list[Finding], hook_event: str, stream=None,
             raise
 
 
-def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> None:
+def _record_audit(state_dir: Path, findings: list[Finding], payload: dict, withheld=()) -> None:
     """append an audit row IFF at least one Finding was produced (only-fires policy).
 
     Silent hook fires carry no forensic signal; recording them flooded logs to
@@ -762,6 +763,7 @@ def _record_audit(state_dir: Path, findings: list[Finding], payload: dict) -> No
         findings=[asdict(f) for f in findings],
         tool_name=payload.get("tool_name", ""),
         oversight_clamp=oversight_clamp,
+        withheld=list(withheld),
     )
     audit.append_row(state_dir, row)
 
@@ -795,6 +797,40 @@ def _accumulate(conn, payload, payload_raw, event_id, state_dir) -> None:
                        blocked=False, ids=_ids_from_payload(payload))
 
 
+def _unchanged(conn, session_id: str, findings: list[Finding]) -> list[Finding]:
+    """The findings this session's agent was already shown word for word, at a stop after which it
+    ran no tool.
+
+    A stop finding the agent has read, with nothing done since, cannot come out differently a
+    second time; re-sending it is the stale refire of register entry F8. Measured 2026-09-28 with
+    tools/worth.py on the live audit: 105 of 125 fires were such repeats, 61 of them
+    gate.unwitnessed_verifier blocking the same stop again and again, and on fae0d17 one unclaimed
+    helper blocked four stops in a row, one of them with stop_hook_active set, which is a loop.
+    Once the agent runs any tool, the finding blocks again if it still holds, so a fault is never
+    hidden: it waits for the act that could change it. The key is everything the agent is shown.
+    A store fault withholds nothing."""
+    try:
+        row = conn.execute("SELECT MAX(id) FROM events WHERE session_id = ? AND event_type IN "
+                           "('PostToolUse', 'PostToolUseFailure')", [session_id]).fetchone()
+        last_tool = str(row[0] if row and row[0] is not None else 0)
+    except Exception:
+        return []
+    seen = []
+    for f in findings:
+        key = "shown:" + hashlib.sha256(json.dumps(
+            [session_id, f.pattern_id, f.file, f.line, f.snippet, f.message]).encode()).hexdigest()
+        try:
+            prior = conn.execute("SELECT value FROM config WHERE key = ?", [key]).fetchone()
+            if prior is not None and prior[0] == last_tool:
+                seen.append(f)
+                continue
+            conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", [key, last_tool])
+            conn.commit()
+        except Exception:
+            continue
+    return seen
+
+
 def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     """PreToolUse / Stop / SubagentStop — and the wildcard law for any event without its own
     row: keyword-prefiltered predicates, plus the Stop gates where the event carries a
@@ -817,9 +853,23 @@ def _evaluate_and_gate(conn, payload, payload_raw, event_id, state_dir) -> None:
     blocking = list(findings)
     if _gates_enabled():
         blocking += gate_findings
+    withheld = []
+    if hook_event in ("Stop", "SubagentStop"):
+        withheld = _unchanged(conn, payload.get("session_id", ""), blocking)
+        if withheld:
+            # A finding the new reply itself raises (a claim restated after its block) is a new
+            # instance, not a repeat: only one that holds with the reply blanked is withheld.
+            try:
+                standing = {(f.pattern_id, f.message) for f in run_stop_checks(
+                    conn, dict(payload, last_assistant_message=""), history, root=state_dir)}
+            except Exception:
+                standing = set()
+            withheld = [f for f in withheld if (f.pattern_id, f.message) in standing]
+        blocking = [f for f in blocking if not any(f is w for w in withheld)]
     _emit_decision(blocking, hook_event, permission_mode=payload.get("permission_mode"),
                   stop_hook_active=payload.get("stop_hook_active") is True)
-    _record_audit(state_dir, findings + gate_findings, payload)
+    _record_audit(state_dir, findings + gate_findings, payload,
+                  withheld=sorted({f.pattern_id for f in withheld} - {f.pattern_id for f in blocking}))
 
 
 # The table maps hook_event_name to its pipeline; unknown events (including SessionStart, which

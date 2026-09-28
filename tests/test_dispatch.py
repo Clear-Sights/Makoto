@@ -1409,11 +1409,14 @@ def test_dispatch_plan_item_drift_gate_blocks_when_it_fires(tmp_path):
     second = {"hook_event_name": "Stop", "session_id": "planitem", "cwd": str(tmp_path),
               "last_assistant_message": "Moving on to other work for now."}
     rc, out = _run_dispatch(state_dir, second)
-    assert "gate.plan_item_drift" in json.loads(out)["reason"], "still open, still blocks"
+    assert "gate.plan_item_drift" not in out, "shown once, nothing done since: not sent again"
+    _run_dispatch(state_dir, _post_bash(tmp_path, "planitem", "ls"))
+    rc, out = _run_dispatch(state_dir, second)
+    assert "gate.plan_item_drift" in json.loads(out)["reason"], "still open after an act, blocks again"
     rc, out = _run_dispatch(state_dir, dict(second, last_assistant_message="I finished §9.3."))
     assert "gate.plan_item_drift" not in out, "saying it is done discharges it"
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
-    assert sum("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows) == 2, \
+    assert sum("gate.plan_item_drift" in r.get("pattern_fires", []) for r in rows) == 3, \
         "the fire must be audited so it leaves a forensic trail"
 
 
