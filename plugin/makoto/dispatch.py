@@ -1089,7 +1089,10 @@ def _dispatch() -> int:
         _note_host_dialect(state_dir, payload.get("session_id"), dialect_notes, host_event)
     # The read ledger (START step 13): a settled Read/Write/Edit is stored with the hash of the file
     # as this session saw it, so a later citation of a file that changed since is a line to evaluate.
-    stamped = facts.stamp(payload)
+    try:
+        stamped = facts.stamp(payload)
+    except Exception:          # the ledger is evidence, never a reason to lose the event
+        stamped = None
     if stamped is not None:
         payload, payload_raw = stamped, json.dumps(stamped, ensure_ascii=False)
     db_path = state_dir / "makoto.record.db"

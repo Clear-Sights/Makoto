@@ -64,6 +64,9 @@ def unstated_sites(root: pathlib.Path) -> list[str]:
             hit = None
             if name in READERS:
                 hit = name
+            elif name == "open" and isinstance(node.func, ast.Attribute) \
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "os":
+                hit = None                   # os.open returns a descriptor: bytes, no text mode
             elif name == "open":
                 mode = ""
                 if node.args[1:2] and isinstance(node.args[1], ast.Constant):
@@ -91,11 +94,13 @@ class EncodingIsStatedOnTheHookPath(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             root = pathlib.Path(name)
             (root / "clean.py").write_text(
-                'p.read_text(encoding="utf-8")\nopen(f, "rb")\n', encoding="utf-8")
+                'p.read_text(encoding="utf-8")\nopen(f, "rb")\nos.open(f, os.O_RDONLY)\n', encoding="utf-8")
             self.assertEqual(unstated_sites(root), [], "a stated encoding must not be flagged")
             (root / "dirty.py").write_text("p.read_text()\n", encoding="utf-8")
             self.assertEqual(len(unstated_sites(root)), 1,
                              "a bare read_text() must be flagged")
+            (root / "dirty2.py").write_text('open(f, os.O_RDONLY)\n', encoding="utf-8")
+            self.assertEqual(len(unstated_sites(root)), 2, "a builtin open with no mode is still text")
 
     def test_the_incident_byte_is_read_by_utf8_and_not_by_the_platform_default(self):
         """The actual fault, reproduced: one curly quote, two codecs, two outcomes.

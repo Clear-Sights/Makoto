@@ -48,13 +48,21 @@ def file_hash(path: str):
     """The file's hash, or None: only a regular file under the size cap is read, so a FIFO or a
     device a call names can never block the hook."""
     try:
-        st = os.stat(path)
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+    except (OSError, ValueError, TypeError):
+        return None                      # a NUL in the path, a missing file, no permission
+    try:
+        st = os.fstat(fd)                # the descriptor, not the name: no swap between the two
         if not stat.S_ISREG(st.st_mode) or st.st_size > _MAX_HASHED:
             return None
-        with open(path, "rb") as f:
+        with os.fdopen(fd, "rb") as f:
+            fd = None
             return hashlib.sha256(f.read()).hexdigest()[:16]
     except OSError:
         return None
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _seen_paths(payload: dict) -> list:
@@ -65,19 +73,36 @@ def _seen_paths(payload: dict) -> list:
         return [p] if p else []
     if payload.get("tool_name") == "Bash":
         try:
-            words = shlex.split(command_of(payload) or "")
+            lex = shlex.shlex(command_of(payload) or "", posix=True, punctuation_chars=True)
+            lex.whitespace_split = True
+            words = list(lex)[:128]
         except ValueError:
             return []
-        cwd = payload.get("cwd") or "."
-        return [w for w in words[:64] if "/" in w or "." in w
-                if not w.startswith("-") and os.path.isfile(w if os.path.isabs(w) else os.path.join(cwd, w))]
+        cwd, out, head = payload.get("cwd") or ".", [], True
+        for i, w in enumerate(words):
+            if w and set(w) <= set(";&|()"):
+                head = True              # the next word is a command, not an argument
+                continue
+            if head and w == "cd" and i + 1 < len(words):
+                nxt = words[i + 1]
+                cwd = nxt if os.path.isabs(nxt) else os.path.join(cwd, nxt)
+            elif not head and not w.startswith("-"):
+                full = w if os.path.isabs(w) else os.path.join(cwd, w)
+                try:
+                    if os.path.isfile(full):
+                        out.append(full)
+                except ValueError:
+                    pass
+            head = False
+        return out
     return []
 
 
 def stamp(payload: dict) -> dict | None:
     """The payload with {path: hash} of each file it showed the session, for a settled call; else None."""
-    if payload.get("hook_event_name") != "PostToolUse":
-        return None
+    ti = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
+    if payload.get("hook_event_name") != "PostToolUse" or ti.get("run_in_background"):
+        return None                      # a background launch has read nothing yet
     cwd = payload.get("cwd") or "."
     seen = {}
     for p in _seen_paths(payload):
@@ -87,17 +112,23 @@ def stamp(payload: dict) -> dict | None:
     return {**payload, SEEN_KEY: seen} if seen else None
 
 
+_QUOTED_RX = _lazy_re(r'"[^"\n]*"|“[^”\n]*”')
+_SENTENCES_RX = _lazy_re(r"(?<=[.!?])\s+|\n+")
+
+
 def read_claim(text: str) -> dict:
-    """{kind, subject} of the first claim sentence in `text`, by the word table; {} for none."""
-    for kind, rx in CLAIM_WORDS.items():
-        m = _claim(text or "", rx)
-        if m is not None:
-            start = (text or "").rfind("\n", 0, m.start()) + 1
-            end = (text or "").find("\n", m.end())
-            sentence = (text or "")[start:len(text) if end < 0 else end]
-            # the subject of a clean claim is the verifier it names, never a file or a word in backticks
-            subj = next((m.group(1) for m in _SUBJECT_RX.finditer(sentence) if is_test_runner(m.group(1))), None)
-            return {"kind": kind, "subject": subj}
+    """{kind, subject} of the first claim sentence in `text`, by the word table; {} for none. A
+    quoted sentence is not the writer's; a sentence ending in `?` is a question and nothing else;
+    the subject is a runner command named in the same sentence."""
+    for sentence in _SENTENCES_RX.split(_QUOTED_RX.sub(" ", text or "")):
+        if not sentence.strip():
+            continue
+        if sentence.rstrip().endswith("?"):
+            return {"kind": "question", "subject": None}
+        for kind, rx in CLAIM_WORDS.items():
+            if kind != "question" and _claim(sentence, rx) is not None:
+                subj = next((m.group(1) for m in _SUBJECT_RX.finditer(sentence) if is_test_runner(m.group(1))), None)
+                return {"kind": kind, "subject": subj}
     return {}
 
 
@@ -111,6 +142,19 @@ def _rel(path: str, cwd: str) -> str:
     return path
 
 
+def _view(read: dict, cwd: str) -> dict:
+    """{key: hash} as seen from `cwd`: a relative key that names a different existing file here
+    is some other file, never the one seen."""
+    out = {}
+    for key, (full, h) in read.items():
+        if not os.path.isabs(key) and cwd:
+            here = os.path.normpath(os.path.join(cwd, key))
+            if here != full and os.path.exists(here):
+                continue
+        out[key] = h
+    return out
+
+
 def fact_of(ev: dict, read: dict | None = None) -> dict:
     """One event as a fact; `read` is the ledger of every earlier seen file (relative to cwd)."""
     name = ev.get("hook_event_name", "")
@@ -122,7 +166,7 @@ def fact_of(ev: dict, read: dict | None = None) -> dict:
     output = ev.get("last_assistant_message") if kind == "Stop" else response_text(ev)
     fact = {"event": kind, "tool": ev.get("tool_name"), "args": ev.get("tool_input") or {},
             "exit": (1 if failed else 0) if kind == "Post" else None, "output": output or "",
-            "cwd": cwd, "source": {"read": dict(read or {})}}
+            "cwd": cwd, "source": {"read": _view(read or {}, cwd)}}
     p = _path_of(ev)
     if p:
         fact["path"] = _rel(p, cwd)
@@ -151,6 +195,7 @@ def facts_of(events: list) -> list:
         out.append(fact_of(ev, read))
         seen = ev.get(SEEN_KEY)
         for path, h in (seen.items() if isinstance(seen, dict) else ()):
-            for key in _suffixes(path, ev.get("cwd") or ""):
-                read[key] = h
+            keys = _suffixes(path, ev.get("cwd") or "")
+            for key in keys:
+                read[key] = (keys[0], h)
     return out

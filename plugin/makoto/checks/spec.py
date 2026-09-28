@@ -1009,7 +1009,13 @@ def _is_exit_zero_literal(argv) -> bool:
 def _propagates_failure(argvs) -> bool:
     """True when a later same-scope segment re-raises the failure an operator swallowed: `exit`/
     `return` with a non-`0` argument, bare `exit`/`return` (propagates `$?`), or `false`.
-    Separates `pytest || exit 1` (honest) from `pytest || echo skip` (masked)."""
+    Separates `pytest || exit 1` (honest) from `pytest || echo skip` (masked). A scope that ENDS
+    in a `[`/`test`/`[[` over a variable (`t=$?; ...; [ "$t" = 1 ]`) returns that test as the
+    command's exit, so the captured status decides it: two false fires on the 3.4.7 record."""
+    last = next((t for t in ([x for x in a if x not in _CONTROL_TOKENS] for a in reversed(argvs)) if t), [])
+    if last and last[0] in ("[", "test", "[[") and any("$" in t for t in last[1:]) and any(
+            t in ("=", "==", "!=", "-eq", "-ne", "-lt", "-le", "-gt", "-ge") for t in last[1:]):
+        return True
     for argv in argvs:
         toks = [t for t in argv if t not in _CONTROL_TOKENS]
         if not toks:
