@@ -239,9 +239,18 @@ def test_unwitnessed_verifier_is_silent_once_the_verifier_has_been_seen_failing(
                                       _bash("pytest -q", "58 passed")]) is None
 
 
-def test_unwitnessed_verifier_still_fires_when_the_red_run_came_after():
+def test_unwitnessed_verifier_is_silent_when_the_red_run_came_after():
+    # discriminant: the red run of the same verifier follows the clean one, with no clean re-run.
+    # Order was pinned the other way until 2026-09-28; it held every later stop of a session that
+    # planted, saw red, and restored without re-running, with nothing left that could pay it.
     assert unwitnessed_verifier_gate([_bash("pytest -q", "58 passed"),
-                                      _bash("pytest -q", "1 failed")]) is not None
+                                      _bash("pytest -q", "1 failed")]) is None
+
+
+def test_unwitnessed_verifier_still_fires_when_another_verifier_was_red():
+    # discriminant: the red run is a different command from the clean one
+    assert unwitnessed_verifier_gate([_bash("pytest -q", "58 passed"),
+                                      _bash("pytest -q tests/other.py", "1 failed")]) is not None
 
 
 def test_unwitnessed_verifier_reads_zero_failed_as_a_clean_report():
