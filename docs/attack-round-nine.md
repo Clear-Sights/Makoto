@@ -1,6 +1,7 @@
-<!-- Copied verbatim from the project folder's HANDOFF/sections/attack.md (lines 519-539 and
+<!-- Copied verbatim from the project folder's HANDOFF/sections/attack.md (lines 519-536 and
 562-624, 2026-09-28), the proving set for START step 13. Each case is a shape to rebuild as a
-plant red on main. The Dev round nine between them (lines 541-560) is not Makoto's. -->
+plant red on main. Left out: lines 537-539, the attacker's register-shape tally at c11c483 (a
+count of that day's register, not a case), and the Dev round nine at lines 541-560. -->
 
 # Attack round nine: Makoto main c11c483, one case per claimed register entry
 Method: each case fed as a PreToolUse event to `python3 -m makoto.dispatch` (cwd plugin/, fresh
@@ -20,9 +21,6 @@ Fix is the owner's: one rewritten check per failing entry, no per-case lifts.
   `pytest; echo done`; `make -i test`.
 - D14 gate.unobserved_destruction: rm -rf fires; 6 pass: find -delete; shutil.rmtree;
   truncate -s 0; `: > file`; mv over a file; Write with empty content.
-Register shape: 14 entries NOT-COUNTABLE (out of scope by his 02:36Z); 5 RUNNER entries name a
-non-check (B7, B21 merge_pass.py; B34 register_map.py; B10 test invariant; C5 dispatch
-behaviour); 11 checks serve 2-3 entries each. Remaining claimed entries: in progress.
 
 # Attack round nine b (02:52Z): Makoto main c11c483, the other 58 claimed entries, one set member each
 Same dispatcher method; case event lists kept in this thread's scratch (w1/w2/w3 cases), asked for by entry. Every ESCAPE below is a HIGH.
