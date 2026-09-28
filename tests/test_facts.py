@@ -77,6 +77,9 @@ def test_the_dispatcher_stores_the_stamp(tmp_path):
 
 
 def test_a_fifo_or_a_directory_is_never_read(tmp_path):
+    assert F.file_hash(str(tmp_path)) is None               # every platform has directories
+    if not hasattr(os, "mkfifo"):                           # Windows: no FIFOs to open
+        return
     fifo = tmp_path / "pipe"
     os.mkfifo(fifo)
     assert F.file_hash(str(fifo)) is None                   # would block forever if opened
@@ -89,6 +92,9 @@ def test_a_fifo_or_a_directory_is_never_read(tmp_path):
 
 def test_a_file_swapped_for_a_fifo_after_the_stat_cannot_hang(tmp_path, monkeypatch):
     import signal
+    if not (hasattr(os, "mkfifo") and hasattr(signal, "SIGALRM")):   # Windows: no FIFO to swap in
+        assert F.file_hash(str(tmp_path)) is None
+        return
     p = tmp_path / "x"
     p.write_text("ok")
     real = os.stat
