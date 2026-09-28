@@ -125,3 +125,12 @@ The row designs are in `docs/FOUNDATION-14.md`. The steps:
     inputs: blobless clones (`git clone --filter=blob:none`) of `Clear-Sights/Scour` and
     `Clear-Sights/Measure-Zero`, each at a pinned sha taken when the step starts. The join is a
     script, not a reading. Neither is needed before this step. owner: the next Makoto session.
+13. Replace per-case recognizers with one mechanism per family (`docs/MECHANISM.md`). A case
+    outside a list must never be ignored: record each command's effect as a Pre/Post tree digest
+    rather than guessing it from names; read a verifier's verdict from its exit code; route prose
+    claims through one claim reader; identify tools by the shape of their input.
+    check: the attacker's violating cases (a case a live row claims but misses) turn red, and the
+    count of module-level lists under `plugin/makoto` falls. plant: one attacker case that the old
+    per-case hook passes reads red under the mechanism.
+    inputs: the attacker's cases; the digest's per-call cost, measured against the 2 s bound;
+    tools/corpus.py for the false rate. owner: the next Makoto session, after steps 7 and 8.
