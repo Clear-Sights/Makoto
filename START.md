@@ -35,9 +35,15 @@ line failed; do not work around it.
 - The skills cheap-execution and adversarial-review are loaded: the line reads each one's
   SKILL.md under `~/.claude/skills`. Every step is run the cheap-execution way, and every "done"
   follows an adversarial-review round.
-- Codex is not a launch item: no step here uses it. A step that does runs `sh tools/codex.sh`
-  first; its LAUNCH MISSING line stops that step only and names the variable to set. Never commit
-  `auth.json`.
+- Codex is not a launch item: a step that uses it runs `sh tools/codex.sh` first; its LAUNCH
+  MISSING line stops that step only and names the variable to set. Never commit `auth.json`.
+- Model choice (Gabriel 2026-09-28): audit across the asymmetry. Claude's work is read by Codex
+  (`gpt-6-astra`, `gpt-6-sol`, any Codex model; `tools/codex_reader.py` is Scour's judgment reader),
+  and Codex's work by Claude; Opus need not review Opus. Where a Claude model has shown better
+  results on a specific aspect with curated context, use it for that aspect alone. Curate the
+  context, and treat Codex as the cheaper per capability, relative to Claude only. Pick the model
+  and effort by what the task would benefit from: a governing artifact gets the highest model; a
+  task that would not benefit from a higher one gets the lower one.
 - The suite is not a launch item: main's merge already ran it on five CI jobs. Before calling any
   step done, run `sh tools/launch_check.sh --suite` (about 76 s more) and see `suite green`.
 
