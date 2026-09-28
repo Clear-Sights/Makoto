@@ -778,7 +778,7 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Pre", posture="BLOC
 # PRE-EDGE DENY (2026-09-25): the dispatch is refused before it launches; the discharge is one
 # Read, Glob or Grep of the ground, then retry. The guard is read from the whole session, not the
 # 1-hour window (`kit._session_rows`): Reads older than the window used to go unseen.
-from makoto.kit import unmet_obligation_gate
+from makoto.kit import unmet_obligation_gate, _session_rows
 from makoto.core._shell import _basename, _effective_argv, _shell_segments
 
 # The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
@@ -831,15 +831,40 @@ def _is_probe(ev: dict) -> bool:
     return bool(cmd) and any(_is_reader_argv(argv) for argv, _op in _shell_segments(cmd))
 
 
-unprobed_fanout_gate = unmet_obligation_gate(
+_fanout_obligation = unmet_obligation_gate(
     act=_is_dispatch,
     guard=_is_probe,
     message=("Work is being dispatched to a subagent and no Read, Glob or Grep appears earlier in "
              "this session's recorded events — the brief was written from assumption, and work "
-             "built on an assumed baseline is inherited whole."),
+             "built on an assumed baseline is inherited whole. A session that holds no Read, "
+             "Glob, Grep or Bash tool retries the same dispatch: the deny fires once."),
     retry_hint=("Read, glob or grep the ground before dispatching, so the brief describes what "
                 "is there; or confirm the dispatch was itself the exploration."),
 )
+
+
+def unprobed_fanout_gate(*, current_event: dict, history: list, pattern, conn=None):
+    """The deny fires once per unprobed stretch. A session with no reading tool cannot pay it
+    (measured 2026-09-28: a coordinator session holding only messaging tools was denied every
+    dispatch, twice, with no exit), and Gabriel's rule of 01:16Z forbids a precaution with no
+    exit. So an earlier dispatch attempt at the Pre edge, with no probe after it, means the deny
+    was already shown: this retry goes through."""
+    finding = _fanout_obligation(current_event=current_event, history=history, pattern=pattern, conn=conn)
+    if finding is None:
+        return None
+    events = [ev for ev in map(decode_history_event, _session_rows(
+        conn, current_event.get("session_id", ""), history)) if isinstance(ev, dict)]
+    if events and events[-1] == current_event:
+        events.pop()        # the store already holds this call itself: it is not an earlier try
+    shown = False
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        if ev.get("hook_event_name") == "PreToolUse" and _is_dispatch(ev):
+            shown = True
+        elif ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure") and _is_probe(ev):
+            shown = False
+    return None if shown else finding
 
 
 fanout_RETRY_HINT = "Read, glob or grep the ground, then retry the dispatch."

@@ -2293,6 +2293,18 @@ def test_dispatch_pre_obligation_denies_the_act_until_its_guard_runs(tmp_path, r
             assert row in decision["hookSpecificOutput"]["permissionDecisionReason"]
 
 
+def test_dispatch_unprobed_fanout_has_an_exit_for_a_session_with_no_reading_tool(tmp_path):
+    """Catch: the first unprobed dispatch is denied. Pass: the same dispatch retried, with nothing
+    read between, goes through: a session holding no Read, Glob, Grep or Bash has an exit."""
+    # discriminant: two Pre dispatches through the real store, no probe between them
+    state_dir = _setup_state(tmp_path)
+    first = dict(_pre(tmp_path, "c", "Agent", prompt="go", description="x"), tool_use_id="toolu_1")
+    out = _run_dispatch(state_dir, first)[1]
+    assert json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    out = _run_dispatch(state_dir, dict(first, tool_use_id="toolu_2"))[1]
+    assert "gate.unprobed_fanout" not in out, out
+
+
 def test_dispatch_undischarged_waiver_denies_until_an_end_is_named(tmp_path):
     """Catch: a Write introducing a silencing directive with no end is denied. Pass: the same
     directive with a tracked item beside it goes through."""

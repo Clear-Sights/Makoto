@@ -390,3 +390,17 @@ def test_unread_structure_is_discharged_by_reading_then_rerunning():
 
 def test_unread_structure_a_later_null_with_no_read_still_fires():
     assert unread_structure_gate([_bash("jq '.a' x.json", "1"), _bash("jq '.b' x.json", "null")]) is not None
+
+
+def test_unprobed_fanout_denies_once_then_lets_the_same_session_through():
+    # discriminant: a denied dispatch recorded at Pre, then the same dispatch again, no probe between
+    pattern = SimpleNamespace(id="gate.unprobed_fanout")
+    dispatch = {"hook_event_name": "PreToolUse", "tool_name": "Agent", "tool_input": {"prompt": "go"}}
+    assert lineage.unprobed_fanout_gate(current_event=dispatch, history=[], pattern=pattern) is not None
+    earlier = dict(dispatch, tool_use_id="toolu_1")     # each real call carries its own id
+    assert lineage.unprobed_fanout_gate(current_event=dict(dispatch, tool_use_id="toolu_2"),
+                                        history=[{"payload": earlier}], pattern=pattern) is None, \
+        "a session with no reading tool has an exit"
+    probe_then = [{"payload": dispatch}, _row("Read", file_path="/repo/a.py"),
+                  _row("Agent", prompt="go"), {"payload": dict(dispatch, tool_input={"prompt": "again"})}]
+    assert lineage.unprobed_fanout_gate(current_event=dispatch, history=probe_then[:3], pattern=pattern) is None
