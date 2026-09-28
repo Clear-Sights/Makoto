@@ -3,8 +3,10 @@
 One file for a session that picks Makoto up. Read it top to bottom. Do not read the history to
 rebuild it; what the history holds that matters is here or in the files it names.
 
-Nothing outside this repository is read at launch. Only two steps need an outside input, and
-each names its own: step 6 needs a live audit, and step 10 needs the shared mesh.
+Nothing outside this repository is read at launch. Three steps need an outside input, and
+each names its own: step 6 needs a live audit, step 10 the shared mesh, and step 12 two clones.
+Prior art from Gabriel's other repositories is in `docs/PRIOR-ART.md`; each step cites the
+item it uses.
 
 ## Launch checklist
 
@@ -87,7 +89,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    finding unconditionally in `lineage.unprobed_fanout_gate`, or drop `k not in red` in
    `switch.unwitnessed_verifier_gate`, and its test reads red.
    inputs: none open. owner: done.
-6. Re-grade worth on a fresh live record, then subtract. Subtraction is the default: a check
+6. Re-grade worth on a fresh live record, then subtract (`docs/PRIOR-ART.md` item 4). Subtraction is the default: a check
    that still fails worth-it is removed, along with its register row reverting to NOT-COUNTABLE,
    rather than narrowed or joined by a new one.
    check: `python3 tools/worth.py AUDIT.jsonl VERDICTS.tsv` exits 0 over every fire since
@@ -100,7 +102,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
    RUNNER row back and the test reads red. inputs: none open; the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
-8. Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
+8. (`docs/PRIOR-ART.md` item 3.) Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
    commit each. Each commit lowers the pin by 1.
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
@@ -123,7 +125,7 @@ The row designs are in `docs/FOUNDATION-14.md`.
    inputs: the classifier refused a read of the remaining 7 reds and the 3 proposed I1 to I3
    cases as "Modify Shared Resources". The placement item in the handoff section carries the line
    that lifts it. owner: the next Makoto session.
-11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md`: off-path acts, hand repeats, serial
+11. Conduct rows J1 to J8, defined in `docs/CONDUCT.md` (`docs/PRIOR-ART.md` item 5): off-path acts, hand repeats, serial
     independent runs, duplicate shapes, unslotted units, re-reads, chunkable edits and small-call
     loops. Some of the conduct Gabriel requires is already live (the entries named in that file).
     These eight are not yet prevented.
@@ -132,3 +134,12 @@ The row designs are in `docs/FOUNDATION-14.md`.
     input that does not exist yet. The inputs that do not exist yet are the step-row reader (J1),
     the names index (J4), the mesh slot map (J5) and a recorded PreCompact event (J6).
     owner: the next Makoto session, after step 7's kit.neighbours.
+12. One count and one owner per register entry (`docs/PRIOR-ART.md` items 1, 2 and 7). Derive the
+    entry count from the register file by script, so no document types it. Join
+    `docs/REGISTER-MAP.tsv` with Scour's declined() reasons into one table that names, per entry,
+    the static probe (Scour), the dynamic runner (Makoto) or neither. Dedupe B7, B2, F2 and D1 by
+    the MERGE-WITNESSES rule.
+    check: a test that reads the count off the register file and fails on any typed count that
+    disagrees. plant: type a wrong count into README.md and the test reads red.
+    inputs: clones of `Clear-Sights/Scour` and `Clear-Sights/Measure-Zero`, each at a pinned sha
+    taken when the step starts. Neither is needed before this step. owner: the next Makoto session.
