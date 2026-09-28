@@ -67,19 +67,29 @@ The row designs are in `docs/FOUNDATION-14.md`.
    check: `tests/test_plugin_digest.py` and the launch checklist's installed-copy line.
    plant: change a byte under `plugin/` without a new pin row, and the test reads red.
    inputs: none open. owner: done.
-5. Re-grade worth on a fresh live record.
+5. ~~Bound every stop check~~ (PR #102). A check blocks one session's stops at most
+   `STOP_BLOCK_BOUND` (3) times. After that its finding is printed and the stop goes through, so
+   no precaution can force endless churn: the session goes long, never forever. Pre denials stay
+   unbounded, because each one returns control and a bounded deny would let a destructive call
+   through.
+   check: `tests/test_stop_unchanged.py`, the test on a session that never satisfies its check.
+   plant: drop the spent filter in `dispatch._evaluate_and_gate`, and stop 4 blocks.
+   inputs: none open. owner: done.
+6. Re-grade worth on a fresh live record, then subtract. Subtraction is the default: a check
+   that still fails worth-it is removed, along with its register row reverting to NOT-COUNTABLE,
+   rather than narrowed or joined by a new one.
    check: `python3 tools/worth.py AUDIT.jsonl VERDICTS.tsv` exits 0 over every fire since
    3.3.0 was installed. plant: a verdicts file missing one fire exits 2.
    inputs: the audit of a session run on 3.3.0 (`~/.makoto/audit.jsonl`), with a verdict for
    each fire. The 09-23 to 09-28 record is in the shared folder under
    `MAKOTO/foundation/audit-2026-09-28.jsonl` and `verdicts-2026-09-28.tsv`, and it reads 5 of
    17 fired checks worth it, measured before steps 2 to 4. owner: the next Makoto session.
-6. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
+7. Build the ratchet and the shared pieces: `kit.neighbours`, which is O(n·t) with one token
    blanked, and `kit.claim`.
    check: a test pins the NOT-COUNTABLE count at 14, and the count only falls. plant: flip any
    RUNNER row back and the test reads red. inputs: none open; the design is
    `docs/FOUNDATION-14.md`, "Shared pieces". owner: the next Makoto session.
-7. Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
+8. Rows B36, H4, E9, D8, B14, F12, A14, B18, B37, F6, B28, A6, G3 and E8, cheapest first, one
    commit each. Each commit lowers the pin by 1.
    check: register_map moves the row to RUNNER; its catch test is red with the row removed;
    latency and worth stay green. plant: the catch case in the FOUNDATION-14 table for that row.
@@ -91,12 +101,12 @@ The row designs are in `docs/FOUNDATION-14.md`.
    - D8: the narrowing-flag list.
 
    Both are settled by the corpus fires, not by judgement. owner: the next Makoto session.
-8. Cut the per-call start cost of about 0.19 s for Pre plus Post.
+9. Cut the per-call start cost of about 0.19 s for Pre plus Post.
    check: a latency reading of the Pre and Post shim time, with a bound. plant: a module-level
    compile added back reads red.
    inputs: which cut to make, lazy regex compiles or a resident process, is unmeasured. Measure
    the lazy-compile cut first, because it is the smaller change. owner: the next Makoto session.
-9. Close the shared mesh (`MAKOTO/mesh`), which reads distance 7 after the harness fix.
+10. Close the shared mesh (`MAKOTO/mesh`), which reads distance 7 after the harness fix.
    check: the mesh reads distance 0, with every triple giving catch red and pass green.
    plant: `MAKOTO/foundation/harness.orig.py` reads 19.
    inputs: the classifier refused a read of the remaining 7 reds and the 3 proposed I1 to I3
