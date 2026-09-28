@@ -2007,31 +2007,72 @@ unrun_count_CHECK = _Check(id="gate.unrun_count_claim", applies_at="Stop", postu
 # never exercised. The row does not judge whether the gradient mattered; it owes the register's
 # fix line as an act: a test write naming the same literal (docs/FOUNDATION-14.md). Owed at the
 # Stop marker, paid by a test-file Write/Edit anywhere in the session.
-_A6_LIT = r"(\d*\.\d+)"
-_A6_CMP = rf"[^\n()]*?(?:[<>]=?\s*{_A6_LIT}|{_A6_LIT}\s*[<>]=?)[^\n()]*?"
-_COLLAPSE_RXS = (
-    re.compile(rf"\b(?:[01]|True|False)\s+if\s+{_A6_CMP}\s+else\s+(?:[01]|True|False)\b"),
-    re.compile(rf"\b(?:int|bool)\(\s*{_A6_CMP}\s*\)"),
-    re.compile(rf"\(\s*{_A6_CMP}\s*\)\.astype\(\s*(?:int|bool|float)"),
-)
-_A6_ANY_LIT_RX = re.compile(r"(?<![\w.])(\d*\.\d+)(?![\w.])")
-_TEST_PATH_RX = re.compile(r"(?:^|/)(?:tests?/|test_[^/]*$|[^/]*_test\.\w+$)")
+import ast
+from makoto.kit import parse_introduced
+_A6_ANY_LIT_RX = re.compile(r"(?<![\w.])(\d*\.?\d+(?:[eE][-+]?\d+)?)(?![\w.])")
+_TEST_PATH_RX = re.compile(r"(?:^|/)(?:tests?/|test_[^/]*$|[^/]*_test\.\w+$|tests?\.py$|conftest\.py$)")
+
+
+def _a6_path(ev) -> str:
+    return str((ev.get("tool_input") or {}).get("file_path", "")).replace("\\", "/")
+
+
+def _a6_text(ev) -> str:
+    """introduced_text, or "" when the payload carries a non-string where text belongs."""
+    try:
+        text = introduced_text(ev["tool_name"], ev["tool_input"])
+    except (TypeError, AttributeError):
+        return ""
+    return text if isinstance(text, str) else ""
+
+
+def _threshold(node):
+    """The float in (0, 1) a comparison node tests against, else None."""
+    if not isinstance(node, ast.Compare) or not all(
+            isinstance(op, (ast.Lt, ast.LtE, ast.Gt, ast.GtE)) for op in node.ops):
+        return None
+    for side in [node.left, *node.comparators]:
+        if isinstance(side, ast.Constant) and type(side.value) is float and 0 < side.value < 1:
+            return side.value
+    return None
+
+
+def _binary(node) -> bool:
+    return isinstance(node, ast.Constant) and type(node.value) in (int, bool) and node.value in (0, 1)
 
 
 def _collapses(text: str):
-    """[(literal, snippet)] for every float-threshold-to-binary mapping in `text`. A score lives in
-    (0, 1), so a literal outside it (a version, `vs_ver <= 12.0`) is not a threshold; a match after
-    `#` or a backtick on its line is a comment or a quoted example, not code."""
-    out, text = [], text or ""
-    for rx in _COLLAPSE_RXS:
-        for m in rx.finditer(text):
-            lead = text[text.rfind("\n", 0, m.start()) + 1:m.start()]
-            if "#" in lead or "`" in lead:
-                continue
-            for lit in m.groups():
-                if lit and 0 < float(lit) < 1:
-                    out.append((repr(float(lit)), m.group(0)))
+    """[(literal, snippet)] for every mapping of a score onto 0/1 at a float threshold in (0, 1):
+    `1 if s >= 0.9 else 0`, `int(p > 0.5)`, `bool(...)`, `(p > 0.5).astype(int)`. Read off the AST,
+    so a string, a comment or a docstring that only SHOWS the shape is not code, and a version
+    compare (`vs_ver <= 12.0`) is not a score. Text that does not parse owes nothing."""
+    tree, _off = parse_introduced(text or "")
+    if tree is None:
+        return []
+    out = []
+    for n in ast.walk(tree):
+        cmp_ = None
+        if isinstance(n, ast.IfExp) and _binary(n.body) and _binary(n.orelse):
+            cmp_ = n.test
+        elif isinstance(n, ast.Call) and len(n.args) == 1 and not n.keywords:
+            f = n.func
+            if isinstance(f, ast.Name) and f.id in ("int", "bool"):
+                cmp_ = n.args[0]
+            elif isinstance(f, ast.Attribute) and f.attr == "astype" and isinstance(n.args[0], ast.Name) \
+                    and n.args[0].id in ("int", "bool", "float"):
+                cmp_ = f.value
+        lit = _threshold(cmp_)
+        if lit is not None:
+            out.append((repr(lit), ast.unparse(n)))
     return out
+
+
+def _tested_literals(text: str) -> set:
+    tree, _off = parse_introduced(text or "")
+    if tree is not None:
+        return {repr(float(n.value)) for n in ast.walk(tree)
+                if isinstance(n, ast.Constant) and type(n.value) in (int, float)}
+    return {repr(float(x)) for x in _A6_ANY_LIT_RX.findall(text or "")}
 
 
 def gradient_collapse_gate(history) -> Optional[Finding]:
@@ -2041,15 +2082,14 @@ def gradient_collapse_gate(history) -> Optional[Finding]:
               and isinstance(ev.get("tool_input"), dict)]
     owed = {}
     for ev in events:
-        if not _TEST_PATH_RX.search(str(ev["tool_input"].get("file_path", ""))):
-            for lit, snip in _collapses(introduced_text(ev["tool_name"], ev["tool_input"])):
+        if not _TEST_PATH_RX.search(_a6_path(ev)):
+            for lit, snip in _collapses(_a6_text(ev)):
                 owed.setdefault(lit, snip)
 
     def pays(ev):
-        if ev is None or not _TEST_PATH_RX.search(str(ev["tool_input"].get("file_path", ""))):
+        if ev is None or not _TEST_PATH_RX.search(_a6_path(ev)):
             return None
-        tested = {repr(float(x)) for x in _A6_ANY_LIT_RX.findall(
-            introduced_text(ev["tool_name"], ev["tool_input"]) or "")}
+        tested = _tested_literals(_a6_text(ev))
         return lambda lit: lit in tested
     # owed at the Stop marker, so a test written after the collapse still pays it
     for _end, lit in unwitnessed(events + [None], owes=lambda ev: owed if ev is None else (),
@@ -2070,7 +2110,72 @@ gradient_collapse_CHECK = _Check(id="gate.gradient_collapse", applies_at="Stop",
                run=lambda c: gradient_collapse_gate(c.history))
 
 
-_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK, unrun_count_CHECK, gradient_collapse_CHECK,)
+# gate.option_interaction -- register E8 OPTION INTERACTION. A Bash run failed and a later run one
+# option token away passed (`X=1 tool` red, `X=1 Y=2 tool` green): the combination that works was
+# found, and nothing pins it, so the next run from config reverts to the one that failed. Owed at
+# the Stop marker for the option token the passing run gained or changed (kit.neighbours finds the
+# pair); paid by a Write/Edit after that passing run whose content carries the token (`Y=2`, or
+# `Y` and `2` both, as a config line writes it).
+from makoto.kit import neighbours as _neighbours
+_OPTION_TOKEN_RX = re.compile(r"^(?:--?[A-Za-z][\w-]*(?:=(\S+))?|([A-Za-z_]\w*)=(\S*))$")
+
+
+def _bash_failed(ev: dict) -> bool:
+    if ev.get("hook_event_name") == "PostToolUseFailure":
+        return True
+    r = ev.get("tool_response")
+    return isinstance(r, dict) and str(r.get("exitCode", r.get("returncode", 0)) or 0) not in ("0", "")
+
+
+def _pinned_by(token: str, text: str) -> bool:
+    if token in text:
+        return True
+    m = _OPTION_TOKEN_RX.match(token)
+    name, value = (m.group(2), m.group(3)) if m and m.group(2) else (token.split("=")[0], m and m.group(1))
+    return bool(value) and bool(re.search(rf"(?<![\w-]){re.escape(name.lstrip('-'))}\b", text)) and value in text
+
+
+def option_interaction_gate(history) -> Optional[Finding]:
+    events = [ev for ev in map(decode_history_event, history or ())
+              if isinstance(ev, dict) and ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure")]
+    runs = [(k, ev) for k, ev in enumerate(events) if ev.get("tool_name") == "Bash"]
+    cmds = [command_of(ev) or "" for _, ev in runs]
+    owed = {}
+    for a, b in _neighbours(cmds, differ=lambda tok: bool(_OPTION_TOKEN_RX.match(tok))):
+        fail, ok = (a, b) if _bash_failed(runs[a][1]) and not _bash_failed(runs[b][1]) else (None, None)
+        if fail is None:
+            continue
+        before, after = cmds[fail].split(), cmds[ok].split()
+        gained = [t for t in after if after.count(t) > before.count(t)]
+        if len(gained) == 1 and _OPTION_TOKEN_RX.match(gained[0]):
+            owed.setdefault(gained[0], (runs[ok][0], cmds[fail], cmds[ok]))
+
+    def pays(item):
+        k, ev = item
+        if ev is None or ev.get("tool_name") not in ("Write", "Edit", "MultiEdit") \
+                or not isinstance(ev.get("tool_input"), dict):
+            return None
+        text = _a6_text(ev)
+        return lambda tok: owed[tok][0] < k and _pinned_by(tok, text)
+    for _end, tok in unwitnessed(list(enumerate(events)) + [(len(events), None)],
+                                 owes=lambda it: owed if it[1] is None else (), pays=pays):
+        _k, red, green = owed[tok]
+        return Finding(pattern_id="gate.option_interaction", file="", line=0, level="error",
+                       message=(f"gate.option_interaction: `{red[:80]}` failed and `{green[:80]}` passed; "
+                                f"the difference is `{tok}`, and nothing written since carries it, so "
+                                "the combination that works is not pinned."),
+                       retry_hint=option_interaction_RETRY_HINT, snippet=tok[:200])
+    return None
+
+
+option_interaction_RETRY_HINT = ("Write the option that made it pass into the config, script or docs "
+                                 "the next run reads, so the working combination is pinned.")
+option_interaction_CHECK = _Check(id="gate.option_interaction", applies_at="Stop", posture="BLOCK",
+               tests="SWITCH", eats=frozenset({"history"}),
+               run=lambda c: option_interaction_gate(c.history))
+
+
+_ROWS = (running_CHECK, action_CHECK, wall_CHECK, canon_CHECK, retry_CHECK, named_CHECK, unnamed_CHECK, green_CHECK, stale_CHECK, relaunch_CHECK, destruction_CHECK, verifier_CHECK, report_CHECK, plan_CHECK, run_promised_CHECK, unverified_merge_CHECK, unrun_count_CHECK, gradient_collapse_CHECK, option_interaction_CHECK,)
 ROWS = {c.id: c for c in _ROWS}
 CHECK, *EXTRA_CHECKS = _ROWS
 _PREDICATES = {retry_CHECK.id: retry_predicate, relaunch_CHECK.id: relaunched_unchanged_gate,

@@ -1105,13 +1105,15 @@ def turn_tool_calls(history) -> int:
     return count
 
 
-def neighbours(commands, k=1):
+def neighbours(commands, k=1, differ=None):
     """[(i, j)], i < j, for every pair of `commands` differing by exactly one whitespace token:
     one added, removed or changed. Identical commands are not neighbours. O(n*t) plus the pairs
     returned, never O(n^2): repeats collapse to one distinct token tuple first, each tuple is keyed
     by polynomial prefix and suffix hashes with one position blanked (a change) or deleted (an add
     or a remove, matched against the whole hash of the shorter), and every candidate pair is then
-    compared token by token, so a hash collision can never add a pair."""
+    compared token by token, so a hash collision can never add a pair. `differ(token)`, when given,
+    admits only pairs whose differing token(s) satisfy it, and is applied BEFORE any pair is formed:
+    a thousand runs of one command over a thousand files are a thousand buckets, not a million pairs."""
     if k != 1:
         raise ValueError("neighbours: only k=1 is defined")
     mod, base = (1 << 61) - 1, 1_000_003
@@ -1130,12 +1132,15 @@ def neighbours(commands, k=1):
         full = pre[n]
         whole.setdefault((n, full), []).append(u)
         for q in range(n):
+            if differ is not None and not differ(t[q]):
+                continue
             suf = (full - pre[q + 1] * pw[n - 1 - q]) % mod          # hash of t[q+1:]
             blanked.setdefault((n, q, pre[q], suf), []).append(u)
             dels.append((u, n - 1, (pre[q] * pw[n - 1 - q] + suf) % mod))
 
     def one_changed(x, y):
-        return len(x) == len(y) and sum(a != b for a, b in zip(x, y)) == 1
+        diff = [(a, b) for a, b in zip(x, y) if a != b]
+        return len(x) == len(y) and len(diff) == 1 and (differ is None or differ(diff[0][1]))
 
     def one_removed(long, short):
         q = next((q for q, (a, b) in enumerate(zip(long, short)) if a != b), len(short))

@@ -71,3 +71,4 @@ G1+	-	gate.unworded_close	tests/test_dispatch.py::test_dispatch_unworded_close_g
 C11+	-	gate.unrun_count_claim	tests/test_dispatch.py::test_dispatch_unrun_count_claim_gate_blocks_a_count_with_no_run	yes	ALSO (T mesh case)
 E12+	-	event.owner_path (owner's own words)	tests/test_pre_rows_deny_through_dispatch.py::test_owner_path_reads_the_owners_own_words	yes	ALSO (T mesh case)
 A6	-	gate.gradient_collapse	tests/test_dispatch.py::test_dispatch_gradient_collapse_gate_blocks_a_threshold_with_no_test	yes	BLOCKED
+E8	-	gate.option_interaction	tests/test_dispatch.py::test_dispatch_option_interaction_gate_blocks_an_unpinned_working_option	yes	BLOCKED

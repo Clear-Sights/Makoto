@@ -34,6 +34,7 @@ DECLARED_IDS: frozenset[str] = frozenset({
     "gate.green_claim",
     "gate.hollow_test",
     "gate.gradient_collapse",
+    "gate.option_interaction",
     "gate.liveness",
     "gate.named_test",
     "gate.pasted_fix",

@@ -69,3 +69,14 @@ def test_neighbours_matches_the_pairwise_definition():
         toks = [tuple(c.split()) for c in cs]
         want = [(i, j) for i, j in itertools.combinations(range(len(cs)), 2) if one_apart(toks[i], toks[j])]
         assert neighbours(cs) == want, cs
+
+
+def test_neighbours_differ_admits_only_pairs_whose_differing_token_passes():
+    opt = lambda t: t.startswith("-")
+    cmds = ["pytest a.py", "pytest b.py", "pytest -x a.py", "pytest -q a.py", "pytest a.py -k"]
+    assert neighbours(cmds, differ=opt) == [(0, 2), (0, 3), (0, 4), (2, 3)]
+    # a thousand runs of one command over a thousand files: no pair forms, and none is enumerated
+    many = [f"pytest -q tests/test_{i}.py" for i in range(3000)]
+    t = time.perf_counter()
+    assert neighbours(many, differ=opt) == []
+    assert time.perf_counter() - t < 1.0

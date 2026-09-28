@@ -169,6 +169,14 @@ def _scenario_gradient_collapse(tmp_path):
     return _ctx(history=[row])
 
 
+def _scenario_option_interaction(tmp_path):
+    # fires on `X=1 tool` red then `X=1 Y=2 tool` green with nothing written after.
+    def run(cmd, rc):
+        return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
+                            "tool_input": {"command": cmd}, "tool_response": {"stdout": "", "exitCode": rc}}}
+    return _ctx(history=[run("X=1 tool", 1), run("X=1 Y=2 tool", 0)])
+
+
 def _scenario_unexamined_wall(tmp_path):
     # fires on an epistemic "cannot" stated with NO act since the operator last spoke. The
     # transcript carries one genuine operator turn (the window boundary) and the history is
@@ -277,6 +285,7 @@ _SCENARIOS = {
     "gate.unworded_close": _scenario_unworded_close,
     "gate.unrun_count_claim": _scenario_unrun_count_claim,
     "gate.gradient_collapse": _scenario_gradient_collapse,
+    "gate.option_interaction": _scenario_option_interaction,
     "gate.claimed_consent_absent": _scenario_claimed_consent_absent,
     "gate.unexamined_wall": _scenario_unexamined_wall,
     "gate.completion": _scenario_completion,

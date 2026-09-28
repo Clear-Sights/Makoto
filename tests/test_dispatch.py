@@ -1561,6 +1561,7 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.unworded_close",       # G1, opt-in words_file
                           "gate.unrun_count_claim",    # C11: a counted all-pass with no run
                           "gate.gradient_collapse",    # A6: a threshold collapse with no test
+                          "gate.option_interaction",   # E8: a working option never pinned
                           "gate.unpaid_acceptance"}    # docs/REGISTER.md I3's runner,
                                                # opt-in (makoto.toml `dispatch = true`)
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
@@ -2430,3 +2431,26 @@ def test_dispatch_gradient_collapse_gate_blocks_a_threshold_with_no_test(tmp_pat
                                          "assert f(0.89) == 0 and f(0.9) == 1\n"))
     rc, out = _run_dispatch(state_dir, stop)
     assert "gate.gradient_collapse" not in (out or "")
+
+
+def _post_bash_rc(tmp_path, session, command, rc):
+    ev = _post_bash(tmp_path, session, command)
+    ev["tool_response"]["exitCode"] = rc
+    return ev
+
+
+def test_dispatch_option_interaction_gate_blocks_an_unpinned_working_option(tmp_path):
+    """gate.option_interaction (E8): `X=1 tool` red then `X=1 Y=2 tool` green, nothing written,
+    blocks the stop; a later write carrying `Y=2` pays it."""
+    state_dir = _setup_state(tmp_path)
+    _run_dispatch(state_dir, _post_bash_rc(tmp_path, "optint", "X=1 tool", 1))
+    _run_dispatch(state_dir, _post_bash_rc(tmp_path, "optint", "X=1 Y=2 tool", 0))
+    stop = {"hook_event_name": "Stop", "session_id": "optint", "cwd": str(tmp_path),
+            "last_assistant_message": "Done."}
+    rc, out = _run_dispatch(state_dir, stop)
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "gate.option_interaction" in decision["reason"]
+    _run_dispatch(state_dir, _post_write(tmp_path, "optint", "config.env", "Y=2\n"))
+    rc, out = _run_dispatch(state_dir, stop)
+    assert "gate.option_interaction" not in (out or "")
