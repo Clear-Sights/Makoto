@@ -20,8 +20,10 @@ line failed; do not work around it.
   unused copy beside it. The live copy should be this checkout's `plugin/`. Reinstalling it, or
   removing an unused copy, is Gabriel's act (hooks load at session start, so it lands next
   session); the line prints NOTE with the act and the session goes on.
-- The session has the repositories it needs: ask to attach (add_repo) Clear-Sights/Scour and
-  Clear-Sights/Measure-Zero, and clone both beside this repository, before anything else.
+- The session has the repositories it needs: clone Clear-Sights/Scour and Clear-Sights/Measure-Zero
+  read-only beside this repository (blobless), before anything else. No step writes to either, so
+  ask to attach one (add_repo) only if its clone is refused. Scour has no handoff of its own: its
+  one open item is step 14 here.
 - DetIO is on: it loads as a plugin at the version DetIO main ships, with
   `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Check: the first turn's context carries the line "DetIO is
   installed in this session", and the launch line prints the installed version. Installed but
@@ -210,4 +212,30 @@ The steps:
     step 13 rows in VOIDS, each naming the construct the language lacks (`refs(...)`, set
     difference, `exists n`, `contains`, `decorated`); fill them in VOIDS order. cap: 6 model calls
     and 10 minutes per row.
+    Stop: at the cap, record the measured number in VOIDS and go on.
+14. Scour's judge (moved from Scour's handoff, row SR1): make Scour's reader catch what
+    adversarial-review catches, so adversarial-review can leave the launch rows. Replay both rounds
+    in Scour's `tests/fixtures/attack/findings.tsv` (check out each head, pass its base) with
+    `python3 -m scour.gate.judgment --on --diff BASE --model MODEL --store /tmp/verdicts.json
+    --ledger /tmp/scour-self.txt`, with `SCOUR_JUDGMENT_TOKENS` set, in the Scour clone at
+    2bface1fd0855b9c228be3ffb5d8cbaeb2044c5d (Scour #31; the reader it needs landed in #30). It
+    writes only under `/tmp`, never to Scour's tree. First sub-step: move `SCOUR_PIN` in
+    `tools/scour.sh` from efd27e9 to 2bface1 and see `sh tools/scour.sh` exit 0 with its verdict
+    line (cap: 2 model calls and 5 minutes); until then launch stays at efd27e9, the pin last run.
+    Measured 2026-09-28, curated (one unit, its seams, its ledger rows, one question per call,
+    memory and thinking off, about 930 tokens fixed per call): Haiku 4.5 1/6 at 82k+144k tokens
+    (37+72 calls); Sonnet 5 0/6 at 109k+193k; Opus 5.5 2/6 asked only the 8 unit-questions the
+    findings sit on, 277k (153k output with thinking off); uncurated Opus 0/6 at 35k+51k. Warm on an
+    unchanged tree: 0 calls; one planted change: 1 call, 1.6k. Misses: H9, M12 and S1 fully or in
+    part; M13 needs a run, so no tool-less reader can catch it. Open this step only when a new model
+    or a new fault class is in hand.
+    check: 6 of 6 in `findings.tsv` named, scored by hand against its id column. plant: a finding
+    removed from the reader's input reads as a miss. owner: the next Makoto session.
+    projection: `python3 -m pytest -q tests/test_layers.py -k Judgment` in the Scour clone (no
+    model): the reader command (READER in `scour/gate/judgment.py`) set to a script replays hot,
+    warm and changed at 0 tokens, and a unit judged twice reads red. cap: 120 model calls (both
+    rounds, one model: 109 unit-questions plus the 8 gold-unit reruns) and 45 minutes. Done when
+    one model names all 6: write that model here and drop adversarial-review from every launch
+    row; otherwise record the model tried, its catch count and its tokens in VOIDS, and
+    adversarial-review stays.
     Stop: at the cap, record the measured number in VOIDS and go on.
