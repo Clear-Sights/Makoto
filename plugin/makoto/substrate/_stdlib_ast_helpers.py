@@ -41,8 +41,11 @@ def _is_scratch(p, cwd) -> bool:
     if not cwd:
         return False                                         # working dir unknown -> never suppress (FN-safe)
     rp = os.path.realpath(str(p))
-    if _under(rp, os.path.realpath(str(cwd))):
+    if _under(rp.lower(), os.path.realpath(str(cwd)).lower()):
         return False                                         # inside the working dir -> in scope
+    # (compared case-folded: ledger keys are folded, so on a case-insensitive disk the folded key
+    # names the file but realpath keeps the fold, and `.../T/...` vs `.../t/...` read as outside;
+    # folding can only widen scope, never skip a file)
     return any(_under(rp, r) for r in _SCRATCH_ROOTS)        # outside cwd AND in a scratch root -> stray scratch
 
 
