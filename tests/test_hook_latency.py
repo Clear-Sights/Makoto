@@ -123,7 +123,7 @@ def _module_level_compiles(src: str) -> int:
 
 
 def test_no_module_level_regex_compile_outside_core():
-    eager = {str(p.relative_to(_PKG)): c for p in _PKG.rglob("*.py")
+    eager = {p.relative_to(_PKG).as_posix(): c for p in _PKG.rglob("*.py")
              if (c := _module_level_compiles(p.read_text(encoding="utf-8")))}
     assert set(eager) <= _EAGER_ALLOWED, eager
 
