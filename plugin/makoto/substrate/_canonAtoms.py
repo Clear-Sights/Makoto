@@ -22,6 +22,7 @@ POSTURE (BLOCK vs ADVISE): see BLOCK_IDS below for the full citation trail.
 """
 from __future__ import annotations
 
+import posixpath
 import re
 from typing import Dict, Iterable, List, Tuple
 
@@ -194,6 +195,35 @@ def _short_flags(args):
     return "".join(a[1:] for a in args if re.fullmatch(r"-[A-Za-z]+", a))
 
 
+# Scratch space destroys no work: a removal whose EVERY target sits strictly under a temp root is
+# cleanup, not destruction. Read lexically (no filesystem, no environment): `$TMPDIR` counts only as
+# the literal word, and `..` is normalized first so `/tmp/../src` cannot launder a real target.
+# The bare root itself (`rm -rf /tmp`) stays destruction -- it holds other sessions' scratch.
+_TEMP_ROOTS = ("/tmp/", "/var/tmp/", "$TMPDIR/", "${TMPDIR}/")
+
+
+def _is_scratch_path(word: str) -> bool:
+    raw = word.replace("\\", "/")
+    if not raw.strip("/"):
+        return False
+    norm = posixpath.normpath(raw)
+    if norm.startswith("../") or norm == "..":
+        return False
+    if "/scratchpad/" in "/" + norm + "/" and not norm.endswith("scratchpad"):
+        return True
+    return any(norm.startswith(root) and len(norm) > len(root) for root in _TEMP_ROOTS)
+
+
+def _rm_targets(args):
+    targets, options_done = [], False
+    for a in args:
+        if not options_done and a == "--":
+            options_done = True
+        elif options_done or not a.startswith("-"):
+            targets.append(a)
+    return targets
+
+
 def _is_destructive_argv(raw_argv) -> bool:
     argv = _effective_argv(raw_argv)
     if not argv:
@@ -204,7 +234,10 @@ def _is_destructive_argv(raw_argv) -> bool:
         flags = _short_flags(args)
         # Intentional scope cut, pinned in test_canon_atoms_destructive: long-form rm stays outside
         # this short-option ponytail even though split short flags are now parsed safely.
-        return "r" in flags and "f" in flags
+        if not ("r" in flags and "f" in flags):
+            return False
+        targets = _rm_targets(args)
+        return not (targets and all(_is_scratch_path(t) for t in targets))
     if program == "git":
         subcommand, subargs = _git_subcommand(argv)
         flags = _short_flags(subargs)

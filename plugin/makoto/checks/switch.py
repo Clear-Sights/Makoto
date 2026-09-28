@@ -1536,6 +1536,8 @@ relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Pre", postur
 # `_canonAtoms._segments` keys on a Call dict this gate does not build. A second definition of destruction here would be `F2 TWO SOURCES OF TRUTH`, and its
 # documented scope cut (long-form `rm` stays outside, pinned in test_canon_atoms_destructive) is
 # inherited whole rather than re-litigated.
+# So is its scratch-space reading (`_canonAtoms._is_scratch_path`): an `rm` whose every target
+# is strictly under a temp root destroys no work and is not destruction for either row.
 #
 # PRE-EDGE DENY (2026-09-25): the destructive command is refused before it runs; the discharge is
 # to run the relevant test or probe (either verdict) and retry.

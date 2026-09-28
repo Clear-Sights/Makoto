@@ -203,3 +203,38 @@ def test_shared_argv_parser_closes_safe_adjacency_gaps():
 
 def test_documented_intentional_long_rm_gap_stays_out_of_scope():
     assert not _fires("rm --recursive --force ./build")
+
+
+# ---- scratch-space cleanup: every target under a temp root destroys no work ---------------------
+def test_rm_rf_of_scratchpad_dir_is_not_destruction():
+    # discriminant: every rm target lies under /tmp/ or a /scratchpad/ component
+    assert not _fires("rm -rf /tmp/claude-0/x/scratchpad/mesh")
+    assert not _fires("rm -rf /var/tmp/build-cache /tmp/a")
+    assert not _fires('rm -rf "$TMPDIR/run1" ${TMPDIR}/run2')
+    assert not _fires("rm -rf /home/user/proj/scratchpad/out")
+
+
+def test_rm_rf_mixing_a_temp_target_with_a_work_target_is_destruction():
+    # discriminant: one target (src) is outside every temp root
+    assert _fires("rm -rf /tmp/x src")
+    assert _fires("rm -rf src")
+    assert _fires("rm -rf build/")
+
+
+def test_temp_root_itself_or_an_escape_from_it_is_destruction():
+    # discriminant: target is the bare root, or '..' normalizes it out of the temp root
+    assert _fires("rm -rf /tmp")
+    assert _fires("rm -rf /tmp/")
+    assert _fires("rm -rf $TMPDIR")
+    assert _fires("rm -rf /tmp/../home/user/src")
+    assert _fires("rm -rf /x/scratchpad/../../src")
+    assert _fires("rm -rf /tmpfoo/x")
+
+
+def test_git_worktree_remove_and_prune_are_not_destruction():
+    # discriminant: git subcommand is `worktree`, whose checkout is disposable
+    assert not _fires("git worktree remove /tmp/wt3")
+    assert not _fires("git worktree remove --force ../wt3")
+    assert not _fires("git worktree prune")
+    assert _fires("git clean -fdx")
+    assert _fires("git reset --hard")

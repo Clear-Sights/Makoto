@@ -838,7 +838,7 @@ def test_dispatch_canon_fingerprints_gate_blocks(tmp_path):
     robust-core, blocking-capable fingerprint) and BLOCKS at Stop by default."""
     state_dir = _setup_state(tmp_path)
     post = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "canon_fp_block",
-            "cwd": str(tmp_path), "tool_input": {"command": "rm -rf /tmp/scratch"},
+            "cwd": str(tmp_path), "tool_input": {"command": "rm -rf build/"},
             "tool_response": {"stdout": "", "stderr": "", "exitCode": 0}}
     rc, out = _run_dispatch(state_dir, post)
     assert rc == 0 and out == ""

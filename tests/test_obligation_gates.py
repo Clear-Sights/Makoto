@@ -297,6 +297,13 @@ def test_unobserved_destruction_inherits_the_one_destructive_classifier():
     assert unobserved_destruction_gate([_bash("ls -la")]) is None
 
 
+def test_unobserved_destruction_is_silent_on_scratch_cleanup():
+    # discriminant: every rm target is under a temp root, so no work is destroyed
+    assert unobserved_destruction_gate([_bash("rm -rf /tmp/claude-0/x/scratchpad/mesh")]) is None
+    assert unobserved_destruction_gate([_bash("git worktree remove --force /tmp/wt3")]) is None
+    assert unobserved_destruction_gate([_bash("rm -rf /tmp/x src")]) is not None
+
+
 # gate.relaunched_unchanged (register E13 PARKED ON AN INHERITED CHANNEL)
 
 def test_relaunched_unchanged_is_silent_on_a_single_launch():
