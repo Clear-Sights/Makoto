@@ -1557,7 +1557,7 @@ def test_no_shadow_gate_every_gate_blocks():
                           "gate.undeclared_falsifiable",  # B32/C2: catalog-completeness auditor
                           "gate.unworded_close",       # G1, opt-in words_file
                           "gate.unrun_count_claim",    # C11: a counted all-pass with no run
-                          "gate.unpaid_acceptance"}    # PROPOSED-REGISTER-ROWS.md I3's runner,
+                          "gate.unpaid_acceptance"}    # docs/REGISTER.md I3's runner,
                                                # opt-in (makoto.toml `dispatch = true`)
     # The check.quantity / claim_check capability no longer EXISTS: no live gate's run adapter
     # references it, and the package exposes no such callable (re-adding it as a gate turns this
