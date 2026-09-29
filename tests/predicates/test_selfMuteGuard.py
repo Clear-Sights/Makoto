@@ -244,7 +244,9 @@ def _home_with_live(tmp_path, monkeypatch, version):
     (root / "installed_plugins.json").write_text(json.dumps(
         {"plugins": {"makoto@makoto": [{"installPath": str(live), "version": version}]}}))
     monkeypatch.setenv("HOME", str(tmp_path))
-    return root / "cache" / "makoto" / "makoto"
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # expanduser's home on Windows
+    # a shell command spells the path with forward slashes: bash drops unquoted backslashes
+    return (root / "cache" / "makoto" / "makoto").as_posix()
 
 
 def _bash(cmd):
@@ -270,4 +272,5 @@ def test_silent_rm_of_an_orphaned_older_version(tmp_path, monkeypatch):
 
 def test_fire_when_the_install_record_is_unreadable(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert _run(_bash(f"rm -rf {tmp_path}/.claude/plugins/cache/makoto/makoto/3.4.8")) is not None
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    assert _run(_bash(f"rm -rf {tmp_path.as_posix()}/.claude/plugins/cache/makoto/makoto/3.4.8")) is not None
