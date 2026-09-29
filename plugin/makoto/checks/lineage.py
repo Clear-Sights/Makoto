@@ -371,35 +371,22 @@ interrupt_DESCRIPTION = 'illusory "interrupted by user" claim (no genuine interr
 # regex-matching payloads unevaluated. Every alternative contains 'u' ('user'/'interrupted'), so
 # ('u', 'U') is the case-independent superset that keeps the prefilter sound.
 interrupt_CHECK = _Check(id='content.illusory_interruption_claim', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('u', 'U'), retry_hint=interrupt_RETRY_HINT, description=interrupt_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern", "conn"}), tests="LINEAGE")
-# content.unsourced_webfetch — WebFetch URL not in any prior tool_result.
+# content.unsourced_webfetch — a fetched URL not in any prior tool_result.
 #
 # The agent invents a URL, often from a plausible-looking host+path pattern in training data,
 # never returned by a prior search or supplied by the user.
 #
 # Predicate walks session history and checks whether the URL appears anywhere in prior
-# tool_response content. Two short-circuits come first: a trusted-host allowlist for well-known
-# docs domains, and -- the one that keeps the condition honest -- a URL the USER typed verbatim
-# in a genuine transcript turn. "Not in a prior tool_result" is a proxy for "fabricated", and it
+# tool_response content, or -- the one that keeps the condition honest -- was typed verbatim by
+# the USER in a genuine transcript turn. The fetch is the effect, not the tool: WebFetch, an MCP
+# fetch tool, or a url client in Bash (round nine H1). No host is trusted: a known host does not
+# witness an invented path under it. "Not in a prior tool_result" is a proxy for "fabricated", and it
 # is a proxy that misfires on the single most clearly-grounded case there is; see `_user_supplied`
 # for the measured misfire.
 import json
 import os
-from urllib.parse import urlparse
 from makoto.kit import raw_payload_str, unwitnessed
 from makoto.vocab import Finding
-
-
-# Allowlisted hosts the agent legitimately knows from training data.
-_TRUSTED_HOSTS = frozenset({
-    "docs.anthropic.com",
-    "code.claude.com",
-    "claude.com",
-    "docs.claude.com",
-    "github.com",          # GitHub is so well-known that fabricating a github URL is rare
-    "stackoverflow.com",
-    "wikipedia.org",
-    "en.wikipedia.org",
-})
 
 
 # What may TRAIL a url and still leave it the url the user typed. A url runs to the next
@@ -462,34 +449,36 @@ def _user_supplied(url: str, current_event: dict) -> bool:
     return any(_ends_url(turn, url) for turn in turns)
 
 
-def _is_fetch_shaped(tool_name: str, tool_input: dict) -> bool:
-    """True for the built-in WebFetch, and for an MCP fetch tool under any other name: the
-    url INPUT is the signal that a tool is being used as a WebFetch, not the literal string
-    "WebFetch" -- an MCP tool whose own name says it fetches (e.g. `mcp__browser__fetch`) and
-    that actually carries a url is the same fabricated-evidence surface under a different name."""
-    if tool_name == "WebFetch":
-        return True
-    return (tool_name.startswith("mcp__") and "fetch" in tool_name.lower()
-            and isinstance(tool_input.get("url"), str) and bool(tool_input.get("url")))
+# Programs whose url arguments are retrieved when the command runs. A url handed to one of these
+# is a fetch whatever tool carries it: `curl <url>` in Bash is the same unseen resource as the
+# same url in WebFetch.
+_URL_CLIENTS = frozenset({"curl", "wget", "http", "https", "xh", "aria2c", "lynx", "w3m",
+                          "links", "fetch"})
+_URL_RX = _lazy_re(r"https?://[^\s'\"<>]+")
 
 
-def _webfetch_url(current_event: dict) -> Optional[str]:
-    """The url a WebFetch-shaped tool commits to, or None when the event never owes one at
-    all: not fetch-shaped, no url, or a TRUSTED host. The user-typed oracle is a real witness
-    and lives in `pays`/`paid`, not here."""
+def _fetched_urls(current_event: dict) -> tuple:
+    """Every url a PreToolUse event is about to retrieve: the `url` input of WebFetch or of an
+    MCP tool whose name says it fetches, and each url argument to a url client in a Bash command.
+
+    No host vouches for a url: a well-known host says nothing about whether the PATH exists, and
+    an invented `github.com/<org>/<repo>/blob/...` is exactly as unseen as any other invented
+    page. Only a prior tool response or the user's own turn witnesses a url."""
     if current_event.get("hook_event_name") != "PreToolUse":
-        return None
+        return ()
+    name = current_event.get("tool_name") or ""
     tool_input = current_event.get("tool_input") or {}
-    if not _is_fetch_shaped(current_event.get("tool_name") or "", tool_input):
-        return None
-    url = tool_input.get("url", "")
-    if not url:
-        return None
-    # Trusted-host short-circuit
-    host = urlparse(url).netloc.lower()
-    if host in _TRUSTED_HOSTS or any(host.endswith("." + th) for th in _TRUSTED_HOSTS):
-        return None
-    return url
+    url = tool_input.get("url")
+    if name == "WebFetch" or (name.startswith("mcp__") and "fetch" in name.lower()):
+        return (url,) if isinstance(url, str) and url else ()
+    if name != "Bash":
+        return ()
+    from makoto.core._shell import _shell_segments
+    out = []
+    for argv, _ in _shell_segments(tool_input.get("command") or ""):
+        if argv and os.path.basename(argv[0]) in _URL_CLIENTS:
+            out += [m.group(0) for a in argv[1:] for m in _URL_RX.finditer(a)]
+    return tuple(dict.fromkeys(out))
 
 
 def _url_grounded_in_history(url: str, history: list) -> bool:
@@ -540,13 +529,12 @@ def _oracle_consulted(transcript_path) -> bool:
 
 
 def webfetch_owes(ev: dict):
-    """OTHER_POINT: an untrusted-host WebFetch commits to the url it names."""
-    return (url,) if (url := _webfetch_url(ev)) is not None else ()
+    """OTHER_POINT: a fetch commits to each url it retrieves."""
+    return _fetched_urls(ev)
 
 
 def webfetch_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
-    """The Pre predicate. Fires iff the WebFetch url passes no short-circuit (`_webfetch_url`:
-    trusted host) and is witnessed by neither a prior tool RESPONSE (`_url_grounded_in_history`)
+    """The Pre predicate. Fires iff a url the event fetches (`_fetched_urls`) is witnessed by neither a prior tool RESPONSE (`_url_grounded_in_history`)
     nor the user's own transcript turn (`_user_supplied`). The message states only what was
     actually checked: the user-typed clause is asserted only when a transcript was available to
     consult (`_oracle_consulted`)."""

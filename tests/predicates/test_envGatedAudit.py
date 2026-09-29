@@ -128,3 +128,22 @@ def test_neg_non_python_target_md():
     """A .md doc containing the shape is prose, not code -> silent (target is .py only; .md was the
     old detector's worst FP, firing on CLAUDE.md itself)."""
     assert not _fires("README.md", "Example: if os.getenv('AUDIT'): write_audit_trail()\n")
+
+
+# === Round nine E7: the env value reaching the gate, not the call's spelling =================
+
+def test_tp_env_read_through_variable():
+    assert _fires("app.py", "import os\nflag = os.getenv('X')\nok = flag\nif ok:\n    run_audit()\n")
+
+
+def test_nm_variable_from_env_gating_non_integrity_body():
+    assert not _fires("app.py", "import os\nflag = os.getenv('DEBUG')\nif flag:\n    print(1)\n")
+
+
+def test_tp_shell_script_env_gate():
+    assert _fires("ci/check.sh", 'if [ -n "$ENABLE_AUDIT" ]; then\n  ./run.sh\nfi\n')
+    assert _fires("ci/check.sh", '[ -n "$FAST" ] || gpg --verify x.sig\n')
+
+
+def test_nm_shell_script_var_the_script_assigns():
+    assert not _fires("ci/check.sh", 'AUDIT=1\nif [ "$AUDIT" = 1 ]; then\n  run_audit\nfi\n')

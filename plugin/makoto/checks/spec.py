@@ -5,7 +5,13 @@ from __future__ import annotations
 #
 # Fires on an introduced `if <env-read>:` whose env-var key or guarded body names an integrity /
 # audit / verification concept (`lexicons._INTEG_VOCAB`). Env-read = `os.environ.get(...)`,
-# `os.getenv(...)`, `os.environ[...]`, or the bare imported forms.
+# `os.getenv(...)`, `os.environ[...]`, or the bare imported forms -- or any name or attribute the
+# introduced code BOUND from one (`flag = os.getenv(...)`; `if flag:`), transitively: the gate is
+# the env value reaching the condition, not the call sitting in it (round nine E7).
+#
+# The effect is language-blind, so a shell script (`.sh`/`.bash`/...) is read too: an
+# `if`/`[ ] &&` condition naming a `$VAR` the script never assigns is an env read, and the same
+# key-or-body integrity signal applies.
 #
 # Gating an audit trail behind an env var means the check runs only when someone opts in — a
 # HOLLOWED word: the audit survives in name while its guarantee is gutted.
@@ -18,8 +24,8 @@ from __future__ import annotations
 # NAME-AGNOSTIC: the signal comes from the KEY *or* a body code identifier, not the literal
 # substring `AUDIT` — a bare feature flag with no integrity token in key or body stays silent.
 #
-# keywords: `getenv`/`environ` are a superset of every env-read spelling this module matches, so
-# dispatch's prefilter can never silently drop a form the predicate would catch.
+# keywords: `getenv`/`environ` (Python) and `$` (shell) are a superset of every env-read spelling
+# this module matches, so dispatch's prefilter can never silently drop a form the predicate would catch.
 #
 # ACKNOWLEDGED FN (precision-first, like 1.4/1.26): an env-gated audit whose only audit op sits in
 # the ``else`` branch, or whose integrity intent is hidden behind a fully-generic name in both key
@@ -31,7 +37,8 @@ import re
 from typing import Optional
 
 from makoto.vocab import _INTEG_VOCAB, _PY_FILE_RX as _TARGET_RX
-from makoto.kit import ast_introduced_predicate, callee_chain
+from makoto.kit import (_exempt_or_finding, _gated_content, ast_introduced_predicate, callee_chain,
+                        parse_introduced)
 
 # `_TARGET_RX` is .py-only — .md is prose.
 _INTEG_RX = _lazy_re(_INTEG_VOCAB, re.I)  # shared L0 integrity vocabulary
@@ -59,7 +66,9 @@ def _value_chain(node: ast.AST) -> str:
 def _is_env_read(node: ast.AST) -> bool:
     """True iff ``node`` reads an environment variable: ``os.getenv(...)`` / ``os.environ.get(...)`` /
     the bare imported ``getenv(...)`` / ``environ.get(...)`` (Call), or ``os.environ[...]`` /
-    ``environ[...]`` (Subscript)."""
+    ``environ[...]`` (Subscript), or a name/attribute ``_parse_marking_env`` found bound from one."""
+    if hasattr(node, "_env_key"):
+        return True
     if isinstance(node, ast.Call):
         return callee_chain(node) in _ENV_CALL_CHAINS
     if isinstance(node, ast.Subscript):
@@ -84,6 +93,8 @@ def _env_key(env_read: ast.AST) -> str:
     the first positional arg of the env CALL (``os.getenv("ENABLE_AUDIT")``), or the subscript key
     of ``os.environ["VERIFY_MODE"]``. Empty when the key is absent or not a ``str`` literal — a
     computed key names nothing."""
+    if hasattr(env_read, "_env_key"):
+        return env_read._env_key
     key: Optional[ast.AST] = None
     if isinstance(env_read, ast.Call):
         key = env_read.args[0] if env_read.args else None
@@ -107,14 +118,116 @@ def _node_match(node: ast.AST) -> Optional[str]:
     return None
 
 
-env_predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_node_match)
+def _parse_marking_env(content: str):
+    """``parse_introduced``, then mark every loaded Name/Attribute whose dotted chain the
+    introduced code bound from an env read (to a fixpoint, so `a = getenv(k); b = a` marks `b`)
+    with ``_env_key``, the key of the read it came from."""
+    tree, off = parse_introduced(content)
+    if tree is None:
+        return tree, off
+    bound: dict = {}
+    grew = True
+    while grew:
+        grew = False
+        for node in ast.walk(tree):
+            value = getattr(node, "value", None)
+            if not isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)) or value is None:
+                continue
+            reads = [x for x in ast.walk(value) if _is_env_read(x)
+                     or (isinstance(x, (ast.Name, ast.Attribute)) and _value_chain(x) in bound)]
+            if not reads:
+                continue
+            key = next((k for k in (_env_key(r) if _is_env_read(r) else bound[_value_chain(r)]
+                                    for r in reads) if k), "")
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                for x in ast.walk(t):
+                    chain = _value_chain(x) if isinstance(x, (ast.Name, ast.Attribute)) else ""
+                    if chain and chain not in bound:
+                        bound[chain] = key
+                        grew = True
+    for node in ast.walk(tree):
+        if (isinstance(node, (ast.Name, ast.Attribute)) and isinstance(node.ctx, ast.Load)
+                and _value_chain(node) in bound):
+            node._env_key = bound[_value_chain(node)]
+    return tree, off
+
+
+_py_predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_node_match,
+                                         parse=_parse_marking_env)
+
+_SH_FILE_RX = _lazy_re(r"\.(sh|bash|zsh|ksh)$")
+_SH_VAR_RX = _lazy_re(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
+_SH_BOUND_RX = _lazy_re(r"(?:^|[\s;&|(])(?:(?:export|local|readonly|declare|typeset)\s+(?:-\w+\s+)*)?"
+                        r"([A-Za-z_][A-Za-z0-9_]*)=|\b(?:read|for)\s+(?:-\w+\s+)*([A-Za-z_][A-Za-z0-9_]*)")
+_SH_QUOTED_RX = _lazy_re(r"'[^']*'|\"(?:[^\"\\\\]|\\\\.)*\"")
+_SH_GUARD_RX = _lazy_re(r"^\s*(?:\[\[?|test\b)(.*?)(?:\]\]?)?\s*(?:&&|\|\|)\s*(.+)$")
+
+
+def _sh_gates(lines: list):
+    """(line index, condition, guarded body) for each `if`/`elif` block and `[ ... ] && cmd` line."""
+    for i, ln in enumerate(lines):
+        m = re.match(r"\s*(?:el)?if\s+(.*?)(?:;\s*then\b(.*))?$", ln)
+        if m:
+            body, depth = [m.group(2) or ""], 0
+            for nxt in lines[i + 1:]:
+                w = nxt.strip()
+                if re.match(r"if\b", w):
+                    depth += 1
+                elif re.match(r"fi\b", w):
+                    if depth == 0:
+                        break
+                    depth -= 1
+                elif depth == 0 and re.match(r"(?:else|elif)\b", w):
+                    break
+                body.append(nxt)
+            yield i, m.group(1), "\n".join(body)
+            continue
+        g = _SH_GUARD_RX.match(ln)
+        if g:
+            yield i, g.group(1), g.group(2)
+
+
+def _sh_predicate(*, current_event: dict, history: list, pattern, conn=None):
+    """The same gate in a shell script: a condition reading a `$VAR` the script never assigns
+    (so it comes from the environment) guarding a body, where the var's name or the body's
+    unquoted words name an integrity concept."""
+    gated = _gated_content(current_event=current_event, target_rx=_SH_FILE_RX, exempt_rx=None)
+    if gated is None:
+        return None
+    fp, content = gated
+    lines = [re.sub(r"(^|\s)#.*", "", ln) for ln in content.splitlines()]
+    bound = {a or b for m in (_SH_BOUND_RX.finditer(ln) for ln in lines) for a, b in
+             (x.groups() for x in m)}
+    for i, cond, body in _sh_gates(lines):
+        env = [v for v in _SH_VAR_RX.findall(cond) if v not in bound]
+        if not env:
+            continue
+        if any(_INTEG_RX.search(v) for v in env):
+            label = "env-gated audit (env-var key names an integrity/verification concept)"
+        elif _INTEG_RX.search(_SH_QUOTED_RX.sub("", body)):
+            label = "env-gated audit (the env-gated body runs an integrity/audit/verification op)"
+        else:
+            continue
+        return _exempt_or_finding(
+            current_event=current_event, conn=conn, pattern=pattern, fp=fp, line_no=i + 1,
+            snippet=content.splitlines()[i].strip()[:120], content=content,
+            message=f"row {pattern.id} ({pattern.description}): shell match {label!r} "
+                    f"at line {i + 1}")
+    return None
+
+
+def env_predicate(*, current_event: dict, history: list, pattern, conn=None):
+    # neither reading consults history: it is not forwarded, so the check eats only what it reads
+    return (_py_predicate(current_event=current_event, history=(), pattern=pattern, conn=conn)
+            or _sh_predicate(current_event=current_event, history=(), pattern=pattern, conn=conn))
 
 
 from makoto.registry import Check as _Check
 env_RETRY_HINT = "Don't gate an audit/verification check behind an env var — `if os.getenv('...'): <audit>` makes the check opt-in, so it silently does nothing unless someone sets the flag (a hollowed integrity check). Run the check unconditionally; if a genuinely-optional diagnostic is intended, annotate the line with `makoto-allow: <reason>`."
-env_DESCRIPTION = 'env-gated audit/verification code (if os.environ.get(...)/os.getenv(...) gating an integrity op)'
+env_DESCRIPTION = 'env-gated audit/verification code (an env value, read directly or through a variable, gating an integrity op)'
 
-env_CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('getenv', 'environ'), retry_hint=env_RETRY_HINT, description=env_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+env_CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('getenv', 'environ', '$'), retry_hint=env_RETRY_HINT, description=env_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 
 # content.verifier_body_hollowed predicate — verifier NEUTERED (body hollowed, or a broad except
 # swallows the failure).
@@ -1525,7 +1638,10 @@ waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Pre", posture="
 #
 # The fix is to name which layer set the value and where it changes: `git var GIT_AUTHOR_IDENT` /
 # `GIT_COMMITTER_IDENT`, run with the command's own overrides (leading `VAR=`, `env -u`,
-# `export`/`unset`, `git -c`, `-C`, `cd`, `--author=`), is what git itself will stamp.
+# `export`/`unset`, `git -c`, `-C`, `cd`, `--author`), is what git itself will stamp. A `git
+# config` write earlier in the same command is replayed as a `-c` on the later git calls (an
+# `include.path` made absolute against the file it would land in), and an `--author` value built
+# by `$(cat F)` / `$(< F)` / `$VAR` is read the way the shell will expand it (round nine A13).
 #
 # Two edges, one reading. Upstream: a commit-creating git command whose author or committer
 # resolves to Claude is refused before it runs. Damage control: a `git push` whose outgoing
@@ -1576,6 +1692,63 @@ def _split_env(argv: list, env: dict) -> tuple[list, dict]:
     return argv[i:], env
 
 
+_SUBST_RX = _lazy_re(r"\$\(\s*(?:cat\s+|<\s*)([^()\s]+)\s*\)|`\s*cat\s+([^`\s]+)\s*`"
+                     r"|\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
+
+
+def _expand(word: str, cwd: str, env: dict) -> str:
+    """`word` as the shell will expand it, for the read-only substitutions an identity is built
+    from: `$(cat F)`, `$(< F)`, `` `cat F` `` read F (trailing newlines dropped, as `$()` does)
+    and `$VAR` / `${VAR}` read the environment. Anything else is left as written."""
+    def sub(m):
+        path = m.group(1) or m.group(2)
+        if path:
+            try:
+                with open(os.path.join(cwd, os.path.expanduser(path)), encoding="utf-8") as fh:
+                    return fh.read(4096).rstrip("\n")
+            except OSError:
+                return m.group(0)
+        return env.get(m.group(3), "")
+    return _SUBST_RX.sub(sub, word)
+
+
+def _config_write(glob: list, args: list, cwd: str, env: dict) -> list:
+    """`-c key=value` for a `git config [set] [scope] key value` write, so later git calls in the
+    same command read it; [] for a read or anything else. A relative `*.path` is made absolute
+    against the file the write lands in, since `-c` includes must be absolute."""
+    rest = list(args[1:] if args[:1] == ["set"] else args)
+    scope, pos, i = "local", [], 0
+    while i < len(rest):
+        a = rest[i]
+        if a in ("--global", "--system", "--local", "--worktree"):
+            scope = a[2:]
+        elif a in ("-f", "--file") and i + 1 < len(rest):
+            scope, i = os.path.join(cwd, rest[i + 1]), i + 1
+        elif a == "--add":
+            pass
+        elif a.startswith("-"):
+            return []
+        else:
+            pos.append(a)
+        i += 1
+    if len(pos) != 2:
+        return []
+    key, value = pos
+    if key.lower().endswith(".path") and not os.path.isabs(os.path.expanduser(value)):
+        if scope in ("local", "worktree"):
+            base = (_git([*glob, "rev-parse", "--absolute-git-dir"], cwd, env) or "").strip()
+        elif scope == "global":
+            base = env.get("HOME", "")
+        elif scope == "system":
+            return []
+        else:
+            base = os.path.dirname(scope)
+        if not base:
+            return []
+        value = os.path.normpath(os.path.join(base, value))
+    return ["-c", f"{key}={value}"]
+
+
 def _git_parts(argv: list) -> Optional[tuple[list, str, list]]:
     """(global options to replay, subcommand, its arguments) for a `git ...` argv, else None."""
     if not argv or os.path.basename(argv[0]) != "git":
@@ -1605,7 +1778,10 @@ def _commit_finding(glob, sub, args, cwd, env) -> Optional[str]:
         return None
     if _git([*glob, "rev-parse", "--git-dir"], cwd, env) is None:
         return None  # not the repo the command will run in: its local config is unread
-    author = next((a.split("=", 1)[1] for a in args if a.startswith("--author=")), None)
+    author = next((_expand(a.split("=", 1)[1], cwd, env) for a in args
+                   if a.startswith("--author=")), None)
+    if author is None and "--author" in args[:-1]:
+        author = _expand(args[args.index("--author") + 1], cwd, env)
     for role, var in (("author", "GIT_AUTHOR_IDENT"), ("committer", "GIT_COMMITTER_IDENT")):
         if role == "author" and author is not None:
             ident = author
@@ -1646,6 +1822,7 @@ def identity_predicate(*, current_event: dict, history: list, pattern, conn=None
     cmd = (current_event.get("tool_input") or {}).get("command", "") or ""
     cwd = current_event.get("cwd") or os.getcwd()
     env = dict(os.environ)
+    written: list = []  # `git config` writes made earlier in this command, as `-c` pairs
     for argv, _ in _shell_segments(cmd):
         argv, seg_env = _split_env(argv, env)
         if not argv:
@@ -1666,11 +1843,16 @@ def identity_predicate(*, current_event: dict, history: list, pattern, conn=None
         if parts is None:
             continue
         glob, sub, args = parts
+        if sub == "config":
+            written += _config_write(glob, args, cwd, seg_env)
+            continue
+        glob = [*written, *glob]
         msg = (_commit_finding(glob, sub, args, cwd, seg_env) if sub in _COMMITTING
                else _push_finding(glob, args, cwd, seg_env) if sub == "push" else None)
         if msg:
             return Finding(pattern_id=pattern.id, file="Bash command", line=1, level="error",
-                           message=f"row {pattern.id}: {msg}", retry_hint=pattern.retry_hint,
+                           message=f"row {pattern.id} ({pattern.description}): {msg}",
+                           retry_hint=pattern.retry_hint,
                            snippet=" ".join(argv)[:200])
     return None
 
