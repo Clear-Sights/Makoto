@@ -38,6 +38,26 @@ _PATH_IN_CMD_RX = _lazy_re(
 )
 
 
+# A file-shaped string in another tool's input: a path ending in an extension, no spaces, no glob.
+_INPUT_PATH_RX = _lazy_re(r"(?:[\w.~\-]*/)*[\w.\-]+\.\w{1,8}")
+# An error-shaped response never counts as a reading, even on a PostToolUse (an MCP tool can return
+# its failure as content). Skipping leaves the gate as it was, so a miss here can only keep a fire.
+_ERROR_RESPONSE_RX = _lazy_re(
+    r"is_?error\W{0,3}true|\berror\b|not found|no such file|does not exist|denied|refused", re.I)
+
+
+def _input_paths(value):
+    """Every file-shaped string anywhere in a tool input (nested dicts and lists included)."""
+    if isinstance(value, dict):
+        for v in value.values():
+            yield from _input_paths(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _input_paths(v)
+    elif isinstance(value, str) and "://" not in value and _INPUT_PATH_RX.fullmatch(value.strip()):
+        yield normalize_path(value.strip())
+
+
 def _bash_key(ev: dict) -> str:
     """Best-effort location a Bash run concerns: a path-shaped token in the
     command, else the cwd, else a stable 'bash' fallback (stated, not inferred)."""
@@ -50,7 +70,8 @@ def _bash_key(ev: dict) -> str:
 
 def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) -> None:
     """Record one update from a PostToolUse event. Write/Edit -> a `touched` row;
-    Bash -> a `value` row with extracted output + exit code. Latest-wins in sqlite;
+    Bash -> a `value` row with extracted output + exit code; any other tool -> a `seen` row per
+    file its input names, when its response carries no error (never overwriting). Latest-wins in sqlite;
     ALSO chain-appended: sqlite stays the latest-wins query index, the chain preserves
     every update sqlite's upsert would otherwise overwrite-and-lose. `root` overrides env-var
     resolution for the chain write only (see `store_root`); sqlite's own root always comes from
@@ -82,6 +103,32 @@ def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) 
         cmd = tool_input.get("command", "") or ""
         kind, value = ("testrun", text[-500:]) if is_test_runner(cmd) else ("value", text[:500])
         _upsert(conn, _bash_key(ev), kind, value, exit_code, event_id, session_id, root=root)
+    else:
+        # Any other settled tool whose input names a file, answered without an error, is a second
+        # reading of that file: a Read, an attach or upload (a post's attached_outputs), a remote
+        # write. The file can sit on a disk this session does not mount (live FP 2026-09-29: a
+        # project post attached the shared folder's session.sh, and gate.completion still fired).
+        tr = ev.get("tool_response")
+        if _ERROR_RESPONSE_RX.search(tr if isinstance(tr, str) else json.dumps(tr, default=str)):
+            return
+        for key in dict.fromkeys(_input_paths(tool_input)):
+            _record_seen(conn, key, event_id, session_id, root=root)
+
+
+def _record_seen(conn, key, event_id, session_id, *, root=None) -> None:
+    """A `seen` row only fills an empty key: it never overwrites a Write's content-depth row or a
+    test run's verdict, so a later Read of a hollow file or of a failing test cannot launder it."""
+    cur = conn.execute(
+        "INSERT INTO ledger (key, value, kind, exit, source_event_id, session_id, ts) "
+        "VALUES (?, NULL, 'seen', NULL, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now')) "
+        "ON CONFLICT(key) DO NOTHING", [key, event_id, session_id])
+    conn.commit()
+    if root is not None and cur.rowcount:
+        try:
+            append({"kind": "seen", "key": key, "value": None, "exit": None,
+                    "source_event_id": event_id, "session_id": session_id}, root=root)
+        except Exception:
+            pass
 
 
 def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=None) -> None:
