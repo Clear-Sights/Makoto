@@ -759,6 +759,52 @@ def launches_worker(ev: dict) -> bool:
     return name.startswith("mcp__") and bool(_WORKER_ADDRESS_RX.search(name.rsplit("__", 1)[-1]))
 
 
+# A worker's brief, read as words (2026-09-29, three live false fires): a launch whose brief only
+# reads is itself the probe `gate.unprobed_fanout` asks for (a session holding no Read tool can
+# only look through a worker), and a second launch on a DIFFERENT brief is another job, not the
+# re-launch `gate.relaunched_unchanged` names. Both are decided on the brief's words alone.
+_BRIEF_WORD_RX = _lazy_re(r"[a-z][a-z0-9_-]{2,}")
+_BRIEF_FILLER = frozenset({
+    "the", "and", "for", "with", "this", "that", "then", "its", "into", "from", "each", "all",
+    "again", "retry", "rerun", "once", "more", "run", "worker", "agent", "task", "please"})
+_NEGATED_CLAUSE_RX = _lazy_re(r"\b(?:do\s+not|don['’]t|never|without|no)\b[^.;\n]*", re.I)
+_WRITE_VERB_RX = _lazy_re(
+    r"\b(?:writ|edit|creat|modif|chang|fix|refactor|implement|add|delet|remov|commit|push|merg|"
+    r"build|install|updat|renam|mov|replac|patch|deploy|launch|restart|generat|apply|migrat)\w*", re.I)
+_READ_VERB_RX = _lazy_re(
+    r"\b(?:read|list|find|grep|search|report|summari[sz]e|look|show|count|inspect|open|print|"
+    r"locate|survey|extract|quote|compare)\w*", re.I)
+
+
+def brief_of(ev: dict) -> str:
+    """The text a launch hands its worker: prompt or message, and its description."""
+    ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+    return " ".join(str(ti.get(k) or "") for k in ("description", "prompt", "message")).strip()
+
+
+def brief_words(ev: dict) -> frozenset:
+    return frozenset(_BRIEF_WORD_RX.findall(brief_of(ev).lower())) - _BRIEF_FILLER
+
+
+def repeats_launch(earlier: dict, later: dict) -> bool:
+    """`later` launches the same job as `earlier`: one brief's words hold the other's. Two empty
+    briefs read as the same job (nothing tells them apart)."""
+    a, b = brief_words(earlier), brief_words(later)
+    return a <= b or b <= a
+
+
+def reads_only(ev: dict) -> bool:
+    """This launch's worker is sent only to look: an Explore worker, or a brief naming a read
+    verb and, outside its negated clauses ("do not edit"), no verb that changes anything."""
+    if not launches_worker(ev):
+        return False
+    ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+    if str(ti.get("subagent_type") or "") == "Explore":
+        return True
+    text = _NEGATED_CLAUSE_RX.sub(" ", brief_of(ev))
+    return bool(_READ_VERB_RX.search(text)) and not _WRITE_VERB_RX.search(text)
+
+
 def dispatch_brief_lines(prompt: str) -> dict:
     """Every line-start label's value in `prompt`, in order, stripped; a missing label is []."""
     out = {label: [] for label in _BRIEF_LABELS}

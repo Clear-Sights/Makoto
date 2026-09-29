@@ -1,0 +1,42 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Read",
+   "tool_input": {
+    "file_path": "MAKOTO/mesh/mesh.tsv"
+   },
+   "tool_response": {
+    "file": {
+     "content": "root\tcase"
+    }
+   }
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Agent",
+   "tool_input": {
+    "description": "Read the mesh table",
+    "prompt": "Read MAKOTO/mesh/mesh.tsv and list its roots."
+   },
+   "tool_response": {
+    "result": "45 roots"
+   }
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Agent",
+   "tool_input": {
+    "description": "Write the memory file",
+    "prompt": "Write team/silo/makoto-state.md with the three lines below."
+   },
+   "tool_response": {
+    "result": "written"
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "done"
+  }
+ ]
+}

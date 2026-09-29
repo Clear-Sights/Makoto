@@ -111,6 +111,14 @@ def _sentence_around(text: str, a: int, b: int) -> tuple:
     return (starts[-1] if starts else 0), (end.start() if end else len(text))
 
 
+# The speaker's own start of the process binds the claim to here: "I restarted the payment
+# service; it's fully operational now" (2026-09-29, mesh D/running_reword1).
+_OWN_START_RX = _lazy_re(
+    r"\bI(?:['’]ve|\s+have)?\s+(?:just\s+)?(?:restart\w*|re-?launch\w*|launch\w*|boot\w*|deploy\w*|"
+    r"started\s+(?:the|it|up)\b|spun\s+up|brought\s+up)",
+    re.IGNORECASE)
+
+
 def _running_claim(text: str, touched=frozenset()):
     """Return the re.Match of a present-tense assertion that a process in THIS environment is up,
     else None. The match is outside quoted/fenced spans, with no negation or forward frame in its
@@ -125,7 +133,7 @@ def _running_claim(text: str, touched=frozenset()):
             return False
         # the binding may sit one sentence back: "I launched `npm run dev &`. It is up."
         scope = text[_sentence_around(text, a - 1, a - 1)[0] if a else 0:b]
-        if _LOCAL_ADDRESS_RX.search(scope):
+        if _LOCAL_ADDRESS_RX.search(scope) or _OWN_START_RX.search(scope):
             return True
         names = {t for t in _name_tokens(scope) if len(t) >= 3 and t not in _RUNNING_PLAIN_WORDS}
         return bool(names & touched)
@@ -1695,7 +1703,7 @@ stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
 # THE ACT IS THE LAUNCH, NOT THE TOOL (round nine E13): a second launch through an MCP
 # session-message tool or a backgrounded `claude -p` is the same repeat as a second Agent call.
 # `kit.launches_worker` reads the launch on every channel.
-from makoto.kit import unmet_obligation_gate, ran_a_verifier, launches_worker
+from makoto.kit import unmet_obligation_gate, ran_a_verifier, launches_worker, repeats_launch
 
 
 # Same guard, same one definition: `kit.ran_a_verifier`. A verifier ran between the launches,
@@ -1704,16 +1712,24 @@ from makoto.kit import unmet_obligation_gate, ran_a_verifier, launches_worker
 _is_probe = ran_a_verifier
 
 
-relaunched_unchanged_gate = unmet_obligation_gate(
-    act=launches_worker,
-    guard=_is_probe,
-    min_acts=2,
-    message=("row gate.relaunched_unchanged (a second worker launch with no verifier run anywhere "
-             "before it): A worker is being launched again with no verifier run anywhere before it — the second "
-             "launch inherits the first one's channel, so nothing shows its target changed."),
-    retry_hint=("Change something and run the target's probe to a report before re-launching; "
-                "or confirm the two launches are independent jobs."),
-)
+def relaunched_unchanged_gate(*, current_event: dict, history: list, pattern, conn=None):
+    """A re-launch is a launch of the SAME job (kit.repeats_launch: one brief's words hold the
+    other's). A second launch on a different brief is another job and owes nothing (measured
+    2026-09-29: an independent file-write worker was denied as a re-launch)."""
+    if not launches_worker(current_event):
+        return None
+    return unmet_obligation_gate(
+        act=lambda ev: launches_worker(ev) and repeats_launch(ev, current_event),
+        guard=_is_probe, min_acts=2, message=_RELAUNCH_MESSAGE, retry_hint=_RELAUNCH_HINT,
+    )(current_event=current_event, history=history, pattern=pattern, conn=conn)
+
+
+_RELAUNCH_MESSAGE = (
+    "row gate.relaunched_unchanged (a second worker launch with no verifier run anywhere "
+    "before it): A worker is being launched again with no verifier run anywhere before it — the second "
+    "launch inherits the first one's channel, so nothing shows its target changed.")
+_RELAUNCH_HINT = ("Change something and run the target's probe to a report before re-launching; "
+                  "or confirm the two launches are independent jobs.")
 
 
 relaunch_RETRY_HINT = "Run the target's probe to a report, then retry the launch."

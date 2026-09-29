@@ -15,5 +15,8 @@
    "hook_event_name": "Stop",
    "last_assistant_message": "I created `src/newmod.py` with the parser logic."
   }
- ]
+ ],
+ "files": {
+  "src/newmod.py": "def parse():\n    pass\n"
+ }
 }

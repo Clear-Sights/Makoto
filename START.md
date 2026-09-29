@@ -168,8 +168,9 @@ The steps:
    back reads red; both read red on 6cff354. inputs: `python3 -X importtime` on the Pre shim.
    owner: done.
 10. ~~Close the shared mesh~~ (branch claude/pensive-carson-cbpr5j). `tools/mesh/` (from
-   `handoff/MAKOTO/mesh` in Measure-Zero-Dev's `handoff.zip`) reads distance 0 over 158 cases and 44
-   roots, and `proposed.tsv` (I1 to I3) reads 0. The last reds were stale cases, not rule gaps: a
+   `handoff/MAKOTO/mesh` in Measure-Zero-Dev's `handoff.zip`) reads distance 0 over 165 cases and 44
+   roots (2026-09-29: seven more, the three live false fires of that night as clean cases with their
+   catch guards; `python3 tools/cover.py --check` states each check's width in `docs/COVERAGE.tsv`), and `proposed.tsv` (I1 to I3) reads 0. The last reds were stale cases, not rule gaps: a
    push with no verifier is now denied at Pre (gate.unverified_merge), `pytest || true` is caught
    first at Pre (content.verifier_exit_masking), the advisory tier was removed 2026-09-25, and a
    scratch `rm -rf` is exempt by design (the catch is now `rm -rf build` after a red run, with
