@@ -492,6 +492,16 @@ _FRAME_NEAR = 40
 _PRODUCE_OBJ_SEP_RX = _lazy_re(
     r"\b(?:so|against|match(?:es|ing)?|reads?\s+from|requires?|"
     r"according\s+to|based\s+on|conform(?:s|ing)?\s+to)\b", re.I)
+# A negated SUBJECT disowns the production as surely as a negated verb: "nothing has produced X",
+# "nobody created X", "no session has written X yet" (the live FP, 2026-09-29: a retraction naming
+# the file it had not produced re-fired the gate). The subject must stand right before the verb
+# (up to two auxiliaries), so "Nothing broke, so I wrote X" and "No surprises: I wrote X" still bite.
+_NEG_SUBJECT_RX = _lazy_re(
+    r"\b(?:nothing|nobody|no\s+one|none|neither|no\s+\w+)\s+(?:\w+\s+){0,2}$", re.I)
+# A participle right after a determiner is an adjective naming the file, not a verb claiming it:
+# "the finished session.sh", "a generated report.md". A verb before it still governs ("I have
+# produced the finished X" fires on "produced").
+_ADJECTIVE_PREFIX_RX = _lazy_re(r"\b(?:the|a|an|this|that|these|those|my|your|our|its|their)\s+$", re.I)
 _PASSIVE_PREFIX_RX = _lazy_re(
     r"\b(?:was|were|is|are|been|being|be|am)(?:\s+[\w-]+){0,2}\s*$", re.IGNORECASE)
 
@@ -516,6 +526,8 @@ def _production_claim_locations(text):
             pre = before[:vm.start()]
             if _BE_AUX_RX.search(pre) or _PASSIVE_PREFIX_RX.search(pre):
                 continue                              # passive/copular -> not a self-production claim
+            if _ADJECTIVE_PREFIX_RX.search(pre):
+                continue                              # "the finished X" -> an adjective, not a claim
             between = before[vm.end():]
             if _CLAUSE_BREAK_RX.search(between):
                 continue                              # verb governs a different clause's noun
@@ -540,6 +552,8 @@ def _production_claim_locations(text):
                 continue                              # "will add X" -> a plan, not a claim
             if _NEG_FRAME_RX.search(near):
                 continue                              # "didn't add X" -> admission (2.8), not a false claim
+            if _NEG_SUBJECT_RX.search(near):
+                continue                              # "nothing has produced X" -> disowned, not claimed
             yield loc
             break
 
