@@ -382,18 +382,6 @@ _RUNNING_CLAIM_RX = _lazy_re(
     r"|\bnow\s+(?:running|listening|serving)\b"
     r"|\b(?:running|listening|serving)\s+(?:on|at)\s+(?:https?://|port\s+|:)\S+",
     re.IGNORECASE)
-# A first-person process-lifecycle ACTION verb (past/perfective) — checks.claimedRunningAbsent
-# requires this to co-occur ANYWHERE in the claim text as a precision firewall: generic
-# explanatory prose ("Vite's dev server is running on port 5173 by default") essentially never
-# ALSO narrates the assistant itself starting something, so this co-occurrence kills that FP
-# class at the cost of a documented recall bound (a bare re-confirmation with no start narrated
-# in the same turn, e.g. "checked again — still running fine", fails open). State words
-# (running/live/up/listening/serving) are deliberately EXCLUDED from this list — including one
-# would make the co-occurrence requirement circular against _RUNNING_CLAIM_RX's own predicate.
-_PROCESS_START_VERB_RX = _lazy_re(
-    r"\bI(?:['’]ve|['’]d|\s+have)?\s+(?:just\s+)?(?:started|launched|spun\s+up|spinning\s+up|"
-    r"brought\s+up|booted|kicked\s+off|fired\s+up|restarted|re-started|ran|deployed|stood\s+up)\b",
-    re.IGNORECASE)
 # Bash-command classifier for "this call concerns a long-lived process's lifecycle" — open-world,
 # deliberately broad like _TEST_RUNNER_RX: an unlisted launcher/healthcheck shape is a documented
 # RECALL bound, never a false-block source. Three families: shell backgrounding operators (the

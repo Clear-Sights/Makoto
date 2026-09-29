@@ -87,16 +87,19 @@ def test_red_no_process_lifecycle_evidence_at_all_fires(tmp_path):
     assert msgs, f"gate.claimed_running MUST fire on a running claim with zero recorded history -- battery VOID: {msgs}"
 
 
-def test_vocabulary_miss_does_not_fire_through_the_real_dispatcher(tmp_path):
-    """SUPERSEDES `test_red_only_unrelated_bash_history_fires`, which required a fire here. To a
-    closed launcher net, "ran only unrelated commands" and "ran a launcher the net does not list"
-    are ONE state, so requiring a fire required a false block on the second. Graded end-to-end
-    through the real dispatcher so the silence is the shipped behaviour, not just the predicate's."""
+def test_foreground_call_grounds_nothing_through_the_real_dispatcher(tmp_path):
+    """Round nine C8 (LAUNCHER EXIT AS JOB EXIT): a foreground call the harness waited on left
+    nothing running, whatever it was called, so it grounds no running claim; the same unlisted
+    launcher backgrounded by the harness did leave something running. Graded end-to-end through
+    the real dispatcher."""
     cwd = str(tmp_path)
     for cmd in ("ls -la", "air -c .air.toml", "php artisan serve"):
         history = [_row(1, cwd, "Bash", {"command": cmd}, {"stdout": "x", "exitCode": 0})]
+        assert _claimed_running_messages(history, cwd, text=_CLAIM), cmd
+        history = [_row(1, cwd, "Bash", {"command": cmd, "run_in_background": True},
+                        {"stdout": "x", "exitCode": 0})]
         msgs = _claimed_running_messages(history, cwd, text=_CLAIM)
-        assert not msgs, f"vocabulary miss must not block ({cmd}): {msgs}"
+        assert not msgs, f"a backgrounded launch must not block ({cmd}): {msgs}"
 
 
 def test_red_no_bash_terminal_at_all_still_fires(tmp_path):
@@ -169,15 +172,13 @@ def test_tn_silent_with_no_running_claim_at_all(tmp_path):
     assert not msgs, f"gate.claimed_running FALSE-POSITIVE: no running-state language at all: {msgs}"
 
 
-def test_tn_silent_without_a_first_person_start_verb(tmp_path):
-    """The core FP the start-verb firewall exists for: generic explanatory prose about a tool's
-    default behavior, paired with BAD history that would otherwise fire -- the claim signal itself
-    must never ground on this text, regardless of history state."""
+def test_red_without_a_first_person_start_verb(tmp_path):
+    """Round nine C8: the bare status line is the claim; no narrated start is needed, and BAD
+    history contradicts it."""
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"interrupted": True})]
-    text = "Vite's dev server is running on port 5173 by default, no extra configuration needed."
-    msgs = _claimed_running_messages(history, cwd, text=text)
-    assert not msgs, f"gate.claimed_running FALSE-POSITIVE: generic explanatory prose, no first-person start verb: {msgs}"
+    text = "Vite's dev server is running on port 5173."
+    assert _claimed_running_messages(history, cwd, text=text)
 
 
 def test_tn_silent_on_past_tense_admission(tmp_path):
@@ -251,18 +252,16 @@ def test_law1_precondition_present_on_red_absent_on_tn_and_clean(tmp_path):
         [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {},
               event_type="PostToolUseFailure")],
     ]
+    # A foreground call the harness waited on left nothing running (round nine C8), so an
+    # unrelated `ls` or a foreground unlisted launcher is no grounding at all.
     red_none_histories = [
         [],
-    ]
-    # NOT-EVALUABLE: a Bash terminal exists but matches no launcher in the closed net. This is
-    # indistinguishable from a real unlisted launcher (`air`, `caddy run`), so it answers False
-    # (silence), not None. It stays graded here rather than deleted -- the case is dispositioned,
-    # not dropped.
-    not_evaluable_histories = [
         [_row(1, cwd, "Bash", {"command": "ls -la"}, {"stdout": "a\nb", "exitCode": 0})],
         [_row(1, cwd, "Bash", {"command": "air -c .air.toml"}, {"exitCode": 0})],
     ]
     tn_false_histories = [
+        [_row(1, cwd, "Bash", {"command": "air -c .air.toml", "run_in_background": True},
+              {"exitCode": 0})],
         [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0})],
         [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"interrupted": True}),
          _row(2, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 0})],
@@ -273,9 +272,6 @@ def test_law1_precondition_present_on_red_absent_on_tn_and_clean(tmp_path):
     for hist in red_none_histories:
         assert _latest_process_call_failed(hist) is None, \
             "RED (no-evidence) fixture must show the precondition as None (ungrounded, not merely 'clean')"
-    for hist in not_evaluable_histories:
-        assert _latest_process_call_failed(hist) is False, \
-            "vocabulary-miss fixture is NOT-EVALUABLE and must fall open (False), never fire"
     for hist in tn_false_histories:
         assert _latest_process_call_failed(hist) is False, \
             "TN/clean fixture must show the precondition as False (grounded AND clean)"

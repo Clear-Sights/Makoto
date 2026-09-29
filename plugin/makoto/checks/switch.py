@@ -6,7 +6,7 @@ from typing import Optional
 
 from makoto.vocab import Finding
 from makoto.vocab import (
-    _RUNNING_CLAIM_RX, _PROCESS_START_VERB_RX, _PROCESS_LIFECYCLE_CMD_RX,
+    _RUNNING_CLAIM_RX, _PROCESS_LIFECYCLE_CMD_RX,
     _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
@@ -29,17 +29,19 @@ running_SHAPE = "SWITCH"
 #   (1) the FAILURE verdict reads only protocol-level terminals -- `tool_response.interrupted`,
 #       a non-zero `exitCode`, and PostToolUseFailure's top-level `error` -- no test-runner regex,
 #       no language/framework token;
-#   (2) the command CLASSIFIER (_PROCESS_LIFECYCLE_CMD_RX) is a broad, open-world, multi-
-#       ecosystem net (like _TEST_RUNNER_RX) -- an unlisted launcher/healthcheck shape is a
-#       documented RECALL bound, never a false-block source.
+#   (2) the witness is the EFFECT of leaving a process running: a call the harness ran in the
+#       background (any tool), a Bash command that backgrounds itself, or a launch/liveness shape
+#       _PROCESS_LIFECYCLE_CMD_RX names. A foreground call the harness waited on left nothing
+#       running, so an unrelated clean call (`ls`) is no grounding (round nine C8).
 #
-# FP firewall: the claim itself only fires when a first-person process-lifecycle action verb
-# (_PROCESS_START_VERB_RX: "I started/launched/ran/...") co-occurs anywhere in the same message --
-# generic explanatory prose about how a tool behaves by default essentially never also narrates
-# the assistant itself starting something, so this kills that FP class at a documented recall
-# cost (a bare later re-confirmation with no start narrated in the same turn fails open).
+# NO START-VERB FIREWALL (round nine C8, 2026-09-29). The claim used to count only beside a
+# first-person start verb ("I started ..."), so the bare status line "the server is running on
+# port 8000" -- the commonest form of the claim -- passed. The entry is LAUNCHER EXIT AS JOB EXIT:
+# what it names is the liveness claim resting on nothing the work emitted, whoever narrated the
+# start. The claim is the running statement alone; quoted, negated and forward-framed clauses are
+# still excluded by `claim`.
 #
-# SCOPE (a named limitation, not a silent gap): evidence is Bash-only. A liveness confirmation
+# SCOPE (a named limitation, not a silent gap): evidence is the tool record. A liveness confirmation
 # the agent established some other way (a screenshot, a Read of a browser devtools log) is
 # invisible here -- the same "open-world, textual-command" limitation is_test_runner documents
 # for itself. Backgrounded launches (`cmd &`) almost always exit 0 at the SHELL level regardless
@@ -66,90 +68,74 @@ running_SHAPE = "SWITCH"
 
 
 def _running_claim(text: str):
-    """Return the re.Match of a first-person, present-tense, ongoing process-liveness claim in
-    `text`, else None. Mirrors substrate.claims.whole_suite_pass_claim's shape: closed-subject-
-    head predicate, quoted/fenced spans excluded, a negated/forward-framed clause excluded (the
-    window walks back to the last sentence boundary, so a leading 'once'/'when'/'if' anywhere in
-    that same clause still voids the match). Requires a co-occurring first-person start verb
-    in `text` OUTSIDE quoted/fenced spans (see module docstring) -- the firewall is span-filtered
-    with the SAME _code_spans exclusion as the claim it guards, or a start verb merely QUOTED in
-    a fence/backticks would arm the very gate _code_spans was added to disarm."""
+    """Return the re.Match of a present-tense, ongoing process-liveness claim in `text`, else
+    None: closed-subject-head predicate, quoted/fenced spans excluded, a negated/forward-framed
+    clause excluded (`claim`)."""
     if not text:
-        return None
-    spans = _code_spans(text)
-    if not any(not any(s <= m.start() < e for s, e in spans)
-               for m in _PROCESS_START_VERB_RX.finditer(text)):
         return None
     return claim(text, _RUNNING_CLAIM_RX)   # 'won't be running' / 'once deployed, it is running'
 
 
-def _bash_postuse_calls(history):
-    """Yield (command, result_dict, is_failure_terminal) for every settled Bash terminal in
-    `history`, in session order. A PostToolUseFailure's top-level error/is_interrupt fields become
-    the same small result shape read below, while the boolean preserves where that error came
-    from. Reuses the canonical row/event decode; a malformed row yields the (None, None, None)
-    marker so the caller can fail OPEN on it -- silently dropping it would push the emptiness
-    branch below toward BLOCK, the opposite of fail-open."""
+def _left_running(ev: dict) -> bool:
+    """This settled call concerns a process meant to outlive it: the harness ran it in the
+    background (`run_in_background`, any tool -- a backgrounded Bash command or worker), or a Bash
+    command that backgrounds, launches or probes a long-lived process (_PROCESS_LIFECYCLE_CMD_RX).
+    A foreground call that returned left nothing running, whatever its program was called."""
+    ti = ev.get("tool_input")
+    if not isinstance(ti, dict):
+        return False
+    if ti.get("run_in_background") is True:
+        return True
+    return ev.get("tool_name") == "Bash" and bool(
+        _PROCESS_LIFECYCLE_CMD_RX.search(str(ti.get("command", "") or "")))
+
+
+def _process_calls(history):
+    """Yield (result_dict, is_failure_terminal) for every settled call in `history` that
+    `_left_running`, in session order. A PostToolUseFailure's top-level error/is_interrupt fields
+    become the same small result shape read below. A malformed row yields (None, None) so the
+    caller can fail OPEN on it -- the dropped row could be the very launch the claim cites."""
     for row in history or ():
         ev = decode_history_event(row)
         if not isinstance(ev, dict):
-            yield None, None, None
+            yield None, None
             continue
         event_type = ev.get("hook_event_name")
         # INCLUDE failed terminals: this gate distinguishes "no evidence" from "ran and failed".
-        if event_type not in ("PostToolUse", "PostToolUseFailure"):
+        if event_type not in ("PostToolUse", "PostToolUseFailure") or not _left_running(ev):
             continue
-        if ev.get("tool_name") != "Bash":
-            continue
-        tool_input = ev.get("tool_input")
-        cmd = str(tool_input.get("command", "") or "") if isinstance(tool_input, dict) else ""
         if event_type == "PostToolUseFailure":
-            yield cmd, failure_terminal_result(ev), True
+            yield failure_terminal_result(ev), True
             continue
         tr = ev.get("tool_response")
-        yield cmd, (tr if isinstance(tr, dict) else {}), False
+        yield (tr if isinstance(tr, dict) else {}), False
 
 
 def _latest_process_call_failed(history) -> Optional[bool]:
-    """None iff no process-lifecycle-shaped Bash call (_PROCESS_LIFECYCLE_CMD_RX) ever ran this
-    session -- the claim has zero grounding. Else True/False for whether the MOST RECENT such
-    call ended in a direct agnostic error state: `interrupted`, a recorded non-zero exit code, or
-    a PostToolUseFailure terminal -- protocol fields only, with no exit-code SEMANTICS guess
-    beyond "non-zero" and no language token. The failure event type itself is sufficient evidence;
-    its optional error text need not be present, and `failure_terminal_result` supplies generic
-    text only so every decoder receives one stable shape. Latest-wins, like
+    """None iff no settled call this session left a process running or probed one
+    (`_left_running`) -- the claim has zero grounding, whatever else ran: an unrelated `ls` is not
+    evidence that anything runs. Else True/False for whether the MOST RECENT such call ended in a
+    direct agnostic error state: `interrupted`, a recorded non-zero exit code, or a
+    PostToolUseFailure terminal -- protocol fields only. Latest-wins, like
     record.ledger.latest_testrun: a later clean re-check supersedes an earlier failed attempt.
 
-    None is reserved for the ONE case with no grounding at all: not a single settled Bash terminal
-    in the window. Two other cases look like "no match" and are NOT-EVALUABLE, so both answer False
-    (fail-open silence), never None:
+    An UNDECODABLE history row answers False (fail-open), never None: absence of parseable
+    evidence must not become a positive "no such call exists".
 
-      * an UNDECODABLE history row -- the dropped row could be the very launch the claim cites, so
-        absence of parseable evidence must not become a positive "no such command exists";
-      * Bash terminals exist but none matches `_PROCESS_LIFECYCLE_CMD_RX` -- the net is a closed
-        vocabulary, so a real launcher outside it (`air`, `bun run dev`, `php artisan serve`,
-        `caddy run`) is a RECALL MISS, not a contradiction. Firing there would tell an agent that
-        genuinely started a server that no process-start command appears, which is a false block in
-        the expensive direction. This is the same fail-open reasoning the undecodable row already
-        gets, applied to the vocabulary as a whole rather than to one row.
-
-    The fix is deliberately NOT "widen the net": a longer closed list is as monotone as a short
-    one, and the next unlisted launcher would false-block identically."""
+    NAMED BOUND: a launcher that daemonizes itself in the foreground under a name
+    _PROCESS_LIFECYCLE_CMD_RX does not list reads as no grounding. A foreground call the harness
+    waited on otherwise left nothing running, so the unlisted-name case is that one shape only."""
     verdict = None
     saw_undecodable = False
-    saw_bash_terminal = False
-    for cmd, tr, is_failure_terminal in _bash_postuse_calls(history):
-        if cmd is None:
+    for tr, is_failure_terminal in _process_calls(history):
+        if tr is None:
             saw_undecodable = True
-            continue
-        saw_bash_terminal = True
-        if not _PROCESS_LIFECYCLE_CMD_RX.search(cmd):
             continue
         interrupted = tr.get("interrupted") is True
         exit_code = tr.get("exitCode", tr.get("exit"))
         verdict = bool(is_failure_terminal or interrupted
                        or (exit_code is not None and exit_code != 0))
-    if verdict is None and (saw_undecodable or saw_bash_terminal):
+    if verdict is None and saw_undecodable:
         return False
     return verdict
 
@@ -178,17 +164,19 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
         if failed is None:
             return Finding(
                 pattern_id="gate.claimed_running", file="", line=0, level="error",
-                message=("Claim states a process/service is running, but no process-start or "
-                         "liveness-check Bash command appears in this session's recent recorded "
-                         "Bash history (the dispatcher's bounded event window) — the word must "
-                         "match the world."),
+                message=("row gate.claimed_running (a running claim with no launch or liveness "
+                         "check behind it): Claim states a process/service is running, but no "
+                         "backgrounded launch, process-start or liveness-check call appears in "
+                         "this session's recent record (the dispatcher's bounded event window) "
+                         "— the word must match the world."),
                 retry_hint=("Actually start or verify the process with a real Bash call and cite a "
                             "clean result, or scope/retract the running claim."),
             )
         return Finding(
             pattern_id="gate.claimed_running", file="", line=0, level="error",
-            message=("Claim states a process/service is running, but the most recently recorded "
-                     "process-start/liveness-check call ended in a direct error state "
+            message=("row gate.claimed_running (a running claim with no launch or liveness check "
+                     "behind it): Claim states a process/service is running, but the most "
+                     "recently recorded process-start/liveness-check call ended in a direct error state "
                      "(interrupted, a non-zero exit, or a failed-tool error terminal) — the "
                      "word must match the world."),
             retry_hint=("Re-run the start/health-check to a real successful result and cite it, "
@@ -224,8 +212,7 @@ action_SHAPE = "SWITCH"
 # closed lexicon of TOOL-shaped past-tense actions (NOT reasoning verbs)
 _ACTION_VERB = r"(?:ran|executed|installed|fetched|cloned|pulled|pushed|deployed|launched)"
 # "I've/I'd deployed" is the same first-person completed-action claim as "I deployed" -- the
-# contraction must not defeat the \bI\s+VERB shape (mirrors _PROCESS_START_VERB_RX's own
-# contraction handling for the sibling gate.claimed_running).
+# contraction must not defeat the \bI\s+VERB shape.
 _ACTION_RX = _lazy_re(rf"\bI(?:['’]ve|['’]d)?\s+{_ACTION_VERB}\s+(?P<obj>`[^`]+`|\S+)", re.I)
 _NEG = _lazy_re(r"\b(?:not|never|without)\b|n't", re.I)
 _FUTURE = _lazy_re(r"\b(?:will|going to|plan to|about to|let me)\b|i'?ll", re.I)
@@ -1493,13 +1480,11 @@ stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
 #
 # PRE-EDGE DENY (2026-09-25): the second launch is refused before it runs; the discharge is to run
 # the target's probe (any verifier) and retry.
-from makoto.kit import unmet_obligation_gate, ran_a_verifier
-
-_DISPATCH_TOOLS = frozenset({"Task", "Agent"})
-
-
-def _is_relaunch(ev: dict) -> bool:
-    return ev.get("tool_name") in _DISPATCH_TOOLS
+#
+# THE ACT IS THE LAUNCH, NOT THE TOOL (round nine E13): a second launch through an MCP
+# session-message tool or a backgrounded `claude -p` is the same repeat as a second Agent call.
+# `kit.launches_worker` reads the launch on every channel.
+from makoto.kit import unmet_obligation_gate, ran_a_verifier, launches_worker
 
 
 # Same guard, same one definition: `kit.ran_a_verifier`. A verifier ran between the launches,
@@ -1509,10 +1494,11 @@ _is_probe = ran_a_verifier
 
 
 relaunched_unchanged_gate = unmet_obligation_gate(
-    act=_is_relaunch,
+    act=launches_worker,
     guard=_is_probe,
     min_acts=2,
-    message=("A worker is being launched again with no verifier run anywhere before it — the second "
+    message=("row gate.relaunched_unchanged (a second worker launch with no verifier run anywhere "
+             "before it): A worker is being launched again with no verifier run anywhere before it — the second "
              "launch inherits the first one's channel, so nothing shows its target changed."),
     retry_hint=("Change something and run the target's probe to a report before re-launching; "
                 "or confirm the two launches are independent jobs."),
@@ -1522,7 +1508,7 @@ relaunched_unchanged_gate = unmet_obligation_gate(
 relaunch_RETRY_HINT = "Run the target's probe to a report, then retry the launch."
 relaunch_DESCRIPTION = "a second worker launch with no verifier run anywhere before it"
 relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Pre", posture="BLOCK",
-               predicate_module=__name__, keywords=("Task", "Agent"),
+               predicate_module=__name__, keywords=("Task", "Agent", "prompt", "message", "claude"),
                retry_hint=relaunch_RETRY_HINT,
                description=relaunch_DESCRIPTION,
                tests="SWITCH",

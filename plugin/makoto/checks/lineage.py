@@ -760,12 +760,10 @@ ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Pre", posture="BLOC
 from makoto.kit import unmet_obligation_gate, _session_rows
 from makoto.core._shell import _basename, _effective_argv, _shell_segments
 
-# The dispatch tools. `Task` is the documented subagent tool name; `Agent` is the same act under
-# the name this harness reports, and both are accepted by name alone. An MCP tool that dispatches
-# a subagent under a third name (`mcp__subagents__dispatch`) is the same act, recognized by its
-# `prompt` input rather than guessed by name -- the brief a dispatch hands off is the one input
-# common to every dispatch tool, named or not.
-_DISPATCH_TOOLS = frozenset({"Task", "Agent"})
+# The dispatch is the launch, on any channel (`kit.launches_worker`): an Agent/Task call, a brief
+# handed to an addressed session through an MCP tool, or a headless `claude -p` Bash command
+# (round nine B11: the last two used to pass because the tool was not on a name list).
+from makoto.kit import launches_worker
 # The reads that pay the obligation.
 _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
 # The same read under Bash: a segment whose command position runs one of these read-only readers
@@ -775,18 +773,6 @@ _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
 # miss is a RECALL bound: the gate still fires on a reader it does not name.
 _BASH_READERS = frozenset({"cat", "head", "tail", "grep", "egrep", "fgrep", "rg", "ls", "wc"})
 _FIND_WRITING_ACTIONS = ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fls")
-
-
-def _is_dispatch(ev: dict) -> bool:
-    name = ev.get("tool_name") or ""
-    if name in _DISPATCH_TOOLS:
-        return True
-    if not name.startswith("mcp__"):
-        return False
-    lname = name.lower()
-    if "agent" not in lname and "dispatch" not in lname:
-        return False
-    return isinstance((ev.get("tool_input") or {}).get("prompt"), str)
 
 
 def _is_reader_argv(argv) -> bool:
@@ -811,9 +797,10 @@ def _is_probe(ev: dict) -> bool:
 
 
 _fanout_obligation = unmet_obligation_gate(
-    act=_is_dispatch,
+    act=launches_worker,
     guard=_is_probe,
-    message=("Work is being dispatched to a subagent and no Read, Glob or Grep appears earlier in "
+    message=("row gate.unprobed_fanout (a subagent dispatch with no Read, Glob or Grep earlier in "
+             "the session): Work is being dispatched to a subagent and no Read, Glob or Grep appears earlier in "
              "this session's recorded events — the brief was written from assumption, and work "
              "built on an assumed baseline is inherited whole. A session that holds no Read, "
              "Glob, Grep or Bash tool retries the same dispatch: the deny fires once."),
@@ -839,7 +826,7 @@ def unprobed_fanout_gate(*, current_event: dict, history: list, pattern, conn=No
     for ev in events:
         if not isinstance(ev, dict):
             continue
-        if ev.get("hook_event_name") == "PreToolUse" and _is_dispatch(ev):
+        if ev.get("hook_event_name") == "PreToolUse" and launches_worker(ev):
             shown = True
         elif ev.get("hook_event_name") in ("PostToolUse", "PostToolUseFailure") and _is_probe(ev):
             shown = False
@@ -849,7 +836,7 @@ def unprobed_fanout_gate(*, current_event: dict, history: list, pattern, conn=No
 fanout_RETRY_HINT = "Read, glob or grep the ground, then retry the dispatch."
 fanout_DESCRIPTION = "a subagent dispatch with no Read, Glob or Grep earlier in the session"
 fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Pre", posture="BLOCK",
-               predicate_module=__name__, keywords=("prompt",),
+               predicate_module=__name__, keywords=("prompt", "message", "claude"),
                retry_hint=fanout_RETRY_HINT,
                description=fanout_DESCRIPTION,
                tests="LINEAGE",
