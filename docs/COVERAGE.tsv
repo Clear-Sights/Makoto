@@ -59,7 +59,7 @@ gate.unobserved_destruction	3/3	2/2	-	measured
 gate.unpaid_acceptance	0/0	0/0	-	unmeasured
 gate.unprobed_fanout	3/3	2/2	-	measured
 gate.unread_structure	2/2	1/1	-	measured
-gate.unrun_count_claim	0/0	0/0	-	unmeasured
+gate.unrun_count_claim	1/1	1/1	-	measured
 gate.unverified_merge	0/0	0/0	-	unmeasured
 gate.unwitnessed_verifier	2/2	1/1	-	measured
 gate.unworded_close	0/0	0/0	-	unmeasured

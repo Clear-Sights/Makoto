@@ -164,3 +164,5 @@ gate.unobserved_destruction	scratchvar_pass	ALLOW	H/destruction_scratchvar_pass.
 gate.unobserved_destruction	loopwork_catch	FIRE	H/destruction_loopwork_catch.json	a loop-body binding to a work dir still reads as destruction
 gate.unknown_ref_switch	catfile_pass	ALLOW	H/ref_catfile_pass.json	a ref read out of a file the session read is known
 gate.unprobed_fanout	readfix_catch	FIRE	H/fanout_readfix_catch.json	a brief that reads then changes code is still a fan-out
+gate.unrun_count_claim	relayed_pass	ALLOW	H/count_relayed_pass.json	2026-09-29 FP: a count another session reports, attributed, is not a count of own work
+gate.unrun_count_claim	own_catch	FIRE	H/count_own_catch.json	the same count stated as own, with a report merely agreeing, still fires
