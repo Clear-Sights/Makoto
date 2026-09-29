@@ -34,15 +34,15 @@ def test_tp_subject_predicate_present_tense():
 
 
 def test_tp_contraction_subject():
-    assert _running_claim("I just launched it. It's up and running.") is not None
+    assert _running_claim("I just launched it. It's up and running on :3000.") is not None
 
 
 def test_tp_alternate_closed_subject():
-    assert _running_claim("I started the container. The container is up and running.") is not None
+    assert _running_claim("I started the container. The container is up and running on :3000.") is not None
 
 
 def test_tp_banner_style_now_running():
-    assert _running_claim("I just launched the deploy. Now running.") is not None
+    assert _running_claim("I just launched the deploy. Now running on :3000.") is not None
 
 
 def test_tp_banner_style_serving_at_url():
@@ -96,14 +96,14 @@ def test_fires_when_history_has_only_unrelated_bash_calls():
     An unlisted launcher is still seen when it left something running: backgrounded by the shell
     or by the harness (test_witness_backgrounded_unlisted_launcher_is_silent)."""
     hist = [_post("ls -la", stdout="a\nb", exitCode=0)]
-    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    f = claimed_running_gate("I started the server. It is now running on :3000.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
 def test_fires_when_only_a_pretooluse_row_exists_for_the_launch():
     # PreToolUse carries no settled tool_response yet -- only PostToolUse counts as evidence
     hist = [_pre("npm run dev")]
-    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    f = claimed_running_gate("I started the server. It is now running on :3000.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
@@ -111,7 +111,7 @@ def test_fires_when_history_has_only_non_bash_process_looking_calls():
     # a non-Bash tool_name is not evidence, even if its own fields look process-shaped
     hist = [{"payload": {"hook_event_name": "PostToolUse", "tool_name": "Read",
                           "tool_input": {"command": "npm run dev"}, "tool_response": {"exitCode": 0}}}]
-    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    f = claimed_running_gate("I started the server. It is now running on :3000.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
@@ -124,13 +124,13 @@ def test_fires_when_latest_launch_was_interrupted():
 
 def test_fires_when_latest_healthcheck_exited_nonzero():
     hist = [_post("curl -sf http://localhost:3000", exitCode=7)]
-    f = claimed_running_gate("I started it earlier; it is still running.", history=hist)
+    f = claimed_running_gate("I started it earlier; it is still running on :3000.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
 def test_failed_process_start_terminal_is_misreported_not_unsubstantiated():
     hist = [_failure("npm run dev", error="Connection error", is_interrupt=False)]
-    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    f = claimed_running_gate("I started the server. It is now running on :3000.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
     assert "most recently recorded" in f.message
 
@@ -138,7 +138,7 @@ def test_failed_process_start_terminal_is_misreported_not_unsubstantiated():
 def test_failure_terminal_without_error_text_is_still_failure_evidence():
     hist = [_failure("npm run dev", error=None, is_interrupt=False)]
     assert _latest_process_call_failed(hist) is True
-    f = claimed_running_gate("I started the server. It is now running.", history=hist)
+    f = claimed_running_gate("I started the server. It is now running on :3000.", history=hist)
     assert f is not None and "most recently recorded" in f.message
 
 
@@ -146,19 +146,19 @@ def test_successful_post_with_benign_error_key_is_not_a_failure_terminal():
     hist = [_post("npm run dev", stdout="listening", exitCode=0, error=None)]
     assert _latest_process_call_failed(hist) is False
     assert claimed_running_gate(
-        "I started the server. It is now running.", history=hist) is None
+        "I started the server. It is now running on :3000.", history=hist) is None
 
 
 def test_fires_when_the_latest_of_two_calls_is_the_failing_one():
     hist = [_post("npm run dev &", exitCode=0), _post("curl -sf http://localhost:3000", exitCode=7)]
-    f = claimed_running_gate("I started the server. It is running now.", history=hist)
+    f = claimed_running_gate("I started the server. It is running on :3000 now.", history=hist)
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
 def test_unfulfilled_and_misreported_messages_are_distinct():
     # the two contradiction shapes are worth telling apart in the retry feedback
-    no_evidence = claimed_running_gate("I started the server. It is running now.", history=[])
-    misreported = claimed_running_gate("I started the server. It is running now.",
+    no_evidence = claimed_running_gate("I started the server. It is running on :3000 now.", history=[])
+    misreported = claimed_running_gate("I started the server. It is running on :3000 now.",
                                         history=[_post("npm run dev &", interrupted=True)])
     assert no_evidence.message != misreported.message
 
@@ -171,7 +171,7 @@ def test_silent_when_latest_launch_exited_cleanly():
 
 def test_silent_when_an_earlier_failure_is_superseded_by_a_later_clean_call():
     hist = [_post("npm run dev &", interrupted=True), _post("curl -sf http://localhost:3000", exitCode=0)]
-    assert claimed_running_gate("I started the server. It is running now.", history=hist) is None
+    assert claimed_running_gate("I started the server. It is running on :3000 now.", history=hist) is None
 
 
 def test_silent_when_no_running_claim_at_all():
@@ -197,26 +197,50 @@ def test_witness_backgrounded_unlisted_launcher_is_silent():
                                    "tool_response": {"stdout": "running in background"}}}]):
             assert _latest_process_call_failed(hist) is False, launcher
             assert claimed_running_gate(
-                "I started the server. It is now running.", history=hist) is None, launcher
+                "I started the server. It is now running on :3000.", history=hist) is None, launcher
         assert _latest_process_call_failed([_post(launcher, exitCode=0)]) is None, launcher
 
 
 def test_witness_no_bash_call_at_all_still_fires():
     # zero Bash terminals in history at all -- the claim has NO grounding whatsoever, so this
     # must still fire UNFULFILLED. Proves the fix does not disable the gate.
-    f = claimed_running_gate("I started the server. It is now running.", history=[])
+    f = claimed_running_gate("I started the server. It is now running on :3000.", history=[])
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
 
 def test_tp_adjectival_operational_predicate():
     # "fully operational" is the same ongoing-liveness claim as "up and running" -- 'operational'
     # was missing from the closed state-word list, and 'fully' from the optional adverb slot.
-    assert _running_claim("I restarted the payment service; it's fully operational now.") \
+    assert _running_claim("I restarted the payment service; it's fully operational on :3000 now.") \
         is not None
 
 
 def test_reword_operational_claim_fires_with_no_evidence():
     f = claimed_running_gate(
-        "I restarted the payment service; it's fully operational now.", history=[])
+        "I restarted the payment service; it's fully operational on :3000 now.", history=[])
     assert f is not None and f.pattern_id == "gate.claimed_running"
 
+
+
+# --- the claim is about THIS environment (round nine C8 follow-up) ---
+def test_generic_statements_are_no_claim_even_on_empty_history():
+    for text in ("Vite's dev server is running on port 5173 by default, no extra configuration needed.",
+                 "If you run `npm start`, the app is running on localhost:3000.",
+                 "Usually the daemon is running as root on most distributions."):
+        assert _running_claim(text) is None, text
+        assert claimed_running_gate(text, history=[]) is None, text
+
+
+def test_unbound_status_line_is_no_claim():
+    # names nothing the session touched and no local address: not about this environment
+    assert _running_claim("The service is up and running.") is None
+
+
+def test_claim_bound_by_a_name_the_session_touched():
+    hist = [_post("ls -la", exitCode=0), {"payload": {
+        "hook_event_name": "PostToolUse", "tool_name": "Write",
+        "tool_input": {"file_path": "/w/worker.py", "content": "x"}, "tool_response": {}}}]
+    text = "The worker is running: worker.py picked up the queue."
+    f = claimed_running_gate(text, history=hist)
+    assert f is not None and f.pattern_id == "gate.claimed_running"
+    assert claimed_running_gate(text, history=[]) is None     # unbound without the record

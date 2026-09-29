@@ -2,12 +2,14 @@ from __future__ import annotations
 
 
 from makoto.vocab import _lazy_re
+import re
 from typing import Optional
 
 from makoto.vocab import Finding
 from makoto.vocab import (
-    _RUNNING_CLAIM_RX, _PROCESS_LIFECYCLE_CMD_RX,
-    _NEGATION_RX, _ADV_FORWARD_RX, _SENTENCE_SPLIT_RX,
+    _RUNNING_CLAIM_RX, _PROCESS_LIFECYCLE_CMD_RX, _LOCAL_ADDRESS_RX, _GENERIC_FRAME_RX,
+    _NOT_PRESENT_RX, _RUNNING_PLAIN_WORDS,
+    _SENTENCE_SPLIT_RX,
 )
 from makoto.substrate.claims import _code_spans
 from makoto.kit import claim, decode_history_event, failure_terminal_result, unwitnessed
@@ -38,8 +40,13 @@ running_SHAPE = "SWITCH"
 # first-person start verb ("I started ..."), so the bare status line "the server is running on
 # port 8000" -- the commonest form of the claim -- passed. The entry is LAUNCHER EXIT AS JOB EXIT:
 # what it names is the liveness claim resting on nothing the work emitted, whoever narrated the
-# start. The claim is the running statement alone; quoted, negated and forward-framed clauses are
-# still excluded by `claim`.
+# start. Quoted, negated and forward-framed clauses are still excluded by `claim`.
+#
+# THE CLAIM IS ABOUT THIS ENVIRONMENT. Without the firewall, prose about how a tool behaves
+# ("Vite's dev server is running on port 5173 by default") would read as a claim. The claim is a
+# present-tense assertion bound to what this session touched -- a local address, or a name its
+# own commands, paths or URLs carried -- in a sentence with no generic or modal frame ("by
+# default", "usually", "would", "if you run"). See `_running_claim`.
 #
 # SCOPE (a named limitation, not a silent gap): evidence is the tool record. A liveness confirmation
 # the agent established some other way (a screenshot, a Read of a browser devtools log) is
@@ -67,13 +74,63 @@ running_SHAPE = "SWITCH"
 # out of this one gate's scope.
 
 
-def _running_claim(text: str):
-    """Return the re.Match of a present-tense, ongoing process-liveness claim in `text`, else
-    None: closed-subject-head predicate, quoted/fenced spans excluded, a negated/forward-framed
-    clause excluded (`claim`)."""
-    if not text:
-        return None
-    return claim(text, _RUNNING_CLAIM_RX)   # 'won't be running' / 'once deployed, it is running'
+_NAME_TOKEN_RX = _lazy_re(r"[A-Za-z0-9_][\w.\-/:]*[\w/]|[A-Za-z0-9_]")
+# The tool inputs that name what a session touched: a command, a path, a URL. Prose fields (a
+# call's description, a dispatch prompt) name nothing the session ran.
+_TOUCH_KEYS = ("command", "file_path", "path", "url")
+
+
+def _name_tokens(s: str) -> set:
+    """Each name-shaped word of `s`, lowercased, plus its `/` and `:` parts (`src/app.py` also
+    names `app.py`; `main:app` also names `main`)."""
+    out = set()
+    for t in _NAME_TOKEN_RX.findall(s or ""):
+        t = t.lower()
+        out.add(t)
+        out.update(p for p in re.split(r"[/:]", t) if p)
+    return out
+
+
+def _touched_names(history) -> frozenset:
+    """Every name token of a command, path or URL any recorded tool call in `history` carried."""
+    out = set()
+    for row in history or ():
+        ev = decode_history_event(row)
+        ti = ev.get("tool_input") if isinstance(ev, dict) else None
+        if isinstance(ti, dict):
+            for k in _TOUCH_KEYS:
+                if isinstance(ti.get(k), str):
+                    out |= _name_tokens(ti[k])
+    return frozenset(out)
+
+
+def _sentence_around(text: str, a: int, b: int) -> tuple:
+    """(start, end) of the sentence holding text[a:b]."""
+    starts = [m.end() for m in _SENTENCE_SPLIT_RX.finditer(text, 0, max(a, 0))]
+    end = _SENTENCE_SPLIT_RX.search(text, b)
+    return (starts[-1] if starts else 0), (end.start() if end else len(text))
+
+
+def _running_claim(text: str, touched=frozenset()):
+    """Return the re.Match of a present-tense assertion that a process in THIS environment is up,
+    else None. The match is outside quoted/fenced spans, with no negation or forward frame in its
+    clause (`claim`'s grammar); its sentence is not generic or modal ("by default", "usually",
+    "would", "if you run") and names no past or absent subject before it ("was", "nothing"); and its sentence is bound to this environment -- a local address
+    (localhost, `:8000`, `port 8000`, a PID) or a name the session's own tool calls touched
+    (`touched`, from `_touched_names`). A sentence about how a tool behaves in general names
+    neither, and is no claim about this session."""
+    def bound(m):
+        a, b = _sentence_around(text, m.start(), m.end())
+        if _GENERIC_FRAME_RX.search(text[a:b]) or _NOT_PRESENT_RX.search(text[a:m.start()]):
+            return False
+        # the binding may sit one sentence back: "I launched `npm run dev &`. It is up."
+        scope = text[_sentence_around(text, a - 1, a - 1)[0] if a else 0:b]
+        if _LOCAL_ADDRESS_RX.search(scope):
+            return True
+        names = {t for t in _name_tokens(scope) if len(t) >= 3 and t not in _RUNNING_PLAIN_WORDS}
+        return bool(names & touched)
+
+    return claim(text or "", _RUNNING_CLAIM_RX, keep=bound)
 
 
 def _left_running(ev: dict) -> bool:
@@ -152,7 +209,9 @@ def claimed_running_gate(text, *, history=()) -> Optional[Finding]:
         # The one subject a running claim commits to: itself. Cheap and pure -- the witness
         # (whether the session's own record contradicts it) lives in `paid`, below, so a claim
         # never even reaches that check once `_running_claim` alone rules it out.
-        return (t,) if _running_claim(t) is not None else ()
+        if not _RUNNING_CLAIM_RX.search(t or ""):
+            return ()      # no running word: the record is not read at all
+        return (t,) if _running_claim(t, _touched_names(history)) is not None else ()
 
     def pays(_t):
         return None

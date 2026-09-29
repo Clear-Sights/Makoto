@@ -120,7 +120,7 @@ def test_red_latest_launch_interrupted_fires(tmp_path):
 def test_red_latest_healthcheck_nonzero_exit_fires(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 7})]
-    msgs = _claimed_running_messages(history, cwd, text="I started it earlier; it is still running.")
+    msgs = _claimed_running_messages(history, cwd, text="I started it earlier; it is still running on :3000.")
     assert msgs, f"gate.claimed_running MUST fire when the latest healthcheck exited non-zero -- battery VOID: {msgs}"
 
 
@@ -142,7 +142,7 @@ def test_red_latest_of_two_calls_is_the_failing_one_fires(tmp_path):
         _row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0}),
         _row(2, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 7}),
     ]
-    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running now.")
+    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running on :3000 now.")
     assert msgs, f"gate.claimed_running MUST fire when the LATEST recorded call is the failing one -- battery VOID: {msgs}"
 
 
@@ -162,7 +162,7 @@ def test_tn_silent_when_an_earlier_failure_is_superseded_by_a_later_clean_call(t
         _row(1, cwd, "Bash", {"command": "npm run dev &"}, {"interrupted": True}),
         _row(2, cwd, "Bash", {"command": "curl -sf http://localhost:3000"}, {"exitCode": 0}),
     ]
-    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running now.")
+    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running on :3000 now.")
     assert not msgs, f"gate.claimed_running FALSE-POSITIVE: a later clean call must supersede an earlier failure: {msgs}"
 
 
@@ -211,7 +211,7 @@ def test_tn_silent_when_a_subagent_launched_it_cleanly(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"exitCode": 0},
                     agent_id="subagent-1")]
-    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running now.")
+    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running on :3000 now.")
     assert not msgs, f"gate.claimed_running FALSE-POSITIVE: a subagent's clean launch is real session evidence: {msgs}"
 
 
@@ -222,7 +222,7 @@ def test_red_subagent_launch_interrupted_still_fires(tmp_path):
     cwd = str(tmp_path)
     history = [_row(1, cwd, "Bash", {"command": "npm run dev &"}, {"interrupted": True},
                     agent_id="subagent-1")]
-    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running now.")
+    msgs = _claimed_running_messages(history, cwd, text="I started the server. It is running on :3000 now.")
     assert msgs, f"gate.claimed_running MUST fire when the subagent's own launch was interrupted -- battery VOID: {msgs}"
 
 

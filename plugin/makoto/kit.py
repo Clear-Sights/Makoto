@@ -1206,11 +1206,12 @@ def neighbours(commands, k=1, differ=None):
     return sorted({(min(i, j), max(i, j)) for u, v in hits for i in at[distinct[u]] for j in at[distinct[v]]})
 
 
-def claim(text: str, rx: re.Pattern):
+def claim(text: str, rx: re.Pattern, keep=None):
     """The first match of `rx` in `text` that is the writer's own claim, else None: outside ```
     fences and inline backticks, and with no negation or forward frame ('not', 'once', 'when',
-    'if') in its clause, walked back to the last sentence boundary within 70 characters. The
-    grammar gate.unrun_count_claim and gate.running_claim share."""
+    'if') in its clause, walked back to the last sentence boundary within 70 characters, and
+    accepted by `keep(match)` when given. The grammar gate.unrun_count_claim and
+    gate.claimed_running share."""
     if not text:
         return None
     spans = _code_spans(text)
@@ -1220,6 +1221,8 @@ def claim(text: str, rx: re.Pattern):
             continue
         clause = _SENTENCE_SPLIT_RX.split(text[max(0, a - 70):a])[-1]
         if _NEGATION_RX.search(clause) or _ADV_FORWARD_RX.search(clause):
+            continue
+        if keep is not None and not keep(m):
             continue
         return m
     return None
