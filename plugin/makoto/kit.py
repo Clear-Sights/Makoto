@@ -841,18 +841,42 @@ def live_query_finding(*, query, posture_label) -> Callable[..., Optional[Findin
 # identicalRetryInterdiction.py refuses to fire on anything but a confident True.
 
 # Markers whose PRESENCE means the failure will NOT change on an UNMODIFIED retry -- the error is
-# a property of the call itself (a typo, a missing module, a permission the environment will not
-# grant merely by waiting), not of external timing/state. Each is a real, specific runtime-error
-# shape, not a vague "sounds bad" heuristic.
+# a property of the call itself (a path that does not exist, a permission the environment will
+# not grant merely by waiting, a command the shell cannot resolve), not of external timing/state.
+# These are the operating system's and the shell's own error strings. A raised exception is
+# judged by what it is instead (`_raised_statements`), never by a list of exception names:
+# round nine E10 passed a KeyError because it was not on such a list.
 _DETERMINISTIC_MARKERS = (
-    _lazy_re(r"SyntaxError", re.IGNORECASE),
     _lazy_re(r"No such file or directory"),
     _lazy_re(r"Permission denied"),
-    _lazy_re(r"ModuleNotFoundError|ImportError"),
     _lazy_re(r"command not found"),
     _lazy_re(r"is not recognized as an internal or external command"),
-    _lazy_re(r"NameError|AttributeError"),
 )
+
+# A raised exception's own statement: a line at the margin naming the exception by the house
+# convention every Python exception follows (a dotted name ending Error/Exception) and its
+# message, or any margin line that closes a traceback's frames (`  File "...", line N`).
+_FRAME_RX = _lazy_re(r'^\s*File "[^"\n]+", line \d+')
+_RAISED_RX = _lazy_re(r"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*(?:Error|Exception)(?::\s.*)?$")
+_CAMEL_RX = _lazy_re(r"(?<=[a-z])(?=[A-Z])")
+
+
+def _raised_statements(text: str) -> list:
+    """Every raised exception's statement in `text`: the margin line that closes a run of
+    traceback frames, and any margin `NameError: message`-shaped line. The frames and source
+    lines above it are WHERE it was raised and never classify it: a SyntaxError at line 503 is
+    not a 503 (round nine E10)."""
+    out, in_frames = [], False
+    for line in text.splitlines():
+        if _FRAME_RX.match(line):
+            in_frames = True
+            continue
+        if not line or line[0].isspace():
+            continue
+        if in_frames or _RAISED_RX.match(line):
+            out.append(line)
+        in_frames = False
+    return out
 
 # Markers whose PRESENCE means the failure is plausibly time/external-state dependent -- a retry
 # after a real wait, or once a dependency recovers, is a legitimately DIFFERENT action even with
@@ -877,10 +901,16 @@ _TRANSIENT_MARKERS = (
 
 def classify_failure(text: str) -> Optional[bool]:
     """True = deterministic (an unmodified retry cannot help); False = transient (a retry might
-    legitimately help); None = UNCERTAIN -- neither class matched, or both did. None is the safe
+    legitimately help); None = UNCERTAIN -- neither class matched, or both did. A text that
+    carries a raised exception (`_raised_statements`) is decided by those statements alone. None is the safe
     default a BLOCK-tier caller must treat as "do not fire", never as a coin flip."""
     if not text:
         return None
+    raised = [_CAMEL_RX.sub(" ", r) for r in _raised_statements(text)]
+    if raised:
+        # A raised exception is a property of the code and its input unless its own statement
+        # names an outside condition (a refused connection, a timeout): then it is transient.
+        return not any(rx.search(r) for r in raised for rx in _TRANSIENT_MARKERS)
     det = any(rx.search(text) for rx in _DETERMINISTIC_MARKERS)
     trans = any(rx.search(text) for rx in _TRANSIENT_MARKERS)
     if det and not trans:

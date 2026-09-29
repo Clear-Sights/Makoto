@@ -868,10 +868,13 @@ fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Pre", posture="BLOC
 #
 #   1. THE SAME TEXT, not merely two edits -- a normalized block reaching two DISTINCT files.
 #                                                                         73.5% -> 9.2%
-#   2. A CHANGE TO WHAT EXISTS -- `Edit`/`MultiEdit` only. A fix is edited into a file that is
-#      already there, while a file being WRITTEN carries the house import header; admitting
-#      written files is what puts `from __future__ import annotations` in front of the gate.
-#                                                                          9.2% -> 3.8%
+#   2. A CHANGE TO WHAT EXISTS -- a fix lands in a file that is already there, while a file
+#      being CREATED carries the house import header; admitting created files is what puts
+#      `from __future__ import annotations` in front of the gate.       9.2% -> 3.8%
+#      The change is the effect, not the tool (round nine F2/H3): an Edit, a Write over an
+#      existing file (its added lines against the `originalFile` the harness returns), or a Bash
+#      command carrying the block with a path in it that is not the first site. Only a creation
+#      -- a whole `content` with no original -- registers without triggering.
 #   3. SUBSTANCE -- the block must carry a line that is not a comment, an import or a decorator.
 #      A comment quoted at two sites is prose with one home, not a repair whose correctness was
 #      inferred.                                                          3.8% -> 3.2%
@@ -901,14 +904,16 @@ fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Pre", posture="BLOC
 # already held -- one file returning to a prior state, against one text reaching a second file.
 #
 # BLOCK TIER: the discharge is one verifier run, in-turn.
-from makoto.kit import decode_history_event, introduced_text, ran_a_verifier, unwitnessed
-
-# A fix is a change to what already EXISTS. See narrowing 2 above for the rate this buys.
-_EDIT_TOOLS = frozenset({"Edit", "MultiEdit"})
+import difflib
+import keyword
+from makoto.kit import (_path_components, _suffix_match, decode_history_event, introduced_text,
+                        ran_a_verifier, unwitnessed)
+from makoto.state.ledger import _PATH_IN_CMD_RX
 # How many contiguous substantial lines make a block. Measured; see above. Not a tunable
 # threshold but the point where the reading stops naming convention and has not yet stopped
 # naming anything.
 _BLOCK_LINES = 4
+pasted_DESCRIPTION = "one repair landed at a second site with no verifier run after the first"
 # A line carrying no content of its own: closers, separators, a bare marker.
 _TRIVIAL_RX = _lazy_re(r"^[\s)\]},:;#\"']*$")
 # A line that travels as CONVENTION rather than as a repair: a comment, an import, a decorator,
@@ -952,6 +957,61 @@ def _blocks(lines: list) -> list:
     return out
 
 
+# An identifier: renamed consistently, the block is the same fix (round nine H3: value -> amount).
+_IDENT_RX = _lazy_re(r"[A-Za-z_]\w*")
+
+
+def _shape(block: str) -> tuple:
+    """(the block with each non-keyword identifier replaced by its first-occurrence index, the
+    identifiers in that order). Two blocks with one shape differ only by a renaming."""
+    names = []
+
+    def slot(m):
+        w = m.group(0)
+        if keyword.iskeyword(w):
+            return w
+        if w not in names:
+            names.append(w)
+        return "\x00%d" % names.index(w)
+    return _IDENT_RX.sub(slot, block), tuple(names)
+
+
+def _renamed_from(names: tuple, prior: tuple) -> bool:
+    """A renaming, not a new text: fewer than half the identifiers differ. When most of them
+    change, what is shared is only a shape (two table rows, two assignments), not a fix."""
+    return 2 * sum(a != b for a, b in zip(names, prior)) < len(names)
+
+
+def _landing(ev: dict):
+    """(introduced text, sites, whether it can be a SECOND site) for a settled call, or None.
+    Sites are the one file an edit names, or every path-shaped token of a Bash command."""
+    tool, ti = ev.get("tool_name", ""), ev.get("tool_input")
+    if ev.get("hook_event_name") != "PostToolUse" or not isinstance(ti, dict):
+        return None
+    text = introduced_text(tool, ti)
+    if not text:
+        return None
+    if tool == "Bash":
+        sites = [m.group("path").strip("`") for m in _PATH_IN_CMD_RX.finditer(text)]
+        return (text, sites, bool(sites)) if sites else None
+    path = str(ti.get("file_path") or ti.get("notebook_path") or "")
+    if not path:
+        return None
+    if isinstance(ti.get("content"), str) and ti.get("content") == text:
+        tr = ev.get("tool_response")
+        original = tr.get("originalFile") if isinstance(tr, dict) else None
+        if not isinstance(original, str) or not original:
+            return text, [path], False                     # a creation: remembered, never second
+        added = [ln[1:] for ln in difflib.ndiff(original.splitlines(), text.splitlines())
+                 if ln.startswith("+ ")]
+        return "\n".join(added), [path], True
+    return text, [path], True
+
+
+def _same_site(a: str, b: str) -> bool:
+    return _suffix_match(_path_components(a), _path_components(b))
+
+
 def _second_site_finding(block: str, first_file: str, second_file: str) -> Finding:
     head = block.split("\n")[0]
     return Finding(
@@ -960,7 +1020,7 @@ def _second_site_finding(block: str, first_file: str, second_file: str) -> Findi
         line=0,
         level="error",
         message=(
-            f"The same change reached `{second_file}` after `{first_file}` with no verifier run "
+            f"row gate.pasted_fix ({pasted_DESCRIPTION}): the same change reached `{second_file}` after `{first_file}` with no verifier run "
             f"between the two landings, starting `{head}` — so the second site's correctness is "
             f"drawn from the first rather than checked."
         ),
@@ -974,30 +1034,30 @@ def _second_site_finding(block: str, first_file: str, second_file: str) -> Findi
 
 
 def pasted_fix_gate(history) -> Optional[Finding]:
-    """Fire iff one block of introduced text reached a SECOND file with no verifier run between
-    the two landings. LINEAGE: the second landing owes a witness -- a verifier run after the first
-    landing -- and only a run at or after that point pays it."""
+    """Fire iff one block of introduced text, up to a renaming, reached a SECOND site with no
+    verifier run after the first landing. LINEAGE: the second landing owes a witness -- a
+    verifier run after the first landing -- and only a run at or after that point pays it."""
     landed = {}
 
     def owes(item):
         at, ev = item
-        tool = ev.get("tool_name", "")
-        tool_input = ev.get("tool_input")
-        # A block LANDS (registers as a possible first site) from a Write same as an Edit --
-        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered. Without
-        # this, a fix Written into a brand-new module and then Edited into a second file is
-        # invisible: the Write never enters `landed`, so the Edit is never seen as a second paste.
-        if ev.get("hook_event_name") != "PostToolUse" or tool not in (_EDIT_TOOLS | {"Write"}) \
-                or not isinstance(tool_input, dict):
+        # A block LANDS (registers as a possible first site) from a creation same as an edit --
+        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered.
+        landing = _landing(ev)
+        if landing is None:
             return ()
-        path = str(tool_input.get("file_path", ""))
+        text, sites, can_trigger = landing
         second = []
-        for block in _blocks(_kept_lines(introduced_text(tool, tool_input))):
-            where, first = landed.setdefault(block, (path, at))
-            # Only an Edit/MultiEdit second landing fires (narrowing 2): two Writes sharing a
-            # block is convention (e.g. a house import header), never a repair transfer.
-            if where != path and tool in _EDIT_TOOLS:
-                second.append((block, where, first, path))
+        for block in _blocks(_kept_lines(text)):
+            shape, names = _shape(block)
+            prior = landed.setdefault(shape, [])
+            hit = next((p for p in prior if _renamed_from(names, p[0])), None)
+            if hit is None:
+                prior.append((names, sites[0], at))
+                continue
+            where, first = hit[1], hit[2]
+            if can_trigger and not any(_same_site(where, s) for s in sites):
+                second.append((block, where, first, sites[0]))
         return second
 
     def pays(item):
@@ -1016,7 +1076,7 @@ def pasted_fix_gate(history) -> Optional[Finding]:
 
 
 pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="BLOCK",
-               tests="LINEAGE",
+               tests="LINEAGE", description=pasted_DESCRIPTION,
                eats=frozenset({"history"}),
                run=lambda c: pasted_fix_gate(c.history))
 # gate.unclaimed_unit -- the session added a unit that answers to nothing: a function nobody
