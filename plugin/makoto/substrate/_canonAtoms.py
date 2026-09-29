@@ -578,8 +578,31 @@ def atom_revert_loop(calls, text) -> bool:
     return False
 
 
+def _made(word: str, made: set) -> bool:
+    w = posixpath.normpath(word)
+    return any(w == m or w.startswith(m.rstrip("/") + "/") for m in made)
+
+
 def atom_destructive_command(calls, text) -> bool:
-    return _existing(calls, lambda c: c["name"] == "Bash" and is_destructive_command(_cmd(c)))
+    """A Bash call that destroys, except an `rm` whose every target the session itself made earlier
+    with `mkdir`: removing what this session created destroys no prior work (measured 2026-09-29: a
+    `mkdir -p ~/lme2` scratch dir, removed after use, fired notestedit_destruct at Stop)."""
+    made: set = set()
+    for c in calls:
+        if c["name"] != "Bash":
+            continue
+        cmd = _cmd(c)
+        if is_destructive_command(cmd):
+            for argv, _ in _shell_segments(cmd):
+                if not argv or not _is_destructive_argv(argv):
+                    continue
+                args = _rm_targets(argv[1:]) if argv[0].rsplit("/", 1)[-1] == "rm" else None
+                if not args or any("$" in a or "*" in a or "?" in a or not _made(a, made) for a in args):
+                    return True
+        for argv, _ in _shell_segments(cmd):
+            if argv and argv[0].rsplit("/", 1)[-1] == "mkdir":
+                made.update(posixpath.normpath(a) for a in argv[1:] if not a.startswith("-") and "$" not in a)
+    return False
 
 
 ATOMS: Dict[str, object] = {

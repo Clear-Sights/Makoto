@@ -8,5 +8,6 @@ MAKOTO_ROOT=plugin python3 tools/mesh/mesh.py > /tmp/makoto-done-mesh.txt
 tail -1 /tmp/makoto-done-mesh.txt
 grep -q ' distance 0$' /tmp/makoto-done-mesh.txt
 python3 tools/cover.py --check
+if awk -F'\t' 'NR>1 && $5!="measured"' docs/COVERAGE.tsv | grep -q .; then echo "a check's width is not measured"; exit 1; fi
 PYTHONPATH=plugin python3 -m pytest -q -p no:cacheprovider tests/test_round_nine.py tests/test_hook_latency.py
 echo "MAKOTO DONE"

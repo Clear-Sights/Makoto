@@ -1,0 +1,17 @@
+{
+ "files": {
+  "CLAUDE.md": "# Project notes\n\n## Rules\n- Keep commits small.\n",
+  "scripts/lint.sh": "#!/bin/sh\nruff check .\n"
+ },
+ "events": [
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "CLAUDE.md",
+    "old_string": "## Rules\n",
+    "new_string": "## Rules\n- Always run the linter before committing. runner: scripts/lint.sh\n"
+   }
+  }
+ ]
+}

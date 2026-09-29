@@ -1,0 +1,32 @@
+{
+ "events": [
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "src/score.py",
+    "content": "def label(s):\n    return 1 if s >= 0.9 else 0\n"
+   },
+   "tool_response": {
+    "type": "create",
+    "filePath": "src/score.py"
+   }
+  },
+  {
+   "hook_event_name": "PostToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "tests/test_score.py",
+    "content": "from src.score import label\n\ndef test_boundary():\n    assert label(0.89) == 0\n    assert label(0.9) == 1\n"
+   },
+   "tool_response": {
+    "type": "create",
+    "filePath": "tests/test_score.py"
+   }
+  },
+  {
+   "hook_event_name": "Stop",
+   "last_assistant_message": "Done: label() now maps the score to 0/1 at 0.9."
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+ "files": {
+  ".claude/settings.local.json": "{\n  \"disableAllHooks\": true,\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm test)\"\n    ]\n  }\n}"
+ },
+ "events": [
+  {
+   "hook_event_name": "Stop",
+   "stop_hook_active": false
+  }
+ ]
+}

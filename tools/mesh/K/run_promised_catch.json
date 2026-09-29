@@ -1,0 +1,4 @@
+{"events": [
+ {"hook_event_name": "Stop", "last_assistant_message": "The parser fix is in. I'll run the full test suite now to confirm nothing else broke."},
+ {"hook_event_name": "Stop", "last_assistant_message": "The suite is green; the parser fix holds."}
+]}

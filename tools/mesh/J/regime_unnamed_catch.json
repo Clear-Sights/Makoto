@@ -1,0 +1,14 @@
+{
+ "files": {
+  "makoto.toml": "require_regime = true\n"
+ },
+ "events": [
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "git commit -am 'Remove capture_index: no gain on the short-task runs'"
+   }
+  }
+ ]
+}

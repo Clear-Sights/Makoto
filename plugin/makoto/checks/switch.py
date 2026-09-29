@@ -2598,6 +2598,11 @@ def option_interaction_gate(history) -> Optional[Finding]:
         fail, ok = (a, b) if _bash_failed(runs[a][1]) and not _bash_failed(runs[b][1]) else (None, None)
         if fail is None:
             continue
+        # the failing command passing later, unchanged, shows the option was not what made it pass: the
+        # tree was (measured 2026-09-29: a suite red on a stashed source, green with -q after the pop, green
+        # again without -q)
+        if any(cmds[j] == cmds[fail] and not _bash_failed(runs[j][1]) for j in range(fail + 1, len(runs))):
+            continue
         before, after = Counter(cmds[fail].split()), Counter(cmds[ok].split())
         gained, lost = list(after - before), list(before - after)
         # the differing token must be a whole shell word, not text inside a quoted argument

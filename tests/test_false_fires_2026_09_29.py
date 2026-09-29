@@ -1,4 +1,4 @@
-"""The three live false fires of 2026-09-29 and the two mesh misses, each with its guard so the fix
+"""The live false fires of 2026-09-29 and the two mesh misses, each with its guard so the fix
 cannot blind the row. The end-to-end cases are in tools/mesh (H/ and C/ref_reword1, D/running_reword1)."""
 from makoto.kit import reads_only, repeats_launch
 from makoto.substrate._canonAtoms import is_destructive_command
@@ -49,3 +49,13 @@ def test_a_relayed_count_is_not_an_own_count():
     assert unrun_count_claim_gate(
         "All 165 cases passed, going by the thread's report, which I haven't checked myself.", []) is None
     assert unrun_count_claim_gate("All 165 cases passed, and the thread's report agrees.", [])
+
+
+def test_removing_a_dir_this_session_made_is_not_destruction():
+    from makoto.substrate._canonAtoms import atom_destructive_command
+
+    def call(cmd):
+        return {"name": "Bash", "input": {"command": cmd}}
+    assert not atom_destructive_command([call("mkdir -p ~/lme2"), call("rm -rf ~/lme2")], "")
+    assert atom_destructive_command([call("rm -rf ~/lme2")], "")
+    assert atom_destructive_command([call("mkdir -p ~/lme2"), call("rm -rf ~/lme2 src")], "")
