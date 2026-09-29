@@ -502,6 +502,12 @@ _NEG_SUBJECT_RX = _lazy_re(
 # "the finished session.sh", "a generated report.md". A verb before it still governs ("I have
 # produced the finished X" fires on "produced").
 _ADJECTIVE_PREFIX_RX = _lazy_re(r"\b(?:the|a|an|this|that|these|those|my|your|our|its|their)\s+$", re.I)
+# A conjunction that opens a NEW clause ends a negation's reach: ", and I wrote X" after "Nothing
+# failed" is a live claim (the FN found 2026-09-29). Only a comma-led conjunction, a bare "but",
+# or a conjunction followed by its own subject counts, so "I haven't written and committed X"
+# (one clause, one negation over both verbs) stays disowned.
+_CONJ_BREAK_RX = _lazy_re(
+    r",\s*(?:and|but|so|yet|then|while|whereas)\b|\bbut\b|\b(?:and|so|then)\s+(?=(?:i|we)\b)", re.I)
 _PASSIVE_PREFIX_RX = _lazy_re(
     r"\b(?:was|were|is|are|been|being|be|am)(?:\s+[\w-]+){0,2}\s*$", re.IGNORECASE)
 
@@ -548,6 +554,11 @@ def _production_claim_locations(text):
                 # in the PREVIOUS sentence ("Two tests still do not pass. I created X") must
                 # not disarm a live, current-clause claim — absence would read as green.
                 near = near[trailing_break.end():]
+            conj = None
+            for conj in _CONJ_BREAK_RX.finditer(near):
+                pass                                  # keep the LAST conjunction that opens a clause
+            if conj is not None:
+                near = near[conj.end():]              # "Nothing failed, and I wrote X" -> "I wrote X"
             if _FORWARD_FRAME_RX.search(near):
                 continue                              # "will add X" -> a plan, not a claim
             if _NEG_FRAME_RX.search(near):
