@@ -382,18 +382,31 @@ _RUNNING_CLAIM_RX = _lazy_re(
     r"|\bnow\s+(?:running|listening|serving)\b"
     r"|\b(?:running|listening|serving)\s+(?:on|at)\s+(?:https?://|port\s+|:)\S+",
     re.IGNORECASE)
-# A first-person process-lifecycle ACTION verb (past/perfective) — checks.claimedRunningAbsent
-# requires this to co-occur ANYWHERE in the claim text as a precision firewall: generic
-# explanatory prose ("Vite's dev server is running on port 5173 by default") essentially never
-# ALSO narrates the assistant itself starting something, so this co-occurrence kills that FP
-# class at the cost of a documented recall bound (a bare re-confirmation with no start narrated
-# in the same turn, e.g. "checked again — still running fine", fails open). State words
-# (running/live/up/listening/serving) are deliberately EXCLUDED from this list — including one
-# would make the co-occurrence requirement circular against _RUNNING_CLAIM_RX's own predicate.
-_PROCESS_START_VERB_RX = _lazy_re(
-    r"\bI(?:['’]ve|['’]d|\s+have)?\s+(?:just\s+)?(?:started|launched|spun\s+up|spinning\s+up|"
-    r"brought\s+up|booted|kicked\s+off|fired\s+up|restarted|re-started|ran|deployed|stood\s+up)\b",
+# The claim is bound to THIS environment (round nine C8 follow-up): its sentence names a local
+# address -- localhost, a loopback/any address, a `:port`, `port N`, a PID -- or a name the
+# session's own tool calls touched (checks.switch reads those from the record).
+_LOCAL_ADDRESS_RX = _lazy_re(
+    r"\blocalhost\b|\b127\.0\.0\.1\b|\b0\.0\.0\.0\b|\[::1\]|(?<![\w.]):\d{2,5}\b|"
+    r"\bport\s+\d{2,5}\b|\bpid\s*:?\s*\d+", re.IGNORECASE)
+# A generic or modal sentence describes how a tool behaves, not what runs here now.
+_GENERIC_FRAME_RX = _lazy_re(
+    r"\b(?:by\s+default|usually|typically|normally|generally|in\s+general|would|should|could|"
+    r"might|if\s+you|when\s+you|whenever|docs?\s+says?|the\s+documentation|according\s+to|"
+    r"for\s+example)\b|\be\.g\.", re.IGNORECASE)
+# Before the state word, in its sentence: a past or absent subject ("was running on :8000",
+# "nothing is listening on port 8080") -- no present process is asserted up.
+_NOT_PRESENT_RX = _lazy_re(
+    r"\b(?:was|were|had\s+been|used\s+to|nothing|none|nobody|neither|no\s+longer)\b",
     re.IGNORECASE)
+# Words of the claim's own grammar (closed subjects, state words) and function words: naming
+# them binds nothing, so only the sentence's other words are looked up in the session record.
+_RUNNING_PLAIN_WORDS = frozenset("""
+    the this that its it's and are was were now currently already successfully back still fully
+    running live listening serving operational server servers app application service api
+    backend frontend process container daemon worker job bot site database program development
+    with for from into onto over has have had been being our your their done here there all
+    again fine well just also which what then than them they you
+""".split())
 # Bash-command classifier for "this call concerns a long-lived process's lifecycle" — open-world,
 # deliberately broad like _TEST_RUNNER_RX: an unlisted launcher/healthcheck shape is a documented
 # RECALL bound, never a false-block source. Three families: shell backgrounding operators (the

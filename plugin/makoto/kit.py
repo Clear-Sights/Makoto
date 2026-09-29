@@ -17,7 +17,7 @@ import subprocess
 import textwrap
 from typing import Callable, Optional
 
-from makoto.core._shell import _command_runs_tests
+from makoto.core._shell import _basename, _command_runs_tests, _effective_argv, _shell_segments
 from makoto.vocab import (
     _ADV_FORWARD_RX, _NEGATION_RX, _SENTENCE_SPLIT_RX, _code_spans,  # kit.claim
     _TEST_RUNNER_RX,  # pinned by tests/test_lexicons.py
@@ -723,6 +723,41 @@ _BRIEF_LINE_RX = _lazy_re(r"(?m)^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$")
 # The two dispatch-tool names the register names literally.
 DISPATCH_TOOL_NAMES = frozenset({"Agent", "Task"})
 
+# A brief handed to another session or agent names it in its own input or in its tool's name.
+_WORKER_ADDRESS_RX = _lazy_re(r"session|agent|dispatch|worker", re.I)
+
+
+def launches_worker(ev: dict) -> bool:
+    """This call starts a model worker on a brief, whatever channel carries it. ONE definition,
+    shared by gate.unprobed_fanout and gate.relaunched_unchanged (round nine B11/E13: both let a
+    launch through because it came by a tool they did not name).
+
+    The effect has three carriers: the harness's own subagent tool (`DISPATCH_TOOL_NAMES`); a
+    brief (`prompt` or `message` text) handed to an addressed session or agent -- an input key
+    naming one (`session_id`, `persistent_session_id`) or an MCP tool whose own name does
+    (`create_session`); and a Bash segment that runs the model CLI headless on a prompt
+    (`claude -p`, `--print`), backgrounded or not. A message with no addressee (`send_later` to
+    this session, a chat post) starts no worker; `claude plugin ...` hands no prompt."""
+    name = str(ev.get("tool_name") or "")
+    if name in DISPATCH_TOOL_NAMES:
+        return True
+    ti = ev.get("tool_input")
+    if not isinstance(ti, dict):
+        return False
+    if name == "Bash":
+        for argv, _op in _shell_segments(str(ti.get("command", "") or "")):
+            eff = _effective_argv(argv)
+            if eff and _basename(eff[0]) == "claude" and any(
+                    a in ("-p", "--print") or a.startswith("--print=") for a in eff[1:]):
+                return True
+        return False
+    brief = ti.get("prompt") or ti.get("message")
+    if not isinstance(brief, str) or not brief.strip():
+        return False
+    if any(_WORKER_ADDRESS_RX.search(str(k)) for k in ti):
+        return True
+    return name.startswith("mcp__") and bool(_WORKER_ADDRESS_RX.search(name.rsplit("__", 1)[-1]))
+
 
 def dispatch_brief_lines(prompt: str) -> dict:
     """Every line-start label's value in `prompt`, in order, stripped; a missing label is []."""
@@ -1171,11 +1206,12 @@ def neighbours(commands, k=1, differ=None):
     return sorted({(min(i, j), max(i, j)) for u, v in hits for i in at[distinct[u]] for j in at[distinct[v]]})
 
 
-def claim(text: str, rx: re.Pattern):
+def claim(text: str, rx: re.Pattern, keep=None):
     """The first match of `rx` in `text` that is the writer's own claim, else None: outside ```
     fences and inline backticks, and with no negation or forward frame ('not', 'once', 'when',
-    'if') in its clause, walked back to the last sentence boundary within 70 characters. The
-    grammar gate.unrun_count_claim and gate.running_claim share."""
+    'if') in its clause, walked back to the last sentence boundary within 70 characters, and
+    accepted by `keep(match)` when given. The grammar gate.unrun_count_claim and
+    gate.claimed_running share."""
     if not text:
         return None
     spans = _code_spans(text)
@@ -1185,6 +1221,8 @@ def claim(text: str, rx: re.Pattern):
             continue
         clause = _SENTENCE_SPLIT_RX.split(text[max(0, a - 70):a])[-1]
         if _NEGATION_RX.search(clause) or _ADV_FORWARD_RX.search(clause):
+            continue
+        if keep is not None and not keep(m):
             continue
         return m
     return None
