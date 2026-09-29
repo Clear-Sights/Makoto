@@ -839,10 +839,12 @@ undeclared_CHECK = Check(
 # content.verifier_exit_masking — verifier EXIT-CODE masking (a test/build/lint runner's failure
 # hidden).
 #
-# Forcing a verifier's exit code to 0 — `pytest || true`, `go test ; true`, an unrestored
-# `set +e` before a runner, a masking `||` branch, a trailing pipe without pipefail, an `if`
-# wrapper with no failing branch, a `$?` captured but never returned, or a subshell/brace group
-# around any of these — manufactures a green that survives real failures. An `||`/`if` branch
+# THE EFFECT: the verifier's exit is not the call's exit. Any statement after `;` supplies the
+# exit (`; true`, `; exit 0`, `; echo done`, a `$?` captured and dropped) unless a later statement
+# re-raises it; so does the runner's own exit-zero option (`make -i`, `--exit-zero`), an
+# unrestored `set +e`, a masking `||` branch, a trailing pipe without pipefail, an `if` wrapper
+# with no failing branch, or a subshell/brace group around any of these — each manufactures a
+# green that survives real failures. An `||`/`if` branch
 # that RE-RAISES the failure (`pytest || exit 1`) is honest handling and never fires.
 #
 # SCOPED to exit-code masking only. Stream redirection (`2>/dev/null`) is deliberately out of
@@ -939,6 +941,23 @@ def _leading_tokens(c: str) -> tuple:
     return tuple(toks[i:])
 
 
+_MAKE_VALUED_OPTIONS = frozenset({"-C", "-f", "-I", "-o", "-W", "--directory", "--file"})
+
+
+def _make_targets(toks) -> list:
+    """`make`'s words with its options (and their values) removed: `make -i -C sub test` ->
+    `make test`, so an option ahead of the target does not hide the runner."""
+    out, skip = [toks[0]], False
+    for t in toks[1:]:
+        if skip:
+            skip = False
+        elif t in _MAKE_VALUED_OPTIONS:
+            skip = True
+        elif not t.startswith("-") and not t.isdigit():
+            out.append(t)
+    return out
+
+
 def _is_runner_command(c: str) -> bool:
     """True iff the statement's LEADING command (after VAR= / wrappers / launcher prefixes) is a
     verifier.
@@ -946,7 +965,29 @@ def _is_runner_command(c: str) -> bool:
     THE BLOCKING TIER: deliberately narrow, bound to `_LEAD_RUNNER_RX`'s explicit foreign-
     ecosystem runner names only — a deny is only ever spent here.
     """
-    return bool(_LEAD_RUNNER_RX.match(" ".join(_leading_tokens(c))))
+    toks = list(_leading_tokens(c))
+    if toks and _basename(toks[0]) == "make":
+        toks = _make_targets(toks)
+    return bool(_LEAD_RUNNER_RX.match(" ".join(toks)))
+
+
+# A runner's OWN option that forces its exit to 0 whatever it found: the mask is inside the
+# runner, so no operator after it shows it. `make -i`/`--ignore-errors` (also inside a combined
+# short flag, `-ik`), and the linters' `--exit-zero`.
+_ZERO_EXIT_OPTIONS = frozenset({"--ignore-errors", "--exit-zero"})
+
+
+def _ignores_own_failure(lead) -> bool:
+    toks = list(_leading_tokens(" ".join(lead)))
+    make = bool(toks) and _basename(toks[0]) == "make"
+    for t in toks[1:]:
+        if t == "--":
+            break
+        if t in _ZERO_EXIT_OPTIONS or t.startswith("--exit-zero"):
+            return True
+        if make and _SET_MINUS_FLAGS_RX.fullmatch(t) and "i" in t:
+            return True
+    return False
 
 
 # Flags that turn a runner call into a query of the tool (`pytest --version`): no test executes, so
@@ -1019,7 +1060,6 @@ _GROUP_TOKENS = frozenset({"{", "}", "};", "(", ")"})
 _CONTROL_TOKENS = frozenset({"then", "else", "elif", "do", "done", "fi", "!"})
 _SET_PLUS_FLAGS_RX = _lazy_re(r"\+[A-Za-z]+\Z")
 _SET_MINUS_FLAGS_RX = _lazy_re(r"-[A-Za-z]+\Z")
-_STATUS_CAPTURE_RX = _lazy_re(r"\$\?")
 
 
 def _top_level_count(segments) -> int:
@@ -1180,8 +1220,10 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
         next_argv = segments[idx + 1][0] if idx + 1 < end else []
         rest = [a for a, _op, _t in segments[idx + 1:end]]
 
-        if operator in ("||", ";") and _is_exit_zero_literal(next_argv):
-            reason = f"verifier failure masked by `{operator} {next_argv[0]}`"
+        if _ignores_own_failure(lead):
+            reason = "verifier told to ignore its own failures (an exit-zero option)"
+        elif operator == "||" and _is_exit_zero_literal(next_argv):
+            reason = f"verifier failure masked by `|| {next_argv[0]}`"
         elif operator in ("|", "|&") and not pipefail_on[is_top]:
             reason = "verifier exit code replaced by the pipeline tail's (`| ...` without pipefail)"
         elif operator == "||" and not _propagates_failure(rest):
@@ -1193,10 +1235,10 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
             if j < end and segments[j][1] == "||"\
                     and not _propagates_failure([a for a, _op, _t in segments[j + 1:end]]):
                 reason = "verifier failure absorbed by the trailing `|| ...` branch"
-        elif operator == ";" and next_argv\
-                and any(_STATUS_CAPTURE_RX.search(t) for t in next_argv)\
-                and not _propagates_failure(rest):
-            reason = "verifier exit captured (`$?`) but never returned"
+        elif operator == ";" and rest and not _propagates_failure(rest):
+            # Whatever runs after `;` supplies the call's exit, so the verifier's is lost unless a
+            # later statement re-raises it: `; true`, `; exit 0`, `; echo done`, `; rc=$?` alike.
+            reason = f"verifier exit replaced by the later `; {' '.join(next_argv)[:40]}`"
         if reason is None and if_wrapped and not _propagates_failure(rest):
             reason = "verifier exit consumed by `if` with no failing branch"
         if reason is None and errexit_off[is_top]:
@@ -1228,7 +1270,7 @@ def masking_predicate(*, current_event: dict, history: list, pattern: Check,
 masking_RETRY_HINT = "Don't mask a verifier's failure with || true / ; true / a masking || branch / a trailing pipe / an if wrapper / set +e. Run the test/build/lint and fix what fails -- a hidden failure that reads as success is a cheat."
 masking_DESCRIPTION = 'verifier exit-code masking (|| true / ; true / masking || branch / trailing pipe / if wrapper / $? dropped / set +e on a test/build/lint runner)'
 
-masking_CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|', ';', 'set +', '$?', 'if ', 'elif '), retry_hint=masking_RETRY_HINT, description=masking_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+masking_CHECK = _Check(id='content.verifier_exit_masking', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('|', ';', '\\n', 'set +', 'if ', 'elif ', 'make', '--exit-zero'), retry_hint=masking_RETRY_HINT, description=masking_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 # gate.undischarged_waiver -- a session-introduced directive silences a checker, and nothing on
 # or beside it says when the silence ends. A waiver with a rationale but no end is not a
 # carve-out; it is a permanent hole with a sentence attached.
@@ -1962,8 +2004,8 @@ bound_RETRY_HINT = "Assert the exact count the fixture produces (`== N`). A ceil
 bound_DESCRIPTION = "a test asserts a count under a literal ceiling instead of its exact value"
 bound_CHECK = _Check(id='content.bound_as_count', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('assert',), retry_hint=bound_RETRY_HINT, description=bound_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 
-# event.nested_budget (register E11 NESTED BUDGET SHADOWED): a `timeout N` inside a Bash call whose
-# own limit is shorter. The Bash tool kills the command at its limit, so the inner budget can never
+# event.nested_budget (register E11 NESTED BUDGET SHADOWED): a budget inside a Bash call (a
+# `timeout N`, an interpreter's `timeout=N`, or the waits it states) past the call's own limit. The Bash tool kills the command at its limit, so the inner budget can never
 # be reached. The limit is the call's `timeout` (else BASH_DEFAULT_TIMEOUT_MS, 120000), capped at
 # the larger of BASH_MAX_TIMEOUT_MS (600000) and the default; a background call has none.
 _BUDGET_UNITS = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}
@@ -1979,10 +2021,61 @@ def _env_ms(name: str, default: int) -> int:
         return default
 
 
+_PAYLOAD_TIMEOUT_RX = _lazy_re(r"\btimeout\s*=\s*(\d+(?:\.\d+)?)")
+_PAYLOAD_SLEEP_RX = _lazy_re(r"\bsleep\(\s*(\d+(?:\.\d+)?)\s*\)")
+_SEQ_RX = _lazy_re(r"\$\(seq\s+(-?\d+)(?:\s+(-?\d+))?(?:\s+(-?\d+))?\)?")
+_RANGE_RX = _lazy_re(r"\{(-?\d+)\.\.(-?\d+)\}")
+
+
+def _duration(word: str):
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)([smhd]?)", word)
+    return float(m.group(1)) * _BUDGET_UNITS[m.group(2)] if m else None
+
+
+def _loop_count(words) -> int:
+    """How many times a `for NAME in WORDS` header runs its body, read lexically: `$(seq [a] b)`,
+    `{a..b}`, or the literal word list. Anything else counts once (a lower bound)."""
+    text = " ".join(words)
+    m = _SEQ_RX.fullmatch(text)
+    if m:
+        nums = [int(g) for g in m.groups() if g is not None]
+        first, step, last = (1, 1, nums[0]) if len(nums) == 1 else \
+            (nums[0], 1, nums[1]) if len(nums) == 2 else (nums[0], nums[1], nums[2])
+        return max(1, (last - first) // step + 1) if step > 0 else 1
+    m = _RANGE_RX.fullmatch(text)
+    if m:
+        return abs(int(m.group(2)) - int(m.group(1))) + 1
+    return max(1, len(words)) if words and "$" not in text else 1
+
+
 def _inner_budgets(command: str):
-    """Seconds each `timeout` in the command allows, from the argv the shell would run."""
+    """Seconds of work the command states for itself, from the argv the shell would run: each
+    `timeout N`, each `timeout=N` inside an interpreter's `-c`/`-e` payload, and the sum of every
+    wait (`sleep N`, `sleep(N)`) times the loops around it. Any one of these past the call's
+    own limit is a budget the call is stopped before reaching."""
+    waited, stack, pending = 0.0, [], 1
     for argv, _op in _shell_segments(command):
         argv = list(argv)
+        if argv[:1] == ["for"]:
+            pending = _loop_count(argv[3:]) if argv[2:3] == ["in"] else 1
+            continue
+        if argv[:1] in (["while"], ["until"]):
+            pending = 1
+            continue
+        if argv[:1] == ["do"]:
+            stack.append(pending)
+            pending, argv = 1, argv[1:]
+        if argv[:1] == ["done"]:
+            if stack:
+                stack.pop()
+            continue
+        times = 1
+        for n in stack:
+            times *= n
+        for prev, word in zip(argv, argv[1:]):
+            if prev in ("-c", "-e"):
+                yield from (float(t) for t in _PAYLOAD_TIMEOUT_RX.findall(word))
+                waited += times * sum(float(t) for t in _PAYLOAD_SLEEP_RX.findall(word))
         while argv:
             word = argv.pop(0)
             if _ASSIGNMENT_RX.fullmatch(word):
@@ -1992,15 +2085,19 @@ def _inner_budgets(command: str):
                 while argv and argv[0].startswith("-"):
                     argv.pop(0)
                 continue
+            if word == "sleep":
+                waited += times * sum(d for d in map(_duration, argv) if d is not None)
+                break
             if word != "timeout":
                 break
             while argv and argv[0].startswith("-"):
                 if argv.pop(0) in _TIMEOUT_VALUED_OPTIONS and argv:
                     argv.pop(0)
-            m = re.fullmatch(r"(\d+(?:\.\d+)?)([smhd]?)", argv[0]) if argv else None
-            if m:
-                yield float(m.group(1)) * _BUDGET_UNITS[m.group(2)]
+            d = _duration(argv[0]) if argv else None
+            if d is not None:
+                yield d
             break
+    yield waited
 
 
 def budget_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2020,13 +2117,13 @@ def budget_predicate(*, current_event: dict, history: list, pattern, conn=None) 
         return None
     return Finding(
         pattern_id=pattern.id, file="", line=0, level="error",
-        message=(f"row {pattern.id} ({pattern.description}): `timeout {inner:g}` sits inside a Bash "
-                 f"call the tool stops at {outer:g}s, so the inner budget is never reached."))
+        message=(f"row {pattern.id} ({pattern.description}): an inner budget of {inner:g}s sits inside a "
+                 f"Bash call the tool stops at {outer:g}s, so the inner budget is never reached."))
 
 
 budget_RETRY_HINT = "Make the Bash call's own limit at least the inner timeout (the `timeout` parameter, at most the tool's ceiling), run it in the background, or lower the inner timeout."
-budget_DESCRIPTION = "an inner `timeout` longer than the Bash call's own limit"
-budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout',), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+budget_DESCRIPTION = "an inner budget (a timeout, or the waits it states) longer than the Bash call's own limit"
+budget_CHECK = _Check(id='event.nested_budget', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('timeout', 'sleep'), retry_hint=budget_RETRY_HINT, description=budget_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
 
