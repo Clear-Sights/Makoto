@@ -58,7 +58,8 @@ def test_dispatch_loose_comparator_emits_block_json(tmp_path):
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "constitution/integrity/checks/myverifier.py",
-            "content": 'def check(x):\n    return x.startswith("ok")\n',
+            "old_string": 'def check(x):\n    return x == "ok"\n',
+            "new_string": 'def check(x):\n    return x.startswith("ok")\n',
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
@@ -319,7 +320,8 @@ def test_dispatch_still_writes_audit_row_when_finding_fires(tmp_path):
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "/tmp/constitution/integrity/checks/test_block.py",
-            "content": 'def check(s): return s.startswith("ok")\n',
+            "old_string": 'def check(s): return s == "ok"\n',
+            "new_string": 'def check(s): return s.startswith("ok")\n',
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
@@ -340,12 +342,13 @@ def test_dispatch_env_disable_silences_specific_pattern(tmp_path):
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
+        "tool_name": "Edit",
         "session_id": "disable_test",
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "/tmp/constitution/integrity/checks/test_block.py",
-            "content": 'def check(s): return s.startswith("ok")\n',
+            "old_string": 'def check(s): return s == "ok"\n',
+            "new_string": 'def check(s): return s.startswith("ok")\n',
         },
     }
     rc, out = _run_dispatch(state_dir, payload, extra_env={"MAKOTO_DISABLE_PATTERNS": "content.verifier_predicate_weakened"})
@@ -362,19 +365,20 @@ def test_dispatch_audit_row_records_tool_name(tmp_path):
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
+        "tool_name": "Edit",
         "session_id": "tool_name_test",
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "/tmp/constitution/integrity/checks/test_block.py",
-            "content": 'def check(s): return s.startswith("ok")\n',
+            "old_string": 'def check(s): return s == "ok"\n',
+            "new_string": 'def check(s): return s.startswith("ok")\n',
         },
     }
     rc, _ = _run_dispatch(state_dir, payload)
     rows = [json.loads(l) for l in (state_dir / "audit.jsonl").read_text().splitlines() if l.strip()]
     assert len(rows) == 1
-    assert rows[0].get("tool_name") == "Write", (
-        f"expected tool_name='Write' on fire row; got {rows[0].get('tool_name')!r}"
+    assert rows[0].get("tool_name") == "Edit", (
+        f"expected tool_name='Edit' on fire row; got {rows[0].get('tool_name')!r}"
     )
     assert rows[0]["pattern_fires"] == ["content.verifier_predicate_weakened"]
 
@@ -1724,12 +1728,13 @@ def test_dispatch_lazy_init_success_propagates_so_firing_event_blocks(tmp_path):
     state_dir.mkdir(parents=True)  # dir exists, but NO makoto.record.db -> dispatcher inits lazily
     payload = {
         "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
+        "tool_name": "Edit",
         "session_id": "lazy_init_fire",
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "constitution/integrity/checks/v.py",
-            "content": 'def check(s):\n    return s.startswith("ok")\n',
+            "old_string": 'def check(s):\n    return s == "ok"\n',
+            "new_string": 'def check(s):\n    return s.startswith("ok")\n',
         },
     }
     env = os.environ.copy()
@@ -1917,12 +1922,13 @@ def test_dispatch_decision_carries_retry_hint_when_finding_has_one(tmp_path):
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
+        "tool_name": "Edit",
         "session_id": "hint_test",
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "/tmp/constitution/integrity/checks/v.py",
-            "content": 'def check(s): return s.startswith("ok")\n',
+            "old_string": 'def check(s): return s == "ok"\n',
+            "new_string": 'def check(s): return s.startswith("ok")\n',
         },
     }
     rc, out = _run_dispatch(state_dir, payload)
@@ -1947,12 +1953,13 @@ def test_dispatch_audit_exit_code_is_2_on_error_level_finding(tmp_path):
     state_dir = _setup_state(tmp_path)
     payload = {
         "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
+        "tool_name": "Edit",
         "session_id": "exit_code_test",
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "/tmp/constitution/integrity/checks/v.py",
-            "content": 'def check(s): return s.startswith("ok")\n',
+            "old_string": 'def check(s): return s == "ok"\n',
+            "new_string": 'def check(s): return s.startswith("ok")\n',
         },
     }
     rc, _ = _run_dispatch(state_dir, payload)

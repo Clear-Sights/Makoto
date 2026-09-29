@@ -22,6 +22,7 @@ removing the marker:
 phantomCitation is OUT OF SCOPE here (needs a live citation DB conn) — separately unit-tested.
 """
 from __future__ import annotations
+import json
 import glob
 import os
 import re
@@ -55,9 +56,13 @@ def _parse(path: str):
     expects_fire = re.search(r"expected_pass:\s*false", fm) is not None
     rc = re.search(r'reason_contains:\s*"([^"]+)"', fm)
     reason = rc.group(1) if rc else None
+    # `prior:` (a JSON string) is the text the change replaces: a row that fires on a CHANGE,
+    # not on presence, is fed an Edit from `prior` to the body.
+    pr = re.search(r"^prior:\s*(\".*\")\s*$", fm, re.M)
+    prior = json.loads(pr.group(1)) if pr else None
     fr = re.match(r"(?:TP|TN)_([A-Za-z]+)_", os.path.basename(path))
     assert fr, f"{path}: corpus filename must be T[PN]_<row key in its shape module>_<slug>.md"
-    return fr.group(1), expects_fire, reason, body
+    return fr.group(1), expects_fire, reason, body, prior
 
 
 def _params():
@@ -68,26 +73,29 @@ def _params():
     out = []
     for p in sorted(glob.glob(os.path.join(_CDIR, "T[PN]_*.md"))):
         name = os.path.basename(p)
-        stem, expects_fire, reason, body = _parse(p)
+        stem, expects_fire, reason, body, prior = _parse(p)
         assert stem in stem_to_id, f"{name}: corpus names no live check module (catalog has: {sorted(stem_to_id)})"
         pid = stem_to_id[stem]
         if pid in _OUT_OF_SCOPE:
             continue
         assert pid in _PATH, f"{name}: check {pid} has no _PATH surface entry (add one, or an _OUT_OF_SCOPE entry naming where it IS tested)"
         marks = [pytest.mark.xfail(reason=_KNOWN_BUGS[name], strict=True)] if name in _KNOWN_BUGS else []
-        out.append(pytest.param(name, pid, expects_fire, reason, body, marks=marks, id=name))
+        out.append(pytest.param(name, pid, expects_fire, reason, body, prior, marks=marks, id=name))
     assert out, "corpus runner resolved ZERO corpora — the exact silent-death this runner exists to prevent"
     return out
 
 
-@pytest.mark.parametrize("name,pid,expects_fire,reason,body", _params())
-def test_content_scan_corpus(name, pid, expects_fire, reason, body):
+@pytest.mark.parametrize("name,pid,expects_fire,reason,body,prior", _params())
+def test_content_scan_corpus(name, pid, expects_fire, reason, body, prior):
     # checks live in the flat makoto.checks package under descriptive names, not a name
     # derivable from the check id -- resolve via the real catalog's predicate_module.
     _mod_path = next(p.predicate_module for p in load_precheck_catalog() if p.id == pid)
     mod = importlib.import_module(_mod_path)
     pat = PreCheck(id=pid, fire_level="error", description="corpus", retry_hint="x")
     evt = {"hook_event_name": "PreToolUse", "tool_input": {"file_path": _PATH[pid], "content": body}}
+    if prior is not None:
+        evt = {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+               "tool_input": {"file_path": _PATH[pid], "old_string": prior, "new_string": body}}
     f = mod.predicate(current_event=evt, history=[], pattern=pat)
     if expects_fire:
         assert f is not None, f"{name}: expected the check to FIRE, got None"

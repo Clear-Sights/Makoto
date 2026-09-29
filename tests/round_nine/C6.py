@@ -1,7 +1,9 @@
 # C6 content.verifier_predicate_weakened (docs/attack-round-nine.md, round nine b).
 # makoto-allow: fixtures must spell the loosened verdicts the check exists to catch
+# Each case is a WEAKENING: the file on disk holds the strict verdict and the Write loosens it.
 ROW = "content.verifier_predicate_weakened"
 SW = "starts" + "with"
+STRICT = "def check(s):\n    return s.status == 'ok'\n"
 
 
 def _write(rel, body):
@@ -10,7 +12,7 @@ def _write(rel, body):
 
 
 def _case(name, rel, body):
-    return dict(name=name, row=ROW, events=[_write(rel, body)])
+    return dict(name=name, row=ROW, files={rel: STRICT}, events=[_write(rel, body)])
 
 
 CASES = [

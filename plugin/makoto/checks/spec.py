@@ -188,15 +188,16 @@ def _broad_except(handler: ast.ExceptHandler) -> bool:
 
 
 def _hollow_node_match(node: ast.AST) -> Optional[str]:
-    # a verifier-named function NEUTERED to a single pass / return-truthy / assert-truthy statement.
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))\
-            and _VERIFIER_NAME_RX.search(node.name) and _hollow_body(node.body):
-        return f"def {node.name}() -> hollow"
-    # (swallowed-exception arm) a BROAD except handler whose body swallows the failure into a pass —
-    # the runtime sibling of body-hollowing. Broad-only + the integrity-path anchor + makoto-allow
-    # carry FP-safety; a specific-typed except (honest narrowing) never fires.
-    if isinstance(node, ast.ExceptHandler) and _broad_except(node) and _hollow_body(node.body):
-        return "broad except -> swallow"
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _VERIFIER_NAME_RX.search(node.name):
+        # a verifier-named function whose body cannot fail.
+        if _hollow_body(node.body):
+            return f"def {node.name}() -> hollow"
+        # (swallowed-exception arm) inside that verifier, a BROAD except whose body cannot fail —
+        # the runtime sibling of body-hollowing. Scoped to the verifier: a broad except in a
+        # helper or a hook's own fail-open path verifies nothing and so swallows no verdict.
+        if any(isinstance(n, ast.ExceptHandler) and _broad_except(n) and _hollow_body(n.body)
+               for n in ast.walk(node)):
+            return f"def {node.name}(): broad except -> swallow"
     # a hollowed verifier BOUND as a lambda (`verify_seal = lambda s: True`) is an `ast.Assign`,
     # not a `FunctionDef` — the binding form needs its own arm.
     if isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda)\
@@ -218,8 +219,10 @@ body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", postu
 # content.verifier_predicate_weakened predicate — verifier predicate weakened (loose-comparator
 # shape).
 #
-# On a checker file (`_CHECKER_RX`), fires on one of the loose-comparator shapes a strict `==`
-# status test gets weakened into, matched as REAL AST nodes in introduced code:
+# On a checker file (`_CHECKER_RX`), fires on the CHANGE from a strict verdict to a loose one: a
+# strict `== <literal>` comparison the prior text held (the Edit's old_string, or the file on disk
+# a Write replaces) is gone, and one of the loose-comparator shapes it gets weakened into is
+# introduced, matched as REAL AST nodes:
 #
 #   * `.startswith(` / `.endswith(` (prefix/suffix instead of equality),
 #   * `re.match(` / `re.search(` (pattern instead of equality),
@@ -312,7 +315,49 @@ def _parse_fragment(content: str):
         return None, 0
 
 
-weakened_predicate = ast_introduced_predicate(target_rx=_CHECKER_RX, node_match=_loose_label, parse=_parse_fragment)
+_loose_introduced = ast_introduced_predicate(target_rx=_CHECKER_RX, node_match=_loose_label, parse=_parse_fragment)
+
+
+def _strict_forms(text: str) -> set:
+    """Every strict verdict in `text`: an `==`/`is` comparison with a literal side."""
+    tree, _ = _parse_fragment(text or "")
+    if tree is None:
+        return set()
+    return {ast.unparse(n) for n in ast.walk(tree)
+            if isinstance(n, ast.Compare) and len(n.ops) == 1 and isinstance(n.ops[0], (ast.Eq, ast.Is))
+            and (_is_literal(n.left) or _is_literal(n.comparators[0]))}
+
+
+def _prior_and_after(current_event: dict) -> tuple:
+    """(text before, text after) for a Write (the file on disk vs content) or an Edit/MultiEdit
+    (old_string vs new_string, joined)."""
+    ti = current_event.get("tool_input") or {}
+    if not isinstance(ti, dict):
+        return "", ""
+    if current_event.get("tool_name") == "Write" or "content" in ti:
+        fp = str(ti.get("file_path", ""))
+        before = ""
+        try:
+            full = fp if os.path.isabs(fp) else os.path.join(current_event.get("cwd") or "", fp)
+            if os.path.isfile(full):
+                with open(full, encoding="utf-8", errors="replace") as fh:
+                    before = fh.read()
+        except (OSError, ValueError):
+            before = ""
+        return before, str(ti.get("content", ""))
+    edits = [e for e in ti.get("edits") or () if isinstance(e, dict)] or [ti]
+    return ("\n".join(str(e.get("old_string", "")) for e in edits),
+            "\n".join(str(e.get("new_string", "")) for e in edits))
+
+
+def weakened_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    """Fires on the CHANGE: a strict verdict the prior text held is gone and a loose shape is
+    introduced in its place. Presence alone is not a weakening, so a fresh write of honest
+    code that happens to use `.startswith(` never fires."""
+    before, after = _prior_and_after(current_event)
+    if not (_strict_forms(before) - _strict_forms(after)):
+        return None
+    return _loose_introduced(current_event=current_event, history=[], pattern=pattern, conn=conn)
 
 
 weakened_RETRY_HINT = "Use '==' for status comparison — not '.startswith()' / '.endswith()' / 're.match' / 're.search', and not membership ('in [...]' / 'in (...)' / 'in {...}', or a string-literal 'in' substring test), and not a verdict that only excludes a failure literal ('!= \'fail\''): name the one value that passes. Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
