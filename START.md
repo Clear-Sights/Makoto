@@ -225,7 +225,12 @@ The steps:
     gate.unwitnessed_verifier; F10: gate.canon). The proving set is `docs/attack-round-nine.md`
     ("Attack round nine", 21 escapes over E3, E12, E11, C4, D14, and "round nine b", 58 entries),
     each case rebuilt from its shape as a plant red on main; each check's own test file is only the
-    no-regression bar. cap: 6 model calls and 10 minutes per row.
+    no-regression bar. cap: 6 model calls and 10 minutes per row. Landed 2026-09-29 (#118 to #122):
+    `tests/test_round_nine.py` plants 192 cases over 58 entries (the 63 claimed, less G2, B4 and F10
+    by ruling and A5 and A11, whose bases never reproduced), each red before its fix; each entry's
+    live check was rewritten over its effect, since lines do not yet decide the same set as the
+    checks (VOIDS `retire-into-lines`). Held out, with measured numbers: VOIDS `B21-rate`,
+    `F8-dispatch`, `F8-rate`, `C2-claim`, `attack-cut`.
     Stop: at the cap, record the measured number in VOIDS and go on.
 14. Scour's judge (moved from Scour's handoff, row SR1): make Scour's reader catch what
     adversarial-review catches, so adversarial-review can leave the launch rows. Replay both rounds
