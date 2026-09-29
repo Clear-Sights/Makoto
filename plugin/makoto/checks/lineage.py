@@ -1027,13 +1027,15 @@ pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="BLOCK",
 #
 #   1. THE OPERATOR NAMED IT -- the unit's name appears in a genuine operator turn
 #      (`ledger.user_turn_texts`, host-written turns only).
-#   2. SOMETHING REACHES IT -- the name appears somewhere in this session's introduced text other
-#      than its own definition: a call, an export, a test, an edited call site -- or in the file
-#      the unit landed in, read off disk (a registration by name the Edit never carried).
-#   3. A DECORATOR REGISTERED IT -- `@pytest.fixture`, `@app.route`, `@property`, `@click.command`.
-#      A decorator IS a claim: it hands the unit to a framework that will call it. This is the
-#      exclusion that makes the check material rather than noisy, and it generalizes instead of
-#      enumerating frameworks.
+#   2. SOMETHING REACHES IT -- the name appears somewhere in this session's introduced text
+#      OUTSIDE its own definition: a call, an export, a test, an edited call site -- or in the file
+#      the unit landed in, read off disk (a registration by name the Edit never carried). The
+#      definition's own span (its docstring, a recursive call, its decorators) reaches nothing.
+#   3. A DECORATOR REGISTERED IT -- `@pytest.fixture`, `@app.route`, `@click.command`,
+#      `@atexit.register`. A decorator that hands the unit to a framework is a claim: the
+#      framework will call it. One from the standard library or the builtins (`@functools.cache`,
+#      `@property`, `@dataclass`) only WRAPS the unit and hands it to no one, unless it is a
+#      `register`. Read off where the decorator comes from, not which framework it names.
 #
 # Absent all three, the unit was drawn from no claim.
 #
@@ -1069,11 +1071,62 @@ from makoto.kit import decode_history_event, introduced_text, parse_introduced, 
 _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
 # Claimed BY COLLECTION: the runner calls it because of its name. See the comment above.
 _COLLECTED_PREFIX = "test_"
-# How many whole-word occurrences of the unit's name in the session's introduced text mean
-# something REACHES it. The `def`/`class` line contributes the first occurrence, so a second is
-# the earliest evidence of a use: 1 would let every definition discharge itself and 3 would
-# demand two callers.
-_REACHED_AT = 2
+import builtins as _builtins
+import sys as _sys
+import textwrap
+
+
+def _decorator_registers(dec, imported: dict) -> bool:
+    """True when the decorator hands the unit to someone: its root is not the standard library or
+    a builtin, or it is a `register`. `imported` maps a local name to the module it came from."""
+    node = dec.func if isinstance(dec, ast.Call) else dec
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return True                  # an expression decorator: unknown, so a claim (FN-safe)
+    parts.append(node.id)
+    if any("register" in p.lower() for p in parts):
+        return True
+    root = imported.get(node.id, node.id).split(".")[0]
+    stdlib = root in _sys.stdlib_module_names or (node.id not in imported
+                                                  and hasattr(_builtins, node.id))
+    return not stdlib
+
+
+def _imports_of(tree) -> dict:
+    out = {}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            for a in n.names:
+                out[(a.asname or a.name).split(".")[0]] = a.name
+        elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+            for a in n.names:
+                out[a.asname or a.name] = n.module
+    return out
+
+
+def _uses_outside_definition(text: str, name: str) -> int:
+    """Whole-word occurrences of `name` in `text` outside every top-level definition OF `name`
+    (a def/class with its decorators, docstring and body, or a `name = lambda` binding). An unparseable text has no span to cut, so its
+    first occurrence is taken as the definition's own."""
+    tree, offset = parse_introduced(text)
+    if tree is None:
+        return max(0, sum(1 for tok in _TOKEN_RX.findall(text or "") if tok == name) - 1)
+    lines = textwrap.dedent(text).splitlines()
+    for node in (tree.body[0].body if offset else tree.body):
+        own = (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+               and node.name == name) or (
+            isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda)
+            and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == name)
+        if own:
+            first = min([node.lineno] + [d.lineno for d in getattr(node, "decorator_list", [])]) - offset
+            for i in range(first - 1, node.end_lineno - offset):
+                if 0 <= i < len(lines):
+                    lines[i] = ""
+    return sum(1 for tok in _TOKEN_RX.findall("\n".join(lines)) if tok == name)
 
 
 def _introduced_units(text: str) -> list:
@@ -1086,9 +1139,10 @@ def _introduced_units(text: str) -> list:
     if tree is None:
         return []                    # unparseable fragment -> never a finding (FN-safe)
     out = []
+    imported = _imports_of(tree)
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            if node.decorator_list:
+            if any(_decorator_registers(d, imported) for d in node.decorator_list):
                 continue              # a framework registered it: that IS the claim
             name = node.name
         elif (isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda)
@@ -1138,14 +1192,11 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
             introduced.append(text)
     if not introduced:
         return None
-    # REACHED: the name appears in the session's introduced text beyond its own `def`/`class`
-    # line. One occurrence is the definition itself; a second is a use.
-    blob = "\n".join(introduced)
+    # REACHED: the name appears in the session's introduced text outside its own definition.
     on_disk: dict = {}
     unclaimed = [subject for _ev, subject in unwitnessed(
         events, owes=unclaimed_owes,
-        paid=(lambda s: sum(1 for tok in _TOKEN_RX.findall(blob or "") if tok == s[0])
-                        >= _REACHED_AT,
+        paid=(lambda s: any(_uses_outside_definition(t, s[0]) for t in introduced),
               lambda s: _reached_in_file(s[0], s[1], on_disk),
               lambda s: _named_by_operator(s[0], transcript_path)))]
     if not unclaimed:
@@ -1158,6 +1209,7 @@ def unclaimed_unit_gate(history, *, transcript_path=None) -> Optional[Finding]:
         line=0,
         level="error",
         message=(
+            "row gate.unclaimed_unit (a unit drawn from no claim): "
             f"`{name}` was added and answers to nothing on the record{more}: no operator turn "
             f"names it, nothing this session wrote reaches it, and no decorator registered it."
         ),
@@ -1180,7 +1232,7 @@ _FILE_READ_CAP = 2_000_000
 
 
 def _reached_in_file(name: str, path: str, cache: dict) -> bool:
-    """True iff the file the unit landed in names it at least `_REACHED_AT` times: an Edit that
+    """True iff the file the unit landed in names it outside its own definition: an Edit that
     adds `def f` to a file already registering `f` by name (`_PREDICATES = {X.id: f}`) carries the
     definition but not the use, which is on disk. An unreadable file is no evidence."""
     if not path:
@@ -1188,10 +1240,10 @@ def _reached_in_file(name: str, path: str, cache: dict) -> bool:
     if path not in cache:
         try:
             with open(path, encoding="utf-8", errors="replace") as fh:
-                cache[path] = _TOKEN_RX.findall(fh.read(_FILE_READ_CAP))
+                cache[path] = fh.read(_FILE_READ_CAP)
         except OSError:
-            cache[path] = []
-    return sum(1 for tok in cache[path] if tok == name) >= _REACHED_AT
+            cache[path] = ""
+    return _uses_outside_definition(cache[path], name) > 0
 
 
 def _named_by_operator(name: str, transcript_path) -> bool:

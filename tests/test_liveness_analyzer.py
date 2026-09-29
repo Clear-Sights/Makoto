@@ -248,3 +248,27 @@ def test_value_read_only_in_control_flow_is_live():
     assert illusory_statements(_func('def fn(xs):\n n = 0\n for x in xs:\n  n += 1\n return n == 0')) == []
     # iterable read by a for
     assert illusory_statements(_func('def fn(xs):\n items = list(xs)\n for i in items:\n  print(i)\n return 0')) == []
+
+
+# ---- E1 (round nine): def-use, not name; the module body is a scope ----
+def test_a_store_killed_by_a_later_rebind_is_dead_though_its_name_is_live():
+    from makoto.substrate.deadPureStatement import analyze_file
+    src = "def f(a):\n    x = 1 + 2\n    x = a\n    return x\n"
+    assert [r["line"] for r in analyze_file(src, "m.py")] == [2]
+
+
+def test_a_store_read_before_the_rebind_or_skipped_by_a_jump_stays_live():
+    from makoto.substrate.deadPureStatement import analyze_file
+    read_first = "def f(a):\n    x = 1 + 2\n    y = x\n    x = a\n    return x + y\n"
+    jump = ("def f(xs):\n    x = 0\n    for v in xs:\n        if x:\n            return v\n"
+            "        x = 1\n        if v:\n            continue\n        x = v\n    return None\n")
+    under_try = ("def f(a):\n    try:\n        x = 1 + 2\n        g()\n        x = a\n"
+                 "    except E:\n        return x\n    return x\n")
+    for src in (read_first, jump, under_try):
+        assert analyze_file(src, "m.py") == [], src
+
+
+def test_a_bare_pure_computation_at_module_level_is_dead_and_a_binding_is_not():
+    from makoto.substrate.deadPureStatement import analyze_file
+    assert [r["line"] for r in analyze_file("print(2)\n1 + 2\n", "m.py")] == [2]
+    assert analyze_file('"""doc"""\nX = 1 + 2\nf(X)\n', "m.py") == []

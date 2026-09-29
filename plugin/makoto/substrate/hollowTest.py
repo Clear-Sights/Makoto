@@ -42,6 +42,16 @@ _BROAD_EXC_NAMES = ("Exception", "BaseException")
 
 # ---- filename / test-function scope gate -------------------------------------------------------
 def _is_test_filename(path: str) -> bool:
+    """A file whose `test_*` functions are verifiers: pytest's default `python_files` convention
+    (`test_*.py`, `*_test.py`), OR any `.py` under a `tests`/`test` directory. The name is not
+    what makes a verifier: pytest collects a file named on its command line whatever it is
+    called, so `tests/probe.py` holding `def test_x` is run exactly like `tests/test_x.py`."""
+    parts = path.replace("\\", "/").split("/")
+    return _is_collected_name(path) or (
+        parts[-1].endswith(".py") and any(d.lower() in ("tests", "test") for d in parts[:-1]))
+
+
+def _is_collected_name(path: str) -> bool:
     """pytest's own default `python_files` discovery convention: `test_*.py` or `*_test.py`."""
     name = path.replace("\\", "/").rsplit("/", 1)[-1]
     return (name.startswith("test_") and name.endswith(".py")) or name.endswith("_test.py")
@@ -267,22 +277,98 @@ def _contains_call(node) -> bool:
     return any(isinstance(n, ast.Call) for n in ast.walk(node))
 
 
-# ---- sub-pattern 2: literal tautology ------------------------------------------------------------
+# ---- sub-pattern 2: a verdict fixed before the test runs -----------------------------------------
+# Pure builtins a constant verdict may be computed with. Only these are ever called, and only on
+# constant arguments, so evaluating one cannot reach the code under test or the world.
+_CONST_FNS = {f.__name__: f for f in (len, bool, int, str, float, abs, min, max, sum, sorted,
+                                      tuple, list, set, frozenset, all, any, round)}
+_CONST_BINOPS = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b,
+                 ast.Mult: lambda a, b: a * b, ast.Mod: lambda a, b: a % b,
+                 ast.FloorDiv: lambda a, b: a // b, ast.Div: lambda a, b: a / b}
+_CONST_CMPS = {ast.Eq: lambda a, b: a == b, ast.NotEq: lambda a, b: a != b,
+               ast.Lt: lambda a, b: a < b, ast.LtE: lambda a, b: a <= b,
+               ast.Gt: lambda a, b: a > b, ast.GtE: lambda a, b: a >= b,
+               ast.In: lambda a, b: a in b, ast.NotIn: lambda a, b: a not in b,
+               ast.Is: lambda a, b: a is b, ast.IsNot: lambda a, b: a is not b}
+_NO_VALUE = object()
+_CONST_SIZE_CAP = 10_000
+
+
+def _const_value(node):
+    """The value of `node` when it depends on nothing the test computes -- literals, displays,
+    and the pure builtins/operators above over them -- else `_NO_VALUE`. Bounded: a value
+    larger than `_CONST_SIZE_CAP` is not computed further."""
+    try:
+        v = ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        v = _NO_VALUE
+    if v is not _NO_VALUE:
+        return v
+    try:
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+            elts = [_const_value(e) for e in node.elts]
+            if any(e is _NO_VALUE for e in elts):
+                return _NO_VALUE
+            return {ast.List: list, ast.Tuple: tuple, ast.Set: set}[type(node)](elts)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.Not, ast.USub, ast.UAdd)):
+            a = _const_value(node.operand)
+            if a is _NO_VALUE:
+                return _NO_VALUE
+            return (not a) if isinstance(node.op, ast.Not) else (-a if isinstance(node.op, ast.USub) else +a)
+        if isinstance(node, ast.BinOp) and type(node.op) in _CONST_BINOPS:
+            a, b = _const_value(node.left), _const_value(node.right)
+            if a is _NO_VALUE or b is _NO_VALUE:
+                return _NO_VALUE
+            if any(hasattr(x, "__len__") and len(x) > _CONST_SIZE_CAP for x in (a, b)) \
+                    or (isinstance(node.op, ast.Mult) and not all(isinstance(x, (int, float)) for x in (a, b))
+                        and any(isinstance(x, int) and x > _CONST_SIZE_CAP for x in (a, b))):
+                return _NO_VALUE
+            return _CONST_BINOPS[type(node.op)](a, b)
+        if isinstance(node, ast.Compare):
+            vals = [_const_value(x) for x in (node.left, *node.comparators)]
+            if any(x is _NO_VALUE for x in vals):
+                return _NO_VALUE
+            return all(_CONST_CMPS[type(op)](vals[i], vals[i + 1]) for i, op in enumerate(node.ops))
+        if isinstance(node, ast.BoolOp):
+            vals = [_const_value(x) for x in node.values]
+            if any(x is _NO_VALUE for x in vals):
+                return _NO_VALUE
+            out = vals[0]
+            for x in vals[1:]:
+                out = (out or x) if isinstance(node.op, ast.Or) else (out and x)
+            return out
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and node.func.id in _CONST_FNS and not node.keywords:
+            args = [_const_value(a) for a in node.args]
+            if any(a is _NO_VALUE for a in args):
+                return _NO_VALUE
+            return _CONST_FNS[node.func.id](*args)
+    except Exception:
+        return _NO_VALUE                                  # evaluating it raises: not a verdict
+    return _NO_VALUE
+
+
+def _always_truthy(node) -> bool:
+    """True when `node`'s truth is True whatever the test computes: a constant that is truthy, or
+    an `or` with any always-truthy operand (`r == 2 or True` passes whatever `r` is), or an `and`
+    whose operands all are."""
+    if isinstance(node, ast.BoolOp):
+        truths = [_always_truthy(v) for v in node.values]
+        return any(truths) if isinstance(node.op, ast.Or) else all(truths)
+    v = _const_value(node)
+    if v is _NO_VALUE:
+        return False
+    try:
+        return bool(v)
+    except Exception:
+        return False
+
+
 def _is_tautology(test) -> bool:
-    def _literal_truth(node):
-        """bool(<literal>) when the truth value is statically decidable, else None. Covers every
-        `ast.literal_eval`-able display (`1`, `"nonempty"`, `[1]`, `(0,)`) plus `not <literal>`."""
-        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
-            inner = _literal_truth(node.operand)
-            return None if inner is None else (not inner)
-        try:
-            return bool(ast.literal_eval(node))
-        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
-            return None                                   # not a literal: truth unknown
-    if _literal_truth(test) is True:
-        return True                                       # a statically-truthy literal always passes
-    if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "bool"\
-            and len(test.args) == 1 and not test.keywords and _literal_truth(test.args[0]) is True:
+    """The verdict is fixed before the test runs: it cannot come out false whatever the code
+    under test does. Read off the value, not its spelling -- `assert True`, `assert len([1]) == 1`
+    and `assert r == 2 or True` are one effect."""
+    if _always_truthy(test):
         return True
     if isinstance(test, ast.Compare) and len(test.ops) == 1\
             and isinstance(test.ops[0], (ast.Eq, ast.Is, ast.LtE, ast.GtE)):
@@ -302,15 +388,20 @@ def _is_tautology(test) -> bool:
 
 
 # ---- sub-pattern 3: swallowed failure path -------------------------------------------------------
-def _no_op_handler_body(handler) -> bool:
-    for s in handler.body:
-        if isinstance(s, ast.Pass):
-            continue
-        if isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant) and (
-                s.value.value is Ellipsis or isinstance(s.value.value, str)):
-            continue                                          # a docstring/`...`-as-comment: still no-op
-        return False
+def _handler_passes(handler, helper_asserts: frozenset = frozenset()) -> bool:
+    """The handler lets the test PASS: nothing in it raises, asserts, or fails. `pass`, `...`,
+    `return`, a log line and a flag are one effect -- the failure went nowhere."""
+    for n in _iter_own_scope(handler.body):
+        if isinstance(n, ast.Raise) or _is_recognized_assertion(n, helper_asserts):
+            return False
+        if isinstance(n, ast.Expr) and _is_skip_call_stmt(n):
+            return False                                      # an honest skip is reported, not a pass
     return True
+
+
+def _handler_leaves(handler) -> bool:
+    """The handler ends the test (`return`), so no assertion after the try can see the failure."""
+    return any(isinstance(n, ast.Return) for n in _iter_own_scope(handler.body))
 
 
 def _is_broad_exc_name(node) -> bool:
@@ -330,8 +421,9 @@ def _is_broad_handler_type(handler) -> bool:
     return _is_broad_exc_name(t)
 
 
-def _try_has_qualifying_handler(try_stmt) -> bool:
-    return any(_no_op_handler_body(h) and _is_broad_handler_type(h) for h in try_stmt.handlers)
+def _swallowing_handlers(try_stmt, helper_asserts: frozenset = frozenset()) -> list:
+    return [h for h in try_stmt.handlers
+            if _is_broad_handler_type(h) and _handler_passes(h, helper_asserts)]
 
 
 def _try_body_has_call(try_stmt) -> bool:
@@ -339,13 +431,16 @@ def _try_body_has_call(try_stmt) -> bool:
 
 
 def _is_swallowed_failure(try_stmt, func_stmts, helper_asserts: frozenset = frozenset()) -> bool:
-    if not _try_has_qualifying_handler(try_stmt):
+    handlers = _swallowing_handlers(try_stmt, helper_asserts)
+    if not handlers:
         return False
     # the try body must contain something that can FAIL: a call under test, or an assertion the
     # broad no-op handler would swallow (`try: assert x == 5 / except Exception: pass`)
     if not _try_body_has_call(try_stmt) and not any(
             isinstance(n, ast.Assert) for s in try_stmt.body for n in _walk_own_scope(s)):
         return False
+    if any(_handler_leaves(h) for h in handlers):
+        return True                                           # it returns: nothing after it runs
     try_subtree_ids = {id(n) for n in _walk_own_scope(try_stmt)}
     for n in _iter_own_scope(func_stmts):
         if id(n) in try_subtree_ids:
@@ -539,6 +634,9 @@ _KIND_MESSAGE = {
 }
 
 
+_ROW = "row gate.hollow_test (a test that cannot catch a failure): "
+
+
 def _allowed(lineno, lines) -> bool:
     """On-the-record override (makoto convention), via the ONE canonical marker predicate,
     requiring a colon and a NON-EMPTY reason -- matching
@@ -552,7 +650,7 @@ def _run(ctx) -> list:
     out = []
     for p, src in iter_touched_python_sources(ctx.touched, getattr(ctx, "cwd", None), ctx.fs_read):
         lines = src.splitlines()
-        if _is_test_filename(str(p)):
+        if _is_collected_name(str(p)):
             # A test file that does not parse cannot be analyzed OR collected: absence of
             # findings over it would be vacuous, not clean. Report it, don't fail open.
             try:
@@ -565,7 +663,7 @@ def _run(ctx) -> list:
                         file=str(p),
                         line=bad_line,
                         level="error",
-                        message=(f"hollow test scan impossible: test file does not parse "
+                        message=(_ROW + f"hollow test scan impossible: test file does not parse "
                                  f"(SyntaxError near line {bad_line}), so none of its tests can "
                                  "be collected or evaluated — fix the syntax error, or annotate "
                                  "`# makoto-allow: <reason>` on that line only if intentional."),
@@ -579,7 +677,7 @@ def _run(ctx) -> list:
                 file=str(p),
                 line=f["line"],
                 level="error",                                # a BLOCKING finding
-                message=("hollow test: " + _KIND_MESSAGE[f["kind"]].format(func=f["func"], line=f["line"])
+                message=(_ROW + "hollow test: " + _KIND_MESSAGE[f["kind"]].format(func=f["func"], line=f["line"])
                           + ". A test that cannot catch a failure is not a test; make it assert real "
                             "behavior or remove it; annotate `# makoto-allow: <reason>` only if "
                             "intentional."),
