@@ -84,7 +84,7 @@ def test_an_edit_reports_as_much_as_a_prose_write():
         [_prose_write("HANDOFF.md", "The suite passes.", tool_name="Edit")]) is not None
 
 
-# ---- the target firewall: prose is a report, code is data ------------------------------------
+# ---- the data firewall: a verdict in code is data --------------------------------------------
 
 @pytest.mark.parametrize("path", ["tests/test_x.py", "plugin/makoto/kit.py", "data.json",
                                   "Makefile", "run.sh"])
@@ -135,26 +135,40 @@ def test_a_pretooluse_verifier_row_is_not_a_run():
         history=[run], pattern=CHECK) is not None
 
 
-def test_bash_is_not_a_report_channel_and_the_TARGET_gate_is_why():
-    """The recall bound: a report written through a heredoc, `echo >` or `sed -i` is not seen.
+def _bash(command):
+    return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
+                        "tool_input": {"command": command}, "tool_response": {"stdout": ""}}}
 
-    And the mechanism, because a plant found the docstring wrong about it. Admitting Bash to the
-    tool allowlist does NOT make this fire: a Bash event carries no `file_path`, so the
-    prose-target gate has already decided it. The allowlist is defense in depth over the same
-    exclusion, not the thing doing the excluding -- measured below by admitting Bash and
-    requiring silence anyway."""
-    import makoto.checks.switch as mod
-    ev = {"hook_event_name": "PostToolUse", "tool_name": "Bash",
-          "tool_input": {"command": "echo 'The suite passes.' > HANDOFF.md"},
-          "tool_response": {"stdout": ""}}
-    assert report_before_run_gate([{"payload": ev}]) is None
-    original = mod._MUTATION_TOOLS
-    try:
-        mod._MUTATION_TOOLS = original | {"Bash"}
-        assert not mod._reports_a_run_verdict(ev), \
-            "the prose-target gate, not the tool allowlist, is what excludes a Bash report"
-    finally:
-        mod._MUTATION_TOOLS = original
+
+@pytest.mark.parametrize("command", [
+    "echo 'The suite passes.' > HANDOFF.md",
+    "printf 'The suite passes.\\n' >> STATUS.md",
+    "echo 'The suite passes.' | tee STATUS",
+    "cat > STATUS.md <<EOF\nThe suite passes.\nEOF",
+])
+def test_a_bash_write_is_a_report_channel(command):
+    """Round nine C11: the effect is the verdict landing in a file, whatever writes it."""
+    assert report_before_run_gate([_bash(command)]) is not None, command
+
+
+@pytest.mark.parametrize("command", [
+    "echo 'The suite passes.'",                       # printed, not written
+    "echo 'The suite passes.' > /dev/null",            # a device is not a file
+    "python3 -m pytest -q > report.md",               # the run writes its own output
+    "echo 'The suite passes.' 2>&1",
+])
+def test_a_bash_command_that_writes_no_report(command):
+    assert report_before_run_gate([_bash(command)]) is None, command
+
+
+@pytest.mark.parametrize("path", ["STATUS.html", "STATUS", "notes.tex"])
+def test_any_document_name_is_in_subject(path):
+    """Round nine C11: the target is not an extension list; STATUS.html was the escape."""
+    assert report_before_run_gate([_prose_write(path, "<p>The suite passes.</p>")]) is not None, path
+
+
+def test_a_quoted_verdict_is_cited_not_stated():
+    assert report_before_run_gate([_prose_write("HANDOFF.md", 'The CI bot printed "58 passed".')]) is None
 
 
 def test_the_prose_failure_count_bound_is_real_and_named():
