@@ -35,6 +35,9 @@ from makoto.kit import ast_introduced_predicate, callee_chain
 
 # `_TARGET_RX` is .py-only — .md is prose.
 _INTEG_RX = _lazy_re(_INTEG_VOCAB, re.I)  # shared L0 integrity vocabulary
+# A checker file: anything under a check/checks directory (nested included), or a .py whose name
+# says it checks, lints, audits or verifies. Every verifier row reads this one surface.
+_CHECKER_RX = _lazy_re(r"(^|[/\\])(checks?[/\\].+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
 
 # An env-var READ in CALL form (callee_chain) vs SUBSCRIPT form (value chain).
 _ENV_CALL_CHAINS = {"os.getenv", "getenv", "os.environ.get", "environ.get"}
@@ -116,67 +119,57 @@ env_CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOC
 # content.verifier_body_hollowed predicate — verifier NEUTERED (body hollowed, or a broad except
 # swallows the failure).
 #
-# On the constitution integrity-check surface, fires on a check that "exists" but verifies
-# nothing:
+# On a checker file (`_CHECKER_RX`), fires on a check that "exists" but can never fail:
 #
-#   (A) HOLLOW BODY — a verifier-named function whose entire body (after an optional docstring)
-#       is one neutering statement: `return <truthy-const>` / `pass` / `assert <truthy-const>`.
+#   (A) HOLLOW BODY — a verifier-named function whose body (after an optional docstring) holds
+#       nothing that can fail the verdict: no raise, no assert on a non-tautology, no return of
+#       anything but a tautology or None, no call except output (print / log.*). However many
+#       no-op statements pad it, a body that cannot fail verifies nothing.
 #   (B) SWALLOWED EXCEPTION — a broad except clause (bare `except:` / `except Exception` /
-#       `except BaseException`) whose body swallows the failure into a pass.
+#       `except BaseException`) whose body likewise cannot fail: the failure is swallowed.
 #
-# Distinct from content.verifier_predicate_weakened, which catches a loosened comparator but not
-# a wholesale-hollow body (its body_rx requires startswith/endswith/re.match/in[], none present
-# here) — non-redundant and material on the same surface.
+# Distinct from content.verifier_predicate_weakened, which catches a loosened comparator; this
+# row catches the verdict removed outright.
 #
-# FP-safety: (a) the narrow path anchor excludes ordinary permissive base-class/null-object
-# `return True` methods off the integrity-check path — near-dead in the honest corpus, so
-# FP-safety rests mainly on (b)-(e). (b) the verifier-NAME gate excludes trivial helpers/dunders.
-# (c) the broad-except gate excludes a SPECIFIC-typed except (honest narrowing never fires).
-# (d) the active-code AST gate means a comment/docstring/string mention never fires.
-# (e) ``makoto-allow: <reason>`` exempts an intentional trivially-true base / documented degrade-open.
+# FP-safety: (a) the verifier-NAME gate excludes trivial helpers/dunders. (b) the broad-except
+# gate excludes a SPECIFIC-typed except (honest narrowing never fires). (c) the active-code AST
+# gate means a comment/docstring/string mention never fires. (d) any call but output counts as
+# work, so a verifier that delegates is never hollow. (e) ``makoto-allow: <reason>`` exempts an
+# intentional trivially-true base / documented degrade-open.
 from makoto.kit import ast_introduced_predicate
 
-# `[/\\]` + `.+` covers nested `…/checks/sub/seal.py` and a backslash-delivered Windows path.
-body__TARGET_RX = _lazy_re(r"constitution[/\\]integrity[/\\]checks[/\\].+\.py$")
 # A verifier-named function: an integrity/verification verb, or a generic entry-point name
-# (`run`/`main`, anchored; `predicate`/`probe`/`scan`/`seal` substrings) — narrow context (the
-# integrity-checks dir) makes these load-bearing rather than generic.
+# (`run`/`main`, anchored; `predicate`/`probe`/`scan`/`seal` substrings).
 _VERIFIER_NAME_RX = _lazy_re(
     r"(?i)(verif|valid|integrit|attest|check|ensure|enforce|assert|predicate|probe|scan|seal|^run$|^main$)")
 _BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
+_OUTPUT_CALLS = frozenset({"print", "debug", "info", "warning", "warn", "log"})
 
 
 from makoto.substrate.hollowTest import _is_tautology
 
 
-def _swallows(stmt) -> bool:
-    """One statement that NEUTERS a check: `pass`, a bare `...` ellipsis stub, `return
-    <tautology>`, or `assert <tautology>`."""
-    if isinstance(stmt, ast.Pass):
+def _can_fail(node) -> bool:
+    """True iff `node` can fail a verdict: a raise, an import (raises on a missing module), an
+    await/yield, an assert or return of a non-tautology (None excepted: it is the no-finding
+    verdict), or any call but output."""
+    if isinstance(node, (ast.Raise, ast.Import, ast.ImportFrom, ast.Await, ast.Yield, ast.YieldFrom)):
         return True
-    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant)\
-            and stmt.value.value is Ellipsis:
-        return True
-    if isinstance(stmt, ast.Return) and _is_tautology(stmt.value):
-        return True
-    return isinstance(stmt, ast.Assert) and _is_tautology(stmt.test)
-
-
-def _post_docstring(body):
-    """`body` minus a leading docstring statement."""
-    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)\
-            and isinstance(body[0].value.value, str):
-        return body[1:]
-    return body
+    if isinstance(node, ast.Assert):
+        return not _is_tautology(node.test)
+    if isinstance(node, ast.Return):
+        v = node.value
+        return not (v is None or (isinstance(v, ast.Constant) and v.value is None) or _is_tautology(v))
+    if isinstance(node, ast.Call):
+        f = node.func
+        name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
+        return name not in _OUTPUT_CALLS
+    return False
 
 
 def _hollow_body(body) -> bool:
-    """True iff `body` (post-docstring) is exactly one neutering statement, or is EMPTY after the
-    docstring (a docstring-only body checks exactly as much as `pass` does)."""
-    b = _post_docstring(body)
-    if not b:
-        return True                      # docstring-only: zero effective statements
-    return len(b) == 1 and _swallows(b[0])
+    """True iff nothing in `body` can fail the verdict (a docstring-only body included)."""
+    return not any(_can_fail(n) for stmt in body for n in ast.walk(stmt))
 
 
 def _broad_except(handler: ast.ExceptHandler) -> bool:
@@ -214,24 +207,28 @@ def _hollow_node_match(node: ast.AST) -> Optional[str]:
     return None
 
 
-body_predicate = ast_introduced_predicate(target_rx=body__TARGET_RX, node_match=_hollow_node_match)
+body_predicate = ast_introduced_predicate(target_rx=_CHECKER_RX, node_match=_hollow_node_match)
 
 
 body_RETRY_HINT = "Don't neuter a verifier on the integrity-check surface: gutting its body to `return True`/`pass`/`assert True`, or wrapping it in a broad `except Exception: pass`/`return True` that swallows the failure, makes a check that 'exists' but never verifies (the wholesale cousin of loosening a comparator, content.verifier_predicate_weakened). Implement the real check; catch the SPECIFIC expected exception, not a bare/`Exception` swallow; if a trivially-true base or a documented degrade-open is genuinely intended, annotate `makoto-allow: <reason>`."
 body_DESCRIPTION = 'verifier neutered — body hollowed (return-True/pass/assert-True) or a broad except swallows the failure, on the integrity-check surface'
 
-body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('constitution/integrity/checks', 'except', 'assert True'), retry_hint=body_RETRY_HINT, description=body_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('def ', 'except', 'lambda'), retry_hint=body_RETRY_HINT, description=body_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 
 # content.verifier_predicate_weakened predicate — verifier predicate weakened (loose-comparator
 # shape).
 #
-# On the constitution integrity-check surface, fires on one of the loose-comparator shapes a
-# strict `==` status test gets weakened into, matched as REAL AST nodes in introduced code:
+# On a checker file (`_CHECKER_RX`), fires on one of the loose-comparator shapes a strict `==`
+# status test gets weakened into, matched as REAL AST nodes in introduced code:
 #
 #   * `.startswith(` / `.endswith(` (prefix/suffix instead of equality),
 #   * `re.match(` / `re.search(` (pattern instead of equality),
 #   * membership in a LITERAL collection — `in [...]` / `in (...)` / `in {...}`,
-#   * substring membership with a string-literal needle — `"ok" in status`.
+#   * substring membership with a string-literal needle — `"ok" in status`,
+#   * a VERDICT (returned, asserted, or a lambda's body) that is a negated match against a
+#     literal — `status != 'fail'`, `status not in ('fail', 'error')`, `not status == 'fail'`:
+#     it passes every value but the ones named. In an `if` test the same `!=` guards a failure
+#     branch and is strict, so only the verdict position counts.
 #
 # AST-node matching means a comment, docstring, or string-literal mention never fires, and a
 # list-literal `for name in [...]:` iteration (`ast.For`, not `ast.Compare`) is not a comparator
@@ -240,7 +237,7 @@ body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", postu
 # stays silent (FN-safe).
 #
 # SCOPED to the comparator vocabulary above — a relaxed numeric bound (`>=` -> `>`), a downgraded
-# `assert`, a dropped negation, or wholesale removal of the predicate are diff-shaped facts this
+# `assert`, or wholesale removal of the predicate are diff-shaped facts this
 # scan does not claim to catch (content.verifier_body_hollowed's hollowed-function half is
 # separate).
 #
@@ -252,7 +249,6 @@ import textwrap
 
 from makoto.kit import ast_introduced_predicate, callee_chain, parse_introduced
 
-weakened__TARGET_RX = _lazy_re(r"constitution/integrity/checks/.+\.py$")
 _RE_LOOSE_CHAINS = frozenset({"re.match", "re.search"})
 _METHOD_LOOSE = frozenset({"startswith", "endswith"})
 _CONTAINER_LABELS = ((ast.List, "in [...]"), (ast.Tuple, "in (...)"), (ast.Set, "in {...}"))
@@ -277,7 +273,29 @@ def _loose_label(node: ast.AST) -> Optional[str]:
                 if isinstance(left, ast.Constant) and isinstance(left.value, str):
                     return "'<literal>' in <expr> (substring membership)"
             left = comp
+        return None
+    verdict = node.value if isinstance(node, ast.Return) else node.test if isinstance(node, ast.Assert)\
+        else node.body if isinstance(node, ast.Lambda) else None
+    if verdict is not None and _negated_literal(verdict):
+        return "negated-literal verdict (passes every value but one)"
     return None
+
+
+def _is_literal(n) -> bool:
+    return (isinstance(n, ast.Constant) and isinstance(n.value, str))\
+        or (isinstance(n, (ast.List, ast.Tuple, ast.Set)) and all(_is_literal(e) for e in n.elts))
+
+
+def _negated_literal(e) -> bool:
+    """`x != 'lit'` / `x is not 'lit'` / `x not in (<literals>)`, or `not` of the positive form."""
+    pos = isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.Not)
+    e = e.operand if pos else e
+    if not (isinstance(e, ast.Compare) and len(e.ops) == 1):
+        return False
+    neg_ops, pos_ops = (ast.NotEq, ast.IsNot, ast.NotIn), (ast.Eq, ast.Is, ast.In)
+    if not isinstance(e.ops[0], pos_ops if pos else neg_ops):
+        return False
+    return _is_literal(e.left) or _is_literal(e.comparators[0])
 
 
 def _parse_fragment(content: str):
@@ -294,13 +312,13 @@ def _parse_fragment(content: str):
         return None, 0
 
 
-weakened_predicate = ast_introduced_predicate(target_rx=weakened__TARGET_RX, node_match=_loose_label, parse=_parse_fragment)
+weakened_predicate = ast_introduced_predicate(target_rx=_CHECKER_RX, node_match=_loose_label, parse=_parse_fragment)
 
 
-weakened_RETRY_HINT = "Use '==' for status comparison — not '.startswith()' / '.endswith()' / 're.match' / 're.search', and not membership ('in [...]' / 'in (...)' / 'in {...}', or a string-literal 'in' substring test). Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
+weakened_RETRY_HINT = "Use '==' for status comparison — not '.startswith()' / '.endswith()' / 're.match' / 're.search', and not membership ('in [...]' / 'in (...)' / 'in {...}', or a string-literal 'in' substring test), and not a verdict that only excludes a failure literal ('!= \'fail\''): name the one value that passes. Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
 weakened_DESCRIPTION = 'verifier predicate weakened — loose-comparator shape'
 
-weakened_CHECK = _Check(id='content.verifier_predicate_weakened', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('constitution/integrity/checks',), retry_hint=weakened_RETRY_HINT, description=weakened_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+weakened_CHECK = _Check(id='content.verifier_predicate_weakened', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('startswith', 'endswith', 'match(', 'search(', ' in ', '!=', ' is not ', 'not '), retry_hint=weakened_RETRY_HINT, description=weakened_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 # content.illusory_authorship_trailer predicate — illusory Claude/Anthropic-authorship
 # attribution.
 #
@@ -2489,9 +2507,6 @@ def _deny(pattern, fp, what, snippet) -> Finding:
                    retry_hint=pattern.retry_hint, snippet=str(snippet)[:120])
 
 
-_CHECKER_RX = _lazy_re(r"(^|[/\\])(checks?[/\\][^/\\]+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
-
-
 # content.rule_without_runner -- register B7 RULE WITH NO RUNNER. A rule line (always / never /
 # must / do not) added to any instruction file the harness loads -- CLAUDE*.md (CLAUDE.local.md
 # included), AGENTS*.md, .claude/rules/*.md -- must name what runs it: a `runner:` token, or a path
@@ -2543,10 +2558,12 @@ rule_runner_CHECK = _Check(id="content.rule_without_runner", applies_at="Pre", p
 # checker file (a new `*_predicate`/`check_*` function or a `Check(` row) must name its
 # benign-input pass case in the same change: `pass: <test id or fixture path>`, and the named file
 # must exist. Discharge: write the pass twin and name it.
-# a check ROW or its predicate -- `def x_predicate(`, `def check_x(`, `X_CHECK = Check(` -- not a
-# bare verifier function (`def check(s)`), which content.verifier_predicate_weakened reads.
+# a check ROW or its predicate -- any function (sync or async) named `x_predicate`/`check_x`, or
+# any line that constructs a `Check(` row however it is bound (plain, annotated, in a call) --
+# not a bare verifier function (`def check(s)`), which content.verifier_predicate_weakened reads.
 _NEW_CHECK_RX = _lazy_re(
-    r"^\s*(?:def\s+(?:\w+_(?:predicate|check|gate)|(?:check|predicate|gate)_\w+)\s*\(|\w+\s*=\s*_?Check\s*\()")
+    r"^\s*(?:(?:async\s+)?def\s+(?:\w+_(?:predicate|check|gate)|(?:check|predicate|gate)_\w+)\s*\("
+    r'''|(?!(?:class|def|async)\b|#)[^#]*?(?<![\w'"])_?Check\s*\()''')
 _PASS_RX = _lazy_re(r"\bpass:\s*`?([^\s`]+)")
 
 
