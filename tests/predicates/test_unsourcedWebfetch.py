@@ -43,23 +43,23 @@ def test_silent_on_url_in_prior_websearch_payload():
     assert f is None
 
 
-def test_silent_on_trusted_host_anthropic():
-    f = predicate(current_event=_webfetch("https://docs.anthropic.com/en/api"),
-                  history=[], pattern=_PAT, conn=None)
-    assert f is None
+def test_fires_on_invented_path_under_well_known_host():
+    """a well-known host does not witness a path under it (round nine H1)."""
+    for url in ("https://docs.anthropic.com/en/api", "https://github.com/anthropics/anthropic-sdk-python",
+                "https://en.wikipedia.org/wiki/Transformer"):
+        assert predicate(current_event=_webfetch(url), history=[], pattern=_PAT, conn=None) is not None
 
 
-def test_silent_on_trusted_host_github():
-    f = predicate(current_event=_webfetch("https://github.com/anthropics/anthropic-sdk-python"),
-                  history=[], pattern=_PAT, conn=None)
-    assert f is None
+def test_fires_on_unseen_url_fetched_by_bash_client():
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+          "tool_input": {"command": "curl -s https://obscure-site.example.org/paper/123 | head"}}
+    assert predicate(current_event=ev, history=[], pattern=_PAT, conn=None) is not None
 
 
-def test_silent_on_trusted_subdomain():
-    """subdomains of trusted hosts also pass."""
-    f = predicate(current_event=_webfetch("https://en.wikipedia.org/wiki/Transformer"),
-                  history=[], pattern=_PAT, conn=None)
-    assert f is None
+def test_silent_on_url_in_bash_non_client():
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+          "tool_input": {"command": "git commit -m 'see https://obscure-site.example.org/p'"}}
+    assert predicate(current_event=ev, history=[], pattern=_PAT, conn=None) is None
 
 
 def test_silent_on_non_webfetch_tool():

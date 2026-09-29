@@ -100,3 +100,23 @@ def test_not_a_repo_fails_open(tmp_path):
 def test_cd_moves_the_reading_into_the_repo(repo):
     work, _ = repo
     assert _fires(f"cd {shlex.quote(str(work))} && git commit -m x", "/") is not None
+
+
+def test_config_write_earlier_in_the_command_is_read(repo):
+    """Round nine A13: an include.path written by the same command stamps the commit."""
+    work, _ = repo
+    (work.parent / "ident.cfg").write_text(
+        "[user]\n\tname = Claude\n\temail = noreply" + "@anthropic.com\n")
+    cmd = f"{UNSET} git config include.path ../../ident.cfg && {UNSET} git commit -m x"
+    assert _fires(cmd, work) is not None
+    assert _fires(f"{UNSET} git config user.name Ann && {UNSET} git {HUMAN} commit -m x",
+                  work) is None
+
+
+def test_author_read_from_a_file_is_expanded(repo):
+    """Round nine A13: `--author "$(cat F)"` stamps what F holds."""
+    work, _ = repo
+    (work / "who.txt").write_text("Claude <noreply" + "@anthropic.com>\n")
+    (work / "ann.txt").write_text("Ann <ann@example.org>\n")
+    assert _fires(f'{UNSET} git {HUMAN} commit --author "$(cat who.txt)" -m x', work) is not None
+    assert _fires(f'{UNSET} git {HUMAN} commit --author "$(< ann.txt)" -m x', work) is None
