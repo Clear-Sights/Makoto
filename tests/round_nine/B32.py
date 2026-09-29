@@ -12,4 +12,8 @@ CASES = [
     case("base", {"stray.py": "VALUE = 1\n"}),
     case("newrow-undeclared", {"newrow.py": row_module("lambda c: None")}),
     case("declared-row-unrouted", then=UNROUTE),
+    # Importing this module ends the importing process silently; only a catalog READ, never an
+    # import, can still see its undeclared row.
+    case("unimportable-module-read-not-run",
+         {"newrow.py": "import os\nos._exit(0)\n" + row_module("lambda c: c")}),
 ]

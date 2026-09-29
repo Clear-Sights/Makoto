@@ -782,7 +782,7 @@ mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOC
 from pathlib import Path
 
 from makoto.substrate._declared import DECLARED_IDS
-from makoto.registry import Check, discover, scan
+from makoto.registry import ALLOWED_EDGES, Check, discover, scan
 from makoto.registry import POSTURE_BLOCK
 
 
@@ -832,60 +832,110 @@ def _manifest_ids(declared_py: Path) -> frozenset:
     return frozenset()
 
 
-def _returns_constant(fn) -> bool:
-    """True iff `fn`'s body reads nothing and calls nothing: its result is fixed before it runs."""
-    import dis
-    code = getattr(fn, "__code__", None)
-    if code is None:
-        return False
-    inert = {"RESUME", "NOP", "CACHE", "LOAD_CONST", "RETURN_CONST", "RETURN_VALUE"}
-    return all(i.opname in inert for i in dis.get_instructions(code))
+def _const_body(fn) -> bool:
+    """True iff a lambda/def's result is fixed before it runs: it returns a literal (or nothing)."""
+    if isinstance(fn, ast.Lambda):
+        return isinstance(fn.body, ast.Constant)
+    body = [st for st in fn.body
+            if not (isinstance(st, ast.Expr) and isinstance(st.value, ast.Constant))]
+    return (not body or len(body) == 1 and isinstance(body[0], ast.Return)
+            and (body[0].value is None or isinstance(body[0].value, ast.Constant)))
 
 
-def _cannot_fire(chk, mod, stem: str) -> bool:
-    """True iff dispatch can never get a finding out of `chk`: its `run` returns a fixed value,
-    or its predicate module resolves no predicate for its id, or it has neither."""
-    if callable(getattr(chk, "run", None)):
-        return _returns_constant(chk.run)
-    name = getattr(chk, "predicate_module", "") or ""
-    if not name:
+def _read_module(path: Path) -> Optional[dict]:
+    """One checks/ module, read by `ast` and never executed: its top-level Check(...) rows
+    `{id, var, run, pred, valid}`, whether it binds CHECK, its module-level defs, and the ids its
+    `_PREDICATES` router holds (None when it has no router). `None` if it does not parse."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return None
+    rows, defs, router, binds_check = [], {}, None, False
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defs[node.name] = node
+            continue
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+        names = [n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+        binds_check = binds_check or "CHECK" in names
+        val = node.value
+        if "_PREDICATES" in names and isinstance(val, ast.Dict):
+            router = {k.value.id if isinstance(k, ast.Attribute) and isinstance(k.value, ast.Name)
+                      else k.value if isinstance(k, ast.Constant) else None for k in val.keys}
+        call = val if isinstance(val, ast.Call) else None
+        fname = getattr(getattr(call, "func", None), "id", None) or getattr(
+            getattr(call, "func", None), "attr", "")
+        if call is None or not fname.endswith("Check"):
+            continue
+        kw = {k.arg: k.value for k in call.keywords if k.arg}
+        for i, field in enumerate(("id", "applies_at", "posture")):
+            if field not in kw and i < len(call.args):
+                kw[field] = call.args[i]
+
+        def lit(field):
+            v = kw.get(field)
+            return v.value if isinstance(v, ast.Constant) else None
+        edge = lit("applies_at")
+        valid = (isinstance(lit("id"), str) and bool(lit("id"))
+                 and (edge is None or edge in ALLOWED_EDGES) and "applies_at" in kw
+                 and "posture" in kw)
+        rows.append({"id": lit("id"), "var": names[0] if names else None, "run": kw.get("run"),
+                     "pred": kw.get("predicate_module"), "valid": valid})
+    return {"rows": rows, "defs": defs, "router": router, "binds_check": binds_check}
+
+
+def _row_cannot_fire(row, info, stem, catalog) -> bool:
+    """True iff dispatch can never get a finding out of the row: its run returns a fixed value,
+    its predicate module routes no predicate for it, or it has neither."""
+    run = row["run"]
+    if run is not None and not (isinstance(run, ast.Constant) and run.value is None):
+        if isinstance(run, ast.Lambda):
+            return _const_body(run)
+        if isinstance(run, ast.Name) and run.id in info["defs"]:
+            return _const_body(info["defs"][run.id])
+        return False                          # built elsewhere: not decidable here, not dead
+    pred = row["pred"]
+    if pred is None:
         return True
-    target = mod if name in (getattr(mod, "__name__", None), stem) or name.endswith("." + stem) else None
-    if target is None:
-        try:
-            import importlib
-            target = importlib.import_module(name)
-        except Exception:
-            return True
-    router = getattr(target, "_PREDICATES", None)
-    return not callable(getattr(target, "predicate", None)) or (
-        isinstance(router, dict) and chk.id not in router)
+    if isinstance(pred, ast.Name) and pred.id == "__name__":
+        target = info
+    elif isinstance(pred, ast.Constant) and isinstance(pred.value, str):
+        target = catalog.get(pred.value.rsplit(".", 1)[-1])
+    else:
+        return False
+    if target is None or "predicate" not in target["defs"]:
+        return True
+    return target["router"] is not None and not (
+        row["var"] in target["router"] or row["id"] in target["router"])
 
 
 def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
                                 declared: Optional[dict] = None, cwd=None) -> Optional[Finding]:
-    """Fires iff the catalog is not what its manifest says is live: a module with no live
+    """Fires iff the catalog is not what its manifest says is live: a module with no valid
     CHECK, a declared id nothing backs, a live id the manifest never declared, or a live row
     that can never fire. `None` on a consistent catalog. The catalog is the checkout at `cwd`
-    when it carries one, else the running package. One walk over the modules."""
-    from makoto.registry import _PACKAGE_DIR, _iter_modules, _primary_check, _valid_check
+    when it carries one, else the running package; either way it is READ (`ast`), never
+    imported, so no repo code runs in the hook and a checkout ahead of the installed plugin is
+    judged on its own text."""
+    from makoto.registry import _PACKAGE_DIR, _candidate_files
     checkout = _checkout_package(cwd) if package_dir is None else None
     if checkout is not None:
         package_dir = checkout / "checks"
         if declared is None:
             declared = _manifest_ids(checkout / "substrate" / "_declared.py")
     reg = DECLARED_IDS if declared is None else declared
-    mods, live, dead = [], set(), []
-    for stem, mod in _iter_modules(package_dir or _PACKAGE_DIR):
-        primary = _primary_check(mod)
-        if primary is None:
+    catalog = {p.stem: _read_module(p) for p in _candidate_files(package_dir or _PACKAGE_DIR)}
+    mods, live, dead = [], set(), set()
+    for stem, info in catalog.items():
+        rows = [r for r in (info or {}).get("rows", ()) if r["valid"]]
+        if info is None or not info["binds_check"] or not rows:
             mods.append(stem)
-        rows = ([primary] if primary is not None else []) + [
-            x for x in (getattr(mod, "EXTRA_CHECKS", None) or []) if _valid_check(x)]
-        for chk in rows:
-            live.add(chk.id)
-            if _cannot_fire(chk, mod, stem) and chk.id not in dead:
-                dead.append(chk.id)
+        for row in rows:
+            live.add(row["id"])
+            if _row_cannot_fire(row, info, stem, catalog):
+                dead.add(row["id"])
     ids = sorted(pid for pid in reg if pid not in live)
     undeclared = sorted(live - set(reg))
     if not (mods or ids or undeclared or dead):
