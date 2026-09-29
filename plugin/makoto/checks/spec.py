@@ -1572,7 +1572,8 @@ from makoto.kit import _record_exemption, makoto_allow_reason, makoto_allowed, s
 from makoto.state.citations import extract_citations
 
 
-citation__TARGET_RX = _lazy_re(r"\.md$")
+# Prose: a citation is read wherever documentation is written, in any markup, not only Markdown.
+citation__TARGET_RX = _lazy_re(r"\.(md|markdown|mdx|rst|txt|adoc|asciidoc|org|tex)$")
 
 def _canonical_path(conn) -> Optional[str]:
     """The configured canonical_citations_path, or None when unknown."""
@@ -1712,29 +1713,102 @@ liveness_CHECK = _Check(id="gate.liveness", applies_at="Stop", posture="BLOCK", 
                eats=frozenset({"touched", "cwd", "fs_read"}), tests="SPEC")
 
 # the SPEC shape: its rows, and the one Pre entry dispatch calls for any of them
-# content.last_wins (register A4 LAST-WINS): a dict literal, or a JSON object, that repeats a key
-# with a different value. The later value silently wins and nothing states that it should. A key
+# content.last_wins (register A4 LAST-WINS): a dict literal, or a JSON object, that gives one key
+# two different values. The later value silently wins and nothing states that it should. A key
 # repeated with the SAME value leaves no winner to state and stays silent (pyflakes F601's rule).
-# JSON parses as a Python expression, so one AST walk reads both.
-lastwins__TARGET_RX = _lazy_re(r"\.(py|json)$")
+# The keys are the ones the object ends up with, however they are spelled: a `**` unpack of a
+# literal, a `dict(k=v)` call or a name bound once to either contributes its keys in order, and a
+# JSON file is decoded by JSON's rules (so `"a\/b"` is the key `a/b`) before its keys compare.
+import json as _json
+
+
+def _bound_dicts(tree: ast.AST) -> dict:
+    """Names assigned exactly once, to a dict literal or a `dict(...)` call, in this text."""
+    seen: dict = {}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+            seen.setdefault(n.targets[0].id, []).append(n.value)
+    return {k: v[0] for k, v in seen.items()
+            if len(v) == 1 and (isinstance(v[0], ast.Dict) or _is_dict_call(v[0]))}
+
+
+def _is_dict_call(n: ast.AST) -> bool:
+    return isinstance(n, ast.Call) and getattr(n.func, "id", None) == "dict" and not n.args
+
+
+def _entries(node: ast.AST, names: dict, depth: int = 0):
+    """(key, value-node) pairs in the order the object receives them; unknown unpacks add none."""
+    if depth > 8:
+        return
+    if isinstance(node, ast.Name) and node.id in names:
+        node = names[node.id]
+    if isinstance(node, ast.Dict):
+        for k, v in zip(node.keys, node.values):
+            if k is None:
+                yield from _entries(v, names, depth + 1)
+            elif isinstance(k, ast.Constant):
+                yield k.value, v
+    elif _is_dict_call(node):
+        for kw in node.keywords:
+            if kw.arg is None:
+                yield from _entries(kw.value, names, depth + 1)
+            else:
+                yield kw.arg, kw.value
 
 
 def _repeated_key(node: ast.AST) -> Optional[str]:
-    if not isinstance(node, ast.Dict):
+    if not (isinstance(node, ast.Dict) or _is_dict_call(node)):
         return None
     seen = {}
-    for k, v in zip(node.keys, node.values):
-        if isinstance(k, ast.Constant):
-            value = ast.dump(v)
-            if seen.setdefault(k.value, value) != value:
-                return f"key {k.value!r} given two values"
+    for key, v in _entries(node, getattr(node, "_bound", {})):
+        value = ast.dump(v)
+        if seen.setdefault(key, value) != value:
+            return f"key {key!r} given two values"
     return None
 
 
-lastwins_predicate = ast_introduced_predicate(target_rx=lastwins__TARGET_RX, node_match=_repeated_key)
+def _parse_python_bound(content: str):
+    tree, off = parse_introduced(content)
+    if tree is not None:
+        names = _bound_dicts(tree)
+        for n in ast.walk(tree):
+            n._bound = names
+    return tree, off
+
+
+def _json_node(v) -> ast.AST:
+    if isinstance(v, ast.AST):
+        return v
+    if isinstance(v, list):
+        return ast.List(elts=[_json_node(x) for x in v], ctx=ast.Load())
+    return ast.Constant(value=v)
+
+
+def _parse_json(content: str):
+    """A whole JSON document decodes by JSON's rules into Dict nodes that keep every pair; an Edit
+    fragment that is not one falls back to the Python reading, as before."""
+    try:
+        doc = _json.loads(content, object_pairs_hook=lambda pairs: ast.Dict(
+            keys=[ast.Constant(value=k) for k, _ in pairs], values=[_json_node(v) for _, v in pairs]))
+    except ValueError:
+        return parse_introduced(content)
+    return ast.Expression(body=_json_node(doc)), 0
+
+
+_lastwins_py = ast_introduced_predicate(target_rx=_lazy_re(r"\.py$"), node_match=_repeated_key,
+                                        parse=_parse_python_bound)
+_lastwins_json = ast_introduced_predicate(target_rx=_lazy_re(r"\.json$"), node_match=_repeated_key,
+                                          parse=_parse_json)
+
+
+def lastwins_predicate(*, current_event: dict, pattern, conn=None, **rest):
+    args = dict(current_event=current_event, pattern=pattern, conn=conn, **rest)
+    return _lastwins_py(**args) or _lastwins_json(**args)
+
+
 lastwins_RETRY_HINT = "Give each key one value. If the later value is the one meant, delete the earlier; if both are meant, they are two keys."
 lastwins_DESCRIPTION = "a dict or JSON object repeats a key with a different value, so the last one silently wins"
-lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('{',), retry_hint=lastwins_RETRY_HINT, description=lastwins_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('{', 'dict('), retry_hint=lastwins_RETRY_HINT, description=lastwins_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 
 # content.bound_as_count (register B23 BOUND AS COUNT): a test asserts a count stays under a literal
 # ceiling. A test's fixture fixes the count, so the exact value is available, and a ceiling with
@@ -1742,26 +1816,55 @@ lastwins_CHECK = _Check(id='content.last_wins', applies_at="Pre", posture="BLOCK
 bound__TARGET_RX = _lazy_re(r"(^|[/\\])(tests?[/\\].*|test_[^/\\]*|[^/\\]*_test)\.py$")
 
 
-_UNITTEST_BOUND_METHODS = frozenset({"assertLess", "assertLessEqual"})
+def _is_count(n: ast.AST) -> bool:
+    return isinstance(n, ast.Call) and (
+        getattr(n.func, "id", None) == "len" or getattr(n.func, "attr", None) == "count")
+
+
+def _is_int(n: ast.AST) -> bool:
+    return isinstance(n, ast.Constant) and type(n.value) is int
+
+
+def _is_int_range(n: ast.AST) -> bool:
+    return (isinstance(n, ast.Call) and getattr(n.func, "id", None) == "range"
+            and 1 <= len(n.args) <= 3 and all(_is_int(a) for a in n.args))
+
+
+def _caps_count(count: ast.AST, op: ast.cmpop, bound: ast.AST) -> bool:
+    """`count op bound` admits several counts, all under a literal: a ceiling, however ordered."""
+    if not _is_count(count):
+        return False
+    if isinstance(op, (ast.Lt, ast.LtE)):
+        return _is_int(bound)
+    if isinstance(op, ast.In):
+        return _is_int_range(bound)
+    return False
+
+
+_FLIP = {ast.Gt: ast.Lt(), ast.GtE: ast.LtE()}
+# unittest's spellings of the same relations, as (method, op applied to args[0], args[1]).
+_UNITTEST_BOUND_METHODS = {"assertLess": ast.Lt(), "assertLessEqual": ast.LtE(),
+                           "assertGreater": ast.Gt(), "assertGreaterEqual": ast.GtE(),
+                           "assertIn": ast.In()}
+
+
+def _ceiling_pairs(node: ast.AST):
+    """Each (left, op, right) relation the assertion states."""
+    if isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare):
+        lefts = [node.test.left, *node.test.comparators]
+        for i, op in enumerate(node.test.ops):
+            yield lefts[i], op, lefts[i + 1]
+    elif isinstance(node, ast.Call) and len(node.args) >= 2:
+        name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+        if name in _UNITTEST_BOUND_METHODS:
+            yield node.args[0], _UNITTEST_BOUND_METHODS[name], node.args[1]
 
 
 def _slack_ceiling(node: ast.AST) -> Optional[str]:
-    if (isinstance(node, ast.Assert) and isinstance(node.test, ast.Compare)
-            and len(node.test.ops) == 1 and isinstance(node.test.ops[0], (ast.Lt, ast.LtE))):
-        left, right, label_node = node.test.left, node.test.comparators[0], node.test
-    elif (isinstance(node, ast.Call)
-          and (getattr(node.func, "attr", None) or getattr(node.func, "id", None))
-              in _UNITTEST_BOUND_METHODS
-          and len(node.args) >= 2):
-        # unittest's own ceiling form: self.assertLess(len(x), N) / assertLessEqual(...) is the
-        # same "ceiling not exact count" shape as `assert len(x) < N`, just spelled as a call.
-        left, right, label_node = node.args[0], node.args[1], node
-    else:
-        return None
-    counted = isinstance(left, ast.Call) and (
-        getattr(left.func, "id", None) == "len" or getattr(left.func, "attr", None) == "count")
-    if counted and isinstance(right, ast.Constant) and type(right.value) is int:
-        return ast.unparse(label_node)
+    for left, op, right in _ceiling_pairs(node):
+        if _caps_count(left, op, right) or (
+                type(op) in _FLIP and _caps_count(right, _FLIP[type(op)], left)):
+            return ast.unparse(node.test if isinstance(node, ast.Assert) else node)
     return None
 
 

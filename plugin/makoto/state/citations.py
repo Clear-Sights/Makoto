@@ -48,7 +48,8 @@ def extract_citations(text: str) -> list[tuple[str, int, str]]:
         tail = text[m.end():m.end() + 2]
         if len(tail) == 2 and tail[0] == "-" and tail[1].isdigit():
             continue
-        cite = _WS_RUN_RX.sub(" ", m.group(0))
+        # One key per work: the comma and parenthesis spellings fold to `Author [et al.] Year`.
+        cite = _WS_RUN_RX.sub(" ", m.group(0).replace(",", "").replace("(", ""))
         line_no = text[: m.start()].count("\n") + 1
         snip_start = max(0, m.start() - 40)
         snip_end = min(len(text), m.end() + 40)
