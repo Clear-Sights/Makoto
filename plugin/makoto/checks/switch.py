@@ -1406,93 +1406,161 @@ green_CHECK = _Check(id="gate.green_claim", applies_at="Stop", posture="BLOCK",
                                              testrun_exit=c.testrun_exit))
 
 from makoto.vocab import _ADV_FORWARD_RX, _NEGATION_RX, _SENTENCE_SPLIT_RX, _TEETH_FRAME_RX
-from makoto.substrate.pytest_cache import stale_failing_node
+from makoto.substrate.pytest_cache import failing_nodes
+from makoto.substrate.claims import _PRED_TRAIL_RX, _POST_CLAUSE_RX
+from makoto.kit import decode_history_row, is_test_runner
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject on the filesystem --
 # pytest's own on-disk lastfailed record -- never an act exercised by this check itself.
 stale_SHAPE = "OTHER_POINT"
 
-# gate.stale_pass — a WHOLE-SUITE pass-claim ✗ pytest's OWN on-disk failure record.
+# gate.stale_pass — a pass claim ✗ the record the pass would have to come from.
 #
-#     "All tests pass."   ✗   .pytest_cache/v/cache/lastfailed names a failing node
-#                             whose test file + function STILL EXIST on disk.
+#     "All tests pass."    ✗   pytest's lastfailed record, at the project root, names a failing
+#     "test_x passes."         node whose test file + function STILL EXIST on disk, and the claim
+#     "Everything's green."    covers it (universal, or naming that very test);
+#                          ✗   or the last test run in the session's record is OLDER than a
+#                              source edit after it: the pass predates the code it vouches for.
 #
 # The claim-vs-ledger primitive with pytest itself as the ledger: lastfailed is written by the
-# runner, not the assistant, so the contradiction is between the assistant's prose and the
-# toolchain's own record. The existence filter is the staleness firewall (measured 42/42 on the
-# real corpus): a node whose file or `def` is gone was refactored away — the record is stale
-# evidence, not a live failure, and the gate stays silent (fail-open).
+# runner, not the assistant. The existence filter is the staleness firewall: a node whose file or
+# `def` is gone was refactored away — stale evidence, not a live failure, so it is silent.
+# pytest writes its cache at the rootdir, so the record is found from the session's cwd upward
+# (substrate.pytest_cache.record_root), and every entry is examined (a cap let 60 deleted nodes
+# sorting first hide the live one: register H2).
 #
 # WHEN: the pass-claim only exists in the final assistant message, so dispatch is the Stop hook.
-# LATENCY CONTRACT (post-check-class): the gate's WORK is budgeted at
-# the proposed post-check tier — a hard 200-300ms ceiling, target single-digit ms warm — NOT the
-# permissive Stop tier it dispatches in. The evidence side is a literal direct-pointer lookup
-# (one lastfailed read + at most 50 capped file reads; lib/pytest_cache pins the bounds), and the
+# LATENCY CONTRACT (post-check-class): hard 200-300ms ceiling, target single-digit ms warm. The
 # body is ordered cheapest-first so the common path never touches disk:
-#   1. claim regex (no whole-suite claim -> exit; the dominant case)
+#   1. claim regexes (no pass claim -> exit; the dominant case)
 #   2. teeth window (±160 chars around the claim vs lexicons._TEETH_FRAME_RX — a deliberately-
 #      induced failure narrated next to the claim is mutation/teeth testing, not a contradiction)
-#   3. ONLY THEN the disk lookup.
+#   3. ONLY THEN the history walk and the disk lookup.
 # tests/test_stale_pass_gate.py carries the measured-latency falsifier for the ceiling.
 
 _TEETH_WINDOW = 160
+# The success predicate, and a claim that holds it of EVERYTHING rather than of a test noun
+# ('Everything is green', 'All green', 'all passing') -- the universal subject the whole-suite
+# signal's noun list cannot name, since it has no noun.
+_STALE_PRED = r"(?P<pred>pass(?:es|ed|ing)?|(?:all\s+)?green|succeed(?:s|ed)?)"
+_UNIVERSAL_PASS_RX = _lazy_re(
+    r"\b(?:everything|all)\b(?:['’]s|\s+(?:is|are|now|still|has|have))*\s+" + _STALE_PRED + r"\b",
+    re.IGNORECASE)
+# A claim that one NAMED test passes ('`test_x` passes now'): the subject is the test itself.
+_NODE_PASS_RX = _lazy_re(
+    r"\b(?P<name>test_\w+)(?:\[[^\]\s]*\])?`?(?:\s+(?:now|still|again|also|is|are))*\s+"
+    + _STALE_PRED + r"\b", re.IGNORECASE)
+# A landed edit of a SOURCE file: prose files are not what a test run vouches for.
+_EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+_PROSE_EXT_RX = _lazy_re(r"\.(?:md|markdown|rst|txt|adoc)\Z", re.IGNORECASE)
 
 
-# The text owes a witness that pytest's own on-disk record agrees, but ONLY once it carries a
-# clean whole-suite pass-claim: no claim at all, a forward/conditional or negated framing, or a
-# teeth-framed (deliberately-induced-failure) window around it, each mean nothing is claimed here
-# in the first place. One expression by construction (module-level lambda, not `def`: the design
-# pins this module's top-level function count at 1, `stale_pass_gate` alone), built with `:=` so
-# `m`/`lead` are each computed once:
-#   Sentence-prefix guard, GATE-LOCAL (sentinel c): the shared signal's forward/negation window
-#   stops at the last comma — right for green_claim (its conjunct is a recorded red RUN), wrong
-#   here, where "Once I fix the import, the tests pass" (and "It is not the case that, as of this
-#   run, all tests pass") coexist with a live red lastfailed by construction. The WHOLE leading
-#   sentence is scanned — split over the full prefix, no fixed lookback cap, so a long leading
-#   clause cannot truncate away the conditional head — for BOTH the forward frame and a negation:
-#   a DENY here asserts "claim says the whole suite passes", so both frames make that false.
-stale_owes = lambda text: ((True,) if (
-    (m := whole_suite_pass_claim(text)) is not None
-    and not _ADV_FORWARD_RX.search(lead := _SENTENCE_SPLIT_RX.split(text[:m.start()])[-1])
-    and not _NEGATION_RX.search(lead)
-    and not _TEETH_FRAME_RX.search(text[max(0, m.start() - _TEETH_WINDOW):m.end() + _TEETH_WINDOW])
-) else ())
+def _stale_framed(text, m) -> bool:
+    """True iff the claim at `m` asserts nothing here: quoted from code, forward/conditional or
+    negated in its WHOLE leading sentence (no lookback cap, so a long leading clause cannot
+    truncate away the conditional head), negated in its own trailing clause, flowing into a noun
+    ('passes arguments'), or teeth-framed."""
+    lead = _SENTENCE_SPLIT_RX.split(text[:m.start()])[-1]
+    pred = m.start("pred") if "pred" in m.re.groupindex else m.start()
+    return (any(s <= pred < e for s, e in _code_spans(text))
+            or bool(_ADV_FORWARD_RX.search(lead)) or bool(_NEGATION_RX.search(lead))
+            or not _PRED_TRAIL_RX.match(text, m.end())
+            or bool(_NEGATION_RX.search(_POST_CLAUSE_RX.split(text[m.end():m.end() + 60])[0]))
+            or bool(_TEETH_FRAME_RX.search(
+                text[max(0, m.start() - _TEETH_WINDOW):m.end() + _TEETH_WINDOW])))
+
+
+# The text owes a witness that pytest's own record agrees for every pass claim it makes: the
+# subject is None for a universal claim (it covers every node), else the named test.
+def stale_owes(text):
+    out = []
+    m = whole_suite_pass_claim(text)
+    for c in ([m] if m else []) + list(_UNIVERSAL_PASS_RX.finditer(text)):
+        if not _stale_framed(text, c):
+            out.append(None)
+            break
+    for c in _NODE_PASS_RX.finditer(text):
+        if not _stale_framed(text, c):
+            out.append(c.group("name"))
+    return tuple(out)
+
+
 # No event here pays the claim directly: the witness is seeded once, in `paid`, from pytest's own
-# on-disk lastfailed record (see `stale_pass_gate`) -- a second, independent reading of the same
-# subject, not a fresh event in this stream.
+# on-disk record and the session's own run-then-edit order -- a second, independent reading of
+# the same subject, not a fresh event in this stream.
 stale_pays = lambda _text: None
 
 
-def stale_pass_gate(text, *, cwd=None) -> Optional[Finding]:
-    """Fire iff a clean whole-suite pass-claim coexists with a LIVE failing node in pytest's own
-    lastfailed record under `cwd`. Silent on: no/subset/negated/forward/quoted claim, a teeth-framed
-    claim, a missing or green cache, and a stale (deleted-test) record."""
-    if not text or not cwd:
+def _edited_after_last_run(history):
+    """The source path the session edited after its last recorded test run, else None (no run
+    recorded, or nothing but prose touched since)."""
+    edited = None
+    for row in history or ():
+        ev = decode_history_row(row)
+        if not isinstance(ev, dict) or ev.get("hook_event_name") != "PostToolUse":
+            continue
+        ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+        if ev.get("tool_name") == "Bash" and is_test_runner(str(ti.get("command") or "")):
+            edited = ""
+        elif edited == "" and ev.get("tool_name") in _EDIT_TOOLS:
+            path = str(ti.get("file_path") or ti.get("notebook_path") or "")
+            if path and not _PROSE_EXT_RX.search(path):
+                edited = path
+    return edited or None
+
+
+def stale_pass_gate(text, *, cwd=None, history=()) -> Optional[Finding]:
+    """Fire iff a clean pass claim is contradicted by the record it would rest on: a LIVE failing
+    node in pytest's own lastfailed record at the project root that the claim covers, or (for a
+    universal claim) a source edit after the session's last recorded test run. Silent on:
+    no/subset/negated/forward/quoted claim, a teeth-framed claim, a missing or green cache, a
+    stale (deleted-test) record, and a claim naming a test the record does not hold failing."""
+    if not text:
         return None
-    # The disk lookup is the expensive step (latency contract, module docstring): `paid`'s lambda
-    # is only ever CALLED once `owes(text)` has already survived every cheaper text-only guard, so
-    # the common (no-claim) path still never touches disk.
-    for _ev, _subject in unwitnessed(
-            (text,), owes=stale_owes, pays=stale_pays,
-            paid=(lambda _s: stale_failing_node(cwd) is None,)):
-        node = stale_failing_node(cwd)
-        return Finding(
-            pattern_id="gate.stale_pass",
-            file=node.split("::", 1)[0],
-            line=0,
-            level="error",
-            message=("Claim says the whole suite passes, but pytest's own lastfailed record names "
-                     f"{node} as failing and that test still exists — re-run the suite and cite the "
-                     "green result, or retract the claim."),
-            retry_hint=f"Re-run the full suite (or {node}) and cite the green output, or narrow/retract the claim.",
-        )
+    subjects = stale_owes(text)          # text-only: the common (no-claim) path never touches disk
+    if not subjects:
+        return None
+    seen: dict = {}
+
+    def contradiction(subject):
+        # The second reading, taken once per subject: pytest's record for a named test, and for
+        # a universal claim also the session's own run-then-edit order.
+        if subject not in seen:
+            if "nodes" not in seen:
+                seen["nodes"] = failing_nodes(cwd) if cwd else []
+            hit = [n for n in seen["nodes"] if subject is None
+                   or n.split("::")[-1].split("[", 1)[0] == subject]
+            edited = _edited_after_last_run(history) if subject is None and not hit else None
+            seen[subject] = ((hit[0], f"pytest's own lastfailed record names {hit[0]} as failing "
+                                      "and that test still exists") if hit else
+                             (edited, f"{edited} was edited after the last recorded test run, so "
+                                      "the pass is older than the source it vouches for")
+                             if edited else None)
+        return seen[subject]
+
+    for _ev, subject in unwitnessed((text,), owes=lambda _t: subjects, pays=stale_pays,
+                                    paid=(lambda sub: contradiction(sub) is None,)):
+        return _stale_finding(*contradiction(subject))
     return None
+
+
+def _stale_finding(where, why) -> Finding:
+    return Finding(
+        pattern_id="gate.stale_pass",
+        file=where.split("::", 1)[0],
+        line=0,
+        level="error",
+        message=(f"row gate.stale_pass (a pass claim its own record contradicts): the claim says "
+                 f"it passes, but {why} — re-run the suite and cite the green result, or retract "
+                 "the claim."),
+        retry_hint="Re-run the full suite and cite the green output, or narrow/retract the claim.",
+    )
 
 
 stale_CHECK = _Check(id="gate.stale_pass", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
-               eats=frozenset({"text", "cwd"}),
-               run=lambda c: stale_pass_gate(c.text, cwd=c.cwd))
+               eats=frozenset({"text", "cwd", "history"}),
+               run=lambda c: stale_pass_gate(c.text, cwd=c.cwd, history=c.history))
 
 # makoto.checks.relaunchedUnchanged -- gate.relaunched_unchanged, register entry
 # `E13 PARKED ON AN INHERITED CHANNEL`.

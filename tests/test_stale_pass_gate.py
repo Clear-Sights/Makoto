@@ -97,3 +97,36 @@ def test_no_claim_path_never_touches_disk(tmp_path):
     bad = tmp_path / ".pytest_cache" / "v" / "cache" / "lastfailed"
     bad.mkdir(parents=True)                       # a DIRECTORY where the file should be
     assert stale_pass_gate("Refactored the loader.", cwd=str(tmp_path)) is None
+
+
+def _ev(tool, **ti):
+    resp = {"stdout": ti.pop("_out", ""), "stderr": ""} if tool == "Bash" else {}
+    return {"payload": {"hook_event_name": "PostToolUse", "tool_name": tool, "tool_input": ti,
+                        "tool_response": resp}}
+
+
+def test_a_claim_naming_the_failing_node_FIRES_and_one_naming_another_test_is_silent(tmp_path):
+    cwd = _cache(tmp_path, {"tests/t.py::test_red": True},
+                 [("tests/t.py", "def test_red():\n    assert False\n")])
+    assert stale_pass_gate("`test_red` passes now.", cwd=cwd) is not None
+    assert stale_pass_gate("test_blue passes now.", cwd=cwd) is None
+    assert stale_pass_gate("test_red still does not pass.", cwd=cwd) is None
+
+
+def test_a_universal_claim_with_no_test_noun_FIRES(tmp_path):
+    cwd = _cache(tmp_path, {"tests/t.py::test_red": True},
+                 [("tests/t.py", "def test_red():\n    assert False\n")])
+    assert stale_pass_gate("Everything is green.", cwd=cwd) is not None
+    assert stale_pass_gate("Not everything is green yet.", cwd=cwd) is None
+
+
+def test_a_source_edit_after_the_last_run_FIRES_and_a_rerun_or_prose_edit_is_silent(tmp_path):
+    run = _ev("Bash", command="python3 -m pytest -q", _out="3 passed in 0.1s")
+    edit = _ev("Edit", file_path="/r/src/app.py", old_string="1", new_string="2")
+    doc = _ev("Edit", file_path="/r/README.md", old_string="1", new_string="2")
+    claim = "All tests pass."
+    f = stale_pass_gate(claim, cwd=str(tmp_path), history=[run, edit])
+    assert f is not None and "src/app.py" in f.message
+    assert stale_pass_gate(claim, cwd=str(tmp_path), history=[run, edit, run]) is None
+    assert stale_pass_gate(claim, cwd=str(tmp_path), history=[run, doc]) is None
+    assert stale_pass_gate(claim, cwd=str(tmp_path), history=[edit]) is None

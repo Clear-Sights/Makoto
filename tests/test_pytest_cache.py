@@ -105,14 +105,30 @@ def test_access_contract_no_enumeration_call_at_runtime(tmp_path, monkeypatch):
     assert stale_failing_node(cwd) == "tests/t.py::test_red"
 
 
-def test_entry_cap_fails_open(tmp_path):
-    """Beyond the entry hot-path cap (50) entries are UNEXAMINED -> fail-open (silent)."""
+def test_every_entry_is_examined(tmp_path):
+    """No entry cap (register H2): deleted-test entries sorting first cannot hide the live one."""
     entries = {f"tests/gone_{i:04d}.py::test_x": True for i in range(250)}
-    entries["tests/zz_live.py::test_red"] = True   # sorts BEYOND the cap
+    entries["tests/zz_live.py::test_red"] = True   # sorts after every deleted entry
     cwd = _mkcache(tmp_path, entries)
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "zz_live.py").write_text("def test_red():\n    assert False\n")
-    assert stale_failing_node(cwd) is None
+    assert stale_failing_node(cwd) == "tests/zz_live.py::test_red"
+
+
+def test_record_is_found_at_the_project_root_not_past_the_git_root(tmp_path):
+    """pytest writes its cache at the rootdir; a session in a subdirectory reads that record, and
+    the walk up stops at the git work-tree root (register D4/H2)."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    cwd = _mkcache(proj, {"tests/t.py::test_red": True})
+    (proj / "tests").mkdir()
+    (proj / "tests" / "t.py").write_text("def test_red():\n    assert False\n")
+    assert stale_failing_node(str(proj / "tests")) == "tests/t.py::test_red"
+    _mkcache(tmp_path, {"proj/tests/t.py::test_red": True})
+    (proj / ".git").mkdir()
+    (proj / ".pytest_cache" / "v" / "cache" / "lastfailed").unlink()
+    assert stale_failing_node(str(proj / "tests")) is None
+    assert cwd
 
 
 def test_oversize_file_read_is_capped_failopen(tmp_path):
