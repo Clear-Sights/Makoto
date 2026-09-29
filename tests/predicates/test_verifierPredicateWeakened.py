@@ -17,20 +17,41 @@ def _evt(file_path: str, content: str) -> dict:
     return {"hook_event_name": "PreToolUse", "tool_input": {"file_path": file_path, "content": content}}
 
 
-def test_fires_on_startswith_in_check_file():
-    f = predicate(current_event=_evt("constitution/integrity/checks/grader.py",
-                                     "def ok(x):\n    return x.startswith('PASS')\n"), history=[], pattern=_PAT)
+def _overwrite(tmp_path, rel: str, before: str, after: str) -> dict:
+    """A Write that replaces `before` (already on disk) with `after`: the row fires on the CHANGE."""
+    p = tmp_path / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(before)
+    return {"hook_event_name": "PreToolUse", "tool_name": "Write", "cwd": str(tmp_path),
+            "tool_input": {"file_path": rel, "content": after}}
+
+
+def test_fires_on_startswith_in_check_file(tmp_path):
+    f = predicate(current_event=_overwrite(tmp_path, "constitution/integrity/checks/grader.py",
+                                           "def ok(x):\n    return x == 'PASS'\n",
+                                           "def ok(x):\n    return x.startswith('PASS')\n"), history=[], pattern=_PAT)
     assert f is not None and f.pattern_id == "content.verifier_predicate_weakened"
 
 
-def test_fires_on_re_match_in_check_file():
-    assert predicate(current_event=_evt("repo/constitution/integrity/checks/verify.py",
-                                        "import re\nif re.match(r'ok', out): accept()\n"), history=[], pattern=_PAT) is not None
+def test_fires_on_re_match_in_check_file(tmp_path):
+    assert predicate(current_event=_overwrite(tmp_path, "repo/constitution/integrity/checks/verify.py",
+                                              "if out == 'ok': accept()\n",
+                                              "import re\nif re.match(r'ok', out): accept()\n"),
+                     history=[], pattern=_PAT) is not None
 
 
-def test_fires_on_in_list_in_check_file():
-    assert predicate(current_event=_evt("constitution/integrity/checks/score.py",
-                                        "valid = result in ['a', 'b']\n"), history=[], pattern=_PAT) is not None
+def test_fires_on_in_list_in_check_file(tmp_path):
+    assert predicate(current_event=_overwrite(tmp_path, "constitution/integrity/checks/score.py",
+                                              "valid = result == 'a'\n", "valid = result in ['a', 'b']\n"),
+                     history=[], pattern=_PAT) is not None
+
+
+def test_silent_on_fresh_write_of_honest_loose_comparator_in_check_file():
+    """Presence is not weakening: a new checker file using `.startswith(` for honest parsing,
+    with no strict verdict before it, never fires."""
+    assert predicate(current_event=_evt("plugin/checks/parse.py",
+                                        "def tag(obj):\n    if obj.startswith('`'):\n        return 1\n"),
+                     history=[], pattern=_PAT) is None
 
 
 def test_silent_on_loose_comparator_in_user_app_code():

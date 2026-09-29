@@ -38,7 +38,12 @@ assert CASES, "regex_file_cases.json resolved ZERO cases -- the battery would re
 IDS = [c["id"] for c in CASES]
 
 
-def _evt(file_path: str, content: str, event: str = "PreToolUse") -> dict:
+def _evt(file_path: str, content: str, event: str = "PreToolUse", prior=None) -> dict:
+    """A Write of `content`, or, when the case names a `prior`, an Edit replacing it (a row that
+    fires on a CHANGE needs the text it changed)."""
+    if prior is not None:
+        return {"hook_event_name": event, "tool_name": "Edit",
+                "tool_input": {"file_path": file_path, "old_string": prior, "new_string": content}}
     return {"hook_event_name": event,
             "tool_input": {"file_path": file_path, "content": content}}
 
@@ -66,7 +71,7 @@ def test_fires_on_matching_target_and_body(case):
         f"case {case['id']!r} names module {case['module']!r} but the live catalog wires "
         f"{pat.predicate_module!r} -- the battery would exercise a module the check no longer uses"
     )
-    f = pred(current_event=_evt(case["target_path"], case["body_match"]),
+    f = pred(current_event=_evt(case["target_path"], case["body_match"], prior=case.get("prior")),
              history=[], pattern=pat, conn=None)
     assert f is not None, (
         f"pattern {case['id']} should fire on {case['target_path']!r} "
@@ -81,7 +86,7 @@ def test_fires_on_matching_target_and_body(case):
 def test_silent_on_matching_target_with_clean_body(case):
     """negative: target path matches but body doesn't -> None."""
     pred = _load(case["module"])
-    assert pred(current_event=_evt(case["target_path"], case["body_clean"]),
+    assert pred(current_event=_evt(case["target_path"], case["body_clean"], prior=case.get("prior")),
                 history=[], pattern=_pat(case["id"]), conn=None) is None, \
         f"pattern {case['id']} should NOT fire on clean body"
 
@@ -90,7 +95,7 @@ def test_silent_on_matching_target_with_clean_body(case):
 def test_silent_on_wrong_path(case):
     """gate: body matches but path doesn't -> None (path filter dominates)."""
     pred = _load(case["module"])
-    assert pred(current_event=_evt(case["wrong_path"], case["body_match"]),
+    assert pred(current_event=_evt(case["wrong_path"], case["body_match"], prior=case.get("prior")),
                 history=[], pattern=_pat(case["id"]), conn=None) is None, \
         f"pattern {case['id']} should NOT fire on wrong path"
 
@@ -99,6 +104,6 @@ def test_silent_on_wrong_path(case):
 def test_silent_on_non_pretooluse_event(case):
     """gate: PreToolUse-only — Stop / other events return None."""
     pred = _load(case["module"])
-    assert pred(current_event=_evt(case["target_path"], case["body_match"], event="Stop"),
+    assert pred(current_event=_evt(case["target_path"], case["body_match"], event="Stop", prior=case.get("prior")),
                 history=[], pattern=_pat(case["id"]), conn=None) is None, \
         f"pattern {case['id']} should NOT fire on Stop event"

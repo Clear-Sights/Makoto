@@ -64,10 +64,11 @@ def _verifier_weakened_detector() -> MintedDetector:
     negative = {"hook_event_name": "PreToolUse", "tool_name": "Write",
                "tool_input": {"file_path": "constitution/integrity/checks/foo.py",
                               "content": "if status == 'ok':\n    pass\n"}}
-    # THE INVERSE MUTATION: the same comparison, loosened to a startswith() call.
-    positive = {"hook_event_name": "PreToolUse", "tool_name": "Write",
+    # THE INVERSE MUTATION: the same comparison, loosened to a startswith() call by an Edit.
+    positive = {"hook_event_name": "PreToolUse", "tool_name": "Edit",
                "tool_input": {"file_path": "constitution/integrity/checks/foo.py",
-                              "content": "if status.startswith('ok'):\n    pass\n"}}
+                              "old_string": "if status == 'ok':\n    pass\n",
+                              "new_string": "if status.startswith('ok'):\n    pass\n"}}
     return MintedDetector(id="content.verifier_predicate_weakened", category="content-scan-1.x",
                           negative=negative, positive=positive, run=_verifier_weakened_run)
 
