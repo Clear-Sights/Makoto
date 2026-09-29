@@ -158,8 +158,11 @@ _FAILURE_MARKER_RX = _lazy_re(
 # REAL failing run reads as green. Stripped before failure detection (is_failing_testrun).
 _ANSI_SGR_RX = _lazy_re(r"\x1b\[[0-9;:]*m")
 
+# One citation, however it is punctuated: `Smith 2020`, `(Smith, 2020)`, `Smith (2020)`,
+# `Smith et al., 2020`. A year suffix (`2020b`) names a different work, so it is part of the cite.
+# citations.extract_citations folds the punctuation away so every spelling looks up one key.
 _CITATION_RX = _lazy_re(
-    r'\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?)\s+(?:et al\.\s+)?(\d{4})\b'
+    r'\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?),?\s+(?:et al\.,?\s+)?\(?(\d{4}[a-z]?)\b'
 )
 
 # Capitalized English words that match the Author position of the regex but aren't author

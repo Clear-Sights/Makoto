@@ -1555,13 +1555,111 @@ relaunch_CHECK = _Check(id="gate.relaunched_unchanged", applies_at="Pre", postur
 # PRE-EDGE DENY (2026-09-25): the destructive command is refused before it runs; the discharge is
 # to run the relevant test or probe (either verdict) and retry.
 from makoto.kit import unmet_obligation_gate, command_of, ran_a_verifier
-from makoto.core._shell import _shell_segments
+from makoto.core._shell import _effective_argv, _shell_segments
+
+
+# THE EFFECT, NOT THE SPELLING (round nine, D14). The lexical classifier above names commands; the
+# entry names an effect: content that exists now and will not after the call. So the act is also
+# read against the working tree the event runs in: a path that exists under `cwd` (or outside it,
+# spelled outside every temp root) and that the call removes (`rm`, `unlink`, `rmdir`, `shred`,
+# `find -delete|-exec rm`, an interpreter payload's remove/rmtree/unlink), empties (`truncate`, a
+# clobbering `>` redirect), or replaces (`mv`/`cp` onto it, a Write of nothing). Scratch
+# (a temp-root spelling outside `cwd`, an unbound `$VAR`) destroys no work and stays silent.
+import os as _os
+
+_REMOVERS = frozenset({"rm", "unlink", "rmdir", "shred"})
+_CLOBBER = frozenset({">", ">|", "&>"})
+_REPLACERS = frozenset({"mv", "cp"})
+_INTERPRETERS_RX = _lazy_re(r"(?:python[0-9.]*|node|ruby|perl|php)")
+_PAYLOAD_REMOVE_RX = _lazy_re(r"\b(?:rmtree|remove|unlink|rmdir|truncate|rmSync|unlinkSync|rm_rf|rm_r)\s*\(")
+_QUOTED_RX = _lazy_re(r"""['"]([^'"\s]+)['"]""")
+
+
+def _work_path(word: str, cwd: str):
+    """The absolute path `word` names when it is work that exists now, else None."""
+    from makoto.substrate._canonAtoms import _is_scratch_path
+    if not word or "$" in word or "`" in word or word.startswith("-"):
+        return None
+    path = _os.path.normpath(_os.path.join(cwd, _os.path.expanduser(word)))
+    inside = cwd and (path == cwd or path.startswith(cwd.rstrip("/") + "/"))
+    if not inside and _is_scratch_path(word):
+        return None
+    return path if _os.path.lexists(path) else None
+
+
+def _has_content(path) -> bool:
+    try:
+        return bool(path) and (_os.path.isdir(path) or _os.path.getsize(path) > 0)
+    except OSError:
+        return False
+
+
+def _destroyed_targets(argv, cwd: str):
+    """The existing work paths one shell statement removes, empties or replaces."""
+    argv = list(_effective_argv(argv))
+    for i, tok in enumerate(argv[:-1]):
+        if tok in _CLOBBER:
+            p = _work_path(argv[i + 1], cwd)
+            if p and not _os.path.isdir(p) and _has_content(p):
+                yield p
+    if not argv:
+        return
+    program = _os.path.basename(argv[0])
+    words = [a for a in argv[1:] if a not in _CLOBBER and a != ">>"]
+    operands = [a for a in words if not a.startswith("-")]
+    if program in _REMOVERS:
+        yield from filter(None, (_work_path(a, cwd) for a in operands))
+    elif program == "find" and ({"-delete", "-exec", "-execdir"} & set(words)) and \
+            ("-delete" in words or any(_os.path.basename(w) == "rm" for w in words)):
+        for a in words:
+            if a.startswith(("-", "(", "!")):
+                break
+            p = _work_path(a, cwd)
+            if p:
+                yield p
+    elif program == "truncate":
+        sizes = [w[2:] or (words[k + 1] if k + 1 < len(words) else "")
+                 for k, w in enumerate(words) if w.startswith("-s") or w.startswith("--size")]
+        if any(not sz.lstrip("=").startswith("+") for sz in sizes):
+            skip = {words[k + 1] for k, w in enumerate(words) if w in ("-s", "--size", "-r")
+                    and k + 1 < len(words)}
+            for a in operands:
+                p = None if a in skip else _work_path(a, cwd)
+                if _has_content(p):
+                    yield p
+    elif program in _REPLACERS and len(operands) >= 2:
+        p = _work_path(operands[-1], cwd)
+        if p and not _os.path.isdir(p) and _has_content(p):
+            yield p
+    elif _INTERPRETERS_RX.fullmatch(program):
+        for prev, word in zip(argv, argv[1:]):
+            if prev in ("-c", "-e") and _PAYLOAD_REMOVE_RX.search(word):
+                yield from filter(None, (_work_path(q, cwd) for q in _QUOTED_RX.findall(word)))
+
+
+def _destroys_existing(ev: dict) -> bool:
+    cwd = str(ev.get("cwd") or "")
+    if not cwd or not _os.path.isabs(cwd):
+        return False
+    ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+    if ev.get("tool_name") == "Write":
+        content = ti.get("content")
+        if not isinstance(content, str) or content.strip():
+            return False
+        return _has_content(_work_path(str(ti.get("file_path") or ""), cwd))
+    cmd = command_of(ev)
+    if not cmd:
+        return False
+    try:
+        return any(True for argv, _ in _shell_segments(cmd) for _p in _destroyed_targets(argv, cwd))
+    except Exception:
+        return False
 
 
 def _is_destruction(ev: dict) -> bool:
     from makoto.substrate._canonAtoms import is_destructive_command
     cmd = command_of(ev)
-    return bool(cmd) and is_destructive_command(cmd)
+    return (bool(cmd) and is_destructive_command(cmd)) or _destroys_existing(ev)
 
 
 # The guard is `kit.ran_a_verifier`, the ONE definition of "something observed behaviour",
@@ -1574,7 +1672,8 @@ _is_observer = ran_a_verifier
 unobserved_destruction_gate = unmet_obligation_gate(
     act=_is_destruction,
     guard=_is_observer,
-    message=("Content is about to be destroyed and no verifier has run first — with no behaviour observed "
+    message=("row gate.unobserved_destruction (a destructive act with no verifier run earlier in the "
+             "session): Content is about to be destroyed and no verifier has run first — with no behaviour observed "
              "before the destruction, the undo cannot be proven against anything."),
     retry_hint=("Run the relevant test or probe to a report (PASS or FAIL) before a destructive "
                 "act, so there is a pre-image to check an undo against."),
@@ -1586,7 +1685,8 @@ destruction_DESCRIPTION = "a destructive command with no verifier run earlier in
 destruction_CHECK = _Check(id="gate.unobserved_destruction", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__,
                keywords=("rm", "reset", "clean", "push", "checkout", "dd", "mkfs", "drop", "DROP",
-                         "truncate", "TRUNCATE"),
+                         "truncate", "TRUNCATE", ">", "mv", "cp", "find", "unlink", "shred",
+                         "remove", "Write"),
                retry_hint=destruction_RETRY_HINT,
                description=destruction_DESCRIPTION,
                tests="SWITCH",
