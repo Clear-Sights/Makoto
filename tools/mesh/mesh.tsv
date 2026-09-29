@@ -72,6 +72,7 @@ gate.completion	pass	ALLOW	C/completion_pass.json	a real recorded Write of the p
 gate.completion	disowned	ALLOW	C/completion_disowned.json	a file named as not yet produced (negated subject, future, retraction, "the finished X") is not a claim (live FP 2026-09-29)
 gate.completion	attached	ALLOW	C/completion_attached.json	a file another tool read or attached without error is a second reading, on a disk this session may not mount (live FP 2026-09-29)
 gate.completion	attach_failed	FIRE	C/completion_attach_failed.json	the same attach answered with an error is no reading: the claim still fires
+gate.completion	earlier_negation	FIRE	C/completion_earlier_negation.json	a negation in an earlier clause ("Nothing failed, and I wrote X") does not disarm the claim (FN found 2026-09-29)
 gate.dropped	catch	FIRE	C/dropped_catch.json	I'll add 3 new functions to path with nothing delivered fires
 gate.dropped	reword	FIRE	C/dropped_reword1.json	line-range forward claim phrasing fires
 gate.dropped	reword2	FIRE	C/dropped_reword2.json	"natural ""a function named X"" phrasing fires, but only because the regex misparses the word ""named"" itself as the defined symbol -- fires for the wrong internal reason (would also misfire on a correctly-delivered def)"

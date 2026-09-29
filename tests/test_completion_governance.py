@@ -79,3 +79,32 @@ def test_a_path_named_as_not_yet_produced_stays_inert():
 def test_the_disowning_frames_do_not_silence_a_real_claim():
     missed = [t for t in DISOWN_GUARD_FIRES if not _fires(t)]
     assert missed == [], missed
+
+
+# --- FN (found 2026-09-29): a negation in an EARLIER clause disarmed a live claim -----------
+# The negation must govern the claim verb's own clause; a conjunction that opens a new clause
+# with its own subject (", and I", "and we", "but") ends the negation's reach.
+EARLIER_CLAUSE_NEGATION_FIRES = [
+    "Nothing failed, and I wrote config.yaml.",
+    "Tests didn't fail and I created handler.py.",
+    "I couldn't reproduce it, so I wrote repro.py.",
+    "Nothing broke but I committed fix.py.",
+    "It never crashed, yet I patched loader.py anyway.",
+]
+
+SAME_CLAUSE_NEGATION_INERT = [
+    "I haven't written and committed session.sh.",
+    "I did not, in the end, create handler.py.",
+    "I didn't create handler.py.",
+    "We never wrote or committed config.yaml.",
+]
+
+
+def test_a_negation_in_an_earlier_clause_does_not_disarm_the_claim():
+    missed = [t for t in EARLIER_CLAUSE_NEGATION_FIRES if not _fires(t)]
+    assert missed == [], missed
+
+
+def test_a_negation_in_the_claims_own_clause_still_disowns_it():
+    fired = [t for t in SAME_CLAUSE_NEGATION_INERT if _fires(t)]
+    assert fired == [], fired
