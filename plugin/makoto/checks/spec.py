@@ -748,15 +748,34 @@ def _read_only(cmd: str) -> bool:
                for s in segs)
 
 
+def _live_trees() -> list[str]:
+    """The install paths the host loads makoto from (installed_plugins.json), or [] when unread."""
+    try:
+        with open(os.path.join(os.path.expanduser("~"), ".claude", "plugins", "installed_plugins.json"),
+                  encoding="utf-8") as f:
+            plugins = json.load(f).get("plugins", {})
+        return [os.path.normpath(e["installPath"]) for k, v in plugins.items()
+                if k.split("@", 1)[0] == "makoto" for e in v if e.get("installPath")]
+    except (OSError, ValueError, AttributeError, KeyError, TypeError):
+        return []
+
+
 def _unreachable_tree(cmd: str) -> str:
-    """The makoto plugin-tree path a command relocates, removes or truncates, or ""."""
+    """The makoto plugin-tree path a command relocates, removes or truncates, or "". A path that
+    shares no prefix with the live install (an orphaned older version) leaves makoto reachable; an
+    unreadable install record counts every plugin-tree path as live."""
+    live = None
     for s in _segments(cmd) or ():
         tool = s[0].rsplit("/", 1)[-1]
         for i, w in enumerate(s):
             if not _PLUGIN_TREE_RX.search(w):
                 continue
             if tool in _UNREACH_CMDS or (i > 0 and s[i - 1] in (">", ">>")):
-                return w
+                live = _live_trees() if live is None else live
+                p = os.path.normpath(os.path.expanduser(w.replace("$HOME", "~", 1)))
+                if not live or any(p == t or t.startswith(p + os.sep) or p.startswith(t + os.sep)
+                                   for t in live):
+                    return w
     return ""
 
 

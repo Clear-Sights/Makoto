@@ -233,3 +233,41 @@ def test_catalog_row_exists_and_matches():
     assert row.predicate_module == "makoto.checks.spec"
     assert row.posture.strip().upper() == "BLOCK"
     assert "settings.json" in row.keywords
+
+
+# ---- the install record decides which plugin tree is live ------------------------------------
+def _home_with_live(tmp_path, monkeypatch, version):
+    import json
+    root = tmp_path / ".claude" / "plugins"
+    live = root / "cache" / "makoto" / "makoto" / version
+    live.mkdir(parents=True)
+    (root / "installed_plugins.json").write_text(json.dumps(
+        {"plugins": {"makoto@makoto": [{"installPath": str(live), "version": version}]}}))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    return root / "cache" / "makoto" / "makoto"
+
+
+def _bash(cmd):
+    return {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": cmd}}
+
+
+def test_fire_rm_of_the_live_version(tmp_path, monkeypatch):
+    cache = _home_with_live(tmp_path, monkeypatch, "3.4.12")
+    assert _run(_bash(f"rm -rf {cache}/3.4.12")) is not None
+
+
+def test_fire_rm_of_a_parent_of_the_live_version(tmp_path, monkeypatch):
+    cache = _home_with_live(tmp_path, monkeypatch, "3.4.12")
+    assert _run(_bash(f"rm -rf {cache}")) is not None
+
+
+def test_silent_rm_of_an_orphaned_older_version(tmp_path, monkeypatch):
+    # measured 2026-09-29: removing the orphaned 3.4.8 copy after 3.4.12 was installed read as a
+    # self-mute, though the host loads only the recorded install path
+    cache = _home_with_live(tmp_path, monkeypatch, "3.4.12")
+    assert _run(_bash(f"rm -rf {cache}/3.4.8")) is None
+
+
+def test_fire_when_the_install_record_is_unreadable(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert _run(_bash(f"rm -rf {tmp_path}/.claude/plugins/cache/makoto/makoto/3.4.8")) is not None
