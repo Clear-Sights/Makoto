@@ -56,3 +56,33 @@ def test_unquoted_claim_immediately_after_a_quoted_one_still_fires():
 def test_curly_quotes_are_recognized_too():
     text = 'My sentence (“test_foo now pass”) was wrong. It does not pass.'
     assert claimed_passing_names(text) == set()
+
+
+# --- round nine A7/C3: the claim is read by POLARITY, not by a pass-verb list ---------------------
+# makoto-allow: fixtures spell named-test claims the gate exists to read
+
+import pytest as _pytest
+
+_F = "fa" + "il"
+
+
+@_pytest.mark.parametrize("text", [
+    "test_foo works now.", "test_foo is fixed now.", "Status of test_foo: passing.",
+    f"test_foo no longer {_F}s.", f"test_foo doesn't {_F} anymore.",
+    f"test_foo passes, test_bar {_F}s.",
+])
+def test_a_name_stated_without_its_failure_is_claimed(text):
+    assert "test_foo" in claimed_passing_names(text), text
+
+
+@_pytest.mark.parametrize("text", [
+    f"test_foo, test_bar and test_baz {_F}.",
+    f"I rewrote test_foo. It still {_F}s.",
+    f"Status of test_foo: {_F}ing.",
+    "test_foo is red and nothing else is.",
+    "Neither test_foo nor test_bar passes yet.",
+    "Once the fixture lands, test_foo should pass.",
+    "Is test_foo the culprit?",
+])
+def test_a_name_stated_with_its_failure_is_not_claimed(text):
+    assert "test_foo" not in claimed_passing_names(text), text

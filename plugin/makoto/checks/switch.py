@@ -997,29 +997,50 @@ named_pays = lambda _text: None
 # testing is not a material failure (#1).
 
 
-# ---- lexicon (gate-specific, local — like gate.fabricated_action) -----------------------
-
-# A success predicate that can bind to a named-test subject in PROSE (the claim side).
-_PASS_PRED_RX = _lazy_re(r"\b(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed)?)\b", re.IGNORECASE)
-# Negation / forward-framing in the immediate claim clause -> not an assertion of present success.
-_NEG_RX = _lazy_re(r"\b(?:not|never|no|fail(?:s|ed|ing)?|don['’]?t|doesn['’]?t|"
-                     r"didn['’]?t|isn['’]?t|won['’]?t|can['’]?t)\b", re.IGNORECASE)
-_FORWARD_RX = _lazy_re(r"\b(?:will|going\s+to|gonna|once|after|when|next|should|need(?:s)?\s+to|"
-                         r"to\s+make|let['’]?s|I['’]?ll|expect(?:s|ed|ing)?)\b", re.IGNORECASE)
-# The clause boundary that isolates the text immediately governing the name.
-_CLAUSE_SPLIT_RX = _lazy_re(r"[,;:—]")
-# One actual quoted run (straight or curly), single-line: the (#4) exemption is span-membership.
+# ---- the claim's polarity, read against the record -------------------------------------------
+#
+# ROUND NINE (A7, C3): the reader used to look for a PASS VERB bound to the name ("passes",
+# "green"), so "test_x works now", "test_charge is fixed now" and "Status of test_x: passing"
+# (the colon cut the clause before the verb) all walked past it. Success is an open class -- works,
+# is fixed, is sorted, behaves -- and a verb list chases it forever. What is closed is the other
+# side: the record says FAILED, and a text that reports that result carries the failure's own
+# polarity -- a failure word (fails, error, red, broken) or a negation (not, never, no, n't). So
+# the claim is read by POLARITY: a name whose record is red, stated in the text with no negative
+# polarity anywhere in its scope, is stated as not failing, and that contradicts the record.
+#
+# A negated failure is positive ("no longer fails", "doesn't fail anymore"): a negation within a
+# few words before a failure word cancels it, and neither counts.
+#
+# SCOPE of a name's polarity: its sentence, less any clause that names a DIFFERENT test (in
+# "test_x passes, test_y fails" the failure is test_y's), unless the name's own clause is nothing
+# but names (in "test_x, test_y and test_z fail" test_x is a list item and the verb is shared);
+# plus each FOLLOWING sentence that opens with a pronoun and names no test ("I rewrote test_x. It
+# still fails."). Not a claim at all, and silent: a quoted span or a fenced block (cited, not
+# asserted), a question, a forward/hypothetical frame before the name ("once test_x passes"), and
+# the excluded item of an enumerated count (#3 below).
+_FAILURE_POLE_RX = _lazy_re(r"\b(?:fail\w*|errors?|erroring|errored|red|broken|breaks?|crash\w*|"
+                            r"xfail\w*|regress\w*)\b", re.IGNORECASE)
+_NEGATION_POLE_RX = _lazy_re(r"\b(?:not|never|no|none|nothing|neither|nor|cannot|without|unable)\b"
+                             r"|n['’]t\b", re.IGNORECASE)
+# Only an ADVERBIAL negation cancels a failure word ("no longer fails", "doesn't fail"); a nominal
+# one ("nothing else is red") is about some other subject and cancels nothing.
+_CANCELS_RX = _lazy_re(r"^(?:not|never|no|cannot|without)$|n['’]t$", re.IGNORECASE)
+_FORWARD_RX = _lazy_re(r"\b(?:will|going\s+to|gonna|once|next|should|need(?:s)?\s+to|"
+                         r"to\s+make|let['’]?s|I['’]?ll|expect(?:s|ed|ing)?|if|until|would|could)\b",
+                       re.IGNORECASE)
+_CLAUSE_SPLIT_RX = _lazy_re(r"[,;—]")
 _QUOTE_SPAN_RX = _lazy_re(r'"[^"\n]*"|“[^”\n]*”')
-# Sentence split reuses vocab._SENTENCE_SPLIT_RX -- this file held the repo's last
-# byte-identical private copy; every other consumer already imports the vocab object.
+_FENCE_RX = _lazy_re(r"```.*?(?:```|\Z)", re.DOTALL)
+_PRONOUN_LEAD_RX = _lazy_re(r"^\s*(?:it|its|it['’]s|this|that|which|they|the\s+(?:same\s+)?test)\b",
+                            re.IGNORECASE)
+# A clause that is only names and conjunctions is a list item sharing the sentence's verb.
+_NAMES_ONLY_RX = _lazy_re(r"^[\s`*()\[\]&/,;—-]*(?:(?:and|or|plus)\b[\s`*()\[\]&/,;—-]*)*$", re.IGNORECASE)
 
-
-# (#1) DELIBERATELY-INDUCED failure framing (a FAILED produced by mutation/teeth testing is not a
-# material failure): _TEETH_FRAME_RX LIFTED to lexicons (consolidation T2.2, byte-identical) —
-# second consumer is gate.stale_pass's claim teeth-window.
+# (#1) DELIBERATELY-INDUCED failure framing: _TEETH_FRAME_RX lives in lexicons; the per-test fold
+# (`current_named_verdicts`) already reads it.
 
 # (#3) An ENUMERATED suite count ("478/479 tests pass"): when the named test is introduced as the
-# EXCLUDED item of such a count, "pass" binds to the count, not the name (green_claim's count rule).
+# EXCLUDED item of such a count, the sentence's verdict binds to the count, not the name.
 _ENUM_COUNT_RX = _lazy_re(
     r"\b\d+\s*/\s*\d+\b|\b\d+\s+(?:tests?\s+)?(?:pass(?:ed|es|ing)?|green)\b", re.IGNORECASE)
 _EXCLUDE_RX = _lazy_re(
@@ -1027,72 +1048,58 @@ _EXCLUDE_RX = _lazy_re(
     r"skip\w*|ignor\w*|aside\s+from|other\s+than|unrelated|pollut\w*|leftover)\b", re.IGNORECASE)
 
 
-def _external_pass_predicate(window: str) -> bool:
-    """(#2) True iff a CLEAN pass predicate binds the name: one OUTSIDE every test_\\w+ identifier
-    span AND not itself negated or forward/expectation-framed in its neighbourhood. In
-    `test_main_is_green_on_real` the 'green' is part of the identifier; in '(expecting green-at-HEAD)
-    is wrong' the external 'green' is an EXPECTATION — neither is a present-tense pass claim."""
-    name_spans = [(m.start(), m.end()) for m in _TESTNAME_RX.finditer(window)]
-    for pm in _PASS_PRED_RX.finditer(window):
-        if any(s <= pm.start() and pm.end() <= e for s, e in name_spans):
-            continue
-        nb = window[max(0, pm.start() - 45):pm.end() + 25]
-        if _NEG_RX.search(nb) or _FORWARD_RX.search(nb):
-            continue
-        return True
-    return False
-
-
 def claimed_passing_names(text: str) -> set:
-    """The EXACT test names `text` asserts are PRESENTLY passing. A name qualifies iff it co-occurs
-    with a CLEAN external pass predicate in its clause, not negated, not forward-framed, and not the
-    excluded item of an enumerated count. A whole-suite claim (no test_\\w+ subject) yields nothing —
-    that is green_claim's, deliberately out of scope here."""
+    """The EXACT test names `text` states WITHOUT negative polarity -- as not failing. See the
+    block above for the scope; a whole-suite claim (no test_\\w+ subject) yields nothing -- that
+    is green_claim's, deliberately out of scope here."""
     if not text:
         return set()
+    sents = [s for s in _SENTENCE_SPLIT_RX.split(_FENCE_RX.sub(" ", text)) if s and s.strip()]
+
+    def _negative(region: str) -> bool:
+        fails = [m.start() for m in _FAILURE_POLE_RX.finditer(region)]
+        negs = [m.start() for m in _NEGATION_POLE_RX.finditer(region)]
+        cancels = {m.start() for m in _NEGATION_POLE_RX.finditer(region) if _CANCELS_RX.search(m.group(0))}
+        for f in fails:
+            near = [n for n in negs if n < f and n in cancels and len(region[n:f].split()) <= 4]
+            if not near:
+                return True                  # an uncancelled failure word
+            negs.remove(near[-1])            # a negated failure: both cancel
+        return bool(negs)                    # an uncancelled negation
+
     out = set()
-    for sent in _SENTENCE_SPLIT_RX.split(text):
-        if not _PASS_PRED_RX.search(sent):
+    for i, sent in enumerate(sents):
+        if sent.rstrip().endswith("?"):
             continue
-        # (#4) QUOTED material: citing a phrase to examine, correct, or retract it — e.g. 'my
-        # sentence ("...test_foo now pass") reads as a claim... retracting it' — is not itself a
-        # fresh, present-tense assertion. The neg/forward checks below only see a small window
-        # local to the name; a retraction two sentences later is invisible to them, so a quoted
-        # span is excluded here regardless of what surrounds it. The exemption is a SPAN test
-        # (the name must lie inside one actual quoted run), not a loose any-quote-before-and-
-        # after test — 'the "smoke" tier: test_charge passes and the "core" tier too' quotes two
-        # OTHER words, and its genuine claim over test_charge must still bind.
         quote_spans = [m.span() for m in _QUOTE_SPAN_RX.finditer(sent)]
-        for nm in _TESTNAME_RX.finditer(sent):
-            name = nm.group(0)
-            a, b = nm.start(), nm.end()
-            if any(s <= a and b <= e for s, e in quote_spans):
-                continue
-            # The CLAUSE containing the name bounds every binding decision — negation, forward
-            # framing, and the pass predicate itself. A predicate in a DIFFERENT clause
-            # ("test_charge is quarantined, everything else passes") governs different material
-            # and must not bind to this name.
-            cstart = 0
-            for m in _CLAUSE_SPLIT_RX.finditer(sent, 0, a):
-                cstart = m.end()
-            cm = _CLAUSE_SPLIT_RX.search(sent, b)
-            cend = cm.start() if cm else len(sent)
-            pre = sent[max(cstart, a - 80):a]
-            post = sent[b:min(cend, b + 40)]
-            if _NEG_RX.search(pre + " " + post):
-                continue
-            if _FORWARD_RX.search(pre):
-                continue
+        names = [nm for nm in _TESTNAME_RX.finditer(sent)
+                 if not any(s <= nm.start() and nm.end() <= e for s, e in quote_spans)]
+        if not names:
+            continue
+        cuts = [0] + [m.end() for m in _CLAUSE_SPLIT_RX.finditer(sent)] + [len(sent) + 1]
+        clauses = [(cuts[k], cuts[k + 1]) for k in range(len(cuts) - 1)]
+        follow = []
+        for nxt in sents[i + 1:]:
+            if not _PRONOUN_LEAD_RX.search(nxt) or _TESTNAME_RX.search(nxt):
+                break
+            follow.append(nxt)
+        for nm in names:
+            name, a = nm.group(0), nm.start()
+            ca, cb = next((s, e) for s, e in clauses if s <= a < e)
+            own = sent[ca:cb]
+            if _FORWARD_RX.search(sent[:a]) or _FORWARD_RX.search(sent[a:cb]):
+                continue                     # hypothetical: "once X lands, test_x should pass"
             if _ENUM_COUNT_RX.search(sent) and _EXCLUDE_RX.search(sent[:a]):
                 continue
-            window = sent[max(cstart, a - 80):min(cend, b + 60)]
-            if _external_pass_predicate(window):
+            if _NAMES_ONLY_RX.match(_TESTNAME_RX.sub(" ", own).rstrip(".!:")):
+                scope = sent
+            else:
+                scope = " ".join(sent[s:e] for s, e in clauses
+                                 if (s, e) == (ca, cb) or not any(
+                                     o.group(0) != name for o in _TESTNAME_RX.finditer(sent[s:e])))
+            if not _negative(_QUOTE_SPAN_RX.sub(" ", " ".join([scope] + follow))):
                 out.add(name)
     return out
-
-
-
-
 
 
 def named_test_gate(text, *, history=()) -> Optional[Finding]:
@@ -1157,7 +1164,8 @@ def named_test_gate(text, *, history=()) -> Optional[Finding]:
             file="tests",
             line=0,
             level="error",
-            message=(f"Claim states {nm} passes, but the most recent recorded run of that exact test "
+            message=(f"row gate.named_test (a named test stated as not failing over its recorded red): "
+                     f"the text states {nm} with no failure in it, but the most recent recorded run of that exact test "
                      f"({red_id}) shows it FAILED — re-run {nm} to green and cite it, or retract "
                      f"the claim."),
             retry_hint=f"Re-run {nm} and cite the green result, or narrow/retract the claim.",
@@ -1243,9 +1251,13 @@ unnamed_SHAPE = "OTHER_POINT"
 # green of that id is no longer red here either. One-line by construction (module-level lambda,
 # not `def`): the design pins this module's top-level function count at 1 (`unnamed_failure_gate`
 # alone).
+# A red id is named by its function or by its module: "1 failed (`test_plugin_digest`)" names
+# tests/test_plugin_digest.py::test_pinned, measured on this session's own closing texts.
 _red_names = lambda history: frozenset(
-    tid.rpartition("::")[2].split("[", 1)[0]
-    for tid, v in current_named_verdicts(history).items() if v == "FAIL")
+    part
+    for tid, v in current_named_verdicts(history).items() if v == "FAIL"
+    for part in (tid.rpartition("::")[2].split("[", 1)[0],
+                 tid.rpartition("::")[0].rsplit("/", 1)[-1].rsplit(".", 1)[0]))
 
 # `ev` is `(text, history)`. The turn owes naming at least one of the record's own currently-red
 # test identities, but ONLY once it has counted a failure at all -- a text with no counted
@@ -1262,11 +1274,21 @@ unnamed_pays = lambda _ev: None
 
 # A COUNTED failure as an agent WRITES one. See the docstring for why this is not
 # `vocab._FAILURE_SUMMARY_RX` and must not become it.
-_COUNT = r"(?:[1-9]\d*|one|two|three|four|five|six|seven|eight|nine|ten)"
+#
+# ROUND NINE (C12): the count was a list of number words that stopped at ten, and the verdict had to
+# follow the subject noun directly, so "twelve tests failed" and "three tests are failing" were not
+# counts. A count is a NUMBER, digits or spelled by English's own number grammar (units, teens,
+# tens and their compounds, hundred, dozen) -- the grammar, not a list of the ones seen -- and the
+# verdict governs a counted SUBJECT with up to two words between them ("3 of 40 tests failed",
+# "three tests are failing", "four unit tests still fail").
+_UNIT = r"(?:one|two|three|four|five|six|seven|eight|nine)"
+_COUNT = (rf"(?:[1-9]\d*|{_UNIT}|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
+          rf"|(?:twen|thir|for|fif|six|seven|eigh|nine)ty(?:[\s-]{_UNIT})?|(?:a\s+)?dozen|(?:a\s+)?hundred)")
 _SUBJECT = r"(?:tests?|checks?|cases?|specs?|suites?|assertions?|examples?)"
-_VERDICT = r"(?:failed|failures?|failing|errors?|erroring)"
+_VERDICT = r"(?:fail(?:s|ed|ing)?|failures?|errors?|erroring|errored)"
 _COUNTED_FAILURE_RX = _lazy_re(
-    rf"\b{_COUNT}\s+(?:{_SUBJECT}\s+)?{_VERDICT}\b"
+    rf"\b{_COUNT}\s+(?:[\w-]+\s+){{0,2}}{_SUBJECT}\s+(?:[\w-]+\s+){{0,2}}{_VERDICT}\b"
+    rf"|\b{_COUNT}\s+{_VERDICT}\b"
     rf"|\b(?:failures?|errors?)\s*:\s*[1-9]\d*\b",
     re.IGNORECASE)
 
@@ -1285,6 +1307,7 @@ def unnamed_failure_gate(text, *, history=()) -> Optional[Finding]:
             line=0,
             level="error",
             message=(
+                f"row gate.unnamed_failure (a counted failure with its identity dropped): "
                 f"the turn counts a failure and names none of the {len(red)} failing test "
                 f"identit{'y' if len(red) == 1 else 'ies'} the run itself recorded (e.g. {red[0]}). "
                 f"A count sends the reader back to the output; the name is the thing they act on."
@@ -1873,12 +1896,22 @@ verifier_CHECK = _Check(id="gate.unwitnessed_verifier", applies_at="Stop", postu
 #
 # PRE-EDGE DENY (2026-09-25): the Write/Edit is judged on its tool_input before it lands; the
 # discharge is to run the verifier and retry.
-from makoto.kit import introduced_text, ran_a_verifier, unmet_obligation_gate
+from makoto.kit import (_command_runs_tests, introduced_text, parse_introduced, ran_a_verifier,
+                        unmet_obligation_gate)
+from makoto.core._shell import statements as _statements
 from makoto.vocab import _SUCCESS_SUMMARY_RX
 
-# A PROSE document -- where a narration lives. Code is excluded by extension, deliberately; see
-# the docstring's measurement.
-_PROSE_TARGET_RX = _lazy_re(r"\.(?:md|markdown|rst|txt|adoc|org)$", re.IGNORECASE)
+# ROUND NINE (C11): the act was "Write/Edit/MultiEdit into a file named md/rst/txt/adoc/org", so the
+# same report written by `printf ... > STATUS.md` or into STATUS.html was not an act. The effect is
+# a verdict landing in a FILE, whatever writes it and whatever the file is called; the one
+# measured exclusion is a verdict that is DATA -- introduced text that is itself code (a fixture
+# like `RED_OUTPUT = "2 failed, 56 passed in 2.0s"`), or a verdict inside a quoted span (cited,
+# not stated, as the claim reader treats a quote). A Bash statement writes a file when it
+# redirects (`>`, `>>`) to a path that is not a device or a descriptor, or runs `tee` on one; the
+# text it introduces is its own words. A command that runs the verifier itself (`pytest > out.md`)
+# writes the run's output, not a prediction of it, and is not an act.
+_QUOTED_VERDICT_RX = _lazy_re(r'"[^"\n]*"|“[^”\n]*”')
+_HEREDOC_RX = _lazy_re(r"<<-?\s*['\"]?([A-Za-z_]\w*)['\"]?")
 _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
 # A counted all-pass in prose ("All 602 checks pass"): a count is a measurement, so writing one
 # before anything ran is the same unmeasured claim (register C11 / the claim-without-measurement
@@ -1887,30 +1920,72 @@ _COUNTED_PASS_RX = _lazy_re(r"\ball\s+\d[\d,]*\s+\w+\s+(?:pass(?:ed|es)?|green)\
 
 
 def _reports_a_run_verdict(ev: dict) -> bool:
-    """This settled event wrote a run's verdict into a prose document.
+    """This event writes a run's verdict into a file.
 
     Two readers, both already in the tree and neither copied: `vocab._SUCCESS_SUMMARY_RX` for a
     PASTED runner summary ("58 passed"), and `substrate/claims.whole_suite_pass_claim` for the
-    same verdict written as PROSE ("the suite is green"). The second is the tree's FP-hardened
-    claim reader -- it firewalls a subset claim from a whole-suite one, and refuses a negated,
-    forward-framed, or code-quoted match -- and gate.green_claim grades the closing text on that
-    same object. A third copy of either is what `F2 TWO SOURCES OF TRUTH` names.
+    same verdict written as PROSE ("the suite is green"). A third copy of either is what
+    `F2 TWO SOURCES OF TRUTH` names.
 
     THE GREEN DIRECTION ONLY, named rather than implied. A prose failure count written before
     anything ran ("3 tests failed") is the same ORDER fault, and this gate does not see it: the
-    shared summary lexicon is output-shaped and wants the count adjacent (`3 failed`), and the
-    prose-shaped one belongs to gate.unnamed_failure, in whose own subject it was measured --
-    copying it here is the duplication above. The asymmetry also costs least where it matters:
-    a report of success written before the run is the half that MISLEADS, and it is the half
-    with a hardened reader.
+    prose-shaped count reader belongs to gate.unnamed_failure, in whose own subject it was
+    measured. A report of success written before the run is the half that MISLEADS.
     """
     tool = ev.get("tool_name", "")
-    if tool not in _MUTATION_TOOLS:
-        return False
     ti = ev.get("tool_input", {}) or {}
-    if not isinstance(ti, dict) or not _PROSE_TARGET_RX.search(str(ti.get("file_path", ""))):
+    if not isinstance(ti, dict):
         return False
-    text = introduced_text(tool, ti)
+    if tool in _MUTATION_TOOLS:
+        text = introduced_text(tool, ti)
+        if not text or parse_introduced(text)[0] is not None:
+            return False                                   # code: a verdict in it is data
+    elif tool == "Bash":
+        cmd = str(ti.get("command", "") or "")
+        if _command_runs_tests(cmd):
+            return False
+
+        def _file(target: str) -> bool:
+            return bool(target) and not target.startswith(("&", "/dev/"))
+
+        def _writes(ws) -> bool:
+            for i, w in enumerate(ws):
+                op = w.lstrip("0123456789&")
+                if op.startswith(">") and _file(op.lstrip(">") or (ws[i + 1] if i + 1 < len(ws) else "")):
+                    return True
+            return ws[0] == "tee" and any(_file(w) for w in ws[1:] if not w.startswith("-"))
+
+        # Each line, with a heredoc's body attached to the line that opens it: the text a writing
+        # statement introduces is its own words, the pipeline feeding it (`echo x | tee f`), and
+        # its heredoc body -- which, when it is code, is data like any other code.
+        lines, parts = cmd.split("\n"), []
+        k = 0
+        while k < len(lines):
+            head, body = lines[k], []
+            m = _HEREDOC_RX.search(head)
+            k += 1
+            if m:
+                while k < len(lines) and lines[k].strip() != m.group(1):
+                    body.append(lines[k])
+                    k += 1
+                k += 1
+            stmts = _statements(head) or ()
+            for j, (ws, _scope, _op) in enumerate(stmts):
+                if not _writes(ws):
+                    continue
+                if body and parse_introduced("\n".join(body))[0] is not None:
+                    continue
+                feed = j
+                while feed > 0 and stmts[feed][2] == "|":
+                    feed -= 1
+                parts.append(" ".join(w for s_ in stmts[feed:j + 1] for w in s_[0]))
+                parts.extend(body)
+        if not parts:
+            return False
+        text = "\n".join(parts)
+    else:
+        return False
+    text = _QUOTED_VERDICT_RX.sub(" ", text)
     return bool(text) and bool(_SUCCESS_SUMMARY_RX.search(text)
                                or whole_suite_pass_claim(text) or _COUNTED_PASS_RX.search(text))
 
@@ -1918,7 +1993,8 @@ def _reports_a_run_verdict(ev: dict) -> bool:
 report_before_run_gate = unmet_obligation_gate(
     act=_reports_a_run_verdict,
     guard=ran_a_verifier,
-    message=("a run's success is being written into a prose document with no verifier run anywhere "
+    message=("row gate.report_before_run (a run verdict written before any verifier ran): "
+             "a run's success is being written into a document with no verifier run anywhere "
              "before it — the report precedes the outcome it reports, so it is a prediction in a "
              "result's grammar."),
     retry_hint=("Run the verifier first and write the verdict from what it printed; or, if the "
@@ -1931,7 +2007,8 @@ report_RETRY_HINT = "Run the verifier first, then write the verdict from what it
 report_DESCRIPTION = "a run verdict written into prose before any verifier ran"
 report_CHECK = _Check(id="gate.report_before_run", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__,
-               keywords=(".md", ".MD", ".markdown", ".rst", ".txt", ".adoc", ".org"),
+               keywords=("pass", "Pass", "PASS", "green", "Green", "GREEN", "succe", "Succe",
+                         "SUCCE", "ok"),
                retry_hint=report_RETRY_HINT,
                description=report_DESCRIPTION,
                tests="SWITCH",

@@ -5,7 +5,8 @@ the output of the event at `at` (default: the last). Main let every case through
 there. Cases live one module per entry in tests/round_nine/, as CASES lists of dicts:
 
     name, row, events; optional files {relpath: text} under the case cwd, home {relpath: text}
-    under the case HOME, setup (a shell line run in the cwd first), at (event index).
+    under the case HOME, setup (a shell line run in the cwd first, or a function taking the cwd
+    Path), at (event index).
 
 `{cwd}` and `{home}` inside any string are replaced with the case's directories."""
 from __future__ import annotations
@@ -59,7 +60,9 @@ def run_case(case: dict, root: Path) -> list[str]:
             p = base / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(_fill(text, str(cwd), str(home)))
-    if case.get("setup"):
+    if callable(case.get("setup")):
+        case["setup"](cwd)
+    elif case.get("setup"):
         subprocess.run(_fill(case["setup"], str(cwd), str(home)), shell=True, cwd=cwd,
                        check=True, capture_output=True)
     env = dict(os.environ, MAKOTO_STATE_DIR=str(state), HOME=str(home))

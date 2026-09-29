@@ -66,9 +66,9 @@ def entry_dispatches_to_makoto(entry) -> bool:
 
 def _entry_command_invokes_makoto(entry) -> bool:
     """True iff one of the entry's hook COMMANDS is a makoto invocation form
-    (`MAKOTO_INVOCATION_RX`). The functional half of the wiring question: `event_wired` keys on
-    this, so a `_makoto_managed` entry whose command was gutted to a no-op reads UNWIRED. A None
-    "hooks" value is an unwired entry, never a raise: this input is reachable from
+    (`MAKOTO_INVOCATION_RX`) anywhere in it: the ownership half, so install/uninstall still
+    absorb and remove an entry that names makoto but no longer runs it (`event_wired` asks the
+    stricter running question). A None "hooks" value is an unwired entry, never a raise: this input is reachable from
     attacker-controlled settings.json content."""
     if not isinstance(entry, dict):
         return False
@@ -82,18 +82,81 @@ def _entry_command_invokes_makoto(entry) -> bool:
 entry_owned_by_makoto = entry_dispatches_to_makoto
 
 
+# The events whose entries the harness filters by tool name (`matcher`); every other event's
+# matcher never keeps makoto from running.
+_TOOL_EVENTS = ("PreToolUse", "PostToolUse", "PostToolUseFailure")
+# Interpreters of makoto's two invocation kinds: a shell runs the `.sh` forms, python the `-m` form.
+_SCRIPT_RUNNER_RX = _lazy_re(r"(?:ba|da|z|k)?sh|python[0-9.]*")
+_CONTROL = frozenset({";", "&&", "||", "|", "&", ";;", "(", ")", "|&"})
+
+
+def _matcher_reaches_every_tool(matcher) -> bool:
+    """True iff the entry's tool matcher admits any tool at all -- absent, "", "*", or a pattern
+    that matches a tool name it was never written for (a fresh random one)."""
+    if matcher in (None, "", "*"):
+        return True
+    if not isinstance(matcher, str):
+        return False
+    try:
+        return re.fullmatch(matcher, "T" + os.urandom(6).hex()) is not None
+    except re.error:
+        return False
+
+
+def command_runs_makoto(command) -> bool:
+    """True iff the shell, running `command`, EXECUTES makoto with the hook's own stdin: the
+    first simple command (nothing before it can short-circuit, divert or drain the event) is a
+    makoto invocation form (`MAKOTO_INVOCATION_RX`) in program position -- the form itself, or
+    the operand of the interpreter that runs it -- with no input redirected away. A form that is
+    only printed, commented, or reached after `||` does not run."""
+    import shlex
+    try:
+        lex = shlex.shlex(str(command or ""), posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return False
+    argv = []
+    for w in words:
+        if w in _CONTROL:
+            break
+        if set(w) <= set("<>&|"):
+            if "<" in w:
+                return False
+            break
+        if not argv and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", w, re.S):
+            continue
+        argv.append(w)
+    if not argv:
+        return False
+    if MAKOTO_INVOCATION_RX.search(argv[0]):
+        return True
+    runner = re.split(r"[/\\]", argv[0])[-1]
+    if not _SCRIPT_RUNNER_RX.fullmatch(runner):
+        return False
+    return bool(MAKOTO_INVOCATION_RX.search(" ".join(argv[1:3])))
+
+
 def event_wired(hooks, event: str) -> bool:
     """True iff a hooks-shaped dict (either settings.json's own "hooks" key, or a plugin
-    manifest's "hooks" key -- same shape, same semantics) wires `event` to makoto. This is not
-    "does a file exist", it is "does a real entry for this exact event name makoto".
+    manifest's "hooks" key -- same shape, same semantics) makes makoto RUN on `event`: an entry
+    for this exact event whose matcher reaches every tool (for a tool event) and one of whose
+    commands executes makoto (`command_runs_makoto`). Naming makoto is not running it.
 
-    Keys on `_entry_command_invokes_makoto`, NOT on `entry_dispatches_to_makoto`: the
-    `_makoto_managed` flag alone must never read as wired, since anyone editing settings.json can
-    strip the command while keeping the flag. Ownership (absorption/removal) and wiredness are
-    answered separately."""
+    Never keys on the `_makoto_managed` flag: anyone editing settings.json can strip the command
+    while keeping the flag. Ownership (absorption/removal) and wiredness are answered
+    separately."""
     if not isinstance(hooks, dict):
         return False
-    return any(_entry_command_invokes_makoto(h) for h in hooks.get(event, []) or ())
+    for entry in hooks.get(event, []) or ():
+        if not isinstance(entry, dict):
+            continue
+        if event in _TOOL_EVENTS and not _matcher_reaches_every_tool(entry.get("matcher")):
+            continue
+        if any(isinstance(inner, dict) and command_runs_makoto(inner.get("command", ""))
+               for inner in entry.get("hooks") or ()):
+            return True
+    return False
 
 
 def read_plugin_manifest_hooks(plugin_root, fs_read) -> dict:

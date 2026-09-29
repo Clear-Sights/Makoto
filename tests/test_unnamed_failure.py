@@ -136,3 +136,18 @@ def test_a_parametrized_id_is_matched_on_its_bare_name():
                         "tests/test_billing.py::test_charge[eur] FAILED\n1 failed in 1.0s")]
     assert unnamed_failure_gate("1 failed: test_charge.", history=history) is None
     assert unnamed_failure_gate("1 test failed.", history=history) is not None
+
+
+# ---- round nine C12: a count is a number, and the verdict governs a counted subject ----------
+# makoto-allow: fixtures spell failure counts the gate exists to read
+
+@pytest.mark.parametrize("text", [
+    "Twelve tests fa" + "iled.", "three tests are fa" + "iling.", "twenty-one checks fa" + "iled",
+    "3 of 40 tests fa" + "iled.", "four unit tests still fa" + "il",
+])
+def test_round_nine_counts_are_counts(text):
+    assert _COUNTED_FAILURE_RX.search(text), text
+
+
+def test_naming_the_failing_module_names_the_identity():
+    assert unnamed_failure_gate("2 fa" + "iled (`test_billing`).", history=_red_history()) is None

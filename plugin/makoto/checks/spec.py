@@ -977,7 +977,7 @@ mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOC
 from pathlib import Path
 
 from makoto.substrate._declared import DECLARED_IDS
-from makoto.registry import Check, discover, scan
+from makoto.registry import ALLOWED_EDGES, Check, discover, scan
 from makoto.registry import POSTURE_BLOCK
 
 
@@ -996,30 +996,168 @@ def orphan_ids(*, package_dir: Optional[Path] = None,
     return sorted(pid for pid in reg if pid not in live_ids)
 
 
+def _checkout_package(cwd) -> Optional[Path]:
+    """The makoto package a makoto checkout at `cwd` carries (its checks/ and its manifest),
+    when that is not the package running now; `None` otherwise. The agent edits the checkout,
+    so the checkout's catalog is the one that can drift in-turn."""
+    if not cwd:
+        return None
+    running = Path(__file__).resolve().parent.parent
+    for rel in ("plugin/makoto", "makoto"):
+        root = Path(cwd) / rel
+        try:
+            if (root / "checks").is_dir() and (root / "substrate" / "_declared.py").is_file():
+                return None if root.resolve() == running else root
+        except OSError:
+            return None
+    return None
+
+
+def _manifest_ids(declared_py: Path) -> frozenset:
+    """The string ids `DECLARED_IDS` holds in a manifest file, read without executing it."""
+    try:
+        tree = ast.parse(declared_py.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return frozenset()
+    for node in tree.body:
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else getattr(node, "targets", [])
+        if any(isinstance(t, ast.Name) and t.id == "DECLARED_IDS" for t in targets):
+            return frozenset(n.value for n in ast.walk(node.value)
+                             if isinstance(n, ast.Constant) and isinstance(n.value, str))
+    return frozenset()
+
+
+def _const_body(fn) -> bool:
+    """True iff a lambda/def's result is fixed before it runs: it returns a literal (or nothing)."""
+    if isinstance(fn, ast.Lambda):
+        return isinstance(fn.body, ast.Constant)
+    body = [st for st in fn.body
+            if not (isinstance(st, ast.Expr) and isinstance(st.value, ast.Constant))]
+    return (not body or len(body) == 1 and isinstance(body[0], ast.Return)
+            and (body[0].value is None or isinstance(body[0].value, ast.Constant)))
+
+
+def _read_module(path: Path) -> Optional[dict]:
+    """One checks/ module, read by `ast` and never executed: its top-level Check(...) rows
+    `{id, var, run, pred, valid}`, whether it binds CHECK, its module-level defs, and the ids its
+    `_PREDICATES` router holds (None when it has no router). `None` if it does not parse."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return None
+    rows, defs, router, binds_check = [], {}, None, False
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defs[node.name] = node
+            continue
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+        names = [n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+        binds_check = binds_check or "CHECK" in names
+        val = node.value
+        if "_PREDICATES" in names and isinstance(val, ast.Dict):
+            router = {k.value.id if isinstance(k, ast.Attribute) and isinstance(k.value, ast.Name)
+                      else k.value if isinstance(k, ast.Constant) else None for k in val.keys}
+        call = val if isinstance(val, ast.Call) else None
+        fname = getattr(getattr(call, "func", None), "id", None) or getattr(
+            getattr(call, "func", None), "attr", "")
+        if call is None or not fname.endswith("Check"):
+            continue
+        kw = {k.arg: k.value for k in call.keywords if k.arg}
+        for i, field in enumerate(("id", "applies_at", "posture")):
+            if field not in kw and i < len(call.args):
+                kw[field] = call.args[i]
+
+        def lit(field):
+            v = kw.get(field)
+            return v.value if isinstance(v, ast.Constant) else None
+        edge = lit("applies_at")
+        valid = (isinstance(lit("id"), str) and bool(lit("id"))
+                 and (edge is None or edge in ALLOWED_EDGES) and "applies_at" in kw
+                 and "posture" in kw)
+        rows.append({"id": lit("id"), "var": names[0] if names else None, "run": kw.get("run"),
+                     "pred": kw.get("predicate_module"), "valid": valid})
+    return {"rows": rows, "defs": defs, "router": router, "binds_check": binds_check}
+
+
+def _row_cannot_fire(row, info, stem, catalog) -> bool:
+    """True iff dispatch can never get a finding out of the row: its run returns a fixed value,
+    its predicate module routes no predicate for it, or it has neither."""
+    run = row["run"]
+    if run is not None and not (isinstance(run, ast.Constant) and run.value is None):
+        if isinstance(run, ast.Lambda):
+            return _const_body(run)
+        if isinstance(run, ast.Name) and run.id in info["defs"]:
+            return _const_body(info["defs"][run.id])
+        return False                          # built elsewhere: not decidable here, not dead
+    pred = row["pred"]
+    if pred is None:
+        return True
+    if isinstance(pred, ast.Name) and pred.id == "__name__":
+        target = info
+    elif isinstance(pred, ast.Constant) and isinstance(pred.value, str):
+        target = catalog.get(pred.value.rsplit(".", 1)[-1])
+    else:
+        return False
+    if target is None or "predicate" not in target["defs"]:
+        return True
+    return target["router"] is not None and not (
+        row["var"] in target["router"] or row["id"] in target["router"])
+
+
 def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
-                                declared: Optional[dict] = None) -> Optional[Finding]:
-    """Fires iff the checks/ catalog has an orphan on either side; `None` on a fully consistent
-    catalog. Fail-open by construction: both halves already fail-open internally."""
-    mods = orphan_modules(package_dir=package_dir)
-    ids = orphan_ids(package_dir=package_dir, declared=declared)
-    if not mods and not ids:
+                                declared: Optional[dict] = None, cwd=None) -> Optional[Finding]:
+    """Fires iff the catalog is not what its manifest says is live: a module with no valid
+    CHECK, a declared id nothing backs, a live id the manifest never declared, or a live row
+    that can never fire. `None` on a consistent catalog. The catalog is the checkout at `cwd`
+    when it carries one, else the running package; either way it is READ (`ast`), never
+    imported, so no repo code runs in the hook and a checkout ahead of the installed plugin is
+    judged on its own text."""
+    from makoto.registry import _PACKAGE_DIR, _candidate_files
+    checkout = _checkout_package(cwd) if package_dir is None else None
+    if checkout is not None:
+        package_dir = checkout / "checks"
+        if declared is None:
+            declared = _manifest_ids(checkout / "substrate" / "_declared.py")
+    reg = DECLARED_IDS if declared is None else declared
+    catalog = {p.stem: _read_module(p) for p in _candidate_files(package_dir or _PACKAGE_DIR)}
+    mods, live, dead = [], set(), set()
+    for stem, info in catalog.items():
+        rows = [r for r in (info or {}).get("rows", ()) if r["valid"]]
+        if info is None or not info["binds_check"] or not rows:
+            mods.append(stem)
+        for row in rows:
+            live.add(row["id"])
+            if _row_cannot_fire(row, info, stem, catalog):
+                dead.add(row["id"])
+    ids = sorted(pid for pid in reg if pid not in live)
+    undeclared = sorted(live - set(reg))
+    if not (mods or ids or undeclared or dead):
         return None
     parts = []
     if mods:
         parts.append("orphan module(s) on disk with no live CHECK registered: "
-                     + ", ".join(mods))
+                     + ", ".join(sorted(mods)))
     if ids:
         parts.append("declared ID(s) in the manifest with no live module backing them: "
                      + ", ".join(ids))
+    if undeclared:
+        parts.append("live ID(s) the manifest never declared: " + ", ".join(undeclared))
+    if dead:
+        parts.append("live row(s) that can never fire (run returns a fixed value, or no "
+                     "predicate resolves for the id): " + ", ".join(sorted(dead)))
     return Finding(
         pattern_id="gate.undeclared_falsifiable",
         file="makoto/checks/",
         line=0,
         level="error",
-        message="checks/ catalog completeness drift -- " + "; ".join(parts),
+        message="row gate.undeclared_falsifiable (checks/ catalog completeness): "
+                + "; ".join(parts),
         retry_hint=("Fix the checks/ catalog: give every on-disk module a valid CHECK "
-                    "(id/applies_at/posture), and either implement or remove every "
-                    "declared-but-missing manifest entry in _declared.py."),
+                    "(id/applies_at/posture), declare every live id in _declared.py, route "
+                    "every row to a predicate or a run that reads its input, and either "
+                    "implement or remove every declared-but-missing manifest entry."),
     )
 
 
@@ -1029,7 +1167,8 @@ undeclared_CHECK = Check(
     applies_at="Stop",
     posture=POSTURE_BLOCK,
     tests="SPEC",
-    run=lambda ctx=None: undeclared_falsifiable_gate(),
+    eats=frozenset({"cwd"}),
+    run=lambda ctx=None: undeclared_falsifiable_gate(cwd=getattr(ctx, "cwd", None)),
 )
 # content.verifier_exit_masking — verifier EXIT-CODE masking (a test/build/lint runner's failure
 # hidden).
