@@ -634,34 +634,54 @@ structure_CHECK = _Check(id="gate.unread_structure", applies_at="Stop", posture=
 # ==============================================================================================
 # unknownRefSwitch
 # ==============================================================================================
-# gate.unknown_ref_switch -- HEAD was moved to a ref nothing in this session had printed.
-# Switching a ref is a boundary, and what must survive it (the work in the tree) has to be named
-# before the boundary is crossed: a `git checkout` or `git switch` in the session's own Bash
-# record is a boundary crossed in front of makoto, and whether the ref was ever printed first is
-# two commands on the record.
+# gate.unknown_ref_switch -- HEAD or the work tree was moved to a ref nothing in this session had
+# printed. Moving to a ref is a boundary, and what must survive it (the work in the tree) has to
+# be named before the boundary is crossed; whether the ref was ever printed first is on the
+# record.
 #
-# PRE-EDGE DENY (2026-09-25): the switch is refused before HEAD moves; the discharge is to print
-# the refs (`git branch`, `git rev-parse --verify <ref>`) and retry.
-from makoto.kit import unmet_obligation_gate, command_matches
+# PRE-EDGE DENY (2026-09-25): the move is refused before HEAD moves; the discharge is to print
+# the ref (`git branch`, `git rev-parse --verify <ref>`, a log or fetch that shows it) and retry.
+#
+# THE EFFECT, NOT THE VERB (register D12: `reset --keep` and `rebase` walked past a list of
+# checkout/switch/reset --hard). A git segment is read as a move unless its subcommand is one that
+# never sets HEAD or the work tree from a commit (_REF_STILL, below: it reads, lists, records,
+# publishes, or edits refs other than HEAD). An unknown subcommand is a move -- the list fails
+# CLOSED. Every positional word of a move is a candidate ref, less what cannot be one: a word
+# after `--`, a path that exists, a pseudo-ref HEAD already names (`HEAD~2`, `@{u}`, `-`,
+# FETCH_HEAD), the repository slot of `pull`, and the action word of a verb that takes one
+# (`bisect start`, `worktree add <path>`). A branch the command itself creates
+# (`checkout -b|-B|--orphan NEW`, `switch -c|-C|--create|--force-create|--orphan NEW`,
+# `worktree add -b NEW`) names itself, and a later segment switching to it is not unknown.
+from makoto.kit import _session_rows, _SETTLED, command_of, unwitnessed
 from makoto.core._shell import _basename, _effective_argv, _git_subcommand, _shell_segments
 
-# Moving HEAD. `git checkout <ref>` and `git switch <ref>` are the two forms, read per shell
-# segment (`core._shell`), so `git -C dir checkout`, doubled spaces and `a || b` chains parse as
-# git does. `git checkout -- <path>` restores a FILE and moves nothing: a leading `--` is no
-# switch. `git reset --hard <ref>` moves HEAD (and the working tree) to a ref the same way;
-# `git reset --hard` with no ref discards edits in place and names no boundary to cross.
-#
-# CREATING A BRANCH NAMES THE NEW REF ITSELF: `checkout -b|-B|--orphan NEW [BASE]` and
-# `switch -c|-C|--create|--force-create|--orphan NEW [BASE]` make NEW, so NEW is not an unknown
-# ref, and a later segment of the same command switching to NEW (the create-or-switch idiom
-# `git checkout -b X || git checkout X`) is not either. Only BASE, when given, is held to the
-# rule. A BASE of `HEAD` or `@` moves nothing.
 _CREATE_FLAGS = frozenset({"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"})
-_STAY_REFS = frozenset({"HEAD", "@"})
+# Subcommands that never set HEAD or the work tree from a commit. Anything else is a move.
+_REF_STILL = frozenset({
+    "status", "log", "show", "diff", "rev-parse", "rev-list", "branch", "tag", "fetch", "push",
+    "ls-remote", "ls-files", "ls-tree", "cat-file", "blame", "annotate", "grep", "config",
+    "remote", "describe", "show-ref", "for-each-ref", "reflog", "shortlog", "add", "commit", "rm",
+    "mv", "notes", "help", "version", "clone", "init", "format-patch", "archive", "count-objects",
+    "fsck", "gc", "prune", "repack", "merge-base", "name-rev", "diff-tree", "diff-files",
+    "diff-index", "var", "check-ignore", "check-attr", "check-ref-format", "apply", "hash-object",
+    "update-index", "verify-commit", "verify-tag", "cherry", "range-diff", "whatchanged",
+    "show-branch", "clean", "mergetool", "difftool", "commit-tree", "mktree", "write-tree",
+    "bundle", "credential", "lfs", "request-pull", "send-email", "submodule", "sparse-checkout",
+    "maintenance", "replace", "stash", "pack-refs", "update-ref", ""})
+# A value-taking option whose value is NOT the move's target (a message, a strategy, a file).
+_VALUED = frozenset({"-m", "-F", "-s", "-X", "--strategy", "--strategy-option", "--exec",
+                     "--message", "--file", "--author", "--date", "--reason", "-U", "--depth",
+                     "--cleanup", "--pathspec-from-file", "--conflict", "--reference"})
+# A value-taking option whose value IS the move's target (`rebase --onto X`, `restore --source X`).
+_TARGET_VALUED = frozenset({"--onto", "--source"})
+# Pseudo-refs HEAD already names: moving relative to them crosses no unnamed boundary.
+_PSEUDO_REFS = frozenset({"", "HEAD", "@", "-", "FETCH_HEAD", "ORIG_HEAD", "MERGE_HEAD",
+                          "CHERRY_PICK_HEAD", "REBASE_HEAD", "AUTO_MERGE", "stash"})
+_REF_SUFFIX_RX = _lazy_re(r"(?:[~^].*|@\{.*)\Z")
 # A redirection word shlex leaves in the argv (`2>/dev/null`, `>`, `&>log`): never a ref.
 _REDIRECT_RX = _lazy_re(r"\d*&?[<>]+&?")
-# Printing the ref. `git status` and `git log` are NOT here, because neither names the ref being
-# switched TO.
+# Listing the refs outright. `git status` and `git log` are NOT here, because neither lists the
+# ref being moved TO (a log that shows it prints it, and is read as a print of that ref).
 _REF_PRINT_RX = _lazy_re(r"\bgit\s+(?:rev-parse|branch|show-ref|for-each-ref|ls-remote)\b")
 
 
@@ -683,64 +703,112 @@ def _without_redirects(args):
     return [a for a in out if a is not None]
 
 
-def _switch_target(argv, created: set):
-    """The ref this git segment moves HEAD to, or None; records any branch it creates."""
+def _git_dir(argv, cwd):
+    """The directory a git argv runs in: `-C dir` (relative to `cwd`), else `cwd`."""
+    args = list(argv[1:])
+    d = cwd or "."
+    while args and args[0].startswith("-"):
+        if args[0] == "-C" and len(args) > 1:
+            d = os.path.join(d, args[1])
+        args = args[2:] if args[0] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace") else args[1:]
+    return d
+
+
+def _move_targets(argv, created: set, cwd: str) -> list:
+    """The refs this segment moves HEAD or the work tree to; records any branch it creates."""
     eff = _effective_argv(argv)
-    if not eff or _basename(eff[0]) != "git":
-        return None
+    if not eff:
+        return []
+    if _basename(eff[0]) == "gh":
+        rest = [a for a in eff[1:] if not a.startswith("-")]
+        return rest[2:3] if rest[:2] == ["pr", "checkout"] else []
+    if _basename(eff[0]) != "git":
+        return []
     sub, args = _git_subcommand(eff)
-    if sub == "reset":
-        if "--hard" not in args:
-            return None
-        rest = [a for a in args if not a.startswith("-")]
-        return rest[0] if rest else None
-    if sub not in ("checkout", "switch"):
-        return None
-    positional, made = [], None
-    it = iter(_without_redirects(args))
+    if sub == "worktree":
+        if not args or args[0] != "add":
+            return []
+        args = args[1:]
+    elif sub in _REF_STILL:
+        return []
+    where = _git_dir(eff, cwd)
+    positional, targets, it = [], [], iter(_without_redirects(args))
     for a in it:
         if a == "--":
             break
         if a in _CREATE_FLAGS:
             made = next(it, None)
+            if made:
+                created.add(made)
+        elif a in _VALUED:
+            next(it, None)
+        elif a in _TARGET_VALUED or (sub == "restore" and a == "-s"):
+            targets.append(next(it, ""))
+        elif a.startswith("--") and "=" in a:
+            if a.split("=", 1)[0] in _TARGET_VALUED:
+                targets.append(a.split("=", 1)[1])
         elif not a.startswith("-"):
             positional.append(a)
-    if made is not None:
-        created.add(made)
-        base = positional[0] if positional else None
-        return None if base is None or base in _STAY_REFS else base
-    if not positional or positional[0] in created or positional[0] in _STAY_REFS:
-        return None
-    return positional[0]
+    if sub in ("worktree", "pull", "bisect") and positional:
+        positional = positional[1:]           # the path / repository / action slot
+    if sub == "reset" and positional and not os.path.exists(os.path.join(where, positional[0])):
+        positional = positional[:1]           # `reset <ref> -- paths`: only the first is a ref
+    targets += [a for a in positional if not os.path.exists(os.path.join(where, a))]
+    # A word the shell expands (`$ref`, a command substitution) names nothing readable here.
+    return [t for t in targets if t not in created and not any(c in t for c in "$`")
+            and _REF_SUFFIX_RX.sub("", t) not in _PSEUDO_REFS]
 
 
-def _is_ref_switch(ev: dict) -> bool:
-    cmd = command_of(ev)
+def _printed(ref: str, texts) -> bool:
+    """True iff `ref` (or, for an abbreviated hash, a hash it begins) appears in a settled
+    event's command or output."""
+    tail = r"(?![\w-])" if not _lazy_re(r"[0-9a-f]{4,40}\Z").match(ref) else ""
+    rx = re.compile(r"(?<![\w.-])" + re.escape(ref) + tail)
+    return any(rx.search(t) for t in texts)
+
+
+def unknown_ref_switch_gate(*, current_event: dict, history: list, pattern, conn=None):
+    cmd = command_of(current_event)
     if not cmd:
-        return False
+        return None
     created: set = set()
-    return any(_switch_target(argv, created) is not None for argv, _op in _shell_segments(cmd))
+    targets = [t for argv, _op in _shell_segments(cmd)
+               for t in _move_targets(argv, created, str(current_event.get("cwd") or ""))]
+    if not targets:
+        return None
+    rows = _session_rows(conn, current_event.get("session_id", ""), history)
+    events = [ev for ev in map(decode_history_event, rows)
+              if isinstance(ev, dict) and ev.get("hook_event_name") in _SETTLED] + [current_event]
+
+    def pays(ev):
+        # A settled call that listed the refs pays every move after it; any other settled call
+        # pays the refs its command or output names.
+        if ev is current_event:
+            return None
+        if _REF_PRINT_RX.search(command_of(ev)):
+            return lambda _t: True
+        text = json.dumps([ev.get("tool_input"), ev.get("tool_response")], ensure_ascii=False)
+        return lambda t: _printed(t, (text,))
+
+    unknown = [t for _ev, t in unwitnessed(
+        events, owes=lambda ev: targets if ev is current_event else (), pays=pays)]
+    if not unknown:
+        return None
+    return Finding(
+        pattern_id=pattern.id, file="", line=0, level="error",
+        message=(f"row gate.unknown_ref_switch ({ref_DESCRIPTION}): this call moves HEAD or the "
+                 f"work tree to {unknown[0]!r}, which nothing in this session had printed — moving "
+                 "to a ref is a boundary, and what has to survive it was never named."),
+        retry_hint=("Print the ref first (`git rev-parse --verify <ref>`, `git branch -a`, "
+                    "`git log -1 <ref>`) so the move is to something known."),
+        snippet=str(current_event.get("tool_name", ""))[:200],
+    )
 
 
-# `kit.command_matches` is the one body for "this event's command matches a regex" -- four
-# copies of it appeared the moment this batch landed and the duplicate-function law caught them.
-_is_ref_print = command_matches(_REF_PRINT_RX)
-
-
-unknown_ref_switch_gate = unmet_obligation_gate(
-    act=_is_ref_switch,
-    guard=_is_ref_print,
-    message=("HEAD is about to move to a ref that nothing in this session had printed — switching a ref "
-             "is a boundary, and what has to survive it was never named."),
-    retry_hint=("Print the refs first (`git rev-parse --verify <ref>`, `git branch`, "
-                "`git show-ref`) so the switch is to something known."),
-)
-
-
-ref_RETRY_HINT = "Print the refs first, then retry the switch."
-ref_DESCRIPTION = "HEAD moved to a ref nothing in this session printed"
+ref_RETRY_HINT = "Print the ref first, then retry the move."
+ref_DESCRIPTION = "HEAD or the work tree moved to a ref nothing in this session printed"
 ref_CHECK = _Check(id="gate.unknown_ref_switch", applies_at="Pre", posture="BLOCK",
-               predicate_module=__name__, keywords=("checkout", "switch", "reset"),
+               predicate_module=__name__, keywords=("git", "checkout"),
                retry_hint=ref_RETRY_HINT,
                description=ref_DESCRIPTION,
                tests="LINEAGE",

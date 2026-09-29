@@ -413,3 +413,19 @@ def test_unprobed_fanout_denies_once_then_lets_the_same_session_through():
     probe_then = [{"payload": dispatch}, _row("Read", file_path="/repo/a.py"),
                   _row("Agent", prompt="go"), {"payload": dict(dispatch, tool_input={"prompt": "again"})}]
     assert lineage.unprobed_fanout_gate(current_event=dispatch, history=probe_then[:3], pattern=pattern) is None
+
+
+def test_unknown_ref_switch_reads_the_move_not_the_verb():
+    """Register D12: any call that moves HEAD or the work tree to an unprinted ref, whatever the
+    verb; a ref printed earlier (in any output or command) is known."""
+    for cmd in ("git reset --keep feature-x", "git rebase feature-x", "git merge feature-x",
+                "git cherry-pick feature-x", "git restore --source=feature-x a.py",
+                "git rebase --onto feature-x main"):
+        assert unknown_ref_switch_gate([_bash(cmd)]) is not None, cmd
+    assert unknown_ref_switch_gate([_bash("git fetch origin", " * [new branch] feature-x -> origin/feature-x"),
+                                    _bash("git merge origin/feature-x")]) is None
+    assert unknown_ref_switch_gate([_bash("git log -1", "commit b8af73b1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7"),
+                                    _bash("git merge b8af73b")]) is None
+    for cmd in ("git commit -m feature-x", "git push origin feature-x", "git diff feature-x",
+                "git reset --hard HEAD~1", "git merge @{u}", "git stash pop"):
+        assert unknown_ref_switch_gate([_bash(cmd)]) is None, cmd

@@ -93,3 +93,24 @@ def test_denied_pretooluse_attempt_is_not_an_intervening_change():
     hist = [_write_row(1, "f.py", "A"), _write_row(2, "f.py", "B"),
             _write_row(3, "f.py", "A", event="PreToolUse")]
     assert predicate(current_event=_cur("f.py", "B"), history=hist, pattern=_PAT) is None
+
+
+def _row(idx, tool, **ti):
+    payload = json.dumps({"hook_event_name": "PostToolUse", "tool_name": tool,
+                          "tool_input": dict(file_path="f.py", **ti)})
+    return (idx, "t", "PostToolUse", "/repo", payload)
+
+
+def test_the_revert_is_read_from_whole_file_states_whatever_tool_carries_each_step():
+    """Register D11: B reached by an Edit, or A restored by an Edit replacing the whole content,
+    is the same A->B->A revert; an Edit whose base is unknown is silent."""
+    hist = [_row(1, "Write", content="x = 1\n"), _row(2, "Edit", old_string="1", new_string="2")]
+    assert predicate(current_event=_cur("f.py", "x = 1\n"), history=hist, pattern=_PAT) is not None
+    hist = [_row(1, "Write", content="A"), _row(2, "Write", content="B")]
+    edit = {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+            "tool_input": {"file_path": "f.py", "old_string": "B", "new_string": "A"}}
+    assert predicate(current_event=edit, history=hist, pattern=_PAT) is not None
+    hist = [_row(1, "Edit", old_string="1", new_string="2")]
+    edit = {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+            "tool_input": {"file_path": "f.py", "old_string": "2", "new_string": "1"}}
+    assert predicate(current_event=edit, history=hist, pattern=_PAT) is None

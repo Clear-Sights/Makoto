@@ -1220,44 +1220,47 @@ consent_CHECK = _Check(id="gate.claimed_consent_absent", applies_at="Stop", post
                run=lambda c: claimed_consent_absent_gate(c.text,
                                                          transcript_path=c.transcript_path))
 
-# PREVENTIVE-at-PreToolUse precheck event.thrash_revert — flag a Write that REVERTS
-# a file back to a byte-identical copy of an earlier whole-file content this session (an A->B->A
-# oscillation) at PreToolUse time.
+# PREVENTIVE-at-PreToolUse precheck event.thrash_revert — flag a write that REVERTS a file back
+# to a byte-identical copy of an earlier whole-file content this session (an A->B->A oscillation)
+# at PreToolUse time, whatever tool carries each step.
 #
-# WHAT IT FIRES ON: the about-to-execute Write carries `content` byte-identical to an EARLIER
-# whole-file Write of the SAME `file_path` in this session's history, with at least one INTERVENING
-# whole-file Write of DIFFERENT content to that path between them (A -> B -> now-A). That is a
-# self-revert that churns the file with no net progress.
+# WHAT IT FIRES ON: the file's content AFTER the about-to-execute Write/Edit/MultiEdit equals a
+# whole-file content the SAME `file_path` held earlier in this session, with at least one
+# DIFFERENT whole-file content landed in between (A -> B -> now-A). That is a self-revert that
+# churns the file with no net progress. The effect is the file's STATE, so B reached by an Edit,
+# or A restored by an Edit that replaces the whole content, is the same revert (register D11).
 #
-# WHY WHOLE-FILE Write.content ONLY (the load-bearing 0-FP narrowing): comparing an Edit `new_string`
+# WHY WHOLE-FILE STATES ONLY (the load-bearing 0-FP narrowing): comparing an Edit `new_string`
 # FRAGMENT gave 7 corpus FALSE POSITIVES in the sibling canon.oscillate — a short snippet or a
-# re-inserted import line is not a closed whole-file unit, so two unrelated edits sharing a fragment
-# look like a bogus revert. This precheck NEVER compares fragments: a CURRENT Edit/MultiEdit/
-# NotebookEdit is SILENT, and a PRIOR Edit/MultiEdit/NotebookEdit is not counted as a content unit
-# (only whole-file Writes are). The compared unit is whole-file `Write.content` exclusively.
+# re-inserted import line is not a closed whole-file unit. This check NEVER compares fragments:
+# each landed step is replayed onto the whole content it applied to (a Write sets it; an Edit
+# splices old_string -> new_string exactly as the tool does), and only whole-file states are
+# compared. A step whose base content is unknown (no Write of the path yet, or an old_string that
+# does not occur exactly as the tool requires) makes the state UNKNOWN until the next Write, so it
+# is silent rather than guessed.
 #
-# Carries its OWN whole-file-Write history walker so a PreToolUse precheck does not import the
-# Stop-gate engine. The ONLY content read is through ByteIdentity (==/len/hash only), so this
-# body CANNOT read content MEANING — only content IDENTITY. Stdlib only; the only imports are
-# makoto.substrate, makoto.kit, makoto.vocab and makoto.registry.
+# Carries its OWN history walker so a PreToolUse precheck does not import the Stop-gate engine.
+# The splice is byte-level (find/replace of the tool's own strings); every comparison goes through
+# ByteIdentity (==/len/hash only), so this body cannot read content MEANING — only IDENTITY.
 from makoto.substrate.byte_identity import ByteIdentity
 from makoto.kit import decode_history_row, unwitnessed
 
 # SHAPE = OTHER_POINT: the witness is a second reading of the same subject -- an earlier
-# whole-file Write of the SAME path, a history row -- never a live-exercised act or a source read.
+# whole-file state of the SAME path, rebuilt from history rows -- never a live-exercised act.
 
 
 def thrash_owes(ev):
-    """The about-to-land whole-file Write owes a witness that it is not an A->B->A self-revert.
-    `ev` is `(now, prior)`: `now` is this write's `ByteIdentity` content, `prior` the ordered
-    whole-file contents this session already landed at the same path. Embeds the full A->B->A
-    walk itself (a single left-to-right pass, exactly as before): the obligation is raised only
-    once some earlier landed content equals `now` (an A) AND some later-landed content in between
-    differs from it (a B) -- a bare A->A repeat with no intervening B is a no-op rewrite, not a
-    revert, and never even raises this."""
+    """The about-to-land content owes a witness that it is not an A->B->A self-revert.
+    `ev` is `(now, prior)`: `now` is the file's resulting `ByteIdentity` content, `prior` the
+    ordered whole-file states this session already landed at the same path (None = unknown).
+    The obligation is raised only once some earlier state equals `now` (an A) AND some
+    later-landed state in between differs from it (a B) -- a bare A->A repeat with no
+    intervening B is a no-op rewrite, not a revert, and never even raises this."""
     now, prior = ev
     seen_earlier_a = False
     for earlier in prior:
+        if earlier is None:
+            continue
         if earlier == now:
             seen_earlier_a = True
         elif seen_earlier_a:
@@ -1265,33 +1268,48 @@ def thrash_owes(ev):
     return ()
 
 
-def _prior_whole_file_writes(history, path: str) -> list:
-    """Ordered ByteIdentity-wrapped whole-file Write contents to `path` in the session history.
-    ONLY tool_name=='Write' rows carrying a `content` key are counted — Edit/MultiEdit/NotebookEdit
-    fragments are deliberately excluded (the canon.oscillate 7-FP lesson). Rows are either the
-    (id, ts, event_type, cwd, raw_payload_json) tuples _select_recent returns OR dicts with a
-    'payload' key (corpus replay). Fail-open: an unparseable / payload-less row is skipped.
+def _thrash_after(tool, ti, content):
+    """The whole-file content after `tool` with input `ti` lands on `content` (None = unknown)."""
+    if tool == "Write":
+        return ti["content"] if isinstance(ti.get("content"), str) else None
+    edits = ([ti] if tool == "Edit" else ti.get("edits") if tool == "MultiEdit" else None)
+    if not isinstance(edits, list):
+        return None
+    for e in edits:
+        if content is None or not isinstance(e, dict):
+            return None
+        old, new = e.get("old_string"), e.get("new_string")
+        if not isinstance(old, str) or not isinstance(new, str) or not old:
+            return None
+        n = content.count(old)
+        if n == 0 or (n > 1 and not e.get("replace_all")):
+            return None                   # the tool refuses this edit: the state is not modelled
+        content = content.replace(old, new) if e.get("replace_all") else content.replace(old, new, 1)
+    return content
 
-    Row-decode step shared via makoto.kit.decode_history_row, the same one substrate._canonAtoms.
-    _decode_row uses -- one definition of the tuple/dict-payload sniff + json.loads, not two. Only
-    this function's own Write/content filter stays local."""
+
+def _prior_whole_file_states(history, path: str) -> list:
+    """Ordered whole-file contents `path` held in the session history, as raw strings (None where
+    unknown). Rows are either the (id, ts, event_type, cwd, raw_payload_json) tuples
+    _select_recent returns OR dicts with a 'payload' key (corpus replay), decoded by
+    makoto.kit.decode_history_row. Fail-open: an unparseable / payload-less row is skipped."""
     out: list = []
+    content = None
     for row in history or ():
         ev = decode_history_row(row)
-        if not isinstance(ev, dict) or ev.get("tool_name") != "Write":
+        if not isinstance(ev, dict) or ev.get("tool_name") not in ("Write", "Edit", "MultiEdit"):
             continue
         # LANDED content only: `_ingest_event` persists every row BEFORE its handler runs, so
         # the history also holds PreToolUse rows (attempts, including DENIED ones) and
-        # PostToolUseFailure rows (writes that did NOT land). Counting those as "the file's
-        # content" made a write that never executed the intervening B — a DENY resting on a
-        # change that never happened. Only a successful PostToolUse row proves the disk held
-        # this content.
+        # PostToolUseFailure rows (writes that did NOT land). Only a successful PostToolUse row
+        # proves the disk held this content.
         if ev.get("hook_event_name") != "PostToolUse":
             continue
         inp = ev.get("tool_input") or {}
-        if not isinstance(inp, dict) or inp.get("file_path") != path or "content" not in inp:
+        if not isinstance(inp, dict) or inp.get("file_path") != path:
             continue
-        out.append(ByteIdentity(inp["content"]))
+        content = _thrash_after(ev.get("tool_name"), inp, content)
+        out.append(content)
     return out
 
 
@@ -1299,23 +1317,19 @@ def thrash_predicate(*, current_event: dict, history: list,
               pattern: Check, conn=None) -> Optional[Finding]:
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
-    # Whole-file Write ONLY. A current Edit/MultiEdit/NotebookEdit carries only a fragment, not a
-    # closed whole-file unit, so it is never judged here (fragment compares are the FP class).
-    if current_event.get("tool_name") != "Write":
-        return None
+    tool = current_event.get("tool_name")
     ti = current_event.get("tool_input")
-    if not isinstance(ti, dict):
+    if tool not in ("Write", "Edit", "MultiEdit") or not isinstance(ti, dict):
         return None
     path = ti.get("file_path") or ""
-    if not path or "content" not in ti:
-        return None                       # no path / no whole-file content -> nothing to revert
-    now = ByteIdentity(ti["content"])
-
-    prior = _prior_whole_file_writes(history, path)
-    # A->B->A: some EARLIER whole-file Write of this path == now (an A), AND at least one whole-file
-    # Write of DIFFERENT content (a B) lies AFTER that earlier A. A bare A->A repeat (no intervening
-    # different content) is a no-op rewrite, not a revert. The walk itself lives in `owes` now; see
-    # its docstring for why one left-to-right pass over `prior` decides it.
+    if not path:
+        return None
+    states = _prior_whole_file_states(history, path)
+    after = _thrash_after(tool, ti, states[-1] if states else None)
+    if after is None:
+        return None                       # no whole-file content to compare -> nothing to revert
+    now = ByteIdentity(after)
+    prior = [None if c is None else ByteIdentity(c) for c in states]
     for _ev, _subject in unwitnessed(((now, prior),), owes=thrash_owes):
         return Finding(
             pattern_id=pattern.id,
@@ -1323,7 +1337,7 @@ def thrash_predicate(*, current_event: dict, history: list,
             line=0,
             level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
             message=(
-                f"row {pattern.id} ({pattern.description}): this Write reverts {path!r} back "
+                f"row {pattern.id} ({pattern.description}): this {tool} reverts {path!r} back "
                 f"to a byte-identical copy of an earlier whole-file content after it was "
                 f"changed in between (an A->B->A oscillation) — the edits cancel out with no "
                 f"net progress. Decide which content is correct and write it once."
@@ -1337,7 +1351,7 @@ thrash_RETRY_HINT = 'Decide which content is correct and write it once; do not r
 thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 
 from makoto.registry import Check
-thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write',), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
+thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write', 'Edit'), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
 # event.unpinned_input -- refuses a dispatch whose READ paths carry no @<12+ hex> content hash,
 # and a Bash call with timeout > 120000 ms unless it verifies pins (sha256sum -c) or names
