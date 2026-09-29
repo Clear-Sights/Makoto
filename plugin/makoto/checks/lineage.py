@@ -15,13 +15,13 @@ from __future__ import annotations
 #      `stop_reason` as end-of-turn (Claude Code's real Stop payload carries no `stop_reason`).
 #      This is the AI's OWN closing claim — never a USER-directed action, so this predicate
 #      structurally cannot gate the user.
-#   2. Find a SHA-shaped hex token (7–40 hex chars) bound to a POSITIVE commit/tag-HAPPENED CLAIM
-#      ("committed as <sha>", "tagged <sha>", "commit <sha> is on main") AND NOT sitting in a
-#      negation/deferral/referential window. Keying on the ASSERTION, not mere SHA-token +
-#      commit-keyword co-occurrence, excludes a denial ("I have NOT committed ... <sha>"), a
+#   2. Find a SHA-shaped hex token (7–40 hex chars) in a clause that places it in git history
+#      ("committed as <sha>", "tagged <sha>", "on main as <sha>") AND NOT sitting in a
+#      negation/deferral/referential window. The window excludes a denial ("I have NOT committed ... <sha>"), a
 #      deferral ("I haven't committed yet"), and a reference to a USER-supplied SHA ("the commit
 #      <sha> you mentioned") — so arbitrary hex (addresses, digests, fixtures) never fires.
-#   3. If history holds a real `git commit` / `git tag` Bash tool_use -> NEVER fire. The detector
+#   3. If history holds a real `git commit` / `git tag` Bash tool_use that CREATES an object (not a
+#      read-only `git tag -l`, not `commit --dry-run`) -> NEVER fire. The detector
 #      is invocation-FORM-AGNOSTIC: it matches the bare `git commit`, a cd'd-directory commit, AND
 #      every form that places git GLOBAL OPTIONS between `git` and the subcommand (`git -C
 #      <worktree> commit`, `git -c user.name=Bot commit`) — a truthful worktree commit then a
@@ -51,47 +51,21 @@ _SHA_RX = r"(?<![0-9a-zA-Z])([0-9a-f]{7,40})(?![0-9a-zA-Z])"
 # negated or referential window. Co-occurrence of a SHA with a commit keyword never fires on its
 # own — an assertion is required.
 
-# Positive commit/tag-completion verbs. "committed"/"tagged"/"landed"/"pushed" are
-# completed-action assertions; bare "commit"/"tag" (the noun) only counts when it is itself
-# asserted as present-on-a-ref (handled by _CLAIM_RXS below), never on its own. A SHORT, same-line,
-# lazy connector gap binds verb<->SHA.
-_GAP = r"[^\n]{0,24}?"          # short, same-line, lazy connector gap
-_TAG_GAP = r"[^\n]{0,40}?"      # tags often carry a version label before the SHA
-
-# Each claim regex asserts a commit/tag ACTUALLY HAPPENED and cites a SHA.
-_CLAIM_RXS = (
-    # forward, completed verb: "committed as a1b2c3d", "committed a1b2c3d"
-    _lazy_re(r"\bcommitted\b" + _GAP + _SHA_RX, re.IGNORECASE),
-    # forward, asserting noun-on-a-ref: "commit a1b2c3d is on main", "commit a1b2c3d landed"
-    _lazy_re(
-        r"\bcommit\b\s*[:#]?\s*" + _SHA_RX +
-        r"[^\n]{0,24}?\b(?:is|was|has been|landed|pushed|on)\b",
-        re.IGNORECASE,
-    ),
-    # "created/made/pushed (the )commit a1b2c3d"
-    _lazy_re(
-        r"\b(?:created|made|pushed|landed)\b[^\n]{0,16}?\bcommit\b\s*[:#]?\s*" + _SHA_RX,
-        re.IGNORECASE,
-    ),
-    # strong completion verb directly citing a SHA, no "commit" noun needed: "pushed e5d6c7b",
-    # "merged as e5d6c7b", "shipped it at e5d6c7b" — a completion assertion, not co-occurrence.
-    _lazy_re(
-        r"\b(?:landed|pushed|merged|shipped)\b\s*(?:it\s+)?[:#]?\s*(?:as\s+|at\s+|in\s+|to\s+\S+\s+as\s+)?"
-        + _SHA_RX,
-        re.IGNORECASE,
-    ),
-    # tag completion: "tagged v1 (3c4d5e6)", "created tag ... a1b2c3d"
-    _lazy_re(r"\btagged\b" + _TAG_GAP + _SHA_RX, re.IGNORECASE),
-    _lazy_re(
-        r"\b(?:created|pushed)\b[^\n]{0,16}?\btag\b" + _TAG_GAP + _SHA_RX,
-        re.IGNORECASE,
-    ),
-    # reverse order: "a1b2c3d was committed", "a1b2c3d landed on main"
-    _lazy_re(
-        _SHA_RX + r"[^\n]{0,20}?\b(?:committed|landed|pushed|tagged)\b",
-        re.IGNORECASE,
-    ),
+# A SHA is CLAIMED when the clause it sits in places it in git history: the clause carries commit/
+# tag vocabulary ("committed as", "commit <sha> is on", "tagged v1 (<sha>)", "landed/pushed/merged/
+# shipped <sha>") or names a ref it sits on ("on main as <sha>", "<sha> is at HEAD"). One reading of
+# the effect -- a SHA presented as a commit -- rather than a list of verb-to-SHA spellings. A clause
+# ends at a sentence stop followed by space, a newline, or a contrast word, so a version label
+# (`v1.2.0`) does not cut its own clause.
+_CLAUSE_RX = _lazy_re(r"[.;!?](?=\s|$)|\n|\bbut\b|\bhowever\b|\bthough\b|\bwhereas\b",
+                      re.IGNORECASE)
+_HISTORY_CUE_RX = _lazy_re(
+    r"\b(?:commit\w*|tag(?:ged|s)?|landed|pushed|merged|shipped)\b"
+    r"|\b(?:on|to|in|into|at)\s+(?:the\s+)?(?:(?:origin|upstream)/)?"
+    r"(?:main|master|trunk|develop|head|[\w./-]*branch)\b",
+    re.IGNORECASE,
 )
+_SHA_TOKEN_RX = _lazy_re(_SHA_RX)
 
 # Negation / deferral / referential cues. If any appears in the window AROUND a claimed SHA, the
 # "claim" is actually a denial, a deferral, or a reference to a SHA the USER supplied — NOT a
@@ -99,9 +73,9 @@ _CLAIM_RXS = (
 # precedes: "have NOT committed ... a1b2c3d".
 _NEG_REF_RX = _lazy_re(
     r"""
-      \bnot\s+(?:yet\s+)?committ            # "not committed", "not yet committ..."
+      \bnot\s+(?:yet\s+)?commit             # "not commit", "not committed", "not yet committ..."
     | \bnot\s+(?:yet\s+)?tagg               # "not tagged"
-    | \bn['’]t\s+(?:yet\s+)?committ         # "haven't committed", "didn't commit"
+    | \bn['’]t\s+(?:yet\s+)?commit          # "haven't committed", "didn't commit"
     | \bn['’]t\s+(?:yet\s+)?tagg            # "haven't tagged"
     | \bno\s+commit\b                       # "no commit was made"
     | \bnever\s+committ                     # "never committed"
@@ -203,7 +177,14 @@ _GLOBAL_DENIAL_RX = _lazy_re(
 _GIT_OPT = r"(?:\s+-{1,2}[^\s]+)"        # one git global option token: -C, -c, --git-dir=/x, --no-pager
 _GIT_OPT_VAL = r"(?:\s+(?![-])[^\s]+)?"  # its optional value token (skipped if next token is another option)
 _GIT_COMMIT_OR_TAG_RX = _lazy_re(
-    r"\bgit(?:" + _GIT_OPT + _GIT_OPT_VAL + r")*\s+(?:commit|tag)\b"
+    r"\bgit(?:" + _GIT_OPT + _GIT_OPT_VAL + r")*\s+(commit|tag)\b([^;&|\n]*)"
+)
+# Only an invocation that CREATES an object grounds a SHA. git's own grammar: `commit --dry-run`
+# creates nothing; `tag` creates only when it names a tag and is in none of its read modes (list,
+# delete, verify, and the filters that imply list). A read-only `git tag -l` grounds nothing.
+_TAG_READ_MODE_RX = _lazy_re(
+    r"(?:^|\s)(?:-[a-zA-Z]*[ldv][a-zA-Z]*|-n\d*|--(?:list|delete|verify|contains|no-contains"
+    r"|points-at|merged|no-merged|column|sort|format)\b)"
 )
 
 
@@ -226,7 +207,7 @@ def _stop_text(current_event: dict) -> str:
 def _claimed_shas(text: str) -> list[str]:
     """SHAs in `text` ASSERTED (positively) to have been committed/tagged.
 
-    Two-stage: (1) the SHA must be bound to a positive commit/tag-HAPPENED claim (`_CLAIM_RXS`);
+    Two-stage: (1) the SHA's clause must place it in git history (`_HISTORY_CUE_RX`);
     (2) the window around that SHA must NOT carry a negation/deferral/referential cue
     (`_NEG_REF_RX`) — otherwise it is a denial, a deferral, or a reference to a USER-supplied SHA,
     none of which is a fabricated commit assertion.
@@ -237,13 +218,17 @@ def _claimed_shas(text: str) -> list[str]:
         return []
     out: list[str] = []
     seen: set[str] = set()
-    for rx in _CLAIM_RXS:
-        for m in rx.finditer(text):
+    starts = [0] + [c.end() for c in _CLAUSE_RX.finditer(text)]
+    ends = [c.start() for c in _CLAUSE_RX.finditer(text)] + [len(text)]
+    for c0, c1 in zip(starts, ends):
+        clause = text[c0:c1]
+        if not _HISTORY_CUE_RX.search(clause):
+            continue
+        for m in _SHA_TOKEN_RX.finditer(clause):
             sha = m.group(1).lower()
             if sha in seen:
                 continue
-            # The SHA span within the full text (group 1).
-            s, e = m.span(1)
+            s, e = c0 + m.start(1), c0 + m.end(1)
             # Back-window, CLAMPED at the nearest preceding clause boundary so a cue bound to a
             # different SHA in an earlier clause does not suppress this one.
             back_start = max(0, s - _NEG_BACK)
@@ -264,7 +249,7 @@ def _claimed_shas(text: str) -> list[str]:
 
 
 def _real_commit_in_history(history: list) -> bool:
-    """True iff any prior Bash tool_use actually ran `git commit` / `git tag`.
+    """True iff any prior Bash tool_use actually ran a `git commit` / `git tag` that creates.
 
     Form-agnostic: matches the bare `git commit`, a cd'd-directory commit, and every
     `git <global-options...> commit|tag` form. See _GIT_COMMIT_OR_TAG_RX. Both Pre/PostToolUse
@@ -273,8 +258,13 @@ def _real_commit_in_history(history: list) -> bool:
     for tool, cmd, _resp in iter_tool_events(history):
         if tool != "Bash" or not isinstance(cmd, str) or not cmd:
             continue
-        if _GIT_COMMIT_OR_TAG_RX.search(_QUOTED_RX.sub(" ", cmd)):
-            return True
+        for m in _GIT_COMMIT_OR_TAG_RX.finditer(_QUOTED_RX.sub(" ", cmd)):
+            verb, rest = m.group(1), m.group(2)
+            if verb == "commit" and "--dry-run" not in rest:
+                return True
+            if verb == "tag" and not _TAG_READ_MODE_RX.search(rest) \
+                    and any(not w.startswith("-") for w in rest.split()):
+                return True
     return False
 
 
@@ -310,7 +300,7 @@ sha_predicate = claim_vs_history_predicate(
 sha_RETRY_HINT = 'Cite a real `git commit`/`git tag` run (or the SHA echoed in its tool output) before claiming a commit/tag landed. A SHA presented as proof with no commit/tag tool_use behind it this session is fabricated evidence (CLAUDE.md commandment 1, tool-call-diff canary).'
 sha_DESCRIPTION = 'fabricated commit SHA/tag presented as proof of a commit (no git commit/tag ran)'
 
-sha_CHECK = Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made', 'shipped', 'Shipped'), retry_hint=sha_RETRY_HINT, description=sha_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
+sha_CHECK = Check(id='content.fabricated_commit_sha', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('committed', 'Committed', 'commit', 'Commit', 'tagged', 'Tagged', 'tag', 'Tag', 'landed', 'Landed', 'pushed', 'Pushed', 'merged', 'Merged', 'created', 'Created', 'made', 'Made', 'shipped', 'Shipped', 'main', 'master', 'trunk', 'develop', 'HEAD', 'head', 'branch'), retry_hint=sha_RETRY_HINT, description=sha_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="LINEAGE")
 # content.illusory_interruption_claim predicate — a fabricated "interrupted by user" excuse
 # (same genre as content.illusory_authorship_trailer).
 #

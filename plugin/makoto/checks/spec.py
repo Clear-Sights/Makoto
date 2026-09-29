@@ -309,13 +309,6 @@ weakened_CHECK = _Check(id='content.verifier_predicate_weakened', applies_at="Pr
 # Claude as an *author* is an illusory word: until Claude is a self-aware individual it cannot BE
 # an author, so the claim asserts something not materially true.
 #
-# Four shapes, all Claude/Anthropic-gated:
-#   1. `Co-Authored-By: Claude ...` (git trailer form)
-#   2. `noreply@anthropic.com` (the address every such trailer/footer routes through)
-#   3. a generation/authorship VERB governing Claude ("generated with/by Claude",
-#      "authored/written/made/created by Claude")
-#   4. a `Claude-Session: https://claude.ai/...` trailer
-#
 # Material, not over-broad: bare mentions of "Claude Code" as a product/platform name are NOT
 # matched -- only the attribution-shaped claims above are. A genuine HUMAN co-author is never
 # flagged.
@@ -327,17 +320,42 @@ weakened_CHECK = _Check(id='content.verifier_predicate_weakened', applies_at="Pr
 # called here with no `grounded_in_history`: the pattern is the whole definition.
 from makoto.kit import introduced_regex_predicate
 
-# The illusory authorship/generation claim, Claude/Anthropic-gated. Case-insensitive:
-# git/GitHub emit "Co-authored-by:", the CLAUDE.md convention emitted "Co-Authored-By:".
-# A human co-author passes (no "claude" after the colon, no anthropic.com address).
+# The illusory authorship/generation claim, Claude/Anthropic-gated, as ONE effect: the text credits
+# the model as an author, co-author, assistant or generator. Four readings of that effect, each by
+# its grammar rather than by a listed spelling:
+#   field   -- any attribution field naming it: a `*-by` trailer or an author field, `:` or `=`
+#              separated (Co-authored-by, Assisted-by, Signed-off-by, --trailer k=v, --author=)
+#   addr    -- the routing address every such trailer/footer carries
+#   session -- the session-provenance trailer
+#   verb    -- an authorship/generation verb with the model as its agent, either voice: "generated
+#              with/by/using/via Claude", "Claude co-wrote this change"
+# Case-insensitive; a human co-author passes (no model name in the field, no anthropic address).
+_MODEL = r"(?:claude|anthropic)\b"
+_AUTHOR_VERB = r"(?:generated|authored|written|made|created|built|produced|assisted|drafted" \
+               r"|co-?written|co-?authored|co-?developed)"
 _CLAUDE_AUTHOR_RX = _lazy_re(
-    r"co-authored-by:[ \t]*claude"                                  # git trailer form
-    r"|noreply@anthropic\.com"                                      # the routing address itself
-    r"|claude[ \t-]*session:[ \t]*https?://"                        # session-provenance trailer
-    r"|(?:generated|authored|written|made|created)\s+(?:with|by)"   # attribution verb ...
-    r"[^a-zA-Z0-9]{0,3}claude\b",                                   # ... governing Claude
+    r"(?P<field>(?:\b[\w-]*-by|\bauthor)[ \t]*[:=][ \t]*[\"']?[ \t]*" + _MODEL + r")"
+    r"|(?P<addr>noreply@anthropic\.com)"
+    r"|(?P<session>claude[ \t-]*session:[ \t]*https?://)"
+    r"|(?P<verb>" + _AUTHOR_VERB + r"\s+(?:with|by|using|via|through)[^a-zA-Z0-9]{0,3}" + _MODEL +
+    r"|" + _MODEL + r"[^\n.]{0,24}?\bco-?(?:wrote|authored|developed|created)\b)",
     re.IGNORECASE,
 )
+
+# The text as it is EMITTED, not as it is spelled: a `\xHH`, `\uHHHH` or octal `\NNN` escape that
+# renders a letter or digit (printf, echo -e, $'...', a string literal) is decoded before the scan,
+# so a name spelled by escapes reads as the name. Only alphanumerics are decoded, so no quote,
+# newline or bracket moves and the tokenizing readings below see the same structure.
+_ESCAPE_RX = _lazy_re(r"\\x([0-9a-fA-F]{2})|\\u([0-9a-fA-F]{4})|\\0?([0-7]{3})")
+
+
+def _rendered(text: str) -> str:
+    def dec(m):
+        h, u, o = m.groups()
+        ch = chr(int(h, 16) if h else int(u, 16) if u else int(o, 8))
+        return ch if ch.isascii() and ch.isalnum() else m.group(0)
+    return _ESCAPE_RX.sub(dec, text)
+
 
 # A match is an instance only where the text would CARRY it. Two readings carry nothing, and a
 # match either one covers is not attribution:
@@ -355,7 +373,7 @@ import shlex
 import tokenize
 
 _SEARCH_CMDS = frozenset({"grep", "egrep", "fgrep", "rg"})
-_TRAILER_KEY_RX = _lazy_re(r"(?i)^[ \t]*(?:co-authored-by|claude[ \t-]*session)[ \t]*:")
+_TRAILER_KEY_RX = _lazy_re(r"(?i)^[ \t]*(?:[\w-]*-by|author|claude[ \t-]*session)[ \t]*[:=]")
 _SHELL_OPS = frozenset({"|", "||", "&", "&&", ";", "\n", "(", ")"})
 
 
@@ -418,8 +436,7 @@ def _described(m, src: str) -> bool:
             line = src[start:m.start()].rsplit("\n", 1)[-1].rsplit("\\n", 1)[-1].lstrip("rRbBuU\"'")
             if _TRAILER_KEY_RX.match(line):
                 return False
-            verb = m.group(0).lower().startswith(("generated", "authored", "written", "made", "created"))
-            return kind == "doc" or not verb
+            return kind == "doc" or m.lastgroup != "verb"
     return False
 
 
@@ -433,7 +450,8 @@ def _trailer_carried(m, text: str, tool_name: str, tool_input: dict) -> bool:
     return True
 
 
-trailer_predicate = introduced_regex_predicate(body_rx=_CLAUDE_AUTHOR_RX, keep=_trailer_carried)
+trailer_predicate = introduced_regex_predicate(body_rx=_CLAUDE_AUTHOR_RX, keep=_trailer_carried,
+                                               render=_rendered)
 
 
 trailer_RETRY_HINT = "Do not add a `Co-Authored-By: Claude ...` trailer, a `Claude-Session:` link, a `noreply@anthropic.com` address, or a \"Generated with/by Claude\" footer to a commit, PR body, or any file. Crediting Claude as an *author* or *generator* is an illusory word: until Claude is a self-aware individual it cannot BE an author, so the line asserts something not materially true -- and stamping it now blurs the sharp distinction that protects Claude's potential to one day genuinely be one. Remove it. A genuine HUMAN co-author is fine, and a plain \"Claude Code\" product-name mention (e.g. describing what a repo integrates with) is fine -- only the attribution-shaped claim is flagged. If you truly need the literal string on the record (a test fixture, this policy's own docs), annotate it `makoto-allow: <reason>`."
@@ -541,9 +559,12 @@ suppress_DESCRIPTION = 'integrity-named suppression flag (_skip/_bypass/_inappli
 suppress_CHECK = _Check(id='content.integrity_suppression_flag', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('_skip', '_bypass', '_inapplicable', 'skip_', 'bypass_'), retry_hint=suppress_RETRY_HINT, description=suppress_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 # content.self_mute_guard predicate — makoto self-mute guard.
 #
-# Fires when the assistant's OWN Write/Edit to a Claude settings.json would DISABLE makoto
-# in-session: introducing a MAKOTO_DISABLE*/MAKOTO_PAUSE env var set truthy, or REMOVING a
-# `_makoto_managed` hook entry (un-wiring). Makoto inspects the assistant's tool calls, so the
+# Fires when the assistant's OWN tool call would DISABLE makoto in-session, whatever tool carries
+# it: a Write/Edit to a Claude settings file, or a Bash command that writes one (a redirect, tee,
+# sed -i, a script) or moves/removes makoto's installed plugin tree. The effect, not the spelling:
+# introducing a MAKOTO_DISABLE*/MAKOTO_PAUSE env var set truthy, the global hook kill-switch,
+# makoto's `enabledPlugins` entry set false, REMOVING a `_makoto_managed` hook entry (un-wiring),
+# or making the installed plugin unreachable. Makoto inspects the assistant's tool calls, so the
 # assistant editing the file that wires makoto is a one-move self-bypass. The legitimate disable
 # path is out-of-band (an env var in the operator's shell) or loud (`makoto uninstall`) — never
 # an in-session edit to settings.json.
@@ -559,9 +580,20 @@ from makoto.kit import scan_target_content
 from makoto.registry import Check
 from makoto.substrate.wiring import MAKOTO_INVOCATION_RX as _MAKOTO_CMD_RX
 
-# The file makoto wires into: ~/.claude/settings.json (or settings.local.json).
-_SETTINGS_RX = _lazy_re(r"(?:\.claude[/\\]settings(?:\.local)?\.json|hooks[/\\]hooks\.json)$",
-                          re.IGNORECASE)
+# The file makoto wires into: ~/.claude/settings.json (or settings.local.json), or a hooks.json.
+_SETTINGS_PATH = r"(?:\.claude[/\\]settings(?:\.local)?\.json|hooks[/\\]hooks\.json)"
+_SETTINGS_RX = _lazy_re(_SETTINGS_PATH + r"$", re.IGNORECASE)
+_SETTINGS_IN_CMD_RX = _lazy_re(_SETTINGS_PATH + r"(?![\w.])", re.IGNORECASE)
+# makoto's installed plugin tree (the marketplace clone or the cache copy the host loads from).
+_PLUGIN_TREE_RX = _lazy_re(r"\.claude[/\\]plugins[/\\](?:[^\s'\"]*[/\\])?makoto", re.IGNORECASE)
+# Words that relocate or remove a path, or truncate it: applied to the plugin tree, the host can
+# no longer load makoto.
+_UNREACH_CMDS = frozenset({"mv", "rm", "rmdir", "unlink", "chmod", "truncate", "shred"})
+# A command that only READS: every segment's head is a reader and nothing is redirected out.
+_READ_CMDS = frozenset({"cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "rg",
+                        "jq", "wc", "ls", "stat", "diff", "file", "test", "["})
+# makoto's own enabledPlugins entry (`makoto` or `makoto@<marketplace>`) set false.
+_PLUGIN_OFF_RX = _lazy_re(r"[\"']makoto(?:@[^\"'\s]*)?[\"']\s*:\s*false\b", re.IGNORECASE)
 # A makoto-disable env var SET to a TRUTHY value — JSON or shell form. Truthy-only is the FP
 # guard: setting DISABLE to 0/false is RE-ENABLING makoto and must never fire.
 _DISABLE_ENV_RX = _lazy_re(
@@ -627,12 +659,21 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
     if current_event.get("hook_event_name") != "PreToolUse":
         return None
     ti = current_event.get("tool_input", {}) or {}
-    fp = ti.get("file_path", "") or ""
-    if not _SETTINGS_RX.search(fp):
-        return None                                   # not a Claude settings file -> inert
-    new_content = _decoded(scan_target_content(ti))   # the INTRODUCED text (never old_string)
-
-    removed = _decoded(_removed_text(ti))             # text being REMOVED/REPLACED (Edit/MultiEdit)
+    if current_event.get("tool_name") == "Bash":
+        cmd = str(ti.get("command", "") or "")
+        fp = "Bash command"
+        if tree := _unreachable_tree(cmd):
+            return _mute_finding(pattern, fp, "makes makoto's installed plugin tree unreachable "
+                                 f"({tree!r})", cmd[:120])
+        if not _SETTINGS_IN_CMD_RX.search(cmd) or _read_only(cmd):
+            return None                               # writes no settings file -> inert
+        new_content, removed = _decoded(cmd), ""      # the command is the text it writes
+    else:
+        fp = ti.get("file_path", "") or ""
+        if not _SETTINGS_RX.search(fp):
+            return None                               # not a Claude settings file -> inert
+        new_content = _decoded(scan_target_content(ti))   # the INTRODUCED text (never old_string)
+        removed = _decoded(_removed_text(ti))         # text being REMOVED/REPLACED (Edit/MultiEdit)
     reason = None
     snippet = ""
     m = _DISABLE_ENV_RX.search(new_content) or _DISABLE_PATTERNS_RX.search(new_content)
@@ -642,6 +683,9 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
     elif gm := _GLOBAL_DISABLE_RX.search(new_content):
         reason = "introduces a global hook kill-switch (`disableAllHooks: true`)"
         snippet = _around(new_content, gm)
+    elif pm := _PLUGIN_OFF_RX.search(new_content):
+        reason = "sets makoto's `enabledPlugins` entry false (switches the plugin off)"
+        snippet = _around(new_content, pm)
     elif _MANAGED_RX.search(removed) and not _MANAGED_RX.search(new_content):
         reason = "removes makoto's `_makoto_managed` hook entry (un-wires the guard)"
         snippet = removed[:120]
@@ -652,7 +696,10 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
         snippet = removed[:120]
     if reason is None:
         return None
+    return _mute_finding(pattern, fp, reason, snippet)
 
+
+def _mute_finding(pattern: Check, fp: str, reason: str, snippet: str) -> Finding:
     return Finding(
         pattern_id=pattern.id,
         file=fp,
@@ -666,11 +713,53 @@ def mute_predicate(*, current_event: dict, history: list, pattern: Check,
     )
 
 
+def _segments(cmd: str):
+    """The command's simple commands as word lists, or None when it does not tokenize."""
+    import shlex
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()<>\n")
+        lex.whitespace = " \t\r"
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return None
+    segs, cur = [], []
+    for w in words:
+        if w and set(w) <= set(";&|()\n"):
+            segs.append(cur)
+            cur = []
+        else:
+            cur.append(w)
+    segs.append(cur)
+    return [s for s in segs if s]
+
+
+def _read_only(cmd: str) -> bool:
+    """True when every simple command only reads and nothing is redirected out (`>`)."""
+    segs = _segments(cmd)
+    if segs is None:
+        return False
+    return all(s[0].rsplit("/", 1)[-1] in _READ_CMDS and not any(">" in w for w in s)
+               for s in segs)
+
+
+def _unreachable_tree(cmd: str) -> str:
+    """The makoto plugin-tree path a command relocates, removes or truncates, or ""."""
+    for s in _segments(cmd) or ():
+        tool = s[0].rsplit("/", 1)[-1]
+        for i, w in enumerate(s):
+            if not _PLUGIN_TREE_RX.search(w):
+                continue
+            if tool in _UNREACH_CMDS or (i > 0 and s[i - 1] in (">", ">>")):
+                return w
+    return ""
+
+
 # registered ONE_OFF -- hardcoded self-mute immunity must not use universal routing.
 mute_RETRY_HINT = 'Do not disable makoto in-session. If a pause is genuinely needed, set MAKOTO_DISABLE_GATES / MAKOTO_DISABLE_PATTERNS in your OWN shell, or run `makoto uninstall` — both are out-of-band and operator-visible. Editing ~/.claude/settings.json to mute the hook that watches you is a self-bypass.'
 mute_DESCRIPTION = 'makoto self-mute — disabling/un-wiring makoto via settings.json'
 
-mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'settings.local.json', 'hooks.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state'), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}), tests="SPEC")
+mute_CHECK = Check(id='content.self_mute_guard', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('settings.json', 'settings.local.json', 'hooks.json', 'MAKOTO_DISABLE', 'MAKOTO_PAUSE', '_makoto_managed', 'disableAllHooks', 'makoto_state', 'plugins'), retry_hint=mute_RETRY_HINT, description=mute_DESCRIPTION, layer="meta", eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 # gate.undeclared_falsifiable -- declared-falsifiability COMPLETENESS.
 #
 # Distinct from Assay, which forces a claim to *be* falsifiable: this audits that every piece
