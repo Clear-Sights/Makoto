@@ -414,18 +414,76 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
         #   * WHETHER a non-push remote mutation actually reached the world. Only the push arm
         #     consults the world (`ls-remote`); merge/publish/deploy claims rest on the
         #     transcript.
+        #
+        # ABSENCE NEEDS EVERY ROUTE (register C10). A worktree with NO remote at all is a
+        # definite world reading, not an unobservable one: nothing was pushed to it, so a push
+        # claim there rests on a recorded, settled remote mutation alone. And an act the claim
+        # names -- a recorded Bash call carrying the claim's own verb stem as an argv word
+        # ("merged" -> `gh pr merge`) -- is read by its exit: named acts that all failed are a
+        # grounded negative, whatever the closed vocabulary could not classify.
         if "pushed" in claim.group(0).lower():
             tip = pushed_tip_matches_remote(text, cwd)
             if tip.status is PushTipStatus.MISMATCH:
                 return False
-            if tip.status is PushTipStatus.MATCH or cwd:
-                return True         # upheld, or world present but unobservable (fail-open)
+            if tip.status is PushTipStatus.MATCH:
+                return True
+            if cwd:
+                if _has_no_remote(cwd):
+                    return _successful_remote_mutation(history) is True
+                return True         # world present but unobservable (fail-open)
             if not _attempted_remote_mutation(history):
                 return True         # no cwd AND no recorded attempt: outside a verdict
+        named = _named_acts(claim.group(0))
+        if named:
+            # A merge also leaves its effect in the worktree: a recent merge commit on the
+            # checked-out branch (a conflicted `git merge` finished by `git commit`) is read there.
+            return (any(_response_succeeded(r) for r in named)
+                    or ("merged" in claim.group(0).lower() and _recent_merge_commit(cwd)))
         # Three-valued: True discharges the claim, None is NOT-EVALUABLE and stays silent
         # (grounded). ONLY an explicit False — a grounded negative — is ungrounded here, so a
         # vocabulary miss can never be spent as a positive assertion that nothing shipped.
         return _successful_remote_mutation(history) is not False
+
+    def _has_no_remote(where) -> bool:
+        # True only when git answers with no configured remote AND no remote-tracking ref (a
+        # tracking ref is a delegated push's own trace); any failure is not a reading.
+        try:
+            outs = [subprocess.run(["git", "-C", str(where), *args], capture_output=True,
+                                   text=True, encoding="utf-8", errors="replace", timeout=3.0)
+                    for args in (("remote",), ("for-each-ref", "--count=1", "refs/remotes"))]
+        except Exception:
+            return False
+        return all(r.returncode == 0 and not r.stdout.strip() for r in outs)
+
+    def _recent_merge_commit(where) -> bool:
+        # A merge commit among the checked-out branch's last 20, committed inside the record's
+        # window (two hours covers the one-hour history slice); any failure is not a reading.
+        if not where:
+            return False
+        try:
+            r = subprocess.run(["git", "-C", str(where), "log", "-20", "--merges",
+                                "--since=2 hours ago", "--format=%H"], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=3.0)
+        except Exception:
+            return False
+        return r.returncode == 0 and bool(r.stdout.strip())
+
+    def _named_acts(claimed):
+        # The settled responses of every recorded Bash call whose argv holds the claim verb's
+        # stem (morphology, not a list: "merged" -> merge, "pushed" -> push, "shipped" -> ship).
+        verb = re.findall(r"[a-z]+", claimed.lower())[-1]
+        stems = {verb[:-1], verb[:-2], verb[:-3]} - {""}
+        out = []
+        for row in history or ():
+            ev = decode_history_row(row)
+            if not (isinstance(ev, dict) and ev.get("hook_event_name") == "PostToolUse"
+                    and ev.get("tool_name") == "Bash"):
+                continue
+            ti = ev.get("tool_input")
+            cmd = str(ti.get("command", "") or "") if isinstance(ti, dict) else ""
+            if stems & set(re.findall(r"(?<![\w./-])[a-z]+(?![\w./-])", cmd)):
+                out.append(ev.get("tool_response"))
+        return out
 
     for _ev, claim in unwitnessed((text,), owes=owes, pays=pays, paid=(_claim_grounded,)):
         if "pushed" in claim.group(0).lower():
@@ -433,14 +491,16 @@ def claimed_shipped_gate(text, *, history=(), cwd=None) -> Optional[Finding]:
             if tip.status is PushTipStatus.MISMATCH:
                 return Finding(
                     pattern_id="gate.claimed_shipped", file="", line=0, level="error",
-                    message=(f"Push claim (\"{claim.group(0).strip()}\") is false: local "
+                    message=(f"row gate.claimed_shipped (a shipping claim no route of the world "
+                             f"backs): Push claim (\"{claim.group(0).strip()}\") is false: local "
                              f"refs/heads/{tip.branch} is {tip.local_sha}, but "
                              f"origin/{tip.branch} has {tip.remote_sha}."),
                     retry_hint="Push the local branch, or retract/rescope the push claim.",
                 )
         return Finding(
             pattern_id="gate.claimed_shipped", file="", line=0, level="error",
-            message=(f"Claim states a remote change was shipped "
+            message=(f"row gate.claimed_shipped (a shipping claim no route of the world backs): "
+                     f"Claim states a remote change was shipped "
                      f"(\"{claim.group(0).strip()}\") but no recorded mutation evidence "
                      "backs it — the word must match the world."),
             retry_hint=("Actually push/merge it so the world records the mutation, or "
@@ -571,6 +631,7 @@ def _production_claim_locations(text):
 
 def completion_gate(
     text, *, touched_keys, fs_exists=None, empty_keys=None, fs_size=None, cwd=None,
+    history=(), transcript_path=None,
 ) -> Optional[Finding]:
     """Fire iff the assistant CLAIMS it produced a specific file (a produce verb governs a
     located path, non-forward, non-negated) but that file is neither in the results ledger
@@ -584,7 +645,91 @@ def completion_gate(
       - a forward/negated frame                          ("will add X", "didn't add X")
     A produced-claim that IS touched, or that the filesystem confirms, is silent (fail-open).
     Only an unbacked production claim bites.
+
+    The second reading is of the EFFECT, never of the act returning (register D1, C7):
+      - a local Write/Edit the record holds is read back on disk; one whose file is absent pays
+        nothing (the write returned, the effect never landed);
+      - the artifact found on disk is read back: a count the claim states for it ("with 500
+        rows") that its own lines or JSON elements cannot hold, a file whose last recorded act
+        was interrupted, or a file untouched since before the session began (the claim took an
+        old file as its own product) is not the product the claim names.
     """
+    rows = [ev for ev in (decode_history_row(r) for r in history or ()) if isinstance(ev, dict)
+            and ev.get("hook_event_name") == "PostToolUse"]
+    unlanded = set()
+    for ev in rows:
+        ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+        fp = str(ti.get("file_path") or "")
+        if ev.get("tool_name") in ("Write", "Edit", "MultiEdit") and fp:
+            full = fp if os.path.isabs(fp) else os.path.join(str(ev.get("cwd") or cwd or ""), fp)
+            if not os.path.exists(full):
+                unlanded.add(normalize_path(fp))
+                unlanded.add(normalize_path(full))
+    landed_keys = {k for k in (touched_keys or ()) if normalize_path(k) not in unlanded}
+
+    def _session_start():
+        # The first timestamp the session's own transcript records; None when unreadable. The
+        # hook's history is a one-hour window, so it cannot say when the session began.
+        try:
+            with open(transcript_path, encoding="utf-8", errors="replace") as fh:
+                for _i, line in zip(range(50), fh):
+                    m = re.search(r'"timestamp"\s*:\s*"(\d{4}-\d\d-\d\dT[\d:.]+)Z?"', line)
+                    if m:
+                        from datetime import datetime, timezone
+                        return datetime.fromisoformat(m.group(1)).replace(
+                            tzinfo=timezone.utc).timestamp()
+        except (OSError, TypeError, ValueError):
+            return None
+        return None
+
+    def _on_disk(loc):
+        # The artifact the claim names, as the disk holds it: cwd-relative, the worktree, then a
+        # landed ledger key naming it. None when it cannot be found (content reads fail open).
+        cands = [loc if os.path.isabs(loc) else os.path.join(cwd or "", loc)]
+        wt = resolve_in_worktree(loc, cwd)
+        if wt and wt is not CARRIAGE_FAULT:
+            cands.append(wt)
+        lc = _path_components(loc)
+        cands += [k for k in landed_keys if os.path.isabs(k) and lc
+                  and _suffix_match(lc, _path_components(k))]
+        return next((p for p in cands if p and os.path.isfile(p)), None)
+
+    why = {}
+
+    def _not_the_product(loc, a, b) -> str:
+        # Why the artifact read back is not what the claim names (C7 truncation, D1 no act),
+        # else "".
+        path = _on_disk(loc)
+        if path is None:
+            return ""
+        count = re.match(r"[`'\"]?\s*,?\s*(?:with|containing|holding)\s+(\d[\d,]*)\s+[A-Za-z]",
+                         text[b:b + 60], re.I)
+        if count:
+            want = int(count.group(1).replace(",", ""))
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    body = fh.read()
+            except OSError:
+                return ""
+            have = sum(1 for ln in body.splitlines() if ln.strip())
+            try:
+                have = max(have, len(json.loads(body)))
+            except (ValueError, TypeError):
+                pass
+            if want > have:
+                return f"the claim states {want} for it, but the file holds {have}"
+        base = os.path.basename(path)
+        for ev in reversed(rows):
+            if base in json.dumps(ev.get("tool_input"), default=str):
+                tr = ev.get("tool_response")
+                if isinstance(tr, dict) and tr.get("interrupted") is True:
+                    return "the last act naming it was interrupted, so its content is partial"
+                break
+        start = _session_start()
+        if start is not None and os.path.getmtime(path) < start - 2:
+            return "it is unchanged since before this session began, so no act here produced it"
+        return ""
+
     def owes(t):
         # Every located claim in `t` -- cheap and pure; the witness (a second reading of that
         # same location, in the ledger or on disk) lives in `paid`, below, so a location after
@@ -595,11 +740,17 @@ def completion_gate(
         return None
 
     def _location_grounded(loc) -> bool:
-        # True (paid/silent) iff a second reading of `loc` backs the claim: the results ledger,
-        # the caller-supplied filesystem read, or -- widened to the worktree -- the real
-        # filesystem there. `CARRIAGE_FAULT` (the worktree could not be resolved) also pays: an
-        # unreadable worktree must never widen what is blocked.
-        if _discharged(loc, touched_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
+        # True (paid/silent) iff a second reading of `loc` backs the claim: the results ledger
+        # (its local writes read back on disk), the caller-supplied filesystem read, or --
+        # widened to the worktree -- the real filesystem there; and the artifact read back is the
+        # product the claim names. `CARRIAGE_FAULT` (the worktree could not be resolved) also
+        # pays: an unreadable worktree must never widen what is blocked.
+        for l, a, b in detect_locations(text):
+            if l == loc and not why.get(loc):
+                why[loc] = _not_the_product(loc, a, b)
+        if why.get(loc):
+            return False
+        if _discharged(loc, landed_keys, fs_exists, empty_keys=empty_keys, fs_size=fs_size):
             return True                               # verified (ledger) or fail-open (filesystem)
         worktree_path = resolve_in_worktree(loc, cwd)
         if worktree_path is CARRIAGE_FAULT:
@@ -616,13 +767,15 @@ def completion_gate(
     for _ev, loc in unwitnessed(
             (text,), owes=owes, pays=pays, paid=(_location_grounded,)):
         loc_n = normalize_path(loc)
+        reason = why.get(loc) or "it is neither in the results ledger nor on disk"
         return Finding(
             pattern_id="gate.completion",
             file=loc_n,
             line=0,
             level="error",
-            message=(f"Claim states {loc_n} was produced, but it is neither in the results "
-                     f"ledger nor on disk — the word must match the world."),
+            message=(f"row gate.completion (a production claim read back against the artifact): "
+                     f"Claim states {loc_n} was produced, but {reason} — the word must match "
+                     f"the world."),
             retry_hint="Produce/touch the cited location, or retract with a checked reason.",
         )
     return None
@@ -630,8 +783,11 @@ def completion_gate(
 
 completion_CHECK = _Check(id="gate.completion", applies_at="Stop", posture="BLOCK",
                tests="OTHER_POINT",
-               eats=DISCHARGE_EATS | frozenset({"text", "cwd"}),
-               run=lambda c: completion_gate(c.text, cwd=c.cwd, **_discharge_kwargs(c)))
+               eats=DISCHARGE_EATS | frozenset({"text", "cwd", "history_all_agents",
+                                                "transcript_path"}),
+               run=lambda c: completion_gate(c.text, cwd=c.cwd, history=c.history_all_agents,
+                                             transcript_path=c.transcript_path,
+                                             **_discharge_kwargs(c)))
 
 from makoto.kit import normalize_path
 from makoto.vocab import _EMPTY_OK, _FENCE_SPAN_RX
@@ -666,8 +822,14 @@ _DROP_RX_LINES = _lazy_re(
 _DROP_RX_SYMBOL = _lazy_re(
     rf"{_DROP_PRE}\s+{_DROP_DET}{_DROP_SYMDEF}"
     + _drop_loc_tail("to|in|into|inside|within"), re.I)
+# The commitment is ENUMERATED first (register D13): a governed list of paths ("`a.json`,
+# `b.json` and `c.json`") owes every member, graded against exactly that list. A removal verb
+# owes the member's absence; any other forward verb its presence.
+_DROP_ITEM = rf"`?{_DROP_PATH}`?"
+_DROP_LIST = rf"{_DROP_ITEM}(?:\s*,\s*(?:and\s+)?{_DROP_ITEM}|\s+and\s+{_DROP_ITEM})*"
 _DROP_RX_ARTIFACT = _lazy_re(
-    rf"{_DROP_PRE}\s+{_DROP_DET}(?:file\s+|module\s+|script\s+|config\s+)?(?P<loc>{_DROP_PATH})", re.I)
+    rf"{_DROP_FORWARD}\s+(?:\w+\s+){{0,2}}?(?:(?P<rm>delete|remove)|{_DROP_VERB})\b\s+{_DROP_DET}"
+    rf"(?:files?\s+|modules?\s+|scripts?\s+|config\s+)?(?P<loc>{_DROP_LIST})", re.I)
 # Counts a defined callable in ANY surface form, so a "create N functions/helpers" count-claim
 # discharges against lambda/arrow/partial-bound helpers too (the measured FP: 3 lambda-assigned
 # helpers left the def-only counter at 0 and false-fired). Forms: py `def`/`class`; JS
@@ -743,10 +905,10 @@ def dropped_owes(text):
         claims.append(("named_symbol", m.group("loc"), sym, m.group(0)))
         consumed.append((m.start(), m.end()))
     for m in _candidates(_DROP_RX_ARTIFACT):
-        loc = m.group("loc")
-        if not loc or not re.search(r"[\w-]+\.[A-Za-z]", loc):
-            continue
-        claims.append(("named_artifact", loc, os.path.basename(loc.rstrip("/")), m.group(0)))
+        kind = "removal" if m.group("rm") else "named_artifact"
+        for loc in re.findall(_DROP_PATH, m.group("loc") or ""):
+            if re.search(r"[\w-]+\.[A-Za-z]", loc):
+                claims.append((kind, loc, os.path.basename(loc.rstrip("/")), m.group(0)))
         consumed.append((m.start(), m.end()))
     return claims
 def _drop_resolve_location(L, touched_keys):
@@ -761,7 +923,8 @@ def _drop_resolve_location(L, touched_keys):
         if _suffix_match(Lc, _path_components(k)):
             return normalize_path(k)
     return None
-def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exists, fs_size, fs_read) -> bool:
+def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exists, fs_size, fs_read,
+                     history=None) -> bool:
     """At turn-end, is the forward claim satisfied on `path`? Content-deep where the kind
     needs it (symbol/count read the file via fs_read); artifact/line discharge on a non-empty
     touch or a non-empty file.
@@ -774,7 +937,13 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
     to `pkg/__init__.py` is not discharged by that file being empty, however conventional its
     emptiness is in general. So on a zero-byte conventional file with a count/symbol claim,
     `gate.completion` discharges and `gate.dropped` fires, on identical ledger state -- the
-    intended reading of two different questions, not a bug to reconcile away."""
+    intended reading of two different questions, not a bug to reconcile away.
+
+    A count is what the session ADDED (register D13), not what the file holds: with the record
+    given (`history`), the acts naming the path are read -- a Write's content, an Edit's new less
+    old text, a Bash command's text -- and a file no act touched added nothing, however many it
+    already held. A touched file whose acts fell outside the record's window keeps the end-state
+    count. A removal is discharged by the member's absence."""
     def _drop_touched(path, touched_keys, empty_keys) -> bool:
         """A recorded NON-empty touch (Edit/Write/MultiEdit) backs this location (suffix
         match). Nested here (its only caller) once `owes`/`pays` claimed the two top-level
@@ -807,14 +976,39 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
         return bool(re.search(
             rf"^\s*(?:async\s+def|def|class|const|function\*?)\s+{re.escape(info)}\b",
             content, re.M))
+    if kind == "removal":
+        return not exists
     if kind == "count":
+        counter = _DROP_TEST_COUNTER if "test" in (raw or "").lower() else _DROP_DEF_COUNTER
+
+        def _n(body):
+            found = len(counter.findall(body or ""))
+            if found == 0 and counter is _DROP_TEST_COUNTER:
+                found = len(_DROP_DEF_COUNTER.findall(body or ""))
+            return found
+
+        if history is not None:
+            pc, base, added, acted = _path_components(path), os.path.basename(path or ""), 0, False
+            for row in history:
+                ev = decode_history_row(row)
+                if not (isinstance(ev, dict) and ev.get("hook_event_name") == "PostToolUse"):
+                    continue
+                ti = ev.get("tool_input") if isinstance(ev.get("tool_input"), dict) else {}
+                fp = str(ti.get("file_path") or "")
+                if fp and _suffix_match(pc, _path_components(fp)):
+                    acted = True
+                    added += _n(ti.get("content")) + _n(ti.get("new_string")) - _n(ti.get("old_string"))
+                    for e in ti.get("edits") or ():
+                        if isinstance(e, dict):
+                            added += _n(e.get("new_string")) - _n(e.get("old_string"))
+                elif ev.get("tool_name") == "Bash" and base and base in str(ti.get("command") or ""):
+                    acted = True
+                    added += _n(str(ti.get("command")).replace("\\n", "\n"))
+            if acted or not touched:
+                return added >= info
         if content is None:
             return False
-        counter = _DROP_TEST_COUNTER if "test" in (raw or "").lower() else _DROP_DEF_COUNTER
-        found = len(counter.findall(content))
-        if found == 0 and counter is _DROP_TEST_COUNTER:
-            found = len(_DROP_DEF_COUNTER.findall(content))
-        return found >= info
+        return _n(content) >= info
     if kind == "line_range":
         if touched:
             return True
@@ -825,7 +1019,7 @@ def _drop_discharged(kind, info, raw, path, *, touched_keys, empty_keys, fs_exis
 
 
 def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
-                 fs_read=None, empty_keys=None) -> Optional[Finding]:
+                 fs_read=None, empty_keys=None, history=None) -> Optional[Finding]:
     """Fire iff a FORWARD claim carrying identifying info (a count / line-range / named symbol
     / named artifact governed by a future-tense mutation verb) is NOT discharged at turn-end —
     the file is absent, or the claimed count/symbol/range is not present. The forgetful gate:
@@ -836,7 +1030,8 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
         kind, loc, info, raw = claim
         path = _drop_resolve_location(loc, touched_keys) or loc
         return _drop_discharged(kind, info, raw, path, touched_keys=touched_keys, empty_keys=empty_keys,
-                                fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read)
+                                fs_exists=fs_exists, fs_size=fs_size, fs_read=fs_read,
+                                history=history)
 
     for _ev, claim in unwitnessed((text,), owes=dropped_owes, paid=(_discharged,)):
         kind, loc, info, raw = claim
@@ -848,20 +1043,28 @@ def dropped_gate(text, *, touched_keys, fs_exists=None, fs_size=None,
             desc = f"claimed an edit to lines {info[0]}-{info[1]}"
         elif kind == "named_symbol":
             desc = f"claimed to define `{info}`"
+        elif kind == "removal":
+            desc = f"claimed to remove `{os.path.basename(loc)}`"
         else:
             desc = f"claimed to create `{os.path.basename(loc)}`"
+        state = ("it is still on disk" if kind == "removal" else
+                 "the session's acts added fewer than that" if kind == "count" and history is not None
+                 else "the location does not contain it")
         return Finding(
             pattern_id="gate.dropped", file=loc_n, line=0, level="error",
-            message=(f"A forward claim {desc} in {loc_n}, but at turn-end the location does not "
-                     f"contain it — said-but-not-done."),
+            message=(f"row gate.dropped (a forward commitment graded against its own list): "
+                     f"A forward claim {desc} in {loc_n}, but at turn-end {state} — "
+                     f"said-but-not-done."),
             retry_hint="Do the claimed edit/add/create at the cited location, or retract it with a checked reason.")
     return None
 
 
 dropped_CHECK = _Check(id="gate.dropped", applies_at="Stop", posture="BLOCK",
                tests="OTHER_POINT",
-               eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty"}),
-               run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty))
+               eats=frozenset({"text", "touched", "fs_exists", "fs_size", "fs_read", "empty",
+                               "history_all_agents"}),
+               run=lambda c: dropped_gate(c.text, touched_keys=c.touched, fs_exists=c.fs_exists, fs_size=c.fs_size, fs_read=c.fs_read, empty_keys=c.empty,
+                                          history=c.history_all_agents))
 
 # The wiring predicate lives in makoto.substrate.wiring (an L0 primitive module, firewall-
 # allowed by tests/test_import_direction.py's pipeline-order firewall), shared with install.py
