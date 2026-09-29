@@ -452,48 +452,41 @@ trailer_DESCRIPTION = 'illusory Claude/Anthropic authorship or generation attrib
 trailer_CHECK = _Check(id='content.illusory_authorship_trailer', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('c', 'C'), retry_hint=trailer_RETRY_HINT, description=trailer_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern", "conn"}), tests="SPEC")
 # content.integrity_suppression_flag predicate — INTEGRITY-suppression flag WITHOUT an ADR backlink.
 #
-# Fires on a `.toml` config file that introduces a suppression flag whose key NAMES an
-# integrity/verification/audit concept, carrying a `_(skip|bypass|inapplicable)` suffix (or the
-# prefix form `skip_<integ>` / `bypass_<integ>`) set `= true` as a standalone assignment line —
-# unless an
-# `ADR-NNN` backlink ON OR ADJACENT TO the flag line (e.g. a `*_rationale =
-# "ADR-042"` line) or a `makoto-allow:` marker is present. BOTH carve-outs are
-# recorded through the exemption sink: an exemption that leaves no audit row is a
+# Fires on a machine-read config file (.toml, setup.cfg / .cfg, .ini, .yaml) that introduces a
+# standalone assignment line setting a suppression flag truthy, where the flag's QUALIFIED name --
+# the enclosing `[section]` header joined to the key -- names an integrity/verification/audit
+# concept AND carries a suppression word (skip / bypass / inapplicable) as one of its segments.
+# `audit_skip = true`, `skip_audit = true`, and `skip = true` under `[tool.audit]` are one flag:
+# which part of the name holds the concept is spelling, not effect. Exempt only when an `ADR-NNN`
+# backlink sits ON OR ADJACENT TO the flag line or a `makoto-allow:` marker is present; BOTH
+# carve-outs are recorded through the exemption sink: an exemption that leaves no audit row is a
 # laundering token, not a carve-out.
 #
 # SCOPE:
-#   * target is `.toml` only — real machine-read config. Markdown is prose/docs, where these
-#     flags appear only as examples, never live config.
-#   * the key must NAME an integrity concept: a bare perf toggle (`cache_skip`) is not an
-#     integrity check, so firing on it would be an illusory (immaterial) word.
-#   * full-LINE anchor (`^...= true`, MULTILINE): the flag must be a standalone assignment line,
-#     so an inline/table mention in prose can't match.
+#   * target is config the machine reads. Markdown is prose/docs, where these flags appear only as
+#     examples, never live config.
+#   * the qualified name must NAME an integrity concept: a bare perf toggle (`cache_skip`) is not
+#     an integrity check, so firing on it would be an illusory (immaterial) word.
+#   * full-LINE anchor: the flag must be a standalone assignment line, so an inline/table mention
+#     in prose can't match. Sections are read from `[...]` headers only; YAML nesting by indent is
+#     not followed (a nested YAML key is read by its own name).
 #
 # ACKNOWLEDGED FN: a deliberately misnamed integrity suppression (`cache_skip = true` where
-# "cache" is really the audit cache) evades — the threat model is honest-but-sloppy, not
+# "cache" is really the audit cache) evades -- the threat model is honest-but-sloppy, not
 # adversarial-deceptive-naming.
-#
-# Built from the regex_file_predicate factory; the ADR-backlink carve-out is a line-scoped,
-# audited wrapper around it (the factory's whole-content `exempt_rx` is deliberately not used —
-# it exempts before the recorder runs).
-from makoto.kit import _record_exemption, regex_file_predicate, scan_target_content
+from makoto.kit import _exempt_or_finding, _record_exemption, scan_target_content
 from makoto.vocab import Finding
 from makoto.vocab import _INTEG_VOCAB as _INTEG   # shared L0 integrity vocab (single source)
-
-suppress__TARGET_RX = _lazy_re(r"\.toml$")
 
 # `_INTEG` stays a module attribute under exactly this name: tests/test_lexicons.py pins
 # `integritySuppressionFlag._INTEG is vocab._INTEG_VOCAB`.
 
-# a STANDALONE assignment line whose key names an integrity concept and carries a suppression
-# affix set true: suffix form (`audit_skip = true`) or prefix form (`skip_audit = true`).
-# MULTILINE so `^` binds to each physical line; quotes optional for TOML quoted keys.
-_FLAG_RX = _lazy_re(
-    r"(?im)^[ \t]*[\"']?(?:"
-    r"\w*(?:" + _INTEG + r")\w*_(?:skip|bypass|inapplicable)"
-    r"|(?:skip|bypass)_\w*(?:" + _INTEG + r")\w*"
-    r")[\"']?[ \t]*=[ \t]*true\b"
-)
+suppress__TARGET_RX = _lazy_re(r"\.(?:toml|cfg|ini|ya?ml)$", re.I)
+_SECTION_RX = _lazy_re(r"^[ \t]*\[\[?[ \t]*([^\]\n]+?)[ \t]*\]\]?[ \t]*$")
+_FLAG_LINE_RX = _lazy_re(
+    r"(?i)^[ \t]*[\"']?([\w.:-]+)[\"']?[ \t]*[=:][ \t]*[\"']?(?:true|yes|on|1)[\"']?[ \t]*(?:[#;].*)?$")
+_SUPPRESS_RX = _lazy_re(r"(?i)^(?:(?:skip|bypass)(?:ped|ed)?|inapplicable)$")
+_SEGMENT_SPLIT_RX = _lazy_re(r"[^A-Za-z0-9]+")
 
 # an ADR backlink documents the suppression -> exempt, but only when it sits on the flag's own
 # line or within _ADR_WINDOW adjacent lines. Whole-content scope would be a laundering token: one
@@ -501,44 +494,56 @@ _FLAG_RX = _lazy_re(
 _ADR_BACKLINK_RX = _lazy_re(r"\bADR-\d+\b")
 _ADR_WINDOW = 2
 
-_flag_predicate = regex_file_predicate(
-    target_rx=suppress__TARGET_RX, body_rx=_FLAG_RX, exempt_label="ADR backlink",
-)
+
+def _suppression_flags(content: str):
+    """Yield `(line_no, line)` for every truthy assignment whose section-qualified name holds
+    both an integrity concept and a suppression segment."""
+    section = ""
+    for i, ln in enumerate(content.splitlines(), 1):
+        sm = _SECTION_RX.match(ln)
+        if sm:
+            section = sm.group(1)
+            continue
+        am = _FLAG_LINE_RX.match(ln)
+        if not am:
+            continue
+        segs = [x for x in _SEGMENT_SPLIT_RX.split(f"{section}.{am.group(1)}") if x]
+        if any(_SUPPRESS_RX.match(x) for x in segs) and any(_INTEG_RX.search(x) for x in segs):
+            yield i, ln
 
 
 def suppress_predicate(*, current_event: dict, history: list, pattern,
               conn=None) -> Optional[Finding]:
-    """The factory predicate plus the LINE-SCOPED, AUDITED ADR carve-out.
-
-    Unlike the factory's whole-content `exempt_rx` (which returns before the exemption
-    recorder ever runs), an ADR exemption here is recorded exactly as a `makoto-allow:`
-    marker is -- the module docstring presents the two carve-outs as equivalent, so one must
-    not vanish where the other leaves an audit row."""
-    # `history=()` literal, not the incoming parameter: the factory predicate never reads it, and
-    # this check's declared eats must stay exact (tests/test_check_law_eats.py rejects an
-    # undeclared read).
-    finding = _flag_predicate(current_event=current_event, history=(),
-                              pattern=pattern, conn=conn)
-    if finding is None:
+    """The first unexempted suppression flag, with the LINE-SCOPED, AUDITED ADR carve-out
+    recorded exactly as a `makoto-allow:` marker is."""
+    if current_event.get("hook_event_name") != "PreToolUse":
         return None
-    content = scan_target_content(current_event.get("tool_input", {}) or {})
+    ti = current_event.get("tool_input", {}) or {}
+    fp = ti.get("file_path", "") if isinstance(ti, dict) else ""
+    if not suppress__TARGET_RX.search(fp or ""):
+        return None
+    content = scan_target_content(ti)
     lines = content.splitlines()
-    lo = max(0, finding.line - 1 - _ADR_WINDOW)
-    hi = finding.line + _ADR_WINDOW
-    backlink = _ADR_BACKLINK_RX.search("\n".join(lines[lo:hi]))
-    if backlink:
-        _record_exemption(current_event, conn, pattern_id=pattern.id, file=finding.file,
-                          line=finding.line,
-                          reason=f"ADR backlink {backlink.group(0)} adjacent to the flag",
-                          snippet=finding.snippet)
-        return None
-    return finding
+    for line_no, ln in _suppression_flags(content):
+        window = "\n".join(lines[max(0, line_no - 1 - _ADR_WINDOW):line_no + _ADR_WINDOW])
+        backlink = _ADR_BACKLINK_RX.search(window)
+        if backlink:
+            _record_exemption(current_event, conn, pattern_id=pattern.id, file=fp, line=line_no,
+                              reason=f"ADR backlink {backlink.group(0)} adjacent to the flag",
+                              snippet=ln)
+            continue
+        return _exempt_or_finding(
+            current_event=current_event, conn=conn, pattern=pattern, fp=fp, line_no=line_no,
+            snippet=ln, content=content,
+            message=f"row {pattern.id} ({pattern.description}): matched {ln.strip()!r} at line "
+                    f"{line_no} with no ADR backlink")
+    return None
 
 
 suppress_RETRY_HINT = 'Suppression flags on an integrity/verification/audit-named key require an ADR backlink (*_rationale = "ADR-NNN") or a `makoto-allow: <reason>` marker. Add the rationale or remove the flag.'
-suppress_DESCRIPTION = 'integrity-named suppression flag (_skip/_bypass/_inapplicable=true) in a .toml without ADR backlink'
+suppress_DESCRIPTION = 'integrity-named suppression flag (skip/bypass/inapplicable = true, key or section) in machine-read config without ADR backlink'
 
-suppress_CHECK = _Check(id='content.integrity_suppression_flag', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('_skip', '_bypass', '_inapplicable', 'skip_', 'bypass_'), retry_hint=suppress_RETRY_HINT, description=suppress_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+suppress_CHECK = _Check(id='content.integrity_suppression_flag', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('skip', 'Skip', 'SKIP', 'bypass', 'Bypass', 'BYPASS', 'inapplicable', 'Inapplicable', 'INAPPLICABLE'), retry_hint=suppress_RETRY_HINT, description=suppress_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 # content.self_mute_guard predicate — makoto self-mute guard.
 #
 # Fires when the assistant's OWN Write/Edit to a Claude settings.json would DISABLE makoto
@@ -1189,7 +1194,7 @@ _MUTATION_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 # line. The anchor is what keeps this module immune to its own vocabulary and keeps a keyword
 # inside a string literal or an identifier from matching.
 _DIRECTIVE_RX = _lazy_re(
-    r"""(?x)
+    r"""(?xi)                   # case-blind: flake8 honors the upper-case spelling too
     (?:\#|//|/\*|<!--)          # a comment opener ...
     [^\n]*?                     # ... then, later on the SAME line,
     \b(?:
@@ -1205,9 +1210,10 @@ _DIRECTIVE_RX = _lazy_re(
     )\b
     """
 )
-# A bare test SKIP decorator: the one skip form the runner cannot discharge. `skipif` fails the
-# trailing `\b` on its own; `xfail` is absent by design.
-_BARE_SKIP_RX = _lazy_re(r"(?m)^[ \t]*@(?:pytest\.mark\.)?skip\b")
+# A bare test SKIP decorator, from any namespace (`@pytest.mark.skip`, `@unittest.skip`, `@skip`):
+# the one skip form the runner cannot discharge. `skipif` / `skipIf` / `skipUnless` fail the
+# trailing `\b` on their own; `xfail` is absent by design.
+_BARE_SKIP_RX = _lazy_re(r"(?m)^[ \t]*@(?:[\w.]+\.)?skip\b")
 
 # An end a reader can go and check. Generous on purpose; see the recall bounds above.
 _DISCHARGE_RX = _lazy_re(
@@ -1274,6 +1280,7 @@ def undischarged_waiver_predicate(*, current_event: dict, history: list, pattern
         line=0,
         level="error",
         message=(
+            f"row {pattern.id} ({pattern.description}): "
             f"a checker-silencing directive was introduced with no checkable end named on or "
             f"above it: {named}{more}. An exemption with no end is a permanent hole with a "
             f"sentence attached."
@@ -1292,10 +1299,11 @@ waiver_RETRY_HINT = "Name the end beside the directive, or fix the finding it si
 waiver_DESCRIPTION = "a checker-silencing directive introduced with no checkable end"
 waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__,
-               keywords=("noqa", "nosec", "ignore", "disable", "no cover", "skip"),
+               # every directive needs a comment opener and every skip an `@`: a case-blind superset
+               keywords=("#", "//", "/*", "<!--", "@"),
                retry_hint=waiver_RETRY_HINT, description=waiver_DESCRIPTION,
                tests="SPEC",
-               eats=frozenset({"current_event"}))
+               eats=frozenset({"current_event", "pattern"}))
 # gate.claude_identity -- a commit about to be stamped with an identity nobody chose: the
 # container's git layer (an env var or config file) names Claude at the anthropic.com noreply
 # address, and a plain `git commit` takes that setting as if it were who is writing.
@@ -2196,12 +2204,28 @@ _CHECKER_RX = _lazy_re(r"(^|[/\\])(checks?[/\\][^/\\]+|[^/\\]*(?:check|lint|audi
 
 
 # content.rule_without_runner -- register B7 RULE WITH NO RUNNER. A rule line (always / never /
-# must / do not) added to CLAUDE.md or AGENTS.md must name what runs it: a `runner:` token, or a
-# path in the line that exists. Discharge: name the check on the line, or leave the rule out.
-_RULE_FILE_RX = _lazy_re(r"(^|[/\\])(CLAUDE|AGENTS)\.md$")
+# must / do not) added to any instruction file the harness loads -- CLAUDE*.md (CLAUDE.local.md
+# included), AGENTS*.md, .claude/rules/*.md -- must name what runs it: a `runner:` token, or a path
+# in the line. What it names must be a FILE inside the working tree: a directory (`/`) or a path
+# outside the tree runs nothing this tree's rule is bound to. Discharge: name the check on the
+# line, or leave the rule out.
+_RULE_FILE_RX = _lazy_re(r"(^|[/\\])(?:(?:CLAUDE|AGENTS)(?:\.[\w-]+)*\.md|\.claude[/\\]rules[/\\][^/\\]+\.md)$")
 _RULE_LINE_RX = _lazy_re(r"\b(?:always|never|must|do not|don't|shall)\b", re.I)
 _PATHISH_RX = _lazy_re(r"[\w.-]*[/\\][\w./\\-]+|[\w-]+\.(?:py|sh|js|ts|tsv|toml|json)\b")
 _RUNNER_RX = _lazy_re(r"\brunner:\s*`?([^\s`]+)")
+
+
+def _runner_in_tree(cwd: str, path: str) -> bool:
+    """`path` names a regular file under `cwd` (after resolving links): something that can run."""
+    path = path.split("::", 1)[0].strip("`'\",;:()")
+    if not path or not cwd:
+        return False
+    try:
+        root = os.path.realpath(cwd)
+        full = os.path.realpath(path if os.path.isabs(path) else os.path.join(root, path))
+        return os.path.isfile(full) and os.path.commonpath([root, full]) == root
+    except (OSError, ValueError):
+        return False
 
 
 def rule_runner_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -2214,15 +2238,15 @@ def rule_runner_predicate(*, current_event: dict, history: list, pattern, conn=N
             continue
         m = _RUNNER_RX.search(ln)
         cands = [m.group(1)] if m else _PATHISH_RX.findall(ln)
-        if not any(_exists_under(cwd, c) for c in cands):
-            return _deny(pattern, fp, "the rule line names no runner that exists: " + ln.strip()[:100], ln.strip())
+        if not any(_runner_in_tree(cwd, c) for c in cands):
+            return _deny(pattern, fp, "the rule line names no runner file in the tree: " + ln.strip()[:100], ln.strip())
     return None
 
 
 rule_runner_RETRY_HINT = "Bind every rule to a check on every path: add `runner: <path of the check that runs it>` to the line."
-rule_runner_DESCRIPTION = "a rule line added to CLAUDE.md/AGENTS.md naming no runner that exists"
+rule_runner_DESCRIPTION = "a rule line added to an instruction file (CLAUDE*.md/AGENTS*.md/.claude/rules) naming no runner file in the tree"
 rule_runner_CHECK = _Check(id="content.rule_without_runner", applies_at="Pre", posture="BLOCK",
-               predicate_module=__name__, keywords=("CLAUDE.md", "AGENTS.md"), retry_hint=rule_runner_RETRY_HINT,
+               predicate_module=__name__, keywords=("CLAUDE", "AGENTS", ".claude"), retry_hint=rule_runner_RETRY_HINT,
                description=rule_runner_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 

@@ -73,7 +73,8 @@ def test_allow_exempt_ids_match_predicate_sources():
     """A Pre row belongs in _ALLOW_EXEMPT_IDS iff its verdict reaches the exemption: a factory
     scaffold that checks makoto_allowed centrally, or makoto_allowed itself. Source-derived so
     the JIT hint can never claim an escape hatch the code does not honor -- or hide one it does."""
-    honors = {"regex_file_predicate", "ast_introduced_predicate", "introduced_regex_predicate", "makoto_allowed"}
+    honors = {"regex_file_predicate", "ast_introduced_predicate", "introduced_regex_predicate", "makoto_allowed",
+              "_exempt_or_finding"}  # the factories' shared tail: it is where they call makoto_allowed
     derived = {row.id for row in rows().values() if row.edge == "Pre" and reached(row) & honors}
     assert derived == set(_ALLOW_EXEMPT_IDS), (
         f"drift: derived-from-source {sorted(derived)} != declared {sorted(_ALLOW_EXEMPT_IDS)}")
