@@ -166,15 +166,32 @@ def test_no_transcript_path_at_all():
 
 # ---- claim 3: a decorator registered it -----------------------------------------------------
 
-@pytest.mark.parametrize("decorator", ["@pytest.fixture", "@app.route('/x')", "@property",
-                                       "@click.command()", "@functools.lru_cache"])
-def test_any_decorator_is_a_claim(decorator):
-    """A decorator hands the unit to a framework that will call it, and the framework is the
-    source that asks for it. Generalizing over decorators rather than enumerating frameworks is
-    what keeps this from being a list that goes stale."""
+@pytest.mark.parametrize("decorator", ["@pytest.fixture", "@app.route('/x')",
+                                       "@click.command()", "import atexit\n@atexit.register",
+                                       "from flask import Flask\n@Flask.route('/x')"])
+def test_a_registering_decorator_is_a_claim(decorator):
+    """A decorator that hands the unit to a framework is a claim: the framework calls it.
+    Read off where the decorator comes from, not which framework it names."""
     content = f"{decorator}\ndef helper():\n    return 1\n"
     assert unclaimed_unit_gate([_unit_write(content)]) is None, decorator
     assert _introduced_units(content) == [], decorator
+
+
+@pytest.mark.parametrize("decorator", ["import functools\n@functools.cache", "@functools.lru_cache",
+                                       "from functools import cache\n@cache", "@property",
+                                       "from dataclasses import dataclass\n@dataclass"])
+def test_a_wrapping_decorator_registers_nothing(decorator):
+    """H6 (round nine): `@functools.cache` wraps the unit and hands it to no one, so it is not
+    a claim; a standard-library or builtin decorator other than a `register` never is."""
+    content = f"{decorator}\ndef helper():\n    return 1\n"
+    assert unclaimed_unit_gate([_unit_write(content)]) is not None, decorator
+
+
+def test_the_units_own_definition_does_not_reach_it():
+    """H6 (round nine): a docstring or a recursive call inside the unit is its own text."""
+    for body in ('    """helper adds one."""\n    return a + 1\n',
+                 "    return helper(a - 1) if a else 0\n"):
+        assert unclaimed_unit_gate([_unit_write("def helper(a):\n" + body)]) is not None, body
 
 
 # ---- the two framework exclusions -----------------------------------------------------------

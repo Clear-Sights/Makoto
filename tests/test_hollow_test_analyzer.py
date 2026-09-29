@@ -21,12 +21,15 @@ def _tree(src):
 
 
 # ---- filename scope gate ------------------------------------------------------------------------
-def test_filename_gate_matches_pytest_default_discovery():
+def test_filename_gate_is_pytest_discovery_or_a_test_directory():
+    """B5 (round nine): `tests/probe.py` holding `def test_x` runs when named on the command
+    line, so a verifier is read wherever it sits in a test directory, not only by its name."""
     assert _is_test_filename("tests/test_foo.py")
     assert _is_test_filename("tests/foo_test.py")
     assert _is_test_filename("test_foo.py")
-    assert not _is_test_filename("tests/helpers.py")
-    assert not _is_test_filename("tests/foo.py")
+    assert _is_test_filename("tests/probe.py")
+    assert not _is_test_filename("src/helpers.py")
+    assert not _is_test_filename("probe.py")
     assert not _is_test_filename("tests/test_foo.txt")
 
 
@@ -131,9 +134,19 @@ def test_not_tautology_when_operator_is_not_eq_or_is():
     assert not _is_tautology(n.test)
 
 
-def test_not_tautology_multi_op_compare():
+def test_constant_chained_compare_is_a_tautology():
+    """B5 (round nine): the verdict is fixed before the test runs however it is spelled."""
     n = _func("def test_a():\n assert 1 == 1 == 1\n").body[0]
-    assert not _is_tautology(n.test)          # spec: exactly ONE operator required
+    assert _is_tautology(n.test)
+
+
+def test_constant_verdicts_are_tautologies_and_constant_false_is_not():
+    for src in ("len([1]) == 1", "r == 2 or True", "sorted([2, 1]) == [1, 2]"):
+        n = _func(f"def test_a():\n r = f()\n assert {src}\n").body[1]
+        assert _is_tautology(n.test), src
+    for src in ("False", "len([]) == 1", "r == 2 or False", "len(r) == 1"):
+        n = _func(f"def test_a():\n r = f()\n assert {src}\n").body[1]
+        assert not _is_tautology(n.test), src
 
 
 # --- corpus-found FP fix: a Call can return a different object/value each evaluation, so an
@@ -169,6 +182,23 @@ def test_not_swallowed_when_handler_type_is_narrow():
 def test_not_swallowed_when_handler_body_is_not_noop():
     f = _func("def test_a():\n try:\n  do_thing()\n except Exception:\n  raise\n")
     assert not _is_swallowed_failure(f.body[0], f.body)
+
+
+def test_swallowed_when_the_handler_returns_or_only_logs():
+    """B2/B20 (round nine): a handler that lets the test pass swallows the failure whatever its
+    body spells; `return` also ends the test, so an assertion after the try cannot see it."""
+    for body in ("return", "log(e)", "return None"):
+        f = _func("def test_a():\n try:\n  r = do_thing()\n  assert r == 2\n"
+                  f" except Exception as e:\n  {body}\n")
+        assert _is_swallowed_failure(f.body[0], f.body), body
+    f = _func("def test_a():\n try:\n  r = do_thing()\n except Exception:\n  return\n assert r == 2\n")
+    assert _is_swallowed_failure(f.body[0], f.body)
+
+
+def test_not_swallowed_when_the_handler_fails_or_skips():
+    for body in ("pytest.fail('x')", "pytest.skip('x')", "raise RuntimeError('x')", "assert False"):
+        f = _func(f"def test_a():\n try:\n  do_thing()\n except Exception:\n  {body}\n")
+        assert not _is_swallowed_failure(f.body[0], f.body), body
 
 
 def test_not_swallowed_when_no_call_in_try_body():

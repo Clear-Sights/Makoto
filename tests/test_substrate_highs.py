@@ -1,7 +1,7 @@
 """Shape tests for two substrate faults the attacker found in every row at once.
 
 A touched file under a directory with a capital letter was never read by the file-reading Stop
-rows, because ledger keys are case-folded; and one decision showed only the worst finding, so a
+rows, because ledger keys were case-folded; and one decision showed only the worst finding, so a
 second fault surfaced only after the first was fixed."""
 from tests.conftest import _run_dispatch, _setup_state
 
