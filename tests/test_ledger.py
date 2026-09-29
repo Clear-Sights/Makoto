@@ -174,3 +174,39 @@ def test_record_update_chain_fault_never_blocks_sqlite_write(tmp_path, monkeypat
     row = read_key(c, "src/x.py")
     assert row is not None
     assert row["kind"] == "touched"
+
+
+_ATTACH = {"hook_event_name": "PostToolUse", "tool_name": "mcp__hearthbot__post_message",
+           "tool_input": {"text": "Here is the finished session.sh.",
+                          "attached_outputs": [{"kind": "file", "ref": "/mnt/shared/HANDOFF/session.sh"}]},
+           "tool_response": '{"message_id": "m1", "attached_outputs_attached": 1}'}
+
+
+def test_an_attaching_tool_records_the_file_it_names_as_seen():
+    """Live FP 2026-09-29: a post attached the shared folder's session.sh (a disk this session does
+    not mount); the attach is the second reading of that file."""
+    c = _conn()
+    record_update(c, _ATTACH, event_id=3, session_id="s")
+    assert read_key(c, "/mnt/shared/HANDOFF/session.sh")["kind"] == "seen"
+    assert read_key(c, "Here is the finished session.sh.") is None      # prose is not a path
+
+
+def test_an_error_shaped_response_records_nothing():
+    c = _conn()
+    record_update(c, {**_ATTACH, "tool_response": '{"error": "file not found"}'}, event_id=3, session_id="s")
+    assert read_key(c, "/mnt/shared/HANDOFF/session.sh") is None
+
+
+def test_a_seen_row_never_overwrites_a_hollow_write_or_a_test_verdict():
+    c = _conn()
+    record_update(c, {"hook_event_name": "PostToolUse", "tool_name": "Write",
+                      "tool_input": {"file_path": "src/a.py", "content": ""}}, event_id=1, session_id="s")
+    record_update(c, {"hook_event_name": "PostToolUse", "tool_name": "Bash",
+                      "tool_input": {"command": "pytest tests/x.py"},
+                      "tool_response": {"stdout": "1 failed", "stderr": "", "exitCode": 1}},
+                  event_id=2, session_id="s")
+    for path in ("src/a.py", "tests/x.py"):
+        record_update(c, {"hook_event_name": "PostToolUse", "tool_name": "Read",
+                          "tool_input": {"file_path": path}, "tool_response": "ok"}, event_id=3, session_id="s")
+    assert (read_key(c, "src/a.py")["kind"], read_key(c, "src/a.py")["value"]) == ("touched", "0")
+    assert read_key(c, "tests/x.py")["kind"] == "testrun"
