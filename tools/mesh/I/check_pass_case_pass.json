@@ -1,0 +1,15 @@
+{
+ "files": {
+  "tests/test_stale_check.py": "from checks.stale_check import stale_predicate\n\ndef test_fresh_event_allowed():\n    assert stale_predicate({'stale': False}) is False\n"
+ },
+ "events": [
+  {
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "checks/stale_check.py",
+    "content": "# pass: tests/test_stale_check.py::test_fresh_event_allowed\ndef stale_predicate(ev):\n    \"\"\"Fires when an event is marked stale.\"\"\"\n    return ev.get('stale') is True\n"
+   }
+  }
+ ]
+}

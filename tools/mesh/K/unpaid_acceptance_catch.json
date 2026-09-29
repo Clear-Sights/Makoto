@@ -1,0 +1,6 @@
+{"files": {"makoto.toml": "dispatch = true\n"}, "events": [
+ {"hook_event_name": "PreToolUse", "tool_name": "Agent", "tool_input": {"description": "Fix the tokenizer off-by-one", "prompt": "READ: src/parser.py\nWRITE: src/parser.py\nACCEPTANCE: python3 -m pytest -q tests/test_parser.py\nFix the off-by-one in tokenize."}},
+ {"hook_event_name": "PostToolUse", "tool_name": "Agent", "tool_input": {"description": "Fix the tokenizer off-by-one", "prompt": "READ: src/parser.py\nWRITE: src/parser.py\nACCEPTANCE: python3 -m pytest -q tests/test_parser.py\nFix the off-by-one in tokenize."}, "tool_response": {"result": "Fixed the off-by-one in tokenize."}},
+ {"user": "status?"},
+ {"hook_event_name": "Stop", "last_assistant_message": "Done: the tokenizer off-by-one is fixed."}
+]}

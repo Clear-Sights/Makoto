@@ -13,9 +13,7 @@ import harness
 
 W = pathlib.Path(__file__).parent
 EXCLUDED = {"gate.stale_establisher": "removed: second runner for H2 (stale_pass fills it)",
-            "gate.relative_path_citation": "removed: fits no register entry",
-            "gate.undeclared_falsifiable": "reads the installed catalog, no input can drive it",
-            "gate.self_wired": "the installed manifest is always wired; unwired needs a second plugin root"}
+            "gate.relative_path_citation": "removed: fits no register entry"}
 
 
 def ids_by_short():
