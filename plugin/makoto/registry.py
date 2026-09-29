@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
@@ -98,9 +99,16 @@ def _load_module(path: Path, directory: Path):
     name = path.stem
     if directory == _PACKAGE_DIR:
         return importlib.import_module(f"makoto.checks.{name}")
-    spec = importlib.util.spec_from_file_location(f"_makoto_checks_scan__{id(directory)}__{name}", path)
+    private = f"_makoto_checks_scan__{id(directory)}__{name}"
+    spec = importlib.util.spec_from_file_location(private, path)
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    # Registered only while it executes: a module-level @dataclass resolves its own module
+    # through sys.modules, and without the entry every such file reads as an import failure.
+    sys.modules[private] = mod
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        sys.modules.pop(private, None)
     return mod
 
 

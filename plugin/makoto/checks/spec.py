@@ -801,30 +801,118 @@ def orphan_ids(*, package_dir: Optional[Path] = None,
     return sorted(pid for pid in reg if pid not in live_ids)
 
 
+def _checkout_package(cwd) -> Optional[Path]:
+    """The makoto package a makoto checkout at `cwd` carries (its checks/ and its manifest),
+    when that is not the package running now; `None` otherwise. The agent edits the checkout,
+    so the checkout's catalog is the one that can drift in-turn."""
+    if not cwd:
+        return None
+    running = Path(__file__).resolve().parent.parent
+    for rel in ("plugin/makoto", "makoto"):
+        root = Path(cwd) / rel
+        try:
+            if (root / "checks").is_dir() and (root / "substrate" / "_declared.py").is_file():
+                return None if root.resolve() == running else root
+        except OSError:
+            return None
+    return None
+
+
+def _manifest_ids(declared_py: Path) -> frozenset:
+    """The string ids `DECLARED_IDS` holds in a manifest file, read without executing it."""
+    try:
+        tree = ast.parse(declared_py.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return frozenset()
+    for node in tree.body:
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else getattr(node, "targets", [])
+        if any(isinstance(t, ast.Name) and t.id == "DECLARED_IDS" for t in targets):
+            return frozenset(n.value for n in ast.walk(node.value)
+                             if isinstance(n, ast.Constant) and isinstance(n.value, str))
+    return frozenset()
+
+
+def _returns_constant(fn) -> bool:
+    """True iff `fn`'s body reads nothing and calls nothing: its result is fixed before it runs."""
+    import dis
+    code = getattr(fn, "__code__", None)
+    if code is None:
+        return False
+    inert = {"RESUME", "NOP", "CACHE", "LOAD_CONST", "RETURN_CONST", "RETURN_VALUE"}
+    return all(i.opname in inert for i in dis.get_instructions(code))
+
+
+def _cannot_fire(chk, mod, stem: str) -> bool:
+    """True iff dispatch can never get a finding out of `chk`: its `run` returns a fixed value,
+    or its predicate module resolves no predicate for its id, or it has neither."""
+    if callable(getattr(chk, "run", None)):
+        return _returns_constant(chk.run)
+    name = getattr(chk, "predicate_module", "") or ""
+    if not name:
+        return True
+    target = mod if name in (getattr(mod, "__name__", None), stem) or name.endswith("." + stem) else None
+    if target is None:
+        try:
+            import importlib
+            target = importlib.import_module(name)
+        except Exception:
+            return True
+    router = getattr(target, "_PREDICATES", None)
+    return not callable(getattr(target, "predicate", None)) or (
+        isinstance(router, dict) and chk.id not in router)
+
+
 def undeclared_falsifiable_gate(*, package_dir: Optional[Path] = None,
-                                declared: Optional[dict] = None) -> Optional[Finding]:
-    """Fires iff the checks/ catalog has an orphan on either side; `None` on a fully consistent
-    catalog. Fail-open by construction: both halves already fail-open internally."""
-    mods = orphan_modules(package_dir=package_dir)
-    ids = orphan_ids(package_dir=package_dir, declared=declared)
-    if not mods and not ids:
+                                declared: Optional[dict] = None, cwd=None) -> Optional[Finding]:
+    """Fires iff the catalog is not what its manifest says is live: a module with no live
+    CHECK, a declared id nothing backs, a live id the manifest never declared, or a live row
+    that can never fire. `None` on a consistent catalog. The catalog is the checkout at `cwd`
+    when it carries one, else the running package. One walk over the modules."""
+    from makoto.registry import _PACKAGE_DIR, _iter_modules, _primary_check, _valid_check
+    checkout = _checkout_package(cwd) if package_dir is None else None
+    if checkout is not None:
+        package_dir = checkout / "checks"
+        if declared is None:
+            declared = _manifest_ids(checkout / "substrate" / "_declared.py")
+    reg = DECLARED_IDS if declared is None else declared
+    mods, live, dead = [], set(), []
+    for stem, mod in _iter_modules(package_dir or _PACKAGE_DIR):
+        primary = _primary_check(mod)
+        if primary is None:
+            mods.append(stem)
+        rows = ([primary] if primary is not None else []) + [
+            x for x in (getattr(mod, "EXTRA_CHECKS", None) or []) if _valid_check(x)]
+        for chk in rows:
+            live.add(chk.id)
+            if _cannot_fire(chk, mod, stem) and chk.id not in dead:
+                dead.append(chk.id)
+    ids = sorted(pid for pid in reg if pid not in live)
+    undeclared = sorted(live - set(reg))
+    if not (mods or ids or undeclared or dead):
         return None
     parts = []
     if mods:
         parts.append("orphan module(s) on disk with no live CHECK registered: "
-                     + ", ".join(mods))
+                     + ", ".join(sorted(mods)))
     if ids:
         parts.append("declared ID(s) in the manifest with no live module backing them: "
                      + ", ".join(ids))
+    if undeclared:
+        parts.append("live ID(s) the manifest never declared: " + ", ".join(undeclared))
+    if dead:
+        parts.append("live row(s) that can never fire (run returns a fixed value, or no "
+                     "predicate resolves for the id): " + ", ".join(sorted(dead)))
     return Finding(
         pattern_id="gate.undeclared_falsifiable",
         file="makoto/checks/",
         line=0,
         level="error",
-        message="checks/ catalog completeness drift -- " + "; ".join(parts),
+        message="row gate.undeclared_falsifiable (checks/ catalog completeness): "
+                + "; ".join(parts),
         retry_hint=("Fix the checks/ catalog: give every on-disk module a valid CHECK "
-                    "(id/applies_at/posture), and either implement or remove every "
-                    "declared-but-missing manifest entry in _declared.py."),
+                    "(id/applies_at/posture), declare every live id in _declared.py, route "
+                    "every row to a predicate or a run that reads its input, and either "
+                    "implement or remove every declared-but-missing manifest entry."),
     )
 
 
@@ -834,7 +922,8 @@ undeclared_CHECK = Check(
     applies_at="Stop",
     posture=POSTURE_BLOCK,
     tests="SPEC",
-    run=lambda ctx=None: undeclared_falsifiable_gate(),
+    eats=frozenset({"cwd"}),
+    run=lambda ctx=None: undeclared_falsifiable_gate(cwd=getattr(ctx, "cwd", None)),
 )
 # content.verifier_exit_masking — verifier EXIT-CODE masking (a test/build/lint runner's failure
 # hidden).

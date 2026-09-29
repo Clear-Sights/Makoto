@@ -18,8 +18,8 @@ from makoto.checks.spec import undeclared_CHECK as CHECK, orphan_ids, orphan_mod
 def _good(tmp_path, name, id_, applies_at="Stop"):
     (tmp_path / name).write_text(
         "from makoto.registry import Check\n"
-        f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture='ADVISE')\n"
-    )
+        f"CHECK = Check(id={id_!r}, applies_at={applies_at!r}, posture='ADVISE', run=lambda c=None: c)\n"
+    )   # a row that can fire: its run reads its input
 
 
 # ---- orphan MODULE: exists on disk, not discoverable/registered -------------------------------
@@ -114,3 +114,30 @@ def test_check_export_shape():
     assert CHECK.id == "gate.undeclared_falsifiable"
     assert CHECK.applies_at == "Stop"
     assert callable(CHECK.run)
+
+
+# ---- live -> declared, and rows that can never fire (round nine C2, B32) -------------------
+
+def test_live_id_the_manifest_never_declared_fires(tmp_path):
+    _good(tmp_path, "live.py", "x.live")
+    f = undeclared_falsifiable_gate(package_dir=tmp_path, declared={})
+    assert f is not None and "never declared: x.live" in f.message
+
+
+def test_row_whose_run_returns_a_fixed_value_cannot_fire(tmp_path):
+    (tmp_path / "dead.py").write_text(
+        "from makoto.registry import Check\n"
+        "CHECK = Check(id='x.dead', applies_at='Stop', posture='ADVISE', run=lambda c: None)\n")
+    f = undeclared_falsifiable_gate(package_dir=tmp_path, declared={"x.dead": "dead"})
+    assert f is not None and "can never fire" in f.message and "x.dead" in f.message
+
+
+def test_row_its_predicate_module_does_not_route_cannot_fire(tmp_path):
+    (tmp_path / "unrouted.py").write_text(
+        "from makoto.registry import Check\n"
+        "CHECK = Check(id='x.unrouted', applies_at='Pre', posture='BLOCK', predicate_module=__name__)\n"
+        "_PREDICATES = {}\n"
+        "def predicate(*, current_event, history, pattern, conn=None):\n"
+        "    return _PREDICATES[pattern.id](current_event=current_event)\n")
+    f = undeclared_falsifiable_gate(package_dir=tmp_path, declared={"x.unrouted": "unrouted"})
+    assert f is not None and "x.unrouted" in f.message
