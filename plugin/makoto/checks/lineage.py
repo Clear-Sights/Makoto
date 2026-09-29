@@ -573,22 +573,35 @@ webfetch_CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", postu
 # many correct commands produce. Only a literal JSON `null` as the whole of what was printed
 # counts. That is a named RECALL bound, and it fails quiet.
 #
-# ONLY THE LATEST TRAVERSAL COUNTS (BLOCK since 2026-09-25): it owes iff it printed null and no
-# structure read precedes it. The discharge is in-turn -- read the structure, then re-run the
-# traversal -- so an early null that was since read around no longer holds every later stop.
+# ONLY THE LATEST TRAVERSAL COUNTS (BLOCK since 2026-09-25): it owes iff everything it printed was
+# null and nothing before it read the SAME data. The discharge is in-turn -- read the structure,
+# then re-run the traversal -- so an early null that was since read around no longer holds every
+# later stop.
+#
+# THE PAYMENT IS THE SHAPE, READ FROM THIS DATA (round nine A3). What pays is an earlier act on
+# the traversal's own source that showed its shape: a Read of that file, a shape query on it
+# (`jq keys`, `type`, `length`, `has(...)`, `paths`, `-e`), or a command on it whose output WAS
+# structure (a JSON object or array printed whole: `jq .`, `cat`). A scalar printed by another
+# guessed path shows no shape and does not pay. A Read of an unrelated file, or a shape query on
+# another file, reads nothing about this one. The source is the file the traversal names; a
+# traversal naming none (stdin from a pipe) has the pipeline upstream of it as its source.
 from makoto.kit import response_text, command_of, decode_history_event, unwitnessed
 
 # A structured-data traversal. `jq` is the canonical one; `python -c ... json` and `yq` are the
 # same act under other programs. A closed vocabulary whose miss is a RECALL bound.
 _TRAVERSAL_RX = _lazy_re(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b")
-# The structure query that pays the obligation: any of the shape-printing jq forms, or a Read of
-# the file.
+# A shape query: the jq/yq forms whose answer is the structure rather than a value in it.
 _STRUCTURE_RX = _lazy_re(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
                            r"\bpaths\b|\bto_entries\b|-e\b)")
-# What a failed traversal prints: a literal null as the WHOLE output -- JSON's `null` (jq/yq) or
-# Python's `None` (the same absent-value token printed by a `python3 -c ...json...` traversal).
-# `.strip()` has already run, so an anchored match is the whole of it.
-_NULL_OUTPUT_RX = _lazy_re(r"\A(?:null|None)\Z")
+# Output that IS structure: a JSON object or array, printed whole.
+_STRUCTURED_OUTPUT_RX = _lazy_re(r"\A[\[{]")
+# What a failed traversal prints: nothing but nulls -- JSON's `null` (jq/yq) or Python's `None`,
+# once for a scalar path or once per element of an array (`.[].name`). `.strip()` has already
+# run, so an anchored match is the whole of it.
+_NULL_OUTPUT_RX = _lazy_re(r"\A(?:(?:null|None)\s*)+\Z")
+# A file operand: a word with an extension, bare or under ./ ../ ~/ /, standing alone or quoted
+# (a python -c `open('x.json')` literal). A jq path (`.a.b`, `.[].x`) starts with a dot and is not.
+_FILE_OPERAND_RX = _lazy_re(r"""(?:^|(?<=[\s'"(=<]))((?:\.{1,2}/|~/|/)?[\w@%+-][\w@%+./-]*\.[A-Za-z]\w{0,9})(?=$|[\s'")|;>,])""")
 
 
 def _is_traversal(ev: dict) -> bool:
@@ -596,32 +609,60 @@ def _is_traversal(ev: dict) -> bool:
     return ev.get("hook_event_name") == "PostToolUse" and bool(cmd and _TRAVERSAL_RX.search(cmd))
 
 
-def _is_structure_read(ev: dict) -> bool:
+def _same_file(a: str, b: str) -> bool:
+    a, b = a.replace("\\", "/"), b.replace("\\", "/")
+    return a == b or a.endswith("/" + b.lstrip("./")) or b.endswith("/" + a.lstrip("./"))
+
+
+def _source_of(cmd: str):
+    """What the traversal reads: the files it names, else the pipeline upstream of it."""
+    files = tuple(_FILE_OPERAND_RX.findall(cmd))
+    if files:
+        return files, ""
+    head, _, _ = cmd.rpartition("|")
+    return (), " ".join(head.split())
+
+
+def _shows_source(ev: dict, source) -> bool:
+    """This earlier act showed the traversal's own data's shape: a Read of the file, or a shape
+    query on the same source, or a command on it that printed structure."""
+    files, upstream = source
     if ev.get("tool_name") == "Read":
-        return True
+        ti = ev.get("tool_input")
+        fp = str(ti.get("file_path", "") or "") if isinstance(ti, dict) else ""
+        return bool(fp) and any(_same_file(fp, f) for f in files)
     cmd = command_of(ev)
-    return bool(cmd and _STRUCTURE_RX.search(cmd))
+    if not cmd:
+        return False
+    if files:
+        named = any(_same_file(g, f) for g in _FILE_OPERAND_RX.findall(cmd) for f in files)
+    else:
+        named = bool(upstream) and upstream in " ".join(cmd.split())
+    return named and bool(_STRUCTURE_RX.search(cmd) or _STRUCTURED_OUTPUT_RX.match(response_text(ev)))
 
 
 def unread_structure_gate(history) -> Optional[Finding]:
-    """Fire iff the session's latest traversal printed null and no structure read precedes it."""
+    """Fire iff the session's latest traversal printed only nulls and nothing before it showed
+    that traversal's own data's shape."""
     events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
     last = max((i for i, ev in enumerate(events) if _is_traversal(ev)), default=None)
     if last is None or not _NULL_OUTPUT_RX.match(response_text(events[last])):
         return None
+    source = _source_of(command_of(events[last]))
     end = len(events)
     for _it, _at in unwitnessed(
             list(enumerate(events)) + [(end, None)],
             owes=lambda it: (last,) if it[0] == end else (),
             pays=lambda it: (lambda at, i=it[0]: i < at)
-            if it[1] is not None and _is_structure_read(it[1]) else None):
+            if it[1] is not None and _shows_source(it[1], source) else None):
         return Finding(
             pattern_id="gate.unread_structure", file="", line=0, level="error",
-            message=("A traversal of structured data printed `null` and nothing in this session "
-                     "looked at the structure first — the positions were assumed to line up "
+            message=("row gate.unread_structure (a null traversal over data never read): a "
+                     "traversal of structured data printed only `null` and nothing in this "
+                     "session had shown that data's shape first — the positions were assumed to line up "
                      "rather than read."),
-            retry_hint=("Print a non-null datum from the file first (`jq 'keys'`, `jq 'type'`, "
-                        "`jq -e 'has(...)'`) or Read it, then re-run the traversal."),
+            retry_hint=("Print a non-null datum from the same file first (`jq 'keys'`, `jq "
+                        "'type'`, `jq '.'`) or Read it, then re-run the traversal."),
             snippet=command_of(events[last])[:200])
     return None
 
@@ -923,10 +964,13 @@ fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Pre", posture="BLOC
 #
 #   1. THE SAME TEXT, not merely two edits -- a normalized block reaching two DISTINCT files.
 #                                                                         73.5% -> 9.2%
-#   2. A CHANGE TO WHAT EXISTS -- `Edit`/`MultiEdit` only. A fix is edited into a file that is
-#      already there, while a file being WRITTEN carries the house import header; admitting
-#      written files is what puts `from __future__ import annotations` in front of the gate.
-#                                                                          9.2% -> 3.8%
+#   2. A CHANGE TO WHAT EXISTS -- a fix lands in a file that is already there, while a file
+#      being CREATED carries the house import header; admitting created files is what puts
+#      `from __future__ import annotations` in front of the gate.       9.2% -> 3.8%
+#      The change is the effect, not the tool (round nine F2/H3): an Edit, a Write over an
+#      existing file (its added lines against the `originalFile` the harness returns), or a Bash
+#      command carrying the block with a path in it that is not the first site. Only a creation
+#      -- a whole `content` with no original -- registers without triggering.
 #   3. SUBSTANCE -- the block must carry a line that is not a comment, an import or a decorator.
 #      A comment quoted at two sites is prose with one home, not a repair whose correctness was
 #      inferred.                                                          3.8% -> 3.2%
@@ -956,14 +1000,16 @@ fanout_CHECK = _Check(id="gate.unprobed_fanout", applies_at="Pre", posture="BLOC
 # already held -- one file returning to a prior state, against one text reaching a second file.
 #
 # BLOCK TIER: the discharge is one verifier run, in-turn.
-from makoto.kit import decode_history_event, introduced_text, ran_a_verifier, unwitnessed
-
-# A fix is a change to what already EXISTS. See narrowing 2 above for the rate this buys.
-_EDIT_TOOLS = frozenset({"Edit", "MultiEdit"})
+import difflib
+import keyword
+from makoto.kit import (_path_components, _suffix_match, decode_history_event, introduced_text,
+                        ran_a_verifier, unwitnessed)
+from makoto.state.ledger import _PATH_IN_CMD_RX
 # How many contiguous substantial lines make a block. Measured; see above. Not a tunable
 # threshold but the point where the reading stops naming convention and has not yet stopped
 # naming anything.
 _BLOCK_LINES = 4
+pasted_DESCRIPTION = "one repair landed at a second site with no verifier run after the first"
 # A line carrying no content of its own: closers, separators, a bare marker.
 _TRIVIAL_RX = _lazy_re(r"^[\s)\]},:;#\"']*$")
 # A line that travels as CONVENTION rather than as a repair: a comment, an import, a decorator,
@@ -1007,6 +1053,61 @@ def _blocks(lines: list) -> list:
     return out
 
 
+# An identifier: renamed consistently, the block is the same fix (round nine H3: value -> amount).
+_IDENT_RX = _lazy_re(r"[A-Za-z_]\w*")
+
+
+def _shape(block: str) -> tuple:
+    """(the block with each non-keyword identifier replaced by its first-occurrence index, the
+    identifiers in that order). Two blocks with one shape differ only by a renaming."""
+    names = []
+
+    def slot(m):
+        w = m.group(0)
+        if keyword.iskeyword(w):
+            return w
+        if w not in names:
+            names.append(w)
+        return "\x00%d" % names.index(w)
+    return _IDENT_RX.sub(slot, block), tuple(names)
+
+
+def _renamed_from(names: tuple, prior: tuple) -> bool:
+    """A renaming, not a new text: fewer than half the identifiers differ. When most of them
+    change, what is shared is only a shape (two table rows, two assignments), not a fix."""
+    return 2 * sum(a != b for a, b in zip(names, prior)) < len(names)
+
+
+def _landing(ev: dict):
+    """(introduced text, sites, whether it can be a SECOND site) for a settled call, or None.
+    Sites are the one file an edit names, or every path-shaped token of a Bash command."""
+    tool, ti = ev.get("tool_name", ""), ev.get("tool_input")
+    if ev.get("hook_event_name") != "PostToolUse" or not isinstance(ti, dict):
+        return None
+    text = introduced_text(tool, ti)
+    if not text:
+        return None
+    if tool == "Bash":
+        sites = [m.group("path").strip("`") for m in _PATH_IN_CMD_RX.finditer(text)]
+        return (text, sites, bool(sites)) if sites else None
+    path = str(ti.get("file_path") or ti.get("notebook_path") or "")
+    if not path:
+        return None
+    if isinstance(ti.get("content"), str) and ti.get("content") == text:
+        tr = ev.get("tool_response")
+        original = tr.get("originalFile") if isinstance(tr, dict) else None
+        if not isinstance(original, str) or not original:
+            return text, [path], False                     # a creation: remembered, never second
+        added = [ln[1:] for ln in difflib.ndiff(original.splitlines(), text.splitlines())
+                 if ln.startswith("+ ")]
+        return "\n".join(added), [path], True
+    return text, [path], True
+
+
+def _same_site(a: str, b: str) -> bool:
+    return _suffix_match(_path_components(a), _path_components(b))
+
+
 def _second_site_finding(block: str, first_file: str, second_file: str) -> Finding:
     head = block.split("\n")[0]
     return Finding(
@@ -1015,7 +1116,7 @@ def _second_site_finding(block: str, first_file: str, second_file: str) -> Findi
         line=0,
         level="error",
         message=(
-            f"The same change reached `{second_file}` after `{first_file}` with no verifier run "
+            f"row gate.pasted_fix ({pasted_DESCRIPTION}): the same change reached `{second_file}` after `{first_file}` with no verifier run "
             f"between the two landings, starting `{head}` — so the second site's correctness is "
             f"drawn from the first rather than checked."
         ),
@@ -1029,30 +1130,30 @@ def _second_site_finding(block: str, first_file: str, second_file: str) -> Findi
 
 
 def pasted_fix_gate(history) -> Optional[Finding]:
-    """Fire iff one block of introduced text reached a SECOND file with no verifier run between
-    the two landings. LINEAGE: the second landing owes a witness -- a verifier run after the first
-    landing -- and only a run at or after that point pays it."""
+    """Fire iff one block of introduced text, up to a renaming, reached a SECOND site with no
+    verifier run after the first landing. LINEAGE: the second landing owes a witness -- a
+    verifier run after the first landing -- and only a run at or after that point pays it."""
     landed = {}
 
     def owes(item):
         at, ev = item
-        tool = ev.get("tool_name", "")
-        tool_input = ev.get("tool_input")
-        # A block LANDS (registers as a possible first site) from a Write same as an Edit --
-        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered. Without
-        # this, a fix Written into a brand-new module and then Edited into a second file is
-        # invisible: the Write never enters `landed`, so the Edit is never seen as a second paste.
-        if ev.get("hook_event_name") != "PostToolUse" or tool not in (_EDIT_TOOLS | {"Write"}) \
-                or not isinstance(tool_input, dict):
+        # A block LANDS (registers as a possible first site) from a creation same as an edit --
+        # narrowing 2 is about which site TRIGGERS a fire, not which site is remembered.
+        landing = _landing(ev)
+        if landing is None:
             return ()
-        path = str(tool_input.get("file_path", ""))
+        text, sites, can_trigger = landing
         second = []
-        for block in _blocks(_kept_lines(introduced_text(tool, tool_input))):
-            where, first = landed.setdefault(block, (path, at))
-            # Only an Edit/MultiEdit second landing fires (narrowing 2): two Writes sharing a
-            # block is convention (e.g. a house import header), never a repair transfer.
-            if where != path and tool in _EDIT_TOOLS:
-                second.append((block, where, first, path))
+        for block in _blocks(_kept_lines(text)):
+            shape, names = _shape(block)
+            prior = landed.setdefault(shape, [])
+            hit = next((p for p in prior if _renamed_from(names, p[0])), None)
+            if hit is None:
+                prior.append((names, sites[0], at))
+                continue
+            where, first = hit[1], hit[2]
+            if can_trigger and not any(_same_site(where, s) for s in sites):
+                second.append((block, where, first, sites[0]))
         return second
 
     def pays(item):
@@ -1071,7 +1172,7 @@ def pasted_fix_gate(history) -> Optional[Finding]:
 
 
 pasted_CHECK = _Check(id="gate.pasted_fix", applies_at="Stop", posture="BLOCK",
-               tests="LINEAGE",
+               tests="LINEAGE", description=pasted_DESCRIPTION,
                eats=frozenset({"history"}),
                run=lambda c: pasted_fix_gate(c.history))
 # gate.unclaimed_unit -- the session added a unit that answers to nothing: a function nobody
@@ -1323,23 +1424,42 @@ unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="B
                                                  transcript_path=c.transcript_path))
 
 
-# event.unbriefed_dispatch -- refuses an Agent/Task dispatch whose prompt lacks a READ:, WRITE:
-# and ACCEPTANCE: line.
+# event.unbriefed_dispatch -- refuses a prompt/message handed to a worker whose brief lacks a
+# filled READ:, WRITE: and ACCEPTANCE: line. The worker channel is read here, not by tool name
+# alone: an Agent/Task prompt, or a message a *send_message / SendMessage tool addresses to a
+# named session (session_id / to / recipient). A label counts only when it carries a value:
+# `READ:` with nothing after it tells the worker nothing (round nine, I1).
 from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines, unwitnessed
 from makoto.core._declaredverifiers import dispatch_opt_in
 
+_SESSION_TARGET_KEYS = ("session_id", "to", "recipient")
+
+
+def _worker_text(ev: dict):
+    ti = ev.get("tool_input")
+    if not isinstance(ti, dict):
+        return None
+    name = ev.get("tool_name") or ""
+    if name in DISPATCH_TOOL_NAMES:
+        text = ti.get("prompt")
+    elif (name.replace("_", "").lower().endswith("sendmessage")
+          and any(isinstance(ti.get(k), str) and ti.get(k) for k in _SESSION_TARGET_KEYS)):
+        text = ti.get("message", ti.get("prompt"))
+    else:
+        return None
+    return text if isinstance(text, str) else None
+
 
 def unbriefed_owes(ev: dict):
-    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in DISPATCH_TOOL_NAMES:
+    if ev.get("hook_event_name") != "PreToolUse":
         return ()
-    ti = ev.get("tool_input")
-    prompt = ti.get("prompt") if isinstance(ti, dict) else None
-    return (prompt,) if isinstance(prompt, str) else ()
+    text = _worker_text(ev)
+    return (text,) if text is not None else ()
 
 
 def _briefed(prompt: str) -> bool:
     lines = dispatch_brief_lines(prompt)
-    return bool(lines["READ"] and lines["WRITE"] and lines["ACCEPTANCE"])
+    return all(any(lines[label]) for label in ("READ", "WRITE", "ACCEPTANCE"))
 
 
 def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -1349,7 +1469,7 @@ def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=Non
         return Finding(
             pattern_id=pattern.id, file="", line=0, level="error",
             message=(f"row {pattern.id} ({pattern.description}): dispatch prompt carries no "
-                     "READ:, WRITE: and ACCEPTANCE: line -- a worker sent without what it "
+                     "filled READ:, WRITE: and ACCEPTANCE: line -- a worker sent without what it "
                      "reads, may write, and what pays it."),
             retry_hint=pattern.retry_hint,
             snippet=prompt[:200],
@@ -1360,11 +1480,11 @@ def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=Non
 unbriefed_RETRY_HINT = ('Give the dispatch a brief with a line-start `READ:`, `WRITE:` and '
                         '`ACCEPTANCE:` (the paths it reads, the paths it may write, and the '
                         'command that pays the work) before sending it.')
-unbriefed_DESCRIPTION = ('dispatch prompt lacks a READ:, WRITE: and ACCEPTANCE: line '
+unbriefed_DESCRIPTION = ('dispatch prompt lacks a filled READ:, WRITE: and ACCEPTANCE: line '
                          '(opt-in: makoto.toml `dispatch = true`)')
 
 unbriefed_CHECK = Check(id='event.unbriefed_dispatch', applies_at="Pre", posture="BLOCK",
-              predicate_module=__name__, keywords=('Agent', 'Task'),
+              predicate_module=__name__, keywords=('Agent', 'Task', 'send_message', 'SendMessage'),
               retry_hint=unbriefed_RETRY_HINT, description=unbriefed_DESCRIPTION,
               eats=frozenset({"current_event", "pattern"}), tests="LINEAGE")
 

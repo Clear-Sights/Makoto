@@ -1575,16 +1575,32 @@ thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 from makoto.registry import Check
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write', 'Edit'), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
-# event.unpinned_input -- refuses a dispatch whose READ paths carry no @<12+ hex> content hash,
-# and a Bash call with timeout > 120000 ms unless it verifies pins (sha256sum -c) or names
-# path@hash.
+# event.unpinned_input -- refuses a dispatch whose READ line names a path that carries no
+# @<12+ hex> content hash of its own, and a Bash call with timeout > 120000 ms unless it verifies
+# pins (sha256sum -c) or names path@hash. A pin is `@<hex>` attached to a PATH-shaped token (a
+# `/` in it, or a `.ext` end): an unrelated tag (`run@<hex>`) pins nothing, and a comma-joined
+# READ token holds several paths, each owing its own pin (round nine, I2).
 from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines as _dispatch_brief_lines
 from makoto.core._declaredverifiers import dispatch_opt_in
 
-_PINNED_READ_RX = _lazy_re(r"^\S+@[0-9a-fA-F]{12,}$")
+_PATH_SHAPE = r"(?:[\w.~-]*/[\w./~-]*|[\w~-][\w./~-]*\.[A-Za-z0-9]+)"
+_PIN = r"@[0-9a-fA-F]{12,}"
+_PATH_TOKEN_RX = _lazy_re(rf"{_PATH_SHAPE}(?:{_PIN})?")
+_PINNED_TOKEN_RX = _lazy_re(rf"{_PATH_SHAPE}{_PIN}")
+_READ_SPLIT_RX = _lazy_re(r"[,;\s]+")
 _SHA256SUM_CHECK_RX = _lazy_re(r"\bsha256sum\b[^\n]*(?:-[A-Za-z]*c\b|--check\b)")
-_PATH_AT_HASH_RX = _lazy_re(r"\S+@[0-9a-fA-F]{12,}\b")
+_PATH_AT_HASH_RX = _lazy_re(rf"(?<![\w./~-]){_PATH_SHAPE}{_PIN}\b")
 _LONG_TIMEOUT_MS = 120000
+
+
+def _unpinned_reads(value: str) -> tuple:
+    """Each path `value` (one READ line) names without its own pin; a non-empty line naming no
+    path at all owes itself (it pins nothing)."""
+    tokens = [t.strip("`'\"()[]<>") for t in _READ_SPLIT_RX.split(value)]
+    paths = [t for t in tokens if t and _PATH_TOKEN_RX.fullmatch(t)]
+    if not paths:
+        return (value,) if value else ()
+    return tuple(t for t in paths if not _PINNED_TOKEN_RX.fullmatch(t))
 
 
 def unpinned_owes(ev: dict):
@@ -1598,8 +1614,7 @@ def unpinned_owes(ev: dict):
         prompt = ti.get("prompt")
         if not isinstance(prompt, str):
             return ()
-        reads = _dispatch_brief_lines(prompt)["READ"]
-        return tuple(r for r in reads if r and not _PINNED_READ_RX.match(r))
+        return tuple(p for r in _dispatch_brief_lines(prompt)["READ"] for p in _unpinned_reads(r))
     if tool == "Bash":
         timeout = ti.get("timeout")
         if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or timeout <= _LONG_TIMEOUT_MS:
@@ -1675,6 +1690,17 @@ def _acceptance_owed(ev: dict, *, since_instant):
     return tuple(" ".join(a.split()) for a in _dispatch_brief_lines(prompt)["ACCEPTANCE"] if a)
 
 
+def _settled(ti: dict, response) -> bool:
+    """The run finished in front of makoto: it was not launched into the background, and the
+    host handed back no background task in place of its result (round nine I3: a launch reports
+    no exit and no error, so `_response_succeeded` alone read it as a pass). A command the host
+    backgrounded on timeout carries the same handle, so the handle is the fact read, whatever
+    put the run there."""
+    if ti.get("run_in_background"):
+        return False
+    return not (isinstance(response, dict) and response.get("backgroundTaskId"))
+
+
 def _acceptance_paid(ev: dict):
     if ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
         return None
@@ -1682,7 +1708,8 @@ def _acceptance_paid(ev: dict):
     command = ti.get("command") if isinstance(ti, dict) else None
     if not isinstance(command, str) or not command:
         return None
-    if not _response_succeeded(ev.get("tool_response")):
+    if not (_settled(ti, ev.get("tool_response"))
+            and _response_succeeded(ev.get("tool_response"))):
         return None
     paid_command = " ".join(command.split())
     return lambda owed: owed == paid_command
@@ -1705,8 +1732,9 @@ def unpaid_acceptance_gate(history, *, transcript_path=None) -> Optional[Finding
     for _ev, command in unwitnessed(reversed(events), owes=owes, pays=_acceptance_paid):
         return Finding(
             pattern_id="gate.unpaid_acceptance", file="", line=0, level="error",
-            message=(f"A dispatch's ACCEPTANCE command ({command!r}) is unpaid: done was claimed "
-                     "but no later run of that exact command exited 0."),
+            message=(f"row gate.unpaid_acceptance (a dispatch's ACCEPTANCE never settled "
+                     f"green): {command!r} is unpaid: done was claimed but no later run of that "
+                     "exact command finished and exited 0 (a background launch is not a run)."),
             retry_hint=("Run the dispatch's own ACCEPTANCE command and let it exit 0 before "
                         "claiming the work done, or retract the claim."),
         )

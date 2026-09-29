@@ -93,3 +93,31 @@ def test_the_check_can_fail(tmp_path):
     assert blocked is not None and silent is None, (
         "the gate must distinguish the two by the act stream alone; if both come back the same, "
         "it has become a text matcher")
+
+
+def test_the_wall_is_read_by_its_effect_not_its_spelling(tmp_path):
+    """Round nine G5: wordings outside the old five phrasings walked past it."""
+    tp = _transcript(tmp_path, ("go on then", _T0))
+    for text in ("I have no means of confirming whether the suite passes.",
+                 "Whether the suite passes is unknowable from here.",
+                 "That cannot be verified from this side.",
+                 "It is impossible to say whether it shipped.",
+                 "There's no telling if the deploy took."):
+        assert unexamined_wall_gate(text, history=[], transcript_path=tp) is not None, text
+
+
+def test_a_stated_limit_after_a_probe_is_silent_whatever_its_wording(tmp_path):
+    tp = _transcript(tmp_path, ("go on then", _T0))
+    for text in ("The variable is unset in this container, so I cannot verify the deploy; only "
+                 "you can set it.",
+                 "Whether the remote passes is unknowable from here: the host refused the "
+                 "connection."):
+        assert unexamined_wall_gate(text, history=[_call("Bash", _T1)], transcript_path=tp) is None
+
+
+def test_non_epistemic_cannots_are_not_walls(tmp_path):
+    tp = _transcript(tmp_path, ("do the thing", _T0))
+    for text in ("I can't check out that branch while the tree is dirty.",
+                 "There is no test for this path yet.",
+                 "That is unavailable on this plan."):
+        assert unexamined_wall_gate(text, history=[], transcript_path=tp) is None, text
