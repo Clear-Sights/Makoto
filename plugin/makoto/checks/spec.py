@@ -2069,6 +2069,7 @@ fp_CHECK = _Check(id="gate.canon_fingerprints", applies_at="Stop", posture="BLOC
 # discharge is in-turn -- say it is done (first-person past tense naming it) or retract it.
 # At most this many labels are named inline in the reminder; any remainder is counted, not named.
 _LABEL_CAP = 8
+drift_DESCRIPTION = "a plan/task-labeled promise still open at the stop"
 
 
 def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
@@ -2085,7 +2086,8 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
         line=0,
         level="error",
         message=(
-            f"plan/task-labeled commitment(s) still open: {labels}{more}. A textual-only signal "
+            f"row gate.plan_item_drift ({drift_DESCRIPTION}): plan/task-labeled commitment(s) "
+            f"still open: {labels}{more}. A textual-only signal "
             "(no filesystem ground truth for a label) -- confirm each is genuinely still pending, "
             "not silently dropped."
         ),
@@ -2094,6 +2096,7 @@ def plan_item_drift_gate(open_items: list) -> Optional[Finding]:
 
 
 drift_CHECK = _Check(id="gate.plan_item_drift", applies_at="Stop", posture="BLOCK",
+               description=drift_DESCRIPTION,
                tests="SPEC",
                eats=frozenset({"open_plan_items"}),
                run=lambda c: plan_item_drift_gate(getattr(c, "open_plan_items", None) or []))

@@ -897,11 +897,12 @@ canon_CHECK = _Check(id="gate.canon", applies_at="Stop", posture="BLOCK",
 # class would fail the SAME zero-FP admissibility bar the invariant demands. This predicate fires
 # ONLY on the confident-True side of that bar.
 #
-# "No intervening state change" is enforced structurally, not by scanning for one: only the
-# SINGLE MOST RECENT history row is consulted. If anything else happened between the failing call
-# and now (a different tool call, a file edit, another Bash command), THAT would be the most
-# recent row instead, and this predicate stays silent -- an intervening action always breaks the
-# match by construction.
+# "No intervening state change" is read off the record back from now: a settled call whose input
+# only NAMES a location (`_names_only`: a Read of a file) and whose Pre and Post sit adjacent (no
+# other event, such as a subagent's, recorded inside it) changes no state, so it is looked
+# through; anything else between the failing call and now -- an edit, another Bash command,
+# a stop, a prompt, a call with events inside it -- breaks the match (round nine E5: a Read between
+# the failure and the retry let the same act through).
 from makoto.kit import (bash_output_text, canon_input, classify_failure, decode_history_event,
                         failure_terminal_result, unwitnessed)
 from makoto.registry import Check
@@ -912,18 +913,25 @@ retry_SHAPE = "SWITCH"
 
 
 def retry_owes(ev):
-    """The about-to-run CURRENT Bash call owes a witness that it is not a byte-identical retry
-    of the immediately preceding call. `ev` is `("current", (prior_input, current_input))`; any
-    other kind owes nothing. Embeds the canon_input equality test itself (like `canon_gate`'s own
-    primitives), so a call whose input differs from the prior one never even raises the
-    obligation -- there is nothing to interdict."""
+    """The about-to-run CURRENT Bash call owes a witness that it is not a retry of the same act
+    as the prior call. `ev` is `("current", (prior_input, current_input))`; any other kind owes
+    nothing. The act is the command that runs (`_act`), so a call whose command differs never
+    even raises the obligation -- there is nothing to interdict."""
     kind, payload = ev
     if kind != "current":
         return ()
     prior_input, current_input = payload
-    if canon_input(prior_input) != canon_input(current_input):
+    if _act(prior_input) != _act(current_input):
         return ()
-    return (canon_input(current_input),)
+    return (_act(current_input),)
+
+
+def _act(tool_input) -> str:
+    """What a Bash call DOES: its command, stripped. The `description` field, and any other key
+    the harness or the agent writes beside it, labels the act without changing it (round nine
+    E5: a retry with a reworded description is the same retry)."""
+    ti = tool_input if isinstance(tool_input, dict) else {}
+    return canon_input(str(ti.get("command", "")).strip())
 
 
 def retry_pays(ev):
@@ -940,21 +948,61 @@ def retry_pays(ev):
     return None
 
 
+def _names_only(tool_input) -> bool:
+    """True iff every value of the input is a number, a flag or one path-shaped token: the call
+    names where to look and carries nothing to put there. An empty `content` carries something
+    (it empties a file); a pattern or a prompt carries something too, and so breaks the match."""
+    if not isinstance(tool_input, dict) or not tool_input:
+        return False
+    return all(isinstance(v, (int, float, bool)) or (
+        isinstance(v, str) and v and not any(c.isspace() for c in v) and ("/" in v or "." in v))
+        for v in tool_input.values())
+
+
+def _stateless(evs: list, i: int) -> int:
+    """If `evs[i]` is a settled call that changed no state, the index of its own Pre (or of it
+    when no Pre was recorded) -- else -1. See the module comment above for the rule."""
+    ev = evs[i]
+    if ev is None or ev.get("hook_event_name") not in ("PostToolUse", "PostToolUseFailure"):
+        return -1
+    # A reading names a location and answers with what it found; an input of names alone with
+    # an empty answer (a bare `{"file_path": ...}` Write) is not known to be one.
+    if ev.get("tool_name") in ("", None, "Bash") or not _names_only(ev.get("tool_input")) \
+            or not ev.get("tool_response"):
+        return -1
+    prev = evs[i - 1] if i else None
+    if prev is not None and prev.get("hook_event_name") == "PreToolUse":
+        same = (prev.get("tool_name") == ev.get("tool_name")
+                and canon_input(prev.get("tool_input") or {}) == canon_input(ev.get("tool_input") or {}))
+        return i - 1 if same else -1
+    return i
+
+
 def _most_recent_completed_bash_call(history) -> Optional[tuple]:
-    """(tool_input, result_text) of the SINGLE MOST RECENT history row, iff that row is a
-    settled PostToolUse/PostToolUseFailure Bash call -- else None (a different tool, a Pre row,
-    or nothing at all). Failed terminals classify their real top-level error text.
+    """(tool_input, result_text) of the most recent settled PostToolUse/PostToolUseFailure Bash
+    call with nothing that changes state recorded after it (`_stateless`), else None. A trailing
+    Pre with no Post (a call denied or still open) is not an act. Failed terminals classify
+    their real top-level error text.
 
     Decoding is `kit.decode_history_event` -- the canonical row-decode-plus-wrapper-fallback
     step, shared with `_canonAtoms._decode_row`. Sharing it is what keeps this predicate
     and its sibling gate (canon.timeout/canon.recur) reading the SAME rows from the same table
     for the same concept -- including rows whose event type lives only on the WRAPPER column."""
-    rows = list(history or ())
-    if not rows:
+    evs = [decode_history_event(r) for r in (history or ())]
+    i = len(evs) - 1
+    while i >= 0:
+        ev = evs[i]
+        if ev is not None and ev.get("hook_event_name") == "PreToolUse" and i == len(evs) - 1:
+            i -= 1
+            continue
+        if ev is not None and ev.get("tool_name") == "Bash":
+            break
+        i = _stateless(evs, i) - 1
+        if i < -1:
+            return None
+    if i < 0:
         return None
-    ev = decode_history_event(rows[-1])
-    if ev is None or ev.get("tool_name") != "Bash":
-        return None
+    ev = evs[i]
     event_type = ev.get("hook_event_name")
     # INCLUDE failed terminals: this check reasons about the immediately prior failed attempt.
     if event_type not in ("PostToolUse", "PostToolUseFailure"):
@@ -994,15 +1042,16 @@ def retry_predicate(*, current_event: dict, history: list, pattern: Check,
             file="",
             line=0,
             level="error",  # Pre-tier is invariantly BLOCK; Check has no fire_level (test_pre_tier_block_invariant.py)
-            message=("Identical retry of a Bash call that just failed deterministically -- retrying "
-                     "the byte-identical command cannot change a deterministic error."),
+            message=(f"row {pattern.id} ({retry_DESCRIPTION}): the command that just failed "
+                     "deterministically is run again unchanged -- the same act cannot change a "
+                     "deterministic error."),
             retry_hint=pattern.retry_hint,
         )
     return None
 
 
-retry_RETRY_HINT = 'You retried the byte-identical failing Bash command with no intervening change, and the prior failure was deterministic (a syntax/import/permission/not-found error) -- retrying it unmodified cannot make progress. Change the command, fix the underlying cause, or take a different action.'
-retry_DESCRIPTION = "byte-identical Bash retry immediately following that SAME call's deterministic failure -- no intervening state change"
+retry_RETRY_HINT = 'You ran the same Bash command again with no state change since it failed, and the failure was deterministic (a raised exception, or a path, permission or command that does not resolve) -- rerunning it unchanged cannot make progress. Change the command, fix the underlying cause, or take a different action.'
+retry_DESCRIPTION = "the same Bash command retried after its deterministic failure, with no state change between"
 
 retry_CHECK = Check(id="event.identical_retry", applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Bash',), retry_hint=retry_RETRY_HINT, description=retry_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="SWITCH")
 
