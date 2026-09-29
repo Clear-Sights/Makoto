@@ -42,3 +42,10 @@ def test_a_ref_read_out_of_a_file_owes_the_file():
 def test_the_speakers_own_start_binds_a_running_claim():
     assert _OWN_START_RX.search("I restarted the payment service; it's fully operational now.")
     assert not _OWN_START_RX.search("I started reviewing the docs; the site is live.")
+
+
+def test_a_relayed_count_is_not_an_own_count():
+    from makoto.checks.switch import unrun_count_claim_gate
+    assert unrun_count_claim_gate(
+        "All 165 cases passed, going by the thread's report, which I haven't checked myself.", []) is None
+    assert unrun_count_claim_gate("All 165 cases passed, and the thread's report agrees.", [])

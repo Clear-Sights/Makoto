@@ -2363,8 +2363,25 @@ unverified_merge_CHECK = _Check(id="gate.unverified_merge", applies_at="Pre", po
 # twin of gate.report_before_run: a count is a measurement, and nothing was measured. Owed at the
 # Stop marker, paid only by an earlier verifier run (`kit.ran_a_verifier`, either verdict).
 # Discharge: run the verifier, then report what it printed.
+# A count another session measured, attributed to it in the same sentence, is a relay, not the
+# writer's own measurement: measured 2026-09-29 04:27Z, a coordinator with no Bash relayed "All 165
+# cases passed, going by the thread's report, which I haven't checked myself" and was blocked. A
+# report that merely agrees ("and the thread's report agrees") attributes nothing and still owes.
+_RELAYED_COUNT_RX = _lazy_re(
+    r"\bgoing\s+by\b|\baccording\s+to\b|\breported\s+by\b|\breports?\s+that\b"
+    r"|\b(?:thread|session|worker|agent|coordinator|ci|run)\s+reports\b"
+    r"|\bi\s+(?:have\s+not|haven['\u2019]?t|did\s+not|didn['\u2019]?t)\s+(?:checked|verified|run|re-?run)\b",
+    re.IGNORECASE)
+
+
+def _own_count(text: str, m) -> bool:
+    a = max(text.rfind(".", 0, m.start()), text.rfind("\n", 0, m.start())) + 1
+    ends = [i for i in (text.find(".", m.end()), text.find("\n", m.end())) if i >= 0]
+    return not _RELAYED_COUNT_RX.search(text[a:min(ends) if ends else len(text)])
+
+
 def unrun_count_claim_gate(text: str, history) -> Optional[Finding]:
-    m = _COUNTED_PASS_RX.search(text or "")
+    m = claim(text or "", _COUNTED_PASS_RX, keep=lambda m: _own_count(text, m))
     if not m:
         return None
     events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
