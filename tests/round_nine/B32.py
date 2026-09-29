@@ -5,8 +5,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from _catalog import case, row_module  # noqa: E402
 
-UNROUTE = ("python3 -c \"import pathlib; p = pathlib.Path('plugin/makoto/checks/spec.py'); "
-           "p.write_text(p.read_text().replace('rule_runner_CHECK.id: rule_runner_predicate, ', '', 1))\"")
+def UNROUTE(cwd):
+    p = cwd / "plugin" / "makoto" / "checks" / "spec.py"
+    p.write_text(p.read_text().replace("rule_runner_CHECK.id: rule_runner_predicate, ", "", 1))
+
 
 CASES = [
     case("base", {"stray.py": "VALUE = 1\n"}),
