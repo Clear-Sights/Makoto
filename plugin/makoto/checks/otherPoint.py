@@ -1575,16 +1575,32 @@ thrash_DESCRIPTION = 'whole-file A->B->A self-revert (no net progress)'
 from makoto.registry import Check
 thrash_CHECK = Check(id='event.thrash_revert', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('Write', 'Edit'), retry_hint=thrash_RETRY_HINT, description=thrash_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}), tests="OTHER_POINT")
 
-# event.unpinned_input -- refuses a dispatch whose READ paths carry no @<12+ hex> content hash,
-# and a Bash call with timeout > 120000 ms unless it verifies pins (sha256sum -c) or names
-# path@hash.
+# event.unpinned_input -- refuses a dispatch whose READ line names a path that carries no
+# @<12+ hex> content hash of its own, and a Bash call with timeout > 120000 ms unless it verifies
+# pins (sha256sum -c) or names path@hash. A pin is `@<hex>` attached to a PATH-shaped token (a
+# `/` in it, or a `.ext` end): an unrelated tag (`run@<hex>`) pins nothing, and a comma-joined
+# READ token holds several paths, each owing its own pin (round nine, I2).
 from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines as _dispatch_brief_lines
 from makoto.core._declaredverifiers import dispatch_opt_in
 
-_PINNED_READ_RX = _lazy_re(r"^\S+@[0-9a-fA-F]{12,}$")
+_PATH_SHAPE = r"(?:[\w.~-]*/[\w./~-]*|[\w~-][\w./~-]*\.[A-Za-z0-9]+)"
+_PIN = r"@[0-9a-fA-F]{12,}"
+_PATH_TOKEN_RX = _lazy_re(rf"{_PATH_SHAPE}(?:{_PIN})?")
+_PINNED_TOKEN_RX = _lazy_re(rf"{_PATH_SHAPE}{_PIN}")
+_READ_SPLIT_RX = _lazy_re(r"[,;\s]+")
 _SHA256SUM_CHECK_RX = _lazy_re(r"\bsha256sum\b[^\n]*(?:-[A-Za-z]*c\b|--check\b)")
-_PATH_AT_HASH_RX = _lazy_re(r"\S+@[0-9a-fA-F]{12,}\b")
+_PATH_AT_HASH_RX = _lazy_re(rf"(?<![\w./~-]){_PATH_SHAPE}{_PIN}\b")
 _LONG_TIMEOUT_MS = 120000
+
+
+def _unpinned_reads(value: str) -> tuple:
+    """Each path `value` (one READ line) names without its own pin; a non-empty line naming no
+    path at all owes itself (it pins nothing)."""
+    tokens = [t.strip("`'\"()[]<>") for t in _READ_SPLIT_RX.split(value)]
+    paths = [t for t in tokens if t and _PATH_TOKEN_RX.fullmatch(t)]
+    if not paths:
+        return (value,) if value else ()
+    return tuple(t for t in paths if not _PINNED_TOKEN_RX.fullmatch(t))
 
 
 def unpinned_owes(ev: dict):
@@ -1598,8 +1614,7 @@ def unpinned_owes(ev: dict):
         prompt = ti.get("prompt")
         if not isinstance(prompt, str):
             return ()
-        reads = _dispatch_brief_lines(prompt)["READ"]
-        return tuple(r for r in reads if r and not _PINNED_READ_RX.match(r))
+        return tuple(p for r in _dispatch_brief_lines(prompt)["READ"] for p in _unpinned_reads(r))
     if tool == "Bash":
         timeout = ti.get("timeout")
         if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or timeout <= _LONG_TIMEOUT_MS:

@@ -1364,23 +1364,42 @@ unclaimed_CHECK = _Check(id="gate.unclaimed_unit", applies_at="Stop", posture="B
                                                  transcript_path=c.transcript_path))
 
 
-# event.unbriefed_dispatch -- refuses an Agent/Task dispatch whose prompt lacks a READ:, WRITE:
-# and ACCEPTANCE: line.
+# event.unbriefed_dispatch -- refuses a prompt/message handed to a worker whose brief lacks a
+# filled READ:, WRITE: and ACCEPTANCE: line. The worker channel is read here, not by tool name
+# alone: an Agent/Task prompt, or a message a *send_message / SendMessage tool addresses to a
+# named session (session_id / to / recipient). A label counts only when it carries a value:
+# `READ:` with nothing after it tells the worker nothing (round nine, I1).
 from makoto.kit import DISPATCH_TOOL_NAMES, dispatch_brief_lines, unwitnessed
 from makoto.core._declaredverifiers import dispatch_opt_in
 
+_SESSION_TARGET_KEYS = ("session_id", "to", "recipient")
+
+
+def _worker_text(ev: dict):
+    ti = ev.get("tool_input")
+    if not isinstance(ti, dict):
+        return None
+    name = ev.get("tool_name") or ""
+    if name in DISPATCH_TOOL_NAMES:
+        text = ti.get("prompt")
+    elif (name.replace("_", "").lower().endswith("sendmessage")
+          and any(isinstance(ti.get(k), str) and ti.get(k) for k in _SESSION_TARGET_KEYS)):
+        text = ti.get("message", ti.get("prompt"))
+    else:
+        return None
+    return text if isinstance(text, str) else None
+
 
 def unbriefed_owes(ev: dict):
-    if ev.get("hook_event_name") != "PreToolUse" or ev.get("tool_name") not in DISPATCH_TOOL_NAMES:
+    if ev.get("hook_event_name") != "PreToolUse":
         return ()
-    ti = ev.get("tool_input")
-    prompt = ti.get("prompt") if isinstance(ti, dict) else None
-    return (prompt,) if isinstance(prompt, str) else ()
+    text = _worker_text(ev)
+    return (text,) if text is not None else ()
 
 
 def _briefed(prompt: str) -> bool:
     lines = dispatch_brief_lines(prompt)
-    return bool(lines["READ"] and lines["WRITE"] and lines["ACCEPTANCE"])
+    return all(any(lines[label]) for label in ("READ", "WRITE", "ACCEPTANCE"))
 
 
 def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
@@ -1390,7 +1409,7 @@ def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=Non
         return Finding(
             pattern_id=pattern.id, file="", line=0, level="error",
             message=(f"row {pattern.id} ({pattern.description}): dispatch prompt carries no "
-                     "READ:, WRITE: and ACCEPTANCE: line -- a worker sent without what it "
+                     "filled READ:, WRITE: and ACCEPTANCE: line -- a worker sent without what it "
                      "reads, may write, and what pays it."),
             retry_hint=pattern.retry_hint,
             snippet=prompt[:200],
@@ -1401,11 +1420,11 @@ def unbriefed_predicate(*, current_event: dict, history: list, pattern, conn=Non
 unbriefed_RETRY_HINT = ('Give the dispatch a brief with a line-start `READ:`, `WRITE:` and '
                         '`ACCEPTANCE:` (the paths it reads, the paths it may write, and the '
                         'command that pays the work) before sending it.')
-unbriefed_DESCRIPTION = ('dispatch prompt lacks a READ:, WRITE: and ACCEPTANCE: line '
+unbriefed_DESCRIPTION = ('dispatch prompt lacks a filled READ:, WRITE: and ACCEPTANCE: line '
                          '(opt-in: makoto.toml `dispatch = true`)')
 
 unbriefed_CHECK = Check(id='event.unbriefed_dispatch', applies_at="Pre", posture="BLOCK",
-              predicate_module=__name__, keywords=('Agent', 'Task'),
+              predicate_module=__name__, keywords=('Agent', 'Task', 'send_message', 'SendMessage'),
               retry_hint=unbriefed_RETRY_HINT, description=unbriefed_DESCRIPTION,
               eats=frozenset({"current_event", "pattern"}), tests="LINEAGE")
 

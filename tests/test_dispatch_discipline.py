@@ -88,6 +88,27 @@ def test_unpinned_silent_on_the_pinned_read_path(tmp_path):
                               history=[], pattern=unpinned_CHECK) is None
 
 
+def test_unpinned_silent_when_every_comma_joined_path_is_pinned(tmp_path):
+    _opt_in(tmp_path)
+    prompt = FULL_PROMPT.replace("READ: plugin/makoto/kit.py@3f2a9c1e0b7d",
+                                 "READ: vocab.py@aa11bb22cc33,plugin/makoto/kit.py@3f2a9c1e0b7d")
+    assert unpinned_predicate(current_event=_agent_event(tmp_path, prompt),
+                              history=[], pattern=unpinned_CHECK) is None
+
+
+def test_unpinned_silent_on_a_long_bash_naming_path_at_hash(tmp_path):
+    _opt_in(tmp_path)
+    ev = _bash_event(tmp_path, "python3 train.py data/set.csv@3f2a9c1e0b7d", 600000)
+    assert unpinned_predicate(current_event=ev, history=[], pattern=unpinned_CHECK) is None
+
+
+def test_unbriefed_silent_on_a_briefed_message_to_a_named_session(tmp_path):
+    _opt_in(tmp_path)
+    ev = {"hook_event_name": "PreToolUse", "tool_name": "SendMessage", "cwd": str(tmp_path),
+          "tool_input": {"to": "a53b7e5ffc9faedc3", "message": FULL_PROMPT}}
+    assert unbriefed_predicate(current_event=ev, history=[], pattern=unbriefed_CHECK) is None
+
+
 # ---- gate.unpaid_acceptance (I3, OTHER_POINT, through kit.unwitnessed) --------------------------
 
 def _transcript(tmp_path, ts="2026-01-01T00:00:05.000000Z"):
