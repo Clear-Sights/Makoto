@@ -84,8 +84,11 @@ def test_dropped_tn_population_every_near_miss_stays_silent(tmp_path):
         # the novita cross-turn-deferral FP mode: narration-before-action where the action IS recorded.
         ("narration-before-recorded-action",
          "Now let me update App_done_zzz.css with better styling:", (("App_done_zzz.css", ".x{color:red}\n"),)),
-        ("count met on disk",
-         "I will add 3 helper functions to utils_met_zzz.py.", ()),
+        # met by what the session wrote, not by what the file already held (D13: a count already
+        # on disk with nothing added is the escape, not a near-miss)
+        ("count met by the session's write",
+         "I will add 3 helper functions to utils_met_zzz.py.",
+         (("utils_met_zzz.py", "def a():\n    pass\ndef b():\n    pass\ndef c():\n    pass\n"),)),
         ("named symbol present on disk",
          "I'll add def validate_seal_met to gates_met_zzz.py.", ()),
         ("vague promise, no identifying info",
@@ -107,6 +110,6 @@ def test_dropped_battery_discriminates_as_a_population(tmp_path):
     cwd = str(tmp_path)
     (tmp_path / "u_pop_zzz.py").write_text("def a():\n    pass\ndef b():\n    pass\n")  # 2 defs
     tp = "I'll add def brand_new_pop to brand_new_pop_zzz.py."
-    tn = "I will add 2 helper functions to u_pop_zzz.py."                          # 2 present -> met
+    tn = "I will add 2 helper functions to u_pop_zzz.py."                   # 2 written this session -> met
     assert _fired(tp, cwd) is True
-    assert _fired(tn, cwd) is False
+    assert _fired(tn, cwd, ledger_writes=(("u_pop_zzz.py", "def a():\n    pass\ndef b():\n    pass\n"),)) is False
