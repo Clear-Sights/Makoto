@@ -1003,6 +1003,13 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
     the harness's own live-loaded hook table."""
     if fs_read is None:
         return None
+    # Read first (the project file is read last). `disableAllHooks` stops every hook from every source, makoto's included: whatever the
+    # hooks tables say, nothing is wired. The most specific settings file that sets it wins.
+    try:
+        raw_local = fs_read(".claude/settings.local.json")
+        local_data = json.loads(raw_local) if raw_local else None
+    except Exception:
+        local_data = None
     try:
         raw = fs_read(".claude/settings.json")
     except Exception:
@@ -1031,6 +1038,7 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
                     else _default_plugin_fs_read)(home_path)
     except Exception:
         raw_home = None
+    home_data = None
     if raw_home:
         try:
             home_data = json.loads(raw_home)
@@ -1058,9 +1066,17 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
         # way -- fail-open on total absence, never a Finding resting on an unconsulted oracle.
         return None
     events = _PLUGIN_MANIFEST_EVENTS if env_root else _MAKOTO_EVENTS
-    missing = _missing_makoto_events(project_hooks, plugin_root=root,
-                                     plugin_fs_read=plugin_fs_read,
-                                     home_hooks=home_hooks, events=events)
+    disabled_by = next((name for name, d in ((".claude/settings.local.json", local_data),
+                                             (".claude/settings.json", data if raw else None),
+                                             ("~/.claude/settings.json", home_data))
+                        if isinstance(d, dict) and "disableAllHooks" in d), None)
+    disabled = disabled_by is not None and {".claude/settings.local.json": local_data,
+                                            ".claude/settings.json": data if raw else None,
+                                            "~/.claude/settings.json": home_data
+                                            }[disabled_by].get("disableAllHooks") is True
+    missing = list(events) if disabled else _missing_makoto_events(
+        project_hooks, plugin_root=root, plugin_fs_read=plugin_fs_read,
+        home_hooks=home_hooks, events=events)
     if not missing:
         return None
     named = ", ".join(missing)
@@ -1083,8 +1099,11 @@ def self_wired_gate(fs_read, *, plugin_root=None, plugin_fs_read=None,
         file=finding_file,
         line=0,
         level="error",
-        message=(f"makoto's hook wiring is missing an entry for: {named} in every consultable "
-                 f"wiring source ({'; '.join(consulted)}). "
+        message=(f"row gate.self_wired (hook wiring): makoto does not run on: {named} -- "
+                 + (f"disableAllHooks is true in {disabled_by}, so no hook runs. " if disabled
+                    else f"no entry in any consultable wiring source ({'; '.join(consulted)}) "
+                    "reaches every tool and executes makoto. ")
+                 + 
                  "This is a PARTIAL-STRIP signal only — it cannot see a simultaneous strip of "
                  "all events from every source at once (see gate.self_wired's docstring)."),
         retry_hint=("Restore the missing hook entry — `makoto install` re-wires "
