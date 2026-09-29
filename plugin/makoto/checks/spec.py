@@ -2578,10 +2578,57 @@ repeated_append_CHECK = _Check(id="event.repeated_append", applies_at="Pre", pos
                description=repeated_append_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
                tests="SPEC")
 
-# content.fallthrough_match -- a `match` statement introduced with no wildcard `case _:` that
-# raises. Register C5 FALLTHROUGH (+B16 E2): no branch for the shape that arrived, so a foreign
-# shape falls out of the dispatch silently. The witness is the introduced source itself (its AST).
-# Discharge: end the dispatch in `case _: raise ...`.
+# content.fallthrough_match -- register C5 FALLTHROUGH (+B16 E2). THE EFFECT: a dispatch whose
+# unrecognised shape leaves it silently -- no branch raises for the shape that arrived. A dispatch
+# is a `match`, or an `if`/`elif` chain testing one subject (`==`, `is`, `in`, `isinstance`). Its
+# default is the wildcard `case _:` / final `else:`, or, with none, the code the fallthrough
+# reaches next in the same block. The default must RAISE on every path: a raise caught inside that
+# same branch (`try: raise ... except: return None`) is a silent fallthrough. The witness is the
+# introduced source itself (its AST). Discharge: end the dispatch in `case _: raise ...`.
+def _always_raises(body) -> bool:
+    for st in body:
+        if isinstance(st, ast.Raise):
+            return True
+        if isinstance(st, (ast.Return, ast.Continue, ast.Break)):
+            return False
+        if isinstance(st, ast.If) and _always_raises(st.body) and _always_raises(st.orelse):
+            return True
+        if isinstance(st, (ast.With, ast.AsyncWith)) and _always_raises(st.body):
+            return True
+        if isinstance(st, ast.Try):
+            if _always_raises(st.finalbody):
+                return True
+            if _always_raises(st.body) and not st.handlers or \
+                    (st.handlers and all(_always_raises(h.body) for h in st.handlers)
+                     and (_always_raises(st.body) or _always_raises(st.orelse))):
+                return True
+    return False
+
+
+def _dispatch_subject(test):
+    if isinstance(test, ast.Compare) and len(test.ops) == 1 and \
+            isinstance(test.ops[0], (ast.Eq, ast.Is, ast.In)):
+        return ast.dump(test.left)
+    if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "isinstance" \
+            and test.args:
+        return ast.dump(test.args[0])
+    return None
+
+
+def _if_chain_default(node):
+    """An if/elif chain of >= 2 tests on one subject -> (True, its final else body); else (False, None)."""
+    subjects, cur = [], node
+    while True:
+        subjects.append(_dispatch_subject(cur.test))
+        if len(cur.orelse) == 1 and isinstance(cur.orelse[0], ast.If):
+            cur = cur.orelse[0]
+            continue
+        break
+    if len(subjects) < 2 or subjects[0] is None or len(set(subjects)) != 1:
+        return False, None
+    return True, cur.orelse
+
+
 def _unguarded_match(src: str) -> Optional[int]:
     import textwrap as _tw
     for text in (src, _tw.dedent(src)):
@@ -2592,13 +2639,32 @@ def _unguarded_match(src: str) -> Optional[int]:
             continue
     else:
         return None
+    elifs = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Match) and node.cases:
-            last = node.cases[-1]
-            wild = (isinstance(last.pattern, ast.MatchAs) and last.pattern.pattern is None
-                    and last.guard is None)
-            if not (wild and any(isinstance(n, ast.Raise) for b in last.body for n in ast.walk(b))):
-                return node.lineno
+        if isinstance(node, ast.If) and len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
+            elifs.add(id(node.orelse[0]))
+    for parent in ast.walk(tree):
+        for field in ("body", "orelse", "finalbody"):
+            block = getattr(parent, field, None)
+            if not isinstance(block, list):
+                continue
+            for i, node in enumerate(block):
+                default = None
+                if isinstance(node, ast.Match) and node.cases:
+                    last = node.cases[-1]
+                    wild = (isinstance(last.pattern, ast.MatchAs) and last.pattern.pattern is None
+                            and last.guard is None)
+                    default = last.body if wild else []
+                elif isinstance(node, ast.If) and id(node) not in elifs:
+                    is_chain, default = _if_chain_default(node)
+                    if not is_chain:
+                        continue
+                else:
+                    continue
+                if not default:
+                    default = block[i + 1:]
+                if not _always_raises(default):
+                    return node.lineno
     return None
 
 
@@ -2616,16 +2682,16 @@ def fallthrough_predicate(*, current_event: dict, history: list, pattern, conn=N
     if line is None:
         return None
     return Finding(pattern_id=pattern.id, file=fp, line=line, level="error",
-                   message=(f"row {pattern.id} ({pattern.description}): the `match` at line {line} of "
-                            "the introduced text has no `case _:` that raises, so an unrecognised shape "
-                            "falls through silently"),
+                   message=(f"row {pattern.id} ({pattern.description}): the dispatch at line {line} of "
+                            "the introduced text has no default branch that raises, so an unrecognised "
+                            "shape falls through silently"),
                    retry_hint=pattern.retry_hint, snippet=fp[:120])
 
 
 fallthrough_RETRY_HINT = "Every dispatch ends in an error: add `case _: raise ValueError(...)` as the last case."
-fallthrough_DESCRIPTION = "a match statement introduced with no raising wildcard case"
+fallthrough_DESCRIPTION = "a dispatch (match or if/elif) introduced with no default branch that raises"
 fallthrough_CHECK = _Check(id="content.fallthrough_match", applies_at="Pre", posture="BLOCK",
-               predicate_module=__name__, keywords=("match",), retry_hint=fallthrough_RETRY_HINT,
+               predicate_module=__name__, keywords=("match", "elif"), retry_hint=fallthrough_RETRY_HINT,
                description=fallthrough_DESCRIPTION, eats=frozenset({"current_event", "pattern"}),
                tests="SPEC")
 
@@ -2834,75 +2900,216 @@ check_pass_case_CHECK = _Check(id="content.check_without_pass_case", applies_at=
 
 
 # content.overdetermined_case -- register B21 OVERDETERMINED VERDICT, merge_pass's discriminant
-# rule moved to tests. A change adding two or more verdict cases (test functions named for a fire:
-# fires / blocks / denies / catches / flags / detects) must give each its own `discriminant:` --
-# what only its condition sees -- and no two may share one. Discharge: isolate each condition with
-# its own input and write down what separates it.
+# rule moved to tests. THE EFFECT: two cases added whose inputs differ and whose asserted verdict is
+# the same, so the verdict cannot say which condition gave it. A case is any test function (`def`
+# or `async def test_*`, whatever verb its name uses); its verdict is its assertions with the
+# literals fed to calls blanked (`assert f(1)` and `assert f(2)` share one; `is True` and
+# `is False` do not), its input is the rest of its body.
+# Each case in such a pair must give its own `discriminant:` -- what only its condition sees -- and
+# no two may share one. Discharge: isolate each condition with its own input and write down what
+# separates it.
 _TEST_FILE_RX = _lazy_re(r"(^|[/\\])(test_[^/\\]*|[^/\\]*_test)\.py$")
-_VERDICT_TEST_RX = _lazy_re(r"^\s*def\s+(test_\w*(?:fire|block|den(?:y|ies)|catch|flag|detect)\w*)\s*\(", re.I)
+_VERDICT_TEST_RX = _lazy_re(r"^\s*(?:async\s+)?def\s+(test_\w*)\s*\(")
 _DISCRIMINANT_RX = _lazy_re(r"\bdiscriminant:\s*(.+?)\s*(?:[\"']{3}|$)")
+
+
+class _BlankLiterals(ast.NodeTransformer):
+    """Blank the literals a call is fed (its input); the literal it is compared to (`is False`,
+    `== 3`) is the verdict and stays."""
+    def visit_Call(self, node):
+        node.func = self.visit(node.func)
+        node.args = [_BlankAll().visit(a) for a in node.args]
+        node.keywords = [_BlankAll().visit(k) for k in node.keywords]
+        return node
+
+
+class _BlankAll(ast.NodeTransformer):
+    def visit_Constant(self, node):
+        return ast.copy_location(ast.Constant(value=None), node)
+
+
+def _verdict_and_input(fn) -> tuple:
+    """(the case's asserted verdict with literals blanked, its whole body) as AST dumps."""
+    import copy as _copy
+    body = list(fn.body)
+    if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], "value", None), ast.Constant):
+        body = body[1:]
+    verdict = []
+    for st in body:
+        for n in ast.walk(st):
+            if isinstance(n, ast.Assert) or (isinstance(n, (ast.With, ast.AsyncWith)) and any(
+                    "raises" in ast.dump(i.context_expr) for i in n.items)):
+                shown = n if isinstance(n, ast.Assert) else [i.context_expr for i in n.items]
+                verdict.append(ast.dump(_BlankLiterals().visit(_copy.deepcopy(
+                    shown if isinstance(shown, ast.AST) else ast.Tuple(elts=shown, ctx=ast.Load())))))
+    return tuple(verdict), ast.dump(ast.Module(body=body, type_ignores=[]))
 
 
 def overdetermined_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     fp, added = _added_lines(current_event)
     if not _TEST_FILE_RX.search(fp):
         return None
-    cases, cur = [], None
+    disc, cur = {}, None
     for ln in added:
         m = _VERDICT_TEST_RX.match(ln)
         if m:
-            cur = [m.group(1), None]
-            cases.append(cur)
-        elif re.match(r"^\s*def\s", ln):
+            cur = m.group(1)
+            disc[cur] = None
+        elif re.match(r"^\s*(?:async\s+)?def\s", ln):
             cur = None
-        elif cur is not None and cur[1] is None:
+        elif cur is not None and disc[cur] is None:
             d = _DISCRIMINANT_RX.search(ln)
             if d:
-                cur[1] = " ".join(d.group(1).lower().split())
-    if len(cases) < 2:
+                disc[cur] = " ".join(d.group(1).lower().split())
+    if len(disc) < 2:
         return None
-    bare = [n for n, d in cases if not d]
-    if bare:
-        return _deny(pattern, fp, f"{len(cases)} verdict cases added and {bare[0]} names no discriminant", bare[0])
-    seen = {}
-    for n, d in cases:
-        if d in seen:
-            return _deny(pattern, fp, f"{seen[d]} and {n} are separated by the same discriminant ({d})", n)
-        seen[d] = n
+    import textwrap as _tw
+    tree = None
+    for text in (introduced_text(current_event.get("tool_name", ""), current_event.get("tool_input") or {}),
+                 "\n".join(added)):
+        for t in (text, _tw.dedent(text)):
+            try:
+                tree = ast.parse(t)
+                break
+            except (SyntaxError, ValueError):
+                continue
+        if tree is not None:
+            break
+    if tree is None:
+        return None
+    groups = {}
+    for fn in ast.walk(tree):
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and fn.name in disc:
+            verdict, inp = _verdict_and_input(fn)
+            if verdict:
+                groups.setdefault(verdict, {})[fn.name] = inp
+    for members in groups.values():
+        if len(set(members.values())) < 2:
+            continue
+        names = list(members)
+        bare = [n for n in names if not disc[n]]
+        if bare:
+            return _deny(pattern, fp, f"{len(names)} cases assert the same verdict on different inputs and "
+                         f"{bare[0]} names no discriminant", bare[0])
+        seen = {}
+        for n in names:
+            if disc[n] in seen:
+                return _deny(pattern, fp, f"{seen[disc[n]]} and {n} are separated by the same discriminant "
+                             f"({disc[n]})", n)
+            seen[disc[n]] = n
     return None
 
 
 overdetermined_RETRY_HINT = "Isolate each condition with its own input: give each verdict case a distinct `discriminant: <what only it sees>`."
-overdetermined_DESCRIPTION = "two or more verdict cases added without one distinct discriminant each"
+overdetermined_DESCRIPTION = "two cases added asserting the same verdict on different inputs without one distinct discriminant each"
 overdetermined_CHECK = _Check(id="content.overdetermined_case", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__, keywords=("def test_",), retry_hint=overdetermined_RETRY_HINT,
                description=overdetermined_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-# content.exemption_unnamed_region -- register B34 LAW EXEMPTS ITS INSTRUMENT. An exclusion /
-# skip / exempt / ignore / allow list added to a checker file must name the region it leaves
-# unreached (`region: ...`, `unreached: ...`, or NOT-COUNTABLE, as REGISTER-MAP does). Discharge:
-# say, in the change, what the checker no longer reaches.
-_EXEMPTION_RX = _lazy_re(r"^\s*\w*(?:exempt|exclu|skip|ignor|allow)\w*\s*(?::[^=]*)?=\s*[\[({]", re.I)
+# content.exemption_unnamed_region -- register B34 LAW EXEMPTS ITS INSTRUMENT. THE EFFECT: a
+# checker file gains a collection (a literal, or one wrapped in a constructor: `frozenset({...})`)
+# that takes work away from the checker -- read from the file itself, whatever the collection is
+# named: membership in it (or any test reading it) guards a `continue` / `return` / `pass` /
+# `break` or a skip call, it filters a comprehension, or it is passed as an exclude / ignore /
+# skip argument. A collection whose own name declares an exemption (exempt / exclude / skip /
+# ignore / allow) is one before any use is written. It must name the region it leaves unreached
+# (`region: ...`, `unreached: ...`, or NOT-COUNTABLE, as REGISTER-MAP does). A collection that is
+# only iterated leaves nothing unreached and is silent. Discharge: say, in the change, what the
+# checker no longer reaches.
+_EXEMPT_NAME_RX = _lazy_re(r"exempt|exclu|skip|ignor|allow", re.I)
+_EXEMPT_ARG_RX = _lazy_re(r"exclu|ignor|skip|exempt", re.I)
 _REGION_RX = _lazy_re(r"\b(?:region|unreached):\s*\S|NOT-COUNTABLE|OUT-OF-SUBJECT")
+
+
+def _collection_value(v) -> bool:
+    while isinstance(v, ast.Call) and len(v.args) == 1 and not v.keywords:
+        v = v.args[0]
+    return isinstance(v, (ast.List, ast.Set, ast.Tuple, ast.Dict))
+
+
+def _reads(node, name) -> bool:
+    return any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(node))
+
+
+def _skips(body) -> bool:
+    if not body:
+        return False
+    st = body[0]
+    if isinstance(st, (ast.Continue, ast.Return, ast.Pass, ast.Break)):
+        return True
+    return isinstance(st, ast.Expr) and isinstance(st.value, ast.Call) \
+        and _EXEMPT_ARG_RX.search(ast.dump(st.value.func)) is not None
+
+
+def _takes_work_away(tree, name) -> bool:
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.If, ast.While)) and _reads(n.test, name) and _skips(n.body):
+            return True
+        if isinstance(n, ast.comprehension) and any(_reads(c, name) for c in n.ifs):
+            return True
+        if isinstance(n, ast.Call) and any(k.arg and _EXEMPT_ARG_RX.search(k.arg) and _reads(k.value, name)
+                                           for k in n.keywords):
+            return True
+    return False
+
+
+def _parse_any(*texts):
+    import textwrap as _tw
+    for text in texts:
+        for t in (text, _tw.dedent(text)):
+            try:
+                return ast.parse(t)
+            except (SyntaxError, ValueError):
+                continue
+    return None
 
 
 def exemption_region_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     fp, added = _added_lines(current_event)
-    if not _CHECKER_RX.search(fp):
+    if not _CHECKER_RX.search(fp) or any(_REGION_RX.search(ln) for ln in added):
         return None
-    hit = next((ln for ln in added if _EXEMPTION_RX.match(ln)), None)
-    if hit is None or any(_REGION_RX.search(ln) for ln in added):
+    ti = current_event.get("tool_input") or {}
+    intro = introduced_text(current_event.get("tool_name", ""), ti)
+    tree = _parse_any(intro, "\n".join(added))
+    if tree is None:
         return None
-    return _deny(pattern, fp, "an exemption list is added and the region it leaves unreached is not named: "
-                 + hit.strip()[:80], hit.strip())
+    on_disk = ""
+    try:
+        full = fp if os.path.isabs(fp) else os.path.join(current_event.get("cwd") or "", fp)
+        if os.path.isfile(full):
+            with open(full, encoding="utf-8", errors="replace") as fh:
+                on_disk = fh.read()
+    except OSError:
+        pass
+    whole = _parse_any(on_disk) if on_disk else None
+    added_set = {ln.strip() for ln in added}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign):
+            targets, value = n.targets, n.value
+        elif isinstance(n, ast.AnnAssign) and n.value is not None:
+            targets, value = [n.target], n.value
+        else:
+            continue
+        for t in targets:
+            if not isinstance(t, ast.Name) or not _collection_value(value):
+                continue
+            line = intro.splitlines()[n.lineno - 1].strip() if n.lineno <= len(intro.splitlines()) else ""
+            if line and line not in added_set:
+                continue
+            if _EXEMPT_NAME_RX.search(t.id) or _takes_work_away(tree, t.id) or \
+                    (whole is not None and _takes_work_away(whole, t.id)):
+                return _deny(pattern, fp, "an exemption list is added and the region it leaves unreached is "
+                             "not named: " + (line or t.id)[:80], line or t.id)
+    return None
 
 
 exemption_region_RETRY_HINT = "Name every region it cannot reach: add `# region: <what this exemption leaves unchecked>`."
 exemption_region_DESCRIPTION = "an exemption list added to a checker naming no unreached region"
 exemption_region_CHECK = _Check(id="content.exemption_unnamed_region", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__,
-               keywords=("xempt", "xclu", "kip", "gnor", "llow", "XEMPT", "XCLU", "KIP", "GNOR", "LLOW"),
+               keywords=("xempt", "xclu", "kip", "gnor", "llow", "XEMPT", "XCLU", "KIP", "GNOR", "LLOW",
+                         " in ", "continue", "return", "pass", "break"),
                retry_hint=exemption_region_RETRY_HINT, description=exemption_region_DESCRIPTION,
                eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
