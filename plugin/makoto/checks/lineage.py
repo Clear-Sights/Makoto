@@ -573,22 +573,35 @@ webfetch_CHECK = _Check(id='content.unsourced_webfetch', applies_at="Pre", postu
 # many correct commands produce. Only a literal JSON `null` as the whole of what was printed
 # counts. That is a named RECALL bound, and it fails quiet.
 #
-# ONLY THE LATEST TRAVERSAL COUNTS (BLOCK since 2026-09-25): it owes iff it printed null and no
-# structure read precedes it. The discharge is in-turn -- read the structure, then re-run the
-# traversal -- so an early null that was since read around no longer holds every later stop.
+# ONLY THE LATEST TRAVERSAL COUNTS (BLOCK since 2026-09-25): it owes iff everything it printed was
+# null and nothing before it read the SAME data. The discharge is in-turn -- read the structure,
+# then re-run the traversal -- so an early null that was since read around no longer holds every
+# later stop.
+#
+# THE PAYMENT IS THE SHAPE, READ FROM THIS DATA (round nine A3). What pays is an earlier act on
+# the traversal's own source that showed its shape: a Read of that file, a shape query on it
+# (`jq keys`, `type`, `length`, `has(...)`, `paths`, `-e`), or a command on it whose output WAS
+# structure (a JSON object or array printed whole: `jq .`, `cat`). A scalar printed by another
+# guessed path shows no shape and does not pay. A Read of an unrelated file, or a shape query on
+# another file, reads nothing about this one. The source is the file the traversal names; a
+# traversal naming none (stdin from a pipe) has the pipeline upstream of it as its source.
 from makoto.kit import response_text, command_of, decode_history_event, unwitnessed
 
 # A structured-data traversal. `jq` is the canonical one; `python -c ... json` and `yq` are the
 # same act under other programs. A closed vocabulary whose miss is a RECALL bound.
 _TRAVERSAL_RX = _lazy_re(r"\b(?:jq|yq|json_pp)\b|python3?\s+-c\b[^\n]*\bjson\b")
-# The structure query that pays the obligation: any of the shape-printing jq forms, or a Read of
-# the file.
+# A shape query: the jq/yq forms whose answer is the structure rather than a value in it.
 _STRUCTURE_RX = _lazy_re(r"\b(?:jq|yq)\b[^\n]*(?:\bkeys\b|\btype\b|\bhas\s*\(|\blength\b|"
                            r"\bpaths\b|\bto_entries\b|-e\b)")
-# What a failed traversal prints: a literal null as the WHOLE output -- JSON's `null` (jq/yq) or
-# Python's `None` (the same absent-value token printed by a `python3 -c ...json...` traversal).
-# `.strip()` has already run, so an anchored match is the whole of it.
-_NULL_OUTPUT_RX = _lazy_re(r"\A(?:null|None)\Z")
+# Output that IS structure: a JSON object or array, printed whole.
+_STRUCTURED_OUTPUT_RX = _lazy_re(r"\A[\[{]")
+# What a failed traversal prints: nothing but nulls -- JSON's `null` (jq/yq) or Python's `None`,
+# once for a scalar path or once per element of an array (`.[].name`). `.strip()` has already
+# run, so an anchored match is the whole of it.
+_NULL_OUTPUT_RX = _lazy_re(r"\A(?:(?:null|None)\s*)+\Z")
+# A file operand: a word with an extension, bare or under ./ ../ ~/ /, standing alone or quoted
+# (a python -c `open('x.json')` literal). A jq path (`.a.b`, `.[].x`) starts with a dot and is not.
+_FILE_OPERAND_RX = _lazy_re(r"""(?:^|(?<=[\s'"(=<]))((?:\.{1,2}/|~/|/)?[\w@%+-][\w@%+./-]*\.[A-Za-z]\w{0,9})(?=$|[\s'")|;>,])""")
 
 
 def _is_traversal(ev: dict) -> bool:
@@ -596,32 +609,60 @@ def _is_traversal(ev: dict) -> bool:
     return ev.get("hook_event_name") == "PostToolUse" and bool(cmd and _TRAVERSAL_RX.search(cmd))
 
 
-def _is_structure_read(ev: dict) -> bool:
+def _same_file(a: str, b: str) -> bool:
+    a, b = a.replace("\\", "/"), b.replace("\\", "/")
+    return a == b or a.endswith("/" + b.lstrip("./")) or b.endswith("/" + a.lstrip("./"))
+
+
+def _source_of(cmd: str):
+    """What the traversal reads: the files it names, else the pipeline upstream of it."""
+    files = tuple(_FILE_OPERAND_RX.findall(cmd))
+    if files:
+        return files, ""
+    head, _, _ = cmd.rpartition("|")
+    return (), " ".join(head.split())
+
+
+def _shows_source(ev: dict, source) -> bool:
+    """This earlier act showed the traversal's own data's shape: a Read of the file, or a shape
+    query on the same source, or a command on it that printed structure."""
+    files, upstream = source
     if ev.get("tool_name") == "Read":
-        return True
+        ti = ev.get("tool_input")
+        fp = str(ti.get("file_path", "") or "") if isinstance(ti, dict) else ""
+        return bool(fp) and any(_same_file(fp, f) for f in files)
     cmd = command_of(ev)
-    return bool(cmd and _STRUCTURE_RX.search(cmd))
+    if not cmd:
+        return False
+    if files:
+        named = any(_same_file(g, f) for g in _FILE_OPERAND_RX.findall(cmd) for f in files)
+    else:
+        named = bool(upstream) and upstream in " ".join(cmd.split())
+    return named and bool(_STRUCTURE_RX.search(cmd) or _STRUCTURED_OUTPUT_RX.match(response_text(ev)))
 
 
 def unread_structure_gate(history) -> Optional[Finding]:
-    """Fire iff the session's latest traversal printed null and no structure read precedes it."""
+    """Fire iff the session's latest traversal printed only nulls and nothing before it showed
+    that traversal's own data's shape."""
     events = [ev for ev in map(decode_history_event, history or ()) if isinstance(ev, dict)]
     last = max((i for i, ev in enumerate(events) if _is_traversal(ev)), default=None)
     if last is None or not _NULL_OUTPUT_RX.match(response_text(events[last])):
         return None
+    source = _source_of(command_of(events[last]))
     end = len(events)
     for _it, _at in unwitnessed(
             list(enumerate(events)) + [(end, None)],
             owes=lambda it: (last,) if it[0] == end else (),
             pays=lambda it: (lambda at, i=it[0]: i < at)
-            if it[1] is not None and _is_structure_read(it[1]) else None):
+            if it[1] is not None and _shows_source(it[1], source) else None):
         return Finding(
             pattern_id="gate.unread_structure", file="", line=0, level="error",
-            message=("A traversal of structured data printed `null` and nothing in this session "
-                     "looked at the structure first — the positions were assumed to line up "
+            message=("row gate.unread_structure (a null traversal over data never read): a "
+                     "traversal of structured data printed only `null` and nothing in this "
+                     "session had shown that data's shape first — the positions were assumed to line up "
                      "rather than read."),
-            retry_hint=("Print a non-null datum from the file first (`jq 'keys'`, `jq 'type'`, "
-                        "`jq -e 'has(...)'`) or Read it, then re-run the traversal."),
+            retry_hint=("Print a non-null datum from the same file first (`jq 'keys'`, `jq "
+                        "'type'`, `jq '.'`) or Read it, then re-run the traversal."),
             snippet=command_of(events[last])[:200])
     return None
 
