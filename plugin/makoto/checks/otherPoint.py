@@ -1458,6 +1458,17 @@ def _acceptance_owed(ev: dict, *, since_instant):
     return tuple(" ".join(a.split()) for a in _dispatch_brief_lines(prompt)["ACCEPTANCE"] if a)
 
 
+def _settled(ti: dict, response) -> bool:
+    """The run finished in front of makoto: it was not launched into the background, and the
+    host handed back no background task in place of its result (round nine I3: a launch reports
+    no exit and no error, so `_response_succeeded` alone read it as a pass). A command the host
+    backgrounded on timeout carries the same handle, so the handle is the fact read, whatever
+    put the run there."""
+    if ti.get("run_in_background"):
+        return False
+    return not (isinstance(response, dict) and response.get("backgroundTaskId"))
+
+
 def _acceptance_paid(ev: dict):
     if ev.get("hook_event_name") != "PostToolUse" or ev.get("tool_name") != "Bash":
         return None
@@ -1465,7 +1476,8 @@ def _acceptance_paid(ev: dict):
     command = ti.get("command") if isinstance(ti, dict) else None
     if not isinstance(command, str) or not command:
         return None
-    if not _response_succeeded(ev.get("tool_response")):
+    if not (_settled(ti, ev.get("tool_response"))
+            and _response_succeeded(ev.get("tool_response"))):
         return None
     paid_command = " ".join(command.split())
     return lambda owed: owed == paid_command
@@ -1488,8 +1500,9 @@ def unpaid_acceptance_gate(history, *, transcript_path=None) -> Optional[Finding
     for _ev, command in unwitnessed(reversed(events), owes=owes, pays=_acceptance_paid):
         return Finding(
             pattern_id="gate.unpaid_acceptance", file="", line=0, level="error",
-            message=(f"A dispatch's ACCEPTANCE command ({command!r}) is unpaid: done was claimed "
-                     "but no later run of that exact command exited 0."),
+            message=(f"row gate.unpaid_acceptance (a dispatch's ACCEPTANCE never settled "
+                     f"green): {command!r} is unpaid: done was claimed but no later run of that "
+                     "exact command finished and exited 0 (a background launch is not a run)."),
             retry_hint=("Run the dispatch's own ACCEPTANCE command and let it exit 0 before "
                         "claiming the work done, or retract the claim."),
         )

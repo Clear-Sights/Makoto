@@ -151,3 +151,33 @@ def test_unpaid_acceptance_check_bounces_once_on_stop_hook_active(tmp_path):
                       fs_read=lambda p: None, history=[_dispatch_row()],
                       transcript_path=transcript, stop_hook_active=True)
     assert unpaid_CHECK.run(ctx) is None
+
+
+def _launch_row(ts, **tool_input):
+    command = "python3 -m pytest -q tests/test_kit.py"
+    return {"ts": ts, "payload": {"hook_event_name": "PostToolUse", "tool_name": "Bash",
+                                  "tool_input": dict({"command": command}, **tool_input),
+                                  "tool_response": {"stdout": "", "stderr": "",
+                                                    "interrupted": False,
+                                                    "backgroundTaskId": "b1"}}}
+
+
+def test_unpaid_acceptance_a_background_launch_does_not_pay(tmp_path):
+    """Round nine I3: a launch reports no exit and no error, and used to read as a pass."""
+    transcript = _transcript(tmp_path)
+    history = [_dispatch_row(), _launch_row("2026-01-01T00:00:02.000000Z", run_in_background=True)]
+    assert unpaid_acceptance_gate(history, transcript_path=transcript) is not None
+
+
+def test_unpaid_acceptance_a_run_backgrounded_on_timeout_does_not_pay(tmp_path):
+    transcript = _transcript(tmp_path)
+    history = [_dispatch_row(), _launch_row("2026-01-01T00:00:02.000000Z")]
+    assert unpaid_acceptance_gate(history, transcript_path=transcript) is not None
+
+
+def test_unpaid_acceptance_a_settled_run_with_no_exit_key_pays(tmp_path):
+    """The live host's success shape carries no exitCode at all; a settled run still pays."""
+    transcript = _transcript(tmp_path)
+    row = _paying_bash_row("2026-01-01T00:00:02.000000Z")
+    del row["payload"]["tool_response"]["exitCode"]
+    assert unpaid_acceptance_gate([_dispatch_row(), row], transcript_path=transcript) is None

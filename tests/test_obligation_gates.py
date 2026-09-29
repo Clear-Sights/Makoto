@@ -413,3 +413,38 @@ def test_unprobed_fanout_denies_once_then_lets_the_same_session_through():
     probe_then = [{"payload": dispatch}, _row("Read", file_path="/repo/a.py"),
                   _row("Agent", prompt="go"), {"payload": dict(dispatch, tool_input={"prompt": "again"})}]
     assert lineage.unprobed_fanout_gate(current_event=dispatch, history=probe_then[:3], pattern=pattern) is None
+
+
+def _read_row(path):
+    return {"payload": {"hook_event_name": "PostToolUse", "tool_name": "Read",
+                        "tool_input": {"file_path": path}, "tool_response": {}}}
+
+
+def test_unread_structure_a_read_of_the_same_file_pays():
+    assert unread_structure_gate([_read_row("/w/config.json"),
+                                  _bash("jq '.a.b' config.json", "null")]) is None
+
+
+def test_unread_structure_a_read_of_another_file_does_not_pay():
+    """Round nine A3: any unrelated Read used to count as having read the structure."""
+    assert unread_structure_gate([_read_row("/w/notes.txt"),
+                                  _bash("jq '.a.b' config.json", "null")]) is not None
+
+
+def test_unread_structure_a_shape_query_on_another_file_does_not_pay():
+    assert unread_structure_gate([_bash("jq 'keys' other.json", '["a"]'),
+                                  _bash("jq '.a.b' config.json", "null")]) is not None
+
+
+def test_unread_structure_printed_structure_of_the_same_file_pays():
+    assert unread_structure_gate([_bash("jq . config.json", '{"a": [1]}'),
+                                  _bash("jq '.a.b' config.json", "null")]) is None
+
+
+def test_unread_structure_fires_on_a_null_per_element():
+    """Round nine A3: `.[].name` over an array prints one null per element."""
+    assert unread_structure_gate([_bash("jq '.[].name' list.json", "null\nnull\nnull")]) is not None
+
+
+def test_unread_structure_a_null_among_values_is_data():
+    assert unread_structure_gate([_bash("jq '.[].name' list.json", "null\n\"b\"\nnull")]) is None

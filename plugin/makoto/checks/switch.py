@@ -356,16 +356,29 @@ wall_SHAPE = "SWITCH"
 
 # An EPISTEMIC cannot: the claim is that a fact cannot be established. Not a refusal, not a
 # statement about capabilities in general -- those are excluded by design, see the docstring.
+#
+# Read as the EFFECT, not as a list of its spellings (round nine G5: "have no means of confirming"
+# and "is unknowable from here" walked past the old five phrasings). The effect is two closed
+# classes composed by grammar, so every wording the composition yields is caught, listed or not:
+#
+#   _KNOW  the one semantic field "come to know": the predicates whose object is a fact.
+#   _BAR   the grammatical operators that deny an ability: a negated modal, "unable/impossible/
+#          not possible to", "no way/means/method of", and "there is no ...ing".
+#
+# A wall is _BAR governing _KNOW within its own clause (at most three words between, no
+# punctuation: "cannot actually be verified", "no means of confirming", "no way for me to
+# tell"), or _KNOW inside the privative adjective un-...-able ("unknowable", "unverifiable";
+# at most three letters between stem and suffix, so "unknowledgeable" is not one). A refusal ("I can't help with that") carries no _KNOW and stays silent.
+_KNOW = (r"(?:know|tell|say|sure|certain|verif|confirm|check(?!\s+out)|determin|establish|ascertain"
+         r"|prov|assess|detect|validat|observ|inspect|measur|test|decid|find\s+out"
+         r"|see\s+(?:whether|if))")
+_BAR = (r"(?:can(?:no|')t|cannot|can\s+not|could(?:n't|\s+not)|unable\s+to|not\s+able\s+to"
+        r"|(?:im|not\s+)possible\s+(?:to|for)|no\s+(?:way|means|method|mechanism|ability)\s+"
+        r"(?:to|of|for))")
 _WALL_RX = _lazy_re(
-    r"\b(?:"
-    r"(?:there\s+is|there's)\s+no\s+way\s+to\s+(?:tell|know|check|determine|verify|find\s+out)"
-    r"|(?:i|we)\s+(?:can(?:no|')t|cannot|am\s+unable\s+to|are\s+unable\s+to)\s+"
-    r"(?:tell|know|check|determine|verify|find\s+out|establish)"
-    r"|(?:it|this|that)\s+(?:is|'s)\s+(?:impossible|not\s+possible)\s+to\s+"
-    r"(?:tell|know|check|determine|verify)"
-    r"|no\s+way\s+of\s+(?:knowing|telling|checking|determining)"
-    r"|(?:i|we)\s+have\s+no\s+way\s+to\s+(?:tell|know|check|determine|verify)"
-    r")\b", re.IGNORECASE)
+    rf"\b(?:{_BAR}(?:\s+[\w']+){{0,3}}?\s+{_KNOW}\w*"
+    rf"|there(?:'s|\s+is)\s+no\s+{_KNOW}\w*ing"
+    rf"|un{_KNOW}\w{{0,3}}?[ai]ble)\b", re.IGNORECASE)
 
 wall_RETRY_HINT = ("You state that something cannot be determined, but you have taken no action since "
               "the operator last spoke. List what you hold and act on it first; if the claim "
@@ -418,7 +431,8 @@ def unexamined_wall_gate(text, *, history=None, transcript_path=None):
         return Finding(
             pattern_id="gate.unexamined_wall",
             file="", line=0, level="error",
-            message=(f"Claim that a fact cannot be established ({wall.group(0)!r}), with no action "
+            message=(f"row gate.unexamined_wall (a claim that a fact cannot be established, made "
+                     f"unlooked): {wall.group(0)!r}, with no action "
                      f"taken since the operator last spoke — the inventory was never opened."),
             retry_hint=wall_RETRY_HINT,
         )
@@ -427,8 +441,6 @@ def unexamined_wall_gate(text, *, history=None, transcript_path=None):
 
 wall_CHECK = _Check(id="gate.unexamined_wall", applies_at="Stop", posture="BLOCK",
                tests="SWITCH",
-               keywords=("no way to tell", "no way to know", "cannot determine",
-                         "can't tell", "no way of knowing", "unable to verify"),
                retry_hint=wall_RETRY_HINT, description=wall_DESCRIPTION,
                eats=frozenset({"text", "history", "transcript_path"}),
                run=lambda c: unexamined_wall_gate(c.text, history=c.history,
