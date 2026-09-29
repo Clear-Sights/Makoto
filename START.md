@@ -123,7 +123,9 @@ The steps:
    recorded on 3.3.0. plant: a verdicts file missing one fire exits 2.
    inputs: the 3.3.0 audit with a verdict for each fire, `docs/v9/records/audit-3.3.0-2026-09-28.jsonl`
    and `docs/v9/records/verdicts-3.3.0-2026-09-28.tsv`; a fresh live record is the running
-   session's `~/.makoto/audit.jsonl`. owner: the next Makoto session.
+   session's `~/.claude/makoto_state/audit.jsonl`. The 2026-09-29 session's record (137 events
+   under 3.4.8 to 3.4.16, ungraded) is `docs/v9/records/audit-3.4.8-to-3.4.16-2026-09-29.jsonl`;
+   it needs a verdicts file before `tools/worth.py` can read it. owner: the next Makoto session.
    projection: `python3 tools/project.py 6 AUDIT.jsonl VERDICTS.tsv` (no model). The 09-28 record is
    `docs/v9/records/audit-3.3.0-2026-09-28.jsonl` with `docs/v9/records/verdicts-3.3.0-2026-09-28.tsv`:
    `PROJECT 6 checks=17 worth=5 not=12 fires=125`. The first 3.4.7 record, graded, is in
