@@ -25,7 +25,8 @@ def test_pretooluse_block_renders_new_wire_shape(tmp_path):
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "constitution/integrity/checks/v.py",
-            "content": 'def check(x):\n    return x.startswith("ok")\n',
+            "old_string": 'def check(x):\n    return x == "ok"\n',
+            "new_string": 'def check(x):\n    return x.startswith("ok")\n',
         },
     }
     rc, out = _run_dispatch(state_dir, payload)

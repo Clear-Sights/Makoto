@@ -36,12 +36,13 @@ def test_predicate_finding_carries_source_event_id(state_dir, run_dispatch):
     """A live predicate fire (content.verifier_predicate_weakened) records a finding stamped with its events.id."""
     payload = {
         "hook_event_name": "PreToolUse",
-        "tool_name": "Write",
+        "tool_name": "Edit",
         "session_id": "prov_pred",
         "cwd": "/tmp",
         "tool_input": {
             "file_path": "constitution/integrity/checks/myverifier.py",
-            "content": 'def check(x):\n    return x.startswith("ok")\n',
+            "old_string": 'def check(x):\n    return x == "ok"\n',
+            "new_string": 'def check(x):\n    return x.startswith("ok")\n',
         },
     }
     rc, out = run_dispatch(state_dir, payload)

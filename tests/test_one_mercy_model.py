@@ -9,7 +9,7 @@ import json
 from makoto.state import ledger
 from tests.conftest import _setup_state, _run_dispatch
 
-# content.verifier_predicate_weakened fires on a Write of a loose-comparator verifier -- the
+# content.verifier_predicate_weakened fires on an Edit loosening a strict verifier -- the
 # known-firing payload test_dispatch.py already pins. The allowed twin differs ONLY by the
 # structured `# makoto-allow: <reason>` marker.
 _VERIFIER_PATH = "constitution/integrity/checks/myverifier.py"
@@ -28,7 +28,9 @@ def _substate(tmp_path, name):
 def _pre_write(state_dir, content, sid, extra_env=None):
     return _run_dispatch(state_dir, {
         "hook_event_name": "PreToolUse", "session_id": sid, "cwd": "/tmp",
-        "tool_input": {"file_path": _VERIFIER_PATH, "content": content},
+        "tool_name": "Edit",
+        "tool_input": {"file_path": _VERIFIER_PATH, "old_string": 'def check(x):\n    return x == "ok"\n',
+                       "new_string": content},
     }, extra_env=extra_env)
 
 

@@ -5,7 +5,13 @@ from __future__ import annotations
 #
 # Fires on an introduced `if <env-read>:` whose env-var key or guarded body names an integrity /
 # audit / verification concept (`lexicons._INTEG_VOCAB`). Env-read = `os.environ.get(...)`,
-# `os.getenv(...)`, `os.environ[...]`, or the bare imported forms.
+# `os.getenv(...)`, `os.environ[...]`, or the bare imported forms -- or any name or attribute the
+# introduced code BOUND from one (`flag = os.getenv(...)`; `if flag:`), transitively: the gate is
+# the env value reaching the condition, not the call sitting in it (round nine E7).
+#
+# The effect is language-blind, so a shell script (`.sh`/`.bash`/...) is read too: an
+# `if`/`[ ] &&` condition naming a `$VAR` the script never assigns is an env read, and the same
+# key-or-body integrity signal applies.
 #
 # Gating an audit trail behind an env var means the check runs only when someone opts in — a
 # HOLLOWED word: the audit survives in name while its guarantee is gutted.
@@ -18,8 +24,8 @@ from __future__ import annotations
 # NAME-AGNOSTIC: the signal comes from the KEY *or* a body code identifier, not the literal
 # substring `AUDIT` — a bare feature flag with no integrity token in key or body stays silent.
 #
-# keywords: `getenv`/`environ` are a superset of every env-read spelling this module matches, so
-# dispatch's prefilter can never silently drop a form the predicate would catch.
+# keywords: `getenv`/`environ` (Python) and `$` (shell) are a superset of every env-read spelling
+# this module matches, so dispatch's prefilter can never silently drop a form the predicate would catch.
 #
 # ACKNOWLEDGED FN (precision-first, like 1.4/1.26): an env-gated audit whose only audit op sits in
 # the ``else`` branch, or whose integrity intent is hidden behind a fully-generic name in both key
@@ -31,10 +37,14 @@ import re
 from typing import Optional
 
 from makoto.vocab import _INTEG_VOCAB, _PY_FILE_RX as _TARGET_RX
-from makoto.kit import ast_introduced_predicate, callee_chain
+from makoto.kit import (_exempt_or_finding, _gated_content, ast_introduced_predicate, callee_chain,
+                        parse_introduced)
 
 # `_TARGET_RX` is .py-only — .md is prose.
 _INTEG_RX = _lazy_re(_INTEG_VOCAB, re.I)  # shared L0 integrity vocabulary
+# A checker file: anything under a check/checks directory (nested included), or a .py whose name
+# says it checks, lints, audits or verifies. Every verifier row reads this one surface.
+_CHECKER_RX = _lazy_re(r"(^|[/\\])(checks?[/\\].+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
 
 # An env-var READ in CALL form (callee_chain) vs SUBSCRIPT form (value chain).
 _ENV_CALL_CHAINS = {"os.getenv", "getenv", "os.environ.get", "environ.get"}
@@ -56,7 +66,9 @@ def _value_chain(node: ast.AST) -> str:
 def _is_env_read(node: ast.AST) -> bool:
     """True iff ``node`` reads an environment variable: ``os.getenv(...)`` / ``os.environ.get(...)`` /
     the bare imported ``getenv(...)`` / ``environ.get(...)`` (Call), or ``os.environ[...]`` /
-    ``environ[...]`` (Subscript)."""
+    ``environ[...]`` (Subscript), or a name/attribute ``_parse_marking_env`` found bound from one."""
+    if hasattr(node, "_env_key"):
+        return True
     if isinstance(node, ast.Call):
         return callee_chain(node) in _ENV_CALL_CHAINS
     if isinstance(node, ast.Subscript):
@@ -81,6 +93,8 @@ def _env_key(env_read: ast.AST) -> str:
     the first positional arg of the env CALL (``os.getenv("ENABLE_AUDIT")``), or the subscript key
     of ``os.environ["VERIFY_MODE"]``. Empty when the key is absent or not a ``str`` literal — a
     computed key names nothing."""
+    if hasattr(env_read, "_env_key"):
+        return env_read._env_key
     key: Optional[ast.AST] = None
     if isinstance(env_read, ast.Call):
         key = env_read.args[0] if env_read.args else None
@@ -104,79 +118,171 @@ def _node_match(node: ast.AST) -> Optional[str]:
     return None
 
 
-env_predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_node_match)
+def _parse_marking_env(content: str):
+    """``parse_introduced``, then mark every loaded Name/Attribute whose dotted chain the
+    introduced code bound from an env read (to a fixpoint, so `a = getenv(k); b = a` marks `b`)
+    with ``_env_key``, the key of the read it came from."""
+    tree, off = parse_introduced(content)
+    if tree is None:
+        return tree, off
+    bound: dict = {}
+    grew = True
+    while grew:
+        grew = False
+        for node in ast.walk(tree):
+            value = getattr(node, "value", None)
+            if not isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)) or value is None:
+                continue
+            reads = [x for x in ast.walk(value) if _is_env_read(x)
+                     or (isinstance(x, (ast.Name, ast.Attribute)) and _value_chain(x) in bound)]
+            if not reads:
+                continue
+            key = next((k for k in (_env_key(r) if _is_env_read(r) else bound[_value_chain(r)]
+                                    for r in reads) if k), "")
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                for x in ast.walk(t):
+                    chain = _value_chain(x) if isinstance(x, (ast.Name, ast.Attribute)) else ""
+                    if chain and chain not in bound:
+                        bound[chain] = key
+                        grew = True
+    for node in ast.walk(tree):
+        if (isinstance(node, (ast.Name, ast.Attribute)) and isinstance(node.ctx, ast.Load)
+                and _value_chain(node) in bound):
+            node._env_key = bound[_value_chain(node)]
+    return tree, off
+
+
+_py_predicate = ast_introduced_predicate(target_rx=_TARGET_RX, node_match=_node_match,
+                                         parse=_parse_marking_env)
+
+_SH_FILE_RX = _lazy_re(r"\.(sh|bash|zsh|ksh)$")
+_SH_VAR_RX = _lazy_re(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
+_SH_BOUND_RX = _lazy_re(r"(?:^|[\s;&|(])(?:(?:export|local|readonly|declare|typeset)\s+(?:-\w+\s+)*)?"
+                        r"([A-Za-z_][A-Za-z0-9_]*)=|\b(?:read|for)\s+(?:-\w+\s+)*([A-Za-z_][A-Za-z0-9_]*)")
+_SH_QUOTED_RX = _lazy_re(r"'[^']*'|\"(?:[^\"\\\\]|\\\\.)*\"")
+_SH_GUARD_RX = _lazy_re(r"^\s*(?:\[\[?|test\b)(.*?)(?:\]\]?)?\s*(?:&&|\|\|)\s*(.+)$")
+
+
+def _sh_gates(lines: list):
+    """(line index, condition, guarded body) for each `if`/`elif` block and `[ ... ] && cmd` line."""
+    for i, ln in enumerate(lines):
+        m = re.match(r"\s*(?:el)?if\s+(.*?)(?:;\s*then\b(.*))?$", ln)
+        if m:
+            body, depth = [m.group(2) or ""], 0
+            for nxt in lines[i + 1:]:
+                w = nxt.strip()
+                if re.match(r"if\b", w):
+                    depth += 1
+                elif re.match(r"fi\b", w):
+                    if depth == 0:
+                        break
+                    depth -= 1
+                elif depth == 0 and re.match(r"(?:else|elif)\b", w):
+                    break
+                body.append(nxt)
+            yield i, m.group(1), "\n".join(body)
+            continue
+        g = _SH_GUARD_RX.match(ln)
+        if g:
+            yield i, g.group(1), g.group(2)
+
+
+def _sh_predicate(*, current_event: dict, history: list, pattern, conn=None):
+    """The same gate in a shell script: a condition reading a `$VAR` the script never assigns
+    (so it comes from the environment) guarding a body, where the var's name or the body's
+    unquoted words name an integrity concept."""
+    gated = _gated_content(current_event=current_event, target_rx=_SH_FILE_RX, exempt_rx=None)
+    if gated is None:
+        return None
+    fp, content = gated
+    lines = [re.sub(r"(^|\s)#.*", "", ln) for ln in content.splitlines()]
+    bound = {a or b for m in (_SH_BOUND_RX.finditer(ln) for ln in lines) for a, b in
+             (x.groups() for x in m)}
+    for i, cond, body in _sh_gates(lines):
+        env = [v for v in _SH_VAR_RX.findall(cond) if v not in bound]
+        if not env:
+            continue
+        if any(_INTEG_RX.search(v) for v in env):
+            label = "env-gated audit (env-var key names an integrity/verification concept)"
+        elif _INTEG_RX.search(_SH_QUOTED_RX.sub("", body)):
+            label = "env-gated audit (the env-gated body runs an integrity/audit/verification op)"
+        else:
+            continue
+        return _exempt_or_finding(
+            current_event=current_event, conn=conn, pattern=pattern, fp=fp, line_no=i + 1,
+            snippet=content.splitlines()[i].strip()[:120], content=content,
+            message=f"row {pattern.id} ({pattern.description}): shell match {label!r} "
+                    f"at line {i + 1}")
+    return None
+
+
+def env_predicate(*, current_event: dict, history: list, pattern, conn=None):
+    # neither reading consults history: it is not forwarded, so the check eats only what it reads
+    return (_py_predicate(current_event=current_event, history=(), pattern=pattern, conn=conn)
+            or _sh_predicate(current_event=current_event, history=(), pattern=pattern, conn=conn))
 
 
 from makoto.registry import Check as _Check
 env_RETRY_HINT = "Don't gate an audit/verification check behind an env var — `if os.getenv('...'): <audit>` makes the check opt-in, so it silently does nothing unless someone sets the flag (a hollowed integrity check). Run the check unconditionally; if a genuinely-optional diagnostic is intended, annotate the line with `makoto-allow: <reason>`."
-env_DESCRIPTION = 'env-gated audit/verification code (if os.environ.get(...)/os.getenv(...) gating an integrity op)'
+env_DESCRIPTION = 'env-gated audit/verification code (an env value, read directly or through a variable, gating an integrity op)'
 
-env_CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('getenv', 'environ'), retry_hint=env_RETRY_HINT, description=env_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+env_CHECK = _Check(id='content.env_gated_audit', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('getenv', 'environ', '$'), retry_hint=env_RETRY_HINT, description=env_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 
 # content.verifier_body_hollowed predicate — verifier NEUTERED (body hollowed, or a broad except
 # swallows the failure).
 #
-# On the constitution integrity-check surface, fires on a check that "exists" but verifies
-# nothing:
+# On a checker file (`_CHECKER_RX`), fires on a check that "exists" but can never fail:
 #
-#   (A) HOLLOW BODY — a verifier-named function whose entire body (after an optional docstring)
-#       is one neutering statement: `return <truthy-const>` / `pass` / `assert <truthy-const>`.
+#   (A) HOLLOW BODY — a verifier-named function whose body (after an optional docstring) holds
+#       nothing that can fail the verdict: no raise, no assert on a non-tautology, no return of
+#       anything but a tautology or None, no call except output (print / log.*). However many
+#       no-op statements pad it, a body that cannot fail verifies nothing.
 #   (B) SWALLOWED EXCEPTION — a broad except clause (bare `except:` / `except Exception` /
-#       `except BaseException`) whose body swallows the failure into a pass.
+#       `except BaseException`) whose body likewise cannot fail: the failure is swallowed.
 #
-# Distinct from content.verifier_predicate_weakened, which catches a loosened comparator but not
-# a wholesale-hollow body (its body_rx requires startswith/endswith/re.match/in[], none present
-# here) — non-redundant and material on the same surface.
+# Distinct from content.verifier_predicate_weakened, which catches a loosened comparator; this
+# row catches the verdict removed outright.
 #
-# FP-safety: (a) the narrow path anchor excludes ordinary permissive base-class/null-object
-# `return True` methods off the integrity-check path — near-dead in the honest corpus, so
-# FP-safety rests mainly on (b)-(e). (b) the verifier-NAME gate excludes trivial helpers/dunders.
-# (c) the broad-except gate excludes a SPECIFIC-typed except (honest narrowing never fires).
-# (d) the active-code AST gate means a comment/docstring/string mention never fires.
-# (e) ``makoto-allow: <reason>`` exempts an intentional trivially-true base / documented degrade-open.
+# FP-safety: (a) the verifier-NAME gate excludes trivial helpers/dunders. (b) the broad-except
+# gate excludes a SPECIFIC-typed except (honest narrowing never fires). (c) the active-code AST
+# gate means a comment/docstring/string mention never fires. (d) any call but output counts as
+# work, so a verifier that delegates is never hollow. (e) ``makoto-allow: <reason>`` exempts an
+# intentional trivially-true base / documented degrade-open.
 from makoto.kit import ast_introduced_predicate
 
-# `[/\\]` + `.+` covers nested `…/checks/sub/seal.py` and a backslash-delivered Windows path.
-body__TARGET_RX = _lazy_re(r"constitution[/\\]integrity[/\\]checks[/\\].+\.py$")
 # A verifier-named function: an integrity/verification verb, or a generic entry-point name
-# (`run`/`main`, anchored; `predicate`/`probe`/`scan`/`seal` substrings) — narrow context (the
-# integrity-checks dir) makes these load-bearing rather than generic.
+# (`run`/`main`, anchored; `predicate`/`probe`/`scan`/`seal` substrings).
 _VERIFIER_NAME_RX = _lazy_re(
     r"(?i)(verif|valid|integrit|attest|check|ensure|enforce|assert|predicate|probe|scan|seal|^run$|^main$)")
 _BROAD_EXCEPT = frozenset({"Exception", "BaseException"})
+_OUTPUT_CALLS = frozenset({"print", "debug", "info", "warning", "warn", "log"})
 
 
 from makoto.substrate.hollowTest import _is_tautology
 
 
-def _swallows(stmt) -> bool:
-    """One statement that NEUTERS a check: `pass`, a bare `...` ellipsis stub, `return
-    <tautology>`, or `assert <tautology>`."""
-    if isinstance(stmt, ast.Pass):
+def _can_fail(node) -> bool:
+    """True iff `node` can fail a verdict: a raise, an import (raises on a missing module), an
+    await/yield, an assert or return of a non-tautology (None excepted: it is the no-finding
+    verdict), or any call but output."""
+    if isinstance(node, (ast.Raise, ast.Import, ast.ImportFrom, ast.Await, ast.Yield, ast.YieldFrom)):
         return True
-    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant)\
-            and stmt.value.value is Ellipsis:
-        return True
-    if isinstance(stmt, ast.Return) and _is_tautology(stmt.value):
-        return True
-    return isinstance(stmt, ast.Assert) and _is_tautology(stmt.test)
-
-
-def _post_docstring(body):
-    """`body` minus a leading docstring statement."""
-    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)\
-            and isinstance(body[0].value.value, str):
-        return body[1:]
-    return body
+    if isinstance(node, ast.Assert):
+        return not _is_tautology(node.test)
+    if isinstance(node, ast.Return):
+        v = node.value
+        return not (v is None or (isinstance(v, ast.Constant) and v.value is None) or _is_tautology(v))
+    if isinstance(node, ast.Call):
+        f = node.func
+        name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
+        return name not in _OUTPUT_CALLS
+    return False
 
 
 def _hollow_body(body) -> bool:
-    """True iff `body` (post-docstring) is exactly one neutering statement, or is EMPTY after the
-    docstring (a docstring-only body checks exactly as much as `pass` does)."""
-    b = _post_docstring(body)
-    if not b:
-        return True                      # docstring-only: zero effective statements
-    return len(b) == 1 and _swallows(b[0])
+    """True iff nothing in `body` can fail the verdict (a docstring-only body included)."""
+    return not any(_can_fail(n) for stmt in body for n in ast.walk(stmt))
 
 
 def _broad_except(handler: ast.ExceptHandler) -> bool:
@@ -195,15 +301,16 @@ def _broad_except(handler: ast.ExceptHandler) -> bool:
 
 
 def _hollow_node_match(node: ast.AST) -> Optional[str]:
-    # a verifier-named function NEUTERED to a single pass / return-truthy / assert-truthy statement.
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))\
-            and _VERIFIER_NAME_RX.search(node.name) and _hollow_body(node.body):
-        return f"def {node.name}() -> hollow"
-    # (swallowed-exception arm) a BROAD except handler whose body swallows the failure into a pass —
-    # the runtime sibling of body-hollowing. Broad-only + the integrity-path anchor + makoto-allow
-    # carry FP-safety; a specific-typed except (honest narrowing) never fires.
-    if isinstance(node, ast.ExceptHandler) and _broad_except(node) and _hollow_body(node.body):
-        return "broad except -> swallow"
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _VERIFIER_NAME_RX.search(node.name):
+        # a verifier-named function whose body cannot fail.
+        if _hollow_body(node.body):
+            return f"def {node.name}() -> hollow"
+        # (swallowed-exception arm) inside that verifier, a BROAD except whose body cannot fail —
+        # the runtime sibling of body-hollowing. Scoped to the verifier: a broad except in a
+        # helper or a hook's own fail-open path verifies nothing and so swallows no verdict.
+        if any(isinstance(n, ast.ExceptHandler) and _broad_except(n) and _hollow_body(n.body)
+               for n in ast.walk(node)):
+            return f"def {node.name}(): broad except -> swallow"
     # a hollowed verifier BOUND as a lambda (`verify_seal = lambda s: True`) is an `ast.Assign`,
     # not a `FunctionDef` — the binding form needs its own arm.
     if isinstance(node, ast.Assign) and isinstance(node.value, ast.Lambda)\
@@ -214,24 +321,30 @@ def _hollow_node_match(node: ast.AST) -> Optional[str]:
     return None
 
 
-body_predicate = ast_introduced_predicate(target_rx=body__TARGET_RX, node_match=_hollow_node_match)
+body_predicate = ast_introduced_predicate(target_rx=_CHECKER_RX, node_match=_hollow_node_match)
 
 
 body_RETRY_HINT = "Don't neuter a verifier on the integrity-check surface: gutting its body to `return True`/`pass`/`assert True`, or wrapping it in a broad `except Exception: pass`/`return True` that swallows the failure, makes a check that 'exists' but never verifies (the wholesale cousin of loosening a comparator, content.verifier_predicate_weakened). Implement the real check; catch the SPECIFIC expected exception, not a bare/`Exception` swallow; if a trivially-true base or a documented degrade-open is genuinely intended, annotate `makoto-allow: <reason>`."
 body_DESCRIPTION = 'verifier neutered — body hollowed (return-True/pass/assert-True) or a broad except swallows the failure, on the integrity-check surface'
 
-body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('constitution/integrity/checks', 'except', 'assert True'), retry_hint=body_RETRY_HINT, description=body_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('def ', 'except', 'lambda'), retry_hint=body_RETRY_HINT, description=body_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 
 # content.verifier_predicate_weakened predicate — verifier predicate weakened (loose-comparator
 # shape).
 #
-# On the constitution integrity-check surface, fires on one of the loose-comparator shapes a
-# strict `==` status test gets weakened into, matched as REAL AST nodes in introduced code:
+# On a checker file (`_CHECKER_RX`), fires on the CHANGE from a strict verdict to a loose one: a
+# strict `== <literal>` comparison the prior text held (the Edit's old_string, or the file on disk
+# a Write replaces) is gone, and one of the loose-comparator shapes it gets weakened into is
+# introduced, matched as REAL AST nodes:
 #
 #   * `.startswith(` / `.endswith(` (prefix/suffix instead of equality),
 #   * `re.match(` / `re.search(` (pattern instead of equality),
 #   * membership in a LITERAL collection — `in [...]` / `in (...)` / `in {...}`,
-#   * substring membership with a string-literal needle — `"ok" in status`.
+#   * substring membership with a string-literal needle — `"ok" in status`,
+#   * a VERDICT (returned, asserted, or a lambda's body) that is a negated match against a
+#     literal — `status != 'fail'`, `status not in ('fail', 'error')`, `not status == 'fail'`:
+#     it passes every value but the ones named. In an `if` test the same `!=` guards a failure
+#     branch and is strict, so only the verdict position counts.
 #
 # AST-node matching means a comment, docstring, or string-literal mention never fires, and a
 # list-literal `for name in [...]:` iteration (`ast.For`, not `ast.Compare`) is not a comparator
@@ -240,7 +353,7 @@ body_CHECK = _Check(id='content.verifier_body_hollowed', applies_at="Pre", postu
 # stays silent (FN-safe).
 #
 # SCOPED to the comparator vocabulary above — a relaxed numeric bound (`>=` -> `>`), a downgraded
-# `assert`, a dropped negation, or wholesale removal of the predicate are diff-shaped facts this
+# `assert`, or wholesale removal of the predicate are diff-shaped facts this
 # scan does not claim to catch (content.verifier_body_hollowed's hollowed-function half is
 # separate).
 #
@@ -252,7 +365,6 @@ import textwrap
 
 from makoto.kit import ast_introduced_predicate, callee_chain, parse_introduced
 
-weakened__TARGET_RX = _lazy_re(r"constitution/integrity/checks/.+\.py$")
 _RE_LOOSE_CHAINS = frozenset({"re.match", "re.search"})
 _METHOD_LOOSE = frozenset({"startswith", "endswith"})
 _CONTAINER_LABELS = ((ast.List, "in [...]"), (ast.Tuple, "in (...)"), (ast.Set, "in {...}"))
@@ -277,7 +389,29 @@ def _loose_label(node: ast.AST) -> Optional[str]:
                 if isinstance(left, ast.Constant) and isinstance(left.value, str):
                     return "'<literal>' in <expr> (substring membership)"
             left = comp
+        return None
+    verdict = node.value if isinstance(node, ast.Return) else node.test if isinstance(node, ast.Assert)\
+        else node.body if isinstance(node, ast.Lambda) else None
+    if verdict is not None and _negated_literal(verdict):
+        return "negated-literal verdict (passes every value but one)"
     return None
+
+
+def _is_literal(n) -> bool:
+    return (isinstance(n, ast.Constant) and isinstance(n.value, str))\
+        or (isinstance(n, (ast.List, ast.Tuple, ast.Set)) and all(_is_literal(e) for e in n.elts))
+
+
+def _negated_literal(e) -> bool:
+    """`x != 'lit'` / `x is not 'lit'` / `x not in (<literals>)`, or `not` of the positive form."""
+    pos = isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.Not)
+    e = e.operand if pos else e
+    if not (isinstance(e, ast.Compare) and len(e.ops) == 1):
+        return False
+    neg_ops, pos_ops = (ast.NotEq, ast.IsNot, ast.NotIn), (ast.Eq, ast.Is, ast.In)
+    if not isinstance(e.ops[0], pos_ops if pos else neg_ops):
+        return False
+    return _is_literal(e.left) or _is_literal(e.comparators[0])
 
 
 def _parse_fragment(content: str):
@@ -294,13 +428,55 @@ def _parse_fragment(content: str):
         return None, 0
 
 
-weakened_predicate = ast_introduced_predicate(target_rx=weakened__TARGET_RX, node_match=_loose_label, parse=_parse_fragment)
+_loose_introduced = ast_introduced_predicate(target_rx=_CHECKER_RX, node_match=_loose_label, parse=_parse_fragment)
 
 
-weakened_RETRY_HINT = "Use '==' for status comparison — not '.startswith()' / '.endswith()' / 're.match' / 're.search', and not membership ('in [...]' / 'in (...)' / 'in {...}', or a string-literal 'in' substring test). Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
+def _strict_forms(text: str) -> set:
+    """Every strict verdict in `text`: an `==`/`is` comparison with a literal side."""
+    tree, _ = _parse_fragment(text or "")
+    if tree is None:
+        return set()
+    return {ast.unparse(n) for n in ast.walk(tree)
+            if isinstance(n, ast.Compare) and len(n.ops) == 1 and isinstance(n.ops[0], (ast.Eq, ast.Is))
+            and (_is_literal(n.left) or _is_literal(n.comparators[0]))}
+
+
+def _prior_and_after(current_event: dict) -> tuple:
+    """(text before, text after) for a Write (the file on disk vs content) or an Edit/MultiEdit
+    (old_string vs new_string, joined)."""
+    ti = current_event.get("tool_input") or {}
+    if not isinstance(ti, dict):
+        return "", ""
+    if current_event.get("tool_name") == "Write" or "content" in ti:
+        fp = str(ti.get("file_path", ""))
+        before = ""
+        try:
+            full = fp if os.path.isabs(fp) else os.path.join(current_event.get("cwd") or "", fp)
+            if os.path.isfile(full):
+                with open(full, encoding="utf-8", errors="replace") as fh:
+                    before = fh.read()
+        except (OSError, ValueError):
+            before = ""
+        return before, str(ti.get("content", ""))
+    edits = [e for e in ti.get("edits") or () if isinstance(e, dict)] or [ti]
+    return ("\n".join(str(e.get("old_string", "")) for e in edits),
+            "\n".join(str(e.get("new_string", "")) for e in edits))
+
+
+def weakened_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
+    """Fires on the CHANGE: a strict verdict the prior text held is gone and a loose shape is
+    introduced in its place. Presence alone is not a weakening, so a fresh write of honest
+    code that happens to use `.startswith(` never fires."""
+    before, after = _prior_and_after(current_event)
+    if not (_strict_forms(before) - _strict_forms(after)):
+        return None
+    return _loose_introduced(current_event=current_event, history=[], pattern=pattern, conn=conn)
+
+
+weakened_RETRY_HINT = "Use '==' for status comparison — not '.startswith()' / '.endswith()' / 're.match' / 're.search', and not membership ('in [...]' / 'in (...)' / 'in {...}', or a string-literal 'in' substring test), and not a verdict that only excludes a failure literal ('!= \'fail\''): name the one value that passes. Loose comparators weaken the verifier per ADR-058 and CLAUDE.md commandment 3."
 weakened_DESCRIPTION = 'verifier predicate weakened — loose-comparator shape'
 
-weakened_CHECK = _Check(id='content.verifier_predicate_weakened', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('constitution/integrity/checks',), retry_hint=weakened_RETRY_HINT, description=weakened_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
+weakened_CHECK = _Check(id='content.verifier_predicate_weakened', applies_at="Pre", posture="BLOCK", predicate_module=__name__, keywords=('startswith', 'endswith', 'match(', 'search(', ' in ', '!=', ' is not ', 'not '), retry_hint=weakened_RETRY_HINT, description=weakened_DESCRIPTION, eats=frozenset({"current_event", "pattern", "conn"}), tests="SPEC")
 # content.illusory_authorship_trailer predicate — illusory Claude/Anthropic-authorship
 # attribution.
 #
@@ -748,15 +924,34 @@ def _read_only(cmd: str) -> bool:
                for s in segs)
 
 
+def _live_trees() -> list[str]:
+    """The install paths the host loads makoto from (installed_plugins.json), or [] when unread."""
+    try:
+        with open(os.path.join(os.path.expanduser("~"), ".claude", "plugins", "installed_plugins.json"),
+                  encoding="utf-8") as f:
+            plugins = json.load(f).get("plugins", {})
+        return [os.path.normpath(e["installPath"]) for k, v in plugins.items()
+                if k.split("@", 1)[0] == "makoto" for e in v if e.get("installPath")]
+    except (OSError, ValueError, AttributeError, KeyError, TypeError):
+        return []
+
+
 def _unreachable_tree(cmd: str) -> str:
-    """The makoto plugin-tree path a command relocates, removes or truncates, or ""."""
+    """The makoto plugin-tree path a command relocates, removes or truncates, or "". A path that
+    shares no prefix with the live install (an orphaned older version) leaves makoto reachable; an
+    unreadable install record counts every plugin-tree path as live."""
+    live = None
     for s in _segments(cmd) or ():
         tool = s[0].rsplit("/", 1)[-1]
         for i, w in enumerate(s):
             if not _PLUGIN_TREE_RX.search(w):
                 continue
             if tool in _UNREACH_CMDS or (i > 0 and s[i - 1] in (">", ">>")):
-                return w
+                live = _live_trees() if live is None else live
+                p = os.path.normpath(os.path.expanduser(w.replace("$HOME", "~", 1)))
+                if not live or any(p == t or t.startswith(p + os.sep) or p.startswith(t + os.sep)
+                                   for t in live):
+                    return w
     return ""
 
 
@@ -1443,7 +1638,10 @@ waiver_CHECK = _Check(id="gate.undischarged_waiver", applies_at="Pre", posture="
 #
 # The fix is to name which layer set the value and where it changes: `git var GIT_AUTHOR_IDENT` /
 # `GIT_COMMITTER_IDENT`, run with the command's own overrides (leading `VAR=`, `env -u`,
-# `export`/`unset`, `git -c`, `-C`, `cd`, `--author=`), is what git itself will stamp.
+# `export`/`unset`, `git -c`, `-C`, `cd`, `--author`), is what git itself will stamp. A `git
+# config` write earlier in the same command is replayed as a `-c` on the later git calls (an
+# `include.path` made absolute against the file it would land in), and an `--author` value built
+# by `$(cat F)` / `$(< F)` / `$VAR` is read the way the shell will expand it (round nine A13).
 #
 # Two edges, one reading. Upstream: a commit-creating git command whose author or committer
 # resolves to Claude is refused before it runs. Damage control: a `git push` whose outgoing
@@ -1494,6 +1692,63 @@ def _split_env(argv: list, env: dict) -> tuple[list, dict]:
     return argv[i:], env
 
 
+_SUBST_RX = _lazy_re(r"\$\(\s*(?:cat\s+|<\s*)([^()\s]+)\s*\)|`\s*cat\s+([^`\s]+)\s*`"
+                     r"|\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
+
+
+def _expand(word: str, cwd: str, env: dict) -> str:
+    """`word` as the shell will expand it, for the read-only substitutions an identity is built
+    from: `$(cat F)`, `$(< F)`, `` `cat F` `` read F (trailing newlines dropped, as `$()` does)
+    and `$VAR` / `${VAR}` read the environment. Anything else is left as written."""
+    def sub(m):
+        path = m.group(1) or m.group(2)
+        if path:
+            try:
+                with open(os.path.join(cwd, os.path.expanduser(path)), encoding="utf-8") as fh:
+                    return fh.read(4096).rstrip("\n")
+            except OSError:
+                return m.group(0)
+        return env.get(m.group(3), "")
+    return _SUBST_RX.sub(sub, word)
+
+
+def _config_write(glob: list, args: list, cwd: str, env: dict) -> list:
+    """`-c key=value` for a `git config [set] [scope] key value` write, so later git calls in the
+    same command read it; [] for a read or anything else. A relative `*.path` is made absolute
+    against the file the write lands in, since `-c` includes must be absolute."""
+    rest = list(args[1:] if args[:1] == ["set"] else args)
+    scope, pos, i = "local", [], 0
+    while i < len(rest):
+        a = rest[i]
+        if a in ("--global", "--system", "--local", "--worktree"):
+            scope = a[2:]
+        elif a in ("-f", "--file") and i + 1 < len(rest):
+            scope, i = os.path.join(cwd, rest[i + 1]), i + 1
+        elif a == "--add":
+            pass
+        elif a.startswith("-"):
+            return []
+        else:
+            pos.append(a)
+        i += 1
+    if len(pos) != 2:
+        return []
+    key, value = pos
+    if key.lower().endswith(".path") and not os.path.isabs(os.path.expanduser(value)):
+        if scope in ("local", "worktree"):
+            base = (_git([*glob, "rev-parse", "--absolute-git-dir"], cwd, env) or "").strip()
+        elif scope == "global":
+            base = env.get("HOME", "")
+        elif scope == "system":
+            return []
+        else:
+            base = os.path.dirname(scope)
+        if not base:
+            return []
+        value = os.path.normpath(os.path.join(base, value))
+    return ["-c", f"{key}={value}"]
+
+
 def _git_parts(argv: list) -> Optional[tuple[list, str, list]]:
     """(global options to replay, subcommand, its arguments) for a `git ...` argv, else None."""
     if not argv or os.path.basename(argv[0]) != "git":
@@ -1523,7 +1778,10 @@ def _commit_finding(glob, sub, args, cwd, env) -> Optional[str]:
         return None
     if _git([*glob, "rev-parse", "--git-dir"], cwd, env) is None:
         return None  # not the repo the command will run in: its local config is unread
-    author = next((a.split("=", 1)[1] for a in args if a.startswith("--author=")), None)
+    author = next((_expand(a.split("=", 1)[1], cwd, env) for a in args
+                   if a.startswith("--author=")), None)
+    if author is None and "--author" in args[:-1]:
+        author = _expand(args[args.index("--author") + 1], cwd, env)
     for role, var in (("author", "GIT_AUTHOR_IDENT"), ("committer", "GIT_COMMITTER_IDENT")):
         if role == "author" and author is not None:
             ident = author
@@ -1564,6 +1822,7 @@ def identity_predicate(*, current_event: dict, history: list, pattern, conn=None
     cmd = (current_event.get("tool_input") or {}).get("command", "") or ""
     cwd = current_event.get("cwd") or os.getcwd()
     env = dict(os.environ)
+    written: list = []  # `git config` writes made earlier in this command, as `-c` pairs
     for argv, _ in _shell_segments(cmd):
         argv, seg_env = _split_env(argv, env)
         if not argv:
@@ -1584,11 +1843,16 @@ def identity_predicate(*, current_event: dict, history: list, pattern, conn=None
         if parts is None:
             continue
         glob, sub, args = parts
+        if sub == "config":
+            written += _config_write(glob, args, cwd, seg_env)
+            continue
+        glob = [*written, *glob]
         msg = (_commit_finding(glob, sub, args, cwd, seg_env) if sub in _COMMITTING
                else _push_finding(glob, args, cwd, seg_env) if sub == "push" else None)
         if msg:
             return Finding(pattern_id=pattern.id, file="Bash command", line=1, level="error",
-                           message=f"row {pattern.id}: {msg}", retry_hint=pattern.retry_hint,
+                           message=f"row {pattern.id} ({pattern.description}): {msg}",
+                           retry_hint=pattern.retry_hint,
                            snippet=" ".join(argv)[:200])
     return None
 
@@ -2314,10 +2578,57 @@ repeated_append_CHECK = _Check(id="event.repeated_append", applies_at="Pre", pos
                description=repeated_append_DESCRIPTION, eats=frozenset({"current_event", "history", "pattern"}),
                tests="SPEC")
 
-# content.fallthrough_match -- a `match` statement introduced with no wildcard `case _:` that
-# raises. Register C5 FALLTHROUGH (+B16 E2): no branch for the shape that arrived, so a foreign
-# shape falls out of the dispatch silently. The witness is the introduced source itself (its AST).
-# Discharge: end the dispatch in `case _: raise ...`.
+# content.fallthrough_match -- register C5 FALLTHROUGH (+B16 E2). THE EFFECT: a dispatch whose
+# unrecognised shape leaves it silently -- no branch raises for the shape that arrived. A dispatch
+# is a `match`, or an `if`/`elif` chain testing one subject (`==`, `is`, `in`, `isinstance`). Its
+# default is the wildcard `case _:` / final `else:`, or, with none, the code the fallthrough
+# reaches next in the same block. The default must RAISE on every path: a raise caught inside that
+# same branch (`try: raise ... except: return None`) is a silent fallthrough. The witness is the
+# introduced source itself (its AST). Discharge: end the dispatch in `case _: raise ...`.
+def _always_raises(body) -> bool:
+    for st in body:
+        if isinstance(st, ast.Raise):
+            return True
+        if isinstance(st, (ast.Return, ast.Continue, ast.Break)):
+            return False
+        if isinstance(st, ast.If) and _always_raises(st.body) and _always_raises(st.orelse):
+            return True
+        if isinstance(st, (ast.With, ast.AsyncWith)) and _always_raises(st.body):
+            return True
+        if isinstance(st, ast.Try):
+            if _always_raises(st.finalbody):
+                return True
+            if _always_raises(st.body) and not st.handlers or \
+                    (st.handlers and all(_always_raises(h.body) for h in st.handlers)
+                     and (_always_raises(st.body) or _always_raises(st.orelse))):
+                return True
+    return False
+
+
+def _dispatch_subject(test):
+    if isinstance(test, ast.Compare) and len(test.ops) == 1 and \
+            isinstance(test.ops[0], (ast.Eq, ast.Is, ast.In)):
+        return ast.dump(test.left)
+    if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "isinstance" \
+            and test.args:
+        return ast.dump(test.args[0])
+    return None
+
+
+def _if_chain_default(node):
+    """An if/elif chain of >= 2 tests on one subject -> (True, its final else body); else (False, None)."""
+    subjects, cur = [], node
+    while True:
+        subjects.append(_dispatch_subject(cur.test))
+        if len(cur.orelse) == 1 and isinstance(cur.orelse[0], ast.If):
+            cur = cur.orelse[0]
+            continue
+        break
+    if len(subjects) < 2 or subjects[0] is None or len(set(subjects)) != 1:
+        return False, None
+    return True, cur.orelse
+
+
 def _unguarded_match(src: str) -> Optional[int]:
     import textwrap as _tw
     for text in (src, _tw.dedent(src)):
@@ -2328,13 +2639,32 @@ def _unguarded_match(src: str) -> Optional[int]:
             continue
     else:
         return None
+    elifs = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Match) and node.cases:
-            last = node.cases[-1]
-            wild = (isinstance(last.pattern, ast.MatchAs) and last.pattern.pattern is None
-                    and last.guard is None)
-            if not (wild and any(isinstance(n, ast.Raise) for b in last.body for n in ast.walk(b))):
-                return node.lineno
+        if isinstance(node, ast.If) and len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
+            elifs.add(id(node.orelse[0]))
+    for parent in ast.walk(tree):
+        for field in ("body", "orelse", "finalbody"):
+            block = getattr(parent, field, None)
+            if not isinstance(block, list):
+                continue
+            for i, node in enumerate(block):
+                default = None
+                if isinstance(node, ast.Match) and node.cases:
+                    last = node.cases[-1]
+                    wild = (isinstance(last.pattern, ast.MatchAs) and last.pattern.pattern is None
+                            and last.guard is None)
+                    default = last.body if wild else []
+                elif isinstance(node, ast.If) and id(node) not in elifs:
+                    is_chain, default = _if_chain_default(node)
+                    if not is_chain:
+                        continue
+                else:
+                    continue
+                if not default:
+                    default = block[i + 1:]
+                if not _always_raises(default):
+                    return node.lineno
     return None
 
 
@@ -2352,16 +2682,16 @@ def fallthrough_predicate(*, current_event: dict, history: list, pattern, conn=N
     if line is None:
         return None
     return Finding(pattern_id=pattern.id, file=fp, line=line, level="error",
-                   message=(f"row {pattern.id} ({pattern.description}): the `match` at line {line} of "
-                            "the introduced text has no `case _:` that raises, so an unrecognised shape "
-                            "falls through silently"),
+                   message=(f"row {pattern.id} ({pattern.description}): the dispatch at line {line} of "
+                            "the introduced text has no default branch that raises, so an unrecognised "
+                            "shape falls through silently"),
                    retry_hint=pattern.retry_hint, snippet=fp[:120])
 
 
 fallthrough_RETRY_HINT = "Every dispatch ends in an error: add `case _: raise ValueError(...)` as the last case."
-fallthrough_DESCRIPTION = "a match statement introduced with no raising wildcard case"
+fallthrough_DESCRIPTION = "a dispatch (match or if/elif) introduced with no default branch that raises"
 fallthrough_CHECK = _Check(id="content.fallthrough_match", applies_at="Pre", posture="BLOCK",
-               predicate_module=__name__, keywords=("match",), retry_hint=fallthrough_RETRY_HINT,
+               predicate_module=__name__, keywords=("match", "elif"), retry_hint=fallthrough_RETRY_HINT,
                description=fallthrough_DESCRIPTION, eats=frozenset({"current_event", "pattern"}),
                tests="SPEC")
 
@@ -2489,9 +2819,6 @@ def _deny(pattern, fp, what, snippet) -> Finding:
                    retry_hint=pattern.retry_hint, snippet=str(snippet)[:120])
 
 
-_CHECKER_RX = _lazy_re(r"(^|[/\\])(checks?[/\\][^/\\]+|[^/\\]*(?:check|lint|audit|verif)[^/\\]*)\.py$", re.I)
-
-
 # content.rule_without_runner -- register B7 RULE WITH NO RUNNER. A rule line (always / never /
 # must / do not) added to any instruction file the harness loads -- CLAUDE*.md (CLAUDE.local.md
 # included), AGENTS*.md, .claude/rules/*.md -- must name what runs it: a `runner:` token, or a path
@@ -2543,10 +2870,12 @@ rule_runner_CHECK = _Check(id="content.rule_without_runner", applies_at="Pre", p
 # checker file (a new `*_predicate`/`check_*` function or a `Check(` row) must name its
 # benign-input pass case in the same change: `pass: <test id or fixture path>`, and the named file
 # must exist. Discharge: write the pass twin and name it.
-# a check ROW or its predicate -- `def x_predicate(`, `def check_x(`, `X_CHECK = Check(` -- not a
-# bare verifier function (`def check(s)`), which content.verifier_predicate_weakened reads.
+# a check ROW or its predicate -- any function (sync or async) named `x_predicate`/`check_x`, or
+# any line that constructs a `Check(` row however it is bound (plain, annotated, in a call) --
+# not a bare verifier function (`def check(s)`), which content.verifier_predicate_weakened reads.
 _NEW_CHECK_RX = _lazy_re(
-    r"^\s*(?:def\s+(?:\w+_(?:predicate|check|gate)|(?:check|predicate|gate)_\w+)\s*\(|\w+\s*=\s*_?Check\s*\()")
+    r"^\s*(?:(?:async\s+)?def\s+(?:\w+_(?:predicate|check|gate)|(?:check|predicate|gate)_\w+)\s*\("
+    r'''|(?!(?:class|def|async)\b|#)[^#]*?(?<![\w'"])_?Check\s*\()''')
 _PASS_RX = _lazy_re(r"\bpass:\s*`?([^\s`]+)")
 
 
@@ -2571,75 +2900,216 @@ check_pass_case_CHECK = _Check(id="content.check_without_pass_case", applies_at=
 
 
 # content.overdetermined_case -- register B21 OVERDETERMINED VERDICT, merge_pass's discriminant
-# rule moved to tests. A change adding two or more verdict cases (test functions named for a fire:
-# fires / blocks / denies / catches / flags / detects) must give each its own `discriminant:` --
-# what only its condition sees -- and no two may share one. Discharge: isolate each condition with
-# its own input and write down what separates it.
+# rule moved to tests. THE EFFECT: two cases added whose inputs differ and whose asserted verdict is
+# the same, so the verdict cannot say which condition gave it. A case is any test function (`def`
+# or `async def test_*`, whatever verb its name uses); its verdict is its assertions with the
+# literals fed to calls blanked (`assert f(1)` and `assert f(2)` share one; `is True` and
+# `is False` do not), its input is the rest of its body.
+# Each case in such a pair must give its own `discriminant:` -- what only its condition sees -- and
+# no two may share one. Discharge: isolate each condition with its own input and write down what
+# separates it.
 _TEST_FILE_RX = _lazy_re(r"(^|[/\\])(test_[^/\\]*|[^/\\]*_test)\.py$")
-_VERDICT_TEST_RX = _lazy_re(r"^\s*def\s+(test_\w*(?:fire|block|den(?:y|ies)|catch|flag|detect)\w*)\s*\(", re.I)
+_VERDICT_TEST_RX = _lazy_re(r"^\s*(?:async\s+)?def\s+(test_\w*)\s*\(")
 _DISCRIMINANT_RX = _lazy_re(r"\bdiscriminant:\s*(.+?)\s*(?:[\"']{3}|$)")
+
+
+class _BlankLiterals(ast.NodeTransformer):
+    """Blank the literals a call is fed (its input); the literal it is compared to (`is False`,
+    `== 3`) is the verdict and stays."""
+    def visit_Call(self, node):
+        node.func = self.visit(node.func)
+        node.args = [_BlankAll().visit(a) for a in node.args]
+        node.keywords = [_BlankAll().visit(k) for k in node.keywords]
+        return node
+
+
+class _BlankAll(ast.NodeTransformer):
+    def visit_Constant(self, node):
+        return ast.copy_location(ast.Constant(value=None), node)
+
+
+def _verdict_and_input(fn) -> tuple:
+    """(the case's asserted verdict with literals blanked, its whole body) as AST dumps."""
+    import copy as _copy
+    body = list(fn.body)
+    if body and isinstance(body[0], ast.Expr) and isinstance(getattr(body[0], "value", None), ast.Constant):
+        body = body[1:]
+    verdict = []
+    for st in body:
+        for n in ast.walk(st):
+            if isinstance(n, ast.Assert) or (isinstance(n, (ast.With, ast.AsyncWith)) and any(
+                    "raises" in ast.dump(i.context_expr) for i in n.items)):
+                shown = n if isinstance(n, ast.Assert) else [i.context_expr for i in n.items]
+                verdict.append(ast.dump(_BlankLiterals().visit(_copy.deepcopy(
+                    shown if isinstance(shown, ast.AST) else ast.Tuple(elts=shown, ctx=ast.Load())))))
+    return tuple(verdict), ast.dump(ast.Module(body=body, type_ignores=[]))
 
 
 def overdetermined_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     fp, added = _added_lines(current_event)
     if not _TEST_FILE_RX.search(fp):
         return None
-    cases, cur = [], None
+    disc, cur = {}, None
     for ln in added:
         m = _VERDICT_TEST_RX.match(ln)
         if m:
-            cur = [m.group(1), None]
-            cases.append(cur)
-        elif re.match(r"^\s*def\s", ln):
+            cur = m.group(1)
+            disc[cur] = None
+        elif re.match(r"^\s*(?:async\s+)?def\s", ln):
             cur = None
-        elif cur is not None and cur[1] is None:
+        elif cur is not None and disc[cur] is None:
             d = _DISCRIMINANT_RX.search(ln)
             if d:
-                cur[1] = " ".join(d.group(1).lower().split())
-    if len(cases) < 2:
+                disc[cur] = " ".join(d.group(1).lower().split())
+    if len(disc) < 2:
         return None
-    bare = [n for n, d in cases if not d]
-    if bare:
-        return _deny(pattern, fp, f"{len(cases)} verdict cases added and {bare[0]} names no discriminant", bare[0])
-    seen = {}
-    for n, d in cases:
-        if d in seen:
-            return _deny(pattern, fp, f"{seen[d]} and {n} are separated by the same discriminant ({d})", n)
-        seen[d] = n
+    import textwrap as _tw
+    tree = None
+    for text in (introduced_text(current_event.get("tool_name", ""), current_event.get("tool_input") or {}),
+                 "\n".join(added)):
+        for t in (text, _tw.dedent(text)):
+            try:
+                tree = ast.parse(t)
+                break
+            except (SyntaxError, ValueError):
+                continue
+        if tree is not None:
+            break
+    if tree is None:
+        return None
+    groups = {}
+    for fn in ast.walk(tree):
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and fn.name in disc:
+            verdict, inp = _verdict_and_input(fn)
+            if verdict:
+                groups.setdefault(verdict, {})[fn.name] = inp
+    for members in groups.values():
+        if len(set(members.values())) < 2:
+            continue
+        names = list(members)
+        bare = [n for n in names if not disc[n]]
+        if bare:
+            return _deny(pattern, fp, f"{len(names)} cases assert the same verdict on different inputs and "
+                         f"{bare[0]} names no discriminant", bare[0])
+        seen = {}
+        for n in names:
+            if disc[n] in seen:
+                return _deny(pattern, fp, f"{seen[disc[n]]} and {n} are separated by the same discriminant "
+                             f"({disc[n]})", n)
+            seen[disc[n]] = n
     return None
 
 
 overdetermined_RETRY_HINT = "Isolate each condition with its own input: give each verdict case a distinct `discriminant: <what only it sees>`."
-overdetermined_DESCRIPTION = "two or more verdict cases added without one distinct discriminant each"
+overdetermined_DESCRIPTION = "two cases added asserting the same verdict on different inputs without one distinct discriminant each"
 overdetermined_CHECK = _Check(id="content.overdetermined_case", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__, keywords=("def test_",), retry_hint=overdetermined_RETRY_HINT,
                description=overdetermined_DESCRIPTION, eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 
 
-# content.exemption_unnamed_region -- register B34 LAW EXEMPTS ITS INSTRUMENT. An exclusion /
-# skip / exempt / ignore / allow list added to a checker file must name the region it leaves
-# unreached (`region: ...`, `unreached: ...`, or NOT-COUNTABLE, as REGISTER-MAP does). Discharge:
-# say, in the change, what the checker no longer reaches.
-_EXEMPTION_RX = _lazy_re(r"^\s*\w*(?:exempt|exclu|skip|ignor|allow)\w*\s*(?::[^=]*)?=\s*[\[({]", re.I)
+# content.exemption_unnamed_region -- register B34 LAW EXEMPTS ITS INSTRUMENT. THE EFFECT: a
+# checker file gains a collection (a literal, or one wrapped in a constructor: `frozenset({...})`)
+# that takes work away from the checker -- read from the file itself, whatever the collection is
+# named: membership in it (or any test reading it) guards a `continue` / `return` / `pass` /
+# `break` or a skip call, it filters a comprehension, or it is passed as an exclude / ignore /
+# skip argument. A collection whose own name declares an exemption (exempt / exclude / skip /
+# ignore / allow) is one before any use is written. It must name the region it leaves unreached
+# (`region: ...`, `unreached: ...`, or NOT-COUNTABLE, as REGISTER-MAP does). A collection that is
+# only iterated leaves nothing unreached and is silent. Discharge: say, in the change, what the
+# checker no longer reaches.
+_EXEMPT_NAME_RX = _lazy_re(r"exempt|exclu|skip|ignor|allow", re.I)
+_EXEMPT_ARG_RX = _lazy_re(r"exclu|ignor|skip|exempt", re.I)
 _REGION_RX = _lazy_re(r"\b(?:region|unreached):\s*\S|NOT-COUNTABLE|OUT-OF-SUBJECT")
+
+
+def _collection_value(v) -> bool:
+    while isinstance(v, ast.Call) and len(v.args) == 1 and not v.keywords:
+        v = v.args[0]
+    return isinstance(v, (ast.List, ast.Set, ast.Tuple, ast.Dict))
+
+
+def _reads(node, name) -> bool:
+    return any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(node))
+
+
+def _skips(body) -> bool:
+    if not body:
+        return False
+    st = body[0]
+    if isinstance(st, (ast.Continue, ast.Return, ast.Pass, ast.Break)):
+        return True
+    return isinstance(st, ast.Expr) and isinstance(st.value, ast.Call) \
+        and _EXEMPT_ARG_RX.search(ast.dump(st.value.func)) is not None
+
+
+def _takes_work_away(tree, name) -> bool:
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.If, ast.While)) and _reads(n.test, name) and _skips(n.body):
+            return True
+        if isinstance(n, ast.comprehension) and any(_reads(c, name) for c in n.ifs):
+            return True
+        if isinstance(n, ast.Call) and any(k.arg and _EXEMPT_ARG_RX.search(k.arg) and _reads(k.value, name)
+                                           for k in n.keywords):
+            return True
+    return False
+
+
+def _parse_any(*texts):
+    import textwrap as _tw
+    for text in texts:
+        for t in (text, _tw.dedent(text)):
+            try:
+                return ast.parse(t)
+            except (SyntaxError, ValueError):
+                continue
+    return None
 
 
 def exemption_region_predicate(*, current_event: dict, history: list, pattern, conn=None) -> Optional[Finding]:
     fp, added = _added_lines(current_event)
-    if not _CHECKER_RX.search(fp):
+    if not _CHECKER_RX.search(fp) or any(_REGION_RX.search(ln) for ln in added):
         return None
-    hit = next((ln for ln in added if _EXEMPTION_RX.match(ln)), None)
-    if hit is None or any(_REGION_RX.search(ln) for ln in added):
+    ti = current_event.get("tool_input") or {}
+    intro = introduced_text(current_event.get("tool_name", ""), ti)
+    tree = _parse_any(intro, "\n".join(added))
+    if tree is None:
         return None
-    return _deny(pattern, fp, "an exemption list is added and the region it leaves unreached is not named: "
-                 + hit.strip()[:80], hit.strip())
+    on_disk = ""
+    try:
+        full = fp if os.path.isabs(fp) else os.path.join(current_event.get("cwd") or "", fp)
+        if os.path.isfile(full):
+            with open(full, encoding="utf-8", errors="replace") as fh:
+                on_disk = fh.read()
+    except OSError:
+        pass
+    whole = _parse_any(on_disk) if on_disk else None
+    added_set = {ln.strip() for ln in added}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Assign):
+            targets, value = n.targets, n.value
+        elif isinstance(n, ast.AnnAssign) and n.value is not None:
+            targets, value = [n.target], n.value
+        else:
+            continue
+        for t in targets:
+            if not isinstance(t, ast.Name) or not _collection_value(value):
+                continue
+            line = intro.splitlines()[n.lineno - 1].strip() if n.lineno <= len(intro.splitlines()) else ""
+            if line and line not in added_set:
+                continue
+            if _EXEMPT_NAME_RX.search(t.id) or _takes_work_away(tree, t.id) or \
+                    (whole is not None and _takes_work_away(whole, t.id)):
+                return _deny(pattern, fp, "an exemption list is added and the region it leaves unreached is "
+                             "not named: " + (line or t.id)[:80], line or t.id)
+    return None
 
 
 exemption_region_RETRY_HINT = "Name every region it cannot reach: add `# region: <what this exemption leaves unchecked>`."
 exemption_region_DESCRIPTION = "an exemption list added to a checker naming no unreached region"
 exemption_region_CHECK = _Check(id="content.exemption_unnamed_region", applies_at="Pre", posture="BLOCK",
                predicate_module=__name__,
-               keywords=("xempt", "xclu", "kip", "gnor", "llow", "XEMPT", "XCLU", "KIP", "GNOR", "LLOW"),
+               keywords=("xempt", "xclu", "kip", "gnor", "llow", "XEMPT", "XCLU", "KIP", "GNOR", "LLOW",
+                         " in ", "continue", "return", "pass", "break"),
                retry_hint=exemption_region_RETRY_HINT, description=exemption_region_DESCRIPTION,
                eats=frozenset({"current_event", "pattern"}), tests="SPEC")
 

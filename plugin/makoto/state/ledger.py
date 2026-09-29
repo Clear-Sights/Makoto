@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - exercised on Windows, and by the injec
 else:
     msvcrt = None
 
-from makoto.kit import bash_output_text, decode_history_event, is_test_runner, normalize_path
+from makoto.kit import bash_output_text, decode_history_event, is_test_runner, normalize_path, spell_path
 from makoto.substrate._canonAtoms import _row_ts
 from makoto.state.store import _state_dir as _chain_state_dir
 
@@ -64,8 +64,8 @@ def _bash_key(ev: dict) -> str:
     cmd = ev.get("tool_input", {}).get("command", "") or ""
     m = _PATH_IN_CMD_RX.search(cmd)
     if m:
-        return normalize_path(m.group("path").strip("`"))
-    return normalize_path(ev.get("cwd", "")) or "bash"
+        return spell_path(m.group("path").strip("`"))
+    return spell_path(ev.get("cwd", "")) or "bash"
 
 
 def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) -> None:
@@ -79,7 +79,7 @@ def record_update(conn, ev: dict, *, event_id: int, session_id: str, root=None) 
     tool = ev.get("tool_name", "")
     tool_input = ev.get("tool_input", {})
     if tool in ("Write", "Edit", "MultiEdit"):
-        key = normalize_path(tool_input.get("file_path", ""))
+        key = spell_path(tool_input.get("file_path", ""))
         if not key:
             return
         # §7.1 content-depth: a Write states the file's FULL content, so record its stripped
@@ -166,9 +166,11 @@ def _upsert(conn, key, kind, value, exit_code, event_id, session_id, *, root=Non
 
 
 def read_key(conn, key: str):
-    """Read the latest ledger row for a normalized key, or None."""
+    """Read the latest ledger row for a key, compared case-folded (keys are recorded as
+    spelled, `kit.spell_path`), or None."""
     r = conn.execute(
-        "SELECT key, value, kind, exit, source_event_id FROM ledger WHERE key = ?",
+        "SELECT key, value, kind, exit, source_event_id FROM ledger WHERE lower(key) = ? "
+        "ORDER BY source_event_id DESC LIMIT 1",
         [normalize_path(key)],
     ).fetchone()
     if not r:

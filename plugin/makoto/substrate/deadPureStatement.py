@@ -353,6 +353,52 @@ def _typed_locals(func) -> set:
     return typed
 
 
+def _killed_stores(func, captured, escaping) -> set:
+    """ids of single-name stores whose value NO read can see: a later statement of the SAME block
+    rebinds the name unconditionally, and nothing between them -- nor the rebinding value itself
+    -- reads it. Liveness by name called `x = 1 + 2; x = a; return x` live because `x` is
+    returned; the value `1 + 2` never is. A `continue`/`break` between the two can skip the
+    rebind and loop back to a read, so it ends the search. Blocks under a `try` are skipped (a
+    handler may read the earlier value after a raise between the two), as are captured and
+    global names."""
+    killed = set()
+    nested = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+    def _reads(node, name):
+        return any(isinstance(n, ast.Name) and n.id == name and not isinstance(n.ctx, ast.Store)
+                   for n in ast.walk(node))
+
+    def _block(stmts):
+        for i, s in enumerate(stmts):
+            name = _assigned_name(s) if isinstance(s, (ast.Assign, ast.AnnAssign)) else None
+            if name is None or name in captured or name in escaping:
+                continue
+            for later in stmts[i + 1:]:
+                if _reads(later, name) or any(isinstance(n, (ast.Continue, ast.Break))
+                                              for n in ast.walk(later)):
+                    break                           # read, or a jump that can skip the rebind
+                if isinstance(later, (ast.Assign, ast.AnnAssign)) and later.value is not None \
+                        and _assigned_name(later) == name:
+                    killed.add(id(s))
+                    break
+
+    def _walk(stmts):
+        _block(stmts)
+        for s in stmts:
+            if isinstance(s, nested) or isinstance(s, _TRY_STMTS):
+                continue
+            for field in ("body", "orelse"):
+                sub = getattr(s, field, None)
+                if isinstance(sub, list) and sub and isinstance(sub[0], ast.stmt):
+                    _walk(sub)
+            if isinstance(s, ast.Match):
+                for case in s.cases:
+                    _walk(case.body)
+
+    _walk(func.body)
+    return killed
+
+
 def illusory_statements(func) -> list:
     """Statements that are provably pure, not effects, and whose result never reaches I/O.
 
@@ -403,13 +449,14 @@ def illusory_statements(func) -> list:
                 _note(stmt.name, stmt.lineno)
         else:
             _bindings(stmt)
+    killed = _killed_stores(func, captured, escaping)
     out = []
     for stmt in func.body:
-        _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out)
+        _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out, killed)
     return out
 
 
-def _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out):
+def _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out, killed=frozenset()):
     # Recurse into EVERY nested block (present-closure / block-containment model). Liveness is
     # function-global, so a pure unused value is dead inside a loop too. Nested def/lambda/class are
     # SEPARATE scopes -> skipped (analyze_file walks them as their own FunctionDefs). try/with-body
@@ -466,7 +513,8 @@ def _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out):
             bound = set()                                   # AnnAssign/AugAssign on a non-Name target
         # Dead iff there is at least one bound name and EVERY one is dead AND uncaptured — any single
         # live/captured target keeps the whole binding live.
-        if bound and all(nm not in live and nm not in captured for nm in bound):
+        if bound and (all(nm not in live and nm not in captured for nm in bound)
+                      or id(stmt) in killed):
             out.append(stmt)
     elif isinstance(stmt, ast.Expr):
         # A bare LITERAL statement is not illusory WORK: a string Constant is a docstring / block
@@ -479,19 +527,32 @@ def _scan(stmt, locals_, escaping, typed, live, captured, first_bind, out):
             out.append(stmt)                                # bare pure computation: illusory
     elif isinstance(stmt, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith)):
         for s in (*stmt.body, *getattr(stmt, "orelse", [])):
-            _scan(s, locals_, escaping, typed, live, captured, first_bind, out)
+            _scan(s, locals_, escaping, typed, live, captured, first_bind, out, killed)
     elif isinstance(stmt, _TRY_STMTS):
         # ast.TryStar (`except*`) carries the identical statement shape — walked identically, so
         # a dead pure statement under `except*` is exactly as visible as under plain `except`.
         for s in (*stmt.body, *[b for h in stmt.handlers for b in h.body],
                   *stmt.orelse, *stmt.finalbody):
-            _scan(s, locals_, escaping, typed, live, captured, first_bind, out)
+            _scan(s, locals_, escaping, typed, live, captured, first_bind, out, killed)
     elif isinstance(stmt, ast.Match):
         # Descend into each case body — a dead pure statement inside a `match` arm is still dead.
         for case in stmt.cases:
             for s in case.body:
-                _scan(s, locals_, escaping, typed, live, captured, first_bind, out)
+                _scan(s, locals_, escaping, typed, live, captured, first_bind, out, killed)
     # ast.FunctionDef / AsyncFunctionDef / Lambda / ClassDef: separate scopes, NOT scanned here.
+
+
+def _scan_module(stmt, out):
+    """Module-scope `_scan` restricted to bare expressions: every name there is a global (never
+    provably pure to read), so only computations over constants qualify."""
+    if isinstance(stmt, ast.Expr):
+        _scan(stmt, frozenset(), frozenset(), frozenset(), frozenset(), frozenset(), {}, out)
+    elif isinstance(stmt, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith)):
+        for s in (*stmt.body, *getattr(stmt, "orelse", [])):
+            _scan_module(s, out)
+    elif isinstance(stmt, _TRY_STMTS):
+        for s in (*stmt.body, *[b for h in stmt.handlers for b in h.body], *stmt.orelse, *stmt.finalbody):
+            _scan_module(s, out)
 
 
 def analyze_file(src: str, path: str) -> list:
@@ -536,6 +597,14 @@ def analyze_file(src: str, path: str) -> list:
                    for li in range(a, b + 1))
     out = []
     try:
+        # The module body is a scope too: a bare pure computation there (`1 + 2`) is dropped
+        # exactly as inside a def. Only bare expressions: a module-level binding is an export.
+        mod_out: list = []
+        for stmt in tree.body:
+            _scan_module(stmt, mod_out)
+        for stmt in mod_out:
+            if not _allowed(stmt):
+                out.append({"file": path, "line": stmt.lineno, "func": "<module>"})
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for stmt in illusory_statements(node):
@@ -568,7 +637,8 @@ def _run(ctx) -> list:
                 file=str(p),
                 line=f["line"],
                 level="error",                               # a BLOCKING finding
-                message=(f"illusory code: {f['func']} line {f['line']} is pure and never reaches I/O. "
+                message=("row gate.liveness (a pure statement whose value nothing reads): "
+                         f"illusory code: {f['func']} line {f['line']} is pure and never reaches I/O. "
                          f"Make it material (use its result / give it an effect) or remove it before this "
                          f"is complete; annotate `# makoto-allow: <reason>` only if it is intentional."),
             ))

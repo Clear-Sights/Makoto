@@ -77,9 +77,10 @@ def render_dispatch() -> list[str]:
         cases = [
             ("clean PreToolUse call", {"hook_event_name": "PreToolUse", "tool_name": "Read",
              "tool_input": {"file_path": "README.md"}, "session_id": "readme-clean", "cwd": str(REPO)}),
-            ("error-level pre-check finding", {"hook_event_name": "PreToolUse", "tool_name": "Write",
+            ("error-level pre-check finding", {"hook_event_name": "PreToolUse", "tool_name": "Edit",
              "tool_input": {"file_path": "constitution/integrity/checks/readme_probe.py",
-                            "content": "if status.startswith('ok'):\n    pass\n"},
+                            "old_string": "return status == 'ok'",
+                            "new_string": "return status.startswith('ok')"},
              "session_id": "readme-pre-block", "cwd": str(REPO)}),
             ("Stop-gate finding", {"hook_event_name": "Stop", "session_id": "readme-stop-block",
              "cwd": str(REPO),

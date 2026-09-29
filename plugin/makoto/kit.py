@@ -50,18 +50,26 @@ from makoto.vocab import (
 # Location is normalized-path EQUALITY (not substring — the fakeexcuse firewall).
 # Quantity is a number compare. Subject-binding gates retraction reasons.
 
-def normalize_path(p: str) -> str:
-    """Case-folded, normalized, trailing-separator-stripped path for equality.
+def spell_path(p: str) -> str:
+    """Normalized, trailing-separator-stripped path, spelled as the filesystem spells it: the
+    form a RECORD keeps. Folding is for equality only (`normalize_path`); a recorded key folded
+    at write time names no file under `Measure-Zero/` on a case-sensitive disk, so every gate
+    that reads a touched file by its key read nothing there.
 
     Separators are forced to forward-slash so a claim/commitment/touched identity is
     platform-stable: os.path.normpath emits '\\' on Windows, which would make the same
     logical path mismatch its POSIX-authored form (Windows-portability fix)."""
     if not p:
         return ""
-    # `.lower()` does the case-folding the docstring promises: `os.path.normcase` is the
-    # identity on POSIX, which silently made every equality/suffix gate built on this
-    # case-sensitive on the platform the hook actually runs on.
-    return os.path.normcase(os.path.normpath(p.strip())).lower().rstrip("/\\").replace("\\", "/")
+    return os.path.normpath(p.strip()).rstrip("/\\").replace("\\", "/")
+
+
+def normalize_path(p: str) -> str:
+    """Case-folded `spell_path`, for EQUALITY: `.lower()` does the folding because
+    `os.path.normcase` is the identity on POSIX, which silently made every equality/suffix gate
+    built on this case-sensitive on the platform the hook actually runs on. Never a record's
+    key: compare with it, record with `spell_path`."""
+    return spell_path(p).lower()
 
 
 # A location is a GENUINE FILE PATH: a known-extension filename, optionally with a

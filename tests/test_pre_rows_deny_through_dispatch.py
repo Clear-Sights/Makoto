@@ -129,6 +129,15 @@ def test_pre_row_allows_its_discharged_twin(tmp_path, row):
     assert row not in (out or ""), f"{row}: denied its discharged twin: {out}"
 
 
+def test_exemption_region_is_silent_on_a_list_that_is_only_iterated(tmp_path):
+    """The same-shape list read in full leaves no region unreached, whatever its name."""
+    state_dir = _setup_state(tmp_path)
+    act = _pre("Write", file_path="lint_check.py", content=(
+        "CARVE_OUTS = ['vendor/']\n\n\ndef roots():\n    for x in CARVE_OUTS:\n        yield x\n"))
+    rc, out = _run_dispatch(state_dir, dict(act, session_id="s", cwd=str(tmp_path)))
+    assert "content.exemption_unnamed_region" not in (out or ""), out
+
+
 def _stop(tmp_path, history, text, transcript=None):
     state_dir = _setup_state(tmp_path)
     for name, body in _FILES.items():
