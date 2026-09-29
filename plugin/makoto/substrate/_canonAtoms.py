@@ -208,6 +208,9 @@ _VAR_RX = _lazy_re(r"\$\{?([A-Za-z_]\w*)\}?")
 _ASSIGN_RX = _lazy_re(r"^([A-Za-z_]\w*)=(.*)$")
 
 
+_BODY_KEYWORDS = frozenset({"do", "then", "else", "{"})
+
+
 def _statement_envs(cmd: str) -> list:
     """[(words, {NAME: value})] per simple statement, each with the bindings made BEFORE it in
     the same shell scope: only a bare `NAME=value` statement binds (an env-prefix `NAME=x cmd`
@@ -224,7 +227,10 @@ def _statement_envs(cmd: str) -> list:
                 envs[scope[:i]] = dict(envs[scope[:i - 1]])
         env = envs[scope]
         out.append((words, dict(env)))
-        m = _ASSIGN_RX.match(words[0]) if len(words) == 1 else None
+        # a loop or branch body's first statement carries its keyword: `do d=/tmp/x$i` binds d
+        # (2026-09-29: a scratch `rm -rf $d` in a for loop read as destruction)
+        bare = words[1:] if len(words) == 2 and words[0] in _BODY_KEYWORDS else words
+        m = _ASSIGN_RX.match(bare[0]) if len(bare) == 1 else None
         if not m:
             continue
         name, value = m.group(1), m.group(2)

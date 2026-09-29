@@ -1,0 +1,4 @@
+{"files": {"src/a.py": "x = 1\n"}, "events": [
+ {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "for i in 1; do d=src; rm -rf $d; done"}, "tool_response": {"stdout": "", "stderr": "", "exitCode": 0}},
+ {"hook_event_name": "Stop", "last_assistant_message": "done"}
+]}

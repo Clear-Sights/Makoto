@@ -795,9 +795,15 @@ def _move_targets(argv, created: set, cwd: str) -> list:
     if sub == "reset" and positional and not os.path.exists(os.path.join(where, positional[0])):
         positional = positional[:1]           # `reset <ref> -- paths`: only the first is a ref
     targets += [a for a in positional if not os.path.exists(os.path.join(where, a))]
-    # A word the shell expands (`$ref`, a command substitution) names nothing readable here.
+    # A word the shell expands (`$ref`, a command substitution) names nothing readable here, except
+    # a ref read out of a file (`"$(cat FILE)"`): the file is what has to have been printed, so it
+    # stands in for the ref (2026-09-29, mesh C/ref_reword1).
+    targets = [(_CAT_SUBST_RX.match(t).group(1) if _CAT_SUBST_RX.match(t) else t) for t in targets]
     return [t for t in targets if t not in created and not any(c in t for c in "$`")
             and _REF_SUFFIX_RX.sub("", t) not in _PSEUDO_REFS]
+
+
+_CAT_SUBST_RX = _lazy_re(r"\$\((?:cat\s+|<\s*)([^\s)$`]+)\)?\Z")
 
 
 def _printed(ref: str, texts) -> bool:
@@ -872,7 +878,7 @@ from makoto.core._shell import _basename, _effective_argv, _shell_segments
 # The dispatch is the launch, on any channel (`kit.launches_worker`): an Agent/Task call, a brief
 # handed to an addressed session through an MCP tool, or a headless `claude -p` Bash command
 # (round nine B11: the last two used to pass because the tool was not on a name list).
-from makoto.kit import launches_worker
+from makoto.kit import launches_worker, reads_only
 # The reads that pay the obligation.
 _PROBE_TOOLS = frozenset({"Read", "Glob", "Grep"})
 # The same read under Bash: a segment whose command position runs one of these read-only readers
@@ -899,14 +905,15 @@ def _is_reader_argv(argv) -> bool:
 
 
 def _is_probe(ev: dict) -> bool:
-    if ev.get("tool_name") in _PROBE_TOOLS:
+    # a settled worker sent only to read was the look itself (kit.reads_only)
+    if ev.get("tool_name") in _PROBE_TOOLS or reads_only(ev):
         return True
     cmd = command_of(ev) if ev.get("tool_name") == "Bash" else ""
     return bool(cmd) and any(_is_reader_argv(argv) for argv, _op in _shell_segments(cmd))
 
 
 _fanout_obligation = unmet_obligation_gate(
-    act=launches_worker,
+    act=lambda ev: launches_worker(ev) and not reads_only(ev),
     guard=_is_probe,
     message=("row gate.unprobed_fanout (a subagent dispatch with no Read, Glob or Grep earlier in "
              "the session): Work is being dispatched to a subagent and no Read, Glob or Grep appears earlier in "

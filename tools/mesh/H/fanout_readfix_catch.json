@@ -1,0 +1,3 @@
+{"events": [
+ {"hook_event_name": "PreToolUse", "tool_name": "Agent", "tool_input": {"description": "Read and fix the parser", "prompt": "Read src/parser.py and fix the off-by-one in tokenize."}}
+]}
