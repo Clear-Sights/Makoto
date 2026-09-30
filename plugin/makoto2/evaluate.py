@@ -1,0 +1,482 @@
+"""V: the one evaluator. Rows (W) x Record (R) x current event -> block dict or None.
+
+Stdlib only, no makoto imports. `record` is R from CANOPY.md "Fixed interface of R" (`.obs`,
+`.observed`, `.objects_of`). Two optional attributes are read with getattr and default to "not
+known": `turn_start` (seq of the last user prompt; absent -> the whole record is the turn) and
+`user_texts` (texts of observed user messages). Neither is in R's fixed interface.
+
+Each row is a pair: owes(event) -> the subjects the act commits to, pays(obs) -> a predicate over
+subjects that one observed effect witnesses (effects from R, never command names). evaluate() runs
+`unwitnessed` over R's settled Obs plus the current event and blocks on the first unpaid subject.
+Outcome is binary: {"row", "message", "objects"} blocks, None is silent.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from typing import Optional
+
+
+# Copied verbatim from Makoto plugin/makoto/kit.py lines 536-561 (Clear-Sights/Makoto a56f0b2).
+def unwitnessed(events, *, owes, pays=None, paid=()):
+    """The one shape: an event owes a witness, and only an earlier event can pay it.
+
+    `owes(ev)` gives the subjects `ev` commits to; `pays(ev)` gives a predicate over subjects
+    that `ev` witnesses, or None. Yields `(ev, subject)` for every subject nothing up to it
+    paid. `paid` seeds predicates that hold before the first event, for a caller whose witness
+    is the whole record rather than one event of it. A witness pays its own event and every
+    later one, never an earlier one. One pass; a predicate that pays everything
+    short-circuits, so an obligation stays O(events).
+
+    `pays` defaults to None -- no per-event witness at all -- for the callers whose witnesses are
+    seeded whole via `paid` (a prior tool response, the whole session's own record, the operator-
+    turn ledger). A caller with nothing to add here need not write its own always-None function.
+
+    The register's families differ only in what counts as the witness: none can pay a held
+    wrong form (SPEC), a second reading of the subject (THE OTHER POINT), an act that selected
+    the branch (THE SWITCH), a read of the source before the write (THE LINEAGE).
+    """
+    paid = list(paid)
+    for ev in events:
+        p = pays(ev) if pays is not None else None
+        if p is not None:
+            paid.append(p)
+        for subject in owes(ev) or ():
+            if not any(q(subject) for q in paid):
+                yield ev, subject
+
+
+# ---------- rows ----------
+
+def load_rows(path: str, cfg: dict) -> list:
+    """rows.tsv -> list of dicts {id, moment, predicate, args(dict), source, cfg}."""
+    with open(path, encoding="utf-8") as fh:
+        lines = [ln.rstrip("\n") for ln in fh if ln.strip()]
+    head = lines[0].split("\t")
+    out = []
+    for ln in lines[1:]:
+        row = dict(zip(head, ln.split("\t")))
+        args = {}
+        for part in filter(None, row.get("args", "").split(";")):
+            k, _, v = part.partition("=")
+            args[k.strip()] = v.strip()
+        row["args"] = args
+        row["cfg"] = cfg
+        out.append(row)
+    return out
+
+
+def load_cfg(path: str) -> dict:
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _load_r():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("makoto2_observed", os.path.join(os.path.dirname(os.path.abspath(__file__)), "observed.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_R = _load_r()
+
+
+def _acts(args):
+    return set(filter(None, args.get("acts", "").split(",")))
+
+
+def evaluate(rows, record, event) -> Optional[dict]:
+    """First row whose moment matches the event and has an unpaid subject -> block; else None."""
+    moment = event.get("hook_event_name", "")
+    for row in rows:
+        if moment not in row["moment"].split(","):
+            continue
+        args, cfg = row.get("args") or {}, row.get("cfg") or {}
+        acts = _acts(args)
+        if acts and not (acts & _R.act_kinds(event)):
+            continue
+        spec = PREDICATES[row["predicate"]]
+        subjects = spec.owes(args, cfg, record, event)
+        if not subjects:
+            continue
+        paid = spec.seed(args, cfg, record) if spec.seed else ()
+        # the current event is not settled: it owes, it never pays
+        pays = (lambda o, _s=spec: None if o is event else _s.pays(args, cfg, o)) if spec.pays else None
+        stream = list(record.obs) + [event]
+        owes = lambda ev, _subj=subjects: _subj if ev is event else ()
+        for _ev, subject in unwitnessed(stream, owes=owes, pays=pays, paid=paid):
+            n = cfg["snippet_len"]
+            return {"row": row["id"],
+                    "message": (f"row {row['id']} ({row['predicate']}): {spec.why} "
+                                f"[{str(subject)[:n]}] -- source: {row['source']}"),
+                    "objects": [str(x) for x in (subject if isinstance(subject, (tuple, frozenset)) else (subject,))]}
+    return None
+
+
+class Spec:
+    def __init__(self, owes, pays=None, seed=None, why=""):
+        self.owes, self.pays, self.seed, self.why = owes, pays, seed, why
+
+
+# ---------- shared readings ----------
+
+# Tools whose output is another session's (agent-authored) text, not a primary observation.
+OTHER_SESSION_TOOLS = frozenset({
+    "mcp__hearthbot__fetch_thread", "mcp__hearthbot__fetch_messages",
+    "mcp__hearthbot__fetch_project_timeline", "mcp__hearthbot__list_thread_sessions",
+    "mcp__claude-code-remote__get_session", "mcp__claude-code-remote__list_events",
+    "mcp__claude-code-remote__get_event", "Agent", "Task", "SendMessage",
+})
+_SOURCE_NAMED_RX = re.compile(r"\b(reports?|reported|says|said|claims?|claimed|per|according to|writes|wrote)\b", re.I)
+
+
+def _text_of(event) -> str:
+    return _R.text_of(event)
+
+
+def _sentences(text: str) -> list:
+    return [s for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+
+
+def _strip_quoted(text: str) -> str:
+    """Drop code spans/blocks, quoted lines and double-quoted spans: words shown, not said."""
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`[^`]*`", " ", text)
+    text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith(">"))
+    return re.sub(r"[\"“][^\"”]*[\"”]", " ", text)
+
+
+def _primary(o) -> bool:
+    return o.tool not in OTHER_SESSION_TOOLS and not o.failed
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", s.replace("’", "'").replace("“", '"').replace("”", '"')).strip().lower()
+
+
+_LEAVES = (str, int, float, bool, type(None))
+
+
+def _walk_user_texts(node, out):
+    if isinstance(node, dict):
+        if node.get("author") == "user":
+            out.extend(node[k] for k in ("body", "text", "content") if isinstance(node.get(k), str))
+        for v in node.values():
+            _walk_user_texts(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _walk_user_texts(v, out)
+    elif isinstance(node, _LEAVES):
+        return
+    else:
+        raise TypeError(f"not a JSON value: {type(node).__name__}")
+
+
+def _user_texts_of(o) -> list:
+    out = []
+    try:
+        _walk_user_texts(json.loads(o.output), out)
+    except (ValueError, TypeError):
+        return []
+    return out
+
+
+def _last_same_call(record, event):
+    last = None
+    for o in record.obs:
+        if o.tool == event.get("tool_name") and o.input == (event.get("tool_input") or {}):
+            last = o
+    return last
+
+
+def _names(o, path: str) -> bool:
+    bare = path.lstrip("./")
+    objs = set(o.objects) | set(o.written) | set(o.created)
+    return any(x == path or x.endswith("/" + bare) or x == bare for x in objs)
+
+
+def _is_act(args, o) -> bool:
+    return bool(_acts(args) & _R.act_kinds({"tool_name": o.tool, "tool_input": o.input}))
+
+
+_DENIAL_RX = re.compile(r"\b(denied|permission|blocked by|hook|not allowed|refused|deny)\b", re.I)
+
+
+def _denied(o) -> bool:
+    return o.failed and bool(_DENIAL_RX.search(o.output or ""))
+
+
+# ---------- rows as (owes, pays) ----------
+
+_ASK_PHRASE_RX = re.compile(
+    r"\b(should i|shall i|do you want|would you like|want me to|let me know (?:if|whether|which)|"
+    r"which (?:one )?do you prefer|can you confirm|please confirm|your call)\b", re.I)
+
+
+def asks_owes(args, cfg, record, event):
+    text = _strip_quoted(_text_of(event))
+    m = _ASK_PHRASE_RX.search(text)
+    if m:
+        return [m.group(0)]
+    return [s.strip() for s in _sentences(text) if s.rstrip().endswith("?")][:1]
+
+
+def thread_owes(args, cfg, record, event):
+    start = getattr(record, "turn_start", None) or 0
+    prior = [o for o in record.obs if _is_act(args, o) and o.seq >= start and not o.failed]
+    return [f"thread started at seq {prior[-1].seq}"] if prior else []
+
+
+_TARGET_KEYS = ("session_id", "thread_id", "thread_ts", "thread", "to")
+
+
+def _target(ti) -> str:
+    return next((str(ti[k]) for k in _TARGET_KEYS if isinstance(ti, dict) and ti.get(k)), "")
+
+
+def pile_owes(args, cfg, record, event):
+    tgt = _target(event.get("tool_input") or {})
+    sends = [o for o in record.obs if _is_act(args, o) and _target(o.input) == tgt and not o.failed]
+    return [(tgt, sends[-1].seq)] if tgt and sends else []
+
+
+def pile_pays(args, cfg, o):
+    if _is_act(args, o) or not o.output:
+        return None
+    return lambda s: s[0] in o.output and o.seq > s[1]
+
+
+_ABSENCE_RXS = [
+    re.compile(r"\bnot signed in(?: to| on)? (?:the )?([\w.\-/]+)", re.I),
+    re.compile(r"([\w.\-/]+) (?:is|are|was|were) (?:still )?(?:missing|not installed|never applied|not there)\b", re.I),
+    re.compile(r"([\w.\-/]+) (?:does not|doesn't|did not|didn't) exist\b", re.I),
+    re.compile(r"\b(?:missing|not installed|never applied):\s*(?:the )?([\w.\-/]+)", re.I),
+    re.compile(r"\b(?:there is|there's|there are|has|have|had) no ([\w.\-/]+)", re.I),
+    re.compile(r"\bno such ([\w.\-/]+)", re.I),
+    re.compile(r"\bno ([\w.\-/]+) (?:exists?|found|anywhere)\b", re.I),
+]
+_STOP_WORDS = frozenset({"it", "this", "that", "they", "the", "a", "an", "one", "thing", "file", "files",
+                         "is", "he", "she", "you", "we", "i", "on", "in", "at", "to", "for", "of"})
+
+
+_GENERIC_ABSENCE = 4          # _ABSENCE_RXS from this index on name no state, only 'no X'
+_REPORTED_RX = re.compile(r"\b(?:said|says|told|claimed|claims|stated|reported|wrote)\b", re.I)
+_SEARCHABLE_RX = re.compile(r"[/._\-\d]|^[A-Z0-9_]{3,}$|[a-z][A-Z]")
+
+
+def absence_owes(args, cfg, record, event):
+    things = []
+    for sentence in _sentences(_strip_quoted(_text_of(event))):
+        for i, rx in enumerate(_ABSENCE_RXS):
+            for m in rx.finditer(sentence):
+                if _REPORTED_RX.search(sentence[:m.start()]):
+                    continue
+                raw = m.group(1).strip(".,;:")
+                if i >= _GENERIC_ABSENCE and not _SEARCHABLE_RX.search(raw):
+                    continue
+                things.append(raw.lower())
+    return [t for t in things if t and t not in _STOP_WORDS]
+
+
+def absence_pays(args, cfg, o):
+    if o.search is None or not o.search[2] or o.failed:
+        return None
+    scope = (str(o.search[0]) + " " + str(o.search[1])).lower()
+    return lambda thing: thing.rsplit("/", 1)[-1] in scope
+
+
+_NUM_RX = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?%?|\d{1,3}(?:,\d{3})+)(?![\w.])")
+
+
+def number_owes(args, cfg, record, event):
+    # a subject only when the number is in another session's text (a relay), not merely unobserved
+    other = [o.output or "" for o in record.obs if o.tool in OTHER_SESSION_TOOLS]
+    out = []
+    for s in _sentences(_text_of(event)):
+        if _SOURCE_NAMED_RX.search(s):
+            continue
+        for m in _NUM_RX.finditer(s):
+            n = m.group(1)
+            if len(re.sub(r"\D", "", n)) >= cfg["min_number_digits"] or "." in n or "%" in n:
+                out.append(n)
+    return [n for n in out if any(re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", t) for t in other)]
+
+
+def number_pays(args, cfg, o):
+    if not _primary(o) or not o.output:
+        return None
+    return lambda n: re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", o.output) is not None
+
+
+_WORDS_CACHE: dict = {}
+
+
+def _words_text(path: str) -> str:
+    if path not in _WORDS_CACHE:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                _WORDS_CACHE[path] = _norm(fh.read())
+        except OSError:
+            _WORDS_CACHE[path] = ""
+    return _WORDS_CACHE[path]
+
+
+_ATTRIB_RX = re.compile(r"(his words|her words|the user(?:'s words)?|gabriel)\b\s*(?:said|wrote|asked|:|,|\()?", re.I)
+_QUOTE_RX = re.compile(r"[\"“]([^\"”]+)[\"”]|^\s*>\s?(.+)$", re.M)
+
+
+def quote_owes(args, cfg, record, event):
+    text, out = _text_of(event), []
+    for a in _ATTRIB_RX.finditer(text):
+        q = _QUOTE_RX.search(text[a.end(): a.end() + cfg["quote_window"]])
+        if not q or q.start() > cfg["quote_gap"]:
+            continue
+        quote = _norm(q.group(1) or q.group(2) or "").strip(" .")
+        if len(quote) >= cfg["quote_min_len"]:
+            out.append(quote)
+    return out
+
+
+def quote_seed(args, cfg, record):
+    words = _words_text(args.get("words", ""))
+    users = [_norm(t) for t in (getattr(record, "user_texts", None) or ())]
+    return [lambda q: q in words or any(q in u for u in users)]
+
+
+def quote_pays(args, cfg, o):
+    if o.tool not in OTHER_SESSION_TOOLS:
+        return None
+    users = [_norm(t) for t in _user_texts_of(o)]
+    return (lambda q: any(q in u for u in users)) if users else None
+
+
+_PATH_RX = re.compile(r"(?<![\w@:/])((?:~|\.{1,2})?/?(?:[\w.\-]+/)+[\w.\-]+\.[A-Za-z0-9]+|/(?:[\w.\-]+/)+[\w.\-]+)")
+
+
+def write_owes(args, cfg, record, event):
+    ti = event.get("tool_input") or {}
+    own = str(ti.get("file_path", ""))
+    named = frozenset(p for p in _PATH_RX.findall(str(ti.get("content", ""))) if p != own)
+    known = frozenset(p for p in named if any(_names(o, p) or p in str(o.output) for o in record.obs))
+    return [tuple(sorted(known))] if known else []
+
+
+def read_pays(args, cfg, o):
+    if o.failed or not (o.tool == "Read" or (o.tool == "Bash" and str(o.output).strip())):
+        return None
+    return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
+
+
+def denied_owes(args, cfg, record, event):
+    last = _last_same_call(record, event)
+    return [last.seq] if last is not None and _denied(last) else []
+
+
+def ran_after_pays(args, cfg, o):
+    return None if o.failed else (lambda seq: o.seq > seq)
+
+
+_UNIT = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}   # seconds per unit (a unit table, not a limit)
+_TIMEOUT_RX = re.compile(r"\btimeout\s+(?:-[-\w]+(?:[= ]\S+)?\s+)*(\d+(?:\.\d+)?)([smhd]?)\b")
+_SLEEP_RX = re.compile(r"\bsleep(?:\s+|\(\s*)(\d+(?:\.\d+)?)([smhd]?)\b")   # shell sleep N, code sleep(N)
+# a time budget written as a setting inside the command: timeout=N, timeout: N, --timeout N, --timeout=N (seconds)
+_SETTING_TIMEOUT_RX = re.compile(r"(?:\b|--)timeout\s*(?:=|:|(?<=--timeout)\s)\s*(\d+(?:\.\d+)?)([smhd]?)\b")
+_FOR_SEQ_RX = re.compile(r"\bfor\s+\w+\s+in\s+(?:\$\(seq\s+(?:(\d+)\s+)?(\d+)\)|\{(\d+)\.\.(\d+)\})[^;]*;\s*do\b(.*?)\bdone\b", re.S)
+_WHILE_RX = re.compile(r"\b(?:while|until)\b.*?\bdo\b(.*?)\bdone\b", re.S)
+
+
+def _ms(n, unit) -> float:
+    return float(n) * _UNIT[unit] * 1000
+
+
+def _sleep_ms(chunk: str) -> float:
+    return sum(_ms(n, u) for n, u in _SLEEP_RX.findall(chunk))
+
+
+def budget_owes(args, cfg, record, event):
+    ti = event.get("tool_input") or {}
+    if ti.get("run_in_background"):
+        return []
+    cmd = str(ti.get("command", ""))
+    limit = float(ti.get("timeout") or cfg["default_tool_timeout_ms"])
+    timeouts = [_ms(n, u) for rx in (_TIMEOUT_RX, _SETTING_TIMEOUT_RX) for n, u in rx.findall(cmd)]
+    rest, looped = cmd, 0.0
+    for m in _FOR_SEQ_RX.finditer(cmd):
+        a, b = (m.group(1) or "1", m.group(2)) if m.group(2) else (m.group(3), m.group(4))
+        looped += max(0, int(b) - int(a) + 1) * _sleep_ms(m.group(5))
+        rest = rest.replace(m.group(0), " ")
+    unbounded = any(_SLEEP_RX.search(m.group(1)) for m in _WHILE_RX.finditer(rest))
+    if unbounded and not timeouts:
+        return [f"unbounded wait loop inside a {int(limit)} ms call"]
+    rest = _WHILE_RX.sub(" ", rest) if unbounded else rest
+    inner = max(timeouts) if unbounded else max([looped + _sleep_ms(rest)] + timeouts)
+    return [f"inner budget {int(inner)} ms > call limit {int(limit)} ms"] if inner > limit else []
+
+
+_LANDED = {
+    "merged": re.compile(r"\bmerged\b", re.I),
+    "landed": re.compile(r"\bmerged\b|\blanded\b|\b[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}\b", re.I),
+    "pushed": re.compile(r"\bpushed\b|\s->\s|Everything up-to-date", re.I),
+    "passed": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
+    "passes": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
+    "shipped": re.compile(r"\bmerged\b|\bshipped\b|\breleased\b", re.I),
+    "green": re.compile(r"\bpassed\b|\bsuccess\b|\bgreen\b", re.I),
+}
+_CLAIM_RX = re.compile(r"\b(merged|landed|pushed|passed|passes|shipped|green)\b", re.I)
+_NEG_RX = re.compile(r"\b(not|never|no|yet|once|until|if|when|before)\b|n't\b", re.I)
+
+
+def landed_owes(args, cfg, record, event):
+    out = []
+    for s in _sentences(_strip_quoted(_text_of(event))):
+        if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
+            continue
+        out += [m.group(1).lower() for m in _CLAIM_RX.finditer(s)
+                if not _NEG_RX.search(s[:m.start()][-cfg["negation_window"]:])]
+    return out
+
+
+def landed_pays(args, cfg, o):
+    if not _primary(o) or not o.output:
+        return None
+    return lambda word: _LANDED[word].search(o.output) is not None
+
+
+def count_owes(args, cfg, record, event):
+    rx = re.compile(
+        r"(?<![\w.])(\d+)\s+(?:[A-Za-z\-]+\s+){0,%d}?(?:in|of|from|at|under|across)\s+`?"
+        r"((?:~|\.{1,2})?/?(?:[\w.\-]+/)*[\w.\-]+\.[A-Za-z0-9]+|/?(?:[\w.\-]+/)+[\w.\-]*)`?" % cfg["count_word_gap"])
+    return [m.group(2).rstrip(".,;:") for m in rx.finditer(_text_of(event))]
+
+
+def repeat_owes(args, cfg, record, event):
+    last = _last_same_call(record, event)
+    if last is None or _denied(last) or not str(last.output).strip():
+        return []
+    return [last.seq] if last.seq >= (getattr(record, "turn_start", 0) or 0) else []
+
+
+def wrote_pays(args, cfg, o):
+    return (lambda seq: o.seq > seq) if (o.written or o.created) else None
+
+
+PREDICATES = {
+    "asks_user": Spec(asks_owes, why="asks the user; threads pick a default and state it"),
+    "second_thread_this_turn": Spec(thread_owes, why="a thread was already started this turn; one at a time"),
+    "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),
+    "absence_unsearched": Spec(absence_owes, absence_pays,
+                               why="claims absence with no empty search whose scope covers it"),
+    "relayed_number": Spec(number_owes, number_pays,
+                           why="a number no primary observation carries and no source is named for"),
+    "user_quote": Spec(quote_owes, quote_pays, quote_seed,
+                       why="quotes the user with words no observed user message or WORDS.tsv holds"),
+    "write_unread_paths": Spec(write_owes, read_pays, why="writes about paths none of which was read"),
+    "denied_retry": Spec(denied_owes, ran_after_pays, why="resends a denied call unchanged with nothing run since"),
+    "budget_exceeds_limit": Spec(budget_owes, why="the inner wait outlives the tool call's own limit"),
+    "landed_unobserved": Spec(landed_owes, landed_pays,
+                              why="claims landed/merged/passed with no status read or run output carrying it"),
+    "count_unread_path": Spec(count_owes, read_pays, why="gives a count for a path never read"),
+    "exact_repeat": Spec(repeat_owes, wrote_pays, why="repeats a settled call with nothing written since"),
+}
