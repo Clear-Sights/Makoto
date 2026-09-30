@@ -127,11 +127,12 @@ def test_plant_blocks_and_lookalike_silent(rows, rid, prec, pev, lrec, lev):
 
 def test_every_row_has_a_case_and_a_verbatim_source(rows):
     assert {r["id"] for r in rows} == {c[0] for c in CASES}
-    mem = open("/tmp/claude/memory/team/silo/MEMORY.md", encoding="utf-8").read()
-    words = open("/mnt/project-files/VERIFY/WORDS.tsv", encoding="utf-8").read()
+    # sources.tsv pins each quote as found in MEMORY.md / WORDS.tsv, which live outside the repo
+    pinned = {ln.split("\t")[0]: ln.rstrip("\n").split("\t")[2]
+              for ln in open(os.path.join(TESTS, "sources.tsv"), encoding="utf-8").readlines()[1:] if ln.strip()}
     for r in rows:
         quoted = r["source"].split(': "', 1)[1].rsplit('"', 1)[0]
-        assert quoted in mem or quoted in words, r["id"]
+        assert pinned.get(r["id"]) == quoted, r["id"]
 
 
 def test_config_keys_cover_config():
