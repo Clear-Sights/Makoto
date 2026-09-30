@@ -10,7 +10,7 @@ which objects an executed event touched.
 
 Objects are paths and identifiers, normalised the same way on both sides:
   - a path-shaped token (holds a "/", or is name.ext) or a Bash operand word, joined onto the
-    event's cwd when relative, then os.path.normpath'd; a trailing ":line[:col]" is dropped;
+    event's cwd when relative, then posixpath.normpath'd; a trailing ":line[:col]" is dropped;
   - a URL, kept verbatim;
   - a result count: a ratio "8/8", or "<n> passed|failed|skipped|error|..." lowercased.
 Equality is exact: observing a directory does not observe the files under it, nor the reverse
@@ -24,6 +24,7 @@ from __future__ import annotations
 import functools
 import json
 import os
+import posixpath
 import re
 import shlex
 from typing import Iterable, NamedTuple, Optional
@@ -206,8 +207,8 @@ def _norm(token: str, cwd: str) -> str:
     if _URL_RX.fullmatch(t) or _RATIO_RX.fullmatch(t):
         return t
     t = os.path.expanduser(t) if t.startswith("~") else t
-    t = os.path.join(cwd, t) if not t.startswith("/") and cwd.startswith("/") else t
-    out = os.path.normpath(t)
+    t = posixpath.join(cwd, t) if not t.startswith("/") and cwd.startswith("/") else t
+    out = posixpath.normpath(t)
     return "" if out == "." else out
 
 
@@ -343,7 +344,7 @@ def _search_of(program, argv, plain, cwd, output, command):
     base = _norm(scope, cwd) or scope
     lines = [ln.strip() for ln in output.splitlines()]
     lines = [ln for ln in lines if ln and not ln.startswith("total ") and not ln.endswith(":")]
-    entries = ({_norm(os.path.join(base, ln.split()[-1]), "") for ln in lines}
+    entries = ({_norm(posixpath.join(base, ln.split()[-1]), "") for ln in lines}
                if program == "ls" else
                {_norm(ln, cwd) for ln in lines} if program == "find" else set())
     return (base, query, not output.strip()), entries
