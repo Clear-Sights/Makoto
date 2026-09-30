@@ -1,8 +1,0 @@
-J1	conduct	event=Pre and tool in {Write,Edit} and not path in STEP_INPUTS
-J2	conduct	event=Pre and tool=Edit and count(tool=Edit and args.old_string=$args.old_string and args.new_string=$args.new_string and path!=$path)>=2 and unseen_since(tool=Bash, tool=Edit and args.old_string=$args.old_string)
-J3	conduct	event=Pre and tool=Bash and not args.run_in_background=true and count(tool=Bash and duration>=30 and not args.run_in_background=true)>=2
-J4	conduct	event=Pre and tool in {Write,Edit} and def.name in SYNONYMS and not seen(tool=Read and path=$def.home)
-J5	conduct	event=Pre and tool=Write and not path in SLOTS
-J6	conduct	event=Pre and tool=Read and seen(tool=Read and path=$path and args.offset=$args.offset and args.limit=$args.limit) and unseen_since(tool in {Write,Edit} and path=$path or event=PreCompact, tool=Read and path=$path)
-J7	conduct	event=Pre and tool=Edit and count(tool=Edit and path=$path, not tool=Edit or path!=$path)>=3
-J8	conduct	event=Pre and tool in {Read,Grep,Bash} and count(tool in {Read,Grep,Bash} and output.size<=2048, tool in {Write,Edit,Agent})>=5

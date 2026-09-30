@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
       }
@@ -28,39 +28,37 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
       }
     ],
     "Stop": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
       }
     ],
     "SubagentStop": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
       }
     ],
-    "SessionStart": [
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/makoto/_dispatch_shim.sh\""
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
       }
