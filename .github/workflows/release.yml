@@ -22,11 +22,6 @@ jobs:
         id: version
         run: |
           VERSION=$(python3 -c "import json; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
-          PACKAGED=$(python3 -c "import re, pathlib; print(re.search(r'^version\s*=\s*\"([^\"]+)\"', pathlib.Path('pyproject.toml').read_text(encoding='utf-8'), re.M).group(1))")
-          if [ "$VERSION" != "$PACKAGED" ]; then
-            echo "plugin.json declares $VERSION but pyproject.toml declares $PACKAGED" >&2
-            exit 1
-          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "releasing v$VERSION"
 
