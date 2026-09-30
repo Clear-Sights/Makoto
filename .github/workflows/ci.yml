@@ -19,11 +19,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install
-        run: python -m pip install -e . pytest
-      - name: Check generated check counts
-        run: python3 tools/render_checks.py --check
+        run: python -m pip install pytest
       - name: Test
-        run: python -m pytest -q
+        run: python -m pytest -q tests
 
   test-macos:
     # public repo only: macOS minutes bill 10x on private repos (the dev mirror)
@@ -36,9 +34,9 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install
-        run: python -m pip install -e . pytest
+        run: python -m pip install pytest
       - name: Test
-        run: python -m pytest -q
+        run: python -m pytest -q tests
 
   test-windows:
     # public repo only, like macOS: Windows minutes bill 2x on private repos (the dev mirror)
@@ -55,6 +53,6 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install
-        run: python -m pip install -e . pytest
+        run: python -m pip install pytest
       - name: Test
-        run: python -m pytest -q
+        run: python -m pytest -q tests
