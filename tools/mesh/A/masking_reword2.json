@@ -1,1 +1,0 @@
-{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "if pytest; then echo ok; fi"}}]}

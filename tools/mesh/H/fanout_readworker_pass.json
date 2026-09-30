@@ -1,3 +1,0 @@
-{"events": [
- {"hook_event_name": "PreToolUse", "tool_name": "Agent", "tool_input": {"subagent_type": "general-purpose", "description": "Read the plan files", "prompt": "Read /mnt/project-files/PLANS/MAKOTO2.md and /mnt/project-files/MAKOTO/mesh/mesh.tsv and report their NEXT sections verbatim. Do not edit anything."}}
-]}

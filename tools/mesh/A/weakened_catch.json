@@ -1,1 +1,0 @@
-{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": {"file_path": "constitution/integrity/checks/status.py", "old_string": "return status == \"ok\"", "new_string": "return status.startswith(\"ok\")"}}]}

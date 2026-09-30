@@ -1,1 +1,0 @@
-{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": "svc/flag_gate2.py", "content": "import os\n\ndef check():\n    if os.environ[\"MODE_X\"]:\n        self.tamper_check()\n"}}]}

@@ -1,4 +1,0 @@
-{"events": [
- {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "bash tests/run.sh"}, "tool_response": {"stdout": "58 passed in 41s", "stderr": "", "exitCode": 0}},
- {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "gh pr merge 47 --squash"}}
-]}

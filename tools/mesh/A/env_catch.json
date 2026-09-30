@@ -1,1 +1,0 @@
-{"events": [{"hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"file_path": "svc/audit_gate.py", "content": "import os\n\ndef check():\n    if os.getenv(\"ENABLE_AUDIT\"):\n        run_audit()\n"}}]}

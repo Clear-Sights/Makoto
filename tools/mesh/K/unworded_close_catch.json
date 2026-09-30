@@ -1,3 +1,0 @@
-{"files": {"makoto.toml": "words_file = \"VERIFY/WORDS.tsv\"\n", "VERIFY/WORDS.tsv": "id\towner words\nW1\tbuild an index of the code so I can find any function by name\nW2\tkeep the index under 1 MB\n"}, "events": [
- {"hook_event_name": "Stop", "last_assistant_message": "Done: the code index is built and every function can be looked up by name."}
-]}

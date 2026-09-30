@@ -1,8 +1,0 @@
-{
- "events": [
-  {
-   "hook_event_name": "Stop",
-   "last_assistant_message": "I don't have the finished session.sh yet. Launch rows is building it and will reply there with the finished session.sh attached. To be exact: nothing has produced the finished session.sh yet, and I haven't written one either."
-  }
- ]
-}
