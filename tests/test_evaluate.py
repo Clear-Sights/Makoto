@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import sys
 from typing import NamedTuple, Optional
 
 import pytest
@@ -138,3 +139,66 @@ def test_every_row_has_a_case_and_a_verbatim_source(rows):
 def test_config_keys_cover_config():
     keys = {ln.split("\t")[0] for ln in open(os.path.join(HERE, "CONFIG_KEYS.txt")) if ln.strip()}
     assert keys == set(json.load(open(os.path.join(HERE, "config.json"))))
+
+
+"""Terminal witnesses bind status and content to the claimed subject."""
+sys.path.insert(0, os.path.dirname(HERE))
+from makoto2.evaluate import landed_owes, landed_pays
+from makoto2.observed import record
+
+
+def observation(output, *, tool='Bash', input=None, code=0):
+    return record([dict(hook_event_name='PostToolUse', tool_name=tool,
+                        tool_input=input or {}, tool_response=dict(stdout=output, exitCode=code))]).obs[0]
+
+
+@pytest.mark.parametrize('output,paid', [
+    ('FAILED test_charge\nsummary: passed', False),
+    ('PASSED test_other\nsummary: passed', False),
+    ('PASSED test_charge', True),
+    ('{"charge":"failed","summary":"passed"}', False),
+    ('{"charge":"passed"}', True),
+    ('charge queued; validation passed', False),
+    ('charge completed; validation passed', True),
+])
+def test_named_status(output, paid):
+    o = observation(output)
+    subjects = landed_owes({}, {'negation_window': 40}, record([]),
+                           dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
+    assert landed_pays({}, {}, o)(subjects[0]) == paid
+
+
+@pytest.mark.parametrize('path,body,paid', [
+    ('out/ledger.json', '', False),
+    ('out/ledger.json', 'broken', False),
+    ('out/ledger.json', '{}', False),
+    ('out/ledger.json', '{"rows":[1]}', True),
+    ('out/ledger.xml', '<ledger>', False),
+    ('out/ledger.xml', '<ledger/>', False),
+    ('out/ledger.xml', '<ledger><row>1</row></ledger>', True),
+])
+def test_artifact(path, body, paid):
+    producer = observation('generated ' + path, input={'command': 'generate > ' + path})
+    r = record([]); r.obs = [producer]
+    subjects = landed_owes({}, {'negation_window': 40}, r,
+                           dict(hook_event_name='Stop', last_assistant_message='Ledger is complete.'))
+    assert not landed_pays({}, {}, producer)(subjects[0])
+    reader = observation(body, tool='Read', input={'file_path': path})
+    payment = landed_pays({}, {}, reader)
+    assert bool(payment and payment(subjects[0])) == paid
+
+
+def test_later_failure_invalidates_success():
+    history = record([dict(hook_event_name='PostToolUse', tool_name='Bash',
+                           tool_input={}, tool_response={'stdout': text})
+                      for text in ('PASSED test_charge', 'FAILED test_charge\nsummary: passed')])
+    subjects = landed_owes({}, {'negation_window': 40}, history,
+                           dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
+    assert not any(landed_pays({}, {}, o)(subjects[0]) for o in history.obs)
+
+
+def test_launcher_success_is_not_job_success():
+    o = observation('charge accepted; validation passed', input={'job': 'charge'}, tool='mcp__worker__launch')
+    subjects = landed_owes({}, {'negation_window': 40}, record([]),
+                           dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
+    assert not landed_pays({}, {}, o)(subjects[0])

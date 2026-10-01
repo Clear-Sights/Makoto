@@ -1,351 +1,72 @@
-# Makoto
+# Makoto 4.0.0
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
 
-**An integrity hook for Claude Code that watches the agent's _own_ tool calls and blocks the ones
-that fake a check.** When Claude says it did something — ran the tests, cited a paper, committed the
-fix, verified the certificate — makoto holds that word against its record. If the deed isn't there,
-or the verification was quietly disabled, makoto blocks the tool call (or the end-of-turn) and hands
-the agent a one-line correction to retry against.
+Makoto is an integrity hook for Claude Code. It checks statements against the
+agent's observed tool effects, blocking a finding or staying silent. Integrity
+here means agreement between a claim and the recorded deed; it does not certify
+code quality or correctness. Live-session outcomes remain unmeasured.
 
-That publication claim is deliberately bounded: Shipped plugin — installable and versioned. The dispatcher is replay-tested against authored sessions; its effect on a live session's outcome is unmeasured.
-
-**Integrity**, as this tool uses the word, is exactly that agreement: a claim the agent made this
-turn is matched by the record of the deed it names. Nothing wider — not correctness, not code
-quality, not whether the deed was a good idea. A gate that only flags a communication-quality
-issue, never a contradiction against the record, does not belong here: makoto blocks or stays silent.
-`makoto.vocab`'s `_INTEG_VOCAB` (vocab.py) is the lexical half of the same idea — the word-set
-naming integrity concepts *in a subject's code* — and is not a second definition of this one.
-
-Checks declare their inputs in `registry.Check.eats`. Runtime outcomes are folded by
-`verdict.apply`; receipt fields come from `state.ledger.emit_receipt`.
-
-## What it catches
-
-makoto fires on mechanical hook events — every `PreToolUse`, `PostToolUse`, and `Stop` — and
-**blocks** on pre-check findings and blocking end-of-turn gate findings. The live inventory is:
-
-<!-- BEGIN GENERATED: check-counts | source: makoto.registry | regenerate: python3 tools/render_checks.py --write -->
-
-- **36 pre-checks**
-- Pre-check ids grouped by dotted prefix — `content`: **19**, `event`: **8**, `gate`: **9**
-- **28 Stop checks** (all checks registered at the Stop edge)
-- **28 end-of-turn gates** (every Stop check reaches the decision)
-- **28 blocking end-of-turn gates** (`posture == BLOCK`)
-- **0 advisory end-of-turn gates** (`posture == ADVISE`)
-
-<!-- END GENERATED: check-counts -->
-
-Two different things are called a *gate* in that list, and the counts are not comparable. The
-`gate.` in a **pre-check id** is a naming prefix and nothing more; an **end-of-turn gate** is any
-check registered at the Stop edge — every one of them reaches the decision pipeline, and its
-`posture` (`BLOCK`/`ADVISE`) alone decides whether a fire blocks the turn. One pre-check carries the prefix today —
-`gate.claude_identity` (Pre-tier, self-defense) — the same naming convention `gate.contract_order`
-used before it was cut 2026-09-18 along with its Stop sibling. Every count above is scoped by
-edge, so no check is counted twice within a line.
-
-**Verifier weakening** — a check silently neutered
-- `content.verifier_predicate_weakened` loose-comparator verifier (`startswith`/`endswith`/`re.match` where `==` is meant)
-- `content.verifier_exit_masking` exit-code masking (`|| true`, `; true`, `set +e` on a test/build/lint)
-- `content.verifier_body_hollowed` hollowed verifier body (`return True` / `pass` in a constitution check)
-- `content.env_gated_audit` audit/verification code gated behind an env var · `content.integrity_suppression_flag` integrity-named suppression flag (`*_skip = true`)
-
-**Fabricated evidence** — a claim with no backing artifact
-- `content.phantom_citation` phantom citation (Author-Year not in `makoto/docs/CITATIONS.md`)
-- `content.unsourced_webfetch` WebFetch of a URL never seen in any prior tool result this session
-- `content.fabricated_commit_sha` fabricated commit SHA/tag presented as proof of a commit
-- `content.illusory_authorship_trailer` an illusory Claude/Anthropic authorship or generation attribution (trailer, session link, routing address, or "Generated with/by Claude" footer) — a plain "Claude Code" product-name mention is not matched
-- `content.illusory_interruption_claim` a fabricated "interrupted by user" claim with no genuine harness-set interruption anywhere in this session's recorded history
-
-**Self-defense**
-- `content.self_mute_guard` makoto self-mute (disabling or un-wiring makoto via `settings.json`)
-- `gate.claude_identity` a commit or push that records Claude as author or committer from the git layer
-
-**Scope & contract discipline** — illusory progress and out-of-contract action (SPEC-5, ported by shape from Assay)
-- `event.thrash_revert` a whole-file Write that reverts a file to an earlier byte-identical content after an intervening different Write (A→B→A, no net progress)
-- `event.nested_budget` an inner `timeout` longer than the Bash call's own limit
-- `event.identical_retry` byte-identical Bash retry immediately following that same call's deterministic failure, with no intervening state change
-
-**Overdefinition** — a claim shaped wider than what was actually measured
-- `content.last_wins` a dict or JSON object repeats a key with a different value, so the last one silently wins
-- `content.bound_as_count` a test asserts a count under a literal ceiling instead of its exact value
-- `content.loosened_after_red` a test assertion loosened while that test's recorded run is red
-- `content.fallthrough_match` a `match` introduced with no raising `case _:`
-- `content.rule_without_runner` a rule line added to CLAUDE.md/AGENTS.md naming no runner that exists
-- `content.check_without_pass_case` a check added to a checker file naming no benign-input pass case
-- `content.overdetermined_case` two or more verdict tests added without a distinct `discriminant:` each
-- `content.exemption_unnamed_region` an exemption list added to a checker naming no unreached region
-- `event.regime_unnamed` (opt-in `require_regime`) code removed on a measured verdict with no `regime:` field
-- `event.repeated_append` a succeeded `>>` append rerun with nothing touching its target since (duplicate rows)
-- `event.owner_path` a delete, overwrite or cut of a path `makoto.toml` declares as the owner's (`owner_paths`)
-
-**End-of-turn gates** — fire on the agent's closing claims, checked against the recorded ledger.
-
-The **certification** column uses the following labels, each naming its own denominator:
-
-- **established** — certified at zero false positives on the named negative sets: the shipped
-  corpus for the ordinary blocking gates (the warning-tier-elimination invariant below — a
-  pattern either blocks at proven zero corpus-FP, or it is cut), and additionally the
-  planted-clean and real-Claude-gold negative sets for `gate.canon_fingerprints` (gold-oracle
-  certification). Zero-FP on those sets is the claim; the live-session false-positive rate
-  accumulates from field use and is not covered by it.
-- **replayed** — a corpus replay ran but is inconclusive by the gate's own admission (the honest
-  corpus almost never carries the triggering precondition), so certification rests instead on
-  held-out adversarial RED fixtures plus that near-vacuous corpus-FP check.
-- **new** — promoted to blocking 2026-09-25 (or added since); not yet corpus-measured. Each names an
-  in-turn discharge, so a false fire costs one act, never a stuck turn.
-
-| Check id | One-line trigger | Fire | Certification |
-|---|---|---|---|
-| `gate.completion` | "done / created `X`" but the artifact isn't on disk | blocking | established |
-| `gate.green_claim` | "suite green" against a recorded test failure | blocking | established |
-| `gate.dropped` | an identifying forward promise left undischarged at turn-end | blocking | established |
-| `gate.fabricated_action` | "I ran `X`" in a turn with no tool call at all | blocking | established |
-| `gate.named_test` | "`test_foo` passes" against a recorded `FAILED` of that named test | blocking | established |
-| `gate.stale_pass` | "all tests pass" against pytest's own live `lastfailed` record | blocking | established |
-| `gate.claimed_running` | "it's running/up" contradicted by this session's own Bash record | blocking | established |
-| `gate.claimed_shipped` | "merged/pushed/live" with no successful remote-mutating call on record | blocking | established |
-| `gate.claimed_consent_absent` | cites the operator's approval, instruction or word in a session whose transcript carries no genuine operator turn at all | blocking | new |
-| `gate.unpaid_acceptance` | a prior-turn dispatch's own ACCEPTANCE command claimed done with no later run of it exiting 0 | blocking | new (opt-in: `makoto.toml` `dispatch = true`) |
-| `gate.run_promised` | the previous turn promised to run something and no Bash call is recorded since | blocking | restored |
-| `gate.unexamined_wall` | states that a fact cannot be determined when no action at all has been taken since the operator's last turn | blocking | new |
-| `gate.liveness` | a statement with no live effect inside a closed function | blocking | established |
-| `gate.hollow_test` | a test gutted so it can never fail (no assert, tautology, swallowed failure, uncollectable) | blocking | established |
-| `gate.canon` | last call ended in an unresolved direct error, or a byte-identical stuck retry loop | blocking | replayed |
-| `gate.canon_fingerprints` | ported canon fingerprints in the robust core established by gold-oracle certification | blocking | established |
-| `gate.self_wired` | makoto's own hook wiring partially stripped from `settings.json` | blocking | new |
-| `gate.plan_item_drift` | open plan/task-labeled commitments sourced from chat prose | blocking | new |
-| `gate.unprobed_fanout` | work dispatched to a subagent with no read, glob or grep before it | blocking (pre-tool deny) | new |
-| `gate.unasked_plan` | a plan presented with no question asked, so an ambiguity was guessed | blocking (pre-tool deny) | new |
-| `gate.unread_structure` | the latest traversal of structured data printed `null` with no structure read before it | blocking | new |
-| `gate.unwitnessed_verifier` | a verifier reporting clean that has never been seen reporting a failure | blocking | new |
-| `gate.unknown_ref_switch` | HEAD moved to a ref nothing in the session had printed | blocking (pre-tool deny) | new |
-| `gate.unobserved_destruction` | content destroyed with no verifier report before it | blocking (pre-tool deny) | new |
-| `gate.relaunched_unchanged` | a second worker launch with no verifier report anywhere before it | blocking (pre-tool deny) | new |
-| `gate.undischarged_waiver` | a checker-silencing directive introduced with no checkable end named beside it | blocking (pre-tool deny) | new |
-| `gate.unnamed_failure` | a counted failure whose recorded failing identity the turn never names | blocking | new |
-| `gate.unverified_merge` | a merge or push to main/master with no clean verifier report settled before it | blocking (pre-tool deny) | new |
-| `gate.unworded_close` | a close citing no row of the owner's words file (opt-in `words_file`) | blocking | new |
-| `gate.unrun_count_claim` | a counted all-pass stated in the reply with no verifier run in the session | blocking | new |
-| `gate.option_interaction` | a failing run made to pass by one option token that nothing written since carries | blocking | new |
-| `gate.gradient_collapse` | a score mapped onto 0/1 at a float threshold that no test written this session carries | blocking | new |
-| `gate.report_before_run` | a run's success written into prose with no verifier run before it | blocking (pre-tool deny) | new |
-| `gate.unclaimed_unit` | a top-level unit added that no turn names, nothing reaches, and no decorator registered | blocking | new |
-| `gate.pasted_fix` | one repair's text edited into a second file with no verifier run after the first landing | blocking | new |
-| `gate.undeclared_falsifiable` | the checks/ catalog itself has an orphan module or a dangling manifest id | blocking | new |
-
-Inspect the pre-tool catalog with `makoto pattern list`; see one pattern in full with `makoto pattern show content.phantom_citation`.
-
-<!-- BEGIN GENERATED: canon-split | source: makoto.substrate._canonAtoms | regenerate: python3 tools/render_checks.py --write -->
-
-- blocking robust core: **4 of 17** ported canon fingerprints
-- advisory remainder: **13** ported canon fingerprints
-
-<!-- END GENERATED: canon-split -->
-
-### Legitimately writing a flagged shape?
-
-Follow the finding's retry hint; exemption scope belongs to the check.
-See [Makoto conventions](plugin/makoto/docs/MAKOTO-CONVENTIONS.md) for the marker syntax.
-
-```python
-if os.environ.get("ENABLE_AUDIT_TRAIL"):  # makoto-allow: app feature, gates user-facing audit logging
-    write_audit_trail()
-```
-
-## Install (plugin)
+## Install
 
 ```
 /plugin marketplace add Clear-Sights/Makoto
 /plugin install makoto@makoto
 ```
 
-Enabling the plugin wires the events declared in [hooks.json](plugin/hooks/hooks.json).
-Its shim executes `python -m makoto.dispatch` from the plugin root.
+The marketplace points at `plugin/`. [hooks.json](plugin/hooks/hooks.json) wires
+PreToolUse, PostToolUse, PostToolUseFailure, Stop, SubagentStop and UserPromptSubmit
+to `cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2`. Python 3.11 or newer is
+required; the runtime uses only the standard library.
 
-State dir + `makoto.record.db` are created lazily on the first hook invocation.
+## Runtime and rules
 
-### Companion setting (optional): suppress the harness auto-trailer
+[observed.py](plugin/makoto2/observed.py) records settled tool effects.
+[rows.tsv](plugin/makoto2/rows.tsv) holds 12 rules and their historical source
+quotes. [evaluate.py](plugin/makoto2/evaluate.py) evaluates those rules, and
+[hook.py](plugin/makoto2/hook.py) emits a pre-tool denial or a Stop/SubagentStop
+block. Other events record effects or mark turn boundaries. Findings fire once
+per rule, object and observed object state; there is no advisory output.
 
-An illusory AI-authorship commit trailer can reach a commit through either path. Pre-Check `content.illusory_authorship_trailer` blocks
-the **agent-authored** one — the trailer typed into a `git commit` message or into file content, the
-surface no setting can reach. The other door is Claude Code's own **automatic** append, which a
-setting governs. To close it at the source, set in `~/.claude/settings.json`:
+The rules cover redundant permission questions, repeated worker starts,
+rebriefing without fetching, unsupported absence claims, unattributed thread
+claims, inaccurate quotes, unread plans, unchanged retries after refusal,
+implicit time limits, unwitnessed completion, unread counts and repeated probes.
+Completion witnesses must match the named subject and operation. Pending launch
+acknowledgements, empty or invalid artifacts, named failures and superseded
+successes cannot stand in for terminal success. This is a bounded evaluator,
+not a claim that every integrity failure is detected. No claim reader is shipped.
 
-```json
-{ "includeCoAuthoredBy": false }
+State is appended lazily to session JSONL files in `~/.claude/makoto2_state`.
+Set `MAKOTO_STATE_DIR` to choose another directory. Runtime defaults are in
+[config.json](plugin/makoto2/config.json), with keys documented in
+[CONFIG_KEYS.txt](plugin/makoto2/CONFIG_KEYS.txt). Some historical rule inputs
+refer to external words files; those are not bundled or created by installation.
+
+## Verify
+
+```
+python -m pip install pytest
+python -m pytest -q tests
 ```
 
-This is defense in depth, not a replacement: the setting closes the auto-append door, `content.illusory_authorship_trailer` closes
-the agent-authored one. makoto's install does **not** write this for you — it leaves `settings.json`
-untouched beyond hook wiring (above); set it yourself if you want the earlier layer.
+CI runs the suite on Linux with Python 3.11, 3.12 and 3.13, and on macOS and
+Windows with Python 3.13. Tests include a blocking plant and silent look-alike
+for every rule, observed-effect cases, completion witness cases, and six hook
+assertions executed during collection. [sources.tsv](tests/sources.tsv) pins
+historical quotes inside the repository; tests do not depend on changing live
+memory files. A pin records historical text, not independently verified provenance.
 
-### Migration from 0.3.0
-
-If you previously ran the old `python -m makoto install` (0.3.0 or earlier), your
-`~/.claude/settings.json` has makoto-managed hook entries. Running the plugin alongside would cause
-double-dispatch. How to tell if you're affected: `grep makoto ~/.claude/settings.json` — any hit
-means the old entries are present. Migrate cleanly:
-
-```bash
-python -m makoto uninstall                   # removes old settings.json entries
-/plugin install https://github.com/Clear-Sights/Makoto  # installs the plugin
-```
-
-## Siblings
-
-Makoto owns the statement surface alongside the independently installed engine for the act.
-Neither inherits or implies the other's coverage. The marketplace inventory is owned by
-[Courthouse](https://github.com/Clear-Sights/Courthouse):
-`claude plugin marketplace add Clear-Sights/Courthouse`.
-
-| Engine | Judges | One line |
-|---|---|---|
-| [**Ward**](https://github.com/Clear-Sights/Ward) | the pending **act** | nothing outright bad happens |
-| **Makoto** (this repo) | the **statement** | words aren't empty |
-
-## Non-plugin install (power users)
-
-```bash
-pip install -e /path/to/makoto
-# Then add makoto hook entries to ~/.claude/settings.json manually — see "Manual wiring" below.
-```
-
-The state dir and `makoto.record.db` are created lazily on the first hook invocation; there is no separate
-init step.
+Manual release reads version `4.0.0` from the plugin manifest to derive its tag.
+The old catalog, CLI, packaging and replay tooling have been replaced by this
+runtime and suite.
 
 ## Uninstall
 
-```bash
-# Plugin install path:
+```
 /plugin uninstall makoto
-
-# Non-plugin settings.json path:
-python -m makoto uninstall   # removes makoto-managed settings.json entries
 ```
 
-The state dir (`~/.claude/makoto_state/`) is preserved on uninstall — `audit.jsonl` and `makoto.record.db`
-remain for forensic value. To fully reset, `rm -rf` the dir.
-
-## CLI
-
-```bash
-python -m makoto status            # patterns loaded, hooks wired, state dir, any patterns muted
-python -m makoto pattern list      # the full live catalog as a table
-python -m makoto pattern show content.phantom_citation  # one pattern in detail
-python -m makoto show src/auth.py  # ledger state for a normalized location key
-python -m makoto install           # non-plugin: wire settings.json directly (prefer the plugin)
-python -m makoto uninstall         # remove makoto-managed settings.json entries
-```
-
-## Manual wiring (fallback)
-
-If you want to inspect or hand-wire what the plugin does, add to the `hooks.PreToolUse`,
-`hooks.PostToolUse`, and `hooks.Stop` arrays of `~/.claude/settings.json`:
-
-```json
-{
-  "matcher": "*",
-  "hooks": [{"type": "command", "command": "python -m makoto.dispatch"}]
-}
-```
-
-## Dispatcher outcomes
-
-The shipped shim communicates findings using the measured response fields below. Invalid input is
-the distinct process-error path.
-
-<!-- BEGIN GENERATED: dispatch-contract | source: plugin/makoto/_dispatch_shim.sh | regenerate: python3 tools/render_checks.py --write -->
-
-| Outcome | Observed mechanism | Process exit |
-|---|---|---|
-| clean PreToolUse call | no blocking decision | **0** |
-| error-level pre-check finding | stdout JSON `hookSpecificOutput.permissionDecision='deny'` | **0** |
-| Stop-gate finding | stdout JSON `decision='block'` | **0** |
-| invalid/non-object payload | no blocking decision | **2** |
-
-<!-- END GENERATED: dispatch-contract -->
-
-## Fire level
-
-`dispatch._OUTCOME_FOR_LEVEL` maps findings to outcomes; `verdict.apply` applies
-`MAKOTO_MODE` and the oversight clamp. The wire tables determine which outcomes each hook emits.
-The local-verifier branch of `content.verifier_exit_masking` can emit an advisory finding.
-
-### Declaring your verifiers (`makoto.toml`)
-
-`content.verifier_exit_masking` recognises a verifier three ways, and only the first two guess
-at names. `_LEAD_RUNNER_RX` is a closed vocabulary of ecosystem runners (`pytest`, `go test`,
-`npm test`) — unambiguous, so it blocks. `_LOCAL_SCRIPT_VERIFIER_RX` is a heuristic over file
-naming (`gates.sh`, `ci-check.sh`) — it cannot see a verifier whose name says nothing, and it
-matches `check-deploy.sh`, which may be a deploy step, so it only ever advises.
-
-The third way is to tell makoto. A `makoto.toml` at your repository root:
-
-```toml
-# Programs this repository verifies itself with.
-verifiers = ["eval/replay.py", "bin/verify-everything", "go"]
-```
-
-A declared program's masked exit code is **blocked**, not merely surfaced: a declaration is a
-statement by the only party that knows, not a guess about spelling. Entries match exactly — the
-token as written, or its trailing path component — never by glob, substring or stem. The
-declaration is additive only: it cannot switch the naming heuristic off, because a file that
-could suppress findings would be a self-mute lever (`content.self_mute_guard`'s subject). With no
-`makoto.toml`, behaviour is unchanged. See `plugin/makoto/core/_declaredverifiers.py`.
-
-## Retry hints
-
-Blocking findings carry their retry hints and conventions through `dispatch._emit_decision`
-into the JSON response.
-
-## Audit log
-
-Firings append to `$MAKOTO_STATE_DIR/audit.jsonl`; clean dispatches do not.
-The row schema is `state.audit.AuditRow`. Its `exit_code` records raw finding severity
-in `dispatch._record_audit`, independently of the dispatcher's process exit.
-
-### The error log
-
-`$MAKOTO_STATE_DIR/dispatch_errors.jsonl` is the other half, and it is the half that matters when
-something goes wrong: one row per predicate that raised and per dispatch-stage can't-evaluate. Every
-row carries `plugin`, `session_id`, `tool_name`, `hook_event` and `id_source`.
-
-Those fields were missing. `audit.jsonl` has carried the session and tool since 1.0.2 and this log
-carried neither — so a *fire* was attributable and a *miss* was not, and every row here is a check
-that did not run. When a batch of fail-opens landed together, "did they affect this session?" could not
-be answered from the record. `id_source` says how the ids were obtained (`payload`, or `raw-scan`
-when the envelope did not parse and they had to be recovered from the raw text); a recovered id
-that does not admit it was recovered is worse than no id.
-
-Row dispositions are `loud-allow` (a check did not run), `BLOCK`, `REPAIRED` (the envelope carried
-bytes that had to be fixed, and evaluation then continued normally), and `NOTE`.
-
-### Fail-open notices
-
-`dispatch._emit_notices` reports buffered carriage faults when the host wire permits.
-Check and audit failures retain their own reporting paths.
-
-### Failure mode
-
-Audit writes are best-effort. If the append fails (disk full, permission denied), dispatch prints one
-stderr line and continues with its original exit code. The audit subsystem cannot cause makoto to
-mis-block or mis-allow a tool call — a fundamental separation-of-concerns invariant.
-
-## Receipt: word → deed → record → receipt
-
-Every touched file, test run and redirect is a hash-chained row in the record, and
-`makoto receipt --session <id>` reports the session's claims and exemptions, each claim bound
-to a `verify_chain`-checkable row.
-
-### Reproduce it: corpus replay
-
-`python3 eval/replay.py` from the repository root replays recorded sessions through the real
-dispatcher. The executable summary below measures its derailment fixtures, total result, and
-success contract.
-
-<!-- BEGIN GENERATED: replay | source: eval/replay.py | regenerate: python3 tools/render_checks.py --write -->
-
-- corpus replay: **4 derailments**, **5/5** sessions pass; the command exits successfully only when every expectation holds
-
-<!-- END GENERATED: replay -->
+Uninstall preserves the state directory. Earlier standalone installations should
+remove their old manually managed hook entries before enabling the plugin to
+avoid running both implementations.

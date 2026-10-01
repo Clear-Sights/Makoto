@@ -1,10 +1,18 @@
 {
   "name": "makoto",
-  "description": "Holds Claude Code to its word — every claim checked against the agent's own logged record; faked checks blocked, not warned. Two-tier catalog (36 pre-checks, 28 Stop gates), each shipped at measured zero false positives.",
+  "description": "Checks statements against observed tool effects using 12 source-pinned rules; blocks findings or stays silent, with subject-bound completion witnesses.",
   "version": "4.0.0",
-  "author": {"name": "Clear-Sights"},
+  "author": {
+    "name": "Clear-Sights"
+  },
   "homepage": "https://github.com/Clear-Sights/Makoto",
   "repository": "https://github.com/Clear-Sights/Makoto",
   "license": "Apache-2.0",
-  "keywords": ["claude-code", "guardrails", "integrity", "hooks", "makoto"]
+  "keywords": [
+    "claude-code",
+    "guardrails",
+    "integrity",
+    "hooks",
+    "makoto"
+  ]
 }
