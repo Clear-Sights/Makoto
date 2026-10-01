@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import xml.etree.ElementTree as ET
 from typing import Optional
 
 
@@ -424,8 +425,17 @@ _LANDED = {
     "shipped": re.compile(r"\bmerged\b|\bshipped\b|\breleased\b", re.I),
     "green": re.compile(r"\bpassed\b|\bsuccess\b|\bgreen\b", re.I),
 }
-_CLAIM_RX = re.compile(r"\b(merged|landed|pushed|passed|passes|shipped|green)\b", re.I)
+_CLAIM_RX = re.compile(r"\b(merged|landed|pushed|passed|passes|shipped|green|completed?|ready)\b", re.I)
 _NEG_RX = re.compile(r"\b(not|never|no|yet|once|until|if|when|before)\b|n't\b", re.I)
+_PENDING_RX = re.compile(r"\b(queued|pending|running|started|launched)\b", re.I)
+
+
+def _subject_words(text):
+    # Identifier components also bind prose names to test nodes and job IDs.
+    return set(re.findall(r"[a-z][a-z0-9]*", text.lower())) - _STOP_WORDS - {
+        "all", "check", "checks", "test", "tests", "generation",
+        "successfully", "consumers", "and", "ci", "has", "was", "rest", "their", "failed", "passed", "suite", "run",
+        "now", "already", "still", "currently"}
 
 
 def landed_owes(args, cfg, record, event):
@@ -433,15 +443,107 @@ def landed_owes(args, cfg, record, event):
     for s in _sentences(_strip_quoted(_text_of(event))):
         if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
             continue
-        out += [m.group(1).lower() for m in _CLAIM_RX.finditer(s)
-                if not _NEG_RX.search(s[:m.start()][-cfg["negation_window"]:])]
+        for m in _CLAIM_RX.finditer(s):
+            if _NEG_RX.search(s[:m.start()][-cfg["negation_window"]:]):
+                continue
+            word = m.group(1).lower()
+            names = _subject_words(re.split(r"\band\b|;", s[:m.start()], flags=re.I)[-1])
+            artifacts = {p for o in record.obs for p in (o.written | o.created |
+                         set(re.findall(r"(?:--output(?:=|\s+)|-o\s+)([^\s;]+)",
+                                        str(o.input.get("command", "")))))
+                         if _subject_words(os.path.splitext(os.path.basename(p))[0]) <= names
+                         and _subject_words(os.path.splitext(os.path.basename(p))[0])}
+            # An artifact commits to its bytes, not a generator's exit or existence.
+            if word in ("complete", "completed", "ready"):
+                jobs = any(names & _subject_words(str(o.input.get("job_id", "")) +
+                           " ".join(re.findall(r"\bjob_id[=:]([\w-]+)", o.output)))
+                           for o in record.obs)
+                if not artifacts and not jobs:
+                    continue
+            else:
+                artifacts = set()
+            if artifacts:
+                out.extend((word, p, "artifact", max((o.seq for o in record.obs
+                           if _names(o, p) and (o.written or o.created or
+                              re.search(r"(?:--output|\s-o)(?:=|\s)", str(o.input.get("command", ""))))), default=-1))
+                           for p in sorted(artifacts))
+            else:
+                # Structured check names and job identifiers determine binding;
+                # prose around an aggregate result is not itself a check identifier.
+                identifiers = set()
+                for o in record.obs:
+                    for line in o.output.splitlines():
+                        try:
+                            value = json.loads(line)
+                        except ValueError:
+                            value = None
+                        if isinstance(value, dict):
+                            identifiers.update(str(k) for k, v in value.items()
+                                               if re.fullmatch(r"pass(?:ed)?|green|success|fail(?:ed)?|error", str(v), re.I))
+                        identifiers.update(re.findall(r"[\w./-]+::[\w:.-]+", line))
+                        identifiers.update(re.findall(r"\b(?:FAILED?|PASSED?|ERROR)\s+([^;,]+)", line, re.I))
+                    identifiers.update(str(v) for k, v in o.input.items() if k in ("job", "job_id"))
+                    identifiers.update(re.findall(r"\bjob_id[=:]([\w-]+)", o.output))
+                bound = names & set().union(*(_subject_words(x) for x in identifiers)) if identifiers else set()
+                names = frozenset(bound or (names if len(names) == 1 else set()))
+                failed_at = max((o.seq for o in record.obs if any(
+                    names & _subject_words(line) and re.search(r"\b(fail(?:ed)?|error|queued|pending|running)\b", line, re.I)
+                    for line in o.output.splitlines())), default=-1)
+                out.append((word, names, "status", failed_at))
     return out
 
 
+def _valid_artifact(o, path):
+    if o.tool not in ("Read", "Write") or not _names(o, path):
+        return False
+    body = str(o.input.get("content", "") if o.tool == "Write" else o.output).strip()
+    if not body:
+        return False
+    try:
+        if path.lower().endswith(".json"):
+            return bool(json.loads(body))
+        if path.lower().endswith(".xml"):
+            root = ET.fromstring(body)
+            return bool(len(root) or (root.text or "").strip())
+    except (ValueError, ET.ParseError):
+        return False
+    return True
+
+
 def landed_pays(args, cfg, o):
-    if not _primary(o) or not o.output:
+    if not _primary(o) or not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
         return None
-    return lambda word: _LANDED[word].search(o.output) is not None
+
+    def pays(subject):
+        word, names, kind, after = subject
+        if o.seq < after:
+            return False
+        if kind == "artifact":
+            return o.exit in (None, 0) and _valid_artifact(o, names)
+        if o.input.get("run_in_background") or o.tool.endswith("__launch") or _PENDING_RX.search(o.output):
+            return False
+        rx = _LANDED.get(word, re.compile(r"\b(completed?|ready)\b", re.I))
+        # JSON status fields and individual text lines keep named outcomes separate
+        # from summaries. Input identifiers bind status APIs, never launch acknowledgements.
+        for line in o.output.splitlines():
+            try:
+                value = json.loads(line)
+            except ValueError:
+                value = None
+            if isinstance(value, dict):
+                if any((not names or _subject_words(str(k)) & names or
+                        (k in ("status", "state") and names & _subject_words(line + json.dumps(o.input))))
+                       and rx.search(str(v)) for k, v in value.items()):
+                    return True
+                continue
+            if names & _subject_words(line) and re.search(r"\b(fail(?:ed)?|error)\b", line, re.I):
+                continue
+            if rx.search(line) and (not names or names & _subject_words(line)
+                                   or names & _subject_words(json.dumps({k: v for k, v in o.input.items()
+                                       if k != "command" or word in ("merged", "landed", "pushed", "shipped")}))):
+                return True
+        return False
+    return pays
 
 
 def count_owes(args, cfg, record, event):
