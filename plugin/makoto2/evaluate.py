@@ -132,7 +132,7 @@ def evaluate(rows, record, event) -> Optional[dict]:
             spec = DISPATCH_SPECS.get(row["id"], spec)
         subjects = spec.owes(args, cfg, record, event)
         if row["id"] == "R11" and moment == "Stop":
-            subjects = [s for s in subjects if s[2] in ("acceptance", "artifact")
+            subjects = [s for s in subjects if s[2] in ("acceptance", "artifact", "status")
                         or s[0] not in ("shipped", "pushed", "landed", "merged", "done", "fixed", "finished", "complete", "completed", "ready", "failed") ]
         if not subjects:
             continue
