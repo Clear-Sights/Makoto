@@ -549,7 +549,8 @@ def landed_pays(args, cfg, o):
 
 _COST_CLAIM_RX = re.compile(
     r"\b(?:saves?|saved|saving|reduces?|reduced|cuts?|cut|lowers?|lowered)\b"
-    r"[^.!?\n]{0,80}\b(?:costs?|tokens?|money|bill|spend|token usage)\b|"
+    r"\s+(?:(?:the|our|input|output|billed|total|operating|\$?[\d.,]+%?)\s+){0,4}"
+    r"(?:costs?|tokens?|money|bill|spend)\b|"
     r"\b(?:cost|token|money|bill)\s+savings\b|\benabled savings\b", re.I)
 _COST_NUMBER = r"(?:\$\s*)?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?"
 
