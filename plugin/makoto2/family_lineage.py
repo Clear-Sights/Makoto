@@ -51,6 +51,9 @@ def readings(record, reader):
         # A quoted value is backed by an actual source's content, not a relay.
         if identities:
             sources[obs.output] = digest(obs.output)
+            for name in references(obs.output, cwd, reader):
+                if not ('/' in name or '.' in os.path.basename(name)):
+                    sources[name] = digest(name)
     return sources, owned
 
 
@@ -71,7 +74,10 @@ def lineage_refs(record, event, reader):
     refs.update(event.get('refs') or ())
     own = reader._norm((event.get('tool_input') or {}).get('file_path', ''), cwd)
     refs.difference_update(owned | {own})
-    return sorted(name for name in refs if name not in sources)
+    return sorted(name for name in refs if name not in sources
+                  and not any(name in o.output for o in record.obs
+                              if not o.failed and (o.tool in ('Read', 'WebFetch')
+                                  or getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('source_reads'))))
 
 
 def lineage_drift(record, event, reader):
@@ -97,7 +103,7 @@ def lineage_drift(record, event, reader):
                 with open(path, encoding='utf-8') as source:
                     current = digest(source.read())
             except OSError:
-                current = None
+                continue  # No current tree reading is available; do not invent drift.
         if current != sources[name]:
             changed.append(name)
     return changed
