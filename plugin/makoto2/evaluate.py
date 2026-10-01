@@ -101,6 +101,7 @@ def evaluate(rows, record, event) -> Optional[dict]:
         if family_lineage.lineage_absence(record, event, _R):
             return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
         for predicate, row, citation in (
+            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:495,782 F2/H3"),
             (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
         ):
             subjects = predicate(record, event, _R)

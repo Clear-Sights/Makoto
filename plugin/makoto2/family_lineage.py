@@ -167,3 +167,19 @@ def unpaid(record, event, reader):
     if event.get('hook_event_name') not in ('PreToolUse', 'Stop', 'SubagentStop'):
         return []
     return [('unread', n) for n in lineage_refs(record, event, reader)] + [('changed', n) for n in lineage_drift(record, event, reader)]
+
+
+def lineage_edit(record, event, reader):
+    from makoto2.family_spec import history, args, verifier_keys, is_verifier
+    if event.get('hook_event_name') != 'PreToolUse' or event.get('tool_name') != 'Edit':
+        return []
+    new = args(event).get('new_string')
+    path = reader._norm(args(event).get('file_path', ''), event.get('cwd', ''))
+    events = history(record)
+    edits = [i for i, e in enumerate(events) if e.get('tool_name') == 'Edit'
+             and args(e).get('new_string') == new]
+    if not edits or not any(reader._norm(args(events[i]).get('file_path', ''),
+                            events[i].get('cwd', event.get('cwd', ''))) != path for i in edits):
+        return []
+    keys = verifier_keys(record)
+    return [] if any(is_verifier(e, keys) for e in events[edits[-1]+1:]) else [path]
