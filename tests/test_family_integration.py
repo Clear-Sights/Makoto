@@ -33,3 +33,17 @@ def test_workspace_supplies_named_sets_without_a_default_vocabulary(tmp_path):
     decision=hook.main(json.dumps(event),cfg,rows,observed.record,evaluate.evaluate)
     assert decision['hookSpecificOutput']['permissionDecision']=='deny'
     assert 'B2/B5/B20' in decision['hookSpecificOutput']['permissionDecisionReason']
+
+
+def test_agent_history_survives_dispatch_optout(tmp_path):
+    cfg,rows=candidate();cfg['state_dir']=str(tmp_path/'state')
+    event={'hook_event_name':'PreToolUse','session_id':'history','cwd':str(tmp_path),'tool_name':'Agent','tool_input':{'prompt':'Inspect'}}
+    assert hook.main(json.dumps(event),cfg,rows,observed.record,evaluate.evaluate)=={}
+    decision=hook.main(json.dumps(event),cfg,rows,observed.record,evaluate.evaluate)
+    assert 'E13' in decision['hookSpecificOutput']['permissionDecisionReason']
+
+
+def test_toml_assignment_is_not_a_python_ast(tmp_path):
+    cfg,rows=candidate()
+    event={'hook_event_name':'PreToolUse','cwd':str(tmp_path),'tool_name':'Write','tool_input':{'file_path':'config.toml','content':'[ci]\naudit_skip = true\n'}}
+    assert evaluate.evaluate(rows,observed.record([]),event) is None

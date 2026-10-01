@@ -121,7 +121,8 @@ def findings(record, event, cfg):
     """Read native hook inputs and explicit settled run responses at the boundary."""
     from makoto2.family_other import _facts
     ti=event.get('tool_input') or {}
-    if event.get('hook_event_name')=='PreToolUse' and event.get('tool_name') in ('Write','Edit'):
+    if (event.get('hook_event_name')=='PreToolUse' and event.get('tool_name') in ('Write','Edit')
+            and str(ti.get('file_path','')).endswith('.py')):
         source=ti.get('content',ti.get('new_string',ti.get('new','')))
         try:
             defects=switch_tree(source)

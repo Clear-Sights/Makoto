@@ -84,7 +84,7 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
                                   and e.get("tool_name") in ("Agent", "Task")]
     config["settings"] = {"makoto": {"dispatch": config["dispatch"]}}
     finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
-    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + (("PreToolUse",) if config["dispatch"] or ev.get("tool_name") not in ("Agent", "Task") else ()):
+    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
         sigma_append(path, {"event": ev})
     if key:
         sigma_append(path, {"key": key})

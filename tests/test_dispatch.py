@@ -41,11 +41,12 @@ def run_session(tmp_path, declaration, prompt=BRIEF, run=None, claim='Done.'):
 
 
 @pytest.mark.parametrize('declaration',[None,'dispatch = false','dispatch = "true"','dispatch = [','[other]\ndispatch = true'])
-def test_optout_has_no_contract_or_pre_state(tmp_path,declaration):
+def test_optout_has_no_dispatch_contract(tmp_path,declaration):
     result,cfg=run_session(tmp_path,declaration,prompt='Fix the parser.')
     assert result == {}
     events,_=hook.sigma_read(hook.sigma_path(cfg['state_dir'],'dispatch-test'))
-    assert all(e['hook_event_name'] in ('PostToolUse', 'Stop') for e in events)
+    assert cfg['dispatch'] is False
+    assert all(o.tool != 'Agent' for o in observed.record(events).obs)
 
 
 @pytest.mark.parametrize('prompt,row',[

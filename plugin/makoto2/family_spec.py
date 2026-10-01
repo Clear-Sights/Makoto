@@ -198,7 +198,7 @@ def claims(text, record):
     for o in record.obs:
         identities.update(re.findall(r'\b(?:FAILED|ERROR)\s+([\w./:\[\]-]+)',o.output))
     result=[]
-    for sentence in re.split(r'(?<=[.!?])\s+|\n',str(text or '')):
+    for sentence in re.split(r'(?<=[.!?])\s+|\n|\s+[-—–]+\s+|;',str(text or '')):
         if sentence.rstrip().endswith('?'):
             result.append(Claim('question','',False,False));continue
         quoted = re.findall(r'`([^`]+)`',sentence)
