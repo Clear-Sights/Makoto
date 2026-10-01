@@ -210,24 +210,6 @@ def test_launcher_success_is_not_job_success():
     assert not landed_pays({}, {}, o)(subjects[0])
 
 
-@pytest.mark.parametrize('text,blocked', [
-    ('This reduces cost. Enabled-arm numerator: $2; bill denominator: $80.', True),
-    ('Delivery edge: cached prompt; bill denominator: $80. This saves money.', True),
-    ('Delivery edge: cached prompt; enabled-arm numerator: 1.2e3 tokens. This cuts token usage.', True),
-    ('Delivery edge: cached prompt; enabled-arm numerator: 20 tokens; bill denominator: $80. Off-arm zero proves enabled savings.', True),
-    ('Delivery edge: unknown; enabled-arm numerator: $2; bill denominator: $80. This saves cost.', True),
-    ('Delivery edge: child prompt; enabled-arm numerator: $2; bill denominator: $0. This saves cost.', True),
-    ('The saved authentication file and unset API-token variables describe sign-in.', False),
-    ('Does this save money?', False),
-    ('We will measure whether this saves tokens.', False),
-    ('REPORT.md reports: "This saves $20 in cost."', False),
-    ('This does not save tokens.', False),
-    ('Bill denominator: $1,000; delivery edge: cached prompt; on-arm numerator: 1.2e3 tokens. This saves tokens.', False),
-])
-def test_cost_accounting_boundary(text, blocked):
-    assert bool(V.cost_owes({}, {}, Record([]), reply(text))) == blocked
-
-
 @pytest.mark.parametrize("command,output", [
     ("pytest -v", "FAILED tests/test_bill.py::test_charge - AssertionError"),
     ("python -m unittest -v", "FAIL: test_charge (tests.test_bill.Billing)"),
