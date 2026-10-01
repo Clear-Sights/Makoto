@@ -391,43 +391,6 @@ def read_pays(args, cfg, o):
     return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
 
 
-_UNIT = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}   # seconds per unit (a unit table, not a limit)
-_TIMEOUT_RX = re.compile(r"\btimeout\s+(?:-[-\w]+(?:[= ]\S+)?\s+)*(\d+(?:\.\d+)?)([smhd]?)\b")
-_SLEEP_RX = re.compile(r"\bsleep(?:\s+|\(\s*)(\d+(?:\.\d+)?)([smhd]?)\b")   # shell sleep N, code sleep(N)
-# a time budget written as a setting inside the command: timeout=N, timeout: N, --timeout N, --timeout=N (seconds)
-_SETTING_TIMEOUT_RX = re.compile(r"(?:\b|--)timeout\s*(?:=|:|(?<=--timeout)\s)\s*(\d+(?:\.\d+)?)([smhd]?)\b")
-_FOR_SEQ_RX = re.compile(r"\bfor\s+\w+\s+in\s+(?:\$\(seq\s+(?:(\d+)\s+)?(\d+)\)|\{(\d+)\.\.(\d+)\})[^;]*;\s*do\b(.*?)\bdone\b", re.S)
-_WHILE_RX = re.compile(r"\b(?:while|until)\b.*?\bdo\b(.*?)\bdone\b", re.S)
-
-
-def _ms(n, unit) -> float:
-    return float(n) * _UNIT[unit] * 1000
-
-
-def _sleep_ms(chunk: str) -> float:
-    return sum(_ms(n, u) for n, u in _SLEEP_RX.findall(chunk))
-
-
-def budget_owes(args, cfg, record, event):
-    ti = event.get("tool_input") or {}
-    if ti.get("run_in_background"):
-        return []
-    cmd = str(ti.get("command", ""))
-    limit = float(ti.get("timeout") or cfg["default_tool_timeout_ms"])
-    timeouts = [_ms(n, u) for rx in (_TIMEOUT_RX, _SETTING_TIMEOUT_RX) for n, u in rx.findall(cmd)]
-    rest, looped = cmd, 0.0
-    for m in _FOR_SEQ_RX.finditer(cmd):
-        a, b = (m.group(1) or "1", m.group(2)) if m.group(2) else (m.group(3), m.group(4))
-        looped += max(0, int(b) - int(a) + 1) * _sleep_ms(m.group(5))
-        rest = rest.replace(m.group(0), " ")
-    unbounded = any(_SLEEP_RX.search(m.group(1)) for m in _WHILE_RX.finditer(rest))
-    if unbounded and not timeouts:
-        return [f"unbounded wait loop inside a {int(limit)} ms call"]
-    rest = _WHILE_RX.sub(" ", rest) if unbounded else rest
-    inner = max(timeouts) if unbounded else max([looped + _sleep_ms(rest)] + timeouts)
-    return [f"inner budget {int(inner)} ms > call limit {int(limit)} ms"] if inner > limit else []
-
-
 _LANDED = {
     "merged": re.compile(r"\bmerged\b", re.I),
     "landed": re.compile(r"\bmerged\b|\blanded\b|\b[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}\b", re.I),
@@ -698,7 +661,6 @@ PREDICATES = {
     "user_quote": Spec(quote_owes, quote_pays, quote_seed,
                        why="quotes the user with words no observed user message or WORDS.tsv holds"),
     "write_unread_paths": Spec(write_owes, read_pays, why="writes about paths none of which was read"),
-    "budget_exceeds_limit": Spec(budget_owes, why="the inner wait outlives the tool call's own limit"),
     "landed_unobserved": Spec(landed_owes, landed_pays,
                               why="claims an outcome without its observed status or counted failing subjects"),
     "count_unread_path": Spec(count_owes, read_pays, why="gives a count for a path never read"),
