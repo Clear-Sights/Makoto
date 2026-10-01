@@ -11,3 +11,4 @@ R10	PreToolUse	budget_exceeds_limit	acts=run	field catch 21:16Z; MEMORY.md STAND
 R11	PreToolUse,Stop	landed_unobserved	acts=say	MEMORY.md OWNED FAILURES: "told him an in-progress step as landed (22:35Z)"
 R12	PreToolUse,Stop	count_unread_path	acts=say	MEMORY.md OWNED FAILURES: "claimed before checking"
 R13	PreToolUse	exact_repeat		MEMORY.md STANDING RULES: "Nothing done before may cost a token again."
+R14	PreToolUse,Stop	cost_unaccounted	acts=say,brief	B14 MECHANISM AS OUTCOME; C16 target-reaching measurement: REPORT.md step6: "Enabled-arm exposure is not observable"

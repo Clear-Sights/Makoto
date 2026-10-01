@@ -115,6 +115,8 @@ CASES = [
      Record([Obs(1, "Bash", {"command": "ls /r"}, "a b"),
              Obs(2, "Write", {"file_path": "/r/c"}, "", written=frozenset({"/r/c"}))]),
      pre("Bash", command="ls /r")),
+    ("R14", Record([]), reply("This change saves tokens."),
+     Record([]), reply("This change saves tokens. Delivery edge: child prompt; enabled-arm measured numerator: 20 tokens; bill denominator: $80.")),
 ]
 
 
@@ -202,3 +204,21 @@ def test_launcher_success_is_not_job_success():
     subjects = landed_owes({}, {'negation_window': 40}, record([]),
                            dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
     assert not landed_pays({}, {}, o)(subjects[0])
+
+
+@pytest.mark.parametrize('text,blocked', [
+    ('This reduces cost. Enabled-arm numerator: $2; bill denominator: $80.', True),
+    ('Delivery edge: cached prompt; bill denominator: $80. This saves money.', True),
+    ('Delivery edge: cached prompt; enabled-arm numerator: 1.2e3 tokens. This cuts token usage.', True),
+    ('Delivery edge: cached prompt; enabled-arm numerator: 20 tokens; bill denominator: $80. Off-arm zero proves enabled savings.', True),
+    ('Delivery edge: unknown; enabled-arm numerator: $2; bill denominator: $80. This saves cost.', True),
+    ('Delivery edge: child prompt; enabled-arm numerator: $2; bill denominator: $0. This saves cost.', True),
+    ('The saved authentication file and unset API-token variables describe sign-in.', False),
+    ('Does this save money?', False),
+    ('We will measure whether this saves tokens.', False),
+    ('REPORT.md reports: "This saves $20 in cost."', False),
+    ('This does not save tokens.', False),
+    ('Bill denominator: $1,000; delivery edge: cached prompt; on-arm numerator: 1.2e3 tokens. This saves tokens.', False),
+])
+def test_cost_accounting_boundary(text, blocked):
+    assert bool(V.cost_owes({}, {}, Record([]), reply(text))) == blocked

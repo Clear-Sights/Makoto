@@ -546,6 +546,42 @@ def landed_pays(args, cfg, o):
     return pays
 
 
+
+_COST_CLAIM_RX = re.compile(
+    r"\b(?:saves?|saved|saving|reduces?|reduced|cuts?|cut|lowers?|lowered)\b"
+    r"\s+(?:(?:the|our|input|output|billed|total|operating|\$?[\d.,]+%?)\s+){0,4}"
+    r"(?:costs?|tokens?|money|bill|spend)\b|"
+    r"\b(?:cost|token|money|bill)\s+savings\b|\benabled savings\b", re.I)
+_COST_NUMBER = r"(?:\$\s*)?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?"
+
+
+def cost_owes(args, cfg, record, event):
+    """A savings assertion must name its accounting scope in the same message.
+
+    Explicit labelled fields keep this an omission check, not a causal oracle.
+    Questions, future measurements and quotations are not asserted savings.
+    An off-arm zero cannot supply an enabled-arm numerator.
+    """
+    text = _strip_quoted(_text_of(event))
+    claims = [s for s in _sentences(text) if _COST_CLAIM_RX.search(s)
+              and not s.rstrip().endswith("?")
+              and not re.search(r"\b(?:will|plan(?:ning)? to|intend to|whether|would|could|might)\b", s, re.I)
+              and not re.search(r"\b(?:does not|doesn't|did not|cannot|can't|no)\s+(?:save|reduce|cut|lower|savings)\b", s, re.I)]
+    if not claims:
+        return []
+    edge = re.search(r"\bdelivery (?:edge|path)\s*:\s*([^;\n.!?]+)", text, re.I)
+    enabled = re.search(r"\b(?:enabled|on)[ -]arm (?:measured )?numerator\s*:\s*"
+                        + _COST_NUMBER + r"\s*(?:tokens?|USD|dollars?)?", text, re.I)
+    bill = re.search(r"\bbill denominator\s*:\s*(" + _COST_NUMBER + r")", text, re.I)
+    denominator = float(bill[1].replace("$", "").replace(",", "").replace(" ", "")) if bill else 0
+    off_zero = any(re.search(r"\boff[ -]arm\b[^.!?\n]*(?:\bzero\b|(?<![\d.])0(?![\d.]))", s, re.I)
+                   for s in claims)
+    if (not edge or edge[1].strip().lower() in {"none", "unknown", "unobserved", "n/a"}
+            or not enabled or denominator <= 0 or off_zero):
+        return claims
+    return []
+
+
 def count_owes(args, cfg, record, event):
     rx = re.compile(
         r"(?<![\w.])(\d+)\s+(?:[A-Za-z\-]+\s+){0,%d}?(?:in|of|from|at|under|across)\s+`?"
@@ -565,6 +601,7 @@ def wrote_pays(args, cfg, o):
 
 
 PREDICATES = {
+    "cost_unaccounted": Spec(cost_owes, why="savings need a delivery edge, enabled-arm numerator and bill denominator; off-arm zero is not enabled savings"),
     "asks_user": Spec(asks_owes, why="asks the user; threads pick a default and state it"),
     "second_thread_this_turn": Spec(thread_owes, why="a thread was already started this turn; one at a time"),
     "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),

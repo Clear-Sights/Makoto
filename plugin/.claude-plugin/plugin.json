@@ -1,7 +1,7 @@
 {
   "name": "makoto",
   "description": "Checks statements against observed tool effects using 12 source-pinned rules; blocks findings or stays silent, with subject-bound completion witnesses.",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "author": {
     "name": "Clear-Sights"
   },
