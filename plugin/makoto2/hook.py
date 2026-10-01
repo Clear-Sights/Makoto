@@ -63,9 +63,15 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
     # Dispatch is a workspace contract; invalid or absent declarations are off.
     try:
         with open(os.path.join(ev.get("cwd") or os.getcwd(), "makoto.toml"), "rb") as fh:
-            config["dispatch"] = tomllib.load(fh).get("dispatch") is True
+            declaration = tomllib.load(fh)
+            config["dispatch"] = declaration.get("dispatch") is True
+            tables = declaration.get("named_sets", {})
+            if isinstance(tables, dict):
+                config["named_sets"] = {k: v for k, v in tables.items()
+                                        if isinstance(v, list) and all(isinstance(x, str) for x in v)}
     except (OSError, ValueError):
         config["dispatch"] = False
+        config["named_sets"] = {}
     path = sigma_path(config["state_dir"], ev.get("session_id", ""))
     events, keys = sigma_read(path)
     record = record_fn(events + ([ev] if ev.get("hook_event_name") in SETTLED else []))
@@ -78,7 +84,7 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
                                   and e.get("tool_name") in ("Agent", "Task")]
     config["settings"] = {"makoto": {"dispatch": config["dispatch"]}}
     finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
-    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
+    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + (("PreToolUse",) if config["dispatch"] or ev.get("tool_name") not in ("Agent", "Task") else ()):
         sigma_append(path, {"event": ev})
     if key:
         sigma_append(path, {"key": key})

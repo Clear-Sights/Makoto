@@ -138,7 +138,9 @@ def spec_write(record, event, cfg):
     ti = args(event);text = content(event);path = str(ti.get('file_path',ti.get('path','')))
     out = []
     test = matches(cfg, 'TEST_PATH', path)
-    if test and not re.search(r'\b(assert|raise|expect)', text):
+    from makoto2 import family_switch
+    adapted={'event':'Pre','tool':event.get('tool_name'),'path':path,'content':text}
+    if any(family_switch.switch_write(adapted,pattern) for pattern in cfg.get('named_sets',{}).get('TEST_PATH',())):
         out.append(finding(('B2','B5','B20'),path,'not args.content matches "\\b(assert|raise|expect)" and path matches TEST_PATH', 'SPEC.write'))
     if matches(cfg,'WAIVER',text) and not re.search(r'\b(until|expires|remove by)\b',text):
         out.append(finding(('B9',),path,'args.content matches WAIVER and not args.content matches "\\b(until|expires|remove by)\\b"','SPEC.write'))
@@ -221,6 +223,18 @@ def claims(text, record):
     return result
 
 
+def read_claims(record,event):
+    explicit=event.get('claim')
+    if not isinstance(explicit,dict):
+        from makoto2 import observed
+        return [c._asdict() for c in claims(observed.text_of(event),record)]
+    claim=dict(explicit)
+    if 'falsifier' not in claim:
+        subject=claim.get('subject')
+        claim['falsifier']=bool(subject and subject in verifier_keys(record))
+    return [claim]
+
+
 def spec_claim(record, event, cfg):
     out=[];ti=args(event)
     dispatch=cfg.get('settings',{}).get('makoto',{}).get('dispatch') is True
@@ -230,13 +244,15 @@ def spec_claim(record, event, cfg):
             out.append(finding(('I1',),'brief','not (args.prompt matches "(?m)^READ:" and args.prompt matches "(?m)^WRITE:" and args.prompt matches "(?m)^ACCEPTANCE:")','R04'))
     if not stop(event):return out
     raw=history(record)
-    for claim in claims(event.get('last_assistant_message',''),record):
-        if claim.kind=='pass' and not any(settled(e) and exit_of(e)==0 and
-                re.search(re.escape(claim.subject),str(args(e).get('command',''))) for e in raw):
+    from makoto2 import family_switch,family_lineage,family_other,observed
+    observations=[{'command':o.input.get('command',''),'exit':o.exit} for o in record.obs]
+    for value in read_claims(record,event):
+        claim=Claim(value.get('kind',''),value.get('subject',''),value.get('names',False),bool(value.get('falsifier')))
+        if claim.subject and family_switch.switch_pass({'event':'Stop','claim':value},observations):
             out.append(finding(('A7','C3'),claim.subject,'claim.kind=pass and not seen(exit=0 and args.command matches $claim.subject)','R11'))
-        if claim.kind in ('clean','absent') and not claim.falsifier:
+        if claim.kind in ('clean','absent') and family_lineage.lineage_absence(record,event,observed):
             out.append(finding(('C2','B32'),claim.subject,'claim.kind in {clean,absent} and not claim.falsifier','R05'))
-        if claim.kind=='done' and claim.subject and not (Path(event.get('cwd') or '.')/claim.subject).exists():
+        if claim.kind=='done' and any(entry=='D1' and subject==claim.subject for entry,subject in family_other.other_claim(record,event,observed,cfg.get('dispatch',False))):
             out.append(finding(('C7','D1'),claim.subject,'claim.kind=done and not tree.$claim.subject.exists','R11'))
         if claim.kind=='shipped' and not any(settled(e) and exit_of(e)==0 and re.search(r'git\s+push',str(args(e).get('command',''))) for e in raw):
             out.append(finding(('C10',),claim.subject,'claim.kind=shipped and not seen(args.command matches "git\\s+push" and exit=0)','R11'))
@@ -285,34 +301,11 @@ def spec_history(record, event, cfg):
 
 
 def spec_refs(record,event,cfg):
-    from makoto2 import observed, lineage
+    from makoto2 import observed, family_lineage
     if not (pre(event) or stop(event)):return []
-    text = observed.text_of(event)
-    if event.get('tool_name') in ('Write','Edit'):text=content(event)
-    if not text:return []
-    sources,owned=lineage.readings(record,observed)
-    refs=observed._text_objects(re.sub(r'(?<=\w)\.(?=\s|$)', '', text),event.get('cwd') or '')
-    refs={p.rstrip('.!?') for p in refs if '/' in p or '.' in os.path.basename(p)}
-    refs.update(re.findall(r'\b[0-9a-f]{7,40}\b',text))
-    # Quoted values, URL content and revision IDs are read from returned source
-    # bytes; a mere mention in a call or an assistant's answer never pays.
-    values=set()
-    for e in history(record):
-        if not settled(e) or e.get('tool_name') not in ('Read','WebFetch') or exit_of(e) not in (None,0):continue
-        response=e.get('tool_response',{});body=observed._flatten(response)
-        values.update(re.findall(r'\b[0-9a-f]{7,40}\b',body))
-        values.update(re.findall(r'["\u201c]([^"\u201d]+)["\u201d]',body))
-        if e.get('tool_name')=='WebFetch' and args(e).get('url'):sources[str(args(e)['url'])]='read'
-    quotes=re.findall(r'["\u201c]([^"\u201d]+)["\u201d]',text)
-    refs.update(value for value in quotes if value not in values)
-    own=observed._norm(args(event).get('file_path',''),event.get('cwd') or '')
-    refs.discard(own)
-    out=[]
-    for name in sorted(refs-owned-values):
-        relative=os.path.relpath(name,event['cwd']) if event.get('cwd') and name.startswith(event['cwd']+'/') else name
-        if name not in sources and relative not in sources:
-            out.append(finding(('A2','G1','H1','H4','H5'),name,'refs(output)-source.read!={}','R08'))
-    return out
+    return [finding(('A2','G1','H1','H4','H5'), name,
+                    'refs(output)-source.read!={} -- source: REGISTRY-v9.md:79,543,761,793,803','R08')
+            for name in family_lineage.lineage_refs(record,event,observed)]
 
 
 def evaluate(record,event,cfg):

@@ -115,3 +115,36 @@ def switch_doc(event, observations, doc_path):
             and event.get('claim', {}).get('kind') == 'pass'
             and re.search(doc_path, event.get('path', '')) is not None
             and not any(o.get('verifier') for o in observations))
+
+
+def findings(record, event, cfg):
+    """Read native hook inputs and explicit settled run responses at the boundary."""
+    from makoto2.family_other import _facts
+    ti=event.get('tool_input') or {}
+    if event.get('hook_event_name')=='PreToolUse' and event.get('tool_name') in ('Write','Edit'):
+        source=ti.get('content',ti.get('new_string',ti.get('new','')))
+        try:
+            defects=switch_tree(source)
+        except (SyntaxError,TypeError,ValueError):
+            defects=[]
+        entries={'gradient':'A6','fallthrough':'C5','unused_result':'E1','recovery':'E9'}
+        for predicate,line in defects:
+            yield {'row':'SWITCH.'+predicate,'message':entries[predicate]+': '+predicate,'objects':[str(ti.get('file_path','')),str(line)]}
+        from makoto2.family_spec import read_claims,verifier_keys
+        doc_paths=cfg.get('named_sets',{}).get('DOC_PATH',())
+        observations=[{'verifier':o.input.get('command') in verifier_keys(record)} for o in record.obs]
+        for claim in read_claims(record,event):
+            adapted={'event':'Pre','tool':event.get('tool_name'),'path':ti.get('file_path',''),'claim':claim}
+            if any(switch_doc(adapted,observations,path) for path in doc_paths):
+                yield {'row':'SWITCH.doc','message':'C11: no verifier seen','objects':[adapted['path']]}
+    if event.get('hook_event_name')=='Stop':
+        entries={'clean_base':'B10','isolated_row':'B21','replay_sequence':'B28','own_tree':'B34','settings':'E8'}
+        required={'suite_on_clean_base':('checks',),'plant':('reddened_rows','plant'),
+                  'suite':('replay_sequence',),'gate_on_own_tree':('verdict',)}
+        for response in _facts(record):
+            run=response.get('run')
+            needs=required.get(run,()) if isinstance(run,str) else ()
+            if any(k not in response for k in needs) or ('shipped' in response and 'tested' not in response):
+                continue
+            for predicate in switch_run(response):
+                yield {'row':'SWITCH.'+predicate,'message':entries[predicate]+': '+predicate,'objects':[str(response)]}

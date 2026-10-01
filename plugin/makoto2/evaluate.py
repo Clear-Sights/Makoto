@@ -17,7 +17,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from makoto2.lineage import unpaid as lineage_unpaid
-from makoto2 import family_spec, family_lineage
+from makoto2 import family_spec, family_lineage, family_switch
 from makoto2.family_other import findings as other_findings
 from typing import Optional
 
@@ -101,7 +101,6 @@ def evaluate(rows, record, event) -> Optional[dict]:
         if family_lineage.lineage_absence(record, event, _R):
             return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
         for predicate, row, citation in (
-            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:782 H3/F2"),
             (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
         ):
             subjects = predicate(record, event, _R)
@@ -112,11 +111,13 @@ def evaluate(rows, record, event) -> Optional[dict]:
     cfg = rows[0].get("cfg", {}) if rows else {}
     for finding in other_findings(record, event, _R, cfg.get("dispatch", False)):
         return finding
+    for finding in family_switch.findings(record,event,cfg):
+        return finding
     for row in rows:
         if moment not in row["moment"].split(","):
             continue
         args, cfg = row.get("args") or {}, row.get("cfg") or {}
-        if row["id"] in ("R05", "R06", "R07", "R12"):
+        if row["id"] in ("R05", "R07", "R12"):
             continue
         acts = _acts(args)
         dispatch_brief = (cfg.get("dispatch") and moment == "PreToolUse"
@@ -132,7 +133,7 @@ def evaluate(rows, record, event) -> Optional[dict]:
         subjects = spec.owes(args, cfg, record, event)
         if row["id"] == "R11" and moment == "Stop":
             subjects = [s for s in subjects if s[2] in ("acceptance", "artifact")
-                        or s[0] not in ("pass", "passed", "green", "shipped", "pushed", "landed", "merged", "done", "fixed", "finished", "complete", "completed", "ready", "failed") ]
+                        or s[0] not in ("shipped", "pushed", "landed", "merged", "done", "fixed", "finished", "complete", "completed", "ready", "failed") ]
         if not subjects:
             continue
         paid = spec.seed(args, cfg, record) if spec.seed else ()

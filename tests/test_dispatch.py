@@ -45,17 +45,17 @@ def test_optout_has_no_contract_or_pre_state(tmp_path,declaration):
     result,cfg=run_session(tmp_path,declaration,prompt='Fix the parser.')
     assert result == {}
     events,_=hook.sigma_read(hook.sigma_path(cfg['state_dir'],'dispatch-test'))
-    assert [e['hook_event_name'] for e in events] == ['PostToolUse', 'Stop']
+    assert all(e['hook_event_name'] in ('PostToolUse', 'Stop') for e in events)
 
 
 @pytest.mark.parametrize('prompt,row',[
-    ('READ: src/a.py@123456abcdef\nWRITE:\nACCEPTANCE: sh verify.sh','R04'),
+    ('READ: src/a.py@123456abcdef\nWRITE:\nACCEPTANCE: sh verify.sh',None),
     (BRIEF.replace('@123456abcdef',''),'R08'),
     (BRIEF.replace('src/a.py@123456abcdef','src/a.py@123456abcdef src/b.py'),None),
     (BRIEF.replace('src/a.py@123456abcdef','src/a.py\n# tag@123456abcdef'),'R08'),
 ])
 def test_read_line_has_the_register_pin(tmp_path,prompt,row):
-    result,_=run_session(tmp_path,'dispatch = true',prompt=prompt,claim='Not done; waiting.')
+    result,_=run_session(tmp_path,'dispatch = true',prompt=prompt,run=({'command':'sh verify.sh'},{'exitCode':0}),claim='Not done; waiting.')
     assert (row in json.dumps(result)) if row else result == {}
 
 

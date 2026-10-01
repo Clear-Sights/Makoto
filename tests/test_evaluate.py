@@ -131,10 +131,9 @@ def test_plant_blocks_and_lookalike_silent(rows, rid, prec, pev, lrec, lev):
         pev = {"hook_event_name": "Stop", "claim": {"kind": "absent"}}
         lev = {"hook_event_name": "Stop", "claim": {"kind": "absent", "falsifier": "source result"}}
     elif rid == "R06":
-        # A relayed number alone is not refs(output); the exact proxy is removed.
-        assert V.evaluate(rows, prec, pev) is None
-        assert V.evaluate(rows, lrec, lev) is None
-        return
+        # The replacement of this legacy check is excluded: the mesh oracle
+        # requires an unquoted number, outside register refs(output).
+        expected_row = "R06"
     elif rid == "R07":
         expected_row = "R08"
         quote = "the mesh is the chart"

@@ -15,7 +15,7 @@ def digest(content):
 
 
 def references(text, cwd, reader):
-    text = str(text or '')
+    text = re.sub(r'(?<=\w)\.(?=\s|$)', '', str(text or ''))
     refs = {p.rstrip('.!?') for p in reader._text_objects(text, cwd)
             if '://' in p or '/' in p or '.' in os.path.basename(p)}
     refs.update(m.group(0) for m in re.finditer(r'(?<![\w])[0-9a-f]{40}(?:[0-9a-f]{24})?(?![\w])', text))
@@ -104,34 +104,13 @@ def lineage_drift(record, event, reader):
 
 
 def lineage_absence(record, event, reader):
-    claim = event.get('claim') or {}
+    from makoto2.family_spec import read_claims
+    claims = read_claims(record,event)
+    claim = next((c for c in claims if c.get('kind') in ('clean','absent')), {})
     return (event.get('hook_event_name') == 'Stop'
             and claim.get('kind') in ('clean', 'absent') and not claim.get('falsifier'))
 
 
-def lineage_edit(record, event, reader):
-    if event.get('hook_event_name') != 'PreToolUse' or event.get('tool_name') != 'Edit':
-        return []
-    ti = event.get('tool_input') or {}
-    new = ti.get('new_string', ti.get('new'))
-    if new is None:
-        return []
-    path = reader._norm(ti.get('file_path', ''), event.get('cwd') or '')
-    edits = []
-    for obs in record.obs:
-        if obs.failed:
-            continue
-        if obs.tool == 'Edit' and obs.input.get('new_string', obs.input.get('new')) == new:
-            edits.append(obs)
-    if not edits:
-        return []
-    # unseen_since refers to the most recent same-new Edit, at any path.
-    last = edits[-1]
-    if any(getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('verifier') and not o.failed
-           for o in record.obs if o.seq > last.seq):
-        return []
-    return [new] if any(reader._norm(o.input.get('file_path', ''), getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('cwd', '')) != path
-                        for o in edits) else []
 
 
 def lineage_units(record, event, reader):

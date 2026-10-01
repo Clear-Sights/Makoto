@@ -539,16 +539,8 @@ def record(events: Iterable[dict]) -> Record:
             continue
         o = _read(ev, i, seen)
         obs.append(o)
-        command = o.input.get("command") or ""
-        verifier = ev.get("verifier") is True or (
-            o.tool == "Bash" and o.exit is not None and any(
-                _basename(argv[0]) in ("pytest", "unittest")
-                or (len(argv) > 2 and _basename(argv[0]).startswith("python")
-                    and argv[1] == "-m" and argv[2] in ("pytest", "unittest"))
-                for argv, _operator in _segments(command) if argv))
         readers[i] = MappingProxyType({"cwd": str(ev.get("cwd") or ""),
-                                      "source_reads": tuple(ev.get("source_reads") or ()),
-                                      "verifier": verifier})
+                                      "source_reads": tuple(ev.get("source_reads") or ())})
         seen |= o.objects
         fetched = o.tool.endswith(_FETCH_TOOL_SUFFIXES) and _executed(o)
         users.extend(_user_entries(ev.get("tool_response")) if fetched else ())

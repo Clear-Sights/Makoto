@@ -29,19 +29,11 @@ def _facts(record):
                     yield value
 
 
-def _claims(event, reader):
-    explicit = event.get('claim')
-    if isinstance(explicit, dict):
-        return [explicit]
-    # Fixed word table; quoted examples and questions are not closing claims.
-    result = []
-    for line in reader.text_of(event).splitlines():
-        if line.lstrip().startswith('>') or line.rstrip().endswith('?'):
-            continue
-        match = re.fullmatch(r'\s*(clean|running|done|plan|retracted)\s*:\s*(.+?)\s*', line, re.I)
-        if match:
-            result.append({'kind': match[1].lower(), 'subject': match[2]})
-    return result
+def _claims(event, reader, record=None):
+    if record is None:
+        return [dict(event['claim'])] if isinstance(event.get('claim'),dict) else []
+    from makoto2.family_spec import read_claims
+    return read_claims(record,event)
 
 
 def _tree(text):
@@ -93,14 +85,16 @@ def other_normalization(record, event, reader):
 
 def other_witness(record, event, reader):
     if event.get('hook_event_name') == 'PreToolUse' and event.get('tool_name') == 'Agent':
-        if not any(o.seq >= record.turn_start and o.tool in ('Bash', 'Glob', 'Grep', 'Read') for o in record.obs):
+        users = [i for i, e in enumerate(getattr(record, 'events', ()))
+                 if e.get('hook_event_name') == 'UserPromptSubmit']
+        if users and not any(o.seq > users[-1] and o.tool in ('Bash', 'Glob', 'Grep', 'Read') for o in record.obs):
             return [('B11', 'post-user probe')]
     if event.get('hook_event_name') != 'Stop':
         return []
     out = []
-    for claim in _claims(event, reader):
+    for claim in _claims(event, reader, record):
         subject = claim.get('subject', '')
-        if claim.get('kind') == 'clean' and not any(o.input.get('command') == subject and o.exit is not None and o.exit != 0 for o in record.obs):
+        if claim.get('kind') == 'clean' and subject and not any(o.input.get('command') == subject and o.exit is not None and o.exit != 0 for o in record.obs):
             out.append(('B4', subject))
         if claim.get('helps') and not any(isinstance(f.get('run_pair'), dict) and f['run_pair'].get('subject') == subject
                and 'with' in f['run_pair'] and 'without' in f['run_pair']
@@ -161,24 +155,12 @@ def other_refs(record, event, reader):
     return [name for state, name in unpaid(record, event, reader) if state == 'unread']
 
 
-def other_edit(record, event, reader):
-    if event.get('hook_event_name') != 'PreToolUse' or event.get('tool_name') != 'Edit':
-        return []
-    ti = event.get('tool_input') or {}
-    new = ti.get('new_string')
-    edits = [o for o in record.obs if o.tool == 'Edit' and o.input.get('new_string') == new]
-    if not edits or not any(reader._norm(o.input.get('file_path', ''), event.get('cwd', '')) != reader._norm(ti.get('file_path', ''), event.get('cwd', '')) for o in edits):
-        return []
-    failed = {o.input.get('command') for o in record.obs if o.exit is not None and o.exit != 0}
-    if not any(o.seq > edits[-1].seq and o.input.get('command') in failed and o.exit is not None for o in record.obs):
-        return [str(new)]
-    return []
 
 
 def other_plan(record, event, reader):
     if event.get('hook_event_name') != 'Stop':
         return []
-    claims = [c for e in getattr(record, 'events', ()) for c in _claims(e, reader)]
+    claims = [c for e in getattr(record, 'events', ()) for c in _claims(e, reader, record)]
     planned = {c.get('subject') for c in claims if c.get('kind') == 'plan'}
     settled = {c.get('subject') for c in claims if c.get('kind') in ('done', 'retracted')}
     return sorted(planned - settled)
@@ -188,11 +170,11 @@ def other_claim(record, event, reader, dispatch=False):
     if event.get('hook_event_name') != 'Stop':
         return []
     out = []
-    for c in _claims(event, reader):
+    for c in _claims(event, reader, record):
         subject = c.get('subject', '')
         if c.get('kind') == 'running' and not any(subject in o.output for o in record.obs):
             out.append(('C8', subject))
-        if c.get('kind') == 'done' and not os.path.exists(reader._norm(subject, event.get('cwd', ''))):
+        if c.get('kind') == 'done' and subject and not os.path.exists(reader._norm(subject, event.get('cwd', ''))):
             out.append(('D1', subject))
     if dispatch:
         for e in getattr(record, 'events', ()):
@@ -206,7 +188,7 @@ def other_claim(record, event, reader, dispatch=False):
 
 CHECKS = ((other_normalization, 'A14'), (other_witness, 'B4,B11,B14'),
           (other_supervisor, 'B26,B1,D9'), (other_run, 'D8,D14,F14'),
-          (other_write, 'D11,D12'), (other_edit, 'F2,H3'),
+          (other_write, 'D11,D12'),
           (other_plan, 'F8,D13'))
 
 
