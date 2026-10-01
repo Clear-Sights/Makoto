@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import sys
 from typing import NamedTuple, Optional
 
 import pytest
@@ -141,6 +142,7 @@ def test_config_keys_cover_config():
 
 
 """Terminal witnesses bind status and content to the claimed subject."""
+sys.path.insert(0, os.path.dirname(HERE))
 from makoto2.evaluate import landed_owes, landed_pays
 from makoto2.observed import record
 
