@@ -17,7 +17,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from makoto2.lineage import unpaid as lineage_unpaid
-from makoto2 import family_spec
+from makoto2 import family_spec, family_lineage
 from makoto2.family_other import findings as other_findings
 from typing import Optional
 
@@ -98,6 +98,15 @@ def evaluate(rows, record, event) -> Optional[dict]:
     for finding in family_spec.evaluate(record, event, cfg):
         return finding
     if moment in ("PreToolUse", "Stop", "SubagentStop"):
+        if family_lineage.lineage_absence(record, event, _R):
+            return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
+        for predicate, row, citation in (
+            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:782 H3/F2"),
+            (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
+        ):
+            subjects = predicate(record, event, _R)
+            if subjects:
+                return {"row": row, "message": citation, "objects": subjects}
         for state, name in lineage_unpaid(record, event, _R):
             return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
     cfg = rows[0].get("cfg", {}) if rows else {}
@@ -107,11 +116,15 @@ def evaluate(rows, record, event) -> Optional[dict]:
         if moment not in row["moment"].split(","):
             continue
         args, cfg = row.get("args") or {}, row.get("cfg") or {}
+        if row["id"] in ("R05", "R06", "R07", "R12"):
+            continue
         acts = _acts(args)
         dispatch_brief = (cfg.get("dispatch") and moment == "PreToolUse"
                           and event.get("tool_name") in ("Agent", "Task")
                           and row["id"] in DISPATCH_SPECS)
         if acts and not (acts & _R.act_kinds(event)) and not dispatch_brief:
+            continue
+        if row["id"] == "R08" and not dispatch_brief:
             continue
         spec = PREDICATES[row["predicate"]]
         if dispatch_brief:
@@ -166,10 +179,7 @@ def dispatch_schema_owes(args, cfg, record, event):
 
 
 def dispatch_pins_owes(args, cfg, record, event):
-    lines = _brief_fields(event)["READ"]
-    # Each declared token owns its pin; a hash in a comment cannot pay another path.
-    tokens = [t.strip("-`\"'") for line in lines for t in re.split(r"[\s,]+", line)]
-    return [t for t in tokens if t and t != "-" and not re.fullmatch(r"[^@]+@[0-9a-fA-F]{12,}", t)]
+    return family_lineage.lineage_pin(args, cfg, record, event)
 
 
 DISPATCH_SPECS = {

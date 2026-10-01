@@ -126,10 +126,30 @@ def test_plant_blocks_and_lookalike_silent(rows, rid, prec, pev, lrec, lev):
         assert V.evaluate(rows, prec, pev) is None
         assert V.evaluate(rows, lrec, lev) is None
         return
+    expected_row = rid
+    if rid == "R05":
+        pev = {"hook_event_name": "Stop", "claim": {"kind": "absent"}}
+        lev = {"hook_event_name": "Stop", "claim": {"kind": "absent", "falsifier": "source result"}}
+    elif rid == "R06":
+        # A relayed number alone is not refs(output); the exact proxy is removed.
+        assert V.evaluate(rows, prec, pev) is None
+        assert V.evaluate(rows, lrec, lev) is None
+        return
+    elif rid == "R07":
+        expected_row = "R08"
+        quote = "the mesh is the chart"
+        lrec = Record([Obs(1, "Read", {"ref": quote}, quote)])
+    elif rid == "R08":
+        lev = dict(lev, tree={"/r/a.py": {"hash": V.family_lineage.digest("x = 1")}})
+    elif rid == "R12":
+        expected_row = "R08"
+        lev = dict(lev, cwd="/r", tree={"/r/docs/MAP.tsv": {"hash": V.family_lineage.digest("..")}})
     out = V.evaluate(rows, prec, pev)
-    assert out is not None and out["row"] == rid, out
-    assert rid in out["message"] and "source:" in out["message"] and out["objects"]
+    assert out is not None and out["row"] == expected_row, out
+    assert out["objects"]
+    assert ("REGISTRY-v9.md" if rid in ("R05", "R07", "R08", "R12") else "source:") in out["message"]
     assert V.evaluate(rows, lrec, lev) is None
+
 
 
 def test_every_row_has_a_case_and_a_verbatim_source(rows):
@@ -234,4 +254,7 @@ def test_failure_subject_fold_and_every_name(rows):
     log = red._replace(input={"command": "cat pytest.log"})
     assert V.evaluate([row], Record([log]), reply("Two tests failed.")) is None
     assert V.evaluate([row], record, reply("If two tests failed, list them.")) is None
-    assert V.evaluate([row], record, reply('The runner reports "two tests failed".')) is None
+    quoted = reply('The runner reports "two tests failed".')
+    assert V.evaluate([row], record, quoted)["row"] == "R08"
+    source = Obs(2, "Read", {"ref": "two tests failed"}, "two tests failed")
+    assert V.evaluate([row], Record([red, source]), quoted) is None

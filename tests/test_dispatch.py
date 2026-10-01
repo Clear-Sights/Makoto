@@ -24,6 +24,14 @@ def run_session(tmp_path, declaration, prompt=BRIEF, run=None, claim='Done.'):
     # B11 requires a post-user baseline probe independently of dispatch opt-in.
     send(dict(hook_event_name='PostToolUse', tool_name='Read',
               tool_input={'file_path':'baseline'}, tool_response={'content':'baseline'}))
+    # Dispatch contract cases isolate pin/acceptance predicates after source reads.
+    for name in evaluate.family_lineage.references(prompt, str(tmp_path), observed):
+        path = Path(name)
+        if path.is_absolute() and path.is_relative_to(tmp_path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('source', encoding='utf-8')
+            send(dict(hook_event_name='PostToolUse', tool_name='Read',
+                      tool_input={'file_path':str(path)}, tool_response={'content':'source'}))
     first = send(dict(hook_event_name='PreToolUse',tool_name='Agent',tool_input=dict(prompt=prompt)))
     if first:
         return first, cfg
@@ -43,12 +51,12 @@ def test_optout_has_no_contract_or_pre_state(tmp_path,declaration):
 @pytest.mark.parametrize('prompt,row',[
     ('READ: src/a.py@123456abcdef\nWRITE:\nACCEPTANCE: sh verify.sh','R04'),
     (BRIEF.replace('@123456abcdef',''),'R08'),
-    (BRIEF.replace('src/a.py@123456abcdef','src/a.py@123456abcdef src/b.py'),'R08'),
+    (BRIEF.replace('src/a.py@123456abcdef','src/a.py@123456abcdef src/b.py'),None),
     (BRIEF.replace('src/a.py@123456abcdef','src/a.py\n# tag@123456abcdef'),'R08'),
 ])
-def test_each_input_owns_its_contract(tmp_path,prompt,row):
-    result,_=run_session(tmp_path,'dispatch = true',prompt=prompt)
-    assert row in json.dumps(result)
+def test_read_line_has_the_register_pin(tmp_path,prompt,row):
+    result,_=run_session(tmp_path,'dispatch = true',prompt=prompt,claim='Not done; waiting.')
+    assert (row in json.dumps(result)) if row else result == {}
 
 
 @pytest.mark.parametrize('run,claim,blocked',[

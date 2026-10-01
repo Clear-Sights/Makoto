@@ -31,7 +31,9 @@ def test_source_changes_at_use_and_reread(tmp_path):
 def test_reading_own_answer_does_not_create_a_source(tmp_path):
     source=tmp_path/'answer.tsv';source.write_text('own')
     write=dict(hook_event_name='PostToolUse',tool_name='Write',tool_input={'file_path':str(source),'content':'own'},tool_response={'type':'create'})
-    assert unpaid(record([write,read(source,'own')]),act(tmp_path,'answer.tsv'),observed)==[('unread',str(source))]
+    assert not unpaid(record([write,read(source,'own')]),act(tmp_path,'answer.tsv'),observed)
+    sources, owned = __import__('makoto2.lineage', fromlist=['readings']).readings(record([write,read(source,'own')]), observed)
+    assert str(source) in owned and str(source) not in sources
 
 
 def test_closing_reference_requires_read(tmp_path):
