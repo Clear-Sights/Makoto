@@ -43,6 +43,19 @@ Set `MAKOTO_STATE_DIR` to choose another directory. Runtime defaults are in
 [CONFIG_KEYS.txt](plugin/makoto2/CONFIG_KEYS.txt). Some historical rule inputs
 refer to external words files; those are not bundled or created by installation.
 
+For a workspace that wants explicit worker contracts, set `dispatch = true` in
+its `makoto.toml`. The default is off; false, absent or invalid declarations
+keep the existing behavior. R04 requires filled, case-sensitive `READ:`,
+`WRITE:` and `ACCEPTANCE:` fields on Agent/Task briefs. R08 requires each READ
+input token to carry its own `@` followed by at least 12 hexadecimal digits;
+READ lists can span lines and use whitespace or commas. R11 blocks recognized
+done/fixed/finished/completed assertions until every accepted brief's literal
+ACCEPTANCE command has a later settled Bash execution with explicit exit zero.
+Background launches and results from workers do not pay that obligation.
+Accepted Pre briefs are stored as contracts and never treated as settled effects.
+This checks declared pins and delivered outcomes; it does not prove snapshots
+or causal validity, or govern expensive Bash calls without a declared READ list.
+
 ## Verify
 
 ```
