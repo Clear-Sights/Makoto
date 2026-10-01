@@ -96,9 +96,14 @@ def evaluate(rows, record, event) -> Optional[dict]:
             continue
         args, cfg = row.get("args") or {}, row.get("cfg") or {}
         acts = _acts(args)
-        if acts and not (acts & _R.act_kinds(event)):
+        dispatch_brief = (cfg.get("dispatch") and moment == "PreToolUse"
+                          and event.get("tool_name") in ("Agent", "Task")
+                          and row["id"] in DISPATCH_SPECS)
+        if acts and not (acts & _R.act_kinds(event)) and not dispatch_brief:
             continue
         spec = PREDICATES[row["predicate"]]
+        if dispatch_brief:
+            spec = DISPATCH_SPECS.get(row["id"], spec)
         subjects = spec.owes(args, cfg, record, event)
         if not subjects:
             continue
@@ -119,6 +124,41 @@ def evaluate(rows, record, event) -> Optional[dict]:
 class Spec:
     def __init__(self, owes, pays=None, seed=None, why=""):
         self.owes, self.pays, self.seed, self.why = owes, pays, seed, why
+
+
+# Filled labels and path-attached pins reuse the dispatch grammar from 648f876.
+def _brief_fields(event):
+    prompt = (event.get("tool_input") or {}).get("prompt", "")
+    fields = {k: [] for k in ("READ", "WRITE", "ACCEPTANCE")}
+    if not isinstance(prompt, str):
+        return fields
+    label = None
+    for line in prompt.splitlines():
+        match = re.match(r"^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$", line)
+        if match:
+            label = match[1]
+            if match[2].strip():
+                fields[label].append(match[2].strip())
+        elif label == "READ" and line.strip():
+            fields[label].append(line.strip())
+    return fields
+
+
+def dispatch_schema_owes(args, cfg, record, event):
+    return [k for k, values in _brief_fields(event).items() if not values]
+
+
+def dispatch_pins_owes(args, cfg, record, event):
+    lines = _brief_fields(event)["READ"]
+    # Each declared token owns its pin; a hash in a comment cannot pay another path.
+    tokens = [t.strip("-`\"'") for line in lines for t in re.split(r"[\s,]+", line)]
+    return [t for t in tokens if t and t != "-" and not re.fullmatch(r"[^@]+@[0-9a-fA-F]{12,}", t)]
+
+
+DISPATCH_SPECS = {
+    "R04": Spec(dispatch_schema_owes, why="dispatch brief lacks a filled field"),
+    "R08": Spec(dispatch_pins_owes, why="declared READ input lacks its revision pin"),
+}
 
 
 # ---------- shared readings ----------
@@ -496,6 +536,16 @@ def _unnamed_failures(record, event, cfg):
 
 def landed_owes(args, cfg, record, event):
     out = _unnamed_failures(record, event, cfg)
+    if cfg.get("dispatch"):
+        claims = [s for s in _sentences(_strip_quoted(_text_of(event)))
+                  if not s.rstrip().endswith("?") and not _SOURCE_NAMED_RX.search(s)
+                  and not _NEG_RX.search(s) and not _PENDING_RX.search(s)
+                  and re.search(r"\b(done|fixed|finished|completed?)\b", s, re.I)]
+        if claims:
+            out.extend(("done", command, "acceptance", seq)
+                       for seq, brief in getattr(record, "dispatch_briefs", ())
+                       for command in _brief_fields(brief)["ACCEPTANCE"])
+
     for s in _sentences(_strip_quoted(_text_of(event))):
         if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
             continue
@@ -567,12 +617,20 @@ def _valid_artifact(o, path):
 
 
 def landed_pays(args, cfg, o):
-    if not _primary(o) or not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
+    if not _primary(o):
         return None
 
     def pays(subject):
         word, names, kind, after = subject
         if kind == "failure-report":
+            return False
+        if kind == "acceptance":
+            return (o.seq > after and o.tool == "Bash" and o.exit == 0
+                    and o.input.get("command", "").strip() == names
+                    and not o.input.get("run_in_background")
+                    and o.seq not in cfg.get("dispatch_background", ())
+                    and not _PENDING_RX.search(o.output))
+        if not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
             return False
         if o.seq < after:
             return False
