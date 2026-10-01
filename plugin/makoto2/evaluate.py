@@ -149,6 +149,8 @@ def _brief_fields(event):
 
 
 def dispatch_schema_owes(args, cfg, record, event):
+    if not cfg.get("dispatch") or event.get("tool_name") not in ("Agent", "Task"):
+        return []
     return [k for k, values in _brief_fields(event).items() if not values]
 
 
@@ -254,25 +256,6 @@ def _denied(o) -> bool:
 
 
 # ---------- rows as (owes, pays) ----------
-
-_TARGET_KEYS = ("session_id", "thread_id", "thread_ts", "thread", "to")
-
-
-def _target(ti) -> str:
-    return next((str(ti[k]) for k in _TARGET_KEYS if isinstance(ti, dict) and ti.get(k)), "")
-
-
-def pile_owes(args, cfg, record, event):
-    tgt = _target(event.get("tool_input") or {})
-    sends = [o for o in record.obs if _is_act(args, o) and _target(o.input) == tgt and not o.failed]
-    return [(tgt, sends[-1].seq)] if tgt and sends else []
-
-
-def pile_pays(args, cfg, o):
-    if _is_act(args, o) or not o.output:
-        return None
-    return lambda s: s[0] in o.output and o.seq > s[1]
-
 
 _ABSENCE_RXS = [
     re.compile(r"\bnot signed in(?: to| on)? (?:the )?([\w.\-/]+)", re.I),
@@ -621,7 +604,7 @@ def wrote_pays(args, cfg, o):
 
 
 PREDICATES = {
-    "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),
+    "dispatch_schema": Spec(dispatch_schema_owes, why="dispatch fields required by I1"),
     "absence_unsearched": Spec(absence_owes, absence_pays,
                                why="claims absence with no empty search whose scope covers it"),
     "relayed_number": Spec(number_owes, number_pays,
