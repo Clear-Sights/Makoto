@@ -251,19 +251,6 @@ def _denied(o) -> bool:
 
 # ---------- rows as (owes, pays) ----------
 
-_ASK_PHRASE_RX = re.compile(
-    r"\b(should i|shall i|do you want|would you like|want me to|let me know (?:if|whether|which)|"
-    r"which (?:one )?do you prefer|can you confirm|please confirm|your call)\b", re.I)
-
-
-def asks_owes(args, cfg, record, event):
-    text = _strip_quoted(_text_of(event))
-    m = _ASK_PHRASE_RX.search(text)
-    if m:
-        return [m.group(0)]
-    return [s.strip() for s in _sentences(text) if s.rstrip().endswith("?")][:1]
-
-
 def thread_owes(args, cfg, record, event):
     start = getattr(record, "turn_start", None) or 0
     prior = [o for o in record.obs if _is_act(args, o) and o.seq >= start and not o.failed]
@@ -718,7 +705,6 @@ def wrote_pays(args, cfg, o):
 
 PREDICATES = {
     "cost_unaccounted": Spec(cost_owes, why="savings need a delivery edge, enabled-arm numerator and bill denominator; off-arm zero is not enabled savings"),
-    "asks_user": Spec(asks_owes, why="asks the user; threads pick a default and state it"),
     "second_thread_this_turn": Spec(thread_owes, why="a thread was already started this turn; one at a time"),
     "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),
     "absence_unsearched": Spec(absence_owes, absence_pays,

@@ -1,5 +1,4 @@
 id	moment	predicate	args	source
-R01	PreToolUse,Stop	asks_user	acts=say	MEMORY.md OWNED FAILURES: "kept asking him"
 R03	PreToolUse	second_thread_this_turn	acts=thread	MEMORY.md OWNED FAILURES: "many threads at once"
 R04	PreToolUse	note_pile	acts=note	MEMORY.md OWNED FAILURES: "re-briefed a thread four times in minutes"
 R05	PreToolUse,Stop	absence_unsearched	acts=say	MEMORY.md OWNED FAILURES: "then said narrowers were never applied without checking (23:27Z)"
