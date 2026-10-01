@@ -16,6 +16,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from makoto2.lineage import unpaid as lineage_unpaid
 from typing import Optional
 
 
@@ -91,6 +92,9 @@ def _acts(args):
 def evaluate(rows, record, event) -> Optional[dict]:
     """First row whose moment matches the event and has an unpaid subject -> block; else None."""
     moment = event.get("hook_event_name", "")
+    if moment in ("PreToolUse", "Stop", "SubagentStop"):
+        for state, name in lineage_unpaid(record, event, _R):
+            return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
     for row in rows:
         if moment not in row["moment"].split(","):
             continue

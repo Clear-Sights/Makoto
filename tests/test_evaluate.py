@@ -97,7 +97,7 @@ CASES = [
     ("R07", Record([]), reply('His words: "ship it tonight"'),
      Record([]), reply('His words: "the mesh is the chart"')),
     ("R08", Record([Obs(1, "Glob", {"pattern": "/r/*.py"}, "/r/a.py\n/r/b.py")]), pre("Write", file_path="/r/plan.md", content="Edit /r/a.py and /r/b.py"),
-     Record([READ_X]), pre("Write", file_path="/r/plan.md", content="Edit /r/a.py and /r/b.py")),
+     Record([READ_X]), pre("Write", file_path="/r/plan.md", content="Edit /r/a.py")),
     ("R09", Record([Obs(1, "Bash", {"command": "rm -rf x"}, "PreToolUse hook denied this", exit=None, failed=True)]),
      pre("Bash", command="rm -rf x"),
      Record([Obs(1, "Bash", {"command": "rm -rf x"}, "PreToolUse hook denied this", exit=None, failed=True),
