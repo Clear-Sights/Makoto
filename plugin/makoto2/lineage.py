@@ -38,7 +38,7 @@ def unpaid(record, event, reader):
     text = reader.text_of(event) if closing else ti.get('content', ti.get('new_string', ''))
     cwd = event.get('cwd') or ''
     refs = reader._text_objects(str(text), cwd)
-    refs = {p for p in refs if '/' in p or '.' in os.path.basename(p)}
+    refs = {p.rstrip(".!?") for p in refs if '/' in p or '.' in os.path.basename(p)}
     own = reader._norm(ti.get('file_path', ''), cwd)
     refs.discard(own)
     sources, owned = readings(record, reader)
