@@ -391,15 +391,6 @@ def read_pays(args, cfg, o):
     return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
 
 
-def denied_owes(args, cfg, record, event):
-    last = _last_same_call(record, event)
-    return [last.seq] if last is not None and _denied(last) else []
-
-
-def ran_after_pays(args, cfg, o):
-    return None if o.failed else (lambda seq: o.seq > seq)
-
-
 _UNIT = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}   # seconds per unit (a unit table, not a limit)
 _TIMEOUT_RX = re.compile(r"\btimeout\s+(?:-[-\w]+(?:[= ]\S+)?\s+)*(\d+(?:\.\d+)?)([smhd]?)\b")
 _SLEEP_RX = re.compile(r"\bsleep(?:\s+|\(\s*)(\d+(?:\.\d+)?)([smhd]?)\b")   # shell sleep N, code sleep(N)
@@ -707,7 +698,6 @@ PREDICATES = {
     "user_quote": Spec(quote_owes, quote_pays, quote_seed,
                        why="quotes the user with words no observed user message or WORDS.tsv holds"),
     "write_unread_paths": Spec(write_owes, read_pays, why="writes about paths none of which was read"),
-    "denied_retry": Spec(denied_owes, ran_after_pays, why="resends a denied call unchanged with nothing run since"),
     "budget_exceeds_limit": Spec(budget_owes, why="the inner wait outlives the tool call's own limit"),
     "landed_unobserved": Spec(landed_owes, landed_pays,
                               why="claims an outcome without its observed status or counted failing subjects"),
