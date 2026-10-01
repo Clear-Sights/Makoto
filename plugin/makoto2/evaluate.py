@@ -18,6 +18,7 @@ import re
 import xml.etree.ElementTree as ET
 from makoto2.lineage import unpaid as lineage_unpaid
 from makoto2 import family_spec
+from makoto2.family_other import findings as other_findings
 from typing import Optional
 
 
@@ -99,6 +100,9 @@ def evaluate(rows, record, event) -> Optional[dict]:
     if moment in ("PreToolUse", "Stop", "SubagentStop"):
         for state, name in lineage_unpaid(record, event, _R):
             return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
+    cfg = rows[0].get("cfg", {}) if rows else {}
+    for finding in other_findings(record, event, _R, cfg.get("dispatch", False)):
+        return finding
     for row in rows:
         if moment not in row["moment"].split(","):
             continue

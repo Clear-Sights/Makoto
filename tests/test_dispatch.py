@@ -21,6 +21,9 @@ def run_session(tmp_path, declaration, prompt=BRIEF, run=None, claim='Done.'):
     def send(event):
         event.update(cwd=str(tmp_path),session_id='dispatch-test')
         return hook.main(json.dumps(event),cfg,rows,observed.record,evaluate.evaluate)
+    # B11 requires a post-user baseline probe independently of dispatch opt-in.
+    send(dict(hook_event_name='PostToolUse', tool_name='Read',
+              tool_input={'file_path':'baseline'}, tool_response={'content':'baseline'}))
     first = send(dict(hook_event_name='PreToolUse',tool_name='Agent',tool_input=dict(prompt=prompt)))
     if first:
         return first, cfg
@@ -34,7 +37,7 @@ def test_optout_has_no_contract_or_pre_state(tmp_path,declaration):
     result,cfg=run_session(tmp_path,declaration,prompt='Fix the parser.')
     assert result == {}
     events,_=hook.sigma_read(hook.sigma_path(cfg['state_dir'],'dispatch-test'))
-    assert [e['hook_event_name'] for e in events] == ['Stop']
+    assert [e['hook_event_name'] for e in events] == ['PostToolUse', 'Stop']
 
 
 @pytest.mark.parametrize('prompt,row',[
@@ -55,7 +58,7 @@ def test_each_input_owns_its_contract(tmp_path,prompt,row):
     (({'command':'sh verify.sh','run_in_background':True},{'exitCode':0}),'Done.',True),
     (({'command':'sh verify.sh'},{'exitCode':0,'backgroundTaskId':'job'}),'Done.',True),
     (({'command':'echo sh verify.sh'},{'exitCode':0}),'Done.',True),
-    (None,'Not done; waiting.',False),
+    (None,'Not done; waiting.',True),
 ])
 def test_only_settled_exact_acceptance_pays(tmp_path,run,claim,blocked):
     result,cfg=run_session(tmp_path,'dispatch = true',run=run,claim=claim)
