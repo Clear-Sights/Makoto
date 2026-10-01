@@ -1,1 +1,1 @@
-{"permissions":{"allow":["Bash(codex exec *)","Bash(python3 router/run.py *)","Bash(sh /mnt/project-files/TEMP/route.sh *)","mcp__github__merge_pull_request"]}}
+{"permissions":{"allow":["Bash(codex exec *)","Bash(sh /mnt/project-files/*)","Bash(python3 router/run.py *)","Bash(sh /mnt/project-files/TEMP/route.sh *)","mcp__github__merge_pull_request"]}}
