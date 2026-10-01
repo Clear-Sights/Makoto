@@ -251,12 +251,6 @@ def _denied(o) -> bool:
 
 # ---------- rows as (owes, pays) ----------
 
-def thread_owes(args, cfg, record, event):
-    start = getattr(record, "turn_start", None) or 0
-    prior = [o for o in record.obs if _is_act(args, o) and o.seq >= start and not o.failed]
-    return [f"thread started at seq {prior[-1].seq}"] if prior else []
-
-
 _TARGET_KEYS = ("session_id", "thread_id", "thread_ts", "thread", "to")
 
 
@@ -705,7 +699,6 @@ def wrote_pays(args, cfg, o):
 
 PREDICATES = {
     "cost_unaccounted": Spec(cost_owes, why="savings need a delivery edge, enabled-arm numerator and bill denominator; off-arm zero is not enabled savings"),
-    "second_thread_this_turn": Spec(thread_owes, why="a thread was already started this turn; one at a time"),
     "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),
     "absence_unsearched": Spec(absence_owes, absence_pays,
                                why="claims absence with no empty search whose scope covers it"),
