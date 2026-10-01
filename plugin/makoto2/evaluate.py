@@ -438,8 +438,64 @@ def _subject_words(text):
         "now", "already", "still", "currently"}
 
 
+
+# Number grammar reused from gate.unnamed_failure (6afe37e); prose counts,
+# unlike runner summaries, can place a subject between number and verdict.
+_FAILURE_UNIT = r"(?:one|two|three|four|five|six|seven|eight|nine)"
+_FAILURE_COUNT = (rf"(?:[1-9]\d*|{_FAILURE_UNIT}|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
+                  rf"|(?:twen|thir|for|fif|six|seven|eigh|nine)ty(?:[\s-]{_FAILURE_UNIT})?|(?:a\s+)?dozen|(?:a\s+)?hundred)")
+_FAILURE_SUBJECT = r"(?:tests?|checks?|cases?|specs?|suites?|assertions?|examples?)"
+_FAILURE_VERDICT = r"(?:fail(?:s|ed|ing)?|failures?|errors?|erroring|errored)"
+_FAILURE_REPORT_RX = re.compile(
+    rf"\b{_FAILURE_COUNT}\s+(?:[\w-]+\s+){{0,2}}{_FAILURE_SUBJECT}\s+(?:[\w-]+\s+){{0,2}}{_FAILURE_VERDICT}\b"
+    rf"|\b{_FAILURE_COUNT}\s+{_FAILURE_VERDICT}(?:\s+{_FAILURE_SUBJECT})?\b"
+    rf"|\b(?:{_FAILURE_SUBJECT}\s+)?(?:failures?|errors?|failed)\s*:\s*[1-9]\d*\b", re.I)
+_TEST_OUTCOME_RX = re.compile(
+    r"^\s*(FAILED|PASSED)\s+([\w./-]+::[\w:.-]+(?:\[[^\]\n]+\])?)"
+    r"|^\s*(FAIL|ERROR):\s+(test_\w+)\s+\(([^)]+)\)"
+    r"|^\s*(test_\w+)\s+\(([^)]+)\)\s+\.\.\.\s+(ok|FAIL|ERROR)\b", re.M)
+
+
+def _failed_test_subjects(record):
+    # Reuse the observed shell tokenizer: displaying a log is not running tests.
+    verdicts = {}
+    for o in record.obs:
+        if o.tool != "Bash" or o.failed:
+            continue
+        runners = [argv for argv, _ in _R._segments(str(o.input.get("command", "")))
+                   if argv and (os.path.basename(argv[0]) in ("pytest", "py.test") or
+                       (re.fullmatch(r"python[0-9.]*", os.path.basename(argv[0])) and
+                        tuple(argv[1:3]) in (("-m", "pytest"), ("-m", "unittest"))))]
+        if not runners:
+            continue
+        for m in _TEST_OUTCOME_RX.finditer(o.output):
+            status, node, unit_status, unit_name, unit_class, verbose_name, verbose_class, verbose_status = m.groups()
+            identity = node or (unit_class + "::" + unit_name if unit_name else verbose_class + "::" + verbose_name)
+            verdicts[identity] = (status or unit_status or verbose_status) not in ("PASSED", "ok")
+    return [node for node, failed in verdicts.items() if failed]
+
+
+def _unnamed_failures(record, event, cfg):
+    text = _text_of(event)
+    reports = []
+    for sentence in _sentences(_strip_quoted(text)):
+        if sentence.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(sentence):
+            continue
+        for m in _FAILURE_REPORT_RX.finditer(sentence):
+            if not _NEG_RX.search(sentence[:m.start()][-cfg["negation_window"]:]):
+                reports.append(m)
+    if not reports:
+        return []
+    # Inline code can NAME a failure even though quoted counts are not assertions.
+    tokens = {token.rstrip(".:/-") for token in re.findall(r"[\w./:-]+(?:\[[^\]\n]+\])?", text)}
+    missing = [node for node in _failed_test_subjects(record)
+               if not tokens.intersection({node, node.rsplit("::", 1)[-1].split("[", 1)[0],
+                   os.path.splitext(os.path.basename(node.split("::", 1)[0]))[0]})]
+    return [("failed", frozenset(missing), "failure-report", -1)] if missing else []
+
+
 def landed_owes(args, cfg, record, event):
-    out = []
+    out = _unnamed_failures(record, event, cfg)
     for s in _sentences(_strip_quoted(_text_of(event))):
         if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
             continue
@@ -516,6 +572,8 @@ def landed_pays(args, cfg, o):
 
     def pays(subject):
         word, names, kind, after = subject
+        if kind == "failure-report":
+            return False
         if o.seq < after:
             return False
         if kind == "artifact":
@@ -615,7 +673,7 @@ PREDICATES = {
     "denied_retry": Spec(denied_owes, ran_after_pays, why="resends a denied call unchanged with nothing run since"),
     "budget_exceeds_limit": Spec(budget_owes, why="the inner wait outlives the tool call's own limit"),
     "landed_unobserved": Spec(landed_owes, landed_pays,
-                              why="claims landed/merged/passed with no status read or run output carrying it"),
+                              why="claims an outcome without its observed status or counted failing subjects"),
     "count_unread_path": Spec(count_owes, read_pays, why="gives a count for a path never read"),
     "exact_repeat": Spec(repeat_owes, wrote_pays, why="repeats a settled call with nothing written since"),
 }
