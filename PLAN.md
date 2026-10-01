@@ -1,0 +1,5 @@
+1. Fill register-alignment: recover pushed audit inputs in a disposable clone, confirm current PR state, obtain owner-approved predicates, attribute all regressions, implement and plant the semantic check.
+2. Fill package-consistency: reconcile selected manifest and README version after register changes; run and plant the package check.
+3. Fill complete-validation: rerun affected met-hole checks and plants, retain five-job CI receipts on the exact selected head, implement and plant receipt verification.
+4. Fill fresh-installation: after owner review/merge, prove selected version plus blocked slip and silent control in a fresh account without adding hooks; retain receipts and implement and plant their checker; resolve any hook-dependent installation conflict with owner.
+5. Fill whole-repo-clean: audit all current and ignored content outside history, implement and plant content verification, refresh input pins, resolve pending changes through the owner's normal review process, and run the final check.
