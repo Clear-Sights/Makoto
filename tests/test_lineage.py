@@ -42,5 +42,5 @@ def test_closing_reference_requires_read(tmp_path):
 
 
 def test_sentence_punctuation_is_not_part_of_the_source_name(tmp_path):
-    source=tmp_path/'original.tsv';source.write_text('value')
-    assert not unpaid(record([read(source,'value')]),act(tmp_path,'See original.tsv.'),observed)
+    source=tmp_path/'records/original.tsv';source.parent.mkdir();source.write_text('value')
+    assert not unpaid(record([read(source,'value')]),act(tmp_path,'See records/original.tsv.'),observed)
