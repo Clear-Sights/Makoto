@@ -593,14 +593,20 @@ def count_owes(args, cfg, record, event):
 
 
 def repeat_owes(args, cfg, record, event):
-    last = _last_same_call(record, event)
-    if last is None or _denied(last) or not str(last.output).strip():
+    if event.get("tool_name") != "Bash":
         return []
-    return [last.seq] if last.seq >= (getattr(record, "turn_start", 0) or 0) else []
+    command = (event.get("tool_input") or {}).get("command")
+    last = next((o for o in reversed(record.obs) if o.tool == "Bash"
+                 and o.input.get("command") == command), None)
+    if last is None or last.exit is None:
+        return []
+    if last.exit == 0 and ">>" not in str(command):
+        return []
+    return [last.seq]
 
 
 def wrote_pays(args, cfg, o):
-    return (lambda seq: o.seq > seq) if (o.written or o.created) else None
+    return (lambda seq: o.seq > seq) if o.tool in ("Write", "Edit") else None
 
 
 PREDICATES = {
@@ -615,5 +621,5 @@ PREDICATES = {
     "landed_unobserved": Spec(landed_owes, landed_pays,
                               why="claims an outcome without its observed status or counted failing subjects"),
     "count_unread_path": Spec(count_owes, read_pays, why="gives a count for a path never read"),
-    "exact_repeat": Spec(repeat_owes, wrote_pays, why="repeats a settled call with nothing written since"),
+    "exact_repeat": Spec(repeat_owes, wrote_pays, why="replays an append or retries a failed command without an intervening edit"),
 }

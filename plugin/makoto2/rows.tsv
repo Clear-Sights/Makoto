@@ -6,4 +6,4 @@ R07	PreToolUse,Stop	user_quote	acts=say;words=/mnt/project-files/VERIFY/WORDS.ts
 R08	PreToolUse	write_unread_paths	acts=write	WORDS.tsv:6615 (H5 REFERENT DRAWN FROM THE HEAD): "a thing pointed at, never read from source"
 R11	PreToolUse,Stop	landed_unobserved	acts=say	MEMORY.md OWNED FAILURES: "told him an in-progress step as landed (22:35Z)"
 R12	PreToolUse,Stop	count_unread_path	acts=say	MEMORY.md OWNED FAILURES: "claimed before checking"
-R13	PreToolUse	exact_repeat		MEMORY.md STANDING RULES: "Nothing done before may cost a token again."
+R13	PreToolUse	exact_repeat		REGISTRY-v9.md:126 A11; :275 E5/E10: "count distinct content, not records"
