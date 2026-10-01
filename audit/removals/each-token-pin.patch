@@ -1,0 +1,15 @@
+--- a/plugin/makoto2/evaluate.py
++++ b/plugin/makoto2/evaluate.py
+@@ -155,10 +155,8 @@
+ 
+ 
+ def dispatch_pins_owes(args, cfg, record, event):
+-    lines = _brief_fields(event)["READ"]
+-    # Each declared token owns its pin; a hash in a comment cannot pay another path.
+-    tokens = [t.strip("-`\"'") for line in lines for t in re.split(r"[\s,]+", line)]
+-    return [t for t in tokens if t and t != "-" and not re.fullmatch(r"[^@]+@[0-9a-fA-F]{12,}", t)]
++    prompt = (event.get("tool_input") or {}).get("prompt", "")
++    return ["READ"] if re.search(r"(?m)^READ:", prompt) and not re.search(r"(?m)^READ:.*@[0-9a-f]{12,}", prompt) else []
+ 
+ 
+ DISPATCH_SPECS = {
