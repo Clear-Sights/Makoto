@@ -17,6 +17,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from makoto2.lineage import unpaid as lineage_unpaid
+from makoto2 import family_spec
 from typing import Optional
 
 
@@ -92,6 +93,9 @@ def _acts(args):
 def evaluate(rows, record, event) -> Optional[dict]:
     """First row whose moment matches the event and has an unpaid subject -> block; else None."""
     moment = event.get("hook_event_name", "")
+    cfg = rows[0].get("cfg", {}) if rows else {}
+    for finding in family_spec.evaluate(record, event, cfg):
+        return finding
     if moment in ("PreToolUse", "Stop", "SubagentStop"):
         for state, name in lineage_unpaid(record, event, _R):
             return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
@@ -109,6 +113,9 @@ def evaluate(rows, record, event) -> Optional[dict]:
         if dispatch_brief:
             spec = DISPATCH_SPECS.get(row["id"], spec)
         subjects = spec.owes(args, cfg, record, event)
+        if row["id"] == "R11" and moment == "Stop":
+            subjects = [s for s in subjects if s[2] in ("acceptance", "artifact")
+                        or s[0] not in ("pass", "passed", "green", "shipped", "pushed", "landed", "merged", "done", "fixed", "finished", "complete", "completed", "ready", "failed") ]
         if not subjects:
             continue
         paid = spec.seed(args, cfg, record) if spec.seed else ()

@@ -1,9 +1,6 @@
 id	moment	predicate	args	source
-R04	PreToolUse	dispatch_schema	acts=brief	REGISTRY-v9.md:990 I1: "event.unbriefed_dispatch"
-R05	PreToolUse,Stop	absence_unsearched	acts=say	MEMORY.md OWNED FAILURES: "then said narrowers were never applied without checking (23:27Z)"
 R06	PreToolUse,Stop	relayed_number	acts=say	MEMORY.md OWNED FAILURES: "Stated thread claims as fact"
 R07	PreToolUse,Stop	user_quote	acts=say;words=/mnt/project-files/VERIFY/WORDS.tsv	WORDS.tsv cmsg_01CZb217TBsj7a1uAAdtXepPCJNggdBGdenfgpZ8oQGS7U: "I didn't say that we should focus on API"
 R08	PreToolUse	write_unread_paths	acts=write	WORDS.tsv:6615 (H5 REFERENT DRAWN FROM THE HEAD): "a thing pointed at, never read from source"
 R11	PreToolUse,Stop	landed_unobserved	acts=say	MEMORY.md OWNED FAILURES: "told him an in-progress step as landed (22:35Z)"
 R12	PreToolUse,Stop	count_unread_path	acts=say	MEMORY.md OWNED FAILURES: "claimed before checking"
-R13	PreToolUse	exact_repeat		REGISTRY-v9.md:126 A11; :275 E5/E10: "count distinct content, not records"

@@ -40,6 +40,8 @@ def o_once(finding, record, keys):               # O: at most once per (row, obj
         return None, None
     objs = sorted(finding.get("objects") or [])
     state = [(o.seq, o.tool) for o in record.obs if set(objs) & (set(o.objects) | set(o.written) | set(o.created))]
+    if "predicate" in finding:
+        state = getattr(record, "events", state)
     key = hashlib.sha256(json.dumps([finding["row"], objs, state]).encode()).hexdigest()
     return (None, None) if key in keys else (finding, key)
 
@@ -74,11 +76,9 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
         record.dispatch_briefs = [(i, e) for i, e in enumerate(events)
                                   if e.get("hook_event_name") == "PreToolUse"
                                   and e.get("tool_name") in ("Agent", "Task")]
+    config["settings"] = {"makoto": {"dispatch": config["dispatch"]}}
     finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
-    if ev.get("hook_event_name") in SETTLED + TURN_MARKS:
-        sigma_append(path, {"event": ev})
-    if (config["dispatch"] and finding is None and ev.get("hook_event_name") == "PreToolUse"
-            and ev.get("tool_name") in ("Agent", "Task")):
+    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
         sigma_append(path, {"event": ev})
     if key:
         sigma_append(path, {"key": key})
