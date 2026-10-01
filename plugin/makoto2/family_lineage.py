@@ -75,9 +75,11 @@ def lineage_refs(record, event, reader):
     own = reader._norm((event.get('tool_input') or {}).get('file_path', ''), cwd)
     refs.difference_update(owned | {own})
     return sorted(name for name in refs if name not in sources
-                  and not any(name in o.output for o in record.obs
+                  and not (not os.path.isabs(name) and '://' not in name
+                           and not re.fullmatch('[0-9a-f]{40}(?:[0-9a-f]{24})?', name)
+                           and any(name in o.output for o in record.obs
                               if not o.failed and (o.tool in ('Read', 'WebFetch')
-                                  or getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('source_reads'))))
+                                  or getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('source_reads')))))
 
 
 def lineage_drift(record, event, reader):
