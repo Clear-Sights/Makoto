@@ -2,10 +2,13 @@
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
 
-Makoto is an integrity hook for Claude Code. It checks statements against the
-agent's observed tool effects, blocking a finding or staying silent. Integrity
-here means agreement between a claim and the recorded deed; it does not certify
-code quality or correctness. Live-session outcomes remain unmeasured.
+“Makoto prevents blindspots through detection”
+(cmsg_01CZb217TBsj7a1uAAdtXepP3dgKHAVmDP8Nk9f2nVV5uu, 2026-10-01T21:41Z).
+
+The shipped runtime is an integrity hook for Claude Code. It checks statements
+against the agent's observed tool effects, blocking a finding or staying silent.
+It does not certify code quality or correctness. Live-session outcomes remain
+unmeasured.
 
 ## Install
 
