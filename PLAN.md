@@ -21,18 +21,18 @@ PLANTS_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
 
 These are declarations, not commands executed during formation. Model checks do not replace the product acceptance gates.
 
-Wave 1: subtract (predicted 208231 tokens)
-Wave 2: configure, decode (predicted 416462 tokens)
-Wave 3: observe, rules (predicted 416462 tokens)
-Wave 4: evaluate, register (predicted 416462 tokens)
-Wave 5: once (predicted 208231 tokens)
-Wave 6: advance, emit (predicted 416462 tokens)
-Wave 7: persist, validate (predicted 416462 tokens)
-Wave 8: package (predicted 208231 tokens)
-Wave 9: audit, fresh (predicted 416462 tokens)
-Wave 10: join (predicted 208231 tokens)
-Wave 11: handoff (predicted 208231 tokens)
-Wave 12: zero (predicted 208231 tokens)
+Wave 1: subtract (predicted 67483 tokens)
+Wave 2: configure, decode (predicted 134966 tokens)
+Wave 3: observe, rules (predicted 134966 tokens)
+Wave 4: evaluate, register (predicted 134966 tokens)
+Wave 5: once (predicted 67483 tokens)
+Wave 6: advance, emit (predicted 134966 tokens)
+Wave 7: persist, validate (predicted 134966 tokens)
+Wave 8: package (predicted 67483 tokens)
+Wave 9: audit, fresh (predicted 134966 tokens)
+Wave 10: join (predicted 67483 tokens)
+Wave 11: handoff (predicted 67483 tokens)
+Wave 12: zero (predicted 67483 tokens)
 
 At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.
 

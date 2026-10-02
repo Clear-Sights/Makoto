@@ -1,2 +1,5 @@
 task	tokens	source
 subtract	208231	route-out/makoto/run/RUN.json 2026-10-02
+subtract	407924	/home/user/route-out/makoto/run/RUN.json candidates.subtract[0] 2026-10-02
+subtract	215235	/home/user/route-out/makoto/run/RUN.json candidates.subtract[1] 2026-10-02
+subtract	67483	/home/user/route-out/makoto/run/RUN.json candidates.subtract[2] 2026-10-02

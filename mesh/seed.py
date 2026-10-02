@@ -58,9 +58,10 @@ def derive(plan_only=False):
         if citation.startswith('SPIRIT.md#'):citation=citation.split('#')[1]
         command='PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task '+id
         if id=='subtract':
-            inputs='mesh/reference/,mesh/SUBTRACT.tsv'
-            present='only requirement-needed units in seed; old generators preserved as reference'
-            absent='bottom-up inventory and SCC generators at active paths'
+            removals=read(ROOT/'mesh/SUBTRACT.tsv')
+            inputs=','.join(sorted({r['path'] for r in removals})+['mesh/SUBTRACT.tsv','mesh/SUBTRACT-KEPT.tsv','mesh/reference/'])
+            present='preserved reference originals and retained live infrastructure recorded in mesh/SUBTRACT-KEPT.tsv; scope only the exact SUBTRACT units; exclude pinned mesh/check.py and mesh/plants.py, all reference files and retained mesh/seed.py; if originals are already absent, verify and finish in this first attempt without edits'
+            absent='AST-identical reference originals at active units: '+', '.join(r['path']+':'+r['unit'] for r in removals)
         elif id=='zero':
             inputs='mesh/,PLAN.md,TASKS.tsv,MESH.tsv'
             present='model contracts equal requirement envelopes; implementation done only with all current evidence'
