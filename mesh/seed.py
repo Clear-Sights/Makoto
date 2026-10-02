@@ -1,6 +1,7 @@
 """Derive route tasks and concurrency waves from final-program openings only."""
 from pathlib import Path
 import argparse
+import ast
 import csv
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,31 @@ def read(path):
 def write(path,rows,fields):
     with path.open('w',newline='') as f:
         w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
+
+
+def callers(paths):
+    """Include live callers and tests; historical references are read-only."""
+    modules = {Path(path).stem for path in paths}
+    found = set(paths)
+    for path in sorted(ROOT.rglob('*.py')):
+        rel = path.relative_to(ROOT).as_posix()
+        if rel.startswith(('mesh/', '.')):
+            continue
+        text = path.read_text()
+        try:
+            nodes = ast.walk(ast.parse(text))
+            imported = set()
+            for node in nodes:
+                if isinstance(node, ast.Import):
+                    imported.update(a.name.split('.')[-1] for a in node.names)
+                elif isinstance(node, ast.ImportFrom):
+                    imported.add((node.module or '').split('.')[-1])
+                    imported.update(a.name for a in node.names)
+        except SyntaxError:
+            imported = set()
+        if modules & imported or any(source in text for source in paths):
+            found.add(rel)
+    return sorted(found)
 
 
 def task_class(task):
@@ -71,17 +97,17 @@ def derive(plan_only=False):
         command='PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task '+id
         if id=='subtract':
             removals=read(ROOT/'mesh/SUBTRACT.tsv')
-            inputs=','.join(sorted({r['path'] for r in removals})+['mesh/SUBTRACT.tsv','mesh/SUBTRACT-KEPT.tsv','mesh/reference/'])
+            inputs=','.join(sorted({r['path'] for r in removals})+['mesh/SUBTRACT.tsv','mesh/SUBTRACT-KEPT.tsv'])
             present='preserved reference originals and retained live infrastructure recorded in mesh/SUBTRACT-KEPT.tsv; scope only the exact SUBTRACT units; exclude pinned mesh/check.py and mesh/plants.py, all reference files and retained mesh/seed.py; if originals are already absent, verify and finish in this first attempt without edits'
             absent='AST-identical reference originals at active units: '+', '.join(r['path']+':'+r['unit'] for r in removals)
         elif id=='zero':
-            inputs='mesh/,PLAN.md,TASKS.tsv,MESH.tsv'
-            present='model contracts equal requirement envelopes; implementation done only with all current evidence'
+            inputs='mesh/evidence/zero.json'
+            present='model contracts equal requirement envelopes; implementation done only with all current evidence; run PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py to write the required output mesh/evidence/zero.json; measurement inputs are read-only'
             absent='model missing/over constraints; stale or missing evidence cannot imply implementation done'
         else:
             candidate=slot['filled-by'] or 'OPEN'
             paths=sorted({x.split(':')[0] for x in candidate.split(';') if x!='OPEN'})
-            inputs=','.join(paths+[f'mesh/evidence/{id}.json'])
+            inputs=','.join(callers(paths)+[f'mesh/evidence/{id}.json'])
             present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate
             absent='unrealized behavior and stale/missing current evidence'
         brief=f'PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'
@@ -115,6 +141,7 @@ def derive(plan_only=False):
         cost=sum(int(t['estimate_tokens']) for t in tasks if t['task'] in wave)
         lines.append(f'Wave {n}: '+', '.join(wave)+f' (predicted {cost} tokens)')
     lines+=['','At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.','',
+      'Required route outputs: each slot owns its declared mesh/evidence/<slot>.json receipt; register also owns mesh/evidence/register-proposal.md. The zero task writes mesh/evidence/zero.json by running PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py. These files are retained proof artifacts for measurement and handoff, including reports of missing or external evidence. Zero reads mesh/, PLAN.md, TASKS.tsv and MESH.tsv without changing them; its output excludes itself from source pins. Model zero and implementation completion remain separate.', '',
       'Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. Historical docs and old mesh artifacts are reference; no hook invocation/configuration, credentials, gate runs, publishing or merges.']
     start = lines.index('```text')
     end = lines.index('```', start + 1)

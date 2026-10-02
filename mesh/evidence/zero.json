@@ -1,14 +1,14 @@
 {
   "task": "zero",
-  "selected_input_digest": "b6031cdf17a705873d1d9aa8b5f980c5ef3c58a16f0452e058dabab3ddbc63c6",
+  "selected_input_digest": "5ae4e1737a3d2b5a1f4bc3a8edb2e522b85f1d004336517901aa540c8a0476ec",
   "source_pins": {
     "MESH.tsv": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
-    "PLAN.md": "c5c659ca7e0c626eb972f62a1661b9c93a2715e5e59eb1fc1bb305119de3069a",
-    "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+    "PLAN.md": "21ff3989e28f7b5c1c4a29ff590a97c6d60829e35b2e2cddd3d15d9fe7e7a4e4",
+    "TASKS.tsv": "4967432fcd1ed606c16bccca660c24ea60ffad827c759c2f513b7626d3eae393",
     "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
     "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
     "mesh/FILLS.tsv": "f13042c5de69b4c680d0cfde2e45ab913a822a3611e68e4dfa2ae7ff330b8d79",
-    "mesh/PREDICTIONS.tsv": "4baa8cea2602e491540bb8e91f43011232a8d6cd6a172f244e2e7edb6a8faa88",
+    "mesh/PREDICTIONS.tsv": "99f00e09f6eee61c7d3de78ab6cffc3c048090a0094844d2ef8bb422e8a8d8fa",
     "mesh/README.md": "c033482f62ccd9bed68caf57990282c015769216060ef277ee5614ca4fe8960e",
     "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
     "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
@@ -42,7 +42,7 @@
     "mesh/reference/seed.py": "4b1154a889895be6e442d37c625da4a2a3a5d182afc5497a783066a2b6ffafd1",
     "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
     "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
-    "mesh/seed.py": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+    "mesh/seed.py": "4d6a7c95b162b6cb39609f9d3b7689c6643dc8836b3f5d5a33cd38d82ad2e93e",
     "mesh/test_zero.py": "a0c759fde02fccc39c63b278cc4ef3498bfbbcf8f662d996c93789da67a6f24a",
     "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
     "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
@@ -493,6 +493,7 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
+        "TASKS.tsv",
         "mesh/check.py"
       ]
     },
@@ -529,6 +530,7 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
+        "TASKS.tsv",
         "mesh/check.py"
       ]
     },
@@ -586,6 +588,7 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
+        "TASKS.tsv",
         "mesh/check.py"
       ]
     },
@@ -606,7 +609,9 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
-        "mesh/check.py"
+        "TASKS.tsv",
+        "mesh/check.py",
+        "mesh/seed.py"
       ]
     },
     "validate": {
@@ -633,6 +638,7 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
+        "TASKS.tsv",
         "mesh/check.py"
       ]
     },
@@ -660,7 +666,9 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
-        "mesh/check.py"
+        "TASKS.tsv",
+        "mesh/check.py",
+        "mesh/seed.py"
       ]
     },
     "fresh": {
@@ -687,7 +695,9 @@
       "missing_inputs": [],
       "stale_inputs": [
         "PLAN.md",
-        "mesh/check.py"
+        "TASKS.tsv",
+        "mesh/check.py",
+        "mesh/seed.py"
       ]
     },
     "audit": {
@@ -735,10 +745,11 @@
       ],
       "stale_inputs": [
         "PLAN.md",
-        "mesh/PREDICTIONS.tsv",
+        "TASKS.tsv",
         "mesh/README.md",
         "mesh/check.py",
-        "mesh/plants.py"
+        "mesh/plants.py",
+        "mesh/seed.py"
       ]
     },
     "join": {
@@ -786,10 +797,11 @@
       ],
       "stale_inputs": [
         "PLAN.md",
-        "mesh/PREDICTIONS.tsv",
+        "TASKS.tsv",
         "mesh/README.md",
         "mesh/check.py",
-        "mesh/plants.py"
+        "mesh/plants.py",
+        "mesh/seed.py"
       ]
     },
     "handoff": {
@@ -837,10 +849,11 @@
       ],
       "stale_inputs": [
         "PLAN.md",
-        "mesh/PREDICTIONS.tsv",
+        "TASKS.tsv",
         "mesh/README.md",
         "mesh/check.py",
-        "mesh/plants.py"
+        "mesh/plants.py",
+        "mesh/seed.py"
       ]
     }
   },
