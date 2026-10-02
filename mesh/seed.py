@@ -85,7 +85,11 @@ def derive(plan_only=False):
             present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate
             absent='unrealized behavior and stale/missing current evidence'
         brief=f'PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'
-        tasks.append(dict(task=id,deps=','.join(sorted(parents)),brief=brief,inputs=inputs,check=command,hand='yes' if id=='register' else 'no',piece=id,citation=citation,estimate_tokens=cost))
+        if id=='register':
+            # Owner decides register amendments: realize the ports against the approved register; never amend it.
+            brief+=' Never amend the register; if realization needs an amendment, write it to mesh/evidence/register-proposal.md for the owner and report EXTERNAL.'
+            inputs+=',mesh/evidence/register-proposal.md'
+        tasks.append(dict(task=id,deps=','.join(sorted(parents)),brief=brief,inputs=inputs,check=command,hand='no',piece=id,citation=citation,estimate_tokens=cost))
         mesh.append(dict(hole=id,check=command,plant='PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy '+id,piece=id,citation=citation,status='SHAPE_PRESENT',realization=slot['fill-status'] if slot else 'MODEL_ONLY'))
         predictions.append(dict(task=id,shape='PRESENT',implementation='REMOVED' if id=='subtract' else slot['fill-status'] if slot else 'UNPROVEN',evidence='EXTERNAL' if id in EXTERNAL_SLOTS else 'UNMEASURED',cost_tokens=cost))
     waves=[];pending=set(deps);done=set()
