@@ -20,7 +20,9 @@ Deterministic, stdlib only, no imports from any other package. The shell splitte
 Makoto 3.4.19 core/_shell.py `_shell_segments` (prior art), trimmed to what this module reads.
 """
 from __future__ import annotations
+from types import MappingProxyType
 
+import copy
 import functools
 import json
 import os
@@ -523,7 +525,9 @@ def record(events: Iterable[dict]) -> Record:
     event's position in `events` (so `before` can be the act's own position in the same list).
     Stop and UserPromptSubmit events are not Obs; they mark turns (Record.turn_start) and a
     prompt's text joins Record.user_texts, as do user-authored entries of a fetched thread."""
+    events = tuple(copy.deepcopy(tuple(events or ())))
     obs, seen, users, boundary = [], set(), [], None
+    readers = {}
     for i, ev in enumerate(events or ()):
         name = ev.get("hook_event_name") if isinstance(ev, dict) else None
         if name in _TURN_MARKS:
@@ -535,10 +539,14 @@ def record(events: Iterable[dict]) -> Record:
             continue
         o = _read(ev, i, seen)
         obs.append(o)
+        readers[i] = MappingProxyType({"cwd": str(ev.get("cwd") or ""),
+                                      "source_reads": tuple(ev.get("source_reads") or ())})
         seen |= o.objects
         fetched = o.tool.endswith(_FETCH_TOOL_SUFFIXES) and _executed(o)
         users.extend(_user_entries(ev.get("tool_response")) if fetched else ())
     rec = Record(obs)
+    rec.events = events
+    rec.reader_evidence = MappingProxyType(readers)
     rec.user_texts = users
     rec.turn_start = 0 if boundary is None else next(
         (o.seq for o in obs if o.seq > boundary), boundary + 1)

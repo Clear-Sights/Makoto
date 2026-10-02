@@ -40,6 +40,8 @@ def o_once(finding, record, keys):               # O: at most once per (row, obj
         return None, None
     objs = sorted(finding.get("objects") or [])
     state = [(o.seq, o.tool) for o in record.obs if set(objs) & (set(o.objects) | set(o.written) | set(o.created))]
+    if "predicate" in finding:
+        state = getattr(record, "events", state)
     key = hashlib.sha256(json.dumps([finding["row"], objs, state]).encode()).hexdigest()
     return (None, None) if key in keys else (finding, key)
 
@@ -61,9 +63,15 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
     # Dispatch is a workspace contract; invalid or absent declarations are off.
     try:
         with open(os.path.join(ev.get("cwd") or os.getcwd(), "makoto.toml"), "rb") as fh:
-            config["dispatch"] = tomllib.load(fh).get("dispatch") is True
+            declaration = tomllib.load(fh)
+            config["dispatch"] = declaration.get("dispatch") is True
+            tables = declaration.get("named_sets", {})
+            if isinstance(tables, dict):
+                config["named_sets"] = {k: v for k, v in tables.items()
+                                        if isinstance(v, list) and all(isinstance(x, str) for x in v)}
     except (OSError, ValueError):
         config["dispatch"] = False
+        config["named_sets"] = {}
     path = sigma_path(config["state_dir"], ev.get("session_id", ""))
     events, keys = sigma_read(path)
     record = record_fn(events + ([ev] if ev.get("hook_event_name") in SETTLED else []))
@@ -74,11 +82,9 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
         record.dispatch_briefs = [(i, e) for i, e in enumerate(events)
                                   if e.get("hook_event_name") == "PreToolUse"
                                   and e.get("tool_name") in ("Agent", "Task")]
+    config["settings"] = {"makoto": {"dispatch": config["dispatch"]}}
     finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
-    if ev.get("hook_event_name") in SETTLED + TURN_MARKS:
-        sigma_append(path, {"event": ev})
-    if (config["dispatch"] and finding is None and ev.get("hook_event_name") == "PreToolUse"
-            and ev.get("tool_name") in ("Agent", "Task")):
+    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
         sigma_append(path, {"event": ev})
     if key:
         sigma_append(path, {"key": key})

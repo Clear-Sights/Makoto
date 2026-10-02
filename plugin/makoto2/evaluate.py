@@ -16,6 +16,9 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from makoto2.lineage import unpaid as lineage_unpaid
+from makoto2 import family_spec, family_lineage, family_switch
+from makoto2.family_other import findings as other_findings
 from typing import Optional
 
 
@@ -91,20 +94,47 @@ def _acts(args):
 def evaluate(rows, record, event) -> Optional[dict]:
     """First row whose moment matches the event and has an unpaid subject -> block; else None."""
     moment = event.get("hook_event_name", "")
+    cfg = rows[0].get("cfg", {}) if rows else {}
+    for finding in family_spec.evaluate(record, event, cfg):
+        return finding
+    if moment in ("PreToolUse", "Stop", "SubagentStop"):
+        if family_lineage.lineage_absence(record, event, _R):
+            return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
+        for predicate, row, citation in (
+            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:495,782 F2/H3"),
+            (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
+        ):
+            subjects = predicate(record, event, _R)
+            if subjects:
+                return {"row": row, "message": citation, "objects": subjects}
+        for state, name in lineage_unpaid(record, event, _R):
+            return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
+    cfg = rows[0].get("cfg", {}) if rows else {}
+    for finding in other_findings(record, event, _R, cfg.get("dispatch", False)):
+        return finding
+    for finding in family_switch.findings(record,event,cfg):
+        return finding
     for row in rows:
         if moment not in row["moment"].split(","):
             continue
         args, cfg = row.get("args") or {}, row.get("cfg") or {}
+        if row["id"] in ("R05", "R07", "R12"):
+            continue
         acts = _acts(args)
         dispatch_brief = (cfg.get("dispatch") and moment == "PreToolUse"
                           and event.get("tool_name") in ("Agent", "Task")
                           and row["id"] in DISPATCH_SPECS)
         if acts and not (acts & _R.act_kinds(event)) and not dispatch_brief:
             continue
+        if row["id"] == "R08" and not dispatch_brief:
+            continue
         spec = PREDICATES[row["predicate"]]
         if dispatch_brief:
             spec = DISPATCH_SPECS.get(row["id"], spec)
         subjects = spec.owes(args, cfg, record, event)
+        if row["id"] == "R11" and moment == "Stop":
+            subjects = [s for s in subjects if s[2] in ("acceptance", "artifact", "status")
+                        or s[0] not in ("shipped", "pushed", "landed", "merged", "done", "fixed", "finished", "complete", "completed", "ready", "failed") ]
         if not subjects:
             continue
         paid = spec.seed(args, cfg, record) if spec.seed else ()
@@ -145,14 +175,13 @@ def _brief_fields(event):
 
 
 def dispatch_schema_owes(args, cfg, record, event):
+    if not cfg.get("dispatch") or event.get("tool_name") not in ("Agent", "Task"):
+        return []
     return [k for k, values in _brief_fields(event).items() if not values]
 
 
 def dispatch_pins_owes(args, cfg, record, event):
-    lines = _brief_fields(event)["READ"]
-    # Each declared token owns its pin; a hash in a comment cannot pay another path.
-    tokens = [t.strip("-`\"'") for line in lines for t in re.split(r"[\s,]+", line)]
-    return [t for t in tokens if t and t != "-" and not re.fullmatch(r"[^@]+@[0-9a-fA-F]{12,}", t)]
+    return family_lineage.lineage_pin(args, cfg, record, event)
 
 
 DISPATCH_SPECS = {
@@ -250,44 +279,6 @@ def _denied(o) -> bool:
 
 
 # ---------- rows as (owes, pays) ----------
-
-_ASK_PHRASE_RX = re.compile(
-    r"\b(should i|shall i|do you want|would you like|want me to|let me know (?:if|whether|which)|"
-    r"which (?:one )?do you prefer|can you confirm|please confirm|your call)\b", re.I)
-
-
-def asks_owes(args, cfg, record, event):
-    text = _strip_quoted(_text_of(event))
-    m = _ASK_PHRASE_RX.search(text)
-    if m:
-        return [m.group(0)]
-    return [s.strip() for s in _sentences(text) if s.rstrip().endswith("?")][:1]
-
-
-def thread_owes(args, cfg, record, event):
-    start = getattr(record, "turn_start", None) or 0
-    prior = [o for o in record.obs if _is_act(args, o) and o.seq >= start and not o.failed]
-    return [f"thread started at seq {prior[-1].seq}"] if prior else []
-
-
-_TARGET_KEYS = ("session_id", "thread_id", "thread_ts", "thread", "to")
-
-
-def _target(ti) -> str:
-    return next((str(ti[k]) for k in _TARGET_KEYS if isinstance(ti, dict) and ti.get(k)), "")
-
-
-def pile_owes(args, cfg, record, event):
-    tgt = _target(event.get("tool_input") or {})
-    sends = [o for o in record.obs if _is_act(args, o) and _target(o.input) == tgt and not o.failed]
-    return [(tgt, sends[-1].seq)] if tgt and sends else []
-
-
-def pile_pays(args, cfg, o):
-    if _is_act(args, o) or not o.output:
-        return None
-    return lambda s: s[0] in o.output and o.seq > s[1]
-
 
 _ABSENCE_RXS = [
     re.compile(r"\bnot signed in(?: to| on)? (?:the )?([\w.\-/]+)", re.I),
@@ -408,52 +399,6 @@ def read_pays(args, cfg, o):
     if o.failed or not (o.tool == "Read" or (o.tool == "Bash" and str(o.output).strip())):
         return None
     return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
-
-
-def denied_owes(args, cfg, record, event):
-    last = _last_same_call(record, event)
-    return [last.seq] if last is not None and _denied(last) else []
-
-
-def ran_after_pays(args, cfg, o):
-    return None if o.failed else (lambda seq: o.seq > seq)
-
-
-_UNIT = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}   # seconds per unit (a unit table, not a limit)
-_TIMEOUT_RX = re.compile(r"\btimeout\s+(?:-[-\w]+(?:[= ]\S+)?\s+)*(\d+(?:\.\d+)?)([smhd]?)\b")
-_SLEEP_RX = re.compile(r"\bsleep(?:\s+|\(\s*)(\d+(?:\.\d+)?)([smhd]?)\b")   # shell sleep N, code sleep(N)
-# a time budget written as a setting inside the command: timeout=N, timeout: N, --timeout N, --timeout=N (seconds)
-_SETTING_TIMEOUT_RX = re.compile(r"(?:\b|--)timeout\s*(?:=|:|(?<=--timeout)\s)\s*(\d+(?:\.\d+)?)([smhd]?)\b")
-_FOR_SEQ_RX = re.compile(r"\bfor\s+\w+\s+in\s+(?:\$\(seq\s+(?:(\d+)\s+)?(\d+)\)|\{(\d+)\.\.(\d+)\})[^;]*;\s*do\b(.*?)\bdone\b", re.S)
-_WHILE_RX = re.compile(r"\b(?:while|until)\b.*?\bdo\b(.*?)\bdone\b", re.S)
-
-
-def _ms(n, unit) -> float:
-    return float(n) * _UNIT[unit] * 1000
-
-
-def _sleep_ms(chunk: str) -> float:
-    return sum(_ms(n, u) for n, u in _SLEEP_RX.findall(chunk))
-
-
-def budget_owes(args, cfg, record, event):
-    ti = event.get("tool_input") or {}
-    if ti.get("run_in_background"):
-        return []
-    cmd = str(ti.get("command", ""))
-    limit = float(ti.get("timeout") or cfg["default_tool_timeout_ms"])
-    timeouts = [_ms(n, u) for rx in (_TIMEOUT_RX, _SETTING_TIMEOUT_RX) for n, u in rx.findall(cmd)]
-    rest, looped = cmd, 0.0
-    for m in _FOR_SEQ_RX.finditer(cmd):
-        a, b = (m.group(1) or "1", m.group(2)) if m.group(2) else (m.group(3), m.group(4))
-        looped += max(0, int(b) - int(a) + 1) * _sleep_ms(m.group(5))
-        rest = rest.replace(m.group(0), " ")
-    unbounded = any(_SLEEP_RX.search(m.group(1)) for m in _WHILE_RX.finditer(rest))
-    if unbounded and not timeouts:
-        return [f"unbounded wait loop inside a {int(limit)} ms call"]
-    rest = _WHILE_RX.sub(" ", rest) if unbounded else rest
-    inner = max(timeouts) if unbounded else max([looped + _sleep_ms(rest)] + timeouts)
-    return [f"inner budget {int(inner)} ms > call limit {int(limit)} ms"] if inner > limit else []
 
 
 _LANDED = {
@@ -663,41 +608,6 @@ def landed_pays(args, cfg, o):
 
 
 
-_COST_CLAIM_RX = re.compile(
-    r"\b(?:saves?|saved|saving|reduces?|reduced|cuts?|cut|lowers?|lowered)\b"
-    r"\s+(?:(?:the|our|input|output|billed|total|operating|\$?[\d.,]+%?)\s+){0,4}"
-    r"(?:costs?|tokens?|money|bill|spend)\b|"
-    r"\b(?:cost|token|money|bill)\s+savings\b|\benabled savings\b", re.I)
-_COST_NUMBER = r"(?:\$\s*)?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?"
-
-
-def cost_owes(args, cfg, record, event):
-    """A savings assertion must name its accounting scope in the same message.
-
-    Explicit labelled fields keep this an omission check, not a causal oracle.
-    Questions, future measurements and quotations are not asserted savings.
-    An off-arm zero cannot supply an enabled-arm numerator.
-    """
-    text = _strip_quoted(_text_of(event))
-    claims = [s for s in _sentences(text) if _COST_CLAIM_RX.search(s)
-              and not s.rstrip().endswith("?")
-              and not re.search(r"\b(?:will|plan(?:ning)? to|intend to|whether|would|could|might)\b", s, re.I)
-              and not re.search(r"\b(?:does not|doesn't|did not|cannot|can't|no)\s+(?:save|reduce|cut|lower|savings)\b", s, re.I)]
-    if not claims:
-        return []
-    edge = re.search(r"\bdelivery (?:edge|path)\s*:\s*([^;\n.!?]+)", text, re.I)
-    enabled = re.search(r"\b(?:enabled|on)[ -]arm (?:measured )?numerator\s*:\s*"
-                        + _COST_NUMBER + r"\s*(?:tokens?|USD|dollars?)?", text, re.I)
-    bill = re.search(r"\bbill denominator\s*:\s*(" + _COST_NUMBER + r")", text, re.I)
-    denominator = float(bill[1].replace("$", "").replace(",", "").replace(" ", "")) if bill else 0
-    off_zero = any(re.search(r"\boff[ -]arm\b[^.!?\n]*(?:\bzero\b|(?<![\d.])0(?![\d.]))", s, re.I)
-                   for s in claims)
-    if (not edge or edge[1].strip().lower() in {"none", "unknown", "unobserved", "n/a"}
-            or not enabled or denominator <= 0 or off_zero):
-        return claims
-    return []
-
-
 def count_owes(args, cfg, record, event):
     rx = re.compile(
         r"(?<![\w.])(\d+)\s+(?:[A-Za-z\-]+\s+){0,%d}?(?:in|of|from|at|under|across)\s+`?"
@@ -706,21 +616,24 @@ def count_owes(args, cfg, record, event):
 
 
 def repeat_owes(args, cfg, record, event):
-    last = _last_same_call(record, event)
-    if last is None or _denied(last) or not str(last.output).strip():
+    if event.get("tool_name") != "Bash":
         return []
-    return [last.seq] if last.seq >= (getattr(record, "turn_start", 0) or 0) else []
+    command = (event.get("tool_input") or {}).get("command")
+    last = next((o for o in reversed(record.obs) if o.tool == "Bash"
+                 and o.input.get("command") == command), None)
+    if last is None or last.exit is None:
+        return []
+    if last.exit == 0 and ">>" not in str(command):
+        return []
+    return [last.seq]
 
 
 def wrote_pays(args, cfg, o):
-    return (lambda seq: o.seq > seq) if (o.written or o.created) else None
+    return (lambda seq: o.seq > seq) if o.tool in ("Write", "Edit") else None
 
 
 PREDICATES = {
-    "cost_unaccounted": Spec(cost_owes, why="savings need a delivery edge, enabled-arm numerator and bill denominator; off-arm zero is not enabled savings"),
-    "asks_user": Spec(asks_owes, why="asks the user; threads pick a default and state it"),
-    "second_thread_this_turn": Spec(thread_owes, why="a thread was already started this turn; one at a time"),
-    "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),
+    "dispatch_schema": Spec(dispatch_schema_owes, why="dispatch fields required by I1"),
     "absence_unsearched": Spec(absence_owes, absence_pays,
                                why="claims absence with no empty search whose scope covers it"),
     "relayed_number": Spec(number_owes, number_pays,
@@ -728,10 +641,8 @@ PREDICATES = {
     "user_quote": Spec(quote_owes, quote_pays, quote_seed,
                        why="quotes the user with words no observed user message or WORDS.tsv holds"),
     "write_unread_paths": Spec(write_owes, read_pays, why="writes about paths none of which was read"),
-    "denied_retry": Spec(denied_owes, ran_after_pays, why="resends a denied call unchanged with nothing run since"),
-    "budget_exceeds_limit": Spec(budget_owes, why="the inner wait outlives the tool call's own limit"),
     "landed_unobserved": Spec(landed_owes, landed_pays,
                               why="claims an outcome without its observed status or counted failing subjects"),
     "count_unread_path": Spec(count_owes, read_pays, why="gives a count for a path never read"),
-    "exact_repeat": Spec(repeat_owes, wrote_pays, why="repeats a settled call with nothing written since"),
+    "exact_repeat": Spec(repeat_owes, wrote_pays, why="replays an append or retries a failed command without an intervening edit"),
 }
