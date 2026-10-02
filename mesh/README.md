@@ -39,8 +39,14 @@ outputs of checks and historical measurements;
 a passing model gate does not make stale receipts current. Re-run
 `PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py` after changing selected mesh or
 plan inputs. It executes every product acceptance and reports open implementation obligations. Cleanup results live outside the repository at
-`/home/user/route-out/makoto/CLEANUP.txt`.
+`/home/user/route-out/makoto-r9/CLEANUP.txt`.
 
 TASKS.tsv now selects executable product acceptance in tests/acceptance_tasks.py; TRACE.tsv names each requirement’s test. MESH.tsv keeps its separate model checks. plants.py verifies every product check is red when its fill is removed; an already red evidence task stays open. ALREADY-MET.tsv records only passing product checks, with SHA-256 output digests and retained output under mesh/evidence/product-checks/. Historical receipts alone do not establish current acceptance.
 
 FIX16: register is local load/enforce/replay of the unchanged shipped rows.tsv. Gabriel owns amendments; register-proposal.md is outside the seed DAG. Local pytest, model checks, plants and fixed-input replay are authorized. Proof files are outputs and never accepted as implementation evidence.
+
+Fixed done-tail cleanup 2026-10-02: the current inventory contains no scratch,
+temporary, cache or untracked files to remove. All repository files are listed
+in the route’s PROTECTED.txt and retained, including plugin metadata, required
+references and evidence. The check and plant commands above remain unchanged.
+This cleanup records file hygiene; it does not establish implementation completion.

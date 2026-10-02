@@ -26,7 +26,7 @@ exact-head CI and fresh-session receipts remain separate obligations.
 PLAN.md and TASKS.tsv describe the dependency graph and current estimates,
 with COST_FACTOR=2. Retain the requirement-driven seed generator and subtraction
 references. Old extraction tables and checkers are removed; source pins remain.
-The cleanup record is `/home/user/route-out/makoto/CLEANUP.txt`.
+The cleanup record is `/home/user/route-out/makoto-r9/CLEANUP.txt`.
 
 The current zero report separates model validity from implementation completion.
 Existing receipts include open, stale and external evidence; re-measure after

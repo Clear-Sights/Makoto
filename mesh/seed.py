@@ -77,7 +77,7 @@ def measured_costs(path):
 
 
 def derive(plan_only=False):
-    costs, floor = measured_costs(ROOT/'mesh/COSTS.tsv')
+    _, floor = measured_costs(ROOT/'mesh/COSTS.tsv')
     measured = [row for row in read(ROOT/'mesh/COSTS.tsv') if row['passed'] == 'yes']
     slots={s['slot']:s for s in read(ROOT/'mesh/SLOTS.tsv')}
     requirements={r['requirement']:r for r in read(ROOT/'mesh/REQUIREMENTS.tsv')}
