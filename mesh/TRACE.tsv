@@ -1,0 +1,40 @@
+requirement	source	verdict
+detect	WORDS.tsv:WHY	TRACED
+decode	docs-def:README.md#Runtime and rules	TRACED
+settled	SPIRIT.md#Acceptance checks	TRACED
+terminal	docs-def:README.md#Runtime and rules	TRACED
+rule-permission	docs-def:README.md#Runtime and rules	TRACED
+rule-worker	docs-def:README.md#Runtime and rules	TRACED
+rule-rebrief	docs-def:README.md#Runtime and rules	TRACED
+rule-absence	docs-def:README.md#Runtime and rules	TRACED
+rule-thread	docs-def:README.md#Runtime and rules	TRACED
+rule-quote	docs-def:README.md#Runtime and rules	TRACED
+rule-plan	docs-def:README.md#Runtime and rules	TRACED
+rule-retry	docs-def:README.md#Runtime and rules	TRACED
+rule-time	docs-def:README.md#Runtime and rules	TRACED
+rule-completion	docs-def:README.md#Runtime and rules	TRACED
+rule-count	docs-def:README.md#Runtime and rules	TRACED
+rule-probe	docs-def:README.md#Runtime and rules	TRACED
+once	docs-def:README.md#Runtime and rules	TRACED
+output	docs-def:README.md#Runtime and rules	TRACED
+boundaries	docs-def:README.md#Runtime and rules	TRACED
+store	docs-def:README.md#Runtime and rules	TRACED
+configuration	docs-def:README.md#Runtime and rules	TRACED
+sources	SPIRIT.md#Acceptance checks	TRACED
+register	SPIRIT.md#Acceptance checks	TRACED
+suite	SPIRIT.md#Acceptance checks	TRACED
+ci	SPIRIT.md#Acceptance checks	TRACED
+package	SPIRIT.md#Acceptance checks	TRACED
+install	SPIRIT.md#Acceptance checks	TRACED
+audit	SPIRIT.md#Acceptance checks	TRACED
+done	WORDS.tsv:DONE	TRACED
+handoff	WORDS.tsv:HANDOFF	TRACED
+awareness	WORDS.tsv:AWARE	TRACED
+focus	WORDS.tsv:FOCUS	TRACED
+nohooks	WORDS.tsv:NOHOOKS	TRACED
+scope-detio-bar	WORDS.tsv:DETIO-BAR	TRACED
+scope-causality	WORDS.tsv:CAUSALITY	TRACED
+scope-why	WORDS.tsv:WHY	TRACED
+scope	SPIRIT.md#Out-of-scope	TRACED
+uninstall	docs-def:README.md#Uninstall	TRACED
+limits	docs-def:README.md#Runtime and rules	TRACED

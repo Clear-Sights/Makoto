@@ -1,6 +1,6 @@
 """One hostile mutation per computed check, in minimal credential-free copies.
 No runtime imports, hooks, test suite, gate, network or checkout mutations.
---copy TASK prints a private copy whose MESH check must fail, for route Step 0.
+--copy TASK mutates the current disposable working tree for route Step 0.
 """
 from pathlib import Path
 import argparse
@@ -27,7 +27,7 @@ def write(path,fields,rows):
 
 
 def mutate(copy,check):
-    filename={'schema':'SOURCES','wires':'WIRES','reachable':'WIRES','trace':'SLOTS','coverage':'REQUIREMENTS','fills':'FILLS','missing':'CONSTRAINTS','over':'CONSTRAINTS','subtractions':'SUBTRACT','route':None,'wire-rule':'WIRES','tighten':'TIGHTEN'}[check]
+    filename={'schema':'SOURCES','wires':'WIRES','reachable':'WIRES','trace':'TRACE','coverage':'REQUIREMENTS','fills':'FILLS','missing':'CONSTRAINTS','over':'CONSTRAINTS','subtractions':'SUBTRACT','route':None,'wire-rule':'WIRES','tighten':'TIGHTEN'}[check]
     path=copy/'mesh'/(filename+'.tsv') if filename else copy/'TASKS.tsv'
     fields,rows=read(path)
     if check=='tighten':rows[-1]['shape']='{}'
@@ -35,7 +35,7 @@ def mutate(copy,check):
     elif check=='schema':rows[0]['sha256']='0'*64
     elif check=='wires':rows[0]['target']='configure#defaults'
     elif check=='reachable':rows=[w for w in rows if not (w['source'].startswith('decode#') or w['target'].startswith('decode#'))]
-    elif check=='trace':next(s for s in rows if s['slot']=='once')['requirements']=''
+    elif check=='trace':rows.pop(0)
     elif check=='coverage':rows[0]['port']='absent'
     elif check=='fills':rows[0]['unit']='no_such_function'
     elif check=='missing':rows=[c for c in rows if c['requirement']!='detect']
@@ -66,7 +66,7 @@ def main():
     if args.copy:
         _,tasks=read(ROOT/'TASKS.tsv')
         if args.copy not in {t['task'] for t in tasks}:parser.error('unknown task')
-        copy=local_copy();mutate(copy,'missing');print(copy);return 0
+        mutate(Path.cwd(),'missing');return 0
     selected=(args.check,) if args.check else CHECKS
     failures=[]
     for check in selected:
@@ -80,6 +80,9 @@ def main():
             print(check+': '+('plant RED (baseline PASS)' if ok else 'plant FAILED'))
             if not ok:failures.append(check);print(baseline.stdout+result.stdout+result.stderr)
         finally:shutil.rmtree(copy)
+    if not args.check:
+        from route_preflight import prove
+        failures.extend(prove())
     return int(bool(failures))
 
 if __name__=='__main__':raise SystemExit(main())

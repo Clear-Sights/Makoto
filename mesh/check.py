@@ -22,7 +22,7 @@ TABLES = {'SLOTS': ('slot','inputs','outputs','requirements','loosest','filled-b
           'REQUIREMENTS': ('requirement','source','text','scope','slot','port','universe','allowed','required','math-type'),
           'CONSTRAINTS': ('constraint','requirement','slot','port','accepts','derivation'),
           'FILLS': ('path','unit','slot','reason'), 'SUBTRACT': ('path','unit','reason'),
-          'SOURCES': ('path','sha256')}
+          'TRACE': ('requirement','source','verdict'), 'SOURCES': ('path','sha256')}
 TASK_FIELDS = ('task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens')
 # Nominal payloads are open records: these fields are required, extra fields permitted.
 # No implementation class, exact collection length, rule order or serialization is imposed.
@@ -151,6 +151,13 @@ def errors(root=ROOT):
             p=root/('mesh/reference/docs-def-README.md' if prefix=='docs-def:README.md' else prefix)
             exists=bool(sep and p.is_file() and re.search(r'^#+ '+re.escape(heading)+r'\s*$',p.read_text(),re.M))
         if not exists:bad['schema'].append('unresolved citation '+source)
+    traces = {t['requirement']: t for t in tables['TRACE']}
+    if len(traces) != len(tables['TRACE']) or set(traces) != set(reqs):
+        bad['trace'].append('TRACE coverage or duplicate')
+    for r in R:
+        t = traces.get(r['requirement'], {})
+        if t.get('verdict') != 'TRACED' or t.get('source') != r['source']:
+            bad['trace'].append('requirement without TRACED source: ' + r['requirement'])
     forward={s:set() for s in slots}; backward={s:set() for s in slots}; connected=set()
     for w in W:
         try:
@@ -266,6 +273,11 @@ def errors(root=ROOT):
             if id=='zero':need|=slots.keys()-{INPUT,OUTPUT}
             if set(filter(None,t['deps'].split(',')))!=need:bad['route'].append(id+' incorrect dependencies')
             if not t['estimate_tokens'].isdigit() or int(t['estimate_tokens'])<=0 or 'PRESENT:' not in t['brief'] or 'ABSENT:' not in t['brief'] or 'EXTERNAL' not in t['brief'] or 're-measure' not in t['brief'] or 'BLOCKED' in t['brief']:bad['route'].append(id+' invalid prediction/cost/failure')
+            sources = [(root / name).read_text() for name in SOURCE_PATHS]
+            citation = meshmap.get(id, {}).get('citation', '')
+            headings = {h for text in sources for h in re.findall(r'^#+ (.+)$', text, re.M)}
+            if citation not in headings | {word['id'] for word in words}:
+                bad['route'].append(id+' unresolved bare citation')
             m=meshmap.get(id,{})
             if m.get('check')!=t['check'] or not m.get('plant'):bad['route'].append(id+' check/plant mismatch')
     except (OSError,KeyError,ValueError) as e:bad['route'].append(str(e))
