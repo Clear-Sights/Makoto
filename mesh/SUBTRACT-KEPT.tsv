@@ -1,2 +1,0 @@
-path	unit	reason
-mesh/seed.py	<module>	Retained live requirement-driven route generator used by check.py and plants.py; obsolete reference seed removed (git history retains it).

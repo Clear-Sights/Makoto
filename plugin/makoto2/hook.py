@@ -7,14 +7,10 @@ TURN_MARKS = ("Stop", "SubagentStop", "UserPromptSubmit")   # not Obs; R reads t
 
 def d_in(raw):                                   # D_in: stdin bytes -> event (fail open)
     try:
-        # Python's decoder otherwise accepts non-JSON NaN/Infinity values.
-        ev = json.loads(raw, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
-    except (ValueError, TypeError, RecursionError):
+        ev = json.loads(raw or "{}")
+    except (ValueError, TypeError):
         return None
-    if not isinstance(ev, dict):
-        return None
-    name = ev.get("hook_event_name")
-    return ev if isinstance(name, str) and name else None
+    return ev if isinstance(ev, dict) and ev.get("hook_event_name") else None
 
 def sigma_path(state_dir, session_id):           # Sigma: where this session's store lives
     safe = hashlib.sha256(str(session_id).encode()).hexdigest()[:16]
@@ -22,32 +18,22 @@ def sigma_path(state_dir, session_id):           # Sigma: where this session's s
 
 def sigma_read(path):                            # Sigma: settled events and fired keys, oldest first
     events, keys = [], set()
-    try:
-        fh = open(path, encoding="utf-8")
-    except FileNotFoundError:
-        return events, keys
-    with fh:
-        for line in fh:
+    if os.path.exists(path):
+        for line in open(path, encoding="utf-8"):
             try:
-                row = json.loads(line, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+                row = json.loads(line)
             except ValueError:
                 continue
-            if not isinstance(row, dict):
-                continue
-            if isinstance(row.get("key"), str):
+            if "key" in row:
                 keys.add(row["key"])
-            elif isinstance(row.get("event"), dict):
+            elif "event" in row:
                 events.append(row["event"])
     return events, keys
 
 def sigma_append(path, row):                     # Sigma: append-only write
-    # Validate before creating state: a failed serialization has no store effect.
-    line = json.dumps(row, sort_keys=True, allow_nan=False) + "\n"
-    directory = os.path.dirname(path)
-    if directory:
-        os.makedirs(directory, exist_ok=True)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:
-        fh.write(line)
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
 
 def o_once(finding, record, keys):               # O: at most once per (row, object, object state)
     if finding is None:
@@ -60,23 +46,17 @@ def o_once(finding, record, keys):               # O: at most once per (row, obj
     return (None, None) if key in keys else (finding, key)
 
 def d_out(event, finding):                       # D_out: finding? -> hook JSON (two outputs only)
-    if event is None or finding is None:
-        return {}
-    name = event.get("hook_event_name")
-    if name not in ("PreToolUse", "Stop", "SubagentStop"):
+    if finding is None:
         return {}
     reason = f"makoto {finding['row']}: {finding['message']}"
-    if name == "PreToolUse":
+    if event.get("hook_event_name") == "PreToolUse":
         return {"hookSpecificOutput": {"hookEventName": "PreToolUse",
                                        "permissionDecision": "deny", "permissionDecisionReason": reason}}
-    return {"decision": "block", "reason": reason}
+    if event.get("hook_event_name") in ("Stop", "SubagentStop"):
+        return {"decision": "block", "reason": reason}
+    return {}
 
 def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired once
-    """Evaluate against settled history, then append effects, boundaries and fired keys.
-
-    A current boundary belongs to the next record, so it cannot erase the turn
-    being evaluated. Events that cannot emit a decision must not consume keys.
-    """
     ev = d_in(raw)
     if ev is None:
         return {}
