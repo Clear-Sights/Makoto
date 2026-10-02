@@ -11,13 +11,13 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 MESH = ROOT / 'mesh'
-CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route')
+CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route', 'wire-rule', 'tighten')
 INPUT = 'PROGRAM_INPUT'
 OUTPUT = 'PROGRAM_OUTPUT'
 SOURCE_PATHS = {'WORDS.tsv','SPIRIT.md','mesh/reference/docs-def-README.md'}
 ATOMS = {'Bytes', 'String', 'JSON', 'Record', 'Finding', 'Evidence', 'Artifact', 'Verdict'}
 CONSTRUCTORS = {'one': 1, 'many': 1, 'option': 1, 'set': 1, 'list': 1, 'map': 2}
-TABLES = {'SLOTS': ('slot','inputs','outputs','requirements','loosest','filled-by','fill-status'),
+TABLES = {'SLOTS': ('slot','inputs','outputs','requirements','loosest','filled-by','fill-status','input-sources','output-from'),
           'WIRES': ('wire','source','target','requirements'),
           'REQUIREMENTS': ('requirement','source','text','scope','slot','port','universe','allowed','required','math-type'),
           'CONSTRAINTS': ('constraint','requirement','slot','port','accepts','derivation'),
@@ -163,6 +163,22 @@ def errors(root=ROOT):
             relevant=set(slots[b if b!=OUTPUT else a]['requirements'].split(','))
             if not refs<=relevant:bad['trace'].append(w['wire']+' foreign requirement')
         except (ValueError,KeyError):bad['wires'].append(w['wire']+' invalid endpoint')
+    # Folded raw inputs remain local bindings, rather than flexibility wires.
+    for slot in S:
+        for q, source in json.loads(slot['input-sources']).items():
+            a, p = source.split('#'); b = slot['slot']
+            if a == INPUT:
+                if ports.get((a,'outputs',p)) != ports.get((b,'inputs',q)):
+                    bad['wires'].append('local binding type mismatch '+source)
+                connected.update(((a,'outputs',p),(b,'inputs',q)))
+                forward[a].add(b); backward[b].add(a)
+    try:
+        from wire_rule import classify, render
+        decisions = classify(mesh)
+        bad['wire-rule'].extend(r['wire or pair']+' '+r['verdict'] for r in decisions if r['verdict'] != 'KEEP')
+        # WIRE-RULE records the applied revision, including its folded wires.
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        bad['wire-rule'].append(str(e))
     for endpoint in ports:
         if endpoint not in connected:bad['wires'].append('unwired '+str(endpoint))
     def reach(start,graph):
@@ -253,6 +269,12 @@ def errors(root=ROOT):
             m=meshmap.get(id,{})
             if m.get('check')!=t['check'] or not m.get('plant'):bad['route'].append(id+' check/plant mismatch')
     except (OSError,KeyError,ValueError) as e:bad['route'].append(str(e))
+    try:
+        from tighten import render as fresh_tighten
+        if (mesh/'TIGHTEN.tsv').read_text() != fresh_tighten(mesh):
+            bad['tighten'].append('TIGHTEN.tsv differs from fresh deterministic fixpoint')
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        bad['tighten'].append(str(e))
     return bad
 
 
