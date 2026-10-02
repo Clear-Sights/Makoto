@@ -1,27 +1,2 @@
-F                                                                        [100%]
-=================================== FAILURES ===================================
-_________________________________ test_handoff _________________________________
-
-    def test_handoff():
->       handoff = product_function('handoff')
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-tests/acceptance_tasks.py:206:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-name = 'handoff'
-
-    def product_function(name):
-        """Open lifecycle slots must expose executable behavior, never a proof file."""
-        import importlib.util
-        path = HERE / 'lifecycle.py'
->       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
-E       AssertionError: handoff: missing product implementation plugin/makoto2/lifecycle.py
-E       assert False
-E        +  where False = is_file()
-E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
-
-tests/acceptance_tasks.py:131: AssertionError
-=========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_handoff - AssertionError: handoff: mis...
-1 failed in 0.07s
+.                                                                        [100%]
+1 passed in 0.06s

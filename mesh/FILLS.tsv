@@ -187,3 +187,4 @@ tests/test_hook.py	test_ci_receipt_controls	validate	Collected CI receipt hostil
 plugin/makoto2/lifecycle.py	fresh	fresh	Install current plugin bytes in an isolated fresh account and execute the installed hook; receipts are not inputs.
 plugin/makoto2/lifecycle.py	audit	audit	Scan current file bytes including ignored content, exclude Git history, and reject detected credentials or unreadable content without proof receipts.
 plugin/makoto2/lifecycle.py	handoff	handoff	Carry the current bounded verdict and explicit absences without evidence reads; wake on changed input.
+plugin/makoto2/lifecycle.py	join	join	Join current passing measurements for the selected head; missing, failed, malformed or mismatched inputs keep completion open.

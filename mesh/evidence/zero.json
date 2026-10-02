@@ -1,18 +1,18 @@
 {
   "task": "zero",
-  "selected_input_digest": "d043a27ce1347e719fbfaaaf4917ffa1583a860449ccf9e119353ee894f7561f",
+  "selected_input_digest": "41c7ab9db9c60e39cf9b2ccbd8621fd479b376edaa93600551c951cb2e89b742",
   "source_pins": {
     "MESH.tsv": "8d7b53318252c209e5338b3d739bb15726125a900368e86acecdf593e2d80a42",
     "PLAN.md": "e6d1a2bde87880ed50e966ea2160c1149dbcc0bba0b1069794ae0f615e5ce0f3",
     "TASKS.tsv": "421383b86120daa6e02924d5dd6e48fddcd1cf10725f3aa3458d7531c8ee656e",
-    "mesh/ALREADY-MET.tsv": "863390c7fddbadd448a2454d26d91beed7defcf73ea419a3aefdd474d5386397",
+    "mesh/ALREADY-MET.tsv": "09630e23ff2f617ae895a8bd2aa6c9760195d8331cd002e3c1936099062dbc16",
     "mesh/CONSTRAINTS.tsv": "cf755b7c23fbeeacfd8da833d10c81d2b5ae15b2fa7b003f563ee14fced62667",
     "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
-    "mesh/FILLS.tsv": "6d3d11810291173d7b2ea79977234a3ce426effa3acedcb871f03a6fd7ad0365",
+    "mesh/FILLS.tsv": "fdaa10b7e2e329dc56acaaaf3d904e5017777ae4e9bdabaa4fe88a75add764bb",
     "mesh/PREDICTIONS.tsv": "129376436d31c0a37e12d85f39b336c0ca6d6edf9de7e931572e2f081401d21e",
     "mesh/README.md": "1624b1ca40f4ab417e52228b80df8c270acf3a56deb3831b5e9ce52e63d4205c",
     "mesh/REQUIREMENTS.tsv": "4848bf0581e71083cc54ff34d48c889ab1eeecc6dcb96040c18ea631313bbdbd",
-    "mesh/SLOTS.tsv": "30c4cb440c3d3d0408f1a61120697d0dacc2abbd9b846216d9e3b9265a014d56",
+    "mesh/SLOTS.tsv": "be4ef91f0266a55e20a93573436aef06155c0d9d207ecbcda679b5fcd99923b1",
     "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
     "mesh/SUBTRACT-KEPT.tsv": "31fe4051e8e82c45ffd30f6db12bae17e093a2e3897a088fcb318682a3e1dd5f",
     "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
@@ -35,24 +35,24 @@
     "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
     "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
     "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
-    "mesh/evidence/product-checks/advance.txt": "4e8b6c5a89da44bf05d17100903172be04033067c113a6831bdfafbd42b7da52",
-    "mesh/evidence/product-checks/audit.txt": "271d7603b8635c065fa3220877ed4a8baa8f94ab239fcf7c946cb7ad9139c27b",
-    "mesh/evidence/product-checks/configure.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/advance.txt": "3be6ffcaecf85b5bd3eef3693ab214b0e7c9eb4e36d117fcf1825652de5eb298",
+    "mesh/evidence/product-checks/audit.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
+    "mesh/evidence/product-checks/configure.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
     "mesh/evidence/product-checks/decode.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
     "mesh/evidence/product-checks/emit.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/evaluate.txt": "bc4c2ff1a05d78db864338a871f51116604f720d25667467a47cb7c30039c666",
-    "mesh/evidence/product-checks/fresh.txt": "e22fc2791fd828f7a3573d843ee290c8b5f4758b234785718a0605c9f08c0609",
-    "mesh/evidence/product-checks/handoff.txt": "294b553075351f46acfc5a27b8d7e22a0305c453c43ef06dd2f413474c90c456",
-    "mesh/evidence/product-checks/join.txt": "3ac89a1eb9c725bd47d338a624a052b14e5c156b02f64f142599f43e8351f50b",
-    "mesh/evidence/product-checks/observe.txt": "bc4c2ff1a05d78db864338a871f51116604f720d25667467a47cb7c30039c666",
+    "mesh/evidence/product-checks/evaluate.txt": "3dd8a455f93386b2d78b9d5605f1c2f52fd55f0962f89b0bd7d602cae0ead952",
+    "mesh/evidence/product-checks/fresh.txt": "d2d744b6b2df2bbb0d73cb7a43f6675bd03881bc2a2c2a74e54ecf18667789e2",
+    "mesh/evidence/product-checks/handoff.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/join.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/observe.txt": "1ab9905d8b0f34f6d791ff7da4efa2de0f7f3e282a078758cc0496cc0230c0f0",
     "mesh/evidence/product-checks/once.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/package.txt": "9196f30bf7be41914cd9e1dbb5b61e83e4c5290630851090b2508678929b7229",
+    "mesh/evidence/product-checks/package.txt": "06254aecdf245cc6f8784e134e36703bcc595ac0578b8c5f7f3591bcb399781b",
     "mesh/evidence/product-checks/persist.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
     "mesh/evidence/product-checks/register.txt": "06254aecdf245cc6f8784e134e36703bcc595ac0578b8c5f7f3591bcb399781b",
-    "mesh/evidence/product-checks/rules.txt": "1ab9905d8b0f34f6d791ff7da4efa2de0f7f3e282a078758cc0496cc0230c0f0",
-    "mesh/evidence/product-checks/subtract.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
-    "mesh/evidence/product-checks/validate.txt": "64ea6be5d87df7dc509bc9902a0ce441130df43069ee986506930fc23acf39c0",
-    "mesh/evidence/product-checks/zero.txt": "44ddccf0449bd7916b1c00a228eee93893cf0366ce86bec523a6a86880f9dd6a",
+    "mesh/evidence/product-checks/rules.txt": "142e711fac20a466998c8bbeb42619edb1e1722cf84dfe39f564f9b894494392",
+    "mesh/evidence/product-checks/subtract.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/validate.txt": "142e711fac20a466998c8bbeb42619edb1e1722cf84dfe39f564f9b894494392",
+    "mesh/evidence/product-checks/zero.txt": "e8cb09fbd82f9f13d88d39855374707596a5f03acefda3d8c1c80b16fd7fed51",
     "mesh/evidence/register-proposal.md": "f39ba65ca206fecb5ff7c4cadeba375c537f384235498665d3db8d420cecc3ca",
     "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
     "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
@@ -69,10 +69,10 @@
   },
   "digest_method": "SHA-256 of canonical source_pins JSON; sorted keys, compact separators, UTF-8, ensure_ascii=False; zero output excluded",
   "model": {
-    "zero": false,
+    "zero": true,
     "missing": 0,
     "over": 0,
-    "structural_violations": 1,
+    "structural_violations": 0,
     "relations": [
       {
         "requirement": "detect",
@@ -464,8 +464,8 @@
       }
     ],
     "plan_matches": true,
-    "check_exit_code": 1,
-    "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: FAIL\n  unclassified /home/user/route-out/makoto-r7/run/candidate-zero-0/plugin/makoto2/lifecycle.py:join\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\nacceptance: PASS\n",
+    "check_exit_code": 0,
+    "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\nacceptance: PASS\n",
     "stderr": ""
   },
   "product_checks": {
@@ -478,97 +478,97 @@
     "configure": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.17s\n",
       "stderr": ""
     },
     "rules": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.62s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.75s\n",
       "stderr": ""
     },
     "observe": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.65s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.72s\n",
       "stderr": ""
     },
     "evaluate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.60s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.81s\n",
       "stderr": ""
     },
     "once": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "emit": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "advance": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.23s\n",
       "stderr": ""
     },
     "persist": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.13s\n",
       "stderr": ""
     },
     "register": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.67s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.74s\n",
       "stderr": ""
     },
     "validate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.72s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 1.18s\n",
       "stderr": ""
     },
     "package": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.59s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 1.13s\n",
       "stderr": ""
     },
     "fresh": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.22s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.31s\n",
       "stderr": ""
     },
     "audit": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.13s\n",
       "stderr": ""
     },
     "join": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
       "stderr": ""
     },
     "handoff": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
       "stderr": ""
     },
     "subtract": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.15s\n",
       "stderr": ""
     }
   },
@@ -665,13 +665,15 @@
     }
   ],
   "stable_inputs": true,
-  "present": [],
+  "present": [
+    "model:requirement_envelopes"
+  ],
   "absent": [],
   "external": [],
-  "done": false,
-  "decision": "not_done",
-  "result": "absent",
-  "status": "OPEN",
+  "done": true,
+  "decision": "done",
+  "result": "pass",
+  "status": "DONE",
   "failure_edge": "Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.",
   "reproduction": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py",
   "scope": "Model pins describe the measurement; completion is determined by executable product checks, never receipt labels."

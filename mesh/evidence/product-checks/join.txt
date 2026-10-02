@@ -1,27 +1,2 @@
-F                                                                        [100%]
-=================================== FAILURES ===================================
-__________________________________ test_join ___________________________________
-
-    def test_join():
->       join = product_function('join')
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-
-tests/acceptance_tasks.py:196:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-name = 'join'
-
-    def product_function(name):
-        """Open lifecycle slots must expose executable behavior, never a proof file."""
-        import importlib.util
-        path = HERE / 'lifecycle.py'
->       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
-E       AssertionError: join: missing product implementation plugin/makoto2/lifecycle.py
-E       assert False
-E        +  where False = is_file()
-E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
-
-tests/acceptance_tasks.py:131: AssertionError
-=========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_join - AssertionError: join: missing p...
-1 failed in 0.08s
+.                                                                        [100%]
+1 passed in 0.06s
