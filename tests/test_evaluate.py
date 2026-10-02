@@ -127,6 +127,12 @@ def test_plant_blocks_and_lookalike_silent(rows, rid, prec, pev, lrec, lev):
         assert V.evaluate(rows, lrec, lev) is None
         return
     expected_row = rid
+    if rid in ("R07", "R12"):
+        # Register refs(output) excludes Pre message arguments (:15).
+        assert V.evaluate(rows, prec, pev) is None
+        assert V.evaluate(rows, lrec, lev) is None
+        pev = {"hook_event_name": "Stop", "last_assistant_message": pev["tool_input"]["text"]}
+        lev = {"hook_event_name": "Stop", "last_assistant_message": lev["tool_input"]["text"]}
     if rid == "R05":
         pev = {"hook_event_name": "Stop", "claim": {"kind": "absent"}}
         lev = {"hook_event_name": "Stop", "claim": {"kind": "absent", "falsifier": "source result"}}
@@ -254,6 +260,8 @@ def test_failure_subject_fold_and_every_name(rows):
     assert V.evaluate([row], Record([log]), reply("Two tests failed.")) is None
     assert V.evaluate([row], record, reply("If two tests failed, list them.")) is None
     quoted = reply('The runner reports "two tests failed".')
+    assert V.evaluate([row], record, quoted) is None
+    quoted = {"hook_event_name": "Stop", "last_assistant_message": quoted["tool_input"]["text"]}
     assert V.evaluate([row], record, quoted)["row"] == "R08"
     source = Obs(2, "Read", {"ref": "two tests failed"}, "two tests failed")
     assert V.evaluate([row], Record([red, source]), quoted) is None
