@@ -1,7 +1,6 @@
 """Measure declarative zero separately from current implementation evidence.
 
-Reads only mesh/, PLAN.md, TASKS.tsv and MESH.tsv. Outside receipt pins are
-EXTERNAL, never silently trusted. Run again whenever selected inputs change.
+Pins mesh/, PLAN.md, TASKS.tsv and MESH.tsv and executes local product checks. Completion is measured by executing product acceptance; proof receipts are outputs. Run again whenever selected inputs change.
 """
 import csv
 import hashlib
@@ -53,35 +52,6 @@ def measure(root):
     return files, sorted(names-files.keys())
 
 
-def receipt_state(receipt, files):
-    if not isinstance(receipt, dict):
-        receipt = {}
-    pins = receipt.get('source_pins')
-    valid = (isinstance(pins, dict) and bool(pins)
-             and all(isinstance(n, str) and isinstance(h, str)
-                     and len(h) == 64 and all(c in '0123456789abcdef' for c in h)
-                     for n, h in pins.items()))
-    pins = pins if valid else {}
-    outside = sorted(n for n in pins if not allowed(n) or n == OUTPUT)
-    missing = sorted(n for n in pins if n not in outside and n not in files)
-    stale = sorted(n for n, h in pins.items()
-                   if n in files and sha(files[n]) != h)
-    digest_valid = bool(valid and sha(canonical(pins)) == receipt.get('selected_input_digest'))
-    current = digest_valid and not outside and not missing and not stale
-    observations = receipt.get('observations', [])
-    observed = (isinstance(observations, list) and bool(observations)
-                and all(isinstance(o, dict) and o.get('result') == 'pass'
-                        for o in observations)
-                and any(o.get('synthetic') is not True for o in observations))
-    accepted = bool(current and observed and receipt.get('result') == 'pass'
-                    and not receipt.get('absent') and not receipt.get('external')
-                    and receipt.get('status') not in ('EXTERNAL', 'OPEN', 'PARTIAL', 'CANDIDATE')
-                    and receipt.get('done') is not False
-                    and receipt.get('decision') != 'not_done')
-    return dict(current=bool(current), accepted=accepted, digest_valid=digest_valid,
-                outside_evidence=outside, missing_inputs=missing, stale_inputs=stale)
-
-
 def derive_waves(tasks):
     remaining = {t['task']: t for t in tasks}
     if len(remaining) != len(tasks):
@@ -114,34 +84,23 @@ def contracts(files):
     return relations
 
 
-def implementation(receipts, files, slots):
-    states, absent, external = {}, [], []
-    for slot in slots:
-        name = slot['slot']
-        if name in ('PROGRAM_INPUT', 'PROGRAM_OUTPUT'):
-            continue
-        receipt = receipts.get(name, {})
-        state = receipt_state(receipt, files)
-        requirements = receipt.get('requirements')
-        identity = (isinstance(requirements, list)
-                    and all(isinstance(r, str) for r in requirements)
-                    and receipt.get('task') == name
-                    and set(filter(None, slot['requirements'].split(',')))
-                    <= set(requirements))
-        state['accepted'] = state['accepted'] and identity
-        states[name] = state
-        if not state['accepted']:
-            absent.append(name+':current_passing_evidence')
-        if slot['fill-status'] == 'OPEN' or not slot['filled-by']:
-            absent.append(name+':bound_proof_producer')
-        external.extend(state['outside_evidence'])
-        external.extend(str(e) for e in receipt.get('external', []))
-    join = receipts.get('join', {})
-    verdict = join.get('verdict')
-    if (join.get('decision') != 'done' or not isinstance(verdict, dict)
-            or verdict.get('decision') != 'done'):
-        absent.append('join:current_done_verdict')
-    return states, sorted(set(absent)), sorted(set(external))
+def implementation(root, slots):
+    """Measure actual product acceptance. Receipts are never completion inputs."""
+    states, absent = {}, []
+    names = [s['slot'] for s in slots if s['slot'] not in ('PROGRAM_INPUT', 'PROGRAM_OUTPUT')]
+    names.append('subtract')
+    for name in names:
+        result = subprocess.run(
+            ['python3', '-m', 'pytest', '-q', '-p', 'no:cacheprovider',
+             'tests/acceptance_tasks.py::test_'+name], cwd=root,
+            env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'),
+            capture_output=True, text=True)
+        states[name] = dict(accepted=result.returncode == 0,
+                            check_exit_code=result.returncode,
+                            stdout=result.stdout, stderr=result.stderr)
+        if result.returncode:
+            absent.append(name+':product_acceptance')
+    return states, sorted(absent), []
 
 
 def main():
@@ -152,17 +111,7 @@ def main():
     plan_matches = all(f"Wave {w['wave']}: {', '.join(w['tasks'])} (predicted {w['predicted_tokens']} tokens)"
                        in plan for w in waves)
     relations = contracts(files)
-    receipts, invalid = {}, []
-    for n, data in files.items():
-        if n.startswith('mesh/evidence/') and n.endswith('.json'):
-            try:
-                r = json.loads(data)
-                if not isinstance(r, dict):
-                    raise ValueError('receipt is not a record')
-                receipts[Path(n).stem] = r
-            except ValueError:
-                invalid.append(n)
-    states, absent, external = implementation(receipts, files, table(files['mesh/SLOTS.tsv']))
+    states, absent, external = implementation(ROOT, table(files['mesh/SLOTS.tsv']))
     check = subprocess.run(['python3', 'mesh/check.py', '--task', 'zero'], cwd=ROOT,
                            env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'),
                            capture_output=True, text=True)
@@ -173,7 +122,6 @@ def main():
     if not stable:
         absent.append('zero:input_changed_during_measurement')
     absent.extend(n+':missing_input' for n in missing)
-    absent.extend(n+':invalid_evidence' for n in invalid)
     done = bool(model_zero and stable and not absent and not external and states)
     report = dict(task='zero', selected_input_digest=sha(canonical(pins)), source_pins=pins,
                   digest_method='SHA-256 of canonical source_pins JSON; sorted keys, compact separators, UTF-8, ensure_ascii=False; zero output excluded',
@@ -183,7 +131,7 @@ def main():
                              structural_violations=sum(line.startswith('  ') for line in check.stdout.splitlines()),
                              relations=relations, plan_matches=plan_matches,
                              check_exit_code=check.returncode, stdout=check.stdout, stderr=check.stderr),
-                  dependency_receipts=states, derived_waves=waves, stable_inputs=stable,
+                  product_checks=states, derived_waves=waves, stable_inputs=stable,
                   present=['model:requirement_envelopes'] if model_zero else [],
                   absent=sorted(set(absent)), external=external,
                   done=done, decision='done' if done else 'not_done',
@@ -191,7 +139,7 @@ def main():
                   status='EXTERNAL' if external else ('DONE' if done else 'OPEN'),
                   failure_edge='Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.',
                   reproduction='PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py',
-                  scope='Only allowed input bytes measured; external pins remain unverified. Model checks do not certify runtime completion.')
+                  scope='Model pins describe the measurement; completion is determined by executable product checks, never receipt labels.')
     (ROOT/OUTPUT).write_text(json.dumps(report, indent=2, ensure_ascii=False)+'\n')
     print(json.dumps(dict(model_zero=model_zero, done=done, status=report['status'], waves=len(waves))))
     return 0 if model_zero and stable else 1

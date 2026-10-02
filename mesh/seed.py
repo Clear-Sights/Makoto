@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUT = 'PROGRAM_INPUT'
 OUTPUT = 'PROGRAM_OUTPUT'
 TASK_FIELDS = ('task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens')
-EXTERNAL_SLOTS = {'register','fresh','audit'}
+EXTERNAL_SLOTS = set()
 
 
 def read(path):
@@ -107,19 +107,19 @@ def derive(plan_only=False):
             absent='AST-identical reference originals at active units: '+', '.join(r['path']+':'+r['unit'] for r in removals)
         elif id=='zero':
             inputs='mesh/evidence/zero.json'
-            present='model contracts equal requirement envelopes; implementation done only with all current evidence; run PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py to write the required output mesh/evidence/zero.json; measurement inputs are read-only'
+            present='model contracts equal requirement envelopes; implementation done only when every executable product acceptance passes; run PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py to write the required output mesh/evidence/zero.json; measurement inputs are read-only'
             absent='model missing/over constraints; stale or missing evidence cannot imply implementation done'
         else:
             candidate=slot['filled-by'] or 'OPEN'
             paths=sorted({x.split(':')[0] for x in candidate.split(';') if x!='OPEN'})
-            inputs=','.join(callers(paths)+[f'mesh/evidence/{id}.json'])
-            present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate
+            inputs=','.join(callers(paths)+['tests/acceptance_tasks.py', f'mesh/evidence/{id}.json'] + (['plugin/makoto2/lifecycle.py'] if id in {'validate','package','fresh','audit','join','handoff'} else []))
+            present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate+'; implement product code and run acceptance; evidence files are optional check outputs, never proof inputs'
             absent='unrealized behavior and stale/missing current evidence'
-        brief=f'PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'
+        brief=f'Local pytest, mesh/check.py, mesh/plants.py and the task check are authorized. PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'
         if id=='register':
             # Owner decides register amendments: realize the ports against the approved register; never amend it.
-            brief+=' Never amend the register; if realization needs an amendment, write it to mesh/evidence/register-proposal.md for the owner and report EXTERNAL.'
-            inputs+=',mesh/evidence/register-proposal.md'
+            brief+=' Load, enforce and replay the CURRENT shipped register exactly. Never amend it. Proposed amendments remain in mesh/evidence/register-proposal.md for Gabriel; approval is not a route obligation or dependency.'
+            inputs+=',plugin/makoto2/rows.tsv,tests/sources.tsv'
         tasks.append(dict(task=id,deps=','.join(sorted(parents)),brief=brief,inputs=inputs,check=command,hand='no',piece=id,citation=citation,estimate_tokens=cost))
         mesh.append(dict(hole=id,check=model_command,plant='PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy '+id,piece=id,citation=citation,status='SHAPE_PRESENT',realization=slot['fill-status'] if slot else 'MODEL_ONLY'))
         predictions.append(dict(task=id,shape='PRESENT',implementation='REMOVED' if id=='subtract' else slot['fill-status'] if slot else 'UNPROVEN',evidence='EXTERNAL' if id in EXTERNAL_SLOTS else 'UNMEASURED',cost_tokens=cost))
@@ -139,7 +139,7 @@ def derive(plan_only=False):
       'Requirements open ports; transformed wires order work. Raw program inputs are local slot bindings (SLOTS input-sources). WIRE-RULE.tsv records the applied classification; wire_rule.py rejects identity wires and detects missing transformed passes. Layer 1 closes only source-backed definite constraints. Layers 2+ use signed deterministic feedback within that closed space: surplus deletion reduces excess, while required deletion increases missing and is forbidden. SymPy simplifies every slot relation before and after the loop. tighten.py computes the least finite requirement relations to a fixpoint, and check.py rejects a stale TIGHTEN.tsv. SUBTRACT is first. Each later wave contains every ready slot, giving maximal concurrency under this one-layer dependency graph. Candidate units in shared files must be edited by one writer or re-measured into disjoint scopes; evidence files are per slot.', '',
       'The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS execute product acceptance, including blocking and silent cases. MESH checks the separate declarative contract. Open evidence obligations fail product acceptance. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a token cost from mesh/COSTS.tsv. Estimates follow route-audit: use the cheapest passing exact task in this checkout, otherwise the largest passing checkout/class or cross-repository class measurement; unmeasured classes use the largest passing run overall. A class is the task-name prefix before the first hyphen (including subtract and fill). Failed attempts never set estimates. The project rule stops a job over twice its cheapest logged passing run of the same class.', '',
       'Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.', '',
-      'Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have plants that mutate the current disposable working tree. This is a reviewable plan; route execution and its tail are outside this request. Register amendments require Gabriel; merging remains with Gabriel.', '',
+      'Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have plants that mutate the current disposable working tree. Local checks and fixed-input hook replay are authorized by FIX16. Register amendments require Gabriel; merging remains with Gabriel.', '',
       'Route configuration:',
       '```text','REPO_DIR=/home/user/makoto','WHY=Makoto prevents blindspots through detection','WORDS_FILES=WORDS.tsv,SPIRIT.md,mesh/reference/docs-def-README.md','MESH_FILE=MESH.tsv','SEED_FILE=PLAN.md','GATE_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py','PLANTS_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py','```','',
       'MESH checks declare model contracts; TASKS checks execute product acceptance. Missing external evidence keeps the corresponding task open.', '']
@@ -147,9 +147,9 @@ def derive(plan_only=False):
         cost=sum(int(t['estimate_tokens']) for t in tasks if t['task'] in wave)
         lines.append(f'Wave {n}: '+', '.join(wave)+f' (predicted {cost} tokens)')
     lines+=['','At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.','',
-      'Required route outputs: each slot owns its declared mesh/evidence/<slot>.json receipt; register also owns mesh/evidence/register-proposal.md. The zero task writes mesh/evidence/zero.json by running PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py. These files are retained proof artifacts for measurement and handoff, including reports of missing or external evidence. Zero reads mesh/, PLAN.md, TASKS.tsv and MESH.tsv without changing them; its output excludes itself from source pins. Model zero and implementation completion remain separate.', '',
+      'Required route outputs: each slot owns its declared mesh/evidence/<slot>.json receipt; Register amendments remain optional proposals in mesh/evidence/register-proposal.md, outside the task DAG. Receipts are outputs only; acceptance executes the product. The zero task writes mesh/evidence/zero.json by running PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py. These files are retained proof artifacts for measurement and handoff, including reports of missing or external evidence. Zero pins mesh/, PLAN.md, TASKS.tsv and MESH.tsv and executes product acceptance without using receipts as proof; its output excludes itself from source pins. Model zero and implementation completion remain separate.', '',
       'Route cleanup leftovers removed: mesh/reference/seed.py (unused historical generator; preserved in git history). Required reference/docs-def-README.md and reference/types.py remain pinned source and subtraction evidence.', '',
-      'Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. The historical README and subtraction types are required references; unused reference seed was removed; no hook invocation/configuration, credentials, gate runs, publishing or merges.']
+      'Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. The historical README and subtraction types are required references; unused reference seed was removed; local pytest, mesh checks, plants and fixed-input replay are authorized; no credentials, publishing or merges.']
     start = lines.index('```text')
     end = lines.index('```', start + 1)
     lines[start+1:end] = config.rstrip().splitlines()

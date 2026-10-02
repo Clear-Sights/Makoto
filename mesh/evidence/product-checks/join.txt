@@ -3,25 +3,25 @@ F                                                                        [100%]
 __________________________________ test_join ___________________________________
 
     def test_join():
->       for task in ('register','validate','package','fresh','audit'): require_receipt(task)
-                                                                       ^^^^^^^^^^^^^^^^^^^^^
+>       join = product_function('join')
+               ^^^^^^^^^^^^^^^^^^^^^^^^
 
-tests/acceptance_tasks.py:173: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/acceptance_tasks.py:196:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-task = 'register'
+name = 'join'
 
-    def require_receipt(task):
-        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
-        assert receipt.get('task') == task
->       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
-E       AssertionError: register: current product evidence absent or external
-E       assert ('absent' == 'pass'
-E         
-E         - pass
-E         + absent)
+    def product_function(name):
+        """Open lifecycle slots must expose executable behavior, never a proof file."""
+        import importlib.util
+        path = HERE / 'lifecycle.py'
+>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E       AssertionError: join: missing product implementation plugin/makoto2/lifecycle.py
+E       assert False
+E        +  where False = is_file()
+E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
 
 tests/acceptance_tasks.py:131: AssertionError
 =========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_join - AssertionError: register: curre...
-1 failed in 0.07s
+FAILED tests/acceptance_tasks.py::test_join - AssertionError: join: missing p...
+1 failed in 0.08s

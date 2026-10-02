@@ -3,26 +3,174 @@ F                                                                        [100%]
 __________________________________ test_zero ___________________________________
 
     def test_zero():
-        # Successful report generation is not implementation completion.
->       for task in ('register','validate','package','fresh','audit','join','handoff'): require_receipt(task)
-                                                                                        ^^^^^^^^^^^^^^^^^^^^^
+        # Execute every completion obligation; handwritten receipts cannot close zero.
+>       suite(*['tests/acceptance_tasks.py::test_'+name for name in
+                ('decode', 'configure', 'rules', 'observe', 'evaluate', 'once', 'emit',
+                 'advance', 'persist', 'register', 'validate', 'package', 'fresh',
+                 'audit', 'join', 'handoff', 'subtract')])
 
-tests/acceptance_tasks.py:189: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/acceptance_tasks.py:227:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-task = 'register'
+paths = ('tests/acceptance_tasks.py::test_decode', 'tests/acceptance_tasks.py::test_configure', 'tests/acceptance_tasks.py::te...tance_tasks.py::test_observe', 'tests/acceptance_tasks.py::test_evaluate', 'tests/acceptance_tasks.py::test_once', ...)
 
-    def require_receipt(task):
-        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
-        assert receipt.get('task') == task
->       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
-E       AssertionError: register: current product evidence absent or external
-E       assert ('absent' == 'pass'
-E         
-E         - pass
-E         + absent)
+    def suite(*paths):
+        result = subprocess.run([sys.executable, '-m', 'pytest', '-q', '-p', 'no:cacheprovider', *paths], cwd=ROOT, capture_output=True, text=True)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ..........FFFFFF.                                                        [100%]
+E         =================================== FAILURES ===================================
+E         ________________________________ test_validate _________________________________
+E
+E             def test_validate():
+E                 suite('tests/test_evaluate.py', 'tests/test_observed.py', 'tests/test_hook.py')
+E         >       validate = product_function('validate')
+E                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E
+E         tests/acceptance_tasks.py:150:
+E         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+E
+E         name = 'validate'
+E
+E             def product_function(name):
+E                 """Open lifecycle slots must expose executable behavior, never a proof file."""
+E                 import importlib.util
+E                 path = HERE / 'lifecycle.py'
+E         >       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E         E       AssertionError: validate: missing product implementation plugin/makoto2/lifecycle.py
+E         E       assert False
+E         E        +  where False = is_file()
+E         E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
+E
+E         tests/acceptance_tasks.py:131: AssertionError
+E         _________________________________ test_package _________________________________
+E
+E         tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_package0')
+E
+E             def test_package(tmp_path):
+E         >       package = product_function('package')
+E                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E
+E         tests/acceptance_tasks.py:160:
+E         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+E
+E         name = 'package'
+E
+E             def product_function(name):
+E                 """Open lifecycle slots must expose executable behavior, never a proof file."""
+E                 import importlib.util
+E                 path = HERE / 'lifecycle.py'
+E         >       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E         E       AssertionError: package: missing product implementation plugin/makoto2/lifecycle.py
+E         E       assert False
+E         E        +  where False = is_file()
+E         E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
+E
+E         tests/acceptance_tasks.py:131: AssertionError
+E         __________________________________ test_fresh __________________________________
+E
+E         tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_fresh0')
+E
+E             def test_fresh(tmp_path):
+E         >       fresh = product_function('fresh')
+E                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E
+E         tests/acceptance_tasks.py:172:
+E         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+E
+E         name = 'fresh'
+E
+E             def product_function(name):
+E                 """Open lifecycle slots must expose executable behavior, never a proof file."""
+E                 import importlib.util
+E                 path = HERE / 'lifecycle.py'
+E         >       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E         E       AssertionError: fresh: missing product implementation plugin/makoto2/lifecycle.py
+E         E       assert False
+E         E        +  where False = is_file()
+E         E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
+E
+E         tests/acceptance_tasks.py:131: AssertionError
+E         __________________________________ test_audit __________________________________
+E
+E         tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_audit0')
+E
+E             def test_audit(tmp_path):
+E         >       audit = product_function('audit')
+E                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E
+E         tests/acceptance_tasks.py:183:
+E         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+E
+E         name = 'audit'
+E
+E             def product_function(name):
+E                 """Open lifecycle slots must expose executable behavior, never a proof file."""
+E                 import importlib.util
+E                 path = HERE / 'lifecycle.py'
+E         >       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E         E       AssertionError: audit: missing product implementation plugin/makoto2/lifecycle.py
+E         E       assert False
+E         E        +  where False = is_file()
+E         E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
+E
+E         tests/acceptance_tasks.py:131: AssertionError
+E         __________________________________ test_join ___________________________________
+E
+E             def test_join():
+E         >       join = product_function('join')
+E                        ^^^^^^^^^^^^^^^^^^^^^^^^
+E
+E         tests/acceptance_tasks.py:196:
+E         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+E
+E         name = 'join'
+E
+E             def product_function(name):
+E                 """Open lifecycle slots must expose executable behavior, never a proof file."""
+E                 import importlib.util
+E                 path = HERE / 'lifecycle.py'
+E         >       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E         E       AssertionError: join: missing product implementation plugin/makoto2/lifecycle.py
+E         E       assert False
+E         E        +  where False = is_file()
+E         E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
+E
+E         tests/acceptance_tasks.py:131: AssertionError
+E         _________________________________ test_handoff _________________________________
+E
+E             def test_handoff():
+E         >       handoff = product_function('handoff')
+E                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E
+E         tests/acceptance_tasks.py:206:
+E         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+E
+E         name = 'handoff'
+E
+E             def product_function(name):
+E                 """Open lifecycle slots must expose executable behavior, never a proof file."""
+E                 import importlib.util
+E                 path = HERE / 'lifecycle.py'
+E         >       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E         E       AssertionError: handoff: missing product implementation plugin/makoto2/lifecycle.py
+E         E       assert False
+E         E        +  where False = is_file()
+E         E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
+E
+E         tests/acceptance_tasks.py:131: AssertionError
+E         =========================== short test summary info ============================
+E         FAILED tests/acceptance_tasks.py::test_validate - AssertionError: validate: m...
+E         FAILED tests/acceptance_tasks.py::test_package - AssertionError: package: mis...
+E         FAILED tests/acceptance_tasks.py::test_fresh - AssertionError: fresh: missing...
+E         FAILED tests/acceptance_tasks.py::test_audit - AssertionError: audit: missing...
+E         FAILED tests/acceptance_tasks.py::test_join - AssertionError: join: missing p...
+E         FAILED tests/acceptance_tasks.py::test_handoff - AssertionError: handoff: mis...
+E         6 failed, 11 passed in 3.00s
+E
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'tests/acceptance_tasks.py:... tests/acceptance_tasks.py::test_handoff - AssertionError: handoff: mis...\n6 failed, 11 passed in 3.00s\n', stderr='').returncode
 
-tests/acceptance_tasks.py:131: AssertionError
+tests/acceptance_tasks.py:24: AssertionError
 =========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_zero - AssertionError: register: curre...
-1 failed in 0.15s
+FAILED tests/acceptance_tasks.py::test_zero - AssertionError: ..........FFFFF...
+1 failed in 3.58s

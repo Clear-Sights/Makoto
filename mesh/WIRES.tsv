@@ -20,8 +20,8 @@ w024	emit#response	validate#response	suite,ci
 w025	emit#response	PROGRAM_OUTPUT#response	output
 w026	persist#stored	audit#stored	audit
 w027	persist#stored	PROGRAM_OUTPUT#stored	store
-w028	register#approval	validate#approval	suite,ci
-w029	register#approval	join#approval	done
+w028	register#replay	validate#replay	suite,ci
+w029	register#replay	join#replay	done
 w030	validate#evidence	package#evidence	package,uninstall
 w031	validate#evidence	join#validation	done
 w032	package#artifact	fresh#artifact	install

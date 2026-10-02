@@ -1,26 +1,2 @@
-F                                                                        [100%]
-=================================== FAILURES ===================================
-________________________________ test_register _________________________________
-
->   def test_register(): require_receipt('register')
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-tests/acceptance_tasks.py:165: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-task = 'register'
-
-    def require_receipt(task):
-        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
-        assert receipt.get('task') == task
->       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
-E       AssertionError: register: current product evidence absent or external
-E       assert ('absent' == 'pass'
-E         
-E         - pass
-E         + absent)
-
-tests/acceptance_tasks.py:131: AssertionError
-=========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_register - AssertionError: register: c...
-1 failed in 0.08s
+.                                                                        [100%]
+1 passed in 0.54s

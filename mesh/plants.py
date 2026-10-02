@@ -72,7 +72,7 @@ def empty_fill(copy, task):
         shutil.copy2(copy/'mesh/reference/types.py', copy/'mesh/types.py')
         return
     if task == 'zero':
-        (copy/'mesh/evidence/zero.json').unlink(missing_ok=True)
+        (copy/'plugin/makoto2/hook.py').write_text('')
         return
     _, fills = read(copy/'mesh/FILLS.tsv')
     grouped = {}

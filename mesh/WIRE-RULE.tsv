@@ -1,10 +1,4 @@
 wire or pair	verdict	reason
-w001	FOLD	identity input or direct variable binding; no transformation
-w002	FOLD	identity input or direct variable binding; no transformation
-w003	FOLD	identity input or direct variable binding; no transformation
-w004	FOLD	identity input or direct variable binding; no transformation
-w005	FOLD	identity input or direct variable binding; no transformation
-w006	FOLD	identity input or direct variable binding; no transformation
 w007	KEEP	transformed input crosses distinct slots
 w008	KEEP	transformed input crosses distinct slots
 w009	KEEP	transformed input crosses distinct slots
@@ -37,9 +31,3 @@ w035	KEEP	transformed input crosses distinct slots
 w036	KEEP	transformed input crosses distinct slots
 w037	KEEP	transformed input crosses distinct slots
 w038	KEEP	transformed input crosses distinct slots
-w039	FOLD	identity input or direct variable binding; no transformation
-w040	FOLD	identity input or direct variable binding; no transformation
-w041	FOLD	identity input or direct variable binding; no transformation
-w042	FOLD	identity input or direct variable binding; no transformation
-w043	FOLD	identity input or direct variable binding; no transformation
-w044	FOLD	identity input or direct variable binding; no transformation

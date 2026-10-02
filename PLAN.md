@@ -6,7 +6,7 @@ The shape model passes independently of implementation. OPEN, PARTIAL and CANDID
 
 Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.
 
-Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have plants that mutate the current disposable working tree. This is a reviewable plan; route execution and its tail are outside this request. Register amendments require Gabriel; merging remains with Gabriel.
+Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have plants that mutate the current disposable working tree. Local checks and fixed-input hook replay are authorized by FIX16. Register amendments require Gabriel; merging remains with Gabriel.
 
 Route configuration:
 ```text
@@ -36,8 +36,8 @@ Wave 12: zero (predicted 593606 tokens)
 
 At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.
 
-Required route outputs: each slot owns its declared mesh/evidence/<slot>.json receipt; register also owns mesh/evidence/register-proposal.md. The zero task writes mesh/evidence/zero.json by running PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py. These files are retained proof artifacts for measurement and handoff, including reports of missing or external evidence. Zero reads mesh/, PLAN.md, TASKS.tsv and MESH.tsv without changing them; its output excludes itself from source pins. Model zero and implementation completion remain separate.
+Required route outputs: each slot owns its declared mesh/evidence/<slot>.json receipt; Register amendments remain optional proposals in mesh/evidence/register-proposal.md, outside the task DAG. Receipts are outputs only; acceptance executes the product. The zero task writes mesh/evidence/zero.json by running PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py. These files are retained proof artifacts for measurement and handoff, including reports of missing or external evidence. Zero pins mesh/, PLAN.md, TASKS.tsv and MESH.tsv and executes product acceptance without using receipts as proof; its output excludes itself from source pins. Model zero and implementation completion remain separate.
 
 Route cleanup leftovers removed: mesh/reference/seed.py (unused historical generator; preserved in git history). Required reference/docs-def-README.md and reference/types.py remain pinned source and subtraction evidence.
 
-Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. The historical README and subtraction types are required references; unused reference seed was removed; no hook invocation/configuration, credentials, gate runs, publishing or merges.
+Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. The historical README and subtraction types are required references; unused reference seed was removed; local pytest, mesh checks, plants and fixed-input replay are authorized; no credentials, publishing or merges.

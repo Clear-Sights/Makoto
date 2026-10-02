@@ -2,25 +2,28 @@ F                                                                        [100%]
 =================================== FAILURES ===================================
 __________________________________ test_fresh __________________________________
 
->   def test_fresh(): require_receipt('fresh')
-                      ^^^^^^^^^^^^^^^^^^^^^^^^
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-206/test_fresh0')
 
-tests/acceptance_tasks.py:170: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+    def test_fresh(tmp_path):
+>       fresh = product_function('fresh')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-task = 'fresh'
+tests/acceptance_tasks.py:172:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-    def require_receipt(task):
-        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
-        assert receipt.get('task') == task
->       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
-E       AssertionError: fresh: current product evidence absent or external
-E       assert ('absent' == 'pass'
-E         
-E         - pass
-E         + absent)
+name = 'fresh'
+
+    def product_function(name):
+        """Open lifecycle slots must expose executable behavior, never a proof file."""
+        import importlib.util
+        path = HERE / 'lifecycle.py'
+>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E       AssertionError: fresh: missing product implementation plugin/makoto2/lifecycle.py
+E       assert False
+E        +  where False = is_file()
+E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
 
 tests/acceptance_tasks.py:131: AssertionError
 =========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_fresh - AssertionError: fresh: current...
-1 failed in 0.18s
+FAILED tests/acceptance_tasks.py::test_fresh - AssertionError: fresh: missing...
+1 failed in 0.08s

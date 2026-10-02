@@ -2,25 +2,28 @@ F                                                                        [100%]
 =================================== FAILURES ===================================
 __________________________________ test_audit __________________________________
 
->   def test_audit(): require_receipt('audit')
-                      ^^^^^^^^^^^^^^^^^^^^^^^^
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-207/test_audit0')
 
-tests/acceptance_tasks.py:171: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+    def test_audit(tmp_path):
+>       audit = product_function('audit')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-task = 'audit'
+tests/acceptance_tasks.py:183:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-    def require_receipt(task):
-        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
-        assert receipt.get('task') == task
->       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
-E       AssertionError: audit: current product evidence absent or external
-E       assert ('fail' == 'pass'
-E         
-E         - pass
-E         + fail)
+name = 'audit'
+
+    def product_function(name):
+        """Open lifecycle slots must expose executable behavior, never a proof file."""
+        import importlib.util
+        path = HERE / 'lifecycle.py'
+>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+E       AssertionError: audit: missing product implementation plugin/makoto2/lifecycle.py
+E       assert False
+E        +  where False = is_file()
+E        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file
 
 tests/acceptance_tasks.py:131: AssertionError
 =========================== short test summary info ============================
-FAILED tests/acceptance_tasks.py::test_audit - AssertionError: audit: current...
-1 failed in 0.13s
+FAILED tests/acceptance_tasks.py::test_audit - AssertionError: audit: missing...
+1 failed in 0.08s

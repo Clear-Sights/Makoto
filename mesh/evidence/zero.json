@@ -1,25 +1,25 @@
 {
   "task": "zero",
-  "selected_input_digest": "2a7be2f8ebd9a34974a9d72d61349d09ff29fbec59f1e5265ed94e909dadb8fe",
+  "selected_input_digest": "04dac46d3a2c8c533cd6820bebf1d2a257cefe6b2b6182dc6d392baa01f1e661",
   "source_pins": {
-    "MESH.tsv": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
-    "PLAN.md": "ae716892d7a548437713bf373676ece3fe9862881a06244f04aa76b20737f04f",
-    "TASKS.tsv": "06d19256dbc95d9a70fc41ca91dd0c9560b1b47e9d43eb83c1386aba58442f95",
-    "mesh/ALREADY-MET.tsv": "ba5b28fa95a924f909f378ad1ed1997b127a750b854fbbafd04c6e983149b191",
-    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "MESH.tsv": "77fdf5824e8da851faa196e19a496154b3c55299e84cb17906e269b4028f6b03",
+    "PLAN.md": "e6d1a2bde87880ed50e966ea2160c1149dbcc0bba0b1069794ae0f615e5ce0f3",
+    "TASKS.tsv": "0a12256c4f261d0a985e009260678cad251e46eaa41a2154e47e001321dcd694",
+    "mesh/ALREADY-MET.tsv": "df2610c3e0febf2cbb8b5bf93160bf42bd75cae98d6c9ec7e64757fd9916573d",
+    "mesh/CONSTRAINTS.tsv": "cf755b7c23fbeeacfd8da833d10c81d2b5ae15b2fa7b003f563ee14fced62667",
     "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
-    "mesh/FILLS.tsv": "b089fae406c939e31e03de66e44522c86a8c14985451e034d4cd4683d8bf0d1b",
-    "mesh/PREDICTIONS.tsv": "2551370e2d60a1dbf6c81321afc426734e37dd0542710537f6501c3eb0c077a4",
-    "mesh/README.md": "1a0a23881929bc878145e40b6d43bb326ce48fe7f850190c93dcf0e9e2072fb8",
-    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
-    "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+    "mesh/FILLS.tsv": "58bed5303c91486c3b0316d03469a7f5800a988a2a460806eed9b82525fe0dcd",
+    "mesh/PREDICTIONS.tsv": "2eddeca6a6a22171097d22d11ccceaedac41f8a13d3ca857a33b6d49a785378e",
+    "mesh/README.md": "1624b1ca40f4ab417e52228b80df8c270acf3a56deb3831b5e9ce52e63d4205c",
+    "mesh/REQUIREMENTS.tsv": "4848bf0581e71083cc54ff34d48c889ab1eeecc6dcb96040c18ea631313bbdbd",
+    "mesh/SLOTS.tsv": "0207582881f8a89478606ef07c45fe448151e1c7521a2b8531729a44e5d3eebb",
     "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
     "mesh/SUBTRACT-KEPT.tsv": "31fe4051e8e82c45ffd30f6db12bae17e093a2e3897a088fcb318682a3e1dd5f",
     "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
-    "mesh/TIGHTEN.tsv": "b7e53a125191f96748549b6bf2ccf660eca4fa9f7ed89848226d27c7f49b3408",
+    "mesh/TIGHTEN.tsv": "957e318c5400fd81f3d3bee6235a55ea4ef174ba2ee416ee10502ed4e4cf6fdb",
     "mesh/TRACE.tsv": "ce7c1f9b218f3d44f6ebc3f010a641a89ef5926fa2a1b6ab94ed48a381072d7d",
-    "mesh/WIRE-RULE.tsv": "662666537431cbb7b52bcf75d371205e8693c3d5482b4607450a2a928c601e1d",
-    "mesh/WIRES.tsv": "eb5fdb9daad0e71f796906759732bf251c405a52ddb237bfcc9bfaac000d4040",
+    "mesh/WIRE-RULE.tsv": "dcde0b3d2957c3511f280cbc4ebcad828b84e2c7ab5087290b8ac2b7a1523a57",
+    "mesh/WIRES.tsv": "81fb6c153e2d6b9193306d05601d0e2778675b866645d82ad984e17692ac5aa4",
     "mesh/check.py": "0101c57872b8ce403bdfe944c54e3fa340a47556d9360b1ef1e2ab5e478ccf8f",
     "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
     "mesh/evidence/audit.json": "5a9a2ec32ce2861e3b74c336f01a0568368f310db2ec30f3217b9ab122912b92",
@@ -34,37 +34,37 @@
     "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
     "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
     "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
-    "mesh/evidence/product-checks/advance.txt": "fa8e3e1f0a4b084326a7027307e5cc3a94f799f9733ea598c3b878fa3c70f37c",
-    "mesh/evidence/product-checks/audit.txt": "c8ae02e66174344f659265525387244f7e7af52e21a6fac6d8ecc91cac5f9d9d",
-    "mesh/evidence/product-checks/configure.txt": "09229b326b028651d725fa47cd1bae9fd8e0145ff8779bdb84ae2762c00ab737",
-    "mesh/evidence/product-checks/decode.txt": "e596cce97643441f2f2c7ef01ee068b6705ce1e028a07a32ba3bd3b3d35d7353",
-    "mesh/evidence/product-checks/emit.txt": "c91dad03511eb111dba9f317cdb7962c64ec389c7d259de488e167c78aac1b31",
-    "mesh/evidence/product-checks/evaluate.txt": "acbadd455418fe405791d2d792bd1c63190d32c09dc2792bcd7909f7c0699441",
-    "mesh/evidence/product-checks/fresh.txt": "8fb7b3c07b51a7bdb1d6336aab5f734dff09c741c0abcbc54230f52229c3eda7",
-    "mesh/evidence/product-checks/handoff.txt": "fc2666ac4ab4dd6759cbce98576f7f8171f5012fdd3cc801a99b6b2a09ee6fb0",
-    "mesh/evidence/product-checks/join.txt": "3a699bbbb75e3b98a43336994566268b0a347d961b8bc8655090d565704f546c",
-    "mesh/evidence/product-checks/observe.txt": "781d8adb85d573445f0a3aa93007fd37217a9bd16cb36bbbb550e5b91756898b",
-    "mesh/evidence/product-checks/once.txt": "e596cce97643441f2f2c7ef01ee068b6705ce1e028a07a32ba3bd3b3d35d7353",
-    "mesh/evidence/product-checks/package.txt": "ffbf29428922316da6999a5f51a72e7fcea9750129da25cd009a2917281e0be6",
-    "mesh/evidence/product-checks/persist.txt": "e596cce97643441f2f2c7ef01ee068b6705ce1e028a07a32ba3bd3b3d35d7353",
-    "mesh/evidence/product-checks/register.txt": "18fcf7d214cca0a99c350a46a6285c5a0ddefe009fcad459f22ab46115d5327c",
-    "mesh/evidence/product-checks/rules.txt": "c46951216fb22cb70c4bbba01b026cd9532f4bdb3308e82f9390b88874bf801f",
-    "mesh/evidence/product-checks/subtract.txt": "976ea3fe6dfa65b827ec05fc16bf49cec94d3fda3b2d6ad4719708e74a38b32d",
-    "mesh/evidence/product-checks/validate.txt": "b85ce7c9bf8519dabd65e9f873aaf898b460e61f9cb977639040698dfe92ae61",
-    "mesh/evidence/product-checks/zero.txt": "f04e01bf2ca1a5139bc0ef771a1eff2b0602d073006fa70c9408e2142eb64f39",
-    "mesh/evidence/register-proposal.md": "0261cd5cde7e503c3a29f8416940e65dae7724f23e929d9d9116a418ad4b2071",
+    "mesh/evidence/product-checks/advance.txt": "4e8b6c5a89da44bf05d17100903172be04033067c113a6831bdfafbd42b7da52",
+    "mesh/evidence/product-checks/audit.txt": "271d7603b8635c065fa3220877ed4a8baa8f94ab239fcf7c946cb7ad9139c27b",
+    "mesh/evidence/product-checks/configure.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/decode.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
+    "mesh/evidence/product-checks/emit.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/evaluate.txt": "bc4c2ff1a05d78db864338a871f51116604f720d25667467a47cb7c30039c666",
+    "mesh/evidence/product-checks/fresh.txt": "e22fc2791fd828f7a3573d843ee290c8b5f4758b234785718a0605c9f08c0609",
+    "mesh/evidence/product-checks/handoff.txt": "294b553075351f46acfc5a27b8d7e22a0305c453c43ef06dd2f413474c90c456",
+    "mesh/evidence/product-checks/join.txt": "3ac89a1eb9c725bd47d338a624a052b14e5c156b02f64f142599f43e8351f50b",
+    "mesh/evidence/product-checks/observe.txt": "bc4c2ff1a05d78db864338a871f51116604f720d25667467a47cb7c30039c666",
+    "mesh/evidence/product-checks/once.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/package.txt": "9196f30bf7be41914cd9e1dbb5b61e83e4c5290630851090b2508678929b7229",
+    "mesh/evidence/product-checks/persist.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "mesh/evidence/product-checks/register.txt": "06254aecdf245cc6f8784e134e36703bcc595ac0578b8c5f7f3591bcb399781b",
+    "mesh/evidence/product-checks/rules.txt": "1ab9905d8b0f34f6d791ff7da4efa2de0f7f3e282a078758cc0496cc0230c0f0",
+    "mesh/evidence/product-checks/subtract.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
+    "mesh/evidence/product-checks/validate.txt": "64ea6be5d87df7dc509bc9902a0ce441130df43069ee986506930fc23acf39c0",
+    "mesh/evidence/product-checks/zero.txt": "44ddccf0449bd7916b1c00a228eee93893cf0366ce86bec523a6a86880f9dd6a",
+    "mesh/evidence/register-proposal.md": "f39ba65ca206fecb5ff7c4cadeba375c537f384235498665d3db8d420cecc3ca",
     "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
     "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
     "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
-    "mesh/plants.py": "0802a1ef56185ab5e3afe42d139037181c9aa3dea07e30ae40bdb157c63efe35",
+    "mesh/plants.py": "66d32f79265e2080dc437966c91409555077195b215d90a9ab0590a7dcda6e92",
     "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
     "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
     "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
-    "mesh/seed.py": "ad656daa53d5424f894a14b186b1f9c3d2bdc2eb0fc67d65c8aeaa571517fbf5",
-    "mesh/test_zero.py": "a0c759fde02fccc39c63b278cc4ef3498bfbbcf8f662d996c93789da67a6f24a",
+    "mesh/seed.py": "bcdbe972f5a434c6c0e7a662a219f69013c5eb286d80fc8c37609d79b5a45551",
+    "mesh/test_zero.py": "3e279e5d7b5c89b32081f89c7379a87c3c44324502e0a93c8a6a187c01e9d765",
     "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
     "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
-    "mesh/zero.py": "1d17051a5efa0a7def089cc909ebc294a9062c25ed35b056b25a82f38fd77911"
+    "mesh/zero.py": "6f8cd91425fa3bd0468de5a8083957a4d68ebf985ecf750ddebdddd02bb2afa2"
   },
   "digest_method": "SHA-256 of canonical source_pins JSON; sorted keys, compact separators, UTF-8, ensure_ascii=False; zero output excluded",
   "model": {
@@ -294,9 +294,9 @@
         "requirement": "register",
         "accepted": [
           "amendment:owner_decides",
+          "current:replayed",
           "recovery_only:unproven",
-          "regression:attributed",
-          "semantic:approved"
+          "regression:attributed"
         ],
         "missing": [],
         "over": []
@@ -467,427 +467,108 @@
     "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
     "stderr": ""
   },
-  "dependency_receipts": {
+  "product_checks": {
     "decode": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": false,
-      "outside_evidence": [
-        "plugin/makoto2/hook.py",
-        "tests/test_hook.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.05s\n",
+      "stderr": ""
     },
     "configure": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/observed.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stderr": ""
     },
     "rules": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        "SPIRIT.md",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.73s\n",
+      "stderr": ""
     },
     "observe": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/observed.py",
-        "tests/test_evaluate.py",
-        "tests/test_observed.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.64s\n",
+      "stderr": ""
     },
     "evaluate": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py",
-        "tests/test_observed.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.63s\n",
+      "stderr": ""
     },
     "once": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": false,
-      "outside_evidence": [
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "tests/test_hook.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stderr": ""
     },
     "emit": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": false,
-      "outside_evidence": [
-        "plugin/makoto2/hook.py",
-        "tests/test_hook.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stderr": ""
     },
     "advance": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": false,
-      "outside_evidence": [
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "tests/test_hook.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stderr": ""
     },
     "persist": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": false,
-      "outside_evidence": [
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "tests/test_hook.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
+      "stderr": ""
     },
     "register": {
-      "current": false,
-      "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        "HANDOFF.md",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py",
-        "mesh/seed.py"
-      ]
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.67s\n",
+      "stderr": ""
     },
     "validate": {
-      "current": false,
       "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        ".github/workflows/ci.yml",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/__init__.py",
-        "plugin/makoto2/__main__.py",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py",
-        "tests/test_hook.py",
-        "tests/test_observed.py"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py"
-      ]
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________________________________ test_validate _________________________________\n\n    def test_validate():\n        suite('tests/test_evaluate.py', 'tests/test_observed.py', 'tests/test_hook.py')\n>       validate = product_function('validate')\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:150: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'validate'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: validate: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_validate - AssertionError: validate: m...\n1 failed in 0.68s\n",
+      "stderr": ""
     },
     "package": {
-      "current": false,
       "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        ".claude-plugin/marketplace.json",
-        "LICENSE",
-        "README.md",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/.claude-plugin/plugin.json",
-        "plugin/hooks/hooks.json",
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/__init__.py",
-        "plugin/makoto2/__main__.py",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py",
-        "mesh/seed.py"
-      ]
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_package _________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-238/test_package0')\n\n    def test_package(tmp_path):\n>       package = product_function('package')\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:160: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'package'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: package: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_package - AssertionError: package: mis...\n1 failed in 0.07s\n",
+      "stderr": ""
     },
     "fresh": {
-      "current": false,
       "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        ".claude-plugin/marketplace.json",
-        "LICENSE",
-        "README.md",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/.claude-plugin/plugin.json",
-        "plugin/hooks/hooks.json",
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/__init__.py",
-        "plugin/makoto2/__main__.py",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv"
-      ],
-      "missing_inputs": [],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/check.py",
-        "mesh/seed.py"
-      ]
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_fresh __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-239/test_fresh0')\n\n    def test_fresh(tmp_path):\n>       fresh = product_function('fresh')\n                ^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:172: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'fresh'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: fresh: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_fresh - AssertionError: fresh: missing...\n1 failed in 0.08s\n",
+      "stderr": ""
     },
     "audit": {
-      "current": false,
       "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        ".claude-plugin/marketplace.json",
-        ".claude/settings.json",
-        ".gitattributes",
-        ".github/workflows/ci.yml",
-        ".github/workflows/release.yml",
-        ".gitignore",
-        "HANDOFF.md",
-        "LACKS.md",
-        "LICENSE",
-        "README.md",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/.claude-plugin/plugin.json",
-        "plugin/hooks/hooks.json",
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/__init__.py",
-        "plugin/makoto2/__main__.py",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py",
-        "tests/test_hook.py",
-        "tests/test_observed.py"
-      ],
-      "missing_inputs": [
-        "mesh/reference/COMPONENTS.tsv",
-        "mesh/reference/DOMAINS.tsv",
-        "mesh/reference/README.md",
-        "mesh/reference/REQUIREMENTS.tsv",
-        "mesh/reference/SLOTS.tsv",
-        "mesh/reference/TIGHTEN.log",
-        "mesh/reference/WIRES.tsv",
-        "mesh/reference/check.py",
-        "mesh/reference/plants.py",
-        "mesh/reference/seed.py"
-      ],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/FILLS.tsv",
-        "mesh/PREDICTIONS.tsv",
-        "mesh/README.md",
-        "mesh/SUBTRACT-KEPT.tsv",
-        "mesh/TRACE.tsv",
-        "mesh/check.py",
-        "mesh/plants.py",
-        "mesh/seed.py"
-      ]
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_audit __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-240/test_audit0')\n\n    def test_audit(tmp_path):\n>       audit = product_function('audit')\n                ^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:183: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'audit'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: audit: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_audit - AssertionError: audit: missing...\n1 failed in 0.10s\n",
+      "stderr": ""
     },
     "join": {
-      "current": false,
       "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        ".claude-plugin/marketplace.json",
-        ".claude/settings.json",
-        ".gitattributes",
-        ".github/workflows/ci.yml",
-        ".github/workflows/release.yml",
-        ".gitignore",
-        "HANDOFF.md",
-        "LACKS.md",
-        "LICENSE",
-        "README.md",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/.claude-plugin/plugin.json",
-        "plugin/hooks/hooks.json",
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/__init__.py",
-        "plugin/makoto2/__main__.py",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py",
-        "tests/test_hook.py",
-        "tests/test_observed.py"
-      ],
-      "missing_inputs": [
-        "mesh/reference/COMPONENTS.tsv",
-        "mesh/reference/DOMAINS.tsv",
-        "mesh/reference/README.md",
-        "mesh/reference/REQUIREMENTS.tsv",
-        "mesh/reference/SLOTS.tsv",
-        "mesh/reference/TIGHTEN.log",
-        "mesh/reference/WIRES.tsv",
-        "mesh/reference/check.py",
-        "mesh/reference/plants.py",
-        "mesh/reference/seed.py"
-      ],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/FILLS.tsv",
-        "mesh/PREDICTIONS.tsv",
-        "mesh/README.md",
-        "mesh/SUBTRACT-KEPT.tsv",
-        "mesh/TRACE.tsv",
-        "mesh/check.py",
-        "mesh/plants.py",
-        "mesh/seed.py"
-      ]
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_join ___________________________________\n\n    def test_join():\n>       join = product_function('join')\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:196: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'join'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: join: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_join - AssertionError: join: missing p...\n1 failed in 0.08s\n",
+      "stderr": ""
     },
     "handoff": {
-      "current": false,
       "accepted": false,
-      "digest_valid": true,
-      "outside_evidence": [
-        ".claude-plugin/marketplace.json",
-        ".claude/settings.json",
-        ".gitattributes",
-        ".github/workflows/ci.yml",
-        ".github/workflows/release.yml",
-        ".gitignore",
-        "HANDOFF.md",
-        "LACKS.md",
-        "LICENSE",
-        "README.md",
-        "SPIRIT.md",
-        "WORDS.tsv",
-        "plugin/.claude-plugin/plugin.json",
-        "plugin/hooks/hooks.json",
-        "plugin/makoto2/CONFIG_KEYS.txt",
-        "plugin/makoto2/__init__.py",
-        "plugin/makoto2/__main__.py",
-        "plugin/makoto2/config.json",
-        "plugin/makoto2/evaluate.py",
-        "plugin/makoto2/hook.py",
-        "plugin/makoto2/observed.py",
-        "plugin/makoto2/rows.tsv",
-        "tests/sources.tsv",
-        "tests/test_evaluate.py",
-        "tests/test_hook.py",
-        "tests/test_observed.py"
-      ],
-      "missing_inputs": [
-        "mesh/reference/COMPONENTS.tsv",
-        "mesh/reference/DOMAINS.tsv",
-        "mesh/reference/README.md",
-        "mesh/reference/REQUIREMENTS.tsv",
-        "mesh/reference/SLOTS.tsv",
-        "mesh/reference/TIGHTEN.log",
-        "mesh/reference/WIRES.tsv",
-        "mesh/reference/check.py",
-        "mesh/reference/plants.py",
-        "mesh/reference/seed.py"
-      ],
-      "stale_inputs": [
-        "PLAN.md",
-        "TASKS.tsv",
-        "mesh/FILLS.tsv",
-        "mesh/PREDICTIONS.tsv",
-        "mesh/README.md",
-        "mesh/SUBTRACT-KEPT.tsv",
-        "mesh/TRACE.tsv",
-        "mesh/check.py",
-        "mesh/plants.py",
-        "mesh/seed.py"
-      ]
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_handoff _________________________________\n\n    def test_handoff():\n>       handoff = product_function('handoff')\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:206: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'handoff'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: handoff: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_handoff - AssertionError: handoff: mis...\n1 failed in 0.08s\n",
+      "stderr": ""
+    },
+    "subtract": {
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stderr": ""
     }
   },
   "derived_waves": [
@@ -987,73 +668,19 @@
     "model:requirement_envelopes"
   ],
   "absent": [
-    "advance:current_passing_evidence",
-    "audit:bound_proof_producer",
-    "audit:current_passing_evidence",
-    "configure:current_passing_evidence",
-    "decode:current_passing_evidence",
-    "emit:current_passing_evidence",
-    "evaluate:current_passing_evidence",
-    "fresh:bound_proof_producer",
-    "fresh:current_passing_evidence",
-    "handoff:bound_proof_producer",
-    "handoff:current_passing_evidence",
-    "join:bound_proof_producer",
-    "join:current_done_verdict",
-    "join:current_passing_evidence",
-    "observe:current_passing_evidence",
-    "once:current_passing_evidence",
-    "package:bound_proof_producer",
-    "package:current_passing_evidence",
-    "persist:current_passing_evidence",
-    "register:bound_proof_producer",
-    "register:current_passing_evidence",
-    "rules:current_passing_evidence",
-    "validate:current_passing_evidence"
+    "audit:product_acceptance",
+    "fresh:product_acceptance",
+    "handoff:product_acceptance",
+    "join:product_acceptance",
+    "package:product_acceptance",
+    "validate:product_acceptance"
   ],
-  "external": [
-    ".claude-plugin/marketplace.json",
-    ".claude/settings.json",
-    ".gitattributes",
-    ".github/workflows/ci.yml",
-    ".github/workflows/release.yml",
-    ".gitignore",
-    "Authentic operator, register approval and exact-head CI evidence remain unavailable.",
-    "Clean committed worktree requires writable Git metadata; supplied .git is read-only.",
-    "Current host uninstall receipt proving state preservation",
-    "Current passing package dependency evidence",
-    "Current passing upstream configure/rules/validate evidence, including authentic exact-head CI and register approval",
-    "Current source-pinned operator receipt for intended version in a fresh account/session, blocked slip, silent control, error-free runtime and rejection of a missing plugin",
-    "HANDOFF.md",
-    "LACKS.md",
-    "LICENSE",
-    "Operator evidence of legacy manual integration cleanup",
-    "README.md",
-    "SPIRIT.md",
-    "Selected committed head and authentic five-job CI receipts",
-    "WORDS.tsv",
-    "authoritative citation and register replay evidence",
-    "current owner-approved register and provenance",
-    "plugin/.claude-plugin/plugin.json",
-    "plugin/hooks/hooks.json",
-    "plugin/makoto2/CONFIG_KEYS.txt",
-    "plugin/makoto2/__init__.py",
-    "plugin/makoto2/__main__.py",
-    "plugin/makoto2/config.json",
-    "plugin/makoto2/evaluate.py",
-    "plugin/makoto2/hook.py",
-    "plugin/makoto2/observed.py",
-    "plugin/makoto2/rows.tsv",
-    "tests/sources.tsv",
-    "tests/test_evaluate.py",
-    "tests/test_hook.py",
-    "tests/test_observed.py"
-  ],
+  "external": [],
   "done": false,
   "decision": "not_done",
   "result": "absent",
-  "status": "EXTERNAL",
+  "status": "OPEN",
   "failure_edge": "Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.",
   "reproduction": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py",
-  "scope": "Only allowed input bytes measured; external pins remain unverified. Model checks do not certify runtime completion."
+  "scope": "Model pins describe the measurement; completion is determined by executable product checks, never receipt labels."
 }

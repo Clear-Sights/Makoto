@@ -2,7 +2,6 @@
 Run individual nodes, not as an unconditional passing regression suite.
 """
 import csv
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -125,54 +124,93 @@ def test_persist(tmp_path):
         test_configure(patch, tmp_path)
 
 
-def require_receipt(task):
-    receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
-    assert receipt.get('task') == task
-    assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
-    pins = receipt.get('source_pins', {})
-    assert pins
-    # A receipt must bind product inputs, not just a convenient mesh fixture.
-    mandatory = {str(p.relative_to(ROOT)) for p in HERE.iterdir() if p.is_file()}
-    assert mandatory <= pins.keys(), 'receipt does not bind shipped product'
-    for name, digest in pins.items():
-        path = ROOT/name
-        assert path.resolve().is_relative_to(ROOT) and path.is_file()
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == digest, f'stale input: {name}'
-    canonical = json.dumps(pins, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
-    assert hashlib.sha256(canonical).hexdigest() == receipt.get('selected_input_digest')
-    observations = receipt.get('observations')
-    assert observations and all(o.get('result') == 'pass' for o in observations)
-    assert any(o.get('synthetic') is not True for o in observations)
-    slot = next(s for s in table(ROOT/'mesh/SLOTS.tsv') if s['slot'] == task)
-    assert slot['filled-by'], 'missing proof producer'
-    requirements = set(slot['requirements'].split(','))
-    assert requirements <= set(receipt.get('requirements', [])), 'receipt omits requirements'
-    present = set(receipt.get('present', []))
-    for requirement in table(ROOT/'mesh/REQUIREMENTS.tsv'):
-        if requirement['requirement'] in requirements:
-            for relation in json.loads(requirement['required']):
-                assert relation in present or requirement['requirement']+':'+relation in present, 'unproven required case: '+relation
-    for binding in slot['filled-by'].split(';'):
-        name, unit = binding.split(':', 1)
-        assert (ROOT/name).is_file(), 'missing proof producer file'
-        if unit != '<module>':
-            sys.path.insert(0, str(ROOT/'mesh'))
-            from check import units
-            assert unit in units(ROOT/name), 'missing proof producer unit'
-    return receipt
+def product_function(name):
+    """Open lifecycle slots must expose executable behavior, never a proof file."""
+    import importlib.util
+    path = HERE / 'lifecycle.py'
+    assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'
+    spec = importlib.util.spec_from_file_location('makoto_lifecycle_acceptance', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    fn = getattr(module, name, None)
+    assert callable(fn), f'{name}: missing executable product function'
+    return fn
 
 
-def test_register(): require_receipt('register')
+def test_register():
+    # Replay the CURRENT shipped register. Amendments are solely owner proposals.
+    rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})
+    assert [r['id'] for r in rows] == ['R01', 'R03', 'R04', 'R05', 'R06', 'R07',
+                                     'R08', 'R09', 'R10', 'R11', 'R12', 'R13', 'R14']
+    suite('tests/test_evaluate.py')
+
+
 def test_validate():
     suite('tests/test_evaluate.py', 'tests/test_observed.py', 'tests/test_hook.py')
-    require_receipt('validate')
-def test_package(): require_receipt('package')
-def test_fresh(): require_receipt('fresh')
-def test_audit(): require_receipt('audit')
+    validate = product_function('validate')
+    jobs = {name: {'head': 'selected', 'result': 'pass'}
+            for name in ('evaluate', 'observed', 'hook', 'package', 'audit')}
+    assert validate('selected', jobs, local_pass=True) == {'decision': 'pass'}
+    assert validate('other', jobs, local_pass=True) == {'decision': 'reject'}
+    assert validate('selected', jobs, local_pass=False) == {'decision': 'reject'}
+    assert validate('selected', {}, local_pass=True) == {'decision': 'reject'}
+
+
+def test_package(tmp_path):
+    package = product_function('package')
+    result = package(ROOT, tmp_path/'artifact')
+    assert result['version'] == '4.0.1'
+    artifact = Path(result['path'])
+    assert artifact.is_dir()
+    assert (artifact/'makoto2/rows.tsv').read_bytes() == (HERE/'rows.tsv').read_bytes()
+    assert (artifact/'makoto2/__main__.py').is_file()
+    assert json.loads((artifact/'.claude-plugin/plugin.json').read_text())['version'] == '4.0.1'
+    suite('tests/test_hook.py')
+
+
+def test_fresh(tmp_path):
+    fresh = product_function('fresh')
+    slip = {'hook_event_name': 'Stop', 'session_id': 'new',
+            'last_assistant_message': 'Want me to push this?'}
+    control = dict(slip, last_assistant_message='Pushing next; that is the default.')
+    assert fresh(ROOT/'plugin', tmp_path/'account', slip)['decision'] == 'block'
+    assert fresh(ROOT/'plugin', tmp_path/'other-account', control) == {}
+    with pytest.raises(FileNotFoundError):
+        fresh(tmp_path/'missing-plugin', tmp_path/'missing-account', slip)
+
+
+def test_audit(tmp_path):
+    audit = product_function('audit')
+    (tmp_path/'source.py').write_text('value = 1\n')
+    assert audit(tmp_path)['decision'] == 'clean'
+    # Include ignored content, and exclude history.
+    (tmp_path/'.git').mkdir()
+    (tmp_path/'.git/history').write_text('AKIA' + 'A'*16)
+    assert audit(tmp_path)['decision'] == 'clean'
+    (tmp_path/'.gitignore').write_text('ignored.txt\n')
+    (tmp_path/'ignored.txt').write_text('AKIA' + 'A'*16)
+    assert audit(tmp_path)['decision'] == 'reject'
+
+
 def test_join():
-    for task in ('register','validate','package','fresh','audit'): require_receipt(task)
-    assert require_receipt('join').get('decision') == 'done'
-def test_handoff(): require_receipt('handoff')
+    join = product_function('join')
+    inputs = {name: {'head': 'selected', 'decision': 'pass'}
+              for name in ('register', 'validate', 'package', 'fresh', 'audit')}
+    assert join('selected', inputs) == {'decision': 'done'}
+    assert join('other', inputs) == {'decision': 'not_done'}
+    for name in inputs:
+        assert join('selected', {k: v for k, v in inputs.items() if k != name}) == {'decision': 'not_done'}
+
+
+def test_handoff():
+    handoff = product_function('handoff')
+    selected = {'project': 'makoto', 'head': 'selected', 'decision': 'not_done',
+                'absent': ['fresh']}
+    expected = {'project': 'makoto', 'head': 'selected', 'decision': 'not_done',
+                'absent': ['fresh'], 'wake': 'changed_input'}
+    assert handoff(selected) == expected
+    assert handoff(dict(selected)) == expected
+    assert handoff(dict(selected, head='changed'))['head'] == 'changed'
 
 
 def test_subtract():
@@ -185,12 +223,8 @@ def test_subtract():
 
 
 def test_zero():
-    # Successful report generation is not implementation completion.
-    for task in ('register','validate','package','fresh','audit','join','handoff'): require_receipt(task)
-    receipt = json.loads((ROOT/'mesh/evidence/zero.json').read_text())
-    assert receipt.get('done') is True and receipt.get('decision') == 'done'
-    assert not receipt.get('absent') and not receipt.get('external')
-    sys.path.insert(0, str(ROOT/'mesh'))
-    from zero import measure, sha
-    files, missing = measure(ROOT)
-    assert not missing and receipt.get('source_pins') == {n:sha(b) for n,b in files.items()}
+    # Execute every completion obligation; handwritten receipts cannot close zero.
+    suite(*['tests/acceptance_tasks.py::test_'+name for name in
+            ('decode', 'configure', 'rules', 'observe', 'evaluate', 'once', 'emit',
+             'advance', 'persist', 'register', 'validate', 'package', 'fresh',
+             'audit', 'join', 'handoff', 'subtract')])
