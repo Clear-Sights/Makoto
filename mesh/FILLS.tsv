@@ -1,5 +1,7 @@
 path	unit	slot	reason
-plugin/makoto2/__init__.py	<module>	package	Candidate support for package,uninstall; existence does not certify behavior
+plugin/makoto2/__init__.py	<module>	package	Runtime packaging and independent removal instructions; acceptance measures behavior
+plugin/makoto2/__init__.py	build_package	package	Copy current runtime and metadata, preserve rule bytes, and reject replacing existing destinations
+plugin/makoto2/lifecycle.py	package	package	Executable artifact builder using current source bytes rather than retained evidence
 plugin/makoto2/__main__.py	<module>	decode	Candidate support for decode; existence does not certify behavior
 plugin/makoto2/__main__.py	run	decode	Candidate support for decode; existence does not certify behavior
 plugin/makoto2/evaluate.py	<module>	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
@@ -182,3 +184,6 @@ plugin/makoto2/lifecycle.py	<module>	validate	Executable validation decision ove
 plugin/makoto2/lifecycle.py	validate	validate	Executable validation decision over current local and selected-head CI results.
 tests/test_hook.py	test_hook_behavior	validate	Collected hook behavior controls
 tests/test_hook.py	test_ci_receipt_controls	validate	Collected CI receipt hostile controls
+plugin/makoto2/lifecycle.py	fresh	fresh	Install current plugin bytes in an isolated fresh account and execute the installed hook; receipts are not inputs.
+plugin/makoto2/lifecycle.py	audit	audit	Scan current file bytes including ignored content, exclude Git history, and reject detected credentials or unreadable content without proof receipts.
+plugin/makoto2/lifecycle.py	handoff	handoff	Carry the current bounded verdict and explicit absences without evidence reads; wake on changed input.

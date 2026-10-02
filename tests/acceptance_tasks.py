@@ -165,6 +165,35 @@ def test_package(tmp_path):
     assert (artifact/'makoto2/rows.tsv').read_bytes() == (HERE/'rows.tsv').read_bytes()
     assert (artifact/'makoto2/__main__.py').is_file()
     assert json.loads((artifact/'.claude-plugin/plugin.json').read_text())['version'] == '4.0.1'
+    assert (artifact/'UNINSTALL.md').is_file()
+    assert not (artifact/'mesh/evidence').exists()
+    assert result['contents']['makoto2/rows.tsv'] == (HERE/'rows.tsv').read_bytes()
+    assert result['input_digest']
+    with pytest.raises(FileExistsError):
+        package(ROOT, artifact)
+    assert (artifact/'makoto2/rows.tsv').read_bytes() == (HERE/'rows.tsv').read_bytes()
+    with pytest.raises(ValueError):
+        package(ROOT, ROOT/'package-output')
+    # Measure new source bytes directly; no retained evidence is required.
+    source = tmp_path/'source'
+    runtime = source/'plugin/makoto2'
+    runtime.mkdir(parents=True)
+    (runtime/'__main__.py').write_text('print("first")\n')
+    (runtime/'rows.tsv').write_text('current rules\n')
+    (runtime/'__pycache__').mkdir()
+    (runtime/'__pycache__/cached.pyc').write_bytes(b'stale cache')
+    first = package(source, tmp_path/'first')
+    repeat = package(source, tmp_path/'repeat')
+    assert first['contents'] == repeat['contents']
+    assert first['input_digest'] == repeat['input_digest']
+    assert 'makoto2/__pycache__/cached.pyc' not in first['contents']
+    (runtime/'rows.tsv').write_text('changed rules\n')
+    changed = package(source, tmp_path/'changed')
+    assert changed['contents']['makoto2/rows.tsv'] == b'changed rules\n'
+    assert changed['input_digest'] != first['input_digest']
+    with pytest.raises(FileNotFoundError):
+        package(tmp_path/'missing-source', tmp_path/'missing-artifact')
+    assert not (tmp_path/'missing-artifact').exists()
     suite('tests/test_hook.py')
 
 
@@ -189,7 +218,28 @@ def test_audit(tmp_path):
     assert audit(tmp_path)['decision'] == 'clean'
     (tmp_path/'.gitignore').write_text('ignored.txt\n')
     (tmp_path/'ignored.txt').write_text('AKIA' + 'A'*16)
+    rejected = audit(tmp_path)
+    assert rejected['decision'] == 'reject'
+    # A retained passing receipt cannot override current credential bytes.
+    (tmp_path/'evidence.json').write_text('{"decision":"clean","result":"pass"}')
     assert audit(tmp_path)['decision'] == 'reject'
+    (tmp_path/'ignored.txt').write_text('safe current content\n')
+    clean = audit(tmp_path)
+    assert clean['decision'] == 'clean'
+    assert clean['input_digest'] != rejected['input_digest']
+    assert audit(tmp_path) == clean
+    hidden = tmp_path/'.hidden'
+    hidden.mkdir()
+    (hidden/'binary').write_bytes(b'\x00\xff' + b'ASIA' + b'B'*16)
+    assert audit(tmp_path)['decision'] == 'reject'
+    (hidden/'binary').unlink()
+    (hidden/'key').write_text('-----BEGIN PRIVATE KEY-----\n')
+    assert audit(tmp_path)['decision'] == 'reject'
+    (hidden/'key').unlink()
+    (hidden/'link').symlink_to(tmp_path/'source.py')
+    assert audit(tmp_path)['decision'] == 'reject'
+    with pytest.raises(FileNotFoundError):
+        audit(tmp_path/'missing')
 
 
 def test_join():

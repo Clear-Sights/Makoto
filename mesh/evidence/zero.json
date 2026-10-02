@@ -1,18 +1,18 @@
 {
   "task": "zero",
-  "selected_input_digest": "04dac46d3a2c8c533cd6820bebf1d2a257cefe6b2b6182dc6d392baa01f1e661",
+  "selected_input_digest": "d043a27ce1347e719fbfaaaf4917ffa1583a860449ccf9e119353ee894f7561f",
   "source_pins": {
-    "MESH.tsv": "77fdf5824e8da851faa196e19a496154b3c55299e84cb17906e269b4028f6b03",
+    "MESH.tsv": "8d7b53318252c209e5338b3d739bb15726125a900368e86acecdf593e2d80a42",
     "PLAN.md": "e6d1a2bde87880ed50e966ea2160c1149dbcc0bba0b1069794ae0f615e5ce0f3",
-    "TASKS.tsv": "0a12256c4f261d0a985e009260678cad251e46eaa41a2154e47e001321dcd694",
-    "mesh/ALREADY-MET.tsv": "df2610c3e0febf2cbb8b5bf93160bf42bd75cae98d6c9ec7e64757fd9916573d",
+    "TASKS.tsv": "421383b86120daa6e02924d5dd6e48fddcd1cf10725f3aa3458d7531c8ee656e",
+    "mesh/ALREADY-MET.tsv": "863390c7fddbadd448a2454d26d91beed7defcf73ea419a3aefdd474d5386397",
     "mesh/CONSTRAINTS.tsv": "cf755b7c23fbeeacfd8da833d10c81d2b5ae15b2fa7b003f563ee14fced62667",
     "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
-    "mesh/FILLS.tsv": "58bed5303c91486c3b0316d03469a7f5800a988a2a460806eed9b82525fe0dcd",
-    "mesh/PREDICTIONS.tsv": "2eddeca6a6a22171097d22d11ccceaedac41f8a13d3ca857a33b6d49a785378e",
+    "mesh/FILLS.tsv": "6d3d11810291173d7b2ea79977234a3ce426effa3acedcb871f03a6fd7ad0365",
+    "mesh/PREDICTIONS.tsv": "129376436d31c0a37e12d85f39b336c0ca6d6edf9de7e931572e2f081401d21e",
     "mesh/README.md": "1624b1ca40f4ab417e52228b80df8c270acf3a56deb3831b5e9ce52e63d4205c",
     "mesh/REQUIREMENTS.tsv": "4848bf0581e71083cc54ff34d48c889ab1eeecc6dcb96040c18ea631313bbdbd",
-    "mesh/SLOTS.tsv": "0207582881f8a89478606ef07c45fe448151e1c7521a2b8531729a44e5d3eebb",
+    "mesh/SLOTS.tsv": "30c4cb440c3d3d0408f1a61120697d0dacc2abbd9b846216d9e3b9265a014d56",
     "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
     "mesh/SUBTRACT-KEPT.tsv": "31fe4051e8e82c45ffd30f6db12bae17e093a2e3897a088fcb318682a3e1dd5f",
     "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
@@ -20,7 +20,8 @@
     "mesh/TRACE.tsv": "ce7c1f9b218f3d44f6ebc3f010a641a89ef5926fa2a1b6ab94ed48a381072d7d",
     "mesh/WIRE-RULE.tsv": "dcde0b3d2957c3511f280cbc4ebcad828b84e2c7ab5087290b8ac2b7a1523a57",
     "mesh/WIRES.tsv": "81fb6c153e2d6b9193306d05601d0e2778675b866645d82ad984e17692ac5aa4",
-    "mesh/check.py": "0101c57872b8ce403bdfe944c54e3fa340a47556d9360b1ef1e2ab5e478ccf8f",
+    "mesh/acceptance.py": "06015d389dab0cbf537682fb7c15beb53bb710affbb9b5751bdc155643036acd",
+    "mesh/check.py": "7a592d84d802f606ae41448d04ffd0c14f8f93e35374fd558972782ce7b6b970",
     "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
     "mesh/evidence/audit.json": "5a9a2ec32ce2861e3b74c336f01a0568368f310db2ec30f3217b9ab122912b92",
     "mesh/evidence/configure.json": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
@@ -56,11 +57,11 @@
     "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
     "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
     "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
-    "mesh/plants.py": "66d32f79265e2080dc437966c91409555077195b215d90a9ab0590a7dcda6e92",
+    "mesh/plants.py": "8f0593d35c9e08747bff1d407eb595b9d34b3f1082452003ed5b77fefd470edf",
     "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
     "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
     "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
-    "mesh/seed.py": "bcdbe972f5a434c6c0e7a662a219f69013c5eb286d80fc8c37609d79b5a45551",
+    "mesh/seed.py": "e07ccf9d3174096c6124291be13f36df1be70d666a6b96fd561a662b0d873b51",
     "mesh/test_zero.py": "3e279e5d7b5c89b32081f89c7379a87c3c44324502e0a93c8a6a187c01e9d765",
     "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
     "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
@@ -68,10 +69,10 @@
   },
   "digest_method": "SHA-256 of canonical source_pins JSON; sorted keys, compact separators, UTF-8, ensure_ascii=False; zero output excluded",
   "model": {
-    "zero": true,
+    "zero": false,
     "missing": 0,
     "over": 0,
-    "structural_violations": 0,
+    "structural_violations": 1,
     "relations": [
       {
         "requirement": "detect",
@@ -463,39 +464,39 @@
       }
     ],
     "plan_matches": true,
-    "check_exit_code": 0,
-    "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+    "check_exit_code": 1,
+    "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: FAIL\n  unclassified /home/user/route-out/makoto-r7/run/candidate-zero-0/plugin/makoto2/lifecycle.py:join\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\nacceptance: PASS\n",
     "stderr": ""
   },
   "product_checks": {
     "decode": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.05s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
       "stderr": ""
     },
     "configure": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "rules": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.73s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.62s\n",
       "stderr": ""
     },
     "observe": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.64s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.65s\n",
       "stderr": ""
     },
     "evaluate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.63s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.60s\n",
       "stderr": ""
     },
     "once": {
@@ -513,13 +514,13 @@
     "advance": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
       "stderr": ""
     },
     "persist": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
       "stderr": ""
     },
     "register": {
@@ -529,45 +530,45 @@
       "stderr": ""
     },
     "validate": {
-      "accepted": false,
-      "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________________________________ test_validate _________________________________\n\n    def test_validate():\n        suite('tests/test_evaluate.py', 'tests/test_observed.py', 'tests/test_hook.py')\n>       validate = product_function('validate')\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:150: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'validate'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: validate: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_validate - AssertionError: validate: m...\n1 failed in 0.68s\n",
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.72s\n",
       "stderr": ""
     },
     "package": {
-      "accepted": false,
-      "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_package _________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-238/test_package0')\n\n    def test_package(tmp_path):\n>       package = product_function('package')\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:160: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'package'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: package: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_package - AssertionError: package: mis...\n1 failed in 0.07s\n",
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.59s\n",
       "stderr": ""
     },
     "fresh": {
-      "accepted": false,
-      "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_fresh __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-239/test_fresh0')\n\n    def test_fresh(tmp_path):\n>       fresh = product_function('fresh')\n                ^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:172: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'fresh'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: fresh: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_fresh - AssertionError: fresh: missing...\n1 failed in 0.08s\n",
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.22s\n",
       "stderr": ""
     },
     "audit": {
-      "accepted": false,
-      "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_audit __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-240/test_audit0')\n\n    def test_audit(tmp_path):\n>       audit = product_function('audit')\n                ^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:183: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'audit'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: audit: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_audit - AssertionError: audit: missing...\n1 failed in 0.10s\n",
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "join": {
-      "accepted": false,
-      "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_join ___________________________________\n\n    def test_join():\n>       join = product_function('join')\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:196: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'join'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: join: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_join - AssertionError: join: missing p...\n1 failed in 0.08s\n",
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
       "stderr": ""
     },
     "handoff": {
-      "accepted": false,
-      "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_handoff _________________________________\n\n    def test_handoff():\n>       handoff = product_function('handoff')\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/acceptance_tasks.py:206: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'handoff'\n\n    def product_function(name):\n        \"\"\"Open lifecycle slots must expose executable behavior, never a proof file.\"\"\"\n        import importlib.util\n        path = HERE / 'lifecycle.py'\n>       assert path.is_file(), f'{name}: missing product implementation plugin/makoto2/lifecycle.py'\nE       AssertionError: handoff: missing product implementation plugin/makoto2/lifecycle.py\nE       assert False\nE        +  where False = is_file()\nE        +    where is_file = PosixPath('/home/user/makoto-v/plugin/makoto2/lifecycle.py').is_file\n\ntests/acceptance_tasks.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_handoff - AssertionError: handoff: mis...\n1 failed in 0.08s\n",
+      "accepted": true,
+      "check_exit_code": 0,
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "subtract": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.06s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
       "stderr": ""
     }
   },
@@ -664,17 +665,8 @@
     }
   ],
   "stable_inputs": true,
-  "present": [
-    "model:requirement_envelopes"
-  ],
-  "absent": [
-    "audit:product_acceptance",
-    "fresh:product_acceptance",
-    "handoff:product_acceptance",
-    "join:product_acceptance",
-    "package:product_acceptance",
-    "validate:product_acceptance"
-  ],
+  "present": [],
+  "absent": [],
   "external": [],
   "done": false,
   "decision": "not_done",
