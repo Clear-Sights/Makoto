@@ -14,16 +14,24 @@ def digest(content):
     return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
 
+def anchor(name, cwd, reader):
+    # _norm joins only onto a '/'-rooted cwd; a drive-rooted cwd is absolute too.
+    if (cwd and os.path.isabs(cwd) and not cwd.startswith('/') and not os.path.isabs(name)
+            and '://' not in name and not reader._RATIO_RX.fullmatch(name)):
+        return reader._norm(os.path.join(cwd, name), '')
+    return name
+
+
 def references(text, cwd, reader):
     text = re.sub(r'(?<=\w)\.(?=\s|$)', '', str(text or ''))
-    refs = {p.rstrip('.!?') for p in reader._text_objects(text, cwd)
+    refs = {anchor(p.rstrip('.!?'), cwd, reader) for p in reader._text_objects(text, cwd)
             if '://' in p or '/' in p or '.' in os.path.basename(p)}
     refs.update(m.group(0) for m in re.finditer(r'(?<![\w])[0-9a-f]{40}(?:[0-9a-f]{24})?(?![\w])', text))
     for match in re.finditer(r'"([^"\n]+)"|“([^”\n]+)”', text):
         value = match.group(1) or match.group(2)
         # A quoted path has the same identity as its unquoted spelling.
         named = reader._text_objects(value, cwd)
-        refs.add(next(iter(named)) if len(named) == 1 else value)
+        refs.add(anchor(next(iter(named)), cwd, reader) if len(named) == 1 else value)
     return refs
 
 
