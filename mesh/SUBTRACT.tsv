@@ -1,0 +1,17 @@
+path	unit	reason
+mesh/types.py	<module>	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	annotation	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	return_type	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	return_type.walk	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract.slot	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract.wire	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract.visit	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract.body_calls	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract.body_calls.walk	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	extract.expression_type	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/types.py	write	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+mesh/seed.py	<module>	Remove the original bottom-up generator unit, preserved in reference/seed.py. Active seed.py is a new requirement-driven generator; replacement source is distinct, not an implementation slot.
+mesh/seed.py	write_table	Remove the original bottom-up generator unit, preserved in reference/seed.py. Active seed.py is a new requirement-driven generator; replacement source is distinct, not an implementation slot.
+mesh/seed.py	derive	Remove the original bottom-up generator unit, preserved in reference/seed.py. Active seed.py is a new requirement-driven generator; replacement source is distinct, not an implementation slot.
+mesh/seed.py	derive.visit	Remove the original bottom-up generator unit, preserved in reference/seed.py. Active seed.py is a new requirement-driven generator; replacement source is distinct, not an implementation slot.

@@ -1,0 +1,153 @@
+path	unit	slot	reason
+plugin/makoto2/__init__.py	<module>	package	Candidate support for package,uninstall; existence does not certify behavior
+plugin/makoto2/__main__.py	<module>	decode	Candidate support for decode; existence does not certify behavior
+plugin/makoto2/__main__.py	run	decode	Candidate support for decode; existence does not certify behavior
+plugin/makoto2/evaluate.py	<module>	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	unwitnessed	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	load_rows	rules	Candidate support for sources; existence does not certify behavior
+plugin/makoto2/evaluate.py	load_cfg	configure	Candidate support for configuration; existence does not certify behavior
+plugin/makoto2/evaluate.py	_load_r	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_acts	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	evaluate	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	Spec	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	Spec.__init__	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_text_of	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_sentences	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_strip_quoted	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_primary	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_norm	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_walk_user_texts	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_user_texts_of	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_last_same_call	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_names	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_is_act	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_denied	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	asks_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	thread_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_target	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	pile_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	pile_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	absence_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	absence_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	number_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	number_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_words_text	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	quote_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	quote_seed	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	quote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	write_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	read_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	denied_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	ran_after_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_ms	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_sleep_ms	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	budget_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_subject_words	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	landed_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_valid_artifact	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	landed_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	landed_pays.pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	cost_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	count_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	repeat_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	wrote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/hook.py	<module>	advance	Candidate support for boundaries; existence does not certify behavior
+plugin/makoto2/hook.py	d_in	decode	Candidate support for decode; existence does not certify behavior
+plugin/makoto2/hook.py	sigma_path	persist	Candidate support for store; existence does not certify behavior
+plugin/makoto2/hook.py	sigma_read	persist	Candidate support for store; existence does not certify behavior
+plugin/makoto2/hook.py	sigma_append	persist	Candidate support for store; existence does not certify behavior
+plugin/makoto2/hook.py	o_once	once	Candidate support for once; existence does not certify behavior
+plugin/makoto2/hook.py	d_out	emit	Candidate support for output; existence does not certify behavior
+plugin/makoto2/hook.py	main	advance	Candidate support for boundaries; existence does not certify behavior
+plugin/makoto2/observed.py	<module>	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Obs	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_basename	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_effective_argv	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_normalize_segment_argv	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_nested_command	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_segments	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_segments.close_segment	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_norm	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_text_objects	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_flatten	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_exit_of	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_executed	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_mkdir	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_touch	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_tee	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_copy	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_truncate	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_inplace	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_none	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_s_ls	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_s_find	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_s_grep	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_search_of	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_bash_reading	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_value_objects	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_input_objects	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_read	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record.__init__	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record.observed	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record.objects_of	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_user_entries	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	record	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	act_kinds	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	text_of	observe	Candidate support for settled; existence does not certify behavior
+tests/test_evaluate.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Obs	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record.__init__	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record.observed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record.objects_of	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	rows	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	pre	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	reply	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_plant_blocks_and_lookalike_silent	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_every_row_has_a_case_and_a_verbatim_source	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_config_keys_cover_config	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	observation	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_named_status	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_artifact	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_later_failure_invalidates_success	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_launcher_success_is_not_job_success	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_cost_accounting_boundary	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	Rec	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	Rec.__init__	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	ev_	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	always	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	never	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	post	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	pre	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	bash	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	seen	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_interface_shape	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_deterministic	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_unobserved_object_blocks	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_empty_history	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_unsettled_event_observes_nothing	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_denied_call_did_not_execute	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_parent_directory_does_not_observe_child	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_before_bound	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_verdict_with_no_earlier_run	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_program_name_is_not_an_object_of_observation	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_code_call_is_not_a_file	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_read_object_is_observed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_written_object_is_observed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_edit_writes_but_does_not_create	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_output_naming_an_object_observes_it	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_red_run_still_executed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_redirect_writes_and_creates_new_file	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_search_fields	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_send_text	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_pasted_fix_read_only_snippets_change_no_file_and_count_as_observation	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_report_before_run_printf_after_run_printed_the_results	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_report_before_run_heredoc_fixture_quoting_verdicts	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_unobserved_destruction_rm_of_dirs_created_by_mkdir	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_destruction_plant_neighbour_still_blocks	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_turn_start_is_first_obs_after_last_boundary	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_turn_start_zero_without_boundary	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_user_texts_from_fetched_thread_user_entries_only	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md

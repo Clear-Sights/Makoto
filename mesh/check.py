@@ -1,121 +1,272 @@
-"""Deterministic structural proof checker; unresolved proofs cannot exit zero."""
-import sys
-if __name__ == '__main__':
-    sys.path.pop(0)
+"""Deterministic final-program shape checker. Never imports or executes runtime code.
+Zero certifies this declarative model, not its candidate implementation or receipts.
+"""
+from pathlib import Path
+import argparse
+import ast
 import csv
 import hashlib
-import subprocess
 import json
-import sys
-from pathlib import Path
-import types as stdlib_types
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
-CHECKS = ('inventory', 'types', 'wires', 'reachable', 'fills', 'coverage', 'missing', 'over', 'package', 'installed-fresh', 'whole-repo-clean')
+MESH = ROOT / 'mesh'
+CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route')
 INPUT = 'PROGRAM_INPUT'
 OUTPUT = 'PROGRAM_OUTPUT'
-FORBIDDEN = ('UNRESOLVED', 'Any')
+SOURCE_PATHS = {'WORDS.tsv','SPIRIT.md','mesh/reference/docs-def-README.md'}
+ATOMS = {'Bytes', 'String', 'JSON', 'Record', 'Finding', 'Evidence', 'Artifact', 'Verdict'}
+CONSTRUCTORS = {'one': 1, 'many': 1, 'option': 1, 'set': 1, 'list': 1, 'map': 2}
+TABLES = {'SLOTS': ('slot','inputs','outputs','requirements','loosest','filled-by','fill-status'),
+          'WIRES': ('wire','source','target','requirements'),
+          'REQUIREMENTS': ('requirement','source','text','scope','slot','port','universe','allowed','required','math-type'),
+          'CONSTRAINTS': ('constraint','requirement','slot','port','accepts','derivation'),
+          'FILLS': ('path','unit','slot','reason'), 'SUBTRACT': ('path','unit','reason'),
+          'SOURCES': ('path','sha256')}
+TASK_FIELDS = ('task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens')
+# Nominal payloads are open records: these fields are required, extra fields permitted.
+# No implementation class, exact collection length, rule order or serialization is imposed.
+PAYLOADS = {
+ 'Record': 'obs:list[settled effect{seq,tool,input,output,exit:option[int],failed,objects:set[String],written:set[String],created:set[String],send:String,search:option[scope,query,empty]}]; turn_start; user_texts:list[String]',
+ 'Finding': '{row:String,message:String,objects:list[String]}',
+ 'Evidence': '{selected_input_digest:String,observations:list[map[String,JSON]],source_pins:map[String,String],result:pass|fail|absent}',
+ 'Artifact': '{contents:map[String,Bytes],input_digest:String}',
+ 'Verdict': '{present:set[String],absent:set[String],external:set[String],input_digest:String}',
+}
 
-# Load the sibling extractor without shadowing Python's stdlib types module.
-def extractor():
-    module = stdlib_types.ModuleType('mesh_extractor')
-    module.__file__ = str(ROOT/'mesh/types.py')
-    exec(compile((ROOT/'mesh/types.py').read_text(), module.__file__, 'exec'), module.__dict__)
-    return module
 
-def read(name):
-    with (ROOT/'mesh'/name).open() as f:
-        return list(csv.DictReader(f, delimiter='\t'))
+def read(path):
+    with path.open(newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        rows = list(reader)
+        return tuple(reader.fieldnames or ()), rows
 
-def measure():
-    errors = {k: [] for k in CHECKS}
-    rows = read('SLOTS.tsv'); wires = read('WIRES.tsv'); requirements = read('REQUIREMENTS.tsv')
-    slots = {r['slot']: r for r in rows}
-    for s in rows:
-        for field in ('inputs:type','outputs:type'):
-            s[field] = json.loads(s[field])
-    expected, ew = extractor().extract(ROOT)
-    if rows != expected or wires != ew: errors['inventory'].append('AST inventory or call argument/return wiring differs')
-    for s in rows:
-        for direction in ('inputs:type','outputs:type'):
-            for port, typ in s[direction].items():
-                if any(x in typ for x in FORBIDDEN): errors['types'].append(s['slot']+'#'+port)
-    graph = {k:set() for k in slots}; reverse = {k:set() for k in slots}
-    for w in wires:
-        a, ap = w['from-slot.output'].split('#',1); b,bp = w['to-slot.input'].split('#',1)
-        if a not in slots or b not in slots or slots[a]['outputs:type'].get(ap) != w['type'] or slots[b]['inputs:type'].get(bp) != w['type']:
-            errors['wires'].append(str(w)); continue
-        graph[a].add(b); reverse[b].add(a)
-    def reach(g, start):
-        seen=set(); pending=[start]
-        while pending:
-            x=pending.pop()
-            if x in seen: continue
-            seen.add(x); pending.extend(sorted(g.get(x,())))
-        return seen
-    forward=reach(graph,INPUT); backward=reach(reverse,OUTPUT)
-    errors['reachable'] = sorted(set(slots)-forward | (set(slots)-backward))
-    filled=[s['filled-by'] for s in rows if s['filled-by']!='EMPTY']
-    if len(filled)!=len(set(filled)): errors['fills'].append('code unit fills multiple slots')
-    if len(slots)!=len(rows): errors['inventory'].append('duplicate slot id')
-    if len({r['requirement id'] for r in requirements})!=len(requirements): errors['coverage'].append('duplicate requirement id')
-    for r in requirements:
-        s=slots.get(r['slot']); port=r['port']
-        actual = None if s is None else s['inputs:type'].get(port,s['outputs:type'].get(port))
-        if actual is None: errors['coverage'].append(r['requirement id'])
-        required=set(json.loads(r['required'])); allowed=set(json.loads(r['allowed']))
-        # Actual accepted domain is a finite, explicit shape contract. Missing domain is unknown.
-        domain_path=ROOT/'mesh/DOMAINS.tsv'
-        domains={d['slot']+'#'+d['port']:set(json.loads(d['values'])) for d in read('DOMAINS.tsv')}
-        domain=domains.get(r['slot']+'#'+port)
-        if domain is not None:
-            import ast
-            try:
-                shape=ast.parse(actual or '',mode='eval').body
-                items=shape.slice.elts if isinstance(shape.slice,ast.Tuple) else [shape.slice]
-                proven={ast.literal_eval(x) for x in items} if isinstance(shape,ast.Subscript) and ast.unparse(shape.value)=='Literal' else None
-            except (SyntaxError,ValueError,AttributeError,TypeError): proven=None
-            if proven!=domain: errors['missing'].append(r['requirement id']+': domain not established by source type')
-        if domain is None: errors['missing'].append(r['requirement id']+': no proven domain')
-        else:
-            if domain-allowed: errors['missing'].append(r['requirement id']+': '+repr(sorted(domain-allowed)))
-            if required-domain: errors['over'].append(r['requirement id']+': '+repr(sorted(required-domain)))
-    manifest=json.loads((ROOT/'plugin/.claude-plugin/plugin.json').read_text())
-    market=json.loads((ROOT/'.claude-plugin/marketplace.json').read_text())
-    if (ROOT/'README.md').read_text().splitlines()[0]!='# Makoto '+manifest['version'] or market['plugins'][0]['source']!='./plugin':
-        errors['package'].append('manifest/readme/marketplace disagree')
-    for kind in ('installed-fresh','whole-repo-clean'):
-        receipt=ROOT/'mesh'/('RECEIPT-'+kind+'.json')
-        if not receipt.exists(): errors[kind].append('EXTERNAL: evidence absent')
-        else:
-            data=json.loads(receipt.read_text())
-            current={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(ROOT.glob('plugin/**/*')) if p.is_file()}
-            if data.get('inputs') != current: errors[kind].append('receipt inputs differ')
-            if kind=='installed-fresh':
-                if data.get('version')!=manifest['version'] or data.get('fresh') is not True or data.get('slip')!='blocked' or data.get('control')!='silent' or data.get('runtime_errors')!=[] or not data.get('provenance'): errors[kind].append('fresh session observations incomplete')
+
+def type_tree(value):
+    tokens = re.findall(r'[A-Za-z]+|[\[\],]', value)
+    if ''.join(tokens) != value:
+        raise ValueError('invalid type '+value)
+    pos = 0
+    def parse():
+        nonlocal pos
+        name = tokens[pos]; pos += 1
+        if name in ATOMS:
+            return (name,)
+        if name not in CONSTRUCTORS or tokens[pos] != '[':
+            raise ValueError('unknown shape '+name)
+        pos += 1; args = [parse()]
+        while tokens[pos] == ',':
+            pos += 1; args.append(parse())
+        if tokens[pos] != ']' or len(args) != CONSTRUCTORS[name]:
+            raise ValueError('shape arity '+name)
+        pos += 1
+        return (name, *args)
+    result = parse()
+    if pos != len(tokens):
+        raise ValueError('trailing shape')
+    # many has a collection carrier, one a scalar/optional/open record.
+    if result[0] not in ('one','many') or (result[0]=='many' and result[1][0] not in ('set','list','map')):
+        raise ValueError('missing multiplicity/collection')
+    return result
+
+
+def units(path):
+    tree = ast.parse(path.read_text(encoding='utf-8'))
+    found = {'<module>'}
+    def walk(node, prefix=''):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef)):
+                name = prefix+child.name; found.add(name); walk(child,name+'.')
             else:
-                status=subprocess.run(['git','status','--porcelain','--untracked-files=all'],cwd=ROOT,capture_output=True,text=True)
-                whitespace=subprocess.run(['git','diff','--check'],cwd=ROOT,capture_output=True,text=True)
-                if status.returncode or status.stdout or whitespace.returncode or data.get('audited')!=current: errors[kind].append('whole repo audit or clean worktree absent')
-    return errors,rows,wires
+                walk(child,prefix)
+    walk(tree)
+    return found
+
+
+def old_unit_present(current,reference,name):
+    def fingerprint(path):
+        tree=ast.parse(path.read_text())
+        if name=='<module>':return ast.dump(tree,include_attributes=False)
+        selected=[]
+        def walk(node,prefix=''):
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef)):
+                    n=prefix+child.name
+                    if n==name:selected.append(ast.dump(child,include_attributes=False))
+                    walk(child,n+'.')
+                else:walk(child,prefix)
+        walk(tree)
+        return selected
+    return fingerprint(current)==fingerprint(reference)
+
+
+def errors(root=ROOT):
+    mesh = root/'mesh'; bad = {c:[] for c in CHECKS}
+    tables = {}
+    for name, fields in TABLES.items():
+        try:
+            header, rows = read(mesh/(name+'.tsv'))
+            if header != fields or any(None in r or any(v is None for v in r.values()) for r in rows):
+                bad['schema'].append('invalid columns '+name)
+            tables[name] = rows
+        except (OSError,ValueError) as e:
+            bad['schema'].append(str(e)); tables[name] = []
+    S=tables['SLOTS']; R=tables['REQUIREMENTS']; W=tables['WIRES']; C=tables['CONSTRAINTS']
+    slots={s['slot']:s for s in S}; reqs={r['requirement']:r for r in R}
+    for name,key in [('SLOTS','slot'),('WIRES','wire'),('REQUIREMENTS','requirement'),('CONSTRAINTS','constraint')]:
+        values=[r[key] for r in tables[name]]
+        if len(values)!=len(set(values)) or not values:bad['schema'].append('empty or duplicate '+name)
+    ports={}; domains={}
+    for s in S:
+        for side in ('inputs','outputs'):
+            try:
+                value=json.loads(s[side])
+                if not isinstance(value,dict):raise ValueError('port map')
+                for p,t in value.items():ports[(s['slot'],side,p)]=type_tree(t)
+            except (ValueError,TypeError,IndexError,KeyError) as e:bad['schema'].append(s['slot']+' '+str(e))
+        if s['fill-status'] not in ('OPEN','CANDIDATE','PARTIAL'):bad['schema'].append('fill status '+s['slot'])
+    if INPUT not in slots or OUTPUT not in slots:bad['schema'].append('boundaries absent')
+    if slots.get(INPUT,{}).get('inputs')!='{}' or slots.get(OUTPUT,{}).get('outputs')!='{}':bad['schema'].append('boundary direction')
+    for r in R:
+        try:
+            universe,allowed,required=[set(json.loads(r[k])) for k in ('universe','allowed','required')]
+            if not required or not required<=allowed<=universe:raise ValueError('invalid requirement relation')
+            domains[r['requirement']]=(universe,allowed,required)
+            type_tree(r['math-type'])
+        except (ValueError,TypeError,IndexError,KeyError) as e:bad['schema'].append(r['requirement']+' '+str(e))
+    # Authority pins reject stale derivations. Coverage of WORDS is independent of slot declarations.
+    if {p['path'] for p in tables['SOURCES']} != SOURCE_PATHS or len(tables['SOURCES'])!=len(SOURCE_PATHS):bad['schema'].append('missing authority pins')
+    for pin in tables['SOURCES']:
+        p=root/pin['path']
+        if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest()!=pin['sha256']:bad['schema'].append('source changed '+pin['path'])
+    _,words=read(root/'WORDS.tsv')
+    for word in words:
+        if not any(r['source']=='WORDS.tsv:'+word['id'] for r in R):bad['coverage'].append('uncaptured WORDS '+word['id'])
+    for r in R:
+        source=r['source']
+        if source.startswith('WORDS.tsv:'):
+            exists=source.split(':',1)[1] in {x['id'] for x in words}
+        else:
+            prefix,sep,heading=source.partition('#')
+            p=root/('mesh/reference/docs-def-README.md' if prefix=='docs-def:README.md' else prefix)
+            exists=bool(sep and p.is_file() and re.search(r'^#+ '+re.escape(heading)+r'\s*$',p.read_text(),re.M))
+        if not exists:bad['schema'].append('unresolved citation '+source)
+    forward={s:set() for s in slots}; backward={s:set() for s in slots}; connected=set()
+    for w in W:
+        try:
+            a,p=w['source'].split('#'); b,q=w['target'].split('#')
+            left=ports[(a,'outputs',p)]; right=ports[(b,'inputs',q)]
+            if left!=right:bad['wires'].append(w['wire']+' type mismatch')
+            forward[a].add(b); backward[b].add(a);connected.update(((a,'outputs',p),(b,'inputs',q)))
+            refs=set(filter(None,w['requirements'].split(',')))
+            if not refs or not refs<=reqs.keys():bad['trace'].append(w['wire']+' no requirement')
+            relevant=set(slots[b if b!=OUTPUT else a]['requirements'].split(','))
+            if not refs<=relevant:bad['trace'].append(w['wire']+' foreign requirement')
+        except (ValueError,KeyError):bad['wires'].append(w['wire']+' invalid endpoint')
+    for endpoint in ports:
+        if endpoint not in connected:bad['wires'].append('unwired '+str(endpoint))
+    def reach(start,graph):
+        seen=set(); todo=[start]
+        while todo:
+            n=todo.pop()
+            if n not in seen:seen.add(n);todo.extend(graph.get(n,()))
+        return seen
+    path=reach(INPUT,forward)&reach(OUTPUT,backward)
+    for s in S:
+        id=s['slot'];refs=set(filter(None,s['requirements'].split(',')))
+        if id not in path:bad['reachable'].append(id+' off input/output path')
+        if not refs or not refs<=reqs.keys():bad['trace'].append(id+' no valid requirement')
+        if id not in (INPUT,OUTPUT) and not any(r['slot']==id for r in R):bad['trace'].append(id+' no direct requirement')
+    for r in R:
+        endpoint=(r['slot'],'outputs',r['port'])
+        if endpoint not in ports or endpoint not in connected or r['requirement'] not in slots.get(r['slot'],{}).get('requirements','').split(','):
+            bad['coverage'].append(r['requirement']+' unrealized port')
+        elif type_tree(r['math-type'])!=ports[endpoint]:
+            # At this layer nominal carriers are invariant: replacing one loses
+            # required values and admits values from a foreign carrier.
+            bad['missing'].append(r['requirement']+' widened/foreign carrier')
+            bad['over'].append(r['requirement']+' excluded required carrier')
+    bindings={}; mapping=set()
+    for f in tables['FILLS']:
+        mapping.add((f['path'],f['unit']))
+        if f['slot'] not in slots:bad['fills'].append('unknown fill slot '+f['slot'])
+        bindings.setdefault(f['slot'],set()).add(f['path']+':'+f['unit'])
+        p=root/f['path']
+        if not p.is_file() or f['unit'] not in units(p):bad['fills'].append('unit absent '+f['path']+':'+f['unit'])
+    for s in S:
+        for binding in filter(None,s['filled-by'].split(';')):
+            if binding not in bindings.get(s['slot'],set()):bad['fills'].append('unmapped binding '+binding)
+    # Constraints intersect independently on each requirement relation.
+    for r in R:
+        id=r['requirement']
+        if id not in domains:continue
+        universe,allowed,required=domains[id]; accepted=set(universe)
+        cs=[c for c in C if c['requirement']==id]
+        for c in cs:
+            try:
+                vals=set(json.loads(c['accepts']))
+                if c['slot']!=r['slot'] or c['port']!=r['port'] or not vals<=universe:
+                    bad['schema'].append(c['constraint']+' foreign relation')
+                accepted &= vals
+            except (ValueError,TypeError):bad['schema'].append(c['constraint']+' invalid relation')
+        if accepted-allowed:bad['missing'].append('MISSING-CONSTRAINT '+id+': '+','.join(sorted(accepted-allowed)))
+        if required-accepted:bad['over'].append('OVER-CONSTRAINT '+id+': '+','.join(sorted(required-accepted)))
+    for c in C:
+        if c['requirement'] not in reqs:bad['schema'].append('orphan constraint '+c['constraint'])
+    subtract={(s['path'],s['unit']) for s in tables['SUBTRACT']}
+    for s in tables['SUBTRACT']:
+        p=root/s['path']; reference=mesh/'reference'/Path(s['path']).name
+        if (s['path'],s['unit']) in mapping:bad['subtractions'].append('subtracted fill '+s['unit'])
+        if not s['reason'] or not reference.is_file() or s['unit'] not in units(reference):bad['subtractions'].append('invalid removal '+s['unit'])
+        if p.exists() and old_unit_present(p,reference,s['unit']):bad['subtractions'].append('seed still contains original '+s['path']+':'+s['unit'])
+    for directory in ('plugin/makoto2','tests'):
+        for p in sorted((root/directory).glob('*.py')):
+            for unit in units(p):
+                if (str(p.relative_to(root)),unit) not in mapping|subtract:bad['subtractions'].append('unclassified '+str(p)+':'+unit)
+    # Route reflects every data dependency and every removal, no invented SCCs.
+    try:
+        header,tasks=read(root/'TASKS.tsv'); mh,rows=read(root/'MESH.tsv')
+        taskmap={t['task']:t for t in tasks}; meshmap={m['hole']:m for m in rows}
+        expected={'subtract','zero'} | (slots.keys()-{INPUT,OUTPUT})
+        if header!=TASK_FIELDS or set(taskmap)!=expected or len(tasks)!=len(taskmap) or set(meshmap)!=expected:bad['route'].append('task/mesh coverage')
+        completed=set(); remaining=set(taskmap)
+        while remaining:
+            ready={t for t in remaining if set(filter(None,taskmap[t]['deps'].split(',')))<=completed}
+            if not ready:bad['route'].append('dependency cycle or missing task');break
+            completed|=ready;remaining-=ready
+        waves=[]; todo=set(taskmap); finished=set()
+        while todo:
+            ready=sorted(t for t in todo if set(filter(None,taskmap[t]['deps'].split(',')))<=finished)
+            if not ready:break
+            waves.append(ready);finished.update(ready);todo.difference_update(ready)
+        plan=(root/'PLAN.md').read_text()
+        for number,wave in enumerate(waves,1):
+            cost=sum(int(taskmap[t]['estimate_tokens']) for t in wave)
+            if f'Wave {number}: '+', '.join(wave)+f' (predicted {cost} tokens)' not in plan:bad['route'].append('stale plan wave '+str(number))
+        for id,t in taskmap.items():
+            need={'subtract'} if id not in ('subtract','zero') else set()
+            if id in slots:
+                need|=backward[id]-{INPUT,OUTPUT}
+            if id=='zero':need|=slots.keys()-{INPUT,OUTPUT}
+            if set(filter(None,t['deps'].split(',')))!=need:bad['route'].append(id+' incorrect dependencies')
+            if not t['estimate_tokens'].isdigit() or int(t['estimate_tokens'])<=0 or 'PRESENT:' not in t['brief'] or 'ABSENT:' not in t['brief'] or 'EXTERNAL' not in t['brief'] or 're-measure' not in t['brief'] or 'BLOCKED' in t['brief']:bad['route'].append(id+' invalid prediction/cost/failure')
+            m=meshmap.get(id,{})
+            if m.get('check')!=t['check'] or not m.get('plant'):bad['route'].append(id+' check/plant mismatch')
+    except (OSError,KeyError,ValueError) as e:bad['route'].append(str(e))
+    return bad
+
 
 def main():
-    errors,slots,wires=measure()
-    selected=sys.argv[2] if len(sys.argv)==3 and sys.argv[1]=='--only' else None
-    if len(sys.argv)==3 and sys.argv[1]=='--component':
-        components={r['task']:set(json.loads(r['slots'])) for r in read('COMPONENTS.tsv')}
-        members=components[sys.argv[2]]
-        requirements={r['requirement id'] for r in read('REQUIREMENTS.tsv') if r['slot'] in members}
-        errors={k:[v for v in values if k in ('inventory','fills') or any(v==s or v.startswith(s+'#') or ('"'+s+'#') in v or ("'"+s+'#') in v for s in members) or any(v.startswith(r+':') or v==r for r in requirements)] for k,values in errors.items()}
-    if selected is not None and selected not in CHECKS:
-        print('unknown check: '+selected)
-        return 2
-    for kind, failures in errors.items():
-        if selected and selected!=kind: continue
-        label={'missing':'MISSING-CONSTRAINT','over':'OVER-CONSTRAINT'}.get(kind,kind)
-        print(label+': '+str(len(failures)))
-        for failure in failures[:5]: print('  '+failure)
-    return int(any(v for k,v in errors.items() if selected is None or k==selected))
+    parser=argparse.ArgumentParser();parser.add_argument('--only',choices=CHECKS);parser.add_argument('--task');args=parser.parse_args()
+    bad=errors()
+    if args.task:
+        _,tasks=read(ROOT/'TASKS.tsv')
+        if args.task not in {t['task'] for t in tasks}:parser.error('unknown task')
+    selected=(args.only,) if args.only else CHECKS
+    for c in selected:
+        print(c+': '+('FAIL' if bad[c] else 'PASS'))
+        for e in bad[c]:print('  '+e)
+    return int(any(bad[c] for c in selected))
 
 if __name__=='__main__':
-    sys.exit(main())
+    raise SystemExit(main())

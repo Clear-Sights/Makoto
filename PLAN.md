@@ -1,16 +1,39 @@
-# Makoto seed derived from WIRES
+# Makoto: top-down seed from final-program wiring
 
-The measured mesh is incomplete. This is a predicted route to 0, not a consistency claim.
-Each explicit wire contributes a dependency. Argument/return feedback is condensed into SCCs; each SCC is one indivisible step. All ready SCCs share a wave, giving maximal graph concurrency. Shared-file writes require serialization and remeasurement.
-Failure edges are re-measure and re-derive, or EXTERNAL for unavailable outside evidence. There is no BLOCKED terminal. The route tail is not authorized: no hooks, credentials, commits, pushes or mutating gates are run.
-The route TASKS schema is taken from /home/user/mz-route/tools/route/route-USAGE.md. TASKS.tsv contains the complete per-step PRESENT/ABSENT prediction, check and token cost. Runtime steps cite the exact README heading Runtime and rules; done bars cite WORDS.tsv DONE.
+Requirements open ports; wires order work. SUBTRACT is first. Each later wave contains every ready slot, giving maximal concurrency under this one-layer dependency graph. Candidate units in shared files must be edited by one writer or re-measured into disjoint scopes; evidence files are per slot.
 
-Wave 1: wire-007, wire-010, wire-011, wire-012, wire-013, wire-014, wire-015, wire-016, wire-017, wire-018, wire-019, wire-020, wire-021, wire-022, wire-023, wire-024, wire-025, wire-026, wire-027, wire-028, wire-029, wire-030, wire-031, wire-032, wire-033, wire-034, wire-035, wire-036, wire-037, wire-038, wire-039, wire-040, wire-041, wire-042, wire-043
-Wave 2: wire-000, wire-001, wire-002, wire-003, wire-004, wire-005
-Wave 3: wire-009
-Wave 4: wire-006
-Wave 5: wire-008
+The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a positive token cost.
 
-After graph waves: all structural proof checks → package → installed-fresh → whole-repo-clean → zero.
-At zero: exact types, complete calls/effects, reachable slots, requirements neither missing nor over-constrained, and all done bars pass against the same inputs.
-External evidence remains absent. Clean git status cannot be met while these changes are deliberately uncommitted. Full-program dynamic-dispatch and exact-type proof remain substantial implementation work.
+Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.
+
+Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have isolated mutation plants. This is a reviewable plan; route execution and its tail are outside this request. Register amendments require Gabriel; merging remains with Gabriel.
+
+Configuration for a later authorized model-only route:
+```text
+REPO_DIR=/home/user/makoto
+WHY=Makoto prevents blindspots through detection
+WORDS_FILES=WORDS.tsv,SPIRIT.md,mesh/reference/docs-def-README.md
+MESH_FILE=MESH.tsv
+SEED_FILE=PLAN.md
+GATE_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py
+PLANTS_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
+```
+
+These are declarations, not commands executed during formation. Model checks do not replace the product acceptance gates.
+
+Wave 1: subtract (predicted 800 tokens)
+Wave 2: configure, decode (predicted 2400 tokens)
+Wave 3: observe, rules (predicted 2800 tokens)
+Wave 4: evaluate, register (predicted 3000 tokens)
+Wave 5: once (predicted 1800 tokens)
+Wave 6: advance, emit (predicted 3000 tokens)
+Wave 7: persist, validate (predicted 3200 tokens)
+Wave 8: package (predicted 1800 tokens)
+Wave 9: audit, fresh (predicted 3000 tokens)
+Wave 10: join (predicted 1800 tokens)
+Wave 11: handoff (predicted 1400 tokens)
+Wave 12: zero (predicted 1000 tokens)
+
+At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.
+
+Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. Historical docs and old mesh artifacts are reference; no hook invocation/configuration, credentials, gate runs, publishing, commits or merges.

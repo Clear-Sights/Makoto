@@ -1,49 +1,28 @@
-This is a failing, conservative reconstruction, not a completed final-program mesh.
+# Makoto final-program mesh
 
-Run `PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py` and
-`PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py`. Neither executes runtime hooks.
-Extraction is `PYTHONDONTWRITEBYTECODE=1 python3 mesh/types.py`.
+The mesh starts from WORDS.tsv, SPIRIT.md and the `docs-def` README snapshot in reference/docs-def-README.md. SOURCES.tsv pins these exact inputs. REQUIREMENTS.tsv is the reviewable interpretation of their clauses; foreign project clauses remain explicit scope exclusions. The new owner request supersedes SPIRIT's older six-artifact formation limit.
 
-Ports use `slot#port` to avoid ambiguity with dots in lexical Python names.
-Input/output cells are JSON port-to-type maps. UNRESOLVED is an absence marker,
-not an exact type, and always fails. EMPTY identifies unproven implementation
-or environment bindings; foreign functions are not silently assumed correct.
-Unit is the singleton invocation/completion shape; it does not carry payloads.
-Literal arguments and source annotations are extracted mechanically. Bare
-collections, callback dispatch, imports through importlib, object methods,
-stdlib signatures without exact annotations, effects and expression dataflow
-remain proof obligations. Thus current output does NOT meet the exact-type bar.
-No OCaml, Coq or standalone shell source was found in the runtime. The shell
-entry is extracted from the plugin hook configuration; it is never launched.
+SLOTS.tsv defines one layer of final-program responsibilities, not Python call sites. Ports use `one[T]` or `many[list[T]]`, `many[set[T]]`, `many[map[K,V]]`; `option[T]` permits absence. Maps and records are open, collection lengths are unrestricted, and no particular implementation algorithm is required. Mathematical payload definitions are constants at the top of check.py. WIRES.tsv gives every opening between these responsibilities, including evidence inputs, output, and state feedback across invocations. Persisted history and fired keys enter at PROGRAM_INPUT on the next invocation; the one-layer graph is deliberately acyclic within an invocation.
 
-The inventory covers explicit runtime functions, methods, lambdas, module
-initialization, calls, shell entry, input/effect boundaries. It is NOT proof of
-implicit Python operations, generated NamedTuple constructors, exceptions,
-callback aliases or dynamic dispatch. Call edges are conservative source
-bindings; unresolved dispatch is an EMPTY slot, not an asserted resolution.
-Each explicit call has an invocation, argument/keyword and return edge.
-Variadic expansion, defaults, mutation, control flow and argument expressions
-need additional constraints. Return consumption is not yet a complete SSA
-model. SLOTS and WIRES are reviewable inventory, not a zero verdict.
+Each requirement identifies an actual output port and a finite behavioral partition of that port. Cases read `input-class:permitted-result`; classification is specified by the source-backed text, not by implementation tags. `universe` is the loosest definitely inhabited relation, `allowed` is the upper requirement envelope, and `required` is its lower envelope. Separate requirements on the same port describe separate facets of its behavior. Their accepted relations are intersections of CONSTRAINTS rows for that requirement. The checker computes:
 
-REQUIREMENTS uses the docs-def README as authority and records finite semantic
-shape requirements. DOMAINS is initially empty. Missing and over are set
-differences: accepted outside allowed, and required outside accepted. Unknown
-domains are missing constraints. Declared domains additionally need a matching
-source Literal type; arbitrary domain tables cannot prove implementation.
-These finite tags do not yet encode the entire runtime behavioral contract.
-Requirement coverage currently proves port existence only, not behavior.
+- MISSING-CONSTRAINT = accepted − allowed.
+- OVER-CONSTRAINT = required − accepted.
 
-Plant reports require a newly introduced diagnostic even when baseline already
-fails. They are sensitivity tests, not claims of a passing baseline. Copies
-exclude git and credential/config directories and are deleted afterward.
-Receipt checks require observations and current plugin hashes; provenance is
-operator evidence, not independently authenticated installation proof.
-Whole-repo cleanliness requires actual clean git status, so the requested
-uncommitted changes intentionally leave that bar unmet.
+An absent constraint admits the full universe, so it can fail. An empty constraint excludes required behavior, so it can fail. No implementation order, hard collection bound or private algorithm is imposed. TIGHTEN.tsv records the computed descent from unconstrained envelopes to zero. Finite partitions are a declarative abstraction of the source requirements, not a proof of the accuracy of today's recognizers. Source interpretation remains inspectable in REQUIREMENTS.tsv; source changes invalidate the snapshot.
 
-The seed condenses all wire edges into strongly connected components before
-layering them. Argument/return feedback creates cycles; these cannot be treated
-as independent tasks. Concurrency means graph independence only; write-scope
-conflicts require remeasurement. It is a predicted route ending at zero,
-not evidence zero is currently reachable with these unresolved contracts.
+FILLS.tsv maps requirement-needed support units to slots; SLOTS lists the entry bindings. CANDIDATE means only that the unit exists, PARTIAL means some proof code exists, and OPEN means no proof producer is bound. These statuses never certify semantics. Every current runtime/test function is classified: the existing helper functions support the required detection or explicit acceptance tests. No runtime function was found removable solely from these requirements. SUBTRACT.tsv instead removes the old bottom-up extraction and seed units from the active model tools. The old seed unit is identified by original path/name and its preserved AST; replacing seed.py is subtraction of that original unit, not a requirement to delete the new file. No constraint is written for a subtracted unit. Old artifacts live only under reference/.
+
+Run only these model tools during formation:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/seed.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
+```
+
+check.py parses source with AST; it never imports runtime modules. Every named check is computed and has a hostile plant in plants.py. Plants verify a passing baseline and the targeted failing diagnostic in disposable, credential-free copies, then delete them. `plants.py --copy TASK` supports route's check-after-removal protocol and leaves one private copy whose path is printed. Checks do not invoke hooks, test collection, gates, installation, git writes or network access.
+
+PLAN.md, TASKS.tsv, MESH.tsv and PREDICTIONS.tsv are generated from the wiring. SUBTRACT is first; every ready dependency enters the same wave. Shared source-file writes require one writer or a new scope measurement. Each step predicts PRESENT/ABSENT, cost and a re-measure/EXTERNAL failure edge. No BLOCKED terminal exists in the seed.
+
+A model exit of zero means every declared shape is reachable, traced, type-compatible, neither missing nor over-constrained, and routed. It does not mean the implementation is DONE. Register semantics, current validation, package, fresh-session and audit evidence still must fill the proof slots against the same selected inputs. The final join requires all of them; missing or stale receipts yield not_done. No receipts, external verification, installation or clean-worktree proof are fabricated here. Requested changes remain uncommitted.

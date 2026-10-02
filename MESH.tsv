@@ -1,57 +1,19 @@
-hole	check	plant	piece	citation	status
-wire-000	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-000	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-000	full program wiring	Runtime and rules	ABSENT
-wire-001	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-001	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-001	full program wiring	Runtime and rules	ABSENT
-wire-002	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-002	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-002	full program wiring	Runtime and rules	ABSENT
-wire-003	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-003	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-003	full program wiring	Runtime and rules	ABSENT
-wire-004	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-004	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-004	full program wiring	Runtime and rules	ABSENT
-wire-005	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-005	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-005	full program wiring	Runtime and rules	ABSENT
-wire-006	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-006	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-006	full program wiring	Runtime and rules	ABSENT
-wire-007	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-007	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-007	full program wiring	Runtime and rules	ABSENT
-wire-008	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-008	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-008	full program wiring	Runtime and rules	ABSENT
-wire-009	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-009	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-009	full program wiring	Runtime and rules	ABSENT
-wire-010	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-010	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-010	full program wiring	Runtime and rules	ABSENT
-wire-011	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-011	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-011	full program wiring	Runtime and rules	ABSENT
-wire-012	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-012	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-012	full program wiring	Runtime and rules	ABSENT
-wire-013	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-013	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-013	full program wiring	Runtime and rules	ABSENT
-wire-014	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-014	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-014	full program wiring	Runtime and rules	ABSENT
-wire-015	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-015	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-015	full program wiring	Runtime and rules	ABSENT
-wire-016	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-016	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-016	full program wiring	Runtime and rules	ABSENT
-wire-017	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-017	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-017	full program wiring	Runtime and rules	ABSENT
-wire-018	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-018	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-018	full program wiring	Runtime and rules	ABSENT
-wire-019	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-019	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-019	full program wiring	Runtime and rules	ABSENT
-wire-020	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-020	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-020	full program wiring	Runtime and rules	ABSENT
-wire-021	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-021	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-021	full program wiring	Runtime and rules	ABSENT
-wire-022	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-022	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-022	full program wiring	Runtime and rules	ABSENT
-wire-023	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-023	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-023	full program wiring	Runtime and rules	ABSENT
-wire-024	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-024	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-024	full program wiring	Runtime and rules	ABSENT
-wire-025	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-025	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-025	full program wiring	Runtime and rules	ABSENT
-wire-026	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-026	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-026	full program wiring	Runtime and rules	ABSENT
-wire-027	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-027	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-027	full program wiring	Runtime and rules	ABSENT
-wire-028	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-028	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-028	full program wiring	Runtime and rules	ABSENT
-wire-029	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-029	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-029	full program wiring	Runtime and rules	ABSENT
-wire-030	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-030	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-030	full program wiring	Runtime and rules	ABSENT
-wire-031	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-031	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-031	full program wiring	Runtime and rules	ABSENT
-wire-032	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-032	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-032	full program wiring	Runtime and rules	ABSENT
-wire-033	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-033	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-033	full program wiring	Runtime and rules	ABSENT
-wire-034	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-034	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-034	full program wiring	Runtime and rules	ABSENT
-wire-035	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-035	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-035	full program wiring	Runtime and rules	ABSENT
-wire-036	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-036	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-036	full program wiring	Runtime and rules	ABSENT
-wire-037	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-037	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-037	full program wiring	Runtime and rules	ABSENT
-wire-038	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-038	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-038	full program wiring	Runtime and rules	ABSENT
-wire-039	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-039	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-039	full program wiring	Runtime and rules	ABSENT
-wire-040	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-040	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-040	full program wiring	Runtime and rules	ABSENT
-wire-041	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-041	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-041	full program wiring	Runtime and rules	ABSENT
-wire-042	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-042	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-042	full program wiring	Runtime and rules	ABSENT
-wire-043	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component wire-043	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wire-043	full program wiring	Runtime and rules	ABSENT
-inventory	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only inventory	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py inventory	inventory	Runtime and rules	PRESENT
-types	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only types	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py types	types	Runtime and rules	ABSENT
-wires	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only wires	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py wires	wires	Runtime and rules	ABSENT
-reachable	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only reachable	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py reachable	reachable	Runtime and rules	ABSENT
-fills	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only fills	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py fills	fills	Runtime and rules	PRESENT
-coverage	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only coverage	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py coverage	coverage	Runtime and rules	PRESENT
-missing	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only missing	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py missing	missing	Runtime and rules	ABSENT
-over	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only over	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py over	over	Runtime and rules	PRESENT
-package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py package	package	DONE	PRESENT
-installed-fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only installed-fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py installed-fresh	installed-fresh	DONE	ABSENT
-whole-repo-clean	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only whole-repo-clean	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py whole-repo-clean	whole-repo-clean	DONE	ABSENT
-zero	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py inventory	distance zero	DONE	ABSENT
+hole	check	plant	piece	citation	status	realization
+decode	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task decode	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy decode	decode	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+configure	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task configure	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy configure	configure	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+rules	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task rules	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy rules	rules	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+observe	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task observe	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy observe	observe	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+evaluate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task evaluate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy evaluate	evaluate	WHY	SHAPE_PRESENT	CANDIDATE
+once	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task once	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy once	once	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+emit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task emit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy emit	emit	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+advance	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task advance	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy advance	advance	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+persist	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task persist	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy persist	persist	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+register	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task register	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy register	register	Acceptance checks	SHAPE_PRESENT	OPEN
+validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy validate	validate	Acceptance checks	SHAPE_PRESENT	PARTIAL
+package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy package	package	Acceptance checks	SHAPE_PRESENT	OPEN
+fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy fresh	fresh	Acceptance checks	SHAPE_PRESENT	OPEN
+audit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task audit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy audit	audit	Acceptance checks	SHAPE_PRESENT	OPEN
+join	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task join	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy join	join	DONE	SHAPE_PRESENT	OPEN
+handoff	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task handoff	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy handoff	handoff	HANDOFF	SHAPE_PRESENT	OPEN
+subtract	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task subtract	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy subtract	subtract	DONE	SHAPE_PRESENT	MODEL_ONLY
+zero	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task zero	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy zero	zero	DONE	SHAPE_PRESENT	MODEL_ONLY

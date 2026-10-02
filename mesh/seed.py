@@ -1,102 +1,84 @@
-"""Derive SCCs and maximum dependency waves directly from the complete wire table."""
-import sys
-if __name__ == '__main__':
-    sys.path.pop(0)
+"""Derive route tasks and concurrency waves from final-program openings only."""
+from pathlib import Path
 import csv
 import json
-from pathlib import Path
-import runpy
 
 ROOT = Path(__file__).resolve().parents[1]
-TASK_FIELDS = ['task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens']
+INPUT = 'PROGRAM_INPUT'
+OUTPUT = 'PROGRAM_OUTPUT'
+TASK_FIELDS = ('task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens')
+COST_BASE = 800
+COST_PER_PORT = 200
+EXTERNAL_SLOTS = {'register','fresh','audit'}
 
-def write_table(path,fields,rows):
-    with path.open('w') as f:
+
+def read(path):
+    with path.open(newline='') as f:return list(csv.DictReader(f,delimiter='\t'))
+
+
+def write(path,rows,fields):
+    with path.open('w',newline='') as f:
         w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
 
-def derive():
-    check=runpy.run_path(str(ROOT/'mesh/check.py'))
-    errors,slots,wires=check['measure']()
-    graph={s['slot']:set() for s in slots}
-    for w in wires:
-        graph[w['from-slot.output'].split('#')[0]].add(w['to-slot.input'].split('#')[0])
-    # Tarjan SCC; sorted traversal gives stable IDs for identical source/model.
-    index={};low={};stack=[];active=set();groups=[]
-    def visit(v):
-        index[v]=low[v]=len(index);stack.append(v);active.add(v)
-        for w in sorted(graph[v]):
-            if w not in index:visit(w);low[v]=min(low[v],low[w])
-            elif w in active:low[v]=min(low[v],index[w])
-        if low[v]==index[v]:
-            group=[]
-            while True:
-                w=stack.pop();active.remove(w);group.append(w)
-                if w==v:break
-            groups.append(sorted(group))
-    for v in sorted(graph):
-        if v not in index:visit(v)
-    groups.sort(key=lambda g:g[0])
-    names=['wire-%03d'%i for i in range(len(groups))]
-    owner={s:names[i] for i,g in enumerate(groups) for s in g}
-    deps={n:set() for n in names}
-    for a,bs in graph.items():
-        for b in bs:
-            if owner[a]!=owner[b]:deps[owner[b]].add(owner[a])
-    pending=set(names);completed=set();waves=[]
-    while pending:
-        ready=sorted(n for n in pending if deps[n]<=completed)
-        if not ready:raise ValueError('SCC condensation must be acyclic')
-        waves.append(ready);completed.update(ready);pending.difference_update(ready)
-    components=[{'task':names[i],'slots':json.dumps(g),'wave':str(next(j+1 for j,w in enumerate(waves) if names[i] in w))} for i,g in enumerate(groups)]
-    write_table(ROOT/'mesh/COMPONENTS.tsv',['task','slots','wave'],components)
-    tasks=[]; byslot={s['slot']:s for s in slots}
-    for i,g in enumerate(groups):
-        name=names[i];cost=500+100*len(g)
-        brief='Fill and constrain SCC: '+', '.join(g)+'. PRESENT: exact source-proven ports and argument/return/effect wiring. ABSENT: unresolved dispatch, types and unsupported shapes. Failure: re-measure and re-derive; unavailable external signatures or evidence: EXTERNAL. Graph independence does not authorize concurrent writes to shared files.'
-        inputs=sorted({byslot[s]['filled-by'].split(':')[0] for s in g if byslot[s]['filled-by']!='EMPTY'})
-        tasks.append(dict(zip(TASK_FIELDS,[name,','.join(sorted(deps[name])),brief,','.join(inputs+['mesh/SLOTS.tsv','mesh/WIRES.tsv','mesh/DOMAINS.tsv']),
-                         'PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component '+name,'no','full program wiring','Runtime and rules',str(cost)])))
-    structural=[k for k in check['CHECKS'] if k not in ('package','installed-fresh','whole-repo-clean')]
-    for kind in structural:
-        tasks.append(dict(zip(TASK_FIELDS,[kind,','.join(sorted(names)),'PRESENT: '+kind+' proof. ABSENT: every measured '+kind+' failure. Failure: re-measure and re-derive; unavailable external evidence: EXTERNAL.','mesh/','PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only '+kind,'no',kind,'Runtime and rules','1000'])))
-    last=','.join(structural)
-    done=[('package',last,'version-consistent distributable','2000','no'),
-          ('installed-fresh','package','actual fresh installation with source-bound slip/control observations','6000','yes'),
-          ('whole-repo-clean','installed-fresh','whole repository audited and clean outside history','6000','yes')]
-    for name,ds,brief,cost,hand in done:
-        tasks.append(dict(zip(TASK_FIELDS,[name,ds,'PRESENT: '+brief+'. ABSENT: stale or missing evidence. Failure: re-measure; unavailable owner session or authorized commit facility: EXTERNAL.',
-                   'mesh/RECEIPT-'+name+'.json','PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only '+name,hand,brief,'DONE',cost])))
-    tasks.append(dict(zip(TASK_FIELDS,['zero','whole-repo-clean','PRESENT: all slots, wiring, requirements and done bars proven. ABSENT: every remaining hole. Predicted distance 0. Failure: re-measure and re-derive; external unavailable evidence: EXTERNAL.',
-                   'mesh/','PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py','no','distance zero','DONE','1000'])))
-    write_table(ROOT/'TASKS.tsv',TASK_FIELDS,tasks)
-    lines=['# Makoto seed derived from WIRES','',
-           'The measured mesh is incomplete. This is a predicted route to 0, not a consistency claim.',
-           'Each explicit wire contributes a dependency. Argument/return feedback is condensed into SCCs; each SCC is one indivisible step. All ready SCCs share a wave, giving maximal graph concurrency. Shared-file writes require serialization and remeasurement.',
-           'Failure edges are re-measure and re-derive, or EXTERNAL for unavailable outside evidence. There is no BLOCKED terminal. The route tail is not authorized: no hooks, credentials, commits, pushes or mutating gates are run.',
-           'The route TASKS schema is taken from /home/user/mz-route/tools/route/route-USAGE.md. TASKS.tsv contains the complete per-step PRESENT/ABSENT prediction, check and token cost. Runtime steps cite the exact README heading Runtime and rules; done bars cite WORDS.tsv DONE.',
-           '']
-    for j,wave in enumerate(waves,1):lines.append('Wave '+str(j)+': '+', '.join(wave))
-    lines += ['','After graph waves: all structural proof checks → package → installed-fresh → whole-repo-clean → zero.',
-              'At zero: exact types, complete calls/effects, reachable slots, requirements neither missing nor over-constrained, and all done bars pass against the same inputs.',
-              'External evidence remains absent. Clean git status cannot be met while these changes are deliberately uncommitted. Full-program dynamic-dispatch and exact-type proof remain substantial implementation work.','']
-    (ROOT/'PLAN.md').write_text('\n'.join(lines))
-    mesh=[]
-    for name in names:
-        mesh.append({'hole':name,'check':'PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --component '+name,'plant':'PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py '+name,'piece':'full program wiring','citation':'Runtime and rules','status':'ABSENT'})
-    for kind in check['CHECKS']:
-        mesh.append({'hole':kind,'check':'PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --only '+kind,
-                     'plant':'PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py '+kind,
-                     'piece':kind,'citation':'DONE' if kind in ('package','installed-fresh','whole-repo-clean') else 'Runtime and rules',
-                     'status':'PRESENT' if not errors[kind] else 'ABSENT'})
-    mesh.append({'hole':'zero','check':'PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py','plant':'PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py inventory','piece':'distance zero','citation':'DONE','status':'ABSENT'})
-    write_table(ROOT/'MESH.tsv',['hole','check','plant','piece','citation','status'],mesh)
-    verdict={'slots':len(slots),'wires':len(wires),'empty':sum(s['filled-by']=='EMPTY' for s in slots),
-             'missing':len(errors['missing']),'over':len(errors['over']),'check.py exit':int(any(errors.values())),
-             'waves':len(waves)+5,'steps':len(tasks),'unresolved ports':len(errors['types']),'wire mismatches':len(errors['wires']),
-             'unreachable slots':len(errors['reachable'])}
-    (ROOT/'VERDICT-MESH.txt').write_text('REPO=makoto\n'+'\n'.join(str(k)+'='+str(v) for k,v in verdict.items())+'\nINCOMPLETE: no zero proof; see mesh/README.md for proof boundaries.\n')
-    (ROOT/'VERDICT-SEED.txt').write_text('REPO=makoto\nDERIVED from WIRES SCC condensation\n'+str(len(waves)+5)+' waves; '+str(len(tasks))+' steps\nPredicted end=0; measured mesh exit=1\nFailure=re-measure or EXTERNAL\n')
-    return verdict
 
-if __name__=='__main__':
-    print(json.dumps(derive(),sort_keys=True))
+def derive():
+    slots={s['slot']:s for s in read(ROOT/'mesh/SLOTS.tsv')}
+    requirements={r['requirement']:r for r in read(ROOT/'mesh/REQUIREMENTS.tsv')}
+    deps={s:{'subtract'} for s in slots if s not in (INPUT,OUTPUT)}
+    for w in read(ROOT/'mesh/WIRES.tsv'):
+        a=w['source'].split('#')[0];b=w['target'].split('#')[0]
+        if a!=INPUT and b!=OUTPUT:deps[b].add(a)
+    deps['subtract']=set();deps['zero']=set(slots)-{INPUT,OUTPUT}
+    tasks=[];mesh=[];predictions=[]
+    for id,parents in deps.items():
+        slot=slots.get(id)
+        refs=slot['requirements'].split(',') if slot else ['done']
+        citation=requirements[refs[0]]['source'].removeprefix('WORDS.tsv:')
+        # Route resolves owner words from WORDS_FILES; SPIRIT headings are literal Markdown headings.
+        if citation.startswith('docs-def:README.md#'):citation=citation.split('#')[1]
+        if citation.startswith('SPIRIT.md#'):citation=citation.split('#')[1]
+        command='PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task '+id
+        if id=='subtract':
+            inputs='mesh/reference/,mesh/SUBTRACT.tsv';cost=800
+            present='only requirement-needed units in seed; old generators preserved as reference'
+            absent='bottom-up inventory and SCC generators at active paths'
+        elif id=='zero':
+            inputs='mesh/,PLAN.md,TASKS.tsv,MESH.tsv';cost=1000
+            present='model contracts equal requirement envelopes; implementation done only with all current evidence'
+            absent='model missing/over constraints; stale or missing evidence cannot imply implementation done'
+        else:
+            candidate=slot['filled-by'] or 'OPEN'
+            paths=sorted({x.split(':')[0] for x in candidate.split(';') if x!='OPEN'})
+            inputs=','.join(paths+[f'mesh/evidence/{id}.json'])
+            cost=COST_BASE+COST_PER_PORT*(len(json.loads(slot['inputs']))+len(json.loads(slot['outputs'])))
+            present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate
+            absent='unrealized behavior and stale/missing current evidence'
+        brief=f'PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'
+        tasks.append(dict(task=id,deps=','.join(sorted(parents)),brief=brief,inputs=inputs,check=command,hand='yes' if id=='register' else 'no',piece=id,citation=citation,estimate_tokens=cost))
+        mesh.append(dict(hole=id,check=command,plant='PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy '+id,piece=id,citation=citation,status='SHAPE_PRESENT',realization=slot['fill-status'] if slot else 'MODEL_ONLY'))
+        predictions.append(dict(task=id,shape='PRESENT',implementation='REMOVED' if id=='subtract' else slot['fill-status'] if slot else 'UNPROVEN',evidence='EXTERNAL' if id in EXTERNAL_SLOTS else 'UNMEASURED',cost_tokens=cost))
+    waves=[];pending=set(deps);done=set()
+    while pending:
+        ready=sorted(t for t in pending if deps[t]<=done)
+        if not ready:raise ValueError('wiring cycle: re-measure the chosen layer')
+        waves.append(ready);done.update(ready);pending.difference_update(ready)
+    write(ROOT/'TASKS.tsv',tasks,TASK_FIELDS)
+    write(ROOT/'MESH.tsv',mesh,('hole','check','plant','piece','citation','status','realization'))
+    write(ROOT/'mesh/PREDICTIONS.tsv',predictions,tuple(predictions[0]))
+    lines=['# Makoto: top-down seed from final-program wiring','',
+      'Requirements open ports; wires order work. SUBTRACT is first. Each later wave contains every ready slot, giving maximal concurrency under this one-layer dependency graph. Candidate units in shared files must be edited by one writer or re-measured into disjoint scopes; evidence files are per slot.', '',
+      'The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a positive token cost.', '',
+      'Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.', '',
+      'Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have isolated mutation plants. This is a reviewable plan; route execution and its tail are outside this request. Register amendments require Gabriel; merging remains with Gabriel.', '',
+      'Configuration for a later authorized model-only route:',
+      '```text','REPO_DIR=/home/user/makoto','WHY=Makoto prevents blindspots through detection','WORDS_FILES=WORDS.tsv,SPIRIT.md,mesh/reference/docs-def-README.md','MESH_FILE=MESH.tsv','SEED_FILE=PLAN.md','GATE_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py','PLANTS_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py','```','',
+      'These are declarations, not commands executed during formation. Model checks do not replace the product acceptance gates.', '']
+    for n,wave in enumerate(waves,1):
+        cost=sum(int(t['estimate_tokens']) for t in tasks if t['task'] in wave)
+        lines.append(f'Wave {n}: '+', '.join(wave)+f' (predicted {cost} tokens)')
+    lines+=['','At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.','',
+      'Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. Historical docs and old mesh artifacts are reference; no hook invocation/configuration, credentials, gate runs, publishing, commits or merges.']
+    (ROOT/'PLAN.md').write_text('\n'.join(lines)+'\n')
+    return waves,tasks
+
+if __name__=='__main__':derive()
