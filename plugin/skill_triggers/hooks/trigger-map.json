@@ -1,0 +1,208 @@
+{
+  "maps": [
+    {
+      "skill": "cheap-execution",
+      "classes": [
+        "bill",
+        "launch",
+        "handoff",
+        "continuation",
+        "suite_timing",
+        "verdict_read",
+        "prior_art",
+        "headless_inputs",
+        "standing_authority",
+        "repeated_guard",
+        "loop_cost"
+      ],
+      "rule_ids": [
+        "C9",
+        "C17",
+        "C1",
+        "C19",
+        "C13",
+        "C20",
+        "C4",
+        "C8",
+        "C10",
+        "C11",
+        "C6"
+      ],
+      "class_rule_ids": {
+        "bill": [
+          "C9"
+        ],
+        "launch": [
+          "C17"
+        ],
+        "handoff": [
+          "C1"
+        ],
+        "continuation": [
+          "C19"
+        ],
+        "suite_timing": [
+          "C13"
+        ],
+        "verdict_read": [
+          "C20"
+        ],
+        "prior_art": [
+          "C4"
+        ],
+        "headless_inputs": [
+          "C8"
+        ],
+        "standing_authority": [
+          "C10"
+        ],
+        "repeated_guard": [
+          "C11"
+        ],
+        "loop_cost": [
+          "C6"
+        ]
+      },
+      "resident_rules": [
+        "C1",
+        "C19",
+        "C20",
+        "C4",
+        "C8",
+        "C10",
+        "C11",
+        "C6"
+      ]
+    },
+    {
+      "skill": "adversarial-review",
+      "classes": [
+        "claim_replay",
+        "labels",
+        "delivered_input",
+        "audit_repeat",
+        "audit_reader",
+        "audit_seams",
+        "audit_plants",
+        "check_validity",
+        "heldout",
+        "audit_stop",
+        "definition"
+      ],
+      "rule_ids": [
+        "A10",
+        "A6",
+        "A8",
+        "A5",
+        "A4",
+        "A1",
+        "A2",
+        "A3",
+        "A7",
+        "A9",
+        "A11"
+      ],
+      "class_rule_ids": {
+        "claim_replay": [
+          "A10"
+        ],
+        "labels": [
+          "A6"
+        ],
+        "delivered_input": [
+          "A8"
+        ],
+        "audit_repeat": [
+          "A5"
+        ],
+        "audit_reader": [
+          "A4"
+        ],
+        "audit_seams": [
+          "A1"
+        ],
+        "audit_plants": [
+          "A2"
+        ],
+        "check_validity": [
+          "A3"
+        ],
+        "heldout": [
+          "A7"
+        ],
+        "audit_stop": [
+          "A9"
+        ],
+        "definition": [
+          "A11"
+        ]
+      },
+      "resident_rules": [
+        "A9",
+        "A11"
+      ]
+    },
+    {
+      "skill": "harness-execution",
+      "classes": [
+        "budget",
+        "harness_launch",
+        "harness_chain",
+        "harness_bill",
+        "detio_store",
+        "router_run",
+        "makoto_hook",
+        "countdown_repairs"
+      ],
+      "rule_ids": [
+        "C18",
+        "H17",
+        "H19",
+        "H9",
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ],
+      "class_rule_ids": {
+        "budget": [
+          "C18"
+        ],
+        "harness_launch": [
+          "H17"
+        ],
+        "harness_chain": [
+          "H19"
+        ],
+        "harness_bill": [
+          "H9"
+        ],
+        "detio_store": [
+          "H2"
+        ],
+        "router_run": [
+          "H3"
+        ],
+        "makoto_hook": [
+          "H4"
+        ],
+        "countdown_repairs": [
+          "H5"
+        ]
+      },
+      "resident_rules": [
+        "C18",
+        "H9",
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ]
+    }
+  ],
+  "precedence": [
+    "adversarial-review",
+    "harness-execution",
+    "cheap-execution"
+  ]
+}

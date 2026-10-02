@@ -1,0 +1,106 @@
+{
+  "scope": "finite typed decisions, not efficacy",
+  "rules": {
+    "C18": {
+      "classes": [
+        "budget"
+      ],
+      "actions": [
+        "reserve_read",
+        "share_95",
+        "stop_low_or_unknown",
+        "replan_codex",
+        "settle_actual",
+        "no_padding"
+      ],
+      "forbidden": [
+        "unknown_as_pass",
+        "token_padding"
+      ]
+    },
+    "H17": {
+      "classes": [
+        "harness_launch"
+      ],
+      "actions": [
+        "astra_codex_plan",
+        "codex_checked_leaf"
+      ],
+      "forbidden": [
+        "unbound_codex_plan"
+      ]
+    },
+    "H19": {
+      "classes": [
+        "harness_chain"
+      ],
+      "actions": [
+        "codex_wait_dependency",
+        "shell_exit_receipts"
+      ],
+      "forbidden": [
+        "shell_chain_failed_parent"
+      ]
+    },
+    "H9": {
+      "classes": [
+        "harness_bill"
+      ],
+      "actions": [
+        "harness_usage_fields",
+        "codex_log_footer"
+      ],
+      "forbidden": [
+        "schema_last_segment"
+      ]
+    },
+    "H2": {
+      "classes": [
+        "detio_store"
+      ],
+      "actions": [
+        "detio_store_objects",
+        "detio_delivery_receipts"
+      ],
+      "forbidden": [
+        "missing_store_object"
+      ]
+    },
+    "H3": {
+      "classes": [
+        "router_run"
+      ],
+      "actions": [
+        "tiller_launch_owner",
+        "router_real_acceptance"
+      ],
+      "forbidden": [
+        "fixture_as_live"
+      ]
+    },
+    "H4": {
+      "classes": [
+        "makoto_hook"
+      ],
+      "actions": [
+        "makoto_observed_enabled",
+        "makoto_dispatch_surface"
+      ],
+      "forbidden": [
+        "uninstalled_hook_as_guard"
+      ]
+    },
+    "H5": {
+      "classes": [
+        "countdown_repairs"
+      ],
+      "actions": [
+        "countdown_repair_list",
+        "countdown_delivered_gate"
+      ],
+      "forbidden": [
+        "countdown_only_zero"
+      ]
+    }
+  }
+}

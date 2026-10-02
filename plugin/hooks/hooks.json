@@ -9,6 +9,15 @@
             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m skill_triggers PreToolUse"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -59,6 +68,16 @@
           {
             "type": "command",
             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m skill_triggers SessionStart"
           }
         ]
       }
