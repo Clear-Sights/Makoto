@@ -222,3 +222,30 @@ def test_launcher_success_is_not_job_success():
 ])
 def test_cost_accounting_boundary(text, blocked):
     assert bool(V.cost_owes({}, {}, Record([]), reply(text))) == blocked
+
+
+@pytest.mark.parametrize("command,output", [
+    ("pytest -v", "FAILED tests/test_bill.py::test_charge - AssertionError"),
+    ("python -m unittest -v", "FAIL: test_charge (tests.test_bill.Billing)"),
+])
+def test_counted_failure_keeps_its_subject(rows, command, output):
+    record = Record([Obs(1, "Bash", {"command": command}, output, exit=1)])
+    row = next(r for r in rows if r["id"] == "R11")
+    plant = V.evaluate([row], record, reply("Twelve tests are failing."))
+    assert plant and plant["row"] == "R11"
+    assert V.evaluate([row], record, reply("One test failed: `test_charge`.")) is None
+
+
+def test_failure_subject_fold_and_every_name(rows):
+    row = next(r for r in rows if r["id"] == "R11")
+    red = Obs(1, "Bash", {"command": "pytest"},
+              "FAILED tests/a.py::test_one\nFAILED tests/b.py::test_two", exit=1)
+    record = Record([red])
+    assert V.evaluate([row], record, reply("Two tests failed: test_one."))
+    assert V.evaluate([row], record, reply("Two tests failed: test_one, test_two.")) is None
+    green = Obs(2, "Bash", {"command": "pytest"}, "PASSED tests/b.py::test_two")
+    assert V.evaluate([row], Record([red, green]), reply("One test failed: test_one.")) is None
+    log = red._replace(input={"command": "cat pytest.log"})
+    assert V.evaluate([row], Record([log]), reply("Two tests failed.")) is None
+    assert V.evaluate([row], record, reply("If two tests failed, list them.")) is None
+    assert V.evaluate([row], record, reply('The runner reports "two tests failed".')) is None

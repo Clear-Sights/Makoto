@@ -1,6 +1,6 @@
 """Makoto rebuilt from the mesh: d(e), S' = D_out(O(V(W(G,C), R(S+e), e), S)), e = D_in(stdin).
 Every function here maps to one symbol in MAP.tsv."""
-import hashlib, json, os, sys
+import hashlib, json, os, sys, tomllib
 
 SETTLED = ("PostToolUse", "PostToolUseFailure")
 TURN_MARKS = ("Stop", "SubagentStop", "UserPromptSubmit")   # not Obs; R reads them as turn boundaries
@@ -58,11 +58,27 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
     ev = d_in(raw)
     if ev is None:
         return {}
+    # Dispatch is a workspace contract; invalid or absent declarations are off.
+    try:
+        with open(os.path.join(ev.get("cwd") or os.getcwd(), "makoto.toml"), "rb") as fh:
+            config["dispatch"] = tomllib.load(fh).get("dispatch") is True
+    except (OSError, ValueError):
+        config["dispatch"] = False
     path = sigma_path(config["state_dir"], ev.get("session_id", ""))
     events, keys = sigma_read(path)
     record = record_fn(events + ([ev] if ev.get("hook_event_name") in SETTLED else []))
+    if config["dispatch"]:
+        config["dispatch_background"] = {i for i, e in enumerate(events)
+                                         if isinstance(e.get("tool_response"), dict)
+                                         and e["tool_response"].get("backgroundTaskId")}
+        record.dispatch_briefs = [(i, e) for i, e in enumerate(events)
+                                  if e.get("hook_event_name") == "PreToolUse"
+                                  and e.get("tool_name") in ("Agent", "Task")]
     finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
     if ev.get("hook_event_name") in SETTLED + TURN_MARKS:
+        sigma_append(path, {"event": ev})
+    if (config["dispatch"] and finding is None and ev.get("hook_event_name") == "PreToolUse"
+            and ev.get("tool_name") in ("Agent", "Task")):
         sigma_append(path, {"event": ev})
     if key:
         sigma_append(path, {"key": key})
