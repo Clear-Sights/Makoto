@@ -1,0 +1,607 @@
+{
+  "task": "rules",
+  "requirement": "sources",
+  "candidate": "plugin/makoto2/evaluate.py:load_rows",
+  "selected_input_digest": "6b16253980d3694e6d08a95c17de9eb5bf05f6bede27a9b78c11fa0173358697",
+  "digest_method": "SHA-256 of UTF-8 canonical source_pins JSON (sorted keys, compact separators); evidence is an output, not self-pinned",
+  "source_pins": {
+    "plugin/makoto2/evaluate.py": "6ee8afd0d269f8ec3f1b6efc300ae3cc766940b7d4535e36f168151292de1701",
+    "plugin/makoto2/observed.py": "18067c306a19b58dfbcdafbe05d4da1eeb42d331627b57498336b30d5c8f4bc8",
+    "plugin/makoto2/rows.tsv": "9da5bf457fd25ffa53d89c3c68e4e0145a921366a311c281ddadd15f3fb789b5",
+    "tests/sources.tsv": "d0eb5f91de6a443da2bef3f05c4bdebde7c8b07a57a0f272117490f4c27a3ada",
+    "tests/test_evaluate.py": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+    "SPIRIT.md": "29e335fadfdfc4ff20c5bac2826dbde47748614dada1ea915dd0476f656cc664",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+    "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+    "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+    "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+    "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+    "PLAN.md": "528bb48f7ad4c47217858cecb9707d6fa8de80f106d4d1f8ae4f0ef3b70fb0be"
+  },
+  "observations": [
+    {
+      "case": "R01: verbatim fixture quote",
+      "expected": "kept asking him",
+      "actual": "kept asking him",
+      "result": "pass"
+    },
+    {
+      "case": "R03: verbatim fixture quote",
+      "expected": "many threads at once",
+      "actual": "many threads at once",
+      "result": "pass"
+    },
+    {
+      "case": "R04: verbatim fixture quote",
+      "expected": "re-briefed a thread four times in minutes",
+      "actual": "re-briefed a thread four times in minutes",
+      "result": "pass"
+    },
+    {
+      "case": "R05: verbatim fixture quote",
+      "expected": "then said narrowers were never applied without checking (23:27Z)",
+      "actual": "then said narrowers were never applied without checking (23:27Z)",
+      "result": "pass"
+    },
+    {
+      "case": "R06: verbatim fixture quote",
+      "expected": "Stated thread claims as fact",
+      "actual": "Stated thread claims as fact",
+      "result": "pass"
+    },
+    {
+      "case": "R07: verbatim fixture quote",
+      "expected": "I didn't say that we should focus on API",
+      "actual": "I didn't say that we should focus on API",
+      "result": "pass"
+    },
+    {
+      "case": "R08: verbatim fixture quote",
+      "expected": "a thing pointed at, never read from source",
+      "actual": "a thing pointed at, never read from source",
+      "result": "pass"
+    },
+    {
+      "case": "R09: verbatim fixture quote",
+      "expected": "Never route around a permission refusal.",
+      "actual": "Never route around a permission refusal.",
+      "result": "pass"
+    },
+    {
+      "case": "R10: verbatim fixture quote",
+      "expected": "Predict failures up front.",
+      "actual": "Predict failures up front.",
+      "result": "pass"
+    },
+    {
+      "case": "R11: verbatim fixture quote",
+      "expected": "told him an in-progress step as landed (22:35Z)",
+      "actual": "told him an in-progress step as landed (22:35Z)",
+      "result": "pass"
+    },
+    {
+      "case": "R12: verbatim fixture quote",
+      "expected": "claimed before checking",
+      "actual": "claimed before checking",
+      "result": "pass"
+    },
+    {
+      "case": "R13: verbatim fixture quote",
+      "expected": "Nothing done before may cost a token again.",
+      "actual": "Nothing done before may cost a token again.",
+      "result": "pass"
+    },
+    {
+      "case": "R14: verbatim fixture quote",
+      "expected": "Enabled-arm exposure is not observable",
+      "actual": "Enabled-arm exposure is not observable",
+      "result": "pass"
+    },
+    {
+      "case": "configuration is passed to every row",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "args parsed without resolving optional historical words",
+      "expected": {
+        "acts": "say",
+        "words": "/mnt/project-files/VERIFY/WORDS.tsv"
+      },
+      "actual": {
+        "acts": "say",
+        "words": "/mnt/project-files/VERIFY/WORDS.tsv"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "explicit current fixture agrees with default",
+      "expected": [
+        {
+          "id": "R01",
+          "moment": "PreToolUse,Stop",
+          "predicate": "asks_user",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"kept asking him\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R03",
+          "moment": "PreToolUse",
+          "predicate": "second_thread_this_turn",
+          "args": {
+            "acts": "thread"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"many threads at once\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R04",
+          "moment": "PreToolUse",
+          "predicate": "note_pile",
+          "args": {
+            "acts": "note"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"re-briefed a thread four times in minutes\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R05",
+          "moment": "PreToolUse,Stop",
+          "predicate": "absence_unsearched",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"then said narrowers were never applied without checking (23:27Z)\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R06",
+          "moment": "PreToolUse,Stop",
+          "predicate": "relayed_number",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"Stated thread claims as fact\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R07",
+          "moment": "PreToolUse,Stop",
+          "predicate": "user_quote",
+          "args": {
+            "acts": "say",
+            "words": "/mnt/project-files/VERIFY/WORDS.tsv"
+          },
+          "source": "WORDS.tsv cmsg_01CZb217TBsj7a1uAAdtXepPCJNggdBGdenfgpZ8oQGS7U: \"I didn't say that we should focus on API\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R08",
+          "moment": "PreToolUse",
+          "predicate": "write_unread_paths",
+          "args": {
+            "acts": "write"
+          },
+          "source": "WORDS.tsv:6615 (H5 REFERENT DRAWN FROM THE HEAD): \"a thing pointed at, never read from source\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R09",
+          "moment": "PreToolUse",
+          "predicate": "denied_retry",
+          "args": {},
+          "source": "MEMORY.md STANDING RULES: \"Never route around a permission refusal.\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R10",
+          "moment": "PreToolUse",
+          "predicate": "budget_exceeds_limit",
+          "args": {
+            "acts": "run"
+          },
+          "source": "field catch 21:16Z; MEMORY.md STANDING RULES: \"Predict failures up front.\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R11",
+          "moment": "PreToolUse,Stop",
+          "predicate": "landed_unobserved",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"told him an in-progress step as landed (22:35Z)\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R12",
+          "moment": "PreToolUse,Stop",
+          "predicate": "count_unread_path",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"claimed before checking\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R13",
+          "moment": "PreToolUse",
+          "predicate": "exact_repeat",
+          "args": {},
+          "source": "MEMORY.md STANDING RULES: \"Nothing done before may cost a token again.\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R14",
+          "moment": "PreToolUse,Stop",
+          "predicate": "cost_unaccounted",
+          "args": {
+            "acts": "say,brief"
+          },
+          "source": "B14 MECHANISM AS OUTCOME; C16 target-reaching measurement: REPORT.md step6: \"Enabled-arm exposure is not observable\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        }
+      ],
+      "actual": [
+        {
+          "id": "R01",
+          "moment": "PreToolUse,Stop",
+          "predicate": "asks_user",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"kept asking him\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R03",
+          "moment": "PreToolUse",
+          "predicate": "second_thread_this_turn",
+          "args": {
+            "acts": "thread"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"many threads at once\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R04",
+          "moment": "PreToolUse",
+          "predicate": "note_pile",
+          "args": {
+            "acts": "note"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"re-briefed a thread four times in minutes\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R05",
+          "moment": "PreToolUse,Stop",
+          "predicate": "absence_unsearched",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"then said narrowers were never applied without checking (23:27Z)\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R06",
+          "moment": "PreToolUse,Stop",
+          "predicate": "relayed_number",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"Stated thread claims as fact\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R07",
+          "moment": "PreToolUse,Stop",
+          "predicate": "user_quote",
+          "args": {
+            "acts": "say",
+            "words": "/mnt/project-files/VERIFY/WORDS.tsv"
+          },
+          "source": "WORDS.tsv cmsg_01CZb217TBsj7a1uAAdtXepPCJNggdBGdenfgpZ8oQGS7U: \"I didn't say that we should focus on API\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R08",
+          "moment": "PreToolUse",
+          "predicate": "write_unread_paths",
+          "args": {
+            "acts": "write"
+          },
+          "source": "WORDS.tsv:6615 (H5 REFERENT DRAWN FROM THE HEAD): \"a thing pointed at, never read from source\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R09",
+          "moment": "PreToolUse",
+          "predicate": "denied_retry",
+          "args": {},
+          "source": "MEMORY.md STANDING RULES: \"Never route around a permission refusal.\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R10",
+          "moment": "PreToolUse",
+          "predicate": "budget_exceeds_limit",
+          "args": {
+            "acts": "run"
+          },
+          "source": "field catch 21:16Z; MEMORY.md STANDING RULES: \"Predict failures up front.\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R11",
+          "moment": "PreToolUse,Stop",
+          "predicate": "landed_unobserved",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"told him an in-progress step as landed (22:35Z)\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R12",
+          "moment": "PreToolUse,Stop",
+          "predicate": "count_unread_path",
+          "args": {
+            "acts": "say"
+          },
+          "source": "MEMORY.md OWNED FAILURES: \"claimed before checking\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R13",
+          "moment": "PreToolUse",
+          "predicate": "exact_repeat",
+          "args": {},
+          "source": "MEMORY.md STANDING RULES: \"Nothing done before may cost a token again.\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        },
+        {
+          "id": "R14",
+          "moment": "PreToolUse,Stop",
+          "predicate": "cost_unaccounted",
+          "args": {
+            "acts": "say,brief"
+          },
+          "source": "B14 MECHANISM AS OUTCOME; C16 target-reaching measurement: REPORT.md step6: \"Enabled-arm exposure is not observable\"",
+          "cfg": {
+            "snippet_len": 80,
+            "extra": {
+              "preserved": true
+            }
+          }
+        }
+      ],
+      "result": "pass"
+    },
+    {
+      "case": "changed row quote is rejected on next read",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "changed fixture is reread on next call",
+      "expected": "changed quote",
+      "actual": "changed quote",
+      "result": "pass"
+    },
+    {
+      "case": "missing rule pin rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "duplicate pin rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "missing quote column rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "unavailable fixture rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "unquoted source rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "duplicate rule rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "truncated row rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "missing source column rejected",
+      "expected": true,
+      "actual": true,
+      "result": "pass"
+    },
+    {
+      "case": "unavailable optional words path is preserved",
+      "expected": "/tmp/rules-proof-p2btvbo2/absent/WORDS.tsv",
+      "actual": "/tmp/rules-proof-p2btvbo2/absent/WORDS.tsv",
+      "result": "pass"
+    },
+    {
+      "case": "optional historical words file is never created",
+      "expected": false,
+      "actual": false,
+      "result": "pass"
+    },
+    {
+      "case": "every shipped rule has slip/control and source coverage; evaluator regression suite",
+      "expected": 0,
+      "actual": 0,
+      "result": "pass",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/test_evaluate.py",
+      "output": "............................................                             [100%]\n44 passed in 0.10s\n"
+    },
+    {
+      "case": "specified declarative rules check",
+      "expected": 0,
+      "actual": 0,
+      "result": "pass",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task rules",
+      "output": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n"
+    }
+  ],
+  "result": "pass",
+  "scope": "Current local fixture agreement and direct loader probes; all shipped rows have tested slip/control cases. Historical external source provenance is not certified. Optional words paths are neither required nor created. Declarative check is not an implementation proof. No hooks invoked or installed.",
+  "model_check": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task rules",
+    "exit_code": 0
+  }
+}

@@ -1,4 +1,4 @@
-# Makoto 4.0.2
+# Makoto 4.0.1
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
 
@@ -81,6 +81,13 @@ memory files. A pin records historical text, not independently verified provenan
 Manual release reads the version from the plugin manifest to derive its tag.
 The old catalog, CLI, packaging and replay tooling have been replaced by this
 runtime and suite.
+
+## Mesh and handoff
+
+[mesh/README.md](mesh/README.md) describes the requirement model and its checks.
+[PLAN.md](PLAN.md) records dependency waves; [HANDOFF.md](HANDOFF.md) describes
+how to resume and distinguish model validity from implementation evidence.
+The pinned README in `mesh/reference/` is a historical source snapshot.
 
 ## Uninstall
 
