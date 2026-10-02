@@ -3,7 +3,6 @@ Run individual nodes, not as an unconditional passing regression suite.
 """
 import csv
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys

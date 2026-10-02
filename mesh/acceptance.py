@@ -1,7 +1,6 @@
 """Inspect pytest acceptance references without importing product code."""
 import ast
 import shlex
-from pathlib import Path
 
 
 def references(root, selector, seen=None):
