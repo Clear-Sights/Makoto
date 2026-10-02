@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skill_triggers/hooks/pretooluse.sh\" 2>/dev/null || true"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m skill_triggers PreToolUse"
           }
         ]
       }
@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skill_triggers/hooks/sessionstart.sh\" 2>/dev/null || true"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m skill_triggers SessionStart"
           }
         ]
       }

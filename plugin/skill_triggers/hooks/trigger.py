@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Advisory only. Any failure produces no output and never blocks a tool."""
-import json, os, sys, shlex, re, fcntl
+import json, os, sys, shlex, re
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 from pathlib import Path
 
 def classify(event):
@@ -55,7 +63,7 @@ def classify(event):
 
 
 def skill_source(root, skill):
-    home = Path.home()
+    home = Path(os.environ.get('HOME') or Path.home())
     synced = sorted((home/'.claude/skills/synced').glob('*/'+skill+'/SKILL.md'))
     candidates = synced + [home/'.claude/skills'/skill/'SKILL.md']
     for path in candidates:
@@ -113,12 +121,16 @@ def main():
     session = event['session_id']
     if not isinstance(session,str) or not session or session in ('.','..') or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.' for c in session):
         raise ValueError('invalid session id')
-    base = Path(os.environ.get('CLAUDE_PLUGIN_DATA') or str(Path.home()/'.cache/makoto'))/'skill-triggers'
+    base = Path(os.environ.get('CLAUDE_PLUGIN_DATA') or str(Path(os.environ.get('HOME') or Path.home())/'.cache/makoto'))/'skill-triggers'
     state = base/session
     state.mkdir(parents=True,exist_ok=True)
     # Serialize the read/update so parallel tools cannot inject the same card twice.
     with (state/'lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX)
+        if fcntl:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+        elif msvcrt:
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(),msvcrt.LK_LOCK,1)
         record = state/'rules.json'
         seen = set(json.loads(record.read_text())) if record.exists() else set()
         fresh = [rid for rid in parsed if rid in ids and mapping['skill']+':'+rid not in seen]

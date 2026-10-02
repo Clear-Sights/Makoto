@@ -31,9 +31,11 @@ def runtime(tmp_path):
 def run(env, kind, event):
     hooks = json.loads((PLUGIN / 'hooks/hooks.json').read_text())['hooks']
     commands = [h['command'] for group in hooks[kind] for h in group['hooks']
-                if '/skill_triggers/' in h['command']]
+                if '-m skill_triggers' in h['command']]
     assert len(commands) == 1
-    result = subprocess.run(commands[0], shell=True, env=env, input=json.dumps(event),
+    # The host expands ${CLAUDE_PLUGIN_ROOT} before running the command.
+    command = commands[0].replace('${CLAUDE_PLUGIN_ROOT}', env['CLAUDE_PLUGIN_ROOT'])
+    result = subprocess.run(command, shell=True, env=env, input=json.dumps(event),
                             text=True, capture_output=True, timeout=10)
     assert result.returncode == 0
     assert result.stderr == ''
@@ -131,7 +133,7 @@ def test_invalid_payload(runtime, event):
 
 def test_public_privacy():
     paths = [p for base in (PLUGIN / 'skill_triggers', FIXTURES)
-             for p in base.rglob('*') if p.is_file()]
+             for p in base.rglob('*') if p.is_file() and '__pycache__' not in p.parts]
     paths.extend([Path(__file__), PLUGIN / 'hooks/hooks.json',
                   PLUGIN / '.claude-plugin/plugin.json',
                   ROOT / '.claude-plugin/marketplace.json'])
