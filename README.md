@@ -2,10 +2,12 @@
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
 
-Makoto is an integrity hook for Claude Code. It checks statements against the
-agent's observed tool effects, blocking a finding or staying silent. Integrity
-here means agreement between a claim and the recorded deed; it does not certify
-code quality or correctness. Live-session outcomes remain unmeasured.
+“Makoto prevents blindspots through detection”
+(cmsg_01CZb217TBsj7a1uAAdtXepP3dgKHAVmDP8Nk9f2nVV5uu, 2026-10-01T21:41Z).
+
+Makoto enforces the blindspot register through Claude Code hooks. It checks
+source text and observed tool effects, blocking a finding or staying silent.
+Live-session outcomes remain unmeasured.
 
 ## Install
 
@@ -22,26 +24,36 @@ required; the runtime uses only the standard library.
 ## Runtime and rules
 
 [observed.py](plugin/makoto2/observed.py) records settled tool effects.
-[rows.tsv](plugin/makoto2/rows.tsv) holds 12 rules and their historical source
-quotes. [evaluate.py](plugin/makoto2/evaluate.py) evaluates those rules, and
+[rows.tsv](plugin/makoto2/rows.tsv) holds historical rules and source quotes.
+[evaluate.py](plugin/makoto2/evaluate.py) runs the register's SPEC, OTHER POINT,
+SWITCH and LINEAGE families before the remaining historical rules, and
 [hook.py](plugin/makoto2/hook.py) emits a pre-tool denial or a Stop/SubagentStop
-block. Other events record effects or mark turn boundaries. Findings fire once
-per rule, object and observed object state; there is no advisory output.
+block. Other events record effects or mark turn boundaries. Findings are
+deduplicated by rule, object and recorded state; SPEC findings
+include event history in that state. There is no advisory output.
 
-The rules cover redundant permission questions, repeated worker starts,
-rebriefing without fetching, unsupported absence claims, unattributed thread
-claims, inaccurate quotes, unread plans, unchanged retries after refusal,
-implicit time limits, unwitnessed completion, unread counts and repeated probes.
-Completion witnesses must match the named subject and operation. Pending launch
-acknowledgements, empty or invalid artifacts, named failures and superseded
-successes cannot stand in for terminal success. This is a bounded evaluator,
-not a claim that every integrity failure is detected. No claim reader is shipped.
+The claim reader uses a fixed word table, with no semantic classifier. Source
+references require prior readings; available current readings are checked for
+drift. This is a bounded evaluator.
 
 State is appended lazily to session JSONL files in `~/.claude/makoto2_state`.
 Set `MAKOTO_STATE_DIR` to choose another directory. Runtime defaults are in
 [config.json](plugin/makoto2/config.json), with keys documented in
 [CONFIG_KEYS.txt](plugin/makoto2/CONFIG_KEYS.txt). Some historical rule inputs
 refer to external words files; those are not bundled or created by installation.
+
+For a workspace that wants explicit worker contracts, set `dispatch = true` in
+its `makoto.toml`. The default is off; false, absent or invalid declarations
+keep the existing behavior. R04 requires case-sensitive `READ:`,
+`WRITE:` and `ACCEPTANCE:` labels on Agent briefs. R08 checks Agent briefs for `@` followed by at least 12 lowercase
+hexadecimal digits on a `READ:` line; it does not validate every input token.
+READ lists can span lines and use whitespace or commas. With dispatch enabled,
+Stop requires an observed exit-zero execution of each Agent ACCEPTANCE command
+even when the closing text makes no completion claim. Recognized completion
+claims also require later settled acceptance executions for Agent/Task briefs.
+Background launches and results from workers do not pay that obligation.
+Accepted Pre briefs are stored as contracts and never treated as settled effects.
+These checks do not prove snapshots or causal validity.
 
 ## Verify
 
@@ -51,13 +63,13 @@ python -m pytest -q tests
 ```
 
 CI runs the suite on Linux with Python 3.11, 3.12 and 3.13, and on macOS and
-Windows with Python 3.13. Tests include a blocking plant and silent look-alike
-for every rule, observed-effect cases, completion witness cases, and six hook
-assertions executed during collection. [sources.tsv](tests/sources.tsv) pins
+Windows with Python 3.13. Tests cover register-family predicates, observed
+effects, dispatch contracts, completion witnesses, and six hook assertions
+executed during collection. [sources.tsv](tests/sources.tsv) pins
 historical quotes inside the repository; tests do not depend on changing live
 memory files. A pin records historical text, not independently verified provenance.
 
-Manual release reads version `4.0.1` from the plugin manifest to derive its tag.
+Manual release reads the version from the plugin manifest to derive its tag.
 The old catalog, CLI, packaging and replay tooling have been replaced by this
 runtime and suite.
 

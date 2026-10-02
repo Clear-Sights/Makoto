@@ -1,6 +1,6 @@
 """Makoto rebuilt from the mesh: d(e), S' = D_out(O(V(W(G,C), R(S+e), e), S)), e = D_in(stdin).
 Every function here maps to one symbol in MAP.tsv."""
-import hashlib, json, os
+import hashlib, json, os, sys, tomllib
 
 SETTLED = ("PostToolUse", "PostToolUseFailure")
 TURN_MARKS = ("Stop", "SubagentStop", "UserPromptSubmit")   # not Obs; R reads them as turn boundaries
@@ -52,20 +52,11 @@ def sigma_append(path, row):                     # Sigma: append-only write
 def o_once(finding, record, keys):               # O: at most once per (row, object, object state)
     if finding is None:
         return None, None
-    objs = sorted(set(finding.get("objects") or []))
-    wanted = set(objs)
-    # Sequence positions are history offsets, not object state. Keep the
-    # settled evidence itself so changed results at the same offset can fire.
-    state = [
-        [o.tool, getattr(o, "input", {}), getattr(o, "output", ""),
-         getattr(o, "exit", None), getattr(o, "failed", False),
-         sorted(wanted & set(o.objects)), sorted(wanted & set(o.written)),
-         sorted(wanted & set(o.created)), getattr(o, "send", ""),
-         getattr(o, "search", None)]
-        for o in record.obs
-        if wanted & (set(o.objects) | set(o.written) | set(o.created))
-    ]
-    key = hashlib.sha256(json.dumps([finding["row"], objs, state], sort_keys=True).encode()).hexdigest()
+    objs = sorted(finding.get("objects") or [])
+    state = [(o.seq, o.tool) for o in record.obs if set(objs) & (set(o.objects) | set(o.written) | set(o.created))]
+    if "predicate" in finding:
+        state = getattr(record, "events", state)
+    key = hashlib.sha256(json.dumps([finding["row"], objs, state]).encode()).hexdigest()
     return (None, None) if key in keys else (finding, key)
 
 def d_out(event, finding):                       # D_out: finding? -> hook JSON (two outputs only)
@@ -89,14 +80,31 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
     ev = d_in(raw)
     if ev is None:
         return {}
-    name = ev["hook_event_name"]
+    # Dispatch is a workspace contract; invalid or absent declarations are off.
+    try:
+        with open(os.path.join(ev.get("cwd") or os.getcwd(), "makoto.toml"), "rb") as fh:
+            declaration = tomllib.load(fh)
+            config["dispatch"] = declaration.get("dispatch") is True
+            tables = declaration.get("named_sets", {})
+            if isinstance(tables, dict):
+                config["named_sets"] = {k: v for k, v in tables.items()
+                                        if isinstance(v, list) and all(isinstance(x, str) for x in v)}
+    except (OSError, ValueError):
+        config["dispatch"] = False
+        config["named_sets"] = {}
     path = sigma_path(config["state_dir"], ev.get("session_id", ""))
     events, keys = sigma_read(path)
-    record = record_fn(events + ([ev] if name in SETTLED else []))
-    finding, key = None, None
-    if name in ("PreToolUse", "Stop", "SubagentStop"):
-        finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
-    if name in SETTLED + TURN_MARKS:
+    record = record_fn(events + ([ev] if ev.get("hook_event_name") in SETTLED else []))
+    if config["dispatch"]:
+        config["dispatch_background"] = {i for i, e in enumerate(events)
+                                         if isinstance(e.get("tool_response"), dict)
+                                         and e["tool_response"].get("backgroundTaskId")}
+        record.dispatch_briefs = [(i, e) for i, e in enumerate(events)
+                                  if e.get("hook_event_name") == "PreToolUse"
+                                  and e.get("tool_name") in ("Agent", "Task")]
+    config["settings"] = {"makoto": {"dispatch": config["dispatch"]}}
+    finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
+    if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
         sigma_append(path, {"event": ev})
     if key:
         sigma_append(path, {"key": key})

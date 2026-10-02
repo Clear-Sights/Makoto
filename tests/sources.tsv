@@ -1,7 +1,7 @@
 id	found_in	quote
 R01	MEMORY.md@2026-09-30T02:05Z	kept asking him
 R03	MEMORY.md@2026-09-30T02:05Z	many threads at once
-R04	not found in MEMORY.md@2026-09-30T02:05Z or WORDS.tsv; quote as written in rows.tsv	re-briefed a thread four times in minutes
+R04	REGISTRY-v9.md:990 I1	event.unbriefed_dispatch
 R05	not found in MEMORY.md@2026-09-30T02:05Z or WORDS.tsv; quote as written in rows.tsv	then said narrowers were never applied without checking (23:27Z)
 R06	MEMORY.md@2026-09-30T02:05Z	Stated thread claims as fact
 R07	WORDS.tsv@9134 b9dca38a1269	I didn't say that we should focus on API
@@ -10,5 +10,5 @@ R09	not found in MEMORY.md@2026-09-30T02:05Z or WORDS.tsv; quote as written in r
 R10	MEMORY.md@2026-09-30T02:05Z	Predict failures up front.
 R11	not found in MEMORY.md@2026-09-30T02:05Z or WORDS.tsv; quote as written in rows.tsv	told him an in-progress step as landed (22:35Z)
 R12	MEMORY.md@2026-09-30T02:05Z	claimed before checking
-R13	MEMORY.md@2026-09-30T02:05Z	Nothing done before may cost a token again.
+R13	REGISTRY-v9.md:126 A11	count distinct content, not records
 R14	REPORT.md step6 C16	Enabled-arm exposure is not observable

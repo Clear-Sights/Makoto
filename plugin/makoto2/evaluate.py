@@ -17,6 +17,9 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from makoto2.lineage import unpaid as lineage_unpaid
+from makoto2 import family_spec, family_lineage, family_switch
+from makoto2.family_other import findings as other_findings
 from typing import Optional
 
 
@@ -135,15 +138,47 @@ def _acts(args):
 def evaluate(rows, record, event) -> Optional[dict]:
     """First row whose moment matches the event and has an unpaid subject -> block; else None."""
     moment = event.get("hook_event_name", "")
+    cfg = rows[0].get("cfg", {}) if rows else {}
+    for finding in family_spec.evaluate(record, event, cfg):
+        return finding
+    if moment in ("PreToolUse", "Stop", "SubagentStop"):
+        if family_lineage.lineage_absence(record, event, _R):
+            return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
+        for predicate, row, citation in (
+            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:495,782 F2/H3"),
+            (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
+        ):
+            subjects = predicate(record, event, _R)
+            if subjects:
+                return {"row": row, "message": citation, "objects": subjects}
+        for state, name in lineage_unpaid(record, event, _R):
+            return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
+    cfg = rows[0].get("cfg", {}) if rows else {}
+    for finding in other_findings(record, event, _R, cfg.get("dispatch", False)):
+        return finding
+    for finding in family_switch.findings(record,event,cfg):
+        return finding
     for row in rows:
         if moment not in row["moment"].split(","):
             continue
         args, cfg = row.get("args") or {}, row.get("cfg") or {}
+        if row["id"] in ("R05", "R07", "R12"):
+            continue
         acts = _acts(args)
-        if acts and not (acts & _R.act_kinds(event)):
+        dispatch_brief = (cfg.get("dispatch") and moment == "PreToolUse"
+                          and event.get("tool_name") in ("Agent", "Task")
+                          and row["id"] in DISPATCH_SPECS)
+        if acts and not (acts & _R.act_kinds(event)) and not dispatch_brief:
+            continue
+        if row["id"] == "R08" and not dispatch_brief:
             continue
         spec = PREDICATES[row["predicate"]]
+        if dispatch_brief:
+            spec = DISPATCH_SPECS.get(row["id"], spec)
         subjects = spec.owes(args, cfg, record, event)
+        if row["id"] == "R11" and moment == "Stop":
+            subjects = [s for s in subjects if s[2] in ("acceptance", "artifact", "status")
+                        or s[0] not in ("shipped", "pushed", "landed", "merged", "done", "fixed", "finished", "complete", "completed", "ready", "failed") ]
         if not subjects:
             continue
         paid = spec.seed(args, cfg, record) if spec.seed else ()
@@ -163,6 +198,40 @@ def evaluate(rows, record, event) -> Optional[dict]:
 class Spec:
     def __init__(self, owes, pays=None, seed=None, why=""):
         self.owes, self.pays, self.seed, self.why = owes, pays, seed, why
+
+
+# Filled labels and path-attached pins reuse the dispatch grammar from 648f876.
+def _brief_fields(event):
+    prompt = (event.get("tool_input") or {}).get("prompt", "")
+    fields = {k: [] for k in ("READ", "WRITE", "ACCEPTANCE")}
+    if not isinstance(prompt, str):
+        return fields
+    label = None
+    for line in prompt.splitlines():
+        match = re.match(r"^(READ|WRITE|ACCEPTANCE):[ \t]*(.*)$", line)
+        if match:
+            label = match[1]
+            if match[2].strip():
+                fields[label].append(match[2].strip())
+        elif label == "READ" and line.strip():
+            fields[label].append(line.strip())
+    return fields
+
+
+def dispatch_schema_owes(args, cfg, record, event):
+    if not cfg.get("dispatch") or event.get("tool_name") not in ("Agent", "Task"):
+        return []
+    return [k for k, values in _brief_fields(event).items() if not values]
+
+
+def dispatch_pins_owes(args, cfg, record, event):
+    return family_lineage.lineage_pin(args, cfg, record, event)
+
+
+DISPATCH_SPECS = {
+    "R04": Spec(dispatch_schema_owes, why="dispatch brief lacks a filled field"),
+    "R08": Spec(dispatch_pins_owes, why="declared READ input lacks its revision pin"),
+}
 
 
 # ---------- shared readings ----------
@@ -410,52 +479,6 @@ def read_pays(args, cfg, o):
     return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
 
 
-def denied_owes(args, cfg, record, event):
-    last = _last_same_call(record, event)
-    return [last.seq] if last is not None and _denied(last) else []
-
-
-def ran_after_pays(args, cfg, o):
-    return None if o.failed else (lambda seq: o.seq > seq)
-
-
-_UNIT = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}   # seconds per unit (a unit table, not a limit)
-_TIMEOUT_RX = re.compile(r"\btimeout\s+(?:-[-\w]+(?:[= ]\S+)?\s+)*(\d+(?:\.\d+)?)([smhd]?)\b")
-_SLEEP_RX = re.compile(r"\bsleep(?:\s+|\(\s*)(\d+(?:\.\d+)?)([smhd]?)\b")   # shell sleep N, code sleep(N)
-# a time budget written as a setting inside the command: timeout=N, timeout: N, --timeout N, --timeout=N (seconds)
-_SETTING_TIMEOUT_RX = re.compile(r"(?:\b|--)timeout\s*(?:=|:|(?<=--timeout)\s)\s*(\d+(?:\.\d+)?)([smhd]?)\b")
-_FOR_SEQ_RX = re.compile(r"\bfor\s+\w+\s+in\s+(?:\$\(seq\s+(?:(\d+)\s+)?(\d+)\)|\{(\d+)\.\.(\d+)\})[^;]*;\s*do\b(.*?)\bdone\b", re.S)
-_WHILE_RX = re.compile(r"\b(?:while|until)\b.*?\bdo\b(.*?)\bdone\b", re.S)
-
-
-def _ms(n, unit) -> float:
-    return float(n) * _UNIT[unit] * 1000
-
-
-def _sleep_ms(chunk: str) -> float:
-    return sum(_ms(n, u) for n, u in _SLEEP_RX.findall(chunk))
-
-
-def budget_owes(args, cfg, record, event):
-    ti = event.get("tool_input") or {}
-    if ti.get("run_in_background"):
-        return []
-    cmd = str(ti.get("command", ""))
-    limit = float(ti.get("timeout") or cfg["default_tool_timeout_ms"])
-    timeouts = [_ms(n, u) for rx in (_TIMEOUT_RX, _SETTING_TIMEOUT_RX) for n, u in rx.findall(cmd)]
-    rest, looped = cmd, 0.0
-    for m in _FOR_SEQ_RX.finditer(cmd):
-        a, b = (m.group(1) or "1", m.group(2)) if m.group(2) else (m.group(3), m.group(4))
-        looped += max(0, int(b) - int(a) + 1) * _sleep_ms(m.group(5))
-        rest = rest.replace(m.group(0), " ")
-    unbounded = any(_SLEEP_RX.search(m.group(1)) for m in _WHILE_RX.finditer(rest))
-    if unbounded and not timeouts:
-        return [f"unbounded wait loop inside a {int(limit)} ms call"]
-    rest = _WHILE_RX.sub(" ", rest) if unbounded else rest
-    inner = max(timeouts) if unbounded else max([looped + _sleep_ms(rest)] + timeouts)
-    return [f"inner budget {int(inner)} ms > call limit {int(limit)} ms"] if inner > limit else []
-
-
 _LANDED = {
     "merged": re.compile(r"\bmerged\b", re.I),
     "landed": re.compile(r"\bmerged\b|\blanded\b|\b[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}\b", re.I),
@@ -478,8 +501,74 @@ def _subject_words(text):
         "now", "already", "still", "currently"}
 
 
+
+# Number grammar reused from gate.unnamed_failure (6afe37e); prose counts,
+# unlike runner summaries, can place a subject between number and verdict.
+_FAILURE_UNIT = r"(?:one|two|three|four|five|six|seven|eight|nine)"
+_FAILURE_COUNT = (rf"(?:[1-9]\d*|{_FAILURE_UNIT}|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen"
+                  rf"|(?:twen|thir|for|fif|six|seven|eigh|nine)ty(?:[\s-]{_FAILURE_UNIT})?|(?:a\s+)?dozen|(?:a\s+)?hundred)")
+_FAILURE_SUBJECT = r"(?:tests?|checks?|cases?|specs?|suites?|assertions?|examples?)"
+_FAILURE_VERDICT = r"(?:fail(?:s|ed|ing)?|failures?|errors?|erroring|errored)"
+_FAILURE_REPORT_RX = re.compile(
+    rf"\b{_FAILURE_COUNT}\s+(?:[\w-]+\s+){{0,2}}{_FAILURE_SUBJECT}\s+(?:[\w-]+\s+){{0,2}}{_FAILURE_VERDICT}\b"
+    rf"|\b{_FAILURE_COUNT}\s+{_FAILURE_VERDICT}(?:\s+{_FAILURE_SUBJECT})?\b"
+    rf"|\b(?:{_FAILURE_SUBJECT}\s+)?(?:failures?|errors?|failed)\s*:\s*[1-9]\d*\b", re.I)
+_TEST_OUTCOME_RX = re.compile(
+    r"^\s*(FAILED|PASSED)\s+([\w./-]+::[\w:.-]+(?:\[[^\]\n]+\])?)"
+    r"|^\s*(FAIL|ERROR):\s+(test_\w+)\s+\(([^)]+)\)"
+    r"|^\s*(test_\w+)\s+\(([^)]+)\)\s+\.\.\.\s+(ok|FAIL|ERROR)\b", re.M)
+
+
+def _failed_test_subjects(record):
+    # Reuse the observed shell tokenizer: displaying a log is not running tests.
+    verdicts = {}
+    for o in record.obs:
+        if o.tool != "Bash" or o.failed:
+            continue
+        runners = [argv for argv, _ in _R._segments(str(o.input.get("command", "")))
+                   if argv and (os.path.basename(argv[0]) in ("pytest", "py.test") or
+                       (re.fullmatch(r"python[0-9.]*", os.path.basename(argv[0])) and
+                        tuple(argv[1:3]) in (("-m", "pytest"), ("-m", "unittest"))))]
+        if not runners:
+            continue
+        for m in _TEST_OUTCOME_RX.finditer(o.output):
+            status, node, unit_status, unit_name, unit_class, verbose_name, verbose_class, verbose_status = m.groups()
+            identity = node or (unit_class + "::" + unit_name if unit_name else verbose_class + "::" + verbose_name)
+            verdicts[identity] = (status or unit_status or verbose_status) not in ("PASSED", "ok")
+    return [node for node, failed in verdicts.items() if failed]
+
+
+def _unnamed_failures(record, event, cfg):
+    text = _text_of(event)
+    reports = []
+    for sentence in _sentences(_strip_quoted(text)):
+        if sentence.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(sentence):
+            continue
+        for m in _FAILURE_REPORT_RX.finditer(sentence):
+            if not _NEG_RX.search(sentence[:m.start()][-cfg["negation_window"]:]):
+                reports.append(m)
+    if not reports:
+        return []
+    # Inline code can NAME a failure even though quoted counts are not assertions.
+    tokens = {token.rstrip(".:/-") for token in re.findall(r"[\w./:-]+(?:\[[^\]\n]+\])?", text)}
+    missing = [node for node in _failed_test_subjects(record)
+               if not tokens.intersection({node, node.rsplit("::", 1)[-1].split("[", 1)[0],
+                   os.path.splitext(os.path.basename(node.split("::", 1)[0]))[0]})]
+    return [("failed", frozenset(missing), "failure-report", -1)] if missing else []
+
+
 def landed_owes(args, cfg, record, event):
-    out = []
+    out = _unnamed_failures(record, event, cfg)
+    if cfg.get("dispatch"):
+        claims = [s for s in _sentences(_strip_quoted(_text_of(event)))
+                  if not s.rstrip().endswith("?") and not _SOURCE_NAMED_RX.search(s)
+                  and not _NEG_RX.search(s) and not _PENDING_RX.search(s)
+                  and re.search(r"\b(done|fixed|finished|completed?)\b", s, re.I)]
+        if claims:
+            out.extend(("done", command, "acceptance", seq)
+                       for seq, brief in getattr(record, "dispatch_briefs", ())
+                       for command in _brief_fields(brief)["ACCEPTANCE"])
+
     for s in _sentences(_strip_quoted(_text_of(event))):
         if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
             continue
@@ -535,11 +624,21 @@ def _valid_artifact(o, path):
 
 
 def landed_pays(args, cfg, o):
-    if not _primary(o) or not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
+    if not _primary(o):
         return None
 
     def pays(subject):
         word, names, kind, after = subject
+        if kind == "failure-report":
+            return False
+        if kind == "acceptance":
+            return (o.seq > after and o.tool == "Bash" and o.exit == 0
+                    and o.input.get("command", "").strip() == names
+                    and not o.input.get("run_in_background")
+                    and o.seq not in cfg.get("dispatch_background", ())
+                    and not _PENDING_RX.search(o.output))
+        if not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
+            return False
         if o.seq < after:
             return False
         if kind == "artifact":
@@ -572,41 +671,6 @@ def landed_pays(args, cfg, o):
 
 
 
-_COST_CLAIM_RX = re.compile(
-    r"\b(?:saves?|saved|saving|reduces?|reduced|cuts?|cut|lowers?|lowered)\b"
-    r"\s+(?:(?:the|our|input|output|billed|total|operating|\$?[\d.,]+%?)\s+){0,4}"
-    r"(?:costs?|tokens?|money|bill|spend)\b|"
-    r"\b(?:cost|token|money|bill)\s+savings\b|\benabled savings\b", re.I)
-_COST_NUMBER = r"(?:\$\s*)?\d[\d,]*(?:\.\d+)?(?:e[+-]?\d+)?"
-
-
-def cost_owes(args, cfg, record, event):
-    """A savings assertion must name its accounting scope in the same message.
-
-    Explicit labelled fields keep this an omission check, not a causal oracle.
-    Questions, future measurements and quotations are not asserted savings.
-    An off-arm zero cannot supply an enabled-arm numerator.
-    """
-    text = _strip_quoted(_text_of(event))
-    claims = [s for s in _sentences(text) if _COST_CLAIM_RX.search(s)
-              and not s.rstrip().endswith("?")
-              and not re.search(r"\b(?:will|plan(?:ning)? to|intend to|whether|would|could|might)\b", s, re.I)
-              and not re.search(r"\b(?:does not|doesn't|did not|cannot|can't|no)\s+(?:save|reduce|cut|lower|savings)\b", s, re.I)]
-    if not claims:
-        return []
-    edge = re.search(r"\bdelivery (?:edge|path)\s*:\s*([^;\n.!?]+)", text, re.I)
-    enabled = re.search(r"\b(?:enabled|on)[ -]arm (?:measured )?numerator\s*:\s*"
-                        + _COST_NUMBER + r"\s*(?:tokens?|USD|dollars?)?", text, re.I)
-    bill = re.search(r"\bbill denominator\s*:\s*(" + _COST_NUMBER + r")", text, re.I)
-    denominator = float(bill[1].replace("$", "").replace(",", "").replace(" ", "")) if bill else 0
-    off_zero = any(re.search(r"\boff[ -]arm\b[^.!?\n]*(?:\bzero\b|(?<![\d.])0(?![\d.]))", s, re.I)
-                   for s in claims)
-    if (not edge or edge[1].strip().lower() in {"none", "unknown", "unobserved", "n/a"}
-            or not enabled or denominator <= 0 or off_zero):
-        return claims
-    return []
-
-
 def count_owes(args, cfg, record, event):
     rx = re.compile(
         r"(?<![\w.])(\d+)\s+(?:[A-Za-z\-]+\s+){0,%d}?(?:in|of|from|at|under|across)\s+`?"
@@ -615,21 +679,24 @@ def count_owes(args, cfg, record, event):
 
 
 def repeat_owes(args, cfg, record, event):
-    last = _last_same_call(record, event)
-    if last is None or _denied(last) or not str(last.output).strip():
+    if event.get("tool_name") != "Bash":
         return []
-    return [last.seq] if last.seq >= (getattr(record, "turn_start", 0) or 0) else []
+    command = (event.get("tool_input") or {}).get("command")
+    last = next((o for o in reversed(record.obs) if o.tool == "Bash"
+                 and o.input.get("command") == command), None)
+    if last is None or last.exit is None:
+        return []
+    if last.exit == 0 and ">>" not in str(command):
+        return []
+    return [last.seq]
 
 
 def wrote_pays(args, cfg, o):
-    return (lambda seq: o.seq > seq) if (o.written or o.created) else None
+    return (lambda seq: o.seq > seq) if o.tool in ("Write", "Edit") else None
 
 
 PREDICATES = {
-    "cost_unaccounted": Spec(cost_owes, why="savings need a delivery edge, enabled-arm numerator and bill denominator; off-arm zero is not enabled savings"),
-    "asks_user": Spec(asks_owes, why="asks the user; threads pick a default and state it"),
-    "second_thread_this_turn": Spec(thread_owes, why="a thread was already started this turn; one at a time"),
-    "note_pile": Spec(pile_owes, pile_pays, why="a note to this thread is still unanswered; read its reply first"),
+    "dispatch_schema": Spec(dispatch_schema_owes, why="dispatch fields required by I1"),
     "absence_unsearched": Spec(absence_owes, absence_pays,
                                why="claims absence with no empty search whose scope covers it"),
     "relayed_number": Spec(number_owes, number_pays,
@@ -637,10 +704,8 @@ PREDICATES = {
     "user_quote": Spec(quote_owes, quote_pays, quote_seed,
                        why="quotes the user with words no observed user message or WORDS.tsv holds"),
     "write_unread_paths": Spec(write_owes, read_pays, why="writes about paths none of which was read"),
-    "denied_retry": Spec(denied_owes, ran_after_pays, why="resends a denied call unchanged with nothing run since"),
-    "budget_exceeds_limit": Spec(budget_owes, why="the inner wait outlives the tool call's own limit"),
     "landed_unobserved": Spec(landed_owes, landed_pays,
-                              why="claims landed/merged/passed with no status read or run output carrying it"),
+                              why="claims an outcome without its observed status or counted failing subjects"),
     "count_unread_path": Spec(count_owes, read_pays, why="gives a count for a path never read"),
-    "exact_repeat": Spec(repeat_owes, wrote_pays, why="repeats a settled call with nothing written since"),
+    "exact_repeat": Spec(repeat_owes, wrote_pays, why="replays an append or retries a failed command without an intervening edit"),
 }
