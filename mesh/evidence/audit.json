@@ -1,0 +1,1088 @@
+{
+  "task": "audit",
+  "requirement": "audit",
+  "candidate_status": "OPEN",
+  "selected_input_digest": "cc7f56fbb86eb28ce127650beee8589d94479923ecb3134c0061b9a86d598cfd",
+  "source_pins": {
+    ".claude-plugin/marketplace.json": "7f5d45d0d85812a3e10f37f4ea56291a35916c48d8624a31962efaa19eae27f0",
+    ".claude/settings.json": "2c456c1611635bdc8090b56e2e2e84736289ac28de0ecc09dcfee1f5820aa7e7",
+    ".gitattributes": "1ea362e53196685d8c89e2bbe3384b386e71933598463639ef7cfcf6d54d2307",
+    ".github/workflows/ci.yml": "3b175343c15e60e88de4fe551b6363aaf41bcd803b7f392b236b4d55e1018f7a",
+    ".github/workflows/release.yml": "d7efb591dbfb4faafb9497ac28c16d346f33025923571ae5e595bc829179a258",
+    ".gitignore": "38daef4bb18f57be6bce97a066bc57e04d8c5151205d59beccdca77ccc184222",
+    "HANDOFF.md": "908e4bfa794c5a85f0221b54b936bbed8a9be9edae90984d5e241797bdabdfff",
+    "LACKS.md": "814d60f6a7f136d8b66083f0246240aba3ebe3c0a28842af295ef392f99f44e6",
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "MESH.tsv": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
+    "PLAN.md": "528bb48f7ad4c47217858cecb9707d6fa8de80f106d4d1f8ae4f0ef3b70fb0be",
+    "README.md": "f478a0f0fe60388b883d8733a9fadfb063843e2a31ba847e9695bfb1c8d642d1",
+    "SPIRIT.md": "29e335fadfdfc4ff20c5bac2826dbde47748614dada1ea915dd0476f656cc664",
+    "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+    "WORDS.tsv": "98785feda250eaaa157b32ffcf69da26ded6f3a0ef36ae024bf88bec1d5bfe1a",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
+    "mesh/FILLS.tsv": "f13042c5de69b4c680d0cfde2e45ab913a822a3611e68e4dfa2ae7ff330b8d79",
+    "mesh/PREDICTIONS.tsv": "99f00e09f6eee61c7d3de78ab6cffc3c048090a0094844d2ef8bb422e8a8d8fa",
+    "mesh/README.md": "19a14cf6d9de96536fcd7617c8c375b40cb6d2992cf5ff3bb8330e8cfbdc8f8c",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+    "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+    "mesh/SUBTRACT-KEPT.tsv": "7cdaa3c4b253634c984698cdb5cabd01f8b02a4c9afeeedb6f0ec7653ba92233",
+    "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
+    "mesh/TIGHTEN.tsv": "b7e53a125191f96748549b6bf2ccf660eca4fa9f7ed89848226d27c7f49b3408",
+    "mesh/TRACE.tsv": "47555d899e2e3e6f56ca9914481b5809139580ac1f4c9fd60f4fd8046b496360",
+    "mesh/WIRE-RULE.tsv": "662666537431cbb7b52bcf75d371205e8693c3d5482b4607450a2a928c601e1d",
+    "mesh/WIRES.tsv": "eb5fdb9daad0e71f796906759732bf251c405a52ddb237bfcc9bfaac000d4040",
+    "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+    "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
+    "mesh/evidence/configure.json": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
+    "mesh/evidence/decode.json": "82f19e09788d858b61a969c4ba7217b2999dbbc8026648427aaf89338bb1d360",
+    "mesh/evidence/emit.json": "40e7923187e76c9c75639b271a2ee8a08abf88e564ccc52724230c0b804b1f32",
+    "mesh/evidence/evaluate.json": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
+    "mesh/evidence/observe.json": "8856de778b4ebdc4ba47130e2ae96ce87c3b9f73ac44d726e73359cdf24687c1",
+    "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
+    "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
+    "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
+    "mesh/evidence/register-proposal.md": "0261cd5cde7e503c3a29f8416940e65dae7724f23e929d9d9116a418ad4b2071",
+    "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
+    "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
+    "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
+    "mesh/plants.py": "d4284ac864a063edab96162429128d11ca0ac613511def22ffa648cc6567c2a8",
+    "mesh/reference/COMPONENTS.tsv": "6ef6c53f9cc3823e074bc06048c8e86e0c86e8e22161aba6a351832f93d4ef34",
+    "mesh/reference/DOMAINS.tsv": "ff4d7012d3c08920feaf26693c9ad8727494c40408420301a7eb1d22ccc55fd3",
+    "mesh/reference/README.md": "f08184daec2ab1357595c8ceef98add659bf85fb119006ed3e9bdccb2684b1f8",
+    "mesh/reference/REQUIREMENTS.tsv": "05062e3ef0ca071430213aafb0742534c23adcd198a529b4538eddc96c9532c1",
+    "mesh/reference/SLOTS.tsv": "c21fa292fe8e9245d223eb8078b7c6c5af2e5f45538f355b976b84c1a3be73f0",
+    "mesh/reference/TIGHTEN.log": "a5515698b23048299d8a523a551ebc6babd7492e0276047c88f0bdf3141ebdb3",
+    "mesh/reference/WIRES.tsv": "6eda116de8d80d0c7093a630e2319fd157ad80349222d56d67a6b9631ae33424",
+    "mesh/reference/check.py": "91774c0be80f53f62b57e7e55cbfd45519be561b8ddff977d972770b98671ba6",
+    "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+    "mesh/reference/plants.py": "c478debd189e628fe0787c7b1bc3d6c0e45df23c12e7ff339ca85abe08d93c3f",
+    "mesh/reference/seed.py": "4b1154a889895be6e442d37c625da4a2a3a5d182afc5497a783066a2b6ffafd1",
+    "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
+    "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
+    "mesh/seed.py": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+    "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+    "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
+    "plugin/.claude-plugin/plugin.json": "59affe1e1d20110d2228770dff105d3dba0eacb2434b0da04166ee8e5a4a5d7f",
+    "plugin/hooks/hooks.json": "179cd6b734a14ec78f8d6ccdd5fec5a96c2676162f385bcf5801ad7a82b03eea",
+    "plugin/makoto2/CONFIG_KEYS.txt": "2e05012a7621564f4e5792f3f8e5087a328bb587b74f21bf2c5265069c919b07",
+    "plugin/makoto2/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "plugin/makoto2/__main__.py": "86cf1bd51906ab908f600522c98d9b9819357b93a4533dd23f57e34295d4913f",
+    "plugin/makoto2/config.json": "989509b9551c6cb30d15442e0a5b300a23fecf0c82fde3fe98f76b277e9ab6d1",
+    "plugin/makoto2/evaluate.py": "51f64ed126a0d7a9aa89c106cd5ddd41ca10e994573f74044100a3bd941beb0d",
+    "plugin/makoto2/hook.py": "f8bc72d932298d2d799d7e667bb6123896ca15fe276abf13e1318e4ee758095a",
+    "plugin/makoto2/observed.py": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+    "plugin/makoto2/rows.tsv": "9da5bf457fd25ffa53d89c3c68e4e0145a921366a311c281ddadd15f3fb789b5",
+    "tests/sources.tsv": "d0eb5f91de6a443da2bef3f05c4bdebde7c8b07a57a0f272117490f4c27a3ada",
+    "tests/test_evaluate.py": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+    "tests/test_hook.py": "bd9e9e65b3b1f142c9a63066187aa17e0b2a9a1e2f09c8201277508e26d4e3f5",
+    "tests/test_observed.py": "9839541828c03ed95fcb0f9b2a9ccb92d1c0bc9bcf92c7d08de5f9ed45d9e90b"
+  },
+  "digest_method": "SHA-256 of UTF-8 canonical source_pins JSON (sorted keys, compact separators, ensure_ascii=False)",
+  "scope": "Every accessible current file including hidden, untracked and ignored content. Root .git/history excluded. Audit output excluded from self-pins to avoid recursive hashing. Narrow local scanners and explicit documentation review are bounded observations, not a complete semantic content certificate.",
+  "inventory": [
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "sha256": "7f5d45d0d85812a3e10f37f4ea56291a35916c48d8624a31962efaa19eae27f0",
+      "bytes": 596,
+      "classification": "untracked"
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "2c456c1611635bdc8090b56e2e2e84736289ac28de0ecc09dcfee1f5820aa7e7",
+      "bytes": 123,
+      "classification": "untracked"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "1ea362e53196685d8c89e2bbe3384b386e71933598463639ef7cfcf6d54d2307",
+      "bytes": 122,
+      "classification": "untracked"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "3b175343c15e60e88de4fe551b6363aaf41bcd803b7f392b236b4d55e1018f7a",
+      "bytes": 1654,
+      "classification": "untracked"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "d7efb591dbfb4faafb9497ac28c16d346f33025923571ae5e595bc829179a258",
+      "bytes": 1376,
+      "classification": "untracked"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "38daef4bb18f57be6bce97a066bc57e04d8c5151205d59beccdca77ccc184222",
+      "bytes": 272,
+      "classification": "untracked"
+    },
+    {
+      "path": "HANDOFF.md",
+      "sha256": "908e4bfa794c5a85f0221b54b936bbed8a9be9edae90984d5e241797bdabdfff",
+      "bytes": 4560,
+      "classification": "untracked"
+    },
+    {
+      "path": "LACKS.md",
+      "sha256": "814d60f6a7f136d8b66083f0246240aba3ebe3c0a28842af295ef392f99f44e6",
+      "bytes": 3035,
+      "classification": "untracked"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "classification": "untracked"
+    },
+    {
+      "path": "MESH.tsv",
+      "sha256": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
+      "bytes": 3236,
+      "classification": "untracked"
+    },
+    {
+      "path": "PLAN.md",
+      "sha256": "528bb48f7ad4c47217858cecb9707d6fa8de80f106d4d1f8ae4f0ef3b70fb0be",
+      "bytes": 3981,
+      "classification": "untracked"
+    },
+    {
+      "path": "README.md",
+      "sha256": "f478a0f0fe60388b883d8733a9fadfb063843e2a31ba847e9695bfb1c8d642d1",
+      "bytes": 3324,
+      "classification": "untracked"
+    },
+    {
+      "path": "SPIRIT.md",
+      "sha256": "29e335fadfdfc4ff20c5bac2826dbde47748614dada1ea915dd0476f656cc664",
+      "bytes": 9641,
+      "classification": "untracked"
+    },
+    {
+      "path": "TASKS.tsv",
+      "sha256": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+      "bytes": 9364,
+      "classification": "untracked"
+    },
+    {
+      "path": "WORDS.tsv",
+      "sha256": "98785feda250eaaa157b32ffcf69da26ded6f3a0ef36ae024bf88bec1d5bfe1a",
+      "bytes": 1182,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/CONSTRAINTS.tsv",
+      "sha256": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+      "bytes": 10634,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/COSTS.tsv",
+      "sha256": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
+      "bytes": 677,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/FILLS.tsv",
+      "sha256": "f13042c5de69b4c680d0cfde2e45ab913a822a3611e68e4dfa2ae7ff330b8d79",
+      "bytes": 26309,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/PREDICTIONS.tsv",
+      "sha256": "99f00e09f6eee61c7d3de78ab6cffc3c048090a0094844d2ef8bb422e8a8d8fa",
+      "bytes": 785,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/README.md",
+      "sha256": "19a14cf6d9de96536fcd7617c8c375b40cb6d2992cf5ff3bb8330e8cfbdc8f8c",
+      "bytes": 6253,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/REQUIREMENTS.tsv",
+      "sha256": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+      "bytes": 18908,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/SLOTS.tsv",
+      "sha256": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+      "bytes": 8495,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/SOURCES.tsv",
+      "sha256": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+      "bytes": 261,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/SUBTRACT-KEPT.tsv",
+      "sha256": "7cdaa3c4b253634c984698cdb5cabd01f8b02a4c9afeeedb6f0ec7653ba92233",
+      "bytes": 1326,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/SUBTRACT.tsv",
+      "sha256": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
+      "bytes": 2047,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/TIGHTEN.tsv",
+      "sha256": "b7e53a125191f96748549b6bf2ccf660eca4fa9f7ed89848226d27c7f49b3408",
+      "bytes": 22177,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/TRACE.tsv",
+      "sha256": "47555d899e2e3e6f56ca9914481b5809139580ac1f4c9fd60f4fd8046b496360",
+      "bytes": 1837,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/WIRE-RULE.tsv",
+      "sha256": "662666537431cbb7b52bcf75d371205e8693c3d5482b4607450a2a928c601e1d",
+      "bytes": 2512,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/WIRES.tsv",
+      "sha256": "eb5fdb9daad0e71f796906759732bf251c405a52ddb237bfcc9bfaac000d4040",
+      "bytes": 2039,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/check.py",
+      "sha256": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+      "bytes": 18006,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/advance.json",
+      "sha256": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
+      "bytes": 32560,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/configure.json",
+      "sha256": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
+      "bytes": 6876,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/decode.json",
+      "sha256": "82f19e09788d858b61a969c4ba7217b2999dbbc8026648427aaf89338bb1d360",
+      "bytes": 17155,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/emit.json",
+      "sha256": "40e7923187e76c9c75639b271a2ee8a08abf88e564ccc52724230c0b804b1f32",
+      "bytes": 17756,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/evaluate.json",
+      "sha256": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
+      "bytes": 394021,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/observe.json",
+      "sha256": "8856de778b4ebdc4ba47130e2ae96ce87c3b9f73ac44d726e73359cdf24687c1",
+      "bytes": 36245,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/once.json",
+      "sha256": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
+      "bytes": 41117,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/package.json",
+      "sha256": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
+      "bytes": 67351,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/persist.json",
+      "sha256": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
+      "bytes": 14785,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/register-proposal.md",
+      "sha256": "0261cd5cde7e503c3a29f8416940e65dae7724f23e929d9d9116a418ad4b2071",
+      "bytes": 1839,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/register.json",
+      "sha256": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
+      "bytes": 4528,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/rules.json",
+      "sha256": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
+      "bytes": 18535,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/evidence/validate.json",
+      "sha256": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
+      "bytes": 5170,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/plants.py",
+      "sha256": "d4284ac864a063edab96162429128d11ca0ac613511def22ffa648cc6567c2a8",
+      "bytes": 4164,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/COMPONENTS.tsv",
+      "sha256": "6ef6c53f9cc3823e074bc06048c8e86e0c86e8e22161aba6a351832f93d4ef34",
+      "bytes": 33946,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/DOMAINS.tsv",
+      "sha256": "ff4d7012d3c08920feaf26693c9ad8727494c40408420301a7eb1d22ccc55fd3",
+      "bytes": 17,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/README.md",
+      "sha256": "f08184daec2ab1357595c8ceef98add659bf85fb119006ed3e9bdccb2684b1f8",
+      "bytes": 3236,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/REQUIREMENTS.tsv",
+      "sha256": "05062e3ef0ca071430213aafb0742534c23adcd198a529b4538eddc96c9532c1",
+      "bytes": 1391,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/SLOTS.tsv",
+      "sha256": "c21fa292fe8e9245d223eb8078b7c6c5af2e5f45538f355b976b84c1a3be73f0",
+      "bytes": 296677,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/TIGHTEN.log",
+      "sha256": "a5515698b23048299d8a523a551ebc6babd7492e0276047c88f0bdf3141ebdb3",
+      "bytes": 2714,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/WIRES.tsv",
+      "sha256": "6eda116de8d80d0c7093a630e2319fd157ad80349222d56d67a6b9631ae33424",
+      "bytes": 221908,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/check.py",
+      "sha256": "91774c0be80f53f62b57e7e55cbfd45519be561b8ddff977d972770b98671ba6",
+      "bytes": 7176,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/docs-def-README.md",
+      "sha256": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+      "bytes": 3393,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/plants.py",
+      "sha256": "c478debd189e628fe0787c7b1bc3d6c0e45df23c12e7ff339ca85abe08d93c3f",
+      "bytes": 4090,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/seed.py",
+      "sha256": "4b1154a889895be6e442d37c625da4a2a3a5d182afc5497a783066a2b6ffafd1",
+      "bytes": 8326,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/reference/types.py",
+      "sha256": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
+      "bytes": 9405,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/route_preflight.py",
+      "sha256": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
+      "bytes": 1386,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/seed.py",
+      "sha256": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+      "bytes": 10398,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/tighten.py",
+      "sha256": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+      "bytes": 3810,
+      "classification": "untracked"
+    },
+    {
+      "path": "mesh/wire_rule.py",
+      "sha256": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
+      "bytes": 3578,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/.claude-plugin/plugin.json",
+      "sha256": "59affe1e1d20110d2228770dff105d3dba0eacb2434b0da04166ee8e5a4a5d7f",
+      "bytes": 505,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/hooks/hooks.json",
+      "sha256": "179cd6b734a14ec78f8d6ccdd5fec5a96c2676162f385bcf5801ad7a82b03eea",
+      "bytes": 1321,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/CONFIG_KEYS.txt",
+      "sha256": "2e05012a7621564f4e5792f3f8e5087a328bb587b74f21bf2c5265069c919b07",
+      "bytes": 704,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/__main__.py",
+      "sha256": "86cf1bd51906ab908f600522c98d9b9819357b93a4533dd23f57e34295d4913f",
+      "bytes": 699,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/config.json",
+      "sha256": "989509b9551c6cb30d15442e0a5b300a23fecf0c82fde3fe98f76b277e9ab6d1",
+      "bytes": 231,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/evaluate.py",
+      "sha256": "51f64ed126a0d7a9aa89c106cd5ddd41ca10e994573f74044100a3bd941beb0d",
+      "bytes": 28836,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/hook.py",
+      "sha256": "f8bc72d932298d2d799d7e667bb6123896ca15fe276abf13e1318e4ee758095a",
+      "bytes": 4661,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/observed.py",
+      "sha256": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+      "bytes": 26177,
+      "classification": "untracked"
+    },
+    {
+      "path": "plugin/makoto2/rows.tsv",
+      "sha256": "9da5bf457fd25ffa53d89c3c68e4e0145a921366a311c281ddadd15f3fb789b5",
+      "bytes": 1600,
+      "classification": "untracked"
+    },
+    {
+      "path": "tests/sources.tsv",
+      "sha256": "d0eb5f91de6a443da2bef3f05c4bdebde7c8b07a57a0f272117490f4c27a3ada",
+      "bytes": 1130,
+      "classification": "untracked"
+    },
+    {
+      "path": "tests/test_evaluate.py",
+      "sha256": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+      "bytes": 10815,
+      "classification": "untracked"
+    },
+    {
+      "path": "tests/test_hook.py",
+      "sha256": "bd9e9e65b3b1f142c9a63066187aa17e0b2a9a1e2f09c8201277508e26d4e3f5",
+      "bytes": 10704,
+      "classification": "untracked"
+    },
+    {
+      "path": "tests/test_observed.py",
+      "sha256": "9839541828c03ed95fcb0f9b2a9ccb92d1c0bc9bcf92c7d08de5f9ed45d9e90b",
+      "bytes": 10960,
+      "classification": "untracked"
+    }
+  ],
+  "inventory_issues": [],
+  "observations": [
+    {
+      "case": "planted synthetic credential is rejected",
+      "relation": null,
+      "observed": true,
+      "expected": true,
+      "result": "pass"
+    },
+    {
+      "case": "planted private address is flagged",
+      "relation": null,
+      "observed": true,
+      "expected": true,
+      "result": "pass"
+    },
+    {
+      "case": "benign public project URL passes narrow detector",
+      "relation": null,
+      "observed": [],
+      "expected": [],
+      "result": "pass"
+    },
+    {
+      "case": "changed selected bytes invalidate a receipt",
+      "relation": null,
+      "observed": false,
+      "expected": false,
+      "result": "pass"
+    },
+    {
+      "case": "missing selected file invalidates a receipt",
+      "relation": null,
+      "observed": false,
+      "expected": false,
+      "result": "pass"
+    },
+    {
+      "case": "unpinned receipt is not current",
+      "relation": null,
+      "observed": false,
+      "expected": false,
+      "result": "pass"
+    },
+    {
+      "case": "enumerate current files regardless of Git tracking or ignore status",
+      "relation": "all_current:pinned_audited",
+      "observed": {
+        "files": 74,
+        "tracked": 0,
+        "ignored": 0
+      },
+      "expected": {
+        "files": 74,
+        "tracked": 0,
+        "ignored": 0
+      },
+      "result": "pass"
+    },
+    {
+      "case": "Git history excluded from audit inputs",
+      "relation": "history:excluded",
+      "observed": false,
+      "expected": false,
+      "result": "pass"
+    },
+    {
+      "case": "current narrow credential scan",
+      "relation": "secret:rejected",
+      "observed": [],
+      "expected": [],
+      "result": "pass"
+    },
+    {
+      "case": "current private-address scan",
+      "relation": "private_infra:rejected",
+      "observed": [],
+      "expected": [],
+      "result": "pass"
+    },
+    {
+      "case": "exact byte duplicate review",
+      "groups": [],
+      "result": "absent",
+      "detail": "Exact matches alone do not establish unnecessary duplication; semantic near-duplicates require review."
+    },
+    {
+      "case": "stale current documentation review",
+      "findings": [
+        {
+          "path": "HANDOFF.md",
+          "claim": "manifest 4.0.1 disagrees with README 4.0.0",
+          "assessment": "Current README and manifest are both 4.0.1."
+        },
+        {
+          "path": "LACKS.md",
+          "claim": "All nine MESH citations",
+          "assessment": "Current mesh contains a different task graph and bare citations."
+        },
+        {
+          "path": "LACKS.md",
+          "claim": "No current checks/plants were executed",
+          "assessment": "Current receipts record executed checks; document does not describe the current model."
+        }
+      ],
+      "result": "fail"
+    },
+    {
+      "case": "dead and semantic duplicate content review",
+      "result": "absent",
+      "detail": "Reference code is intentionally retained per mesh/README.md. No complete semantic liveness or redundancy proof is available; absence of exact duplicates does not prove this facet."
+    },
+    {
+      "case": "current upstream receipt audit",
+      "receipts": {
+        "mesh/evidence/advance.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/hook.py",
+            "tests/test_hook.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/configure.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/evaluate.py",
+            "plugin/makoto2/observed.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/decode.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/hook.py",
+            "tests/test_hook.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/emit.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/hook.py",
+            "tests/test_hook.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/evaluate.json": {
+          "result": "pass",
+          "stale_source_pins": [],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": true
+        },
+        "mesh/evidence/observe.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/evaluate.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/once.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/hook.py",
+            "tests/test_hook.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/package.json": {
+          "result": "absent",
+          "stale_source_pins": [],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": true
+        },
+        "mesh/evidence/persist.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "tests/test_hook.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/register.json": {
+          "result": "absent",
+          "stale_source_pins": [],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": true
+        },
+        "mesh/evidence/rules.json": {
+          "result": "pass",
+          "stale_source_pins": [
+            "plugin/makoto2/evaluate.py",
+            "plugin/makoto2/observed.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        },
+        "mesh/evidence/validate.json": {
+          "result": "absent",
+          "stale_source_pins": [
+            "plugin/makoto2/hook.py"
+          ],
+          "missing_source_pins": [],
+          "pins_present": true,
+          "current": false
+        }
+      },
+      "result": "fail"
+    },
+    {
+      "case": "fresh dependency waves match current plan",
+      "relation": null,
+      "observed": true,
+      "expected": true,
+      "result": "pass"
+    },
+    {
+      "case": "specified declarative model checker",
+      "relation": null,
+      "observed": 0,
+      "expected": 0,
+      "result": "pass"
+    },
+    {
+      "case": "actual worktree is clean",
+      "relation": "worktree:clean",
+      "observed": false,
+      "expected": true,
+      "result": "fail"
+    },
+    {
+      "case": "audit input bytes and coverage unchanged during measurement",
+      "relation": null,
+      "observed": {
+        ".claude-plugin/marketplace.json": "7f5d45d0d85812a3e10f37f4ea56291a35916c48d8624a31962efaa19eae27f0",
+        ".claude/settings.json": "2c456c1611635bdc8090b56e2e2e84736289ac28de0ecc09dcfee1f5820aa7e7",
+        ".gitattributes": "1ea362e53196685d8c89e2bbe3384b386e71933598463639ef7cfcf6d54d2307",
+        ".github/workflows/ci.yml": "3b175343c15e60e88de4fe551b6363aaf41bcd803b7f392b236b4d55e1018f7a",
+        ".github/workflows/release.yml": "d7efb591dbfb4faafb9497ac28c16d346f33025923571ae5e595bc829179a258",
+        ".gitignore": "38daef4bb18f57be6bce97a066bc57e04d8c5151205d59beccdca77ccc184222",
+        "HANDOFF.md": "908e4bfa794c5a85f0221b54b936bbed8a9be9edae90984d5e241797bdabdfff",
+        "LACKS.md": "814d60f6a7f136d8b66083f0246240aba3ebe3c0a28842af295ef392f99f44e6",
+        "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "MESH.tsv": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
+        "PLAN.md": "528bb48f7ad4c47217858cecb9707d6fa8de80f106d4d1f8ae4f0ef3b70fb0be",
+        "README.md": "f478a0f0fe60388b883d8733a9fadfb063843e2a31ba847e9695bfb1c8d642d1",
+        "SPIRIT.md": "29e335fadfdfc4ff20c5bac2826dbde47748614dada1ea915dd0476f656cc664",
+        "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+        "WORDS.tsv": "98785feda250eaaa157b32ffcf69da26ded6f3a0ef36ae024bf88bec1d5bfe1a",
+        "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+        "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
+        "mesh/FILLS.tsv": "f13042c5de69b4c680d0cfde2e45ab913a822a3611e68e4dfa2ae7ff330b8d79",
+        "mesh/PREDICTIONS.tsv": "99f00e09f6eee61c7d3de78ab6cffc3c048090a0094844d2ef8bb422e8a8d8fa",
+        "mesh/README.md": "19a14cf6d9de96536fcd7617c8c375b40cb6d2992cf5ff3bb8330e8cfbdc8f8c",
+        "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+        "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+        "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+        "mesh/SUBTRACT-KEPT.tsv": "7cdaa3c4b253634c984698cdb5cabd01f8b02a4c9afeeedb6f0ec7653ba92233",
+        "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
+        "mesh/TIGHTEN.tsv": "b7e53a125191f96748549b6bf2ccf660eca4fa9f7ed89848226d27c7f49b3408",
+        "mesh/TRACE.tsv": "47555d899e2e3e6f56ca9914481b5809139580ac1f4c9fd60f4fd8046b496360",
+        "mesh/WIRE-RULE.tsv": "662666537431cbb7b52bcf75d371205e8693c3d5482b4607450a2a928c601e1d",
+        "mesh/WIRES.tsv": "eb5fdb9daad0e71f796906759732bf251c405a52ddb237bfcc9bfaac000d4040",
+        "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+        "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
+        "mesh/evidence/configure.json": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
+        "mesh/evidence/decode.json": "82f19e09788d858b61a969c4ba7217b2999dbbc8026648427aaf89338bb1d360",
+        "mesh/evidence/emit.json": "40e7923187e76c9c75639b271a2ee8a08abf88e564ccc52724230c0b804b1f32",
+        "mesh/evidence/evaluate.json": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
+        "mesh/evidence/observe.json": "8856de778b4ebdc4ba47130e2ae96ce87c3b9f73ac44d726e73359cdf24687c1",
+        "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
+        "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
+        "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
+        "mesh/evidence/register-proposal.md": "0261cd5cde7e503c3a29f8416940e65dae7724f23e929d9d9116a418ad4b2071",
+        "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
+        "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
+        "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
+        "mesh/plants.py": "d4284ac864a063edab96162429128d11ca0ac613511def22ffa648cc6567c2a8",
+        "mesh/reference/COMPONENTS.tsv": "6ef6c53f9cc3823e074bc06048c8e86e0c86e8e22161aba6a351832f93d4ef34",
+        "mesh/reference/DOMAINS.tsv": "ff4d7012d3c08920feaf26693c9ad8727494c40408420301a7eb1d22ccc55fd3",
+        "mesh/reference/README.md": "f08184daec2ab1357595c8ceef98add659bf85fb119006ed3e9bdccb2684b1f8",
+        "mesh/reference/REQUIREMENTS.tsv": "05062e3ef0ca071430213aafb0742534c23adcd198a529b4538eddc96c9532c1",
+        "mesh/reference/SLOTS.tsv": "c21fa292fe8e9245d223eb8078b7c6c5af2e5f45538f355b976b84c1a3be73f0",
+        "mesh/reference/TIGHTEN.log": "a5515698b23048299d8a523a551ebc6babd7492e0276047c88f0bdf3141ebdb3",
+        "mesh/reference/WIRES.tsv": "6eda116de8d80d0c7093a630e2319fd157ad80349222d56d67a6b9631ae33424",
+        "mesh/reference/check.py": "91774c0be80f53f62b57e7e55cbfd45519be561b8ddff977d972770b98671ba6",
+        "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+        "mesh/reference/plants.py": "c478debd189e628fe0787c7b1bc3d6c0e45df23c12e7ff339ca85abe08d93c3f",
+        "mesh/reference/seed.py": "4b1154a889895be6e442d37c625da4a2a3a5d182afc5497a783066a2b6ffafd1",
+        "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
+        "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
+        "mesh/seed.py": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+        "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+        "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
+        "plugin/.claude-plugin/plugin.json": "59affe1e1d20110d2228770dff105d3dba0eacb2434b0da04166ee8e5a4a5d7f",
+        "plugin/hooks/hooks.json": "179cd6b734a14ec78f8d6ccdd5fec5a96c2676162f385bcf5801ad7a82b03eea",
+        "plugin/makoto2/CONFIG_KEYS.txt": "2e05012a7621564f4e5792f3f8e5087a328bb587b74f21bf2c5265069c919b07",
+        "plugin/makoto2/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "plugin/makoto2/__main__.py": "86cf1bd51906ab908f600522c98d9b9819357b93a4533dd23f57e34295d4913f",
+        "plugin/makoto2/config.json": "989509b9551c6cb30d15442e0a5b300a23fecf0c82fde3fe98f76b277e9ab6d1",
+        "plugin/makoto2/evaluate.py": "51f64ed126a0d7a9aa89c106cd5ddd41ca10e994573f74044100a3bd941beb0d",
+        "plugin/makoto2/hook.py": "f8bc72d932298d2d799d7e667bb6123896ca15fe276abf13e1318e4ee758095a",
+        "plugin/makoto2/observed.py": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+        "plugin/makoto2/rows.tsv": "9da5bf457fd25ffa53d89c3c68e4e0145a921366a311c281ddadd15f3fb789b5",
+        "tests/sources.tsv": "d0eb5f91de6a443da2bef3f05c4bdebde7c8b07a57a0f272117490f4c27a3ada",
+        "tests/test_evaluate.py": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+        "tests/test_hook.py": "bd9e9e65b3b1f142c9a63066187aa17e0b2a9a1e2f09c8201277508e26d4e3f5",
+        "tests/test_observed.py": "9839541828c03ed95fcb0f9b2a9ccb92d1c0bc9bcf92c7d08de5f9ed45d9e90b"
+      },
+      "expected": {
+        ".claude-plugin/marketplace.json": "7f5d45d0d85812a3e10f37f4ea56291a35916c48d8624a31962efaa19eae27f0",
+        ".claude/settings.json": "2c456c1611635bdc8090b56e2e2e84736289ac28de0ecc09dcfee1f5820aa7e7",
+        ".gitattributes": "1ea362e53196685d8c89e2bbe3384b386e71933598463639ef7cfcf6d54d2307",
+        ".github/workflows/ci.yml": "3b175343c15e60e88de4fe551b6363aaf41bcd803b7f392b236b4d55e1018f7a",
+        ".github/workflows/release.yml": "d7efb591dbfb4faafb9497ac28c16d346f33025923571ae5e595bc829179a258",
+        ".gitignore": "38daef4bb18f57be6bce97a066bc57e04d8c5151205d59beccdca77ccc184222",
+        "HANDOFF.md": "908e4bfa794c5a85f0221b54b936bbed8a9be9edae90984d5e241797bdabdfff",
+        "LACKS.md": "814d60f6a7f136d8b66083f0246240aba3ebe3c0a28842af295ef392f99f44e6",
+        "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "MESH.tsv": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
+        "PLAN.md": "528bb48f7ad4c47217858cecb9707d6fa8de80f106d4d1f8ae4f0ef3b70fb0be",
+        "README.md": "f478a0f0fe60388b883d8733a9fadfb063843e2a31ba847e9695bfb1c8d642d1",
+        "SPIRIT.md": "29e335fadfdfc4ff20c5bac2826dbde47748614dada1ea915dd0476f656cc664",
+        "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+        "WORDS.tsv": "98785feda250eaaa157b32ffcf69da26ded6f3a0ef36ae024bf88bec1d5bfe1a",
+        "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+        "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
+        "mesh/FILLS.tsv": "f13042c5de69b4c680d0cfde2e45ab913a822a3611e68e4dfa2ae7ff330b8d79",
+        "mesh/PREDICTIONS.tsv": "99f00e09f6eee61c7d3de78ab6cffc3c048090a0094844d2ef8bb422e8a8d8fa",
+        "mesh/README.md": "19a14cf6d9de96536fcd7617c8c375b40cb6d2992cf5ff3bb8330e8cfbdc8f8c",
+        "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+        "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+        "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+        "mesh/SUBTRACT-KEPT.tsv": "7cdaa3c4b253634c984698cdb5cabd01f8b02a4c9afeeedb6f0ec7653ba92233",
+        "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
+        "mesh/TIGHTEN.tsv": "b7e53a125191f96748549b6bf2ccf660eca4fa9f7ed89848226d27c7f49b3408",
+        "mesh/TRACE.tsv": "47555d899e2e3e6f56ca9914481b5809139580ac1f4c9fd60f4fd8046b496360",
+        "mesh/WIRE-RULE.tsv": "662666537431cbb7b52bcf75d371205e8693c3d5482b4607450a2a928c601e1d",
+        "mesh/WIRES.tsv": "eb5fdb9daad0e71f796906759732bf251c405a52ddb237bfcc9bfaac000d4040",
+        "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+        "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
+        "mesh/evidence/configure.json": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
+        "mesh/evidence/decode.json": "82f19e09788d858b61a969c4ba7217b2999dbbc8026648427aaf89338bb1d360",
+        "mesh/evidence/emit.json": "40e7923187e76c9c75639b271a2ee8a08abf88e564ccc52724230c0b804b1f32",
+        "mesh/evidence/evaluate.json": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
+        "mesh/evidence/observe.json": "8856de778b4ebdc4ba47130e2ae96ce87c3b9f73ac44d726e73359cdf24687c1",
+        "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
+        "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
+        "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
+        "mesh/evidence/register-proposal.md": "0261cd5cde7e503c3a29f8416940e65dae7724f23e929d9d9116a418ad4b2071",
+        "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
+        "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
+        "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
+        "mesh/plants.py": "d4284ac864a063edab96162429128d11ca0ac613511def22ffa648cc6567c2a8",
+        "mesh/reference/COMPONENTS.tsv": "6ef6c53f9cc3823e074bc06048c8e86e0c86e8e22161aba6a351832f93d4ef34",
+        "mesh/reference/DOMAINS.tsv": "ff4d7012d3c08920feaf26693c9ad8727494c40408420301a7eb1d22ccc55fd3",
+        "mesh/reference/README.md": "f08184daec2ab1357595c8ceef98add659bf85fb119006ed3e9bdccb2684b1f8",
+        "mesh/reference/REQUIREMENTS.tsv": "05062e3ef0ca071430213aafb0742534c23adcd198a529b4538eddc96c9532c1",
+        "mesh/reference/SLOTS.tsv": "c21fa292fe8e9245d223eb8078b7c6c5af2e5f45538f355b976b84c1a3be73f0",
+        "mesh/reference/TIGHTEN.log": "a5515698b23048299d8a523a551ebc6babd7492e0276047c88f0bdf3141ebdb3",
+        "mesh/reference/WIRES.tsv": "6eda116de8d80d0c7093a630e2319fd157ad80349222d56d67a6b9631ae33424",
+        "mesh/reference/check.py": "91774c0be80f53f62b57e7e55cbfd45519be561b8ddff977d972770b98671ba6",
+        "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+        "mesh/reference/plants.py": "c478debd189e628fe0787c7b1bc3d6c0e45df23c12e7ff339ca85abe08d93c3f",
+        "mesh/reference/seed.py": "4b1154a889895be6e442d37c625da4a2a3a5d182afc5497a783066a2b6ffafd1",
+        "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
+        "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
+        "mesh/seed.py": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+        "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+        "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
+        "plugin/.claude-plugin/plugin.json": "59affe1e1d20110d2228770dff105d3dba0eacb2434b0da04166ee8e5a4a5d7f",
+        "plugin/hooks/hooks.json": "179cd6b734a14ec78f8d6ccdd5fec5a96c2676162f385bcf5801ad7a82b03eea",
+        "plugin/makoto2/CONFIG_KEYS.txt": "2e05012a7621564f4e5792f3f8e5087a328bb587b74f21bf2c5265069c919b07",
+        "plugin/makoto2/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "plugin/makoto2/__main__.py": "86cf1bd51906ab908f600522c98d9b9819357b93a4533dd23f57e34295d4913f",
+        "plugin/makoto2/config.json": "989509b9551c6cb30d15442e0a5b300a23fecf0c82fde3fe98f76b277e9ab6d1",
+        "plugin/makoto2/evaluate.py": "51f64ed126a0d7a9aa89c106cd5ddd41ca10e994573f74044100a3bd941beb0d",
+        "plugin/makoto2/hook.py": "f8bc72d932298d2d799d7e667bb6123896ca15fe276abf13e1318e4ee758095a",
+        "plugin/makoto2/observed.py": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+        "plugin/makoto2/rows.tsv": "9da5bf457fd25ffa53d89c3c68e4e0145a921366a311c281ddadd15f3fb789b5",
+        "tests/sources.tsv": "d0eb5f91de6a443da2bef3f05c4bdebde7c8b07a57a0f272117490f4c27a3ada",
+        "tests/test_evaluate.py": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+        "tests/test_hook.py": "bd9e9e65b3b1f142c9a63066187aa17e0b2a9a1e2f09c8201277508e26d4e3f5",
+        "tests/test_observed.py": "9839541828c03ed95fcb0f9b2a9ccb92d1c0bc9bcf92c7d08de5f9ed45d9e90b"
+      },
+      "result": "pass"
+    }
+  ],
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "mesh/check.py",
+        "--task",
+        "audit"
+      ],
+      "exit_code": 0,
+      "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+      "stderr": ""
+    }
+  ],
+  "rederived_waves": [
+    {
+      "wave": 1,
+      "tasks": [
+        "subtract"
+      ],
+      "predicted_tokens": 208231
+    },
+    {
+      "wave": 2,
+      "tasks": [
+        "configure",
+        "decode"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 3,
+      "tasks": [
+        "observe",
+        "rules"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 4,
+      "tasks": [
+        "evaluate",
+        "register"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 5,
+      "tasks": [
+        "once"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 6,
+      "tasks": [
+        "advance",
+        "emit"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 7,
+      "tasks": [
+        "persist",
+        "validate"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 8,
+      "tasks": [
+        "package"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 9,
+      "tasks": [
+        "audit",
+        "fresh"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 10,
+      "tasks": [
+        "join"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 11,
+      "tasks": [
+        "handoff"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 12,
+      "tasks": [
+        "zero"
+      ],
+      "predicted_tokens": 593606
+    }
+  ],
+  "present": [
+    "current_content_inventory_pinned",
+    "history:excluded",
+    "local_credential_and_private_address_controls",
+    "stale_and_missing_receipts_rejected",
+    "current_waves_rederived",
+    "declarative_audit_check_passed"
+  ],
+  "absent": [
+    "all_current:pinned_audited:complete_semantic_certificate",
+    "private_infra:complete_review",
+    "dead:rejected",
+    "duplicate:rejected",
+    "worktree:clean",
+    "all_upstream_receipts_current_and_passing",
+    "audit:bound_proof_producer"
+  ],
+  "external": [
+    "Clean committed worktree requires writable Git metadata; supplied .git is read-only.",
+    "Authentic operator, register approval and exact-head CI evidence remain unavailable."
+  ],
+  "failure_policy": "Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL. Local stale content and stale receipts are failures requiring repair, not external evidence.",
+  "result": "fail",
+  "reproduction": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 /tmp/makoto-audit.py",
+    "script": "import csv\nimport hashlib\nimport ipaddress\nimport json\nimport os\nfrom pathlib import Path\nimport re\nimport subprocess\n\nROOT = Path.cwd()\nOUTPUT = 'mesh/evidence/audit.json'\ndef sha(data):\n    return hashlib.sha256(data).hexdigest()\ndef canonical(value):\n    return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()\ndef command(args):\n    p = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})\n    return {'command': args, 'exit_code': p.returncode, 'stdout': p.stdout, 'stderr': p.stderr}\ndef inventory():\n    files = {}\n    issues = []\n    for base, dirs, names in os.walk(ROOT, followlinks=False):\n        dirs.sort()\n        if Path(base) == ROOT and '.git' in dirs:\n            dirs.remove('.git')\n        for name in sorted(names):\n            p = Path(base) / name\n            rel = p.relative_to(ROOT).as_posix()\n            if rel in ('.git', OUTPUT):\n                continue\n            if p.is_symlink():\n                issues.append({'path': rel, 'category': 'symlink_requires_target_review'})\n                files[rel] = os.readlink(p).encode()\n            else:\n                try:\n                    files[rel] = p.read_bytes()\n                except OSError:\n                    issues.append({'path': rel, 'category': 'unreadable_current_file'})\n        for name in dirs[:]:\n            p = Path(base) / name\n            if p.is_symlink():\n                rel = p.relative_to(ROOT).as_posix()\n                files[rel] = os.readlink(p).encode()\n                issues.append({'path': rel, 'category': 'symlink_requires_target_review'})\n                dirs.remove(name)\n    return files, issues\n\n# Findings store locations and categories only, never matched credential bytes.\nSECRET_PATTERNS = [\n    ('private_key', re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----')),\n    ('aws_access_key', re.compile(r'\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b')),\n    ('github_token', re.compile(r'\\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})\\b')),\n    ('assigned_credential', re.compile(r'''(?im)^\\s*[\"']?(?:api_key|access_token|secret_key|password)[\"']?\\s*[:=]\\s*[\"']([^\\s\"']{12,})[\"']''')),\n]\ndef scan(files):\n    findings = []\n    for name, data in sorted(files.items()):\n        text = data.decode('utf-8', errors='replace')\n        for category, pattern in SECRET_PATTERNS:\n            for match in pattern.finditer(text):\n                findings.append({'path': name, 'line': text.count('\\n', 0, match.start()) + 1, 'category': category})\n        for match in re.finditer(r'(?<![\\d.])(?:\\d{1,3}\\.){3}\\d{1,3}(?![\\d.])', text):\n            try:\n                addr = ipaddress.ip_address(match.group())\n            except ValueError:\n                continue\n            if addr.is_private and not addr.is_loopback and not addr.is_unspecified:\n                findings.append({'path': name, 'line': text.count('\\n', 0, match.start()) + 1, 'category': 'private_address_requires_review'})\n    return findings\n\ndef receipt_status(receipt, files):\n    pins = receipt.get('source_pins', {})\n    missing = sorted(n for n in pins if n not in files)\n    stale = sorted(n for n, h in pins.items() if n in files and sha(files[n]) != h)\n    return {'result': receipt.get('result', 'absent'), 'stale_source_pins': stale, 'missing_source_pins': missing, 'pins_present': bool(pins), 'current': bool(pins) and not stale and not missing}\n\nfiles, inventory_issues = inventory()\npins = {n: sha(data) for n, data in sorted(files.items())}\nfindings = scan(files)\nobservations = []\ndef record(case, actual, expected, relation=None):\n    result = 'pass' if actual == expected else 'fail'\n    observations.append({'case': case, 'relation': relation, 'observed': actual, 'expected': expected, 'result': result})\n    return result == 'pass'\n\n# In-memory hostile controls never place credentials or private infrastructure in checkout.\nrecord('planted synthetic credential is rejected', bool(scan({'ignored.env': ('api_key=\"' + 'synthetic_audit_fixture_123456' + '\"').encode()})), True)\nrecord('planted private address is flagged', bool(scan({'private.txt': b'host=10.42.7.9'})), True)\nrecord('benign public project URL passes narrow detector', scan({'url.txt': b'https://github.com/Clear-Sights/Makoto'}), [])\nrecord('changed selected bytes invalidate a receipt', receipt_status({'result': 'pass', 'source_pins': {'x': sha(b'before')}}, {'x': b'after'})['current'], False)\nrecord('missing selected file invalidates a receipt', receipt_status({'result': 'pass', 'source_pins': {'x': sha(b'before')}}, {})['current'], False)\nrecord('unpinned receipt is not current', receipt_status({'result': 'pass'}, files)['current'], False)\n\ntracked_check = command(['git', 'ls-files', '-z'])\nignored_check = command(['git', 'ls-files', '--others', '--ignored', '--exclude-standard', '-z'])\ntracked = set(tracked_check['stdout'].split('\\0')) - {''}\nignored = set(ignored_check['stdout'].split('\\0')) - {''}\nmanifest = [{'path': n, 'sha256': pins[n], 'bytes': len(data), 'classification': 'tracked' if n in tracked else 'ignored' if n in ignored else 'untracked'} for n, data in sorted(files.items())]\nrecord('enumerate current files regardless of Git tracking or ignore status', {'files': len(files), 'tracked': sum(m['classification']=='tracked' for m in manifest), 'ignored': sum(m['classification']=='ignored' for m in manifest)}, {'files': len(files), 'tracked': len(tracked & files.keys()), 'ignored': len(ignored & files.keys())}, 'all_current:pinned_audited')\nrecord('Git history excluded from audit inputs', any(n == '.git' or n.startswith('.git/') for n in files), False, 'history:excluded')\nrecord('current narrow credential scan', [f for f in findings if f['category'] != 'private_address_requires_review'], [], 'secret:rejected')\nrecord('current private-address scan', [f for f in findings if f['category'] == 'private_address_requires_review'], [], 'private_infra:rejected')\n\ngroups = {}\nfor n, h in pins.items():\n    groups.setdefault(h, []).append(n)\nduplicates = [names for names in groups.values() if len(names) > 1]\nobservations.append({'case': 'exact byte duplicate review', 'groups': duplicates, 'result': 'absent', 'detail': 'Exact matches alone do not establish unnecessary duplication; semantic near-duplicates require review.'})\nstale_content = []\nfor name, phrase, reason in [\n    ('HANDOFF.md', 'manifest 4.0.1 disagrees with README 4.0.0', 'Current README and manifest are both 4.0.1.'),\n    ('HANDOFF.md', 'No current checks/plants were executed', 'Retained current receipts record checks; this sentence, if present, is historical.'),\n    ('LACKS.md', 'All nine MESH citations', 'Current mesh contains a different task graph and bare citations.'),\n    ('LACKS.md', 'No current checks/plants were executed', 'Current receipts record executed checks; document does not describe the current model.'),\n]:\n    if phrase in files.get(name, b'').decode(errors='replace'):\n        stale_content.append({'path': name, 'claim': phrase, 'assessment': reason})\nobservations.append({'case': 'stale current documentation review', 'findings': stale_content, 'result': 'fail' if stale_content else 'absent'})\nobservations.append({'case': 'dead and semantic duplicate content review', 'result': 'absent', 'detail': 'Reference code is intentionally retained per mesh/README.md. No complete semantic liveness or redundancy proof is available; absence of exact duplicates does not prove this facet.'})\nreceipts = {n: receipt_status(json.loads(data), files) for n, data in sorted(files.items()) if n.startswith('mesh/evidence/') and n.endswith('.json')}\nobservations.append({'case': 'current upstream receipt audit', 'receipts': receipts, 'result': 'fail' if any(not r['current'] or r['result'] != 'pass' for r in receipts.values()) else 'pass'})\n\nwith (ROOT/'TASKS.tsv').open(newline='') as f:\n    tasks = list(csv.DictReader(f, delimiter='\\t'))\nfinished = set()\ntodo = {t['task']: t for t in tasks}\nwaves = []\nwhile todo:\n    ready = sorted(n for n, t in todo.items() if set(filter(None, t['deps'].split(','))) <= finished)\n    if not ready:\n        raise RuntimeError('dependency cycle or missing task')\n    waves.append({'wave': len(waves)+1, 'tasks': ready, 'predicted_tokens': sum(int(todo[n]['estimate_tokens']) for n in ready)})\n    finished.update(ready)\n    for n in ready:\n        del todo[n]\nrecord('fresh dependency waves match current plan', all(f\"Wave {w['wave']}: {', '.join(w['tasks'])} (predicted {w['predicted_tokens']} tokens)\" in files['PLAN.md'].decode() for w in waves), True)\ncheck = command(['python3', 'mesh/check.py', '--task', 'audit'])\nrecord('specified declarative model checker', check['exit_code'], 0)\n\noutput = {\n    'task': 'audit', 'requirement': 'audit', 'candidate_status': 'OPEN',\n    'selected_input_digest': sha(canonical(pins)), 'source_pins': pins,\n    'digest_method': 'SHA-256 of UTF-8 canonical source_pins JSON (sorted keys, compact separators, ensure_ascii=False)',\n    'scope': 'Every accessible current file including hidden, untracked and ignored content. Root .git/history excluded. Audit output excluded from self-pins to avoid recursive hashing. Narrow local scanners and explicit documentation review are bounded observations, not a complete semantic content certificate.',\n    'inventory': manifest, 'inventory_issues': inventory_issues, 'observations': observations,\n    'checks': [check], 'rederived_waves': waves,\n    'present': ['current_content_inventory_pinned', 'history:excluded', 'local_credential_and_private_address_controls', 'stale_and_missing_receipts_rejected', 'current_waves_rederived', 'declarative_audit_check_passed'],\n    'absent': ['all_current:pinned_audited:complete_semantic_certificate', 'private_infra:complete_review', 'dead:rejected', 'duplicate:rejected', 'worktree:clean', 'all_upstream_receipts_current_and_passing', 'audit:bound_proof_producer'],\n    'external': ['Clean committed worktree requires writable Git metadata; supplied .git is read-only.', 'Authentic operator, register approval and exact-head CI evidence remain unavailable.'],\n    'failure_policy': 'Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL. Local stale content and stale receipts are failures requiring repair, not external evidence.',\n    'result': 'fail',\n    'reproduction': {'command': 'PYTHONDONTWRITEBYTECODE=1 python3 /tmp/makoto-audit.py', 'script': Path(__file__).read_text()},\n}\n# Write the artifact before measuring worktree status, so the observation includes it.\n(ROOT/OUTPUT).write_text(json.dumps(output, indent=2, ensure_ascii=False)+'\\n')\nstatus = command(['git', 'status', '--porcelain=v1', '--untracked-files=all'])\noutput['worktree'] = status\nrecord('actual worktree is clean', status['exit_code'] == 0 and not status['stdout'].strip(), True, 'worktree:clean')\ncurrent_files, current_issues = inventory()\nrecord('audit input bytes and coverage unchanged during measurement', {n: sha(data) for n, data in sorted(current_files.items())}, pins)\noutput['observations'] = observations\n# Final output gets the same bounded detectors; matching values are not emitted.\nserialized = json.dumps(output, indent=2, ensure_ascii=False)+'\\n'\noutput['output_scan'] = {'findings': scan({OUTPUT: serialized.encode()}), 'self_pin_exclusion': 'This generated output is an audit artifact; its embedded synthetic scanner fixtures are documented controls, not operational credentials or infrastructure.'}\n(ROOT/OUTPUT).write_text(json.dumps(output, indent=2, ensure_ascii=False)+'\\n')\nprint(json.dumps({'files_pinned': len(files), 'scan_findings': len(findings), 'stale_documentation_findings': len(stale_content), 'stale_receipts': sum(not r['current'] for r in receipts.values()), 'worktree_clean': not bool(status['stdout'].strip()), 'model_check_exit': check['exit_code'], 'result': output['result']}))\n"
+  },
+  "worktree": {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "exit_code": 0,
+    "stdout": "?? .claude-plugin/marketplace.json\n?? .claude/settings.json\n?? .gitattributes\n?? .github/workflows/ci.yml\n?? .github/workflows/release.yml\n?? .gitignore\n?? HANDOFF.md\n?? LACKS.md\n?? LICENSE\n?? MESH.tsv\n?? PLAN.md\n?? README.md\n?? SPIRIT.md\n?? TASKS.tsv\n?? WORDS.tsv\n?? mesh/CONSTRAINTS.tsv\n?? mesh/COSTS.tsv\n?? mesh/FILLS.tsv\n?? mesh/PREDICTIONS.tsv\n?? mesh/README.md\n?? mesh/REQUIREMENTS.tsv\n?? mesh/SLOTS.tsv\n?? mesh/SOURCES.tsv\n?? mesh/SUBTRACT-KEPT.tsv\n?? mesh/SUBTRACT.tsv\n?? mesh/TIGHTEN.tsv\n?? mesh/TRACE.tsv\n?? mesh/WIRE-RULE.tsv\n?? mesh/WIRES.tsv\n?? mesh/check.py\n?? mesh/evidence/advance.json\n?? mesh/evidence/audit.json\n?? mesh/evidence/configure.json\n?? mesh/evidence/decode.json\n?? mesh/evidence/emit.json\n?? mesh/evidence/evaluate.json\n?? mesh/evidence/observe.json\n?? mesh/evidence/once.json\n?? mesh/evidence/package.json\n?? mesh/evidence/persist.json\n?? mesh/evidence/register-proposal.md\n?? mesh/evidence/register.json\n?? mesh/evidence/rules.json\n?? mesh/evidence/validate.json\n?? mesh/plants.py\n?? mesh/reference/COMPONENTS.tsv\n?? mesh/reference/DOMAINS.tsv\n?? mesh/reference/README.md\n?? mesh/reference/REQUIREMENTS.tsv\n?? mesh/reference/SLOTS.tsv\n?? mesh/reference/TIGHTEN.log\n?? mesh/reference/WIRES.tsv\n?? mesh/reference/check.py\n?? mesh/reference/docs-def-README.md\n?? mesh/reference/plants.py\n?? mesh/reference/seed.py\n?? mesh/reference/types.py\n?? mesh/route_preflight.py\n?? mesh/seed.py\n?? mesh/tighten.py\n?? mesh/wire_rule.py\n?? plugin/.claude-plugin/plugin.json\n?? plugin/hooks/hooks.json\n?? plugin/makoto2/CONFIG_KEYS.txt\n?? plugin/makoto2/__init__.py\n?? plugin/makoto2/__main__.py\n?? plugin/makoto2/config.json\n?? plugin/makoto2/evaluate.py\n?? plugin/makoto2/hook.py\n?? plugin/makoto2/observed.py\n?? plugin/makoto2/rows.tsv\n?? tests/sources.tsv\n?? tests/test_evaluate.py\n?? tests/test_hook.py\n?? tests/test_observed.py\n",
+    "stderr": ""
+  },
+  "output_scan": {
+    "findings": [
+      {
+        "path": "mesh/evidence/audit.json",
+        "line": 1065,
+        "category": "private_address_requires_review"
+      }
+    ],
+    "self_pin_exclusion": "This generated output is an audit artifact; its embedded synthetic scanner fixtures are documented controls, not operational credentials or infrastructure."
+  }
+}
