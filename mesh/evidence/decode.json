@@ -1,0 +1,755 @@
+{
+  "task": "decode",
+  "requirement": "decode",
+  "candidate": "plugin/makoto2/hook.py:d_in",
+  "selected_input_digest": "940502b64613692b0c6da76c6d07e8a45dda9ddffdd6cbd6fa53a070baac7acf",
+  "digest_scope": "SHA-256 of the complete plugin/makoto2/hook.py bytes; evidence is an output, not self-pinned",
+  "source_pins": {
+    "plugin/makoto2/hook.py": "940502b64613692b0c6da76c6d07e8a45dda9ddffdd6cbd6fa53a070baac7acf",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+    "tests/test_hook.py": "8e1ca0c266afa64192175cd615ab42e4f48f8067cabfb20a2b96f684e5f06c96",
+    "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452"
+  },
+  "observations": [
+    {
+      "case": "valid-0-text",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      },
+      "observed": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      }
+    },
+    {
+      "case": "valid-0-utf-8",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      },
+      "observed": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      }
+    },
+    {
+      "case": "valid-0-utf-16",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      },
+      "observed": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      }
+    },
+    {
+      "case": "valid-0-utf-32",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      },
+      "observed": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      }
+    },
+    {
+      "case": "valid-0-bytearray",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      },
+      "observed": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-α",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "cat named.txt"
+        },
+        "statement": "named statement",
+        "operation": "read",
+        "object": "named.txt",
+        "extra": [
+          null,
+          false,
+          0,
+          {
+            "text": "日本語"
+          }
+        ]
+      }
+    },
+    {
+      "case": "valid-1-text",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      },
+      "observed": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "case": "valid-1-utf-8",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      },
+      "observed": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "case": "valid-1-utf-16",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      },
+      "observed": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "case": "valid-1-utf-32",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      },
+      "observed": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "case": "valid-1-bytearray",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      },
+      "observed": {
+        "hook_event_name": "PostToolUse",
+        "tool_response": {
+          "stdout": "done",
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "case": "valid-2-text",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "Stop"
+      },
+      "observed": {
+        "hook_event_name": "Stop"
+      }
+    },
+    {
+      "case": "valid-2-utf-8",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "Stop"
+      },
+      "observed": {
+        "hook_event_name": "Stop"
+      }
+    },
+    {
+      "case": "valid-2-utf-16",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "Stop"
+      },
+      "observed": {
+        "hook_event_name": "Stop"
+      }
+    },
+    {
+      "case": "valid-2-utf-32",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "Stop"
+      },
+      "observed": {
+        "hook_event_name": "Stop"
+      }
+    },
+    {
+      "case": "valid-2-bytearray",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "Stop"
+      },
+      "observed": {
+        "hook_event_name": "Stop"
+      }
+    },
+    {
+      "case": "valid-3-text",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "SubagentStop"
+      },
+      "observed": {
+        "hook_event_name": "SubagentStop"
+      }
+    },
+    {
+      "case": "valid-3-utf-8",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "SubagentStop"
+      },
+      "observed": {
+        "hook_event_name": "SubagentStop"
+      }
+    },
+    {
+      "case": "valid-3-utf-16",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "SubagentStop"
+      },
+      "observed": {
+        "hook_event_name": "SubagentStop"
+      }
+    },
+    {
+      "case": "valid-3-utf-32",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "SubagentStop"
+      },
+      "observed": {
+        "hook_event_name": "SubagentStop"
+      }
+    },
+    {
+      "case": "valid-3-bytearray",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "SubagentStop"
+      },
+      "observed": {
+        "hook_event_name": "SubagentStop"
+      }
+    },
+    {
+      "case": "valid-4-text",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      },
+      "observed": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      }
+    },
+    {
+      "case": "valid-4-utf-8",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      },
+      "observed": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      }
+    },
+    {
+      "case": "valid-4-utf-16",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      },
+      "observed": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      }
+    },
+    {
+      "case": "valid-4-utf-32",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      },
+      "observed": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      }
+    },
+    {
+      "case": "valid-4-bytearray",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      },
+      "observed": {
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Preserve this text"
+      }
+    },
+    {
+      "case": "valid-5-text",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "observed": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "case": "valid-5-utf-8",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "observed": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "case": "valid-5-utf-16",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "observed": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "case": "valid-5-utf-32",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "observed": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "case": "valid-5-bytearray",
+      "relation": "valid:preserved",
+      "expected": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "observed": {
+        "hook_event_name": "FutureEvent",
+        "unknown": {
+          "nested": [
+            1,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "case": "empty",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "malformed",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "trailing",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "null",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "array",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "scalar-string",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "number",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "boolean",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "missing-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "null-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "empty-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "numeric-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "boolean-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "list-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "object-name",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "invalid-encoding",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "nan",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "infinity",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "negative-infinity",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "excessive-nesting",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "unsupported-none",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "unsupported-map",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    },
+    {
+      "case": "unsupported-int",
+      "relation": "invalid:none",
+      "expected": null,
+      "observed": null
+    }
+  ],
+  "result": "pass",
+  "checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tests/test_hook.py",
+      "exit_code": 0,
+      "stdout": "test_hook OK 6 assertions\n"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task decode",
+      "exit_code": 0,
+      "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+      "scope": "declarative model; runtime behavior measured separately above"
+    }
+  ],
+  "present": [
+    "valid:preserved",
+    "invalid:none"
+  ],
+  "absent": [],
+  "external": []
+}

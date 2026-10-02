@@ -180,7 +180,7 @@ def errors(root=ROOT):
                 connected.update(((a,'outputs',p),(b,'inputs',q)))
                 forward[a].add(b); backward[b].add(a)
     try:
-        from wire_rule import classify, render
+        from wire_rule import classify
         decisions = classify(mesh)
         bad['wire-rule'].extend(r['wire or pair']+' '+r['verdict'] for r in decisions if r['verdict'] != 'KEEP')
         # WIRE-RULE records the applied revision, including its folded wires.

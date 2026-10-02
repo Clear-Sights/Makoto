@@ -1,24 +1,45 @@
-# Makoto formation handoff
+# Makoto current handoff
 
-## Read order
-Read WORDS.tsv, SPIRIT.md, MESH.tsv, then PLAN.md. WORDS.tsv preserves the owner's supplied rows verbatim. SPIRIT.md holds purpose, acceptance bars, scope, copied historical evidence and input pins. MESH.tsv is the timeless set of holes; PLAN.md is the dependency-ordered seed. VERDICT2.txt records this pass's actual check exits.
+Makoto prevents blindspots through detection. Read WORDS.tsv, SPIRIT.md,
+mesh/README.md, MESH.tsv and PLAN.md. The README snapshot under mesh/reference/
+is a pinned historical source; README.md describes the shipped runtime.
 
-## Resume on a fresh account
-Clone https://github.com/Clear-Sights/Makoto.git, enter the repo, and read the files above. Confirm branch, HEAD, worktree status and relevant input hashes before reusing any met status. Use Python >=3.11 and pytest; run each MESH check from repo root using POSIX sh. Execute plants only in their private temporary copies, then run the corresponding check there and require failure. No credentials belong in these files; use the owner's normal account login.
+## Resume and verify
 
-Query current PR #132 and the claude/makoto-register-shapes branch through read-only GitHub access. Recover pushed audit outputs into a disposable clone; missing unpushed outputs must be rebuilt from the copied obligations, never represented as a resumed process. Follow PLAN.md; owner owns register amendments and merges. Preserve source tests and subject binding. Do not merge, publish, rewrite history, install/configure hooks, or embed credentials as part of this formation pass.
+From the repository root, run:
 
-route.sh is absent here and its formation parser contract was not supplied. PLAN.md uses the requested numbered-line format, with a hole id on every line; compatibility with an actual wrapper remains unverified. Recover and inspect a reviewed wrapper in a disposable Tiller/Measure-Zero clone before launching it. Do not invent a route executable. A missing output verdict means pending or failed, never success.
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests mesh/test_zero.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py
+```
 
-## Blockers and open holes
-- register-alignment: REGISTER.md, CITATIONS.tsv, REPLAY.tsv and REGISTER-PROPOSAL.md are absent; semantic validation is unimplemented. Copied S1 records 33 unattributed regressions, 61 unresolved shapes and four conflicts. Recovery-file existence is not acceptance.
-- package-consistency: manifest 4.0.1 disagrees with README 4.0.0; the exact mesh check failed.
-- fresh-installation: no current fresh-session receipt or deciding receipt checker. Historical 4.0.0 installation is insufficient. Existing plugin hook files remain in the repo; removing them conflicts with this pass's permitted-file scope. A hook-free live proof remains unresolved.
-- complete-validation: local suite passed, but exact-head five-job CI receipts and their checker are absent. No current remote result was inferred from copied evidence.
-- whole-repo-clean: formation files are uncommitted by request; full content audit and its planted-secret checker remain absent. git cleanliness alone cannot establish the done-bar.
-- route.sh contract: wrapper unavailable; formation execution was not tested.
+The model gate checks declarative obligations. Plants require a passing baseline
+and the targeted failure in disposable copies, then delete those copies.
+`plants.py --copy TASK` mutates the caller's disposable working tree.
+The runtime suite and zero-report tests provide local validation; current
+exact-head CI and fresh-session receipts remain separate obligations.
 
-Provisional blocked checks explicitly end in false so they cannot accidentally close a hole on file presence or local-suite success. Replace them with deciding semantic/receipt/content checks and meaningful plants before marking met. This pass ran every check and every plant in a private copy; four checks passed, all nine planted checks failed. Deletion plants prove prerequisite sensitivity; failing blocked baselines do not prove semantic sensitivity. Met results apply only to their stated acceptance bar and pinned inputs.
+## Current evidence limits
+
+PLAN.md and TASKS.tsv describe the dependency graph and current estimates,
+with COST_FACTOR=2. Retain the requirement-driven seed generator and subtraction
+references. Old extraction tables and checkers are removed; source pins remain.
+The cleanup record is `/home/user/route-out/makoto/CLEANUP.txt`.
+
+The current zero report separates model validity from implementation completion.
+Existing receipts include open, stale and external evidence; re-measure after
+selected inputs change. Missing or stale receipts cannot establish done.
+Register approval, authentic exact-head CI, fresh account installation evidence,
+bound proof producers and a current whole-repository audit still require evidence.
+README.md and the plugin manifest now both state version 4.0.1; the historical
+source snapshot intentionally retains 4.0.0.
+
+Verify branch, HEAD, worktree status and input hashes before reusing a receipt.
+Existing uncommitted work is preserved. The cleanup does not establish a clean
+committed worktree. Follow PLAN.md for outstanding work; Gabriel owns register
+amendments and merges. Preserve tests and historical provenance.
 
 ## Recorded refusals
 These are historical copied records, not new refusals in this pass:
@@ -29,6 +50,8 @@ These are historical copied records, not new refusals in this pass:
 Do not bypass these gates or retry unchanged. Cross-repo refusals are provenance, not Makoto work items.
 
 ## Keep current
-update these files in the same commit as any change that moves a hole
 
-“These files” means WORDS.tsv, SPIRIT.md, MESH.tsv, PLAN.md, HANDOFF.md and VERDICT2.txt as affected. Append WORDS.tsv rows only for verbatim source text with its timestamp. Recheck affected holes and plants when inputs change, record reasons for open/blocked statuses here, and remove completed steps from PLAN.md. No commit was made in this pass.
+Update affected documentation when behavior or evidence changes. Preserve
+WORDS.tsv, SPIRIT.md and the historical README source pins unless an authorized
+source revision also updates the model. Regenerate selected reports after mesh
+changes; record validation separately from external acceptance evidence.

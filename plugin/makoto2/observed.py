@@ -271,6 +271,8 @@ def _exit_of(tr, output: str) -> Optional[int]:
 def _executed(o: Obs) -> bool:
     """A result came back: an exit code is known, or the call did not fail, or it failed with
     output that is not a denial (a red run is still a run)."""
+    if _DENIAL_RX.search(o.output):
+        return False
     if o.exit is not None or not o.failed:
         return True
     return bool(o.output.strip()) and not _DENIAL_RX.search(o.output)
@@ -452,9 +454,14 @@ def _read(ev: dict, seq: int, seen: set) -> Obs:
     sends = tool in _SEND_TOOLS or tool.endswith(_SEND_TOOL_SUFFIXES)
     send = "\n".join(ti[k] for k in _SEND_KEYS if isinstance(ti.get(k), str) and ti[k]) \
         if sends else ""
-    return Obs(seq=seq, tool=tool, input=dict(ti), output=output, exit=exit_, failed=failed,
+    observation = Obs(seq=seq, tool=tool, input=dict(ti), output=output, exit=exit_, failed=failed,
                objects=frozenset(objects), written=frozenset(written), created=frozenset(created),
                send=send, search=search)
+    # Keep the attempted input for retry detection, but a denied/unlanded call has no deeds.
+    if not _executed(observation):
+        observation = observation._replace(written=frozenset(), created=frozenset(),
+                                           send="", search=None)
+    return observation
 
 
 # ---- the record -------------------------------------------------------------------------------
@@ -495,7 +502,7 @@ class Record:
         return frozenset(out)
 
 
-_TURN_MARKS = ("UserPromptSubmit", "Stop")
+_TURN_MARKS = ("UserPromptSubmit", "Stop", "SubagentStop")
 _FETCH_TOOL_SUFFIXES = ("fetch_thread", "fetch_messages", "fetch_project_timeline")
 _MESSAGE_TEXT_KEYS = ("body", "text", "content", "message")
 
@@ -518,11 +525,16 @@ def _user_entries(value) -> list:
     return [t for k in sorted(value) for t in _user_entries(value[k])]
 
 
-def record(events: Iterable[dict]) -> Record:
+def record(events: Iterable[dict], event: Optional[dict] = None) -> Record:
     """events = decoded hook payloads, oldest first; settled ones become Obs, with seq = the
     event's position in `events` (so `before` can be the act's own position in the same list).
     Stop and UserPromptSubmit events are not Obs; they mark turns (Record.turn_start) and a
-    prompt's text joins Record.user_texts, as do user-authored entries of a fetched thread."""
+    prompt's text joins Record.user_texts, as do user-authored entries of a fetched thread.
+    An optional current event follows the history only when settled; pending calls and current
+    turn boundaries cannot become witnesses or erase the turn being evaluated."""
+    events = list(events or ())
+    if isinstance(event, dict) and event.get("hook_event_name") in _SETTLED:
+        events.append(event)
     obs, seen, users, boundary = [], set(), [], None
     for i, ev in enumerate(events or ()):
         name = ev.get("hook_event_name") if isinstance(ev, dict) else None
@@ -535,7 +547,8 @@ def record(events: Iterable[dict]) -> Record:
             continue
         o = _read(ev, i, seen)
         obs.append(o)
-        seen |= o.objects
+        if _executed(o):
+            seen |= o.objects
         fetched = o.tool.endswith(_FETCH_TOOL_SUFFIXES) and _executed(o)
         users.extend(_user_entries(ev.get("tool_response")) if fetched else ())
     rec = Record(obs)

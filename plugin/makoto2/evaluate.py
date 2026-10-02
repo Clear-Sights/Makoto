@@ -12,6 +12,7 @@ Outcome is binary: {"row", "message", "objects"} blocks, None is silent.
 """
 from __future__ import annotations
 
+import csv
 import json
 import os
 import re
@@ -50,14 +51,46 @@ def unwitnessed(events, *, owes, pays=None, paid=()):
 
 # ---------- rows ----------
 
-def load_rows(path: str, cfg: dict) -> list:
-    """rows.tsv -> list of dicts {id, moment, predicate, args(dict), source, cfg}."""
-    with open(path, encoding="utf-8") as fh:
-        lines = [ln.rstrip("\n") for ln in fh if ln.strip()]
-    head = lines[0].split("\t")
+def load_rows(path: str, cfg: dict, *, pins_path: Optional[str] = None) -> list:
+    """Load rows with verbatim quote agreement against the current source fixture.
+
+    The default fixture is tests/sources.tsv in this checkout; callers with a
+    separately packaged fixture may select it explicitly. Agreement certifies
+    only these fixture bytes, never the historical source's provenance. The
+    optional words= path is carried through without reading or creating it.
+    Both files are reread on every call; absent or invalid pins reject the rows.
+    """
+    if pins_path is None:
+        pins_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "..", "..", "tests", "sources.tsv")
+
+    tables = []
+    for filename, required in (
+            (pins_path, ("id", "found_in", "quote")),
+            (path, ("id", "moment", "predicate", "args", "source"))):
+        with open(filename, encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh, delimiter="\t", quoting=csv.QUOTE_NONE)
+            fields = reader.fieldnames or []
+            if len(fields) != len(set(fields)) or not set(required) <= set(fields):
+                raise ValueError(f"{filename}: missing or duplicate columns")
+            table = list(reader)
+        ids = set()
+        for row in table:
+            if None in row or any(value is None for value in row.values()):
+                raise ValueError(f"{filename}: malformed row")
+            if not row["id"] or row["id"] in ids:
+                raise ValueError(f"{filename}: empty or duplicate id")
+            ids.add(row["id"])
+        tables.append(table)
+
+    pins = {row["id"]: row["quote"] for row in tables[0]}
     out = []
-    for ln in lines[1:]:
-        row = dict(zip(head, ln.split("\t")))
+    for row in tables[1]:
+        source = row["source"]
+        prefix, separator, quote = source.partition(': "')
+        if (not prefix or not separator or not quote.endswith('"')
+                or not quote[:-1] or pins.get(row["id"]) != quote[:-1]):
+            raise ValueError(f"{path}: missing or mismatched source pin for {row['id']}")
         args = {}
         for part in filter(None, row.get("args", "").split(";")):
             k, _, v = part.partition("=")
@@ -69,8 +102,19 @@ def load_rows(path: str, cfg: dict) -> list:
 
 
 def load_cfg(path: str) -> dict:
+    """Read runtime defaults and resolve the documented state-directory override.
+
+    Read on every call so changed configuration and environment are current.
+    Other values, including additional JSON keys, pass through unchanged.
+    """
     with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+        cfg = json.load(fh)
+    if not isinstance(cfg, dict):
+        raise ValueError("configuration must be a JSON object")
+    state_dir = os.environ.get("MAKOTO_STATE_DIR") or cfg.get("state_dir")
+    if state_dir is not None:
+        cfg["state_dir"] = os.path.expanduser(state_dir)
+    return cfg
 
 
 def _load_r():
@@ -244,7 +288,7 @@ def pile_owes(args, cfg, record, event):
 
 
 def pile_pays(args, cfg, o):
-    if _is_act(args, o) or not o.output:
+    if o.tool not in OTHER_SESSION_TOOLS or _is_act(args, o) or o.failed or not o.output:
         return None
     return lambda s: s[0] in o.output and o.seq > s[1]
 
@@ -311,17 +355,13 @@ def number_pays(args, cfg, o):
     return lambda n: re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", o.output) is not None
 
 
-_WORDS_CACHE: dict = {}
-
-
 def _words_text(path: str) -> str:
-    if path not in _WORDS_CACHE:
-        try:
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                _WORDS_CACHE[path] = _norm(fh.read())
-        except OSError:
-            _WORDS_CACHE[path] = ""
-    return _WORDS_CACHE[path]
+    # A changed or removed optional fixture must invalidate its previous witness.
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return _norm(fh.read())
+    except OSError:
+        return ""
 
 
 _ATTRIB_RX = re.compile(r"(his words|her words|the user(?:'s words)?|gabriel)\b\s*(?:said|wrote|asked|:|,|\()?", re.I)
@@ -432,7 +472,7 @@ _PENDING_RX = re.compile(r"\b(queued|pending|running|started|launched)\b", re.I)
 
 def _subject_words(text):
     # Identifier components also bind prose names to test nodes and job IDs.
-    return set(re.findall(r"[a-z][a-z0-9]*", text.lower())) - _STOP_WORDS - {
+    return set(re.findall(r"[a-z][a-z0-9]*|\d+", text.lower())) - _STOP_WORDS - {
         "all", "check", "checks", "test", "tests", "generation",
         "successfully", "consumers", "and", "ci", "has", "was", "rest", "their", "failed", "passed", "suite", "run",
         "now", "already", "still", "currently"}
@@ -464,30 +504,14 @@ def landed_owes(args, cfg, record, event):
                 artifacts = set()
             if artifacts:
                 out.extend((word, p, "artifact", max((o.seq for o in record.obs
-                           if _names(o, p) and (o.written or o.created or
-                              re.search(r"(?:--output|\s-o)(?:=|\s)", str(o.input.get("command", ""))))), default=-1))
+                           if _names(o, p)), default=-1))
                            for p in sorted(artifacts))
             else:
-                # Structured check names and job identifiers determine binding;
-                # prose around an aggregate result is not itself a check identifier.
-                identifiers = set()
-                for o in record.obs:
-                    for line in o.output.splitlines():
-                        try:
-                            value = json.loads(line)
-                        except ValueError:
-                            value = None
-                        if isinstance(value, dict):
-                            identifiers.update(str(k) for k, v in value.items()
-                                               if re.fullmatch(r"pass(?:ed)?|green|success|fail(?:ed)?|error", str(v), re.I))
-                        identifiers.update(re.findall(r"[\w./-]+::[\w:.-]+", line))
-                        identifiers.update(re.findall(r"\b(?:FAILED?|PASSED?|ERROR)\s+([^;,]+)", line, re.I))
-                    identifiers.update(str(v) for k, v in o.input.items() if k in ("job", "job_id"))
-                    identifiers.update(re.findall(r"\bjob_id[=:]([\w-]+)", o.output))
-                bound = names & set().union(*(_subject_words(x) for x in identifiers)) if identifiers else set()
-                names = frozenset(bound or (names if len(names) == 1 else set()))
+                # Keep the claimed subject, including numeric identifiers. An unrelated
+                # status must not erase its name and turn it into an aggregate claim.
+                names = frozenset(names)
                 failed_at = max((o.seq for o in record.obs if any(
-                    names & _subject_words(line) and re.search(r"\b(fail(?:ed)?|error|queued|pending|running)\b", line, re.I)
+                    names <= _subject_words(line + json.dumps(o.input)) and re.search(r"\b(fail(?:ed)?|error|queued|pending|running)\b", line, re.I)
                     for line in o.output.splitlines())), default=-1)
                 out.append((word, names, "status", failed_at))
     return out
@@ -520,7 +544,7 @@ def landed_pays(args, cfg, o):
             return False
         if kind == "artifact":
             return o.exit in (None, 0) and _valid_artifact(o, names)
-        if o.input.get("run_in_background") or o.tool.endswith("__launch") or _PENDING_RX.search(o.output):
+        if o.seq <= after or o.input.get("run_in_background") or o.tool.endswith("__launch") or _PENDING_RX.search(o.output):
             return False
         rx = _LANDED.get(word, re.compile(r"\b(completed?|ready)\b", re.I))
         # JSON status fields and individual text lines keep named outcomes separate
@@ -531,15 +555,16 @@ def landed_pays(args, cfg, o):
             except ValueError:
                 value = None
             if isinstance(value, dict):
-                if any((not names or _subject_words(str(k)) & names or
-                        (k in ("status", "state") and names & _subject_words(line + json.dumps(o.input))))
-                       and rx.search(str(v)) for k, v in value.items()):
+                if any((not names or names <= _subject_words(str(k)) or
+                        (k in ("status", "state") and names <= _subject_words(json.dumps(o.input))))
+                       and rx.search(str(v)) and not _NEG_RX.search(str(v))
+                       for k, v in value.items()):
                     return True
                 continue
-            if names & _subject_words(line) and re.search(r"\b(fail(?:ed)?|error)\b", line, re.I):
+            if re.search(r"\b(fail(?:ed)?|error)\b", line, re.I):
                 continue
-            if rx.search(line) and (not names or names & _subject_words(line)
-                                   or names & _subject_words(json.dumps({k: v for k, v in o.input.items()
+            if rx.search(line) and not _NEG_RX.search(line[:rx.search(line).start()]) and (not names or names <= _subject_words(line)
+                                   or names <= _subject_words(json.dumps({k: v for k, v in o.input.items()
                                        if k != "command" or word in ("merged", "landed", "pushed", "shipped")}))):
                 return True
         return False

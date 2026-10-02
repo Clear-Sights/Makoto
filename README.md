@@ -57,9 +57,16 @@ assertions executed during collection. [sources.tsv](tests/sources.tsv) pins
 historical quotes inside the repository; tests do not depend on changing live
 memory files. A pin records historical text, not independently verified provenance.
 
-Manual release reads version `4.0.0` from the plugin manifest to derive its tag.
+Manual release reads version `4.0.1` from the plugin manifest to derive its tag.
 The old catalog, CLI, packaging and replay tooling have been replaced by this
 runtime and suite.
+
+## Mesh and handoff
+
+[mesh/README.md](mesh/README.md) describes the requirement model and its checks.
+[PLAN.md](PLAN.md) records dependency waves; [HANDOFF.md](HANDOFF.md) describes
+how to resume and distinguish model validity from implementation evidence.
+The pinned README in `mesh/reference/` is a historical source snapshot.
 
 ## Uninstall
 

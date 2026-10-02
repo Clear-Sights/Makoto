@@ -1,0 +1,1752 @@
+{
+  "task": "once",
+  "requirement": "once",
+  "candidate": "plugin/makoto2/hook.py:o_once",
+  "selected_input_digest": "2b80004eb95285e55a8568e8ff6bf6d826784527939f32e44663bbbb9ead2e2d",
+  "digest_scope": "SHA-256 of complete plugin/makoto2/hook.py bytes; evidence is an output, not self-pinned",
+  "source_pins": {
+    "plugin/makoto2/hook.py": "2b80004eb95285e55a8568e8ff6bf6d826784527939f32e44663bbbb9ead2e2d",
+    "plugin/makoto2/observed.py": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+    "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+    "tests/test_hook.py": "8e1ca0c266afa64192175cd615ab42e4f48f8067cabfb20a2b96f684e5f06c96"
+  },
+  "observations": [
+    {
+      "case": "first",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "unchanged",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "no-finding",
+      "relation": "no-finding:silent",
+      "inputs": {
+        "finding": null,
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-tool",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Write",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "3f586b9d23661156bdbe2297d183ee11fdee31656c3f749e3dc2f17bd5c26552"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-tool",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Write",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "3f586b9d23661156bdbe2297d183ee11fdee31656c3f749e3dc2f17bd5c26552",
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-input",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x",
+              "content": "new"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "1c9119dc5d6ef7fa9c25bd6903f73f3d5f606e56cc2d056d912d2bac8982ffdd"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-input",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x",
+              "content": "new"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "1c9119dc5d6ef7fa9c25bd6903f73f3d5f606e56cc2d056d912d2bac8982ffdd",
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-output",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "new",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "75fa2de0cb6b31569658e3df3d2cbfaffe03265a9d851ebb1e8dbc39bc1f330a"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-output",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "new",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "75fa2de0cb6b31569658e3df3d2cbfaffe03265a9d851ebb1e8dbc39bc1f330a"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-exit",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 1,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "9ab5218dafe14149bfb3b00b955a4ce7a9dbaee3987dd04f5d2fb12bee94acb6"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-exit",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 1,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "9ab5218dafe14149bfb3b00b955a4ce7a9dbaee3987dd04f5d2fb12bee94acb6"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-failed",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": true,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "c2227977520984d2e842c1f0affa596a2c9e3504a89ef55c0840d83ec9b4e3df"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-failed",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": true,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "c2227977520984d2e842c1f0affa596a2c9e3504a89ef55c0840d83ec9b4e3df"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-written",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [
+              "x"
+            ],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "f4564a6c53b114683b42c497bf8b11ae41d56a468600d3810e2b1ad64d494bfd"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-written",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [
+              "x"
+            ],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "f4564a6c53b114683b42c497bf8b11ae41d56a468600d3810e2b1ad64d494bfd"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-created",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [
+              "x"
+            ],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "60fd726e4c63dbb0eab85776805cb1e2e6294081c9a6ee87a9af00d502d59bed"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-created",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [
+              "x"
+            ],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "60fd726e4c63dbb0eab85776805cb1e2e6294081c9a6ee87a9af00d502d59bed"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-send",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "new message",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "9b4c7d1e99428e4b1988c6f5c4ccea4c15ff232fb75d4705fef86ee5c9a0d729"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-send",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "new message",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "9b4c7d1e99428e4b1988c6f5c4ccea4c15ff232fb75d4705fef86ee5c9a0d729"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "changed-search",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": [
+              "scope",
+              "query",
+              true
+            ]
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "f127f20a859f68973edaf836bd8499a4223f9aab7d85aafcda333e0d1b32ac41"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "repeat-search",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": [
+              "scope",
+              "query",
+              true
+            ]
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7",
+          "f127f20a859f68973edaf836bd8499a4223f9aab7d85aafcda333e0d1b32ac41"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "sequence-offset-only",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 99,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "unrelated-observation",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          },
+          {
+            "seq": 1,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "other"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "new-relevant-observation",
+      "relation": "changed:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          },
+          {
+            "seq": 1,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "062d3cb02d9bba89348ee38097af6d852b8e261e22e6b680d984f5d47f9e948d"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "different-rule",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r2",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r2",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "9e42df55c022952eb6b4fcacef6405d3cf3b9d35787ad1f4918313b72d428cee"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "different-object",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "y"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "y"
+          ]
+        },
+        "key": "d0e87630746aab53ae9bbc4bebe6eeec286be451ff952f7c8cadacd567ad285b"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "duplicate-objects",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x",
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "message-only",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "new wording",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "multi-object-first",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "y",
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "y",
+            "x"
+          ]
+        },
+        "key": "5316a66258ae6a8ea6b7b1ce58807eaaea04eb170094bba04bd8ad2e03864f96"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "object-order",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x",
+            "y"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "5316a66258ae6a8ea6b7b1ce58807eaaea04eb170094bba04bd8ad2e03864f96"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "map-first",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x",
+              "options": {
+                "a": 1,
+                "b": 2
+              }
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "9ce95c593b8500b59c5c90b8d349802575add9d2e941dd98c6b707f721722c1c"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "map-order",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "options": {
+                "b": 2,
+                "a": 1
+              },
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "9ce95c593b8500b59c5c90b8d349802575add9d2e941dd98c6b707f721722c1c"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "objectless-first",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": []
+        },
+        "observations": [],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": []
+        },
+        "key": "1ff82c6d8b0832c8c6b0fde6195e662032b1736ff2bc5c68db57434d6d1c7719"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "objectless-unrelated-history",
+      "relation": "unchanged:silent",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": []
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": [
+          "1ff82c6d8b0832c8c6b0fde6195e662032b1736ff2bc5c68db57434d6d1c7719"
+        ]
+      },
+      "expected": "silent-and-no-key",
+      "observed": {
+        "decision": null,
+        "key": null
+      },
+      "result": "pass"
+    },
+    {
+      "case": "membership-objects",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [
+              "x"
+            ],
+            "written": [],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "4fbfc007832dc7f50eaff544cf01f70bad68ffce526e367fa0d2f72b7c213af7"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "membership-written",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [],
+            "written": [
+              "x"
+            ],
+            "created": [],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "4c42a257052b455bf26e17274105a86b00c0da0a360b9ac53df9e9fdad24e065"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "membership-created",
+      "relation": "first:finding",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "observations": [
+          {
+            "seq": 0,
+            "tool": "Read",
+            "input": {
+              "file_path": "x"
+            },
+            "output": "old",
+            "exit": 0,
+            "failed": false,
+            "objects": [],
+            "written": [],
+            "created": [
+              "x"
+            ],
+            "send": "",
+            "search": null
+          }
+        ],
+        "fired": []
+      },
+      "expected": "finding-and-key",
+      "observed": {
+        "decision": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "x"
+          ]
+        },
+        "key": "647c830390994627d97fab8aafc5382e3cccab523d95b8490d760db915ab4ce9"
+      },
+      "result": "pass"
+    },
+    {
+      "case": "production-record-settled-failure",
+      "inputs": {
+        "finding": {
+          "row": "r1",
+          "message": "m",
+          "objects": [
+            "/repo/x.txt"
+          ]
+        },
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "x.txt"
+            },
+            "tool_response": {
+              "content": "old"
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "changed_history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "x.txt"
+            },
+            "tool_response": {
+              "content": "new",
+              "exit_code": 1
+            },
+            "cwd": "/repo"
+          }
+        ]
+      },
+      "observed": {
+        "first_key": "589ddf6d1490d23046dd8a95b862d5b3b35fea54a185e9d7d76815d931dc90f5",
+        "changed_key": "120f5ed0ffc548ac72141fd8cd277f09d3ac464ef59d3c687f72209193ac0dba",
+        "repeat_silent": true
+      },
+      "result": "pass"
+    }
+  ],
+  "checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task once",
+      "exit_code": 0,
+      "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+      "stderr": ""
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tests/test_hook.py",
+      "exit_code": 0,
+      "stdout": "test_hook OK 6 assertions\n",
+      "stderr": ""
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/test_observed.py tests/test_evaluate.py",
+      "exit_code": 0,
+      "stdout": ".......................................................................  [100%]\n71 passed in 0.16s\n",
+      "stderr": ""
+    }
+  ],
+  "result": "pass",
+  "present": [
+    "first:finding",
+    "unchanged:silent",
+    "changed:finding"
+  ],
+  "absent": [],
+  "external": [],
+  "scope": "Direct local o_once probes and production Record checks. The specified checker certifies model shape only. Other task receipts pin their own inputs and must be remeasured before reuse after this shared-file change."
+}

@@ -36,4 +36,6 @@ Wave 12: zero (predicted 593606 tokens)
 
 At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.
 
+`PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py` re-measures the permitted mesh and plan inputs, validates receipt selections, and re-derives all dependency waves into `mesh/evidence/zero.json`. The zero output excludes itself from source pins. Model zero and implementation completion are separate fields: missing, stale, synthetic-only or outside-scope evidence cannot produce done. Outside pins remain EXTERNAL without reading their files. Re-run on changed selected bytes or paths; this report itself requires a current whole-repo audit before implementation completion.
+
 Scope: final Makoto detection, portable handoff, proof interfaces and seed. Foreign DetIO/Tiller/Countdown clauses are exclusions. Historical docs and old mesh artifacts are reference; no hook invocation/configuration, credentials, gate runs, publishing or merges.

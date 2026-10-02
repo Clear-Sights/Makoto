@@ -11,7 +11,7 @@ Each requirement identifies an actual output port and a finite behavioral partit
 
 An absent constraint admits the full universe, so it can fail. An empty constraint excludes required behavior, so it can fail. No implementation order, hard collection bound or private algorithm is imposed. TIGHTEN.tsv records the computed descent from unconstrained envelopes to zero. Finite partitions are a declarative abstraction of the source requirements, not a proof of the accuracy of today's recognizers. Source interpretation remains inspectable in REQUIREMENTS.tsv; source changes invalidate the snapshot.
 
-FILLS.tsv maps requirement-needed support units to slots; SLOTS lists the entry bindings. CANDIDATE means only that the unit exists, PARTIAL means some proof code exists, and OPEN means no proof producer is bound. These statuses never certify semantics. Every current runtime/test function is classified: the existing helper functions support the required detection or explicit acceptance tests. No runtime function was found removable solely from these requirements. SUBTRACT.tsv instead removes the old bottom-up extraction and seed units from the active model tools. The old seed unit is identified by original path/name and its preserved AST; replacing seed.py is subtraction of that original unit, not a requirement to delete the new file. No constraint is written for a subtracted unit. Old artifacts live only under reference/.
+FILLS.tsv maps requirement-needed support units to slots; SLOTS lists the entry bindings. CANDIDATE means only that the unit exists, PARTIAL means some proof code exists, and OPEN means no proof producer is bound. These statuses never certify semantics. Every current runtime/test function is classified: the existing helper functions support the required detection or explicit acceptance tests. No runtime function was found removable solely from these requirements. SUBTRACT.tsv instead removes the old bottom-up extraction and seed units from the active model tools. The old seed unit is identified by original path/name and its preserved AST; replacing seed.py is subtraction of that original unit, not a requirement to delete the new file. No constraint is written for a subtracted unit. The retained reference files are the pinned README snapshot and original seed/extraction code used to inspect subtraction provenance. Obsolete reference tables, checkers and tightening logs have been removed.
 
 Run only these model tools during formation:
 
@@ -21,7 +21,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py
 PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
 ```
 
-check.py parses source with AST; it never imports runtime modules. Every named check is computed and has a hostile plant in plants.py. Plants verify a passing baseline and the targeted failing diagnostic in disposable, credential-free copies, then delete them. `plants.py --copy TASK` supports route's check-after-removal protocol and leaves one private copy whose path is printed. Checks do not invoke hooks, test collection, gates, installation, git writes or network access.
+check.py parses source with AST; it never imports runtime modules. Every named check is computed and has a hostile plant in plants.py. Plants verify a passing baseline and the targeted failing diagnostic in disposable, credential-free copies, then delete them. `plants.py --copy TASK` supports route's check-after-removal protocol by mutating the caller's current disposable working tree; the caller must create and delete that copy. Checks do not invoke hooks, test collection, gates, installation, git writes or network access.
 
 PLAN.md, TASKS.tsv, MESH.tsv and PREDICTIONS.tsv are generated from the wiring. SUBTRACT is first; every ready dependency enters the same wave. Shared source-file writes require one writer or a new scope measurement. Each step predicts PRESENT/ABSENT, cost and a re-measure/EXTERNAL failure edge. No BLOCKED terminal exists in the seed.
 
@@ -32,3 +32,12 @@ Revision 2026-10-02: `input-sources` declares each slot input's producer indepen
 `tighten.py` starts every requirement facet at its universe, checks that the constraints pass its envelope, then subtracts every optional case. The lower required envelope is the unique least relation by inclusion. Invariant nominal port carriers remain unchanged; independent facets remain separate. It iterates until no set changes and serializes every slot at each step, including the final fixed shape. check.py compares that serialization byte for byte with TIGHTEN.tsv. The kernel candidate-support narrower does not fit these independent relations; see tighten.py for the examined interface and reason.
 
 Use `python3 mesh/wire_rule.py` to inspect current decisions, `python3 mesh/tighten.py` to regenerate tightening, and `python3 mesh/seed.py --plan-only` to regenerate the plan within the mesh/ and PLAN.md revision scope. Plants include an identity wire and stale tightening shape.
+
+Cleanup 2026-10-02: generated Python bytecode was removed. Keep active mesh
+infrastructure, subtraction references and `mesh/evidence/` receipts: they are
+inputs to checks or proof measurement. Receipt files are historical measurements;
+a passing model gate does not make stale receipts current. Re-run
+`PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py` after changing selected mesh or
+plan inputs. It reports missing, stale and external evidence without certifying
+implementation completion. Cleanup results live outside the repository at
+`/home/user/route-out/makoto/CLEANUP.txt`.

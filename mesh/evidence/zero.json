@@ -1,0 +1,1013 @@
+{
+  "task": "zero",
+  "selected_input_digest": "b6031cdf17a705873d1d9aa8b5f980c5ef3c58a16f0452e058dabab3ddbc63c6",
+  "source_pins": {
+    "MESH.tsv": "8de036f4c37dd38201001c3b3f985941fd8b1d19550f70f913d2126ed2d9af4b",
+    "PLAN.md": "c5c659ca7e0c626eb972f62a1661b9c93a2715e5e59eb1fc1bb305119de3069a",
+    "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
+    "mesh/FILLS.tsv": "f13042c5de69b4c680d0cfde2e45ab913a822a3611e68e4dfa2ae7ff330b8d79",
+    "mesh/PREDICTIONS.tsv": "4baa8cea2602e491540bb8e91f43011232a8d6cd6a172f244e2e7edb6a8faa88",
+    "mesh/README.md": "c033482f62ccd9bed68caf57990282c015769216060ef277ee5614ca4fe8960e",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+    "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+    "mesh/SUBTRACT-KEPT.tsv": "7cdaa3c4b253634c984698cdb5cabd01f8b02a4c9afeeedb6f0ec7653ba92233",
+    "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
+    "mesh/TIGHTEN.tsv": "b7e53a125191f96748549b6bf2ccf660eca4fa9f7ed89848226d27c7f49b3408",
+    "mesh/TRACE.tsv": "47555d899e2e3e6f56ca9914481b5809139580ac1f4c9fd60f4fd8046b496360",
+    "mesh/WIRE-RULE.tsv": "662666537431cbb7b52bcf75d371205e8693c3d5482b4607450a2a928c601e1d",
+    "mesh/WIRES.tsv": "eb5fdb9daad0e71f796906759732bf251c405a52ddb237bfcc9bfaac000d4040",
+    "mesh/check.py": "bd5d6f8b3b555c0ba23aed0808858bd6c88f25908aff743182e1151db1b94a93",
+    "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
+    "mesh/evidence/audit.json": "5a9a2ec32ce2861e3b74c336f01a0568368f310db2ec30f3217b9ab122912b92",
+    "mesh/evidence/configure.json": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
+    "mesh/evidence/decode.json": "82f19e09788d858b61a969c4ba7217b2999dbbc8026648427aaf89338bb1d360",
+    "mesh/evidence/emit.json": "40e7923187e76c9c75639b271a2ee8a08abf88e564ccc52724230c0b804b1f32",
+    "mesh/evidence/evaluate.json": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
+    "mesh/evidence/fresh.json": "a576aa2fd66f609c4d8d0f4831c249e1b74875623f47b5dfc7140072abbff589",
+    "mesh/evidence/handoff.json": "e968ec945a71d8cd90fcd7d5107afaa2426a1711a04822306771d2b6cf320a66",
+    "mesh/evidence/join.json": "874ebf8535c368608f660b06f91f45cee2c20eab193e9ff4ec8f2b4019bfee1b",
+    "mesh/evidence/observe.json": "8856de778b4ebdc4ba47130e2ae96ce87c3b9f73ac44d726e73359cdf24687c1",
+    "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
+    "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
+    "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
+    "mesh/evidence/register-proposal.md": "0261cd5cde7e503c3a29f8416940e65dae7724f23e929d9d9116a418ad4b2071",
+    "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
+    "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
+    "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
+    "mesh/plants.py": "fb323c88d6dc788967f61ae47fa83feac1e8db6db967ecf98670dbca729eee50",
+    "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
+    "mesh/reference/seed.py": "4b1154a889895be6e442d37c625da4a2a3a5d182afc5497a783066a2b6ffafd1",
+    "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
+    "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
+    "mesh/seed.py": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+    "mesh/test_zero.py": "a0c759fde02fccc39c63b278cc4ef3498bfbbcf8f662d996c93789da67a6f24a",
+    "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+    "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
+    "mesh/zero.py": "1d17051a5efa0a7def089cc909ebc294a9062c25ed35b056b25a82f38fd77911"
+  },
+  "digest_method": "SHA-256 of canonical source_pins JSON; sorted keys, compact separators, UTF-8, ensure_ascii=False; zero output excluded",
+  "model": {
+    "zero": true,
+    "missing": 0,
+    "over": 0,
+    "structural_violations": 0,
+    "relations": [
+      {
+        "requirement": "detect",
+        "accepted": [
+          "no_obligation:silent",
+          "paid_subject:silent",
+          "unpaid_subject:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "decode",
+        "accepted": [
+          "invalid:none",
+          "valid:preserved"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "settled",
+        "accepted": [
+          "denied:not_deed",
+          "other_object:not_witness",
+          "other_turn:distinct",
+          "pending:not_deed",
+          "settled:observed"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "terminal",
+        "accepted": [
+          "empty:not_witness",
+          "failure:not_witness",
+          "invalid:not_witness",
+          "matching_terminal:witness",
+          "other_operation:not_witness",
+          "other_subject:not_witness",
+          "pending:not_witness",
+          "superseded:not_witness"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-permission",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-worker",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-rebrief",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-absence",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-thread",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-quote",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-plan",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-retry",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-time",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-completion",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-count",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "rule-probe",
+        "accepted": [
+          "lookalike:silent",
+          "slip:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "once",
+        "accepted": [
+          "changed:finding",
+          "first:finding",
+          "unchanged:silent"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "output",
+        "accepted": [
+          "no_finding:silent",
+          "other_event:silent",
+          "pre_finding:deny",
+          "stop_finding:block",
+          "substop_finding:block"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "boundaries",
+        "accepted": [
+          "boundary:append_boundary",
+          "current_unsettled:not_paid",
+          "settled:append_effect"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "store",
+        "accepted": [
+          "default:home_state",
+          "different_session:isolated",
+          "lazy:append",
+          "override:selected_state"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "configuration",
+        "accepted": [
+          "default:documented",
+          "override:documented",
+          "runtime:stdlib_py311plus"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "sources",
+        "accepted": [
+          "external_words:optional",
+          "pinned:fixture_agreement",
+          "provenance:not_certified"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "register",
+        "accepted": [
+          "amendment:owner_decides",
+          "recovery_only:unproven",
+          "regression:attributed",
+          "semantic:approved"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "suite",
+        "accepted": [
+          "each_rule:slip_and_control",
+          "hook_assertions:six_unit_cases",
+          "observation:subject_bound",
+          "source:pinned"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "ci",
+        "accepted": [
+          "five_jobs:exact_head_pass",
+          "local:pass",
+          "other_head:rejected"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "package",
+        "accepted": [
+          "contents:distributable",
+          "marketplace:plugin",
+          "version:consistent"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "install",
+        "accepted": [
+          "control:silent",
+          "fresh_session:proven",
+          "intended_version:loaded",
+          "missing_plugin:rejected",
+          "runtime:error_free",
+          "slip:blocked"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "audit",
+        "accepted": [
+          "all_current:pinned_audited",
+          "dead:rejected",
+          "duplicate:rejected",
+          "history:excluded",
+          "private_infra:rejected",
+          "secret:rejected",
+          "worktree:clean"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "done",
+        "accepted": [
+          "all_current:done",
+          "any_absent:not_done",
+          "stale:not_done"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "handoff",
+        "accepted": [
+          "missing_input:explicit_absence",
+          "seed_and_mesh:portable"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "awareness",
+        "accepted": [
+          "changed_input:remeasure",
+          "parent:bounded_verdict",
+          "same_inputs:same_verdict"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "focus",
+        "accepted": [
+          "failure:remeasure_or_external",
+          "independent_work:wave",
+          "project:makoto"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "nohooks",
+        "accepted": [
+          "formation:declarative_only",
+          "runtime_transport:defined"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "scope-detio-bar",
+        "accepted": [
+          "detio:excluded"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "scope-causality",
+        "accepted": [
+          "detio:excluded"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "scope-why",
+        "accepted": [
+          "foreign_projects:excluded",
+          "makoto:detection"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "scope",
+        "accepted": [
+          "formation:mesh_seed_only",
+          "history:preserved",
+          "merge:owner"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "uninstall",
+        "accepted": [
+          "legacy:operator_cleanup",
+          "uninstall:state_preserved"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "limits",
+        "accepted": [
+          "claim_reader:absent",
+          "live:unmeasured",
+          "quality:not_certified"
+        ],
+        "missing": [],
+        "over": []
+      }
+    ],
+    "plan_matches": true,
+    "check_exit_code": 0,
+    "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+    "stderr": ""
+  },
+  "dependency_receipts": {
+    "decode": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": false,
+      "outside_evidence": [
+        "plugin/makoto2/hook.py",
+        "tests/test_hook.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "mesh/check.py"
+      ]
+    },
+    "configure": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/observed.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "mesh/check.py"
+      ]
+    },
+    "rules": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        "SPIRIT.md",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "observe": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/observed.py",
+        "tests/test_evaluate.py",
+        "tests/test_observed.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "mesh/check.py"
+      ]
+    },
+    "evaluate": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py",
+        "tests/test_observed.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "once": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": false,
+      "outside_evidence": [
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "tests/test_hook.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "mesh/check.py"
+      ]
+    },
+    "emit": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": false,
+      "outside_evidence": [
+        "plugin/makoto2/hook.py",
+        "tests/test_hook.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "mesh/check.py"
+      ]
+    },
+    "advance": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": false,
+      "outside_evidence": [
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "tests/test_hook.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "mesh/check.py"
+      ]
+    },
+    "persist": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": false,
+      "outside_evidence": [
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "tests/test_hook.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "register": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        "HANDOFF.md",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "validate": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        ".github/workflows/ci.yml",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/__init__.py",
+        "plugin/makoto2/__main__.py",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py",
+        "tests/test_hook.py",
+        "tests/test_observed.py"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "package": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        ".claude-plugin/marketplace.json",
+        "LICENSE",
+        "README.md",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/.claude-plugin/plugin.json",
+        "plugin/hooks/hooks.json",
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/__init__.py",
+        "plugin/makoto2/__main__.py",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "fresh": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        ".claude-plugin/marketplace.json",
+        "LICENSE",
+        "README.md",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/.claude-plugin/plugin.json",
+        "plugin/hooks/hooks.json",
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/__init__.py",
+        "plugin/makoto2/__main__.py",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv"
+      ],
+      "missing_inputs": [],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/check.py"
+      ]
+    },
+    "audit": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        ".claude-plugin/marketplace.json",
+        ".claude/settings.json",
+        ".gitattributes",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        ".gitignore",
+        "HANDOFF.md",
+        "LACKS.md",
+        "LICENSE",
+        "README.md",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/.claude-plugin/plugin.json",
+        "plugin/hooks/hooks.json",
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/__init__.py",
+        "plugin/makoto2/__main__.py",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py",
+        "tests/test_hook.py",
+        "tests/test_observed.py"
+      ],
+      "missing_inputs": [
+        "mesh/reference/COMPONENTS.tsv",
+        "mesh/reference/DOMAINS.tsv",
+        "mesh/reference/README.md",
+        "mesh/reference/REQUIREMENTS.tsv",
+        "mesh/reference/SLOTS.tsv",
+        "mesh/reference/TIGHTEN.log",
+        "mesh/reference/WIRES.tsv",
+        "mesh/reference/check.py",
+        "mesh/reference/plants.py"
+      ],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/PREDICTIONS.tsv",
+        "mesh/README.md",
+        "mesh/check.py",
+        "mesh/plants.py"
+      ]
+    },
+    "join": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        ".claude-plugin/marketplace.json",
+        ".claude/settings.json",
+        ".gitattributes",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        ".gitignore",
+        "HANDOFF.md",
+        "LACKS.md",
+        "LICENSE",
+        "README.md",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/.claude-plugin/plugin.json",
+        "plugin/hooks/hooks.json",
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/__init__.py",
+        "plugin/makoto2/__main__.py",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py",
+        "tests/test_hook.py",
+        "tests/test_observed.py"
+      ],
+      "missing_inputs": [
+        "mesh/reference/COMPONENTS.tsv",
+        "mesh/reference/DOMAINS.tsv",
+        "mesh/reference/README.md",
+        "mesh/reference/REQUIREMENTS.tsv",
+        "mesh/reference/SLOTS.tsv",
+        "mesh/reference/TIGHTEN.log",
+        "mesh/reference/WIRES.tsv",
+        "mesh/reference/check.py",
+        "mesh/reference/plants.py"
+      ],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/PREDICTIONS.tsv",
+        "mesh/README.md",
+        "mesh/check.py",
+        "mesh/plants.py"
+      ]
+    },
+    "handoff": {
+      "current": false,
+      "accepted": false,
+      "digest_valid": true,
+      "outside_evidence": [
+        ".claude-plugin/marketplace.json",
+        ".claude/settings.json",
+        ".gitattributes",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        ".gitignore",
+        "HANDOFF.md",
+        "LACKS.md",
+        "LICENSE",
+        "README.md",
+        "SPIRIT.md",
+        "WORDS.tsv",
+        "plugin/.claude-plugin/plugin.json",
+        "plugin/hooks/hooks.json",
+        "plugin/makoto2/CONFIG_KEYS.txt",
+        "plugin/makoto2/__init__.py",
+        "plugin/makoto2/__main__.py",
+        "plugin/makoto2/config.json",
+        "plugin/makoto2/evaluate.py",
+        "plugin/makoto2/hook.py",
+        "plugin/makoto2/observed.py",
+        "plugin/makoto2/rows.tsv",
+        "tests/sources.tsv",
+        "tests/test_evaluate.py",
+        "tests/test_hook.py",
+        "tests/test_observed.py"
+      ],
+      "missing_inputs": [
+        "mesh/reference/COMPONENTS.tsv",
+        "mesh/reference/DOMAINS.tsv",
+        "mesh/reference/README.md",
+        "mesh/reference/REQUIREMENTS.tsv",
+        "mesh/reference/SLOTS.tsv",
+        "mesh/reference/TIGHTEN.log",
+        "mesh/reference/WIRES.tsv",
+        "mesh/reference/check.py",
+        "mesh/reference/plants.py"
+      ],
+      "stale_inputs": [
+        "PLAN.md",
+        "mesh/PREDICTIONS.tsv",
+        "mesh/README.md",
+        "mesh/check.py",
+        "mesh/plants.py"
+      ]
+    }
+  },
+  "derived_waves": [
+    {
+      "wave": 1,
+      "tasks": [
+        "subtract"
+      ],
+      "predicted_tokens": 208231
+    },
+    {
+      "wave": 2,
+      "tasks": [
+        "configure",
+        "decode"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 3,
+      "tasks": [
+        "observe",
+        "rules"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 4,
+      "tasks": [
+        "evaluate",
+        "register"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 5,
+      "tasks": [
+        "once"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 6,
+      "tasks": [
+        "advance",
+        "emit"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 7,
+      "tasks": [
+        "persist",
+        "validate"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 8,
+      "tasks": [
+        "package"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 9,
+      "tasks": [
+        "audit",
+        "fresh"
+      ],
+      "predicted_tokens": 1187212
+    },
+    {
+      "wave": 10,
+      "tasks": [
+        "join"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 11,
+      "tasks": [
+        "handoff"
+      ],
+      "predicted_tokens": 593606
+    },
+    {
+      "wave": 12,
+      "tasks": [
+        "zero"
+      ],
+      "predicted_tokens": 593606
+    }
+  ],
+  "stable_inputs": true,
+  "present": [
+    "model:requirement_envelopes"
+  ],
+  "absent": [
+    "advance:current_passing_evidence",
+    "audit:bound_proof_producer",
+    "audit:current_passing_evidence",
+    "configure:current_passing_evidence",
+    "decode:current_passing_evidence",
+    "emit:current_passing_evidence",
+    "evaluate:current_passing_evidence",
+    "fresh:bound_proof_producer",
+    "fresh:current_passing_evidence",
+    "handoff:bound_proof_producer",
+    "handoff:current_passing_evidence",
+    "join:bound_proof_producer",
+    "join:current_done_verdict",
+    "join:current_passing_evidence",
+    "observe:current_passing_evidence",
+    "once:current_passing_evidence",
+    "package:bound_proof_producer",
+    "package:current_passing_evidence",
+    "persist:current_passing_evidence",
+    "register:bound_proof_producer",
+    "register:current_passing_evidence",
+    "rules:current_passing_evidence",
+    "validate:current_passing_evidence"
+  ],
+  "external": [
+    ".claude-plugin/marketplace.json",
+    ".claude/settings.json",
+    ".gitattributes",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "Authentic operator, register approval and exact-head CI evidence remain unavailable.",
+    "Clean committed worktree requires writable Git metadata; supplied .git is read-only.",
+    "Current host uninstall receipt proving state preservation",
+    "Current passing package dependency evidence",
+    "Current passing upstream configure/rules/validate evidence, including authentic exact-head CI and register approval",
+    "Current source-pinned operator receipt for intended version in a fresh account/session, blocked slip, silent control, error-free runtime and rejection of a missing plugin",
+    "HANDOFF.md",
+    "LACKS.md",
+    "LICENSE",
+    "Operator evidence of legacy manual integration cleanup",
+    "README.md",
+    "SPIRIT.md",
+    "Selected committed head and authentic five-job CI receipts",
+    "WORDS.tsv",
+    "authoritative citation and register replay evidence",
+    "current owner-approved register and provenance",
+    "plugin/.claude-plugin/plugin.json",
+    "plugin/hooks/hooks.json",
+    "plugin/makoto2/CONFIG_KEYS.txt",
+    "plugin/makoto2/__init__.py",
+    "plugin/makoto2/__main__.py",
+    "plugin/makoto2/config.json",
+    "plugin/makoto2/evaluate.py",
+    "plugin/makoto2/hook.py",
+    "plugin/makoto2/observed.py",
+    "plugin/makoto2/rows.tsv",
+    "tests/sources.tsv",
+    "tests/test_evaluate.py",
+    "tests/test_hook.py",
+    "tests/test_observed.py"
+  ],
+  "done": false,
+  "decision": "not_done",
+  "result": "absent",
+  "status": "EXTERNAL",
+  "failure_edge": "Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.",
+  "reproduction": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py",
+  "scope": "Only allowed input bytes measured; external pins remain unverified. Model checks do not certify runtime completion."
+}

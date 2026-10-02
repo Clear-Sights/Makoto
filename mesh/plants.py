@@ -5,7 +5,6 @@ No runtime imports, hooks, test suite, gate, network or checkout mutations.
 from pathlib import Path
 import argparse
 import csv
-import json
 import shutil
 import subprocess
 import sys
