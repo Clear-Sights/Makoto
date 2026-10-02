@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________________________ test_zero ___________________________________
+
+    def test_zero():
+        # Successful report generation is not implementation completion.
+>       for task in ('register','validate','package','fresh','audit','join','handoff'): require_receipt(task)
+                                                                                        ^^^^^^^^^^^^^^^^^^^^^
+
+tests/acceptance_tasks.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+task = 'register'
+
+    def require_receipt(task):
+        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
+        assert receipt.get('task') == task
+>       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
+E       AssertionError: register: current product evidence absent or external
+E       assert ('absent' == 'pass'
+E         
+E         - pass
+E         + absent)
+
+tests/acceptance_tasks.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_zero - AssertionError: register: curre...
+1 failed in 0.15s

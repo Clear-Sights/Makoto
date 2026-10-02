@@ -1,0 +1,26 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________________________ test_audit __________________________________
+
+>   def test_audit(): require_receipt('audit')
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/acceptance_tasks.py:171: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+task = 'audit'
+
+    def require_receipt(task):
+        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
+        assert receipt.get('task') == task
+>       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
+E       AssertionError: audit: current product evidence absent or external
+E       assert ('fail' == 'pass'
+E         
+E         - pass
+E         + fail)
+
+tests/acceptance_tasks.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_audit - AssertionError: audit: current...
+1 failed in 0.13s

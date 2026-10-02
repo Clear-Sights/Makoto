@@ -22,7 +22,7 @@ TABLES = {'SLOTS': ('slot','inputs','outputs','requirements','loosest','filled-b
           'REQUIREMENTS': ('requirement','source','text','scope','slot','port','universe','allowed','required','math-type'),
           'CONSTRAINTS': ('constraint','requirement','slot','port','accepts','derivation'),
           'FILLS': ('path','unit','slot','reason'), 'SUBTRACT': ('path','unit','reason'),
-          'TRACE': ('requirement','source','verdict'), 'SOURCES': ('path','sha256')}
+          'TRACE': ('requirement','source','verdict','tests'), 'SOURCES': ('path','sha256')}
 TASK_FIELDS = ('task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens')
 # Nominal payloads are open records: these fields are required, extra fields permitted.
 # No implementation class, exact collection length, rule order or serialization is imposed.
@@ -158,6 +158,9 @@ def errors(root=ROOT):
         t = traces.get(r['requirement'], {})
         if t.get('verdict') != 'TRACED' or t.get('source') != r['source']:
             bad['trace'].append('requirement without TRACED source: ' + r['requirement'])
+        expected_test = 'tests/acceptance_tasks.py::test_' + r['slot']
+        if t.get('tests') != expected_test or not (root/'tests/acceptance_tasks.py').is_file() or 'test_'+r['slot'] not in units(root/'tests/acceptance_tasks.py'):
+            bad['trace'].append('missing product acceptance: '+r['requirement'])
     forward={s:set() for s in slots}; backward={s:set() for s in slots}; connected=set()
     for w in W:
         try:
@@ -263,6 +266,9 @@ def errors(root=ROOT):
         taskmap={t['task']:t for t in tasks}; meshmap={m['hole']:m for m in rows}
         expected={'subtract','zero'} | (slots.keys()-{INPUT,OUTPUT})
         if header!=TASK_FIELDS or set(taskmap)!=expected or len(tasks)!=len(taskmap) or set(meshmap)!=expected:bad['route'].append('task/mesh coverage')
+        for task in tasks:
+            expected_check = 'PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/acceptance_tasks.py::test_'+task['task']
+            if task['check'] != expected_check:bad['route'].append('non-product task check '+task['task'])
         completed=set(); remaining=set(taskmap)
         while remaining:
             ready={t for t in remaining if set(filter(None,taskmap[t]['deps'].split(',')))<=completed}
@@ -290,7 +296,7 @@ def errors(root=ROOT):
             if citation not in headings | {word['id'] for word in words}:
                 bad['route'].append(id+' unresolved bare citation')
             m=meshmap.get(id,{})
-            if m.get('check')!=t['check'] or not m.get('plant'):bad['route'].append(id+' check/plant mismatch')
+            if m.get('check')!='PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task '+id or not m.get('plant'):bad['route'].append(id+' check/plant mismatch')
     except (OSError,KeyError,ValueError) as e:bad['route'].append(str(e))
     try:
         from tighten import render as fresh_tighten

@@ -1,0 +1,26 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________________________________ test_handoff _________________________________
+
+>   def test_handoff(): require_receipt('handoff')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/acceptance_tasks.py:175: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+task = 'handoff'
+
+    def require_receipt(task):
+        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
+        assert receipt.get('task') == task
+>       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
+E       AssertionError: handoff: current product evidence absent or external
+E       assert ('absent' == 'pass'
+E         
+E         - pass
+E         + absent)
+
+tests/acceptance_tasks.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_handoff - AssertionError: handoff: cur...
+1 failed in 0.09s

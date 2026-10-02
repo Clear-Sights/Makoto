@@ -4,6 +4,8 @@ No runtime imports, hooks, test suite, gate, network or checkout mutations.
 """
 from pathlib import Path
 import argparse
+import ast
+import os
 import csv
 import shutil
 import subprocess
@@ -12,7 +14,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKS = ('schema','wires','reachable','trace','coverage','fills','missing','over','subtractions','route','wire-rule','tighten','costs')
-COPY_PATHS = ('mesh','WORDS.tsv','SPIRIT.md','PLAN.md','TASKS.tsv','MESH.tsv','plugin/makoto2','tests')
+COPY_PATHS = ('mesh','WORDS.tsv','SPIRIT.md','PLAN.md','TASKS.tsv','MESH.tsv','plugin','tests','README.md','HANDOFF.md','.claude-plugin','.github')
 
 
 def read(path):
@@ -64,6 +66,73 @@ def command(copy,check=None,task=None):
     return subprocess.run(args,cwd=copy,text=True,capture_output=True)
 
 
+def empty_fill(copy, task):
+    """Remove the task's product units, never its acceptance tests or mesh shape."""
+    if task == 'subtract':
+        shutil.copy2(copy/'mesh/reference/types.py', copy/'mesh/types.py')
+        return
+    if task == 'zero':
+        (copy/'mesh/evidence/zero.json').unlink(missing_ok=True)
+        return
+    _, fills = read(copy/'mesh/FILLS.tsv')
+    grouped = {}
+    for row in fills:
+        if row['slot'] == task and not row['path'].startswith('tests/'):
+            grouped.setdefault(row['path'], set()).add(row['unit'])
+    if task == 'validate':
+        for name in ('test_hook.py', 'test_evaluate.py', 'test_observed.py'):
+            (copy/'tests'/name).unlink(missing_ok=True)
+    for name, units in grouped.items():
+        path = copy/name
+        if '<module>' in units:
+            path.write_text('"""Empty product fill plant."""\n')
+            continue
+        tree = ast.parse(path.read_text())
+        lines = path.read_text().splitlines(keepends=True)
+        spans = []
+        def visit(node, prefix=''):
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    unit = prefix + child.name
+                    if unit in units:
+                        start = min([child.lineno] + [d.lineno for d in getattr(child, 'decorator_list', [])])
+                        spans.append((start-1, child.end_lineno))
+                    else:
+                        visit(child, unit+'.')
+                else:
+                    visit(child, prefix)
+        visit(tree)
+        for start, end in sorted(spans, reverse=True):
+            lines[start:end] = []
+        path.write_text(''.join(lines))
+    # Unbound proof slots have an empty fill already; remove their proposed
+    # receipt too, proving missing evidence never makes acceptance green.
+    (copy/f'mesh/evidence/{task}.json').unlink(missing_ok=True)
+
+
+def prove_products():
+    failures = []
+    _, tasks = read(ROOT/'TASKS.tsv')
+    for row in tasks:
+        copy = local_copy()
+        try:
+            def run():
+                return subprocess.run(row['check'], shell=True, cwd=copy,
+                    env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'), capture_output=True, text=True)
+            baseline = run()
+            empty_fill(copy, row['task'])
+            removed = run()
+            ok = removed.returncode != 0
+            label = 'baseline PASS, empty fill RED' if baseline.returncode == 0 else 'real task RED, empty fill RED'
+            print('product '+row['task']+': '+(label if ok else 'FAILED: empty fill accepted'))
+            if not ok:
+                failures.append(row['task'])
+                print(removed.stdout + removed.stderr)
+        finally:
+            shutil.rmtree(copy)
+    return failures
+
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('check',nargs='?',choices=CHECKS);parser.add_argument('--copy',metavar='TASK');args=parser.parse_args()
     if args.copy:
@@ -86,6 +155,7 @@ def main():
     if not args.check:
         from route_preflight import prove
         failures.extend(prove())
+        failures.extend(prove_products())
     return int(bool(failures))
 
 if __name__=='__main__':raise SystemExit(main())

@@ -1,0 +1,27 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________________________ test_validate _________________________________
+
+    def test_validate():
+        suite('tests/test_evaluate.py', 'tests/test_observed.py', 'tests/test_hook.py')
+>       require_receipt('validate')
+
+tests/acceptance_tasks.py:168: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+task = 'validate'
+
+    def require_receipt(task):
+        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
+        assert receipt.get('task') == task
+>       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
+E       AssertionError: validate: current product evidence absent or external
+E       assert ('absent' == 'pass'
+E         
+E         - pass
+E         + absent)
+
+tests/acceptance_tasks.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_validate - AssertionError: validate: c...
+1 failed in 1.11s

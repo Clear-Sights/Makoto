@@ -1,0 +1,26 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________________________________ test_package _________________________________
+
+>   def test_package(): require_receipt('package')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/acceptance_tasks.py:169: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+task = 'package'
+
+    def require_receipt(task):
+        receipt = json.loads((ROOT/f'mesh/evidence/{task}.json').read_text())
+        assert receipt.get('task') == task
+>       assert receipt.get('result') == 'pass' and not receipt.get('absent') and not receipt.get('external'), f'{task}: current product evidence absent or external'
+E       AssertionError: package: current product evidence absent or external
+E       assert ('absent' == 'pass'
+E         
+E         - pass
+E         + absent)
+
+tests/acceptance_tasks.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_package - AssertionError: package: cur...
+1 failed in 0.17s
