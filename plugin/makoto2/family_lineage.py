@@ -63,8 +63,8 @@ def output_text(event, reader):
     ti = event.get('tool_input') or {}
     if event.get('tool_name') in ('Write', 'Edit', 'MultiEdit'):
         return ti.get('content', ti.get('new_string', ''))
-    # Other output-bearing Pre events include messages and dispatch prompts.
-    return reader.text_of(event)
+    # refs(output) is Write/Edit content or closing text (register definition).
+    return ''
 
 
 def lineage_refs(record, event, reader):
