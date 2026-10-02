@@ -1,4 +1,4 @@
-# Makoto 4.0.0
+# Makoto 4.0.1
 
 [![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
 
