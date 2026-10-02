@@ -121,6 +121,10 @@ def derive(plan_only=False):
             # Owner decides register amendments: realize the ports against the approved register; never amend it.
             brief+=' Load, enforce and replay the CURRENT shipped register exactly. Never amend it. Proposed amendments remain in mesh/evidence/register-proposal.md for Gabriel; approval is not a route obligation or dependency.'
             inputs+=',plugin/makoto2/rows.tsv,tests/sources.tsv'
+        if id not in {'zero', 'subtract'}:
+            from acceptance import references
+            tests = references(ROOT, 'tests/acceptance_tasks.py::test_'+id)
+            inputs = ','.join(inputs.split(',') + sorted(tests - set(inputs.split(','))))
         tasks.append(dict(task=id,deps=','.join(sorted(parents)),brief=brief,inputs=inputs,check=command,hand='no',piece=id,citation=citation,estimate_tokens=cost))
         mesh.append(dict(hole=id,check=model_command,plant='PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy '+id,piece=id,citation=citation,status='SHAPE_PRESENT',realization=slot['fill-status'] if slot else 'MODEL_ONLY'))
         predictions.append(dict(task=id,shape='PRESENT',implementation='REMOVED' if id=='subtract' else slot['fill-status'] if slot else 'UNPROVEN',evidence='EXTERNAL' if id in EXTERNAL_SLOTS else 'UNMEASURED',cost_tokens=cost))

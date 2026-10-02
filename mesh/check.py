@@ -11,7 +11,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 MESH = ROOT / 'mesh'
-CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route', 'wire-rule', 'tighten', 'costs')
+CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route', 'wire-rule', 'tighten', 'costs', 'acceptance')
 INPUT = 'PROGRAM_INPUT'
 OUTPUT = 'PROGRAM_OUTPUT'
 SOURCE_PATHS = {'WORDS.tsv','SPIRIT.md','mesh/reference/docs-def-README.md'}
@@ -260,6 +260,9 @@ def errors(root=ROOT):
                 bad['costs'].append(task['task']+' estimate below passing class floor '+str(minimum))
     except (OSError, KeyError, ValueError) as e:
         bad['costs'].append(str(e))
+    from acceptance import errors as acceptance_errors
+    _, acceptance_tasks = read(root/'TASKS.tsv')
+    bad['acceptance'].extend(acceptance_errors(root, acceptance_tasks))
     # Route reflects every data dependency and every removal, no invented SCCs.
     try:
         header,tasks=read(root/'TASKS.tsv'); mh,rows=read(root/'MESH.tsv')

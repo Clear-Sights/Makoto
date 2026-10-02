@@ -224,7 +224,22 @@ def test_subtract():
 
 def test_zero():
     # Execute every completion obligation; handwritten receipts cannot close zero.
-    suite(*['tests/acceptance_tasks.py::test_'+name for name in
-            ('decode', 'configure', 'rules', 'observe', 'evaluate', 'once', 'emit',
-             'advance', 'persist', 'register', 'validate', 'package', 'fresh',
-             'audit', 'join', 'handoff', 'subtract')])
+    suite(
+        'tests/acceptance_tasks.py::test_decode',
+        'tests/acceptance_tasks.py::test_configure',
+        'tests/acceptance_tasks.py::test_rules',
+        'tests/acceptance_tasks.py::test_observe',
+        'tests/acceptance_tasks.py::test_evaluate',
+        'tests/acceptance_tasks.py::test_once',
+        'tests/acceptance_tasks.py::test_emit',
+        'tests/acceptance_tasks.py::test_advance',
+        'tests/acceptance_tasks.py::test_persist',
+        'tests/acceptance_tasks.py::test_register',
+        'tests/acceptance_tasks.py::test_validate',
+        'tests/acceptance_tasks.py::test_package',
+        'tests/acceptance_tasks.py::test_fresh',
+        'tests/acceptance_tasks.py::test_audit',
+        'tests/acceptance_tasks.py::test_join',
+        'tests/acceptance_tasks.py::test_handoff',
+        'tests/acceptance_tasks.py::test_subtract',
+    )

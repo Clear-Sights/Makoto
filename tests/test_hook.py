@@ -8,23 +8,25 @@ class Rec:
 def ev_(**k): return json.dumps(dict(session_id="s", **k))
 def always(rows, rec, ev): return {"row": "r1", "message": "m", "objects": ["x"]} if ev["hook_event_name"] in ("PreToolUse", "Stop") else None
 def never(rows, rec, ev): return None
-_state = tempfile.TemporaryDirectory()
-cfg = {"state_dir": _state.name}
-run = lambda raw, v=always: hook.main(raw, cfg, [], Rec, v)
-# D_in fail open
-assert run("not json") == {} and run("{}") == {}
-# first finding blocks (plant), pre -> deny, stop -> block
-a = run(ev_(hook_event_name="PreToolUse", tool_name="Bash"))
-assert a["hookSpecificOutput"]["permissionDecision"] == "deny", a
-# O: same object state -> silent (look-alike)
-assert run(ev_(hook_event_name="PreToolUse", tool_name="Bash")) == {}
-# O: object state changes -> blocks again (plant)
-run(ev_(hook_event_name="PostToolUse", tool_name="Bash", objs=["x"]), never)
-b = run(ev_(hook_event_name="Stop"))
-assert b.get("decision") == "block", b
-# D_out has two outputs only
-assert set(map(lambda d: tuple(sorted(d)), [a, b, {}])) <= {("hookSpecificOutput",), ("decision", "reason"), ()}
-print("test_hook OK 6 assertions")
+def test_hook_behavior():
+    _state = tempfile.TemporaryDirectory()
+    cfg = {"state_dir": _state.name}
+    run = lambda raw, v=always: hook.main(raw, cfg, [], Rec, v)
+    # D_in fail open
+    assert run("not json") == {} and run("{}") == {}
+    # first finding blocks (plant), pre -> deny, stop -> block
+    a = run(ev_(hook_event_name="PreToolUse", tool_name="Bash"))
+    assert a["hookSpecificOutput"]["permissionDecision"] == "deny", a
+    # O: same object state -> silent (look-alike)
+    assert run(ev_(hook_event_name="PreToolUse", tool_name="Bash")) == {}
+    # O: object state changes -> blocks again (plant)
+    run(ev_(hook_event_name="PostToolUse", tool_name="Bash", objs=["x"]), never)
+    b = run(ev_(hook_event_name="Stop"))
+    assert b.get("decision") == "block", b
+    # D_out has two outputs only
+    assert set(map(lambda d: tuple(sorted(d)), [a, b, {}])) <= {("hookSpecificOutput",), ("decision", "reason"), ()}
+    print("test_hook OK 6 assertions")
+
 
 # Portable, offline GitHub Actions receipt checker. The caller supplies retained
 # API responses: {"run": workflow_run, "jobs": jobs_response["jobs"]}.
@@ -54,41 +56,47 @@ ci_receipt_ok = lambda receipt, head: (
 )
 
 # Synthetic controls and plants never serve as current CI evidence.
-import copy
-_head = "a" * 40
-_receipt = {"run": {"id": 123, "head_sha": _head, "status": "completed",
-                    "conclusion": "success", "path": ".github/workflows/ci.yml",
-                    "repository": {"full_name": "Clear-Sights/Makoto"}},
-            "jobs": [{"name": name, "head_sha": _head, "run_id": 123,
-                      "status": "completed", "conclusion": "success"}
-                     for name in sorted(CI_JOBS)]}
-assert ci_receipt_ok(_receipt, _head)
-assert not ci_receipt_ok(_receipt, "b" * 40)
-assert not ci_receipt_ok(_receipt, None)
-assert not ci_receipt_ok({}, _head)
-for _field, _value in (("head_sha", "b" * 40), ("status", "in_progress"),
-                        ("conclusion", "failure"), ("path", "other.yml"),
-                        ("repository", None), ("id", None)):
-    _plant = copy.deepcopy(_receipt)
-    _plant["run"][_field] = _value
-    assert not ci_receipt_ok(_plant, _head), _field
-for _index in range(5):
-    for _field, _value in (("head_sha", "b" * 40), ("status", "queued"),
-                          ("conclusion", "skipped"), ("run_id", 456),
-                          ("name", "unrelated job")):
+def test_ci_receipt_controls():
+    import copy
+    _head = "a" * 40
+    _receipt = {"run": {"id": 123, "head_sha": _head, "status": "completed",
+                        "conclusion": "success", "path": ".github/workflows/ci.yml",
+                        "repository": {"full_name": "Clear-Sights/Makoto"}},
+                "jobs": [{"name": name, "head_sha": _head, "run_id": 123,
+                          "status": "completed", "conclusion": "success"}
+                         for name in sorted(CI_JOBS)]}
+    assert ci_receipt_ok(_receipt, _head)
+    assert not ci_receipt_ok(_receipt, "b" * 40)
+    assert not ci_receipt_ok(_receipt, None)
+    assert not ci_receipt_ok({}, _head)
+    for _field, _value in (("head_sha", "b" * 40), ("status", "in_progress"),
+                            ("conclusion", "failure"), ("path", "other.yml"),
+                            ("repository", None), ("id", None)):
         _plant = copy.deepcopy(_receipt)
-        _plant["jobs"][_index][_field] = _value
-        assert not ci_receipt_ok(_plant, _head), (_index, _field)
-_plant = copy.deepcopy(_receipt)
-_plant["jobs"].pop()
-assert not ci_receipt_ok(_plant, _head)
-_plant = copy.deepcopy(_receipt)
-_plant["jobs"][0] = copy.deepcopy(_plant["jobs"][1])
-assert not ci_receipt_ok(_plant, _head)
-_plant = copy.deepcopy(_receipt)
-_plant["jobs"].append(copy.deepcopy(_plant["jobs"][0]))
-assert not ci_receipt_ok(_plant, _head)
-print("CI receipt controls and revision/status/job plants OK (synthetic)")
+        _plant["run"][_field] = _value
+        assert not ci_receipt_ok(_plant, _head), _field
+    for _index in range(5):
+        for _field, _value in (("head_sha", "b" * 40), ("status", "queued"),
+                              ("conclusion", "skipped"), ("run_id", 456),
+                              ("name", "unrelated job")):
+            _plant = copy.deepcopy(_receipt)
+            _plant["jobs"][_index][_field] = _value
+            assert not ci_receipt_ok(_plant, _head), (_index, _field)
+    _plant = copy.deepcopy(_receipt)
+    _plant["jobs"].pop()
+    assert not ci_receipt_ok(_plant, _head)
+    _plant = copy.deepcopy(_receipt)
+    _plant["jobs"][0] = copy.deepcopy(_plant["jobs"][1])
+    assert not ci_receipt_ok(_plant, _head)
+    _plant = copy.deepcopy(_receipt)
+    _plant["jobs"].append(copy.deepcopy(_plant["jobs"][0]))
+    assert not ci_receipt_ok(_plant, _head)
+    print("CI receipt controls and revision/status/job plants OK (synthetic)")
+
+
+if __name__ == "__main__":
+    test_hook_behavior()
+    test_ci_receipt_controls()
 
 if __name__ == "__main__" and "--validate" in sys.argv:
     import argparse, hashlib, subprocess

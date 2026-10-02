@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-CHECKS = ('schema','wires','reachable','trace','coverage','fills','missing','over','subtractions','route','fill-scope','wire-rule','tighten','costs')
+CHECKS = ('schema','wires','reachable','trace','coverage','fills','missing','over','subtractions','route','fill-scope','wire-rule','tighten','costs','acceptance','acceptance-scope')
 COPY_PATHS = ('mesh','WORDS.tsv','SPIRIT.md','PLAN.md','TASKS.tsv','MESH.tsv','plugin','tests','README.md','HANDOFF.md','.claude-plugin','.github')
 
 
@@ -28,10 +28,15 @@ def write(path,fields,rows):
 
 
 def mutate(copy,check):
-    filename={'schema':'SOURCES','wires':'WIRES','reachable':'WIRES','trace':'TRACE','coverage':'REQUIREMENTS','fills':'FILLS','missing':'CONSTRAINTS','over':'CONSTRAINTS','subtractions':'SUBTRACT','route':None,'fill-scope':None,'wire-rule':'WIRES','tighten':'TIGHTEN','costs':None}[check]
+    filename={'schema':'SOURCES','wires':'WIRES','reachable':'WIRES','trace':'TRACE','coverage':'REQUIREMENTS','fills':'FILLS','missing':'CONSTRAINTS','over':'CONSTRAINTS','subtractions':'SUBTRACT','route':None,'fill-scope':None,'wire-rule':'WIRES','tighten':'TIGHTEN','costs':None,'acceptance':None,'acceptance-scope':None}[check]
     path=copy/'mesh'/(filename+'.tsv') if filename else copy/'TASKS.tsv'
     fields,rows=read(path)
-    if check=='fill-scope':
+    if check=='acceptance':
+        (copy/'tests/test_hook.py').write_text('# empty pytest file\n')
+    elif check=='acceptance-scope':
+        row=next(t for t in rows if t['task']=='package')
+        row['inputs']=','.join(p for p in row['inputs'].split(',') if p!='tests/test_hook.py')
+    elif check=='fill-scope':
         row=next(t for t in rows if t['task']=='validate')
         row['inputs']=','.join(p for p in row['inputs'].split(',') if p!='mesh/FILLS.tsv')
     elif check=='costs':
@@ -147,11 +152,11 @@ def main():
     for check in selected:
         copy=local_copy()
         try:
-            target='route' if check=='fill-scope' else check
+            target='route' if check=='fill-scope' else 'acceptance' if check=='acceptance-scope' else check
             baseline=command(copy,target)
             mutate(copy,check)
             result=command(copy,target)
-            expected='validate fill outside writable scope' if check=='fill-scope' else check+': FAIL'
+            expected='validate fill outside writable scope' if check=='fill-scope' else target+': FAIL'
             ok=baseline.returncode==0 and result.returncode!=0 and expected in result.stdout
             print(check+': '+('plant RED (baseline PASS)' if ok else 'plant FAILED'))
             if not ok:failures.append(check);print(baseline.stdout+result.stdout+result.stderr)

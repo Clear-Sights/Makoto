@@ -180,3 +180,5 @@ plugin/makoto2/evaluate.py	load_rows	register	Load the CURRENT shipped register 
 plugin/makoto2/evaluate.py	evaluate	register	Enforce current predicates against fixed replay cases
 plugin/makoto2/lifecycle.py	<module>	validate	Executable validation decision over current local and selected-head CI results.
 plugin/makoto2/lifecycle.py	validate	validate	Executable validation decision over current local and selected-head CI results.
+tests/test_hook.py	test_hook_behavior	validate	Collected hook behavior controls
+tests/test_hook.py	test_ci_receipt_controls	validate	Collected CI receipt hostile controls

@@ -59,3 +59,10 @@ changes; record validation separately from external acceptance evidence.
 ## Product task acceptance
 
 TASKS.tsv runs tests/acceptance_tasks.py nodes; MESH.tsv checks the model independently. mesh/ALREADY-MET.tsv records current passing product checks with output digests. Register now passes local load/enforce/replay of the unchanged shipped rows. Seven product obligations remain open: validate, package, fresh, audit, join, handoff and zero. Product plants remove fills and require acceptance to turn red; Acceptance runs code against fixed expected cases; receipt labels never count as completed work. Register amendments remain proposals outside the DAG. Local checks and fixed-input replay are authorized. The unused mesh/reference/seed.py was removed; docs-def-README.md and types.py remain required references.
+
+Task acceptance references are checked recursively by mesh/acceptance.py through
+the model gate. Targets must contain pytest tests, and fill tasks must include
+referenced test files in their writable scope. The seed derives those test scopes.
+The fixed subtract checker and read-only zero aggregation do not write tests.
+The acceptance and acceptance-scope plants reject empty tests and omitted scopes.
+Hook behavior and CI receipt controls now collect under pytest.
