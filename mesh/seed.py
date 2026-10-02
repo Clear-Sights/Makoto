@@ -19,23 +19,35 @@ def write(path,rows,fields):
         w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
 
 
+def task_class(task):
+    return task.split('-', 1)[0]
+
+
 def measured_costs(path):
     with path.open(newline='') as f:
         reader = csv.DictReader(f, delimiter='\t')
-        if reader.fieldnames != ['task', 'tokens', 'source']:
+        if reader.fieldnames != ['repo', 'task', 'class', 'tokens', 'passed', 'source']:
             raise ValueError('invalid COSTS columns')
         rows = list(reader)
     if not rows:
         raise ValueError('COSTS requires a measured attempt')
     costs = {}
+    passing = []
     for row in rows:
         if (None in row or any(v is None for v in row.values())
-                or not row['task'] or not row['source'].strip()
+                or not row['repo'].strip() or not row['task'] or not row['source'].strip()
+                or row['class'] != task_class(row['task'])
+                or row['passed'] not in ('yes', 'no')
                 or not row['tokens'].isdigit() or int(row['tokens']) <= 0):
             raise ValueError('invalid measured COSTS row')
         tokens = int(row['tokens'])
-        costs[row['task']] = min(costs.get(row['task'], tokens), tokens)
-    return costs, min(costs.values())
+        if row['passed'] == 'yes':
+            passing.append(tokens)
+            kind = row['class']
+            costs[kind] = min(costs.get(kind, tokens), tokens)
+    if not passing:
+        raise ValueError('COSTS requires a passing measured run')
+    return costs, max(passing)
 
 
 def derive(plan_only=False):
@@ -50,7 +62,7 @@ def derive(plan_only=False):
     tasks=[];mesh=[];predictions=[]
     for id,parents in deps.items():
         slot=slots.get(id)
-        cost=costs.get(id, floor)
+        cost=costs.get(task_class(id), floor)
         refs=slot['requirements'].split(',') if slot else ['done']
         citation=requirements[refs[0]]['source'].removeprefix('WORDS.tsv:')
         # Route resolves owner words from WORDS_FILES; SPIRIT headings are literal Markdown headings.
@@ -89,7 +101,7 @@ def derive(plan_only=False):
     config = existing_plan.split('```text\n', 1)[1].split('```', 1)[0]
     lines=['# Makoto: top-down seed from final-program wiring','',
       'Requirements open ports; transformed wires order work. Raw program inputs are local slot bindings (SLOTS input-sources). WIRE-RULE.tsv records the applied classification; wire_rule.py rejects identity wires and detects missing transformed passes. Layer 1 closes only source-backed definite constraints. Layers 2+ use signed deterministic feedback within that closed space: surplus deletion reduces excess, while required deletion increases missing and is forbidden. SymPy simplifies every slot relation before and after the loop. tighten.py computes the least finite requirement relations to a fixpoint, and check.py rejects a stale TIGHTEN.tsv. SUBTRACT is first. Each later wave contains every ready slot, giving maximal concurrency under this one-layer dependency graph. Candidate units in shared files must be edited by one writer or re-measured into disjoint scopes; evidence files are per slot.', '',
-      'The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a token cost from mesh/COSTS.tsv. Measured tasks use their cheapest logged attempt; unmeasured tasks use the cheapest logged attempt overall as their floor. The project rule stops a job over twice its cheapest logged run.', '',
+      'The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a token cost from mesh/COSTS.tsv. Each task uses the cheapest passing measured run of its class across repositories; classes without a passing run use the largest passing run of any class. A class is the task-name prefix before the first hyphen (including subtract and fill). Failed attempts never set estimates. The project rule stops a job over twice its cheapest logged passing run of the same class.', '',
       'Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.', '',
       'Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have plants that mutate the current disposable working tree. This is a reviewable plan; route execution and its tail are outside this request. Register amendments require Gabriel; merging remains with Gabriel.', '',
       'Configuration for a later authorized model-only route:',

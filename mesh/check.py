@@ -247,13 +247,14 @@ def errors(root=ROOT):
             for unit in units(p):
                 if (str(p.relative_to(root)),unit) not in mapping|subtract:bad['subtractions'].append('unclassified '+str(p)+':'+unit)
     try:
-        from seed import measured_costs
-        _, floor = measured_costs(mesh/'COSTS.tsv')
+        from seed import measured_costs, task_class
+        costs, floor = measured_costs(mesh/'COSTS.tsv')
         _, cost_tasks = read(root/'TASKS.tsv')
         for task in cost_tasks:
+            minimum = costs.get(task_class(task['task']), floor)
             estimate = task['estimate_tokens']
-            if not estimate.isdigit() or int(estimate) < floor:
-                bad['costs'].append(task['task']+' estimate below measured floor '+str(floor))
+            if not estimate.isdigit() or int(estimate) < minimum:
+                bad['costs'].append(task['task']+' estimate below passing class floor '+str(minimum))
     except (OSError, KeyError, ValueError) as e:
         bad['costs'].append(str(e))
     # Route reflects every data dependency and every removal, no invented SCCs.

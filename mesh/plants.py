@@ -31,9 +31,9 @@ def mutate(copy,check):
     path=copy/'mesh'/(filename+'.tsv') if filename else copy/'TASKS.tsv'
     fields,rows=read(path)
     if check=='costs':
-        from seed import measured_costs
-        _, floor = measured_costs(copy/'mesh/COSTS.tsv')
-        rows[0]['estimate_tokens']=str(floor-1)
+        from seed import measured_costs, task_class
+        costs, floor = measured_costs(copy/'mesh/COSTS.tsv')
+        rows[0]['estimate_tokens']=str(costs.get(task_class(rows[0]['task']), floor)-1)
     elif check=='tighten':rows[-1]['shape']='{}'
     elif check=='wire-rule':rows.append(dict(wire='plant-identity',source='PROGRAM_INPUT#raw',target='decode#raw',requirements='decode'))
     elif check=='schema':rows[0]['sha256']='0'*64
