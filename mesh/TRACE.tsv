@@ -1,0 +1,40 @@
+requirement	source	verdict	tests
+detect	WORDS.tsv:WHY	TRACED	tests/acceptance_tasks.py::test_evaluate
+decode	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_decode
+settled	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_observe
+terminal	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-permission	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-worker	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-rebrief	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-absence	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-thread	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-quote	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-plan	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-retry	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-time	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-completion	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-count	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+rule-probe	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+once	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_once
+output	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_emit
+boundaries	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_advance
+store	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_persist
+configuration	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_configure
+sources	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_rules
+register	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_register
+suite	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_validate
+ci	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_validate
+package	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_package
+install	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_fresh
+audit	SPIRIT.md#Acceptance checks	TRACED	tests/acceptance_tasks.py::test_audit
+done	WORDS.tsv:DONE	TRACED	tests/acceptance_tasks.py::test_join
+handoff	WORDS.tsv:HANDOFF	TRACED	tests/acceptance_tasks.py::test_handoff
+awareness	WORDS.tsv:AWARE	TRACED	tests/acceptance_tasks.py::test_handoff
+focus	WORDS.tsv:FOCUS	TRACED	tests/acceptance_tasks.py::test_handoff
+nohooks	WORDS.tsv:NOHOOKS	TRACED	tests/acceptance_tasks.py::test_handoff
+scope-detio-bar	WORDS.tsv:DETIO-BAR	TRACED	tests/acceptance_tasks.py::test_handoff
+scope-causality	WORDS.tsv:CAUSALITY	TRACED	tests/acceptance_tasks.py::test_handoff
+scope-why	WORDS.tsv:WHY	TRACED	tests/acceptance_tasks.py::test_handoff
+scope	SPIRIT.md#Out-of-scope	TRACED	tests/acceptance_tasks.py::test_handoff
+uninstall	docs-def:README.md#Uninstall	TRACED	tests/acceptance_tasks.py::test_package
+limits	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate

@@ -1,0 +1,92 @@
+{
+  "task": "register",
+  "requirement": "register",
+  "candidate": "OPEN",
+  "port": "register#approval",
+  "selected_input_digest": "e122178c1cd94579c8d58674682528fce34c695be083741fba5c1c34000ba1f6",
+  "source_pins": {
+    "SPIRIT.md": "29e335fadfdfc4ff20c5bac2826dbde47748614dada1ea915dd0476f656cc664",
+    "HANDOFF.md": "908e4bfa794c5a85f0221b54b936bbed8a9be9edae90984d5e241797bdabdfff",
+    "WORDS.tsv": "98785feda250eaaa157b32ffcf69da26ded6f3a0ef36ae024bf88bec1d5bfe1a",
+    "plugin/makoto2/rows.tsv": "9da5bf457fd25ffa53d89c3c68e4e0145a921366a311c281ddadd15f3fb789b5",
+    "plugin/makoto2/evaluate.py": "51f64ed126a0d7a9aa89c106cd5ddd41ca10e994573f74044100a3bd941beb0d",
+    "plugin/makoto2/observed.py": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+    "tests/sources.tsv": "d0eb5f91de6a443da2bef3f05c4bdebde7c8b07a57a0f272117490f4c27a3ada",
+    "tests/test_evaluate.py": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+    "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
+    "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+    "mesh/seed.py": "70625032e64aaa00b1d5bb01e164e44226ee613cfa4f60285c321c9dec55006e",
+    "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
+    "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+    "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
+    "mesh/evidence/evaluate.json": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
+    "TASKS.tsv": "3bb4bc4f22aa5c0b965848ff1286bd1eb4c1ca23b1a30099511009a5d1096217",
+    "PLAN.md": "528bb48f7ad4c47217858cecb9707d6fa8de80f106d4d1f8ae4f0ef3b70fb0be"
+  },
+  "digest_method": "SHA-256 of UTF-8 canonical source_pins JSON (sorted keys, compact separators); evidence outputs are not self-pinned; missing authority inputs are separately recorded",
+  "observations": [
+    {
+      "case": "current owner authority and recovery inputs",
+      "result": "absent",
+      "missing_paths": [
+        "REGISTER.md",
+        "CITATIONS.tsv",
+        "REPLAY.tsv",
+        "REGISTER-PROPOSAL.md"
+      ],
+      "detail": "No current register revision or owner approval can be verified."
+    },
+    {
+      "case": "semantic register proof producer",
+      "result": "absent",
+      "fill_status": "OPEN",
+      "filled_by": "",
+      "detail": "No bound semantic checker or hostile plant establishes register alignment."
+    },
+    {
+      "case": "dependency receipt freshness",
+      "result": "fail",
+      "stale_source_pins": {
+        "rules": [
+          "plugin/makoto2/evaluate.py",
+          "plugin/makoto2/observed.py"
+        ],
+        "evaluate": []
+      },
+      "detail": "A passing historical rules receipt is not current evidence."
+    },
+    {
+      "case": "register acceptance obligations",
+      "result": "absent",
+      "unproven": [
+        "owner-approved predicates",
+        "authoritative source citations",
+        "shared family coverage",
+        "attributed removals",
+        "replay regression accounting"
+      ]
+    },
+    {
+      "case": "specified declarative model check",
+      "result": "pass",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task register",
+      "exit_code": 0,
+      "output": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+      "detail": "Model validity does not establish register semantics or current approval."
+    }
+  ],
+  "result": "absent",
+  "status": "EXTERNAL",
+  "semantic_approval": false,
+  "external": [
+    "current owner-approved register and provenance",
+    "authoritative citation and register replay evidence"
+  ],
+  "proposal": "mesh/evidence/register-proposal.md",
+  "register_amended": false,
+  "failure_edge": "Re-measure changed inputs and re-derive waves; unavailable operator or outside evidence = EXTERNAL.",
+  "scope": "Current local gap and freshness measurement only; register semantics remain unproven. Only allowed evidence outputs were written."
+}

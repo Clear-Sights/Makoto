@@ -1,0 +1,1747 @@
+{
+  "task": "observe",
+  "requirement": "settled",
+  "candidate": "plugin/makoto2/observed.py:record",
+  "selected_input_digest": "190b513e7999569df4460586a164fb468acc11d852e7f5006cd3548600465d01",
+  "digest_method": "SHA-256 of UTF-8 canonical source_pins JSON (sorted keys, compact separators); evidence is an output, not self-pinned",
+  "source_pins": {
+    "plugin/makoto2/observed.py": "efffda3c4d42ec8b8dd4f0453a1cb6bc81deefa16f2909673329033bd0d66b34",
+    "mesh/REQUIREMENTS.tsv": "5028c1de16fac147fca1e7eebe9d150bb0a8e2e35ff878d21587acc5548c0da4",
+    "mesh/CONSTRAINTS.tsv": "dd6bdf7d5e88683b26a1000c12a785a3a00fc8610d61dd0bdbed30c9f84c07a7",
+    "mesh/SLOTS.tsv": "cdd7f624a755c646fd058b4bd5f7f5c3a105a5150c21a67aa727334695fcf3a3",
+    "mesh/check.py": "b9f673d987c492a1b2d776cbbf1dc890bd634d9f87026b28966403d94e884452",
+    "tests/test_observed.py": "9839541828c03ed95fcb0f9b2a9ccb92d1c0bc9bcf92c7d08de5f9ed45d9e90b",
+    "tests/test_evaluate.py": "da80c0f407162101959396929beeb33992de01ff8568755a13d94d72af436e84",
+    "plugin/makoto2/evaluate.py": "6ee8afd0d269f8ec3f1b6efc300ae3cc766940b7d4535e36f168151292de1701"
+  },
+  "observations": [
+    {
+      "case": "read-exact-object",
+      "relation": "settled:observed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true,
+        "seqs": [
+          0
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "current-settled-port",
+      "relation": "settled:observed",
+      "inputs": {
+        "history": [],
+        "event": {
+          "hook_event_name": "PostToolUse",
+          "tool_name": "Read",
+          "tool_input": {
+            "file_path": "a.txt"
+          },
+          "tool_response": {
+            "file": {
+              "content": "hello"
+            }
+          },
+          "cwd": "/repo"
+        },
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true,
+        "seqs": [
+          0
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "current-failure-with-result",
+      "relation": "settled:observed",
+      "inputs": {
+        "history": [],
+        "event": {
+          "hook_event_name": "PostToolUseFailure",
+          "tool_name": "Bash",
+          "tool_input": {
+            "file_path": "a.txt"
+          },
+          "tool_response": {
+            "stdout": "a.txt",
+            "exit_code": 1
+          },
+          "cwd": "/repo"
+        },
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "write-fields",
+      "relation": "settled:observed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "type": "create"
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true,
+        "written": [
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [
+            "/repo/a.txt"
+          ]
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "unrelated-file",
+      "relation": "other_object:not_witness",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "b.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "directory-is-not-child",
+      "relation": "other_object:not_witness",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "src/"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/src/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "cwd-object-binding",
+      "relation": "other_object:not_witness",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/other"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "pending-history",
+      "relation": "pending:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "seqs": []
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [],
+        "written": [],
+        "created": [],
+        "send": [],
+        "search": [],
+        "turn_start": 0,
+        "current_turn_seqs": [],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "pending-current-port",
+      "relation": "pending:not_deed",
+      "inputs": {
+        "history": [],
+        "event": {
+          "hook_event_name": "PreToolUse",
+          "tool_name": "Read",
+          "tool_input": {
+            "file_path": "a.txt"
+          },
+          "tool_response": null,
+          "cwd": "/repo"
+        },
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "seqs": []
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [],
+        "written": [],
+        "created": [],
+        "send": [],
+        "search": [],
+        "turn_start": 0,
+        "current_turn_seqs": [],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "missing-current-port",
+      "relation": "pending:not_deed",
+      "inputs": {
+        "history": [],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "seqs": []
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [],
+        "written": [],
+        "created": [],
+        "send": [],
+        "search": [],
+        "turn_start": 0,
+        "current_turn_seqs": [],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "denied-write-exit-None",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "error": "Tool use was rejected: permission denied",
+              "is_error": true
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ]
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "denial-does-not-poison-creation-None",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "error": "Tool use was rejected: permission denied",
+              "is_error": true
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true,
+        "written": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          1
+        ],
+        "written": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0,
+          1
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "denied-write-exit-0",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "error": "Tool use was rejected: permission denied",
+              "is_error": true,
+              "exit_code": 0
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ]
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "denial-does-not-poison-creation-0",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "error": "Tool use was rejected: permission denied",
+              "is_error": true,
+              "exit_code": 0
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true,
+        "written": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          1
+        ],
+        "written": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0,
+          1
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "denied-write-exit-1",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "error": "Tool use was rejected: permission denied",
+              "is_error": true,
+              "exit_code": 1
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ]
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "denial-does-not-poison-creation-1",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "error": "Tool use was rejected: permission denied",
+              "is_error": true,
+              "exit_code": 1
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true,
+        "written": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          1
+        ],
+        "written": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "created": [
+          [],
+          [
+            "/repo/a.txt"
+          ]
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0,
+          1
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "failure-without-result",
+      "relation": "denied:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Write",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": false,
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ]
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "same-event-is-not-prior",
+      "relation": "pending:not_deed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": 0
+      },
+      "expected": {
+        "observed": false
+      },
+      "observed": {
+        "observed": false,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "prior-position-is-preserved",
+      "relation": "settled:observed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": 2
+      },
+      "expected": {
+        "seqs": [
+          1
+        ],
+        "observed": true
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          1
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          1
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "turn-UserPromptSubmit",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "go"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "b.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "seqs": [
+          0,
+          2
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [
+          2
+        ],
+        "user_texts": [
+          "go"
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          2
+        ],
+        "written": [
+          [],
+          []
+        ],
+        "created": [
+          [],
+          []
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [
+          2
+        ],
+        "user_texts": [
+          "go"
+        ]
+      },
+      "result": "pass"
+    },
+    {
+      "case": "empty-turn-UserPromptSubmit",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "go"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "turn_start": 2,
+        "current_turn_seqs": []
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [],
+        "user_texts": [
+          "go"
+        ]
+      },
+      "result": "pass"
+    },
+    {
+      "case": "turn-Stop",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "Stop",
+            "prompt": "go"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "b.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "seqs": [
+          0,
+          2
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [
+          2
+        ],
+        "user_texts": []
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          2
+        ],
+        "written": [
+          [],
+          []
+        ],
+        "created": [
+          [],
+          []
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [
+          2
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "empty-turn-Stop",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "Stop",
+            "prompt": "go"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "turn_start": 2,
+        "current_turn_seqs": []
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "turn-SubagentStop",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "SubagentStop",
+            "prompt": "go"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "b.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "seqs": [
+          0,
+          2
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [
+          2
+        ],
+        "user_texts": []
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          2
+        ],
+        "written": [
+          [],
+          []
+        ],
+        "created": [
+          [],
+          []
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [
+          2
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "empty-turn-SubagentStop",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "SubagentStop",
+            "prompt": "go"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "turn_start": 2,
+        "current_turn_seqs": []
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 2,
+        "current_turn_seqs": [],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "last-boundary-wins",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "Stop"
+          },
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "b.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          },
+          {
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": "next"
+          },
+          {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": null,
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "turn_start": 4,
+        "current_turn_seqs": [],
+        "user_texts": [
+          "next"
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0,
+          2
+        ],
+        "written": [
+          [],
+          []
+        ],
+        "created": [
+          [],
+          []
+        ],
+        "send": [
+          "",
+          ""
+        ],
+        "search": [
+          null,
+          null
+        ],
+        "turn_start": 4,
+        "current_turn_seqs": [],
+        "user_texts": [
+          "next"
+        ]
+      },
+      "result": "pass"
+    },
+    {
+      "case": "current-stop-keeps-evaluated-turn",
+      "relation": "other_turn:distinct",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Read",
+            "tool_input": {
+              "file_path": "a.txt"
+            },
+            "tool_response": {
+              "file": {
+                "content": "hello"
+              }
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": {
+          "hook_event_name": "Stop"
+        },
+        "wanted": [
+          "/repo/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ]
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    },
+    {
+      "case": "output-object-binding",
+      "relation": "settled:observed",
+      "inputs": {
+        "history": [
+          {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {
+              "file_path": ""
+            },
+            "tool_response": {
+              "stdout": "src/a.txt:12:3"
+            },
+            "cwd": "/repo"
+          }
+        ],
+        "event": null,
+        "wanted": [
+          "/repo/src/a.txt"
+        ],
+        "before": null
+      },
+      "expected": {
+        "observed": true
+      },
+      "observed": {
+        "observed": true,
+        "seqs": [
+          0
+        ],
+        "written": [
+          []
+        ],
+        "created": [
+          []
+        ],
+        "send": [
+          ""
+        ],
+        "search": [
+          null
+        ],
+        "turn_start": 0,
+        "current_turn_seqs": [
+          0
+        ],
+        "user_texts": []
+      },
+      "result": "pass"
+    }
+  ],
+  "checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task observe",
+      "exit_code": 0,
+      "stdout": "schema: PASS\nwires: PASS\nreachable: PASS\ntrace: PASS\ncoverage: PASS\nfills: PASS\nmissing: PASS\nover: PASS\nsubtractions: PASS\nroute: PASS\nwire-rule: PASS\ntighten: PASS\ncosts: PASS\n",
+      "stderr": ""
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/test_observed.py tests/test_evaluate.py",
+      "exit_code": 0,
+      "stdout": ".......................................................................  [100%]\n71 passed in 0.14s\n",
+      "stderr": ""
+    }
+  ],
+  "result": "pass",
+  "present": [
+    "denied:not_deed",
+    "other_object:not_witness",
+    "other_turn:distinct",
+    "pending:not_deed",
+    "settled:observed"
+  ],
+  "absent": [],
+  "external": [],
+  "scope": "Direct local record(history, event) probes and existing observation/evaluation regressions. The shape check certifies the declarative model only. No hooks invoked or installed; no outside operator or evidence required."
+}
