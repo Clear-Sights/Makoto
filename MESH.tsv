@@ -9,7 +9,7 @@ emit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task emit	PYTHONDONTWRITE
 advance	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task advance	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy advance	advance	Runtime and rules	SHAPE_PRESENT	CANDIDATE
 persist	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task persist	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy persist	persist	Runtime and rules	SHAPE_PRESENT	CANDIDATE
 register	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task register	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy register	register	Acceptance checks	SHAPE_PRESENT	CANDIDATE
-validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy validate	validate	Acceptance checks	SHAPE_PRESENT	PARTIAL
+validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy validate	validate	Acceptance checks	SHAPE_PRESENT	CANDIDATE
 package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy package	package	Acceptance checks	SHAPE_PRESENT	OPEN
 fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy fresh	fresh	Acceptance checks	SHAPE_PRESENT	OPEN
 audit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task audit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy audit	audit	Acceptance checks	SHAPE_PRESENT	OPEN

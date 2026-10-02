@@ -111,8 +111,9 @@ def derive(plan_only=False):
             absent='model missing/over constraints; stale or missing evidence cannot imply implementation done'
         else:
             candidate=slot['filled-by'] or 'OPEN'
-            paths=sorted({x.split(':')[0] for x in candidate.split(';') if x!='OPEN'})
-            inputs=','.join(callers(paths)+['tests/acceptance_tasks.py', f'mesh/evidence/{id}.json'] + (['plugin/makoto2/lifecycle.py'] if id in {'validate','package','fresh','audit','join','handoff'} else []))
+            paths=sorted({x.split(':')[0] for x in candidate.split(';') if x!='OPEN'} |
+                         {f['path'] for f in read(ROOT/'mesh/FILLS.tsv') if f['slot']==id})
+            inputs=','.join(callers(paths)+['mesh/SLOTS.tsv', 'mesh/FILLS.tsv', 'tests/acceptance_tasks.py', f'mesh/evidence/{id}.json'] + (['plugin/makoto2/lifecycle.py'] if id in {'validate','package','fresh','audit','join','handoff'} else []))
             present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate+'; implement product code and run acceptance; evidence files are optional check outputs, never proof inputs'
             absent='unrealized behavior and stale/missing current evidence'
         brief=f'Local pytest, mesh/check.py, mesh/plants.py and the task check are authorized. PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'

@@ -284,6 +284,13 @@ def errors(root=ROOT):
             cost=sum(int(taskmap[t]['estimate_tokens']) for t in wave)
             if f'Wave {number}: '+', '.join(wave)+f' (predicted {cost} tokens)' not in plan:bad['route'].append('stale plan wave '+str(number))
         for id,t in taskmap.items():
+            if id in slots:
+                required_scope = {'mesh/SLOTS.tsv', 'mesh/FILLS.tsv'}
+                required_scope.update(f['path'] for f in tables['FILLS'] if f['slot'] == id)
+                if id in {'validate','package','fresh','audit','join','handoff'}:
+                    required_scope.add('plugin/makoto2/lifecycle.py')
+                if not required_scope <= set(t['inputs'].split(',')):
+                    bad['route'].append(id+' fill outside writable scope')
             need={'subtract'} if id not in ('subtract','zero') else set()
             if id in slots:
                 need|=backward[id]-{INPUT,OUTPUT}

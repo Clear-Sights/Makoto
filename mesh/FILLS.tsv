@@ -178,3 +178,5 @@ tests/acceptance_tasks.py	test_advance.finding	validate	Executable product accep
 tests/acceptance_tasks.py	test_advance.run	validate	Executable product acceptance; positive and negative controls, current evidence required
 plugin/makoto2/evaluate.py	load_rows	register	Load the CURRENT shipped register without amendments
 plugin/makoto2/evaluate.py	evaluate	register	Enforce current predicates against fixed replay cases
+plugin/makoto2/lifecycle.py	<module>	validate	Executable validation decision over current local and selected-head CI results.
+plugin/makoto2/lifecycle.py	validate	validate	Executable validation decision over current local and selected-head CI results.
