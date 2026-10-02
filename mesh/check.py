@@ -11,7 +11,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 MESH = ROOT / 'mesh'
-CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route', 'wire-rule', 'tighten')
+CHECKS = ('schema', 'wires', 'reachable', 'trace', 'coverage', 'fills', 'missing', 'over', 'subtractions', 'route', 'wire-rule', 'tighten', 'costs')
 INPUT = 'PROGRAM_INPUT'
 OUTPUT = 'PROGRAM_OUTPUT'
 SOURCE_PATHS = {'WORDS.tsv','SPIRIT.md','mesh/reference/docs-def-README.md'}
@@ -246,6 +246,16 @@ def errors(root=ROOT):
         for p in sorted((root/directory).glob('*.py')):
             for unit in units(p):
                 if (str(p.relative_to(root)),unit) not in mapping|subtract:bad['subtractions'].append('unclassified '+str(p)+':'+unit)
+    try:
+        from seed import measured_costs
+        _, floor = measured_costs(mesh/'COSTS.tsv')
+        _, cost_tasks = read(root/'TASKS.tsv')
+        for task in cost_tasks:
+            estimate = task['estimate_tokens']
+            if not estimate.isdigit() or int(estimate) < floor:
+                bad['costs'].append(task['task']+' estimate below measured floor '+str(floor))
+    except (OSError, KeyError, ValueError) as e:
+        bad['costs'].append(str(e))
     # Route reflects every data dependency and every removal, no invented SCCs.
     try:
         header,tasks=read(root/'TASKS.tsv'); mh,rows=read(root/'MESH.tsv')

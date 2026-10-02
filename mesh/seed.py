@@ -2,14 +2,11 @@
 from pathlib import Path
 import argparse
 import csv
-import json
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUT = 'PROGRAM_INPUT'
 OUTPUT = 'PROGRAM_OUTPUT'
 TASK_FIELDS = ('task','deps','brief','inputs','check','hand','piece','citation','estimate_tokens')
-COST_BASE = 800
-COST_PER_PORT = 200
 EXTERNAL_SLOTS = {'register','fresh','audit'}
 
 
@@ -22,7 +19,27 @@ def write(path,rows,fields):
         w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
 
 
+def measured_costs(path):
+    with path.open(newline='') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        if reader.fieldnames != ['task', 'tokens', 'source']:
+            raise ValueError('invalid COSTS columns')
+        rows = list(reader)
+    if not rows:
+        raise ValueError('COSTS requires a measured attempt')
+    costs = {}
+    for row in rows:
+        if (None in row or any(v is None for v in row.values())
+                or not row['task'] or not row['source'].strip()
+                or not row['tokens'].isdigit() or int(row['tokens']) <= 0):
+            raise ValueError('invalid measured COSTS row')
+        tokens = int(row['tokens'])
+        costs[row['task']] = min(costs.get(row['task'], tokens), tokens)
+    return costs, min(costs.values())
+
+
 def derive(plan_only=False):
+    costs, floor = measured_costs(ROOT/'mesh/COSTS.tsv')
     slots={s['slot']:s for s in read(ROOT/'mesh/SLOTS.tsv')}
     requirements={r['requirement']:r for r in read(ROOT/'mesh/REQUIREMENTS.tsv')}
     deps={s:{'subtract'} for s in slots if s not in (INPUT,OUTPUT)}
@@ -33,6 +50,7 @@ def derive(plan_only=False):
     tasks=[];mesh=[];predictions=[]
     for id,parents in deps.items():
         slot=slots.get(id)
+        cost=costs.get(id, floor)
         refs=slot['requirements'].split(',') if slot else ['done']
         citation=requirements[refs[0]]['source'].removeprefix('WORDS.tsv:')
         # Route resolves owner words from WORDS_FILES; SPIRIT headings are literal Markdown headings.
@@ -40,18 +58,17 @@ def derive(plan_only=False):
         if citation.startswith('SPIRIT.md#'):citation=citation.split('#')[1]
         command='PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task '+id
         if id=='subtract':
-            inputs='mesh/reference/,mesh/SUBTRACT.tsv';cost=800
+            inputs='mesh/reference/,mesh/SUBTRACT.tsv'
             present='only requirement-needed units in seed; old generators preserved as reference'
             absent='bottom-up inventory and SCC generators at active paths'
         elif id=='zero':
-            inputs='mesh/,PLAN.md,TASKS.tsv,MESH.tsv';cost=1000
+            inputs='mesh/,PLAN.md,TASKS.tsv,MESH.tsv'
             present='model contracts equal requirement envelopes; implementation done only with all current evidence'
             absent='model missing/over constraints; stale or missing evidence cannot imply implementation done'
         else:
             candidate=slot['filled-by'] or 'OPEN'
             paths=sorted({x.split(':')[0] for x in candidate.split(';') if x!='OPEN'})
             inputs=','.join(paths+[f'mesh/evidence/{id}.json'])
-            cost=COST_BASE+COST_PER_PORT*(len(json.loads(slot['inputs']))+len(json.loads(slot['outputs'])))
             present='realized '+id+' ports satisfying '+','.join(refs)+'; candidate '+candidate
             absent='unrealized behavior and stale/missing current evidence'
         brief=f'PRESENT: {present}. ABSENT: {absent}. Cost: {cost} tokens. Failure: re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.'
@@ -71,7 +88,7 @@ def derive(plan_only=False):
     config = existing_plan.split('```text\n', 1)[1].split('```', 1)[0]
     lines=['# Makoto: top-down seed from final-program wiring','',
       'Requirements open ports; transformed wires order work. Raw program inputs are local slot bindings (SLOTS input-sources). WIRE-RULE.tsv records the applied classification; wire_rule.py rejects identity wires and detects missing transformed passes. Layer 1 closes only source-backed definite constraints. Layers 2+ use signed deterministic feedback within that closed space: surplus deletion reduces excess, while required deletion increases missing and is forbidden. SymPy simplifies every slot relation before and after the loop. tighten.py computes the least finite requirement relations to a fixpoint, and check.py rejects a stale TIGHTEN.tsv. SUBTRACT is first. Each later wave contains every ready slot, giving maximal concurrency under this one-layer dependency graph. Candidate units in shared files must be edited by one writer or re-measured into disjoint scopes; evidence files are per slot.', '',
-      'The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a positive token cost.', '',
+      'The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a token cost from mesh/COSTS.tsv. Measured tasks use their cheapest logged attempt; unmeasured tasks use the cheapest logged attempt overall as their floor. The project rule stops a job over twice its cheapest logged run.', '',
       'Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.', '',
       'Route TASKS format: /home/user/mz-route/tools/route/route-USAGE.md and route-digest.md. All MESH rows correspond to task ids and have plants that mutate the current disposable working tree. This is a reviewable plan; route execution and its tail are outside this request. Register amendments require Gabriel; merging remains with Gabriel.', '',
       'Configuration for a later authorized model-only route:',

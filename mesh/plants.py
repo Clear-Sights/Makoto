@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-CHECKS = ('schema','wires','reachable','trace','coverage','fills','missing','over','subtractions','route','wire-rule','tighten')
+CHECKS = ('schema','wires','reachable','trace','coverage','fills','missing','over','subtractions','route','wire-rule','tighten','costs')
 COPY_PATHS = ('mesh','WORDS.tsv','SPIRIT.md','PLAN.md','TASKS.tsv','MESH.tsv','plugin/makoto2','tests')
 
 
@@ -27,10 +27,14 @@ def write(path,fields,rows):
 
 
 def mutate(copy,check):
-    filename={'schema':'SOURCES','wires':'WIRES','reachable':'WIRES','trace':'TRACE','coverage':'REQUIREMENTS','fills':'FILLS','missing':'CONSTRAINTS','over':'CONSTRAINTS','subtractions':'SUBTRACT','route':None,'wire-rule':'WIRES','tighten':'TIGHTEN'}[check]
+    filename={'schema':'SOURCES','wires':'WIRES','reachable':'WIRES','trace':'TRACE','coverage':'REQUIREMENTS','fills':'FILLS','missing':'CONSTRAINTS','over':'CONSTRAINTS','subtractions':'SUBTRACT','route':None,'wire-rule':'WIRES','tighten':'TIGHTEN','costs':None}[check]
     path=copy/'mesh'/(filename+'.tsv') if filename else copy/'TASKS.tsv'
     fields,rows=read(path)
-    if check=='tighten':rows[-1]['shape']='{}'
+    if check=='costs':
+        from seed import measured_costs
+        _, floor = measured_costs(copy/'mesh/COSTS.tsv')
+        rows[0]['estimate_tokens']=str(floor-1)
+    elif check=='tighten':rows[-1]['shape']='{}'
     elif check=='wire-rule':rows.append(dict(wire='plant-identity',source='PROGRAM_INPUT#raw',target='decode#raw',requirements='decode'))
     elif check=='schema':rows[0]['sha256']='0'*64
     elif check=='wires':rows[0]['target']='configure#defaults'

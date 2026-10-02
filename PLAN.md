@@ -2,7 +2,7 @@
 
 Requirements open ports; transformed wires order work. Raw program inputs are local slot bindings (SLOTS input-sources). WIRE-RULE.tsv records the applied classification; wire_rule.py rejects identity wires and detects missing transformed passes. Layer 1 closes only source-backed definite constraints. Layers 2+ use signed deterministic feedback within that closed space: surplus deletion reduces excess, while required deletion increases missing and is forbidden. SymPy simplifies every slot relation before and after the loop. tighten.py computes the least finite requirement relations to a fixpoint, and check.py rejects a stale TIGHTEN.tsv. SUBTRACT is first. Each later wave contains every ready slot, giving maximal concurrency under this one-layer dependency graph. Candidate units in shared files must be edited by one writer or re-measured into disjoint scopes; evidence files are per slot.
 
-The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a positive token cost.
+The shape model passes independently of implementation. OPEN, PARTIAL and CANDIDATE are explicit implementation absences, not proof receipts. TASKS check the declared model obligations; they do not run hooks, gates or certify implementation completion. PREDICTIONS.tsv records this distinction. Each task brief predicts PRESENT/ABSENT and a token cost from mesh/COSTS.tsv. Measured tasks use their cheapest logged attempt; unmeasured tasks use the cheapest logged attempt overall as their floor. The project rule stops a job over twice its cheapest logged run.
 
 Failure edges are re-measure and re-derive, or EXTERNAL for unavailable owner decisions, current CI receipts, installation or audit evidence. EXTERNAL returns to the same slot on changed input. There is no BLOCKED terminal and no countdown decrement for stale or absent evidence. The join emits done only when every current proof input is present.
 
@@ -21,18 +21,18 @@ PLANTS_CMD=PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
 
 These are declarations, not commands executed during formation. Model checks do not replace the product acceptance gates.
 
-Wave 1: subtract (predicted 800 tokens)
-Wave 2: configure, decode (predicted 2400 tokens)
-Wave 3: observe, rules (predicted 2800 tokens)
-Wave 4: evaluate, register (predicted 3000 tokens)
-Wave 5: once (predicted 1800 tokens)
-Wave 6: advance, emit (predicted 3000 tokens)
-Wave 7: persist, validate (predicted 3200 tokens)
-Wave 8: package (predicted 1800 tokens)
-Wave 9: audit, fresh (predicted 3000 tokens)
-Wave 10: join (predicted 1800 tokens)
-Wave 11: handoff (predicted 1400 tokens)
-Wave 12: zero (predicted 1000 tokens)
+Wave 1: subtract (predicted 208231 tokens)
+Wave 2: configure, decode (predicted 416462 tokens)
+Wave 3: observe, rules (predicted 416462 tokens)
+Wave 4: evaluate, register (predicted 416462 tokens)
+Wave 5: once (predicted 208231 tokens)
+Wave 6: advance, emit (predicted 416462 tokens)
+Wave 7: persist, validate (predicted 416462 tokens)
+Wave 8: package (predicted 208231 tokens)
+Wave 9: audit, fresh (predicted 416462 tokens)
+Wave 10: join (predicted 208231 tokens)
+Wave 11: handoff (predicted 208231 tokens)
+Wave 12: zero (predicted 208231 tokens)
 
 At the final zero step: model distance = missing + over + structural violations = 0. Implementation distance reaches 0 only after current register, validation, package, fresh-session and whole-repo evidence realize the join contract. No such external receipts are invented in this pass.
 
