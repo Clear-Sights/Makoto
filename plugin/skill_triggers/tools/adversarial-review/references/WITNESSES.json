@@ -1,0 +1,178 @@
+{
+  "scope": "finite typed decisions, not efficacy",
+  "rules": {
+    "A10": {
+      "classes": [
+        "claim_replay"
+      ],
+      "actions": [
+        "semantic_classes",
+        "legitimate_negative",
+        "claim_receipts",
+        "delivered_revision",
+        "fresh_copy",
+        "replay_check_claims"
+      ],
+      "forbidden": [
+        "prose_match_verdict",
+        "report_only_accept",
+        "wrong_revision"
+      ]
+    },
+    "A6": {
+      "classes": [
+        "labels"
+      ],
+      "actions": [
+        "independent_labels",
+        "unchanged_baseline",
+        "discriminating_exam"
+      ],
+      "forbidden": [
+        "self_labels",
+        "baseline_pass_as_gain"
+      ]
+    },
+    "A8": {
+      "classes": [
+        "delivered_input"
+      ],
+      "actions": [
+        "grade_delivery",
+        "separate_noise"
+      ],
+      "forbidden": [
+        "single_noisy_answer"
+      ]
+    },
+    "A5": {
+      "classes": [
+        "audit_repeat"
+      ],
+      "actions": [
+        "diff_from_reviewed",
+        "prior_regressions",
+        "dependency_boundary"
+      ],
+      "forbidden": [
+        "whole_tree_repeat"
+      ]
+    },
+    "A4": {
+      "classes": [
+        "audit_reader"
+      ],
+      "actions": [
+        "one_residual_reader",
+        "different_author_model",
+        "price_last_run",
+        "witness",
+        "record_unresolved"
+      ],
+      "forbidden": [
+        "cheap_reader_team",
+        "unwitnessed_finding"
+      ]
+    },
+    "A1": {
+      "classes": [
+        "audit_seams"
+      ],
+      "actions": [
+        "all_seams",
+        "seam_fault_slots",
+        "missing_wire_finding"
+      ],
+      "forbidden": [
+        "unwired_coverage"
+      ]
+    },
+    "A2": {
+      "classes": [
+        "audit_plants"
+      ],
+      "actions": [
+        "one_fault_per_slot",
+        "hidden_keys",
+        "predict_both_sides",
+        "fault_families",
+        "mechanical_mutants",
+        "equivalence_proof"
+      ],
+      "forbidden": [
+        "exposed_keys",
+        "equivalence_by_assertion"
+      ]
+    },
+    "A3": {
+      "classes": [
+        "check_validity"
+      ],
+      "actions": [
+        "spec_cell",
+        "proof_assumptions",
+        "root_statement_pin",
+        "corpus_reference",
+        "two_sided_same_run",
+        "broken_base_finding"
+      ],
+      "forbidden": [
+        "red_base_as_pass",
+        "never_failed_cell"
+      ]
+    },
+    "A7": {
+      "classes": [
+        "heldout"
+      ],
+      "actions": [
+        "pre_fix_seal",
+        "independent_heldout",
+        "cross_corpus",
+        "grade_once",
+        "spent_calibration",
+        "unused_next",
+        "limits"
+      ],
+      "forbidden": [
+        "reuse_spent_set",
+        "claim_bulk_done"
+      ]
+    },
+    "A9": {
+      "classes": [
+        "audit_stop"
+      ],
+      "actions": [
+        "all_plants_red",
+        "green_base",
+        "different_method_zero",
+        "hold_no_new_method"
+      ],
+      "forbidden": [
+        "duplicate_rate_stop",
+        "repeat_same_reader"
+      ]
+    },
+    "A11": {
+      "classes": [
+        "definition"
+      ],
+      "actions": [
+        "mesh_now",
+        "unique_owner",
+        "presence_absence",
+        "timeless_mesh",
+        "one_repair",
+        "execute_now",
+        "removal_witness",
+        "live_references"
+      ],
+      "forbidden": [
+        "next_version",
+        "duplicate_owner",
+        "decorative_clause"
+      ]
+    }
+  }
+}

@@ -22,6 +22,15 @@ PreToolUse, PostToolUse, PostToolUseFailure, Stop, SubagentStop and UserPromptSu
 to `cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2`. Python 3.11 or newer is
 required; the runtime uses only the standard library.
 
+## Skill triggers
+
+Makoto also carries advisory, fail-silent triggers for cheap-execution,
+adversarial-review and harness-execution. They read the user's installed skills
+at session start and relevant tool calls, without a setup step, and never block
+tool calls. The layer uses
+Python 3's standard library and keeps its independent state in
+`${CLAUDE_PLUGIN_DATA:-$HOME/.cache/makoto}/skill-triggers`.
+
 ## Runtime and rules
 
 [observed.py](plugin/makoto2/observed.py) records settled tool effects.

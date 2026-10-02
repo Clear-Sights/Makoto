@@ -1,0 +1,919 @@
+[
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "nohup codex exec - < BRIEF6.md"
+      }
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "C18",
+      "H17"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 run.py && sh check.sh --real"
+      }
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10",
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "sh gate.sh"
+      }
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "PLANS/DETIO-SEED-MESH.md"
+      }
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C1"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Stop",
+      "tool_input": {},
+      "situation_classes": [
+        "continuation"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C19"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git merge reviewed"
+      }
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 check.py"
+      }
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10",
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "audit_seams"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A1"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "audit_seams"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A1"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "audit_plants"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A2"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "check_validity"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "check_validity"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "audit_reader"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A4"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "audit_stop"
+      ]
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A9"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "printf 'codex exec and gate.sh'"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat check.py"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat README.md"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "codex login"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git status"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo host compaction"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 -c \"import optional\""
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Stop",
+      "tool_input": {},
+      "situation_classes": [
+        "continuation"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C19"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 run.py --real"
+      }
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C13"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Agent",
+      "tool_input": {}
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "C18",
+      "H17"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "budget"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "C18"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "verdict_read"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C20"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "harness_launch"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H17"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "harness_chain"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H19"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "harness_bill"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H9"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "detio_store"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H2"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "router_run"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "makoto_hook"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H4"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "countdown_repairs"
+      ]
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H5"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "spawn_agent",
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C17"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "bash codex-wait.sh"
+      }
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H19"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "detio_store"
+      ],
+      "tool_input": {}
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "H2"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo codex-wait.sh DETIO_STORE_DIR modelUsage Tiller Makoto Countdown"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "verdict_read"
+      ],
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C20"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "launch"
+      ],
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C17"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "launch"
+      ],
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C17"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "claim_replay"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "bill"
+      ],
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C9"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "audit_seams"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A1"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "audit_seams"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A1"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "audit_seams"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A1"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "verdict_read"
+      ],
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C20"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "verdict_read"
+      ],
+      "tool_input": {}
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C20"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "audit_plants"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A2"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "claim_replay"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "audit_plants"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A2"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "claim_replay"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "situation_classes": [
+        "check_validity"
+      ],
+      "tool_input": {}
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A3"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "README.md"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat modelUsage.json"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "prior_art"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C4"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "headless_inputs"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C8"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "standing_authority"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "repeated_guard"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C11"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "SemanticMoment",
+      "tool_input": {},
+      "situation_classes": [
+        "loop_cost"
+      ]
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C6"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 cheap-execution/scripts/bill.py"
+      }
+    },
+    "owner": "cheap-execution",
+    "rules": [
+      "C9"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo cheap-execution/scripts/bill.py"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 cheap-execution/scripts/construction.py"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo cheap-execution/scripts/construction.py"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 harness-execution/scripts/share.py"
+      }
+    },
+    "owner": "harness-execution",
+    "rules": [
+      "C18"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo harness-execution/scripts/share.py"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 adversarial-review/scripts/readout.py"
+      }
+    },
+    "owner": "adversarial-review",
+    "rules": [
+      "A10"
+    ]
+  },
+  {
+    "event": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo adversarial-review/scripts/readout.py"
+      }
+    },
+    "owner": "none",
+    "rules": []
+  }
+]
