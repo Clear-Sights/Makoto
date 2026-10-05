@@ -258,7 +258,15 @@ def _text_objects(text: str, cwd: str) -> set:
     out.update(m.group(0) for m in _RATIO_RX.finditer(rest))
     out.update(f"{m.group(1)} {m.group(2).lower()}" for m in _COUNT_RX.finditer(rest))
     out.update(f"{m.group(2)} {m.group(1).lower()}" for m in _PASSED_N_RX.finditer(rest))
-    out.update(_norm(m.group(0), cwd) for m in _PATH_RX.finditer(_RATIO_RX.sub(" ", rest).replace("\\", "/")))
+    for match in _PATH_RX.finditer(_RATIO_RX.sub(" ", rest).replace("\\", "/")):
+        token = match.group(0)
+        name = _norm(token, cwd)
+        # Plain slash-joined words in prose need an existing path witness.
+        # Extensions and explicit path prefixes already distinguish paths.
+        if (re.fullmatch(r"[\w-]+/[\w-]+", token.rstrip('.'))
+                and not os.path.exists(_norm(token.rstrip('.'), cwd))):
+            continue
+        out.add(name)
     out.discard("")
     return out
 

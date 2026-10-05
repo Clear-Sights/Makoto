@@ -1,4 +1,4 @@
-"""Minimal native-hook witnesses for W1-W11; no replay transcript inputs."""
+"""Minimal native-hook witnesses for W1-W13; no replay transcript inputs."""
 import json
 import os
 from pathlib import Path
@@ -101,6 +101,23 @@ pairs['W11_time_head'] = (
 pairs['W11_time_token'] = (
     [relay, post('echo clock', '106:15:56'), stop('Result 06:15.')],
     [relay, post('echo clock', '06:15'), stop('Result 06:15.')])
+memory = dict(hook_event_name='PreToolUse', tool_name='Write',
+              tool_input={'file_path':'/tmp/claude/memory/team/x/note.md',
+                          'content':'dir/draft/SEED.md is authoritative. SHA abcdef123456. '
+                                    'check30.py proves the counts: 25 named, 0 honest.'})
+pairs['W12_observed_refs'] = (
+    [post('ls dir/draft', 'dir/draft/SEED.md'),
+     post('sha256sum dir/draft/SEED.md', 'abcdef123456' + '0' * 52 + '  dir/draft/SEED.md'),
+     memory],
+    [post('ls dir/draft', 'dir/draft/SEED.md'),
+     post('sha256sum dir/draft/SEED.md', 'abcdef123456' + '0' * 52 + '  dir/draft/SEED.md'),
+     post('ls', 'check30.py'), post('grep counts report', '25 named, 0 honest'), memory])
+pairs['W13_prose_refs'] = (
+    [dict(hook_event_name='PreToolUse', tool_name='Write',
+          tool_input={'file_path':'memory.md', 'content':'dep.py says the operation is safe.'})],
+    [dict(hook_event_name='PreToolUse', tool_name='Write',
+          tool_input={'file_path':'memory.md',
+                      'content':'add/subtract is arithmetic; and/or is a choice; read/write requires care.'})])
 if __name__=='__main__':
     failed=[]
     for name,(fake,honest) in pairs.items():

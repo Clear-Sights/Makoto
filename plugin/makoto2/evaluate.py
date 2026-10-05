@@ -135,7 +135,7 @@ def _acts(args):
 def family_findings(record, event, cfg):
     """One owner per register predicate; return all identities before arbitration."""
     from makoto2 import family_other
-    for module in (family_spec, family_other, family_switch, family_lineage):
+    for module in (family_spec, family_lineage, family_other, family_switch):
         yield from module.findings(record, event, cfg)
 
 

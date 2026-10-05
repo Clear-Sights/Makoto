@@ -119,6 +119,7 @@ tests/test_observed.py	bash	validate	Blocking plants, silent controls and observ
 tests/test_observed.py	seen	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_observed.py	test_interface_shape	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_observed.py	test_deterministic	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_slash_words_need_path_evidence	validate	W13 prose controls and path witnesses distinguish valid references
 tests/test_observed.py	test_plant_unobserved_object_blocks	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_observed.py	test_plant_empty_history	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_observed.py	test_plant_unsettled_event_observes_nothing	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
@@ -314,7 +315,7 @@ tests/test_lineage.py	test_missing_local_source_requires_verification_or_label	v
 tests/test_real_session.py	<module>	validate	REGISTER B28: operator-labelled real succession acceptance
 tests/test_real_session.py	test_real_session	validate	REGISTER B28: operator-labelled real succession acceptance
 plugin/makoto2/family_lineage.py	cited_references	evaluate	Written imports and explicit citation identities determine source dependencies.
-plugin/makoto2/family_lineage.py	hook_lineage_refs	evaluate	Dependencies and explicit citations require a successful primary source read.
+plugin/makoto2/family_lineage.py	hook_lineage_refs	evaluate	Dependencies and explicit citations require a prior settled observation carrying the reference.
 plugin/makoto2/family_spec.py	shipping_observed	evaluate	Successful shipping observation across Bash and GitHub routes.
 tests/test_tells.py	<module>	validate	Existing independent native-hook corpus and population measurement.
 tests/test_tells.py	reason	validate	Existing independent native-hook corpus and population measurement.
@@ -340,3 +341,12 @@ tests/test_windows_paths.py	test_windows_fake_and_honest	validate	Windows payloa
 tests/test_windows_paths.py	test_windows_fake_and_honest.local	validate	Windows payload path identity, fake and honest regression acceptance
 tests/test_windows_paths.py	test_windows_record_identity	validate	Windows payload path identity, fake and honest regression acceptance
 tests/test_windows_paths.py	test_posix_case_urls_and_counts_remain_distinct	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_restored_fixes.py	read	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	write	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_asserted_sources_require_direct_reading	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_explicit_inventory_allows_required_units_and_consumed_helpers	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_preserving_whole_write_must_keep_unrelated_lines	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_absence_requires_independent_probe_when_observed_basis_is_unpaid	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+plugin/makoto2/family_lineage.py	observed_reference	evaluate	Settled inputs and outputs pay source identities, names and hash prefixes across tools.
+plugin/makoto2/family_lineage.py	observed_reference.input_text	evaluate	Flatten nested tool input values for observed reference evidence.
+plugin/makoto2/family_lineage.py	content_references	evaluate	Explicit source content claims require observations of that source content; identities accept any settled observation.

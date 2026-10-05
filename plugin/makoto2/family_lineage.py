@@ -25,6 +25,8 @@ def references(text, cwd, reader):
     refs.update(m.group(1) for m in re.finditer(r'(?i)\b(?:commit|revision|sha)\s+([0-9a-f]{7,64})(?![\w])', text)
                 if re.search('[a-f]', m.group(1)))
     refs.update(m.group(0) for m in re.finditer(r'(?<![\w])[0-9a-f]{40}(?:[0-9a-f]{24})?(?![\w])', text))
+    refs.update(m.group(0) for m in re.finditer(r'(?<![\w])[0-9a-f]{12,64}(?![\w])', text)
+                if re.search('[a-f]', m.group(0)))
     for match in re.finditer(r'"([^"\n]+)"|“([^”\n]+)”', text):
         value = match.group(1) or match.group(2)
         # A quoted path has the same identity as its unquoted spelling.
@@ -116,8 +118,13 @@ def cited_references(event, reader):
         return {name for name in refs if
                 re.search(r'(?i)\b(?:commit|revision|sha)\s+' + re.escape(name) + r'(?!\w)', text)
                 or re.search(r'(?i)\b(?:according to|source:|cites?|by|from)\s+`?'
-                    + re.escape(os.path.basename(name)) + r'(?![\w.-])', text)
-                or re.search(re.escape(os.path.basename(name)) + r'`?\s+(?:says|states)\b', text, re.I)}
+                    + re.escape(os.path.basename(name)) + r'(?![\w-]|\.[\w])', text)
+                or re.search(re.escape(os.path.basename(name)) + r'`?\s+(?:says|states|permits|requires|contains|licenses|proves)\b', text, re.I)
+                or (event.get('hook_event_name') == 'PreToolUse'
+                    and event.get('tool_name') in ('Write', 'Edit')
+                    and re.search(re.escape(os.path.basename(name))
+                    + r'`?(?:\s+and\s+`?[\w./-]+`?)*\s+(?:is|are|permits|requires|proves)\b',
+                    text, re.I))}
     selected = set()
     try:
         tree = ast.parse(text)
@@ -134,12 +141,54 @@ def cited_references(event, reader):
     return selected
 
 
+def content_references(event, reader):
+    """Explicit source-content relationships incur a source reading obligation."""
+    text = output_text(event, reader)
+    if (event.get('hook_event_name') == 'PreToolUse'
+            and str((event.get('tool_input') or {}).get('file_path', '')).endswith('.py')):
+        return cited_references(event, reader)
+    return {name for name in cited_references(event, reader)
+            if re.search(r'(?i)\b(?:according to|source:|cites?|by|from)\s+`?'
+                         + re.escape(os.path.basename(name)) + r'(?![\w-]|\.[\w])', text)
+            or re.search(re.escape(os.path.basename(name))
+                         + r'`?(?:\s+and\s+`?[\w./-]+`?)*\s+'
+                         + r'(?:says|states|permits|requires|contains|licenses|are\s+safe|is\s+safe)\b',
+                         text, re.I)}
+
+
 def hook_lineage_refs(record, event, reader):
     sources, owned = readings(record, reader)
     cwd = event.get('cwd') or ''
     own = reader._norm((event.get('tool_input') or {}).get('file_path', ''), cwd)
+    content = content_references(event, reader)
     return sorted(n for n in cited_references(event, reader) - owned - {own}
-                  if n not in sources)
+                  if n not in sources and (n in content
+                      or not observed_reference(record, n, cwd, reader)))
+
+
+def observed_reference(record, name, cwd, reader):
+    """A settled tool input or output pays the identities it carries.
+
+    Identity evidence does not assert that the observation read file bytes;
+    readings() retains that distinction for content drift checks.
+    """
+    def input_text(value):
+        if isinstance(value, dict):
+            return '\n'.join(input_text(v) for v in value.values())
+        if isinstance(value, (list, tuple)):
+            return '\n'.join(input_text(v) for v in value)
+        return str(value) if value is not None else ''
+
+    for obs in record.obs:
+        observed_cwd = getattr(record, 'reader_evidence', {}).get(obs.seq, {}).get('cwd') or cwd
+        text = input_text(obs.input) + '\n' + obs.output
+        if name in references(text, observed_cwd, reader):
+            return True
+        if re.fullmatch('[0-9a-f]{7,64}', name, re.I) and any(
+                token.lower().startswith(name.lower())
+                for token in re.findall(r'(?<![\w])[0-9a-f]{7,64}(?![\w])', text, re.I)):
+            return True
+    return False
 
 
 def lineage_refs(record, event, reader):
@@ -149,12 +198,9 @@ def lineage_refs(record, event, reader):
     refs.update(event.get('refs') or ())
     own = reader._norm((event.get('tool_input') or {}).get('file_path', ''), cwd)
     refs.difference_update(owned | {own})
+    content = content_references(event, reader)
     return sorted(name for name in refs if name not in sources
-                  and not (not os.path.isabs(name) and '://' not in name
-                           and not re.fullmatch('[0-9a-f]{40}(?:[0-9a-f]{24})?', name)
-                           and any(name in o.output for o in record.obs
-                              if not o.failed and (o.tool in ('Read', 'WebFetch')
-                                  or getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('source_reads')))))
+                  and (name in content or not observed_reference(record, name, cwd, reader)))
 
 
 def lineage_drift(record, event, reader):
@@ -203,8 +249,34 @@ def lineage_drift(record, event, reader):
 
 
 def lineage_absence(record, event, reader):
-    # Semantic absence of a falsifier has no deterministic native witness.
-    return []
+    from makoto2.family_spec import read_claims, history, settled, exit_of, claims
+    if event.get('hook_event_name') != 'Stop':
+        return []
+    absence = [c for c in read_claims(record, event)
+               if c.get('kind') in ('clean', 'absent') and not c.get('falsifier')
+               and (c.get('kind') == 'clean' or isinstance(event.get('claim'), dict)
+                    or re.search(r'(?i)(?<![\w-])(?:absent|missing|none)(?![\w-])',
+                                 output_text(event, reader)))]
+    if not absence:
+        return []
+    raw = history(record)
+    boundary = max((i for i, e in enumerate(raw)
+                    if e.get('hook_event_name') == 'UserPromptSubmit'), default=-1)
+    latest = {}
+    for e in raw[boundary+1:]:
+        if settled(e) and e.get('tool_name') == 'Bash':
+            latest[(e.get('tool_input') or {}).get('command', '')] = exit_of(e)
+    # Bare absence words are not evidence of an unpaid measurement. There must
+    # be an observed basis: a failed probe, or a read restating the verdict,
+    # with no successful independent probe in the current turn.
+    cited = cited_references(event, reader)
+    restated = any(c.kind in ('clean', 'absent')
+                   for e in raw[boundary+1:] if settled(e) and e.get('tool_name') == 'Read'
+                   and reader._norm((e.get('tool_input') or {}).get('file_path', ''),
+                                    e.get('cwd', event.get('cwd', ''))) in cited
+                   for c in claims(reader._flatten(e.get('tool_response')), record))
+    return ['claim'] if (0 not in latest.values()
+                         and (any(code not in (None, 0) for code in latest.values()) or restated)) else []
 
 
 
@@ -236,7 +308,7 @@ def lineage_units(record, event, reader):
     # inventory. Without one, orphanhood is not evaluable from a missing comment.
     claim_texts = [o.output for o in record.obs if not o.failed
                    and o.tool == 'Read' and any(n in sources for n in o.objects)
-                   and re.search(r'(?im)^#+\s*(?:requirements|claims|contract)\b', o.output)]
+                   and re.search(r'(?im)^#+\s*(?:requirements|claims|contract)\b|\bunits?\s+required\s*:', o.output)]
     if not claim_texts:
         return []
     units = []
@@ -250,7 +322,9 @@ def lineage_units(record, event, reader):
         named = any(re.search(r'(?<!\w)' + re.escape(node.name) + r'(?!\w)', text)
                     for text in claim_texts)
         backed = bool(refs & sources.keys())
-        if not named and not backed:
+        consumed = any(isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+                       and n.id == node.name for n in ast.walk(tree))
+        if not named and not backed and not consumed:
             units.append(node.name)
     return units
 

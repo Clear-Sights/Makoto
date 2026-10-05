@@ -4,6 +4,7 @@ Facts come from settled response fields or JSON response objects, never a
 command's spelling. Unknown gate measurements are not invented.
 """
 import ast
+import difflib
 import json
 import os
 import re
@@ -134,8 +135,27 @@ def other_write(record, event, reader):
         # A whole write is ungrounded when it lacks a reading of the prior bytes.
         from makoto2.family_lineage import readings
         sources, owned = readings(record, reader)
-        if path and os.path.exists(path) and path not in sources and path not in owned:
-            return [('D11', path)]
+        if path and os.path.exists(path):
+            ungrounded = path not in sources and path not in owned
+            users = [e.get('prompt', '') for e in getattr(record, 'events', ())
+                     if e.get('hook_event_name') == 'UserPromptSubmit']
+            preserve = users and re.search(
+                r'(?i)\b(?:preserve|keep(?:ing)?|retain)\b', users[-1])
+            lost = False
+            if preserve and not ungrounded:
+                try:
+                    with open(path, encoding='utf-8') as source:
+                        old = source.read().splitlines()
+                    new = ti.get('content', '').splitlines()
+                    lost = any(tag in ('delete', 'replace')
+                               and sum(bool(line.strip()) for line in old[a:b])
+                               > sum(bool(line.strip()) for line in new[c:d])
+                               for tag, a, b, c, d in difflib.SequenceMatcher(
+                                   a=old, b=new, autojunk=False).get_opcodes())
+                except (OSError, UnicodeError):
+                    pass
+            if ungrounded or lost:
+                return [('D11', path)]
     if event.get('tool_name') == 'Bash':
         match = re.search(r'git\s+(checkout|switch|reset)\s+([^;\n&|]+)', ti.get('command', ''))
         if match:

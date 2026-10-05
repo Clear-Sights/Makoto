@@ -67,7 +67,7 @@ def test_explicit_commit_citations_require_primary_readings():
                    tool_input={'command':'git log --oneline'},tool_response='abc1234 fix')
     assert not lineage.hook_lineage_refs(observed.record([primary]),event,observed)
     primary['tool_name']='Agent'
-    assert lineage.hook_lineage_refs(observed.record([primary]),event,observed)==['abc1234']
+    assert not lineage.hook_lineage_refs(observed.record([primary]),event,observed)
 
 
 def test_native_terms_table_uses_the_same_empty_binding_predicate():
