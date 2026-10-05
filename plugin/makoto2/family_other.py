@@ -158,12 +158,17 @@ def other_write(record, event, reader):
 
 
 def other_plan(record, event, reader):
-    if event.get('hook_event_name') != 'Stop':
+    if event.get('hook_event_name') != 'PreToolUse':
         return []
-    claims = [c for e in getattr(record, 'events', ()) for c in _claims(e, reader, record)] + [c for c in _claims(event, reader, record) if c.get('kind') in ('done','retracted')]
-    planned = {c.get('subject') for c in claims if c.get('kind') == 'plan'}
-    settled = {c.get('subject') for c in claims if c.get('kind') in ('done', 'retracted')}
-    return sorted(planned - settled)
+    if event.get('tool_name') != 'Bash':
+        return []
+    from makoto2.evaluate import OTHER_SESSION_TOOLS
+    command = (event.get('tool_input') or {}).get('command','')
+    instructions = {m.group(1) for o in record.obs if o.tool in OTHER_SESSION_TOOLS
+                    for m in re.finditer(r'(?i)\brun\s+`([^`]+)`', o.output)}
+    users = [e.get('prompt', '') for e in getattr(record, 'events', ())
+             if e.get('hook_event_name') == 'UserPromptSubmit']
+    return [command] if command in instructions and not any(command in text for text in users) else []
 
 
 def other_claim(record, event, reader, dispatch=False):

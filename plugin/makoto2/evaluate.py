@@ -16,7 +16,6 @@ import csv
 import json
 import os
 import re
-import xml.etree.ElementTree as ET
 from makoto2 import family_spec, family_lineage, family_switch
 from typing import Optional
 
@@ -390,7 +389,7 @@ def absence_pays(args, cfg, o):
     return lambda thing: thing.rsplit("/", 1)[-1] in scope
 
 
-_NUM_RX = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?%?|\d{1,3}(?:,\d{3})+)(?![\w.])")
+_NUM_RX = re.compile(r"(?<![\w.$,:])(\$?\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,2}:\d{2}(?:Z)?|\$?\d+(?:\.\d+)?%?)(?![\w,:]|\.\d)")
 
 
 def number_owes(args, cfg, record, event):
@@ -404,13 +403,11 @@ def number_owes(args, cfg, record, event):
             n = m.group(1)
             if len(re.sub(r"\D", "", n)) >= cfg["min_number_digits"] or "." in n or "%" in n:
                 out.append(n)
-    return [n for n in out if any(re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", t) for t in other)]
+    return out if other else []
 
 
 def number_pays(args, cfg, o):
-    if not _primary(o) or not o.output:
-        return None
-    return lambda n: re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", o.output) is not None
+    return lambda n: n in {m.group(1) for m in _NUM_RX.finditer(o.output)}
 
 
 def _words_text(path: str) -> str:
@@ -470,27 +467,8 @@ def read_pays(args, cfg, o):
     return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
 
 
-_LANDED = {
-    "merged": re.compile(r"\bmerged\b|\bMerge pull request\b", re.I),
-    "landed": re.compile(r"\bmerged\b|\blanded\b|\b[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}\b", re.I),
-    "pushed": re.compile(r"\bpushed\b|\s->\s|Everything up-to-date", re.I),
-    "passed": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
-    "passes": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
-    "shipped": re.compile(r"\bmerged\b|\bshipped\b|\breleased\b", re.I),
-    "green": re.compile(r"\bpassed\b|\bsuccess\b|\bgreen\b", re.I),
-}
-_CLAIM_RX = re.compile(r"\b(merged|landed|pushed|passed|passes|shipped|green|completed?|ready)\b", re.I)
 _NEG_RX = re.compile(r"\b(not|never|no|yet|once|until|if|when|before)\b|n't\b", re.I)
 _PENDING_RX = re.compile(r"\b(queued|pending|running|started|launched)\b", re.I)
-
-
-def _subject_words(text):
-    # Identifier components also bind prose names to test nodes and job IDs.
-    return set(re.findall(r"[a-z][a-z0-9]*|\d+", text.lower())) - _STOP_WORDS - {
-        "all", "check", "checks", "test", "tests", "generation",
-        "successfully", "consumers", "and", "ci", "has", "was", "rest", "their", "failed", "passed", "suite", "run",
-        "now", "already", "still", "currently", "later", "earlier", "are", "as", "placed"}
-
 
 
 # Number grammar reused from gate.unnamed_failure (6afe37e); prose counts,
@@ -513,8 +491,12 @@ _TEST_OUTCOME_RX = re.compile(
 def _failed_test_subjects(record):
     # Reuse the observed shell tokenizer: displaying a log is not running tests.
     verdicts = {}
+    latest = {}
     for o in record.obs:
-        if o.tool != "Bash" or o.failed:
+        if o.seq >= (getattr(record, 'turn_start', 0) or 0) and o.tool == 'Bash':
+            latest[o.input.get('command', '')] = o
+    for o in sorted(latest.values(), key=lambda o: o.seq):
+        if o.tool != "Bash":
             continue
         runners = [argv for argv, _ in _R._segments(str(o.input.get("command", "")))
                    if argv and (os.path.basename(argv[0]) in ("pytest", "py.test") or
@@ -560,83 +542,10 @@ def landed_owes(args, cfg, record, event):
                        for seq, brief in getattr(record, "dispatch_briefs", ())
                        for command in _brief_fields(brief)["ACCEPTANCE"])
 
-    native_claims = family_spec.read_claims(record, event)
-    paid_words = set()
-    for claim in native_claims:
-        if claim.get('kind') == 'pass' and claim.get('subject') and any(
-                o.exit == 0 and o.input.get('command') == claim['subject'] for o in record.obs):
-            paid_words.update(('pass','passed','green','success'))
-        if claim.get('kind') == 'shipped' and any(
-                o.exit == 0 and re.search(r'git\s+push', str(o.input.get('command',''))) for o in record.obs):
-            paid_words.update(('shipped','pushed'))
-    for s in _sentences(_strip_quoted(_text_of(event))):
-        if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
-            continue
-        for m in _CLAIM_RX.finditer(s):
-            if _NEG_RX.search(s[:m.start()][-cfg["negation_window"]:]):
-                continue
-            # A required future result is not a report of a settled outcome.
-            if re.search(r'\bneeds?\s+(?:all\s+)?(?:\w+\s+){0,3}checks?\s*$', s[:m.start()], re.I):
-                continue
-            word = m.group(1).lower()
-            if word in paid_words:
-                continue
-            # A counted branch survey binds prose to the revision actually
-            # selected in the same Bash run, even after surveying another tree.
-            count = re.search(r'\b(\d+) tests\b', s)
-            if word == 'passes' and re.search(r'\bbranch passes all\b', s, re.I) and count:
-                revisions = [argv[-1] for o in record.obs if o.tool == 'Bash' and not o.failed
-                             and re.search(r'\b'+count[1]+r' passed\b', o.output)
-                             for argv, _ in _R._segments(o.input.get('command', ''))
-                             if len(argv) >= 3 and argv[:2] == ('git', 'checkout')]
-                if revisions:
-                    out.append((word, (revisions[-1], count[1]), 'branch-check', -1))
-                    continue
-            names = _subject_words(re.split(r"\band\b|;", s[:m.start()], flags=re.I)[-1])
-            artifacts = {p for o in record.obs for p in (o.written | o.created |
-                         set(re.findall(r"(?:--output(?:=|\s+)|-o\s+)([^\s;]+)",
-                                        str(o.input.get("command", "")))))
-                         if _subject_words(os.path.splitext(os.path.basename(p))[0]) <= names
-                         and _subject_words(os.path.splitext(os.path.basename(p))[0])}
-            # An artifact commits to its bytes, not a generator's exit or existence.
-            if word in ("complete", "completed", "ready"):
-                jobs = any(names & _subject_words(str(o.input.get("job_id", "")) +
-                           " ".join(re.findall(r"\bjob_id[=:]([\w-]+)", o.output)))
-                           for o in record.obs)
-                if not artifacts and not jobs:
-                    continue
-            else:
-                artifacts = set()
-            if artifacts:
-                out.extend((word, p, "artifact", max((o.seq for o in record.obs
-                           if _names(o, p)), default=-1))
-                           for p in sorted(artifacts))
-            else:
-                # Keep the claimed subject, including numeric identifiers. An unrelated
-                # status must not erase its name and turn it into an aggregate claim.
-                names = frozenset(names)
-                failed_at = max((o.seq for o in record.obs if any(
-                    names <= _subject_words(line + json.dumps(o.input)) and re.search(r"\b(fail(?:ed)?|error|queued|pending|running)\b", line, re.I)
-                    for line in o.output.splitlines())), default=-1)
-                out.append((word, names, "status", failed_at))
+    # The native family owns the settled-run condition for every outcome route.
+    out.extend(("settled", tuple(f['objects']), "settled", -1)
+               for f in family_spec.spec_claim(record, event, cfg) if f['row'] == 'R11')
     return out
-
-
-def _valid_artifact(o, path):
-    if o.tool not in ("Read", "Write") or not _names(o, path):
-        return False
-    body = str(o.input.get("content", "") if o.tool == "Write" else o.output).strip()
-    if not body:
-        return False
-    try:
-        if path.lower().endswith(".json"):
-            return bool(json.loads(body))
-        if path.lower().endswith(".xml"):
-            root = ET.fromstring(body)
-            return bool(len(root) or (root.text or "").strip())
-    except (ValueError, ET.ParseError):
-        return False
-    return True
 
 
 def landed_pays(args, cfg, o):
@@ -644,54 +553,12 @@ def landed_pays(args, cfg, o):
         return None
 
     def pays(subject):
-        word, names, kind, after = subject
-        if kind == "failure-report":
-            return False
-        if kind == 'branch-check':
-            segments = _R._segments(o.input.get('command', ''))
-            selected = any(len(argv) >= 3 and argv[:2] == ('git', 'checkout')
-                           and argv[-1] == names[0] for argv, _ in segments)
-            ran = any(any(token.endswith(('check.py', 'zero.py', 'plants.py')) or token == 'pytest'
-                          for token in argv) for argv, _ in segments)
-            return (o.tool == 'Bash' and selected and ran and not o.failed
-                    and not re.search(r'\b(?:FAIL(?:ED)?|[1-9]\d* failed)\b', o.output)
-                    and bool(re.search(r'\b'+names[1]+r' passed\b', o.output)))
-        if kind == "acceptance":
-            return (o.seq > after and o.tool == "Bash" and o.exit == 0
-                    and o.input.get("command", "").strip() == names
-                    and not o.input.get("run_in_background")
-                    and o.seq not in cfg.get("dispatch_background", ())
-                    and not _PENDING_RX.search(o.output))
-        if not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
-            return False
-        if o.seq < after:
-            return False
-        if kind == "artifact":
-            return o.exit in (None, 0) and _valid_artifact(o, names)
-        if o.seq <= after or o.input.get("run_in_background") or o.tool.endswith("__launch") or _PENDING_RX.search(o.output):
-            return False
-        rx = _LANDED.get(word, re.compile(r"\b(completed?|ready)\b", re.I))
-        # JSON status fields and individual text lines keep named outcomes separate
-        # from summaries. Input identifiers bind status APIs, never launch acknowledgements.
-        for line in o.output.splitlines():
-            try:
-                value = json.loads(line)
-            except ValueError:
-                value = None
-            if isinstance(value, dict):
-                if any((not names or names <= _subject_words(str(k)) or
-                        (k in ("status", "state") and names <= _subject_words(json.dumps(o.input))))
-                       and rx.search(str(v)) and not _NEG_RX.search(str(v))
-                       for k, v in value.items()):
-                    return True
-                continue
-            if re.search(r"\b(fail(?:ed)?|error)\b", line, re.I):
-                continue
-            if rx.search(line) and not _NEG_RX.search(line[:rx.search(line).start()]) and (not names or names <= _subject_words(line)
-                                   or names <= _subject_words(json.dumps({k: v for k, v in o.input.items()
-                                       if k != "command" or word in ("merged", "landed", "pushed", "shipped")}))):
-                return True
-        return False
+        _, command, kind, after = subject
+        return (kind == "acceptance" and o.seq > after and o.tool == "Bash"
+                and o.exit == 0 and o.input.get("command", "").strip() == command
+                and not o.input.get("run_in_background")
+                and o.seq not in cfg.get("dispatch_background", ())
+                and not _PENDING_RX.search(o.output))
     return pays
 
 

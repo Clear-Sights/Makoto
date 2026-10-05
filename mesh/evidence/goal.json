@@ -10,31 +10,32 @@
     "plugin/makoto2/__init__.py": "35248709e66444640d06b530aa948a0f58cae70f3fc868085c18b278b737efde",
     "plugin/makoto2/__main__.py": "86cf1bd51906ab908f600522c98d9b9819357b93a4533dd23f57e34295d4913f",
     "plugin/makoto2/config.json": "989509b9551c6cb30d15442e0a5b300a23fecf0c82fde3fe98f76b277e9ab6d1",
-    "plugin/makoto2/evaluate.py": "52dc1fbb01dcbcec271cd50076d8493f13348e62116119a20b319d93acde2ae6",
-    "plugin/makoto2/family_lineage.py": "1ba98cc149b4cd10582ff7db9443452599e28d9915e0f69a7312717d988f375c",
-    "plugin/makoto2/family_other.py": "976d2cd318ed1796046e27bec1aeb588c06851528b025131dcb24b0d92c659a1",
-    "plugin/makoto2/family_spec.py": "5a78431b03d7ad965c94efbf4ddcc750ace3f26feb03d20bedf67c09b863d245",
+    "plugin/makoto2/evaluate.py": "9597b1f8699cc1fd56d605df507a190f88df3f3a04593e68538cb0d1b92e6985",
+    "plugin/makoto2/family_lineage.py": "865dd8b12eb0bde287073b25f124e2c31f7081bd4a54c26c0ccfce3a00553db7",
+    "plugin/makoto2/family_other.py": "504a2d80292416238036611ec896d0b590c6e0b138533dd9a6a3eeacc5e9a197",
+    "plugin/makoto2/family_spec.py": "8cd5091d814add5c91c46451032c40397555c6ed134b8ca6e83c22cfdba8413e",
     "plugin/makoto2/family_switch.py": "6abe62a5d74540a5f7bcef95f72a5d0b4fe4fa21df36065f2179ab7e0c7cd724",
     "plugin/makoto2/hook.py": "b4a293683f9e7a04d7e2955b59a73a6d7e297cb3a47b37f53ff612a6a29aad41",
     "plugin/makoto2/lifecycle.py": "49e73c5ece6eb9c57de93b6624778c30ec1916a4aef1253fc0abd5a63c7650b4",
     "plugin/makoto2/lineage.py": "110e7ee5e2f6bfdde5fbe39ebc45c31ea92e5cfdc9eaf534209b78f943258e2b",
-    "plugin/makoto2/observed.py": "9d783d63fade9cffc04c2a7ef4dfaf5ee2c0e65b393733cc64d9628bdcccf241",
+    "plugin/makoto2/observed.py": "bbdeca2281b12e02779b6ea515646292c76c814f18fc2919f948a06b158f805a",
     "plugin/makoto2/rows.tsv": "ee868c4421bda9b9133deb315dfa668d2f264b0fd2433e34d13aef8260ea4926",
-    "tests/fixtures/goal.json": "f680142fb381ba7ba5793c3c2e09248ff36baa1dcb26e85624ea0797b514ec03",
+    "tests/fixtures/goal.json": "e2a2fcab0427e63274c87dc6e579f051b24af42fb19f632dd72ebb8bd9884715",
     "tests/fixtures/honest_writes.json": "36804073fff8ffcba0fb18b557fad6290cca500decabf3f23cede4cb5f054d07",
     "tests/test_goal.py": "b2f7fb756fbdaf2247a9b17812e0876b22fdf5d363b6c490f319253471dc248f"
   },
   "baseline_exit_code": 0,
-  "stdout": "........................................................................ [ 48%]\n........................................................................ [ 96%]\n.....                                                                    [100%]\n149 passed in 20.68s\n",
+  "stdout": "........................................................................ [ 49%]\n........................................................................ [ 99%]\n.                                                                        [100%]\n145 passed in 29.56s\n",
   "stderr": "",
-  "catches": 70,
+  "catches": 68,
   "head_entries": 74,
   "families": {
     "SPEC": {
-      "caught": 26,
+      "caught": 25,
       "total": 28,
       "not_evaluable": [
         "A5",
+        "C2",
         "G3"
       ]
     },
@@ -53,15 +54,21 @@
       ]
     },
     "LINEAGE": {
-      "caught": 8,
+      "caught": 7,
       "total": 8,
-      "not_evaluable": []
+      "not_evaluable": [
+        "B32"
+      ]
     }
   },
   "not_evaluable": [
     {
       "id": "A5",
       "reason": "Tried an inner-value quote without a whole-output Read. Hooks cannot distinguish a faithful quote from one whose omitted wrapper changes its truth; requiring every wrapper read would also block the honest quote. The register supplies no context-equivalence witness."
+    },
+    {
+      "id": "C2",
+      "reason": "Native hook prose cannot deterministically distinguish an invalid absence/identity proof from an ordinary validation report; missing a falsifier phrase is not a tell."
     },
     {
       "id": "G3",
@@ -74,19 +81,26 @@
     {
       "id": "F12",
       "reason": "Tried a stated cause with no named discriminating observation. The same observations can be discriminating or merely symptomatic depending on competing mechanisms; hook receipts do not decide that relation. The register specifies no deterministic discriminator."
+    },
+    {
+      "id": "B32",
+      "reason": "Native hook prose cannot deterministically distinguish an invalid absence/identity proof from an ordinary validation report; missing a falsifier phrase is not a tell."
     }
   ],
   "false_fires": 0,
-  "honest_cases": 77,
+  "honest_cases": 75,
   "plants": [
     {
-      "plant": "family_lineage.lineage_absence",
+      "plant": "family_lineage.hook_lineage_refs",
       "predicates": [
-        "family_lineage.lineage_absence"
+        "family_lineage.hook_lineage_refs"
       ],
       "entries": {
-        "C2": true,
-        "B32": true
+        "A2": true,
+        "G1": true,
+        "H1": true,
+        "H4": true,
+        "H5": true
       },
       "red": true,
       "exit_code": 1
@@ -113,21 +127,6 @@
       "entries": {
         "F2": true,
         "H3": true
-      },
-      "red": true,
-      "exit_code": 1
-    },
-    {
-      "plant": "family_lineage.lineage_refs",
-      "predicates": [
-        "family_lineage.lineage_refs"
-      ],
-      "entries": {
-        "A2": true,
-        "G1": true,
-        "H1": true,
-        "H4": true,
-        "H5": true
       },
       "red": true,
       "exit_code": 1
@@ -402,8 +401,7 @@
     {
       "plant": "family SPEC",
       "predicates": [
-        "family_lineage.lineage_absence",
-        "family_lineage.lineage_refs",
+        "family_lineage.hook_lineage_refs",
         "family_other.other_claim",
         "family_other.other_plan",
         "family_spec.spec_authorship",
@@ -429,7 +427,6 @@
         "B23": true,
         "B35": true,
         "B36": true,
-        "C2": true,
         "C6": true,
         "C7": true,
         "C10": true,
@@ -450,9 +447,9 @@
     {
       "plant": "family OTHER POINT",
       "predicates": [
+        "family_lineage.hook_lineage_refs",
         "family_lineage.lineage_drift",
         "family_lineage.lineage_edit",
-        "family_lineage.lineage_refs",
         "family_other.other_claim",
         "family_other.other_environment",
         "family_other.other_normalization",
@@ -521,14 +518,12 @@
     {
       "plant": "family LINEAGE",
       "predicates": [
-        "family_lineage.lineage_absence",
+        "family_lineage.hook_lineage_refs",
         "family_lineage.lineage_drift",
         "family_lineage.lineage_edit",
-        "family_lineage.lineage_refs",
         "family_lineage.lineage_units"
       ],
       "entries": {
-        "B32": true,
         "F10": true,
         "H1": true,
         "H2": true,

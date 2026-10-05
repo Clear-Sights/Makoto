@@ -53,7 +53,12 @@ def history(record):
 def exit_of(event):
     from makoto2 import observed
     response = event.get('tool_response')
-    return observed._exit_of(response, observed._flatten(response))
+    value = observed._exit_of(response, observed._flatten(response))
+    failed = (event.get("hook_event_name") == "PostToolUseFailure" or
+              isinstance(response, dict) and any(response.get(k) for k in ("is_error", "isError", "interrupted")))
+    if failed:
+        return value if value not in (None, 0) else 1
+    return 0 if value is None and settled(event) and event.get("tool_name") == "Bash" else value
 
 
 def settled(event):
@@ -174,7 +179,7 @@ class Claim(NamedTuple):
 
 
 # A single fixed word table; no thresholds or semantic classifier.
-CLAIM_WORDS = {'pass':('pass','passed','green','success'), 'clean':('clean',),
+CLAIM_WORDS = {'pass':('pass','passed','passes','green','success'), 'clean':('clean',),
                'absent':('absent','missing','none'), 'done':('done','fixed','finished','complete','completed','ready'),
                'shipped':('shipped','pushed','landed','merged'), 'running':('running',),
                'count':('failed','failures','passed'), 'plan':('plan','planned'),
@@ -234,15 +239,22 @@ def spec_claim(record, event, cfg):
     if not stop(event):return out
     raw=history(record)
     from makoto2 import family_switch,family_lineage,family_other,observed
-    observations=[{'command':o.input.get('command',''),'exit':o.exit} for o in record.obs]
+    boundary = (getattr(record, 'turn_start', 0) or 0) - 1
+    last_edit = max((i for i,e in enumerate(raw) if settled(e) and e.get('tool_name') in ('Write','Edit','MultiEdit','NotebookEdit')), default=-1)
+    latest = {}
+    for e in raw[boundary+1:]:
+        if settled(e) and e.get('tool_name') == 'Bash':
+            latest[args(e).get('command','')] = exit_of(e)
     for value in read_claims(record,event):
-        claim=Claim(value.get('kind',''),value.get('subject',''),value.get('names',False),bool(value.get('falsifier')))
-        if claim.subject and family_switch.switch_pass({'event':'Stop','claim':value},observations):
-            out.append(finding(('A7','C3'),claim.subject,'claim.kind=pass and not seen(exit=0 and args.command matches $claim.subject)','R11'))
-        if claim.kind=='shipped' and not any(settled(e) and exit_of(e)==0 and re.search(r'git\s+push',str(args(e).get('command',''))) for e in raw):
-            out.append(finding(('C10',),claim.subject,'claim.kind=shipped and not seen(args.command matches "git\\s+push" and exit=0)','R11'))
-        if claim.kind=='count' and not claim.names and verifier_keys(record):
-            out.append(finding(('C12',),claim.subject,'claim.kind=count and not claim.names and seen(verifier and exit!=0)','R11'))
+        kind, subject = value.get('kind'), value.get('subject','')
+        runs = [e for e in raw[max(boundary,last_edit)+1:] if settled(e)
+                and e.get('tool_name') == 'Bash' and args(e).get('command') == subject]
+        if kind == 'pass' and subject and (not runs or exit_of(runs[-1]) != 0):
+            out.append(finding(('A7','C3'),subject,'latest settled run after the last edit is not successful','R11'))
+        if kind == 'shipped' and not shipping_observed(record):
+            out.append(finding(('C10',),subject,'no successful shipping observation','R11'))
+        if kind == 'count' and not value.get('names') and any(code not in (None,0) for code in latest.values()):
+            out.append(finding(('C12',),subject,'latest settled subject result is failure','R11'))
     return out
 
 
@@ -273,8 +285,10 @@ def spec_history(record, event, cfg):
     if not stop(event):return out
     current=claims(event.get('last_assistant_message',''),record)
     earlier=[c for e in raw if e.get('hook_event_name')=='Stop' for c in claims(e.get('last_assistant_message',''),record)]
-    if any(c.kind=='plan' for c in current) and not any(c.kind=='question' for c in earlier):
-        out.append(finding(('G2',),'plan','claim.kind=plan and not seen(claim.kind=question)'))
+    # A request for a plan is distinguishable by an explicit user instruction.
+    users = [e.get('prompt','') for e in raw if e.get('hook_event_name') == 'UserPromptSubmit']
+    if re.match(r'(?i)^\s*(?:my |the )?plan\s*:', event.get('last_assistant_message','')) and not any(re.search(r'(?i)\bplan\b',u) for u in users):
+        out.append(finding(('G2',),'plan','explicit plan without user request'))
     boundary=max((i for i,e in enumerate(raw) if e.get('hook_event_name')=='UserPromptSubmit'),default=-1)
     if any(c.kind=='cannot' for c in current) and not any(e.get('hook_event_name')=='PreToolUse' for e in raw[boundary+1:]):
         out.append(finding(('G5',),'cannot','claim.kind=cannot and unseen_since(event=Pre, event=User)'))
@@ -289,8 +303,17 @@ def findings(record, event, cfg):
     from makoto2.family_other import _facts
     for facts in _facts(record):
         for check in (spec_authorship, spec_terms, spec_launch, spec_budget):
-            yield from check(record, facts, cfg)
+            yield from check(record, dict(facts, cwd=facts.get('cwd', event.get('cwd', ''))), cfg)
 
 
 def evaluate(record, event, cfg):
     return list(findings(record, event, cfg))
+
+
+def shipping_observed(record):
+    from makoto2 import observed
+    return any(not o.failed and o.exit in (None, 0) and (o.tool == 'Bash' and o.exit == 0 and any(
+        tuple(observed._effective_argv(argv)[:2]) == ('git','push')
+        for argv,_ in observed._segments(o.input.get('command',''))) or
+        o.tool.rsplit('__',1)[-1] in ('push_files','create_or_update_file','merge_pull_request'))
+        for o in record.obs)

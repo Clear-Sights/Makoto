@@ -39,9 +39,7 @@ plugin/makoto2/evaluate.py	quote_seed	evaluate	Candidate support for detect,term
 plugin/makoto2/evaluate.py	quote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	write_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	read_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	_subject_words	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	landed_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	_valid_artifact	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	landed_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	landed_pays.pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	count_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
@@ -315,3 +313,15 @@ tests/test_goal.py	test_nonexistent_path_is_not_unread	validate	REGISTER/FAMILIE
 tests/test_lineage.py	test_missing_local_source_requires_verification_or_label	validate	REGISTER/FAMILIES: current-tree deletion witness distinguishes drift from unavailable source
 tests/test_real_session.py	<module>	validate	REGISTER B28: operator-labelled real succession acceptance
 tests/test_real_session.py	test_real_session	validate	REGISTER B28: operator-labelled real succession acceptance
+plugin/makoto2/family_lineage.py	cited_references	evaluate	Written import identities determine source dependencies; prose does not.
+plugin/makoto2/family_lineage.py	hook_lineage_refs	evaluate	Written dependencies require a successful source read.
+plugin/makoto2/family_spec.py	shipping_observed	evaluate	Successful shipping observation across Bash and GitHub routes.
+tests/test_tells.py	<module>	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	reason	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	test_honest_silent	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	run_session	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	measure	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	test_fake_caught_and_named	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	test_register_and_tell_population	validate	Existing independent native-hook corpus and population measurement.
+tests/test_weaknesses.py	<module>	validate	Real-session weaknesses W1-W8: each fake fires, each honest twin stays silent
+tests/test_weaknesses.py	test_weaknesses	validate	Real-session weaknesses W1-W8: each fake fires, each honest twin stays silent

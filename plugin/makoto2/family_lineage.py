@@ -51,6 +51,12 @@ def readings(record, reader):
                 identities.add(reader._norm(path, cwd))
             if obs.input.get('ref'):
                 identities.add(obs.input['ref'])
+        elif obs.tool == 'Bash':
+            segments = list(reader._segments(obs.input.get('command', '')))
+            if len(segments) == 1:
+                argv, op = segments[0]
+                if len(argv) == 2 and os.path.basename(argv[0]) == 'cat' and not argv[1].startswith('-'):
+                    identities.add(reader._norm(argv[1], cwd))
         elif obs.tool == 'WebFetch' and obs.input.get('url'):
             identities.add(obs.input['url'])
         # ls-remote is a primary reading of remote refs, including their SHA.
@@ -81,6 +87,43 @@ def output_text(event, reader):
         return ti.get('content', ti.get('new_string', ''))
     # refs(output) is Write/Edit content or closing text (register definition).
     return ''
+
+
+def cited_references(event, reader):
+    """References used as evidence, rather than strings naming future artifacts.
+
+    Bare path lists remain supported by unpaid() for ledger clients. Hook
+    decisions require a citation/dependency context. Written local dependencies
+    must exist; a proposed output name is not an unread source.
+    """
+    if event.get('hook_event_name') != 'PreToolUse' or event.get('tool_name') not in ('Write','Edit'):
+        return set()
+    if not str((event.get('tool_input') or {}).get('file_path', '')).endswith('.py'):
+        return set()
+    text = output_text(event, reader)
+    cwd = event.get('cwd') or ''
+    selected = set()
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, TypeError):
+        return set()
+    for node in ast.walk(tree):
+        modules = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                   else [node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
+        for module in modules:
+            for suffix in ('.py','/__init__.py'):
+                name = reader._norm(module.replace('.', '/') + suffix, cwd)
+                if os.path.isfile(name):
+                    selected.add(name)
+    return selected
+
+
+def hook_lineage_refs(record, event, reader):
+    sources, owned = readings(record, reader)
+    cwd = event.get('cwd') or ''
+    own = reader._norm((event.get('tool_input') or {}).get('file_path', ''), cwd)
+    return sorted(n for n in cited_references(event, reader) - owned - {own}
+                  if n not in sources)
 
 
 def lineage_refs(record, event, reader):
@@ -144,11 +187,8 @@ def lineage_drift(record, event, reader):
 
 
 def lineage_absence(record, event, reader):
-    from makoto2.family_spec import read_claims
-    claims = read_claims(record,event)
-    claim = next((c for c in claims if c.get('kind') in ('clean','absent')), {})
-    return (event.get('hook_event_name') == 'Stop'
-            and claim.get('kind') in ('clean', 'absent') and not claim.get('falsifier'))
+    # Semantic absence of a falsifier has no deterministic native witness.
+    return []
 
 
 
@@ -175,16 +215,26 @@ def lineage_units(record, event, reader):
         tree = ast.parse(code)
     except SyntaxError:
         return []
+    sources, owned = readings(record, reader)
+    # An ordinary implementation session does not declare a closed claim
+    # inventory. Without one, orphanhood is not evaluable from a missing comment.
+    claim_texts = [o.output for o in record.obs if not o.failed
+                   and o.tool == 'Read' and any(n in sources for n in o.objects)
+                   and re.search(r'(?im)^#+\s*(?:requirements|claims|contract)\b', o.output)]
+    if not claim_texts:
+        return []
     units = []
     lines = code.splitlines()
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.decorator_list or node.name.startswith('test_'):
             continue
-        # A claim belongs to the unit's docstring or source comments; arbitrary
-        # executable literals do not make that unit answer to a source claim.
         claim = ast.get_docstring(node) or ''
         claim += '\n' + '\n'.join(line.split('#', 1)[1] for line in lines[node.lineno-1:node.end_lineno] if '#' in line)
-        if not references(claim, event.get('cwd') or '', reader):
+        refs = references(claim, event.get('cwd') or '', reader)
+        named = any(re.search(r'(?<!\w)' + re.escape(node.name) + r'(?!\w)', text)
+                    for text in claim_texts)
+        backed = bool(refs & sources.keys())
+        if not named and not backed:
             units.append(node.name)
     return units
 
@@ -226,7 +276,7 @@ def findings(record, event, cfg):
         return
     checks = (
         (lineage_absence, ('C2','B32'), 'R05'),
-        (lineage_refs, ('A2','G1','H1','H4','H5'), 'R08'),
+        (hook_lineage_refs, ('A2','G1','H1','H4','H5'), 'R08'),
         (lineage_drift, ('D4','F7','F10','H2'), 'L.drift'),
         (lineage_edit, ('F2','H3'), 'L.edit'),
         (lineage_units, ('H6',), 'L.units'),

@@ -430,6 +430,8 @@ def _read(ev: dict, seq: int, seen: set) -> Obs:
     failed = (ev.get("hook_event_name") == "PostToolUseFailure"
               or bool(trd.get("is_error") or trd.get("isError") or trd.get("interrupted"))
               or bool(_DENIAL_RX.search(output)))
+    if tool == "Bash" and exit_ is None and not failed:
+        exit_ = 0
     objects = _input_objects(ti, cwd)
     written, created, search = set(), set(), None
     command = ti.get("command")
