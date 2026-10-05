@@ -335,3 +335,8 @@ tests/test_denominators.py	test_explicit_commit_citations_require_primary_readin
 tests/test_denominators.py	test_native_terms_table_uses_the_same_empty_binding_predicate	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
 tests/test_denominators.py	test_shipment_status_is_distinct_from_a_modified_noun	validate	Evidence-boundary regressions across representations.
 tests/test_denominators.py	test_revision_field_in_primary_measurement_pays_citation	validate	Evidence-boundary regressions across representations.
+tests/test_windows_paths.py	<module>	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_windows_fake_and_honest	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_windows_fake_and_honest.local	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_windows_record_identity	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_posix_case_urls_and_counts_remain_distinct	validate	Windows payload path identity, fake and honest regression acceptance

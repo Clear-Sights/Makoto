@@ -15,11 +15,7 @@ def digest(content):
 
 
 def anchor(name, cwd, reader):
-    # _norm joins only onto a '/'-rooted cwd; a drive-rooted cwd is absolute too.
-    if (cwd and os.path.isabs(cwd) and not cwd.startswith('/') and not os.path.isabs(name)
-            and '://' not in name and not reader._RATIO_RX.fullmatch(name)):
-        return reader._norm(os.path.join(cwd, name), '')
-    return name
+    return reader._norm(name, cwd)
 
 
 def references(text, cwd, reader):
@@ -188,7 +184,7 @@ def lineage_drift(record, event, reader):
         elif name in sources and not ('/' in name or '.' in os.path.basename(name)):
             continue  # quoted values carry their own immutable identity
         else:
-            path = name if os.path.isabs(name) else os.path.join(cwd, name)
+            path = reader._norm(name, cwd)
             try:
                 with open(path, encoding='utf-8') as source:
                     current = digest(source.read())

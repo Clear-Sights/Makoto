@@ -10,7 +10,7 @@ which objects an executed event touched.
 
 Objects are paths and identifiers, normalised the same way on both sides:
   - a path-shaped token (holds a "/", or is name.ext) or a Bash operand word, joined onto the
-    event's cwd when relative, then posixpath.normpath'd; a trailing ":line[:col]" is dropped;
+    event's cwd when relative, then normalized in the payload's path dialect; a trailing ":line[:col]" is dropped;
   - a URL, kept verbatim;
   - a result count: a ratio "8/8", or "<n> passed|failed|skipped|error|..." lowercased.
 Equality is exact: observing a directory does not observe the files under it, nor the reverse
@@ -26,6 +26,7 @@ import copy
 import functools
 import json
 import os
+import ntpath
 import posixpath
 import re
 import shlex
@@ -219,7 +220,8 @@ _PASSED_N_RX = re.compile(r"\b(passed|failed)\s+(\d+)(?:/\d+)?\b", re.I)
 # name directly followed by "(" or "[" is a call or an index in code (json.load(), d.items[), not
 # a file, so it is not read as one.
 _PATH_RX = re.compile(
-    r"(?<![\w.@+~/-])(?:~|\.{1,2})?/?(?:[\w.@+-]+/)+[\w.@+*-]*"
+    r"(?<![\w.@+~/-])(?:[A-Za-z]:/|//)(?:[\w.@+-]+/)*[\w.@+*-]+"
+    r"|(?<![\w.@+~/-])(?:~|\.{1,2})?/?(?:[\w.@+-]+/)+[\w.@+*-]*"
     r"|(?<![\w.@+~/-])[\w@+*-]+(?:\.[\w@+*-]+)*\.[A-Za-z][A-Za-z0-9]{0,7}(?![\w(\[.])")
 _LINE_REF_RX = re.compile(r"(?::\d+){1,2}$")
 _EDGE_PUNCT = "\"'`,;:()[]{}<>"
@@ -235,8 +237,16 @@ def _norm(token: str, cwd: str) -> str:
     if _URL_RX.fullmatch(t) or _RATIO_RX.fullmatch(t):
         return t
     t = os.path.expanduser(t) if t.startswith("~") else t
-    t = posixpath.join(cwd, t) if not t.startswith("/") and cwd.startswith("/") else t
-    out = posixpath.normpath(t)
+    cwd = str(cwd or "").replace("\\", "/")
+    # Select the path dialect from the payload, not the machine running the hook.
+    # Drive-rooted and UNC paths are Windows identities even on a POSIX host.
+    windows = bool(ntpath.splitdrive(t)[0] or ntpath.splitdrive(cwd)[0])
+    if windows:
+        t = ntpath.join(cwd, t) if ntpath.isabs(cwd) else t
+        out = ntpath.normcase(ntpath.normpath(t)).replace("\\", "/")
+    else:
+        t = posixpath.join(cwd, t) if not t.startswith("/") and cwd.startswith("/") else t
+        out = posixpath.normpath(t)
     return "" if out == "." else out
 
 
@@ -248,7 +258,7 @@ def _text_objects(text: str, cwd: str) -> set:
     out.update(m.group(0) for m in _RATIO_RX.finditer(rest))
     out.update(f"{m.group(1)} {m.group(2).lower()}" for m in _COUNT_RX.finditer(rest))
     out.update(f"{m.group(2)} {m.group(1).lower()}" for m in _PASSED_N_RX.finditer(rest))
-    out.update(_norm(m.group(0), cwd) for m in _PATH_RX.finditer(_RATIO_RX.sub(" ", rest)))
+    out.update(_norm(m.group(0), cwd) for m in _PATH_RX.finditer(_RATIO_RX.sub(" ", rest).replace("\\", "/")))
     out.discard("")
     return out
 
