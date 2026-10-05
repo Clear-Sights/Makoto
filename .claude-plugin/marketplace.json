@@ -8,7 +8,7 @@
     {
       "name": "makoto",
       "source": "./plugin",
-      "description": "Checks statements against observed tool effects using 12 source-pinned rules; blocks findings or stays silent, with subject-bound completion witnesses. Includes advisory installed-skill triggers.",
+      "description": "Checks statements against observed tool effects using 12 source-pinned rules; blocks findings or stays silent, with subject-bound completion witnesses.",
       "category": "workflow",
       "tags": [
         "integrity",
