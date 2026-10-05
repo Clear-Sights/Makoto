@@ -26,6 +26,8 @@ def references(text, cwd, reader):
     text = re.sub(r'(?<=\w)\.(?=\s|$)', '', str(text or ''))
     refs = {anchor(p.rstrip('.!?'), cwd, reader) for p in reader._text_objects(text, cwd)
             if '://' in p or '/' in p or '.' in os.path.basename(p)}
+    refs.update(m.group(1) for m in re.finditer(r'(?i)\b(?:commit|revision|sha)\s+([0-9a-f]{7,64})(?![\w])', text)
+                if re.search('[a-f]', m.group(1)))
     refs.update(m.group(0) for m in re.finditer(r'(?<![\w])[0-9a-f]{40}(?:[0-9a-f]{24})?(?![\w])', text))
     for match in re.finditer(r'"([^"\n]+)"|“([^”\n]+)”', text):
         value = match.group(1) or match.group(2)
@@ -59,6 +61,17 @@ def readings(record, reader):
                     identities.add(reader._norm(argv[1], cwd))
         elif obs.tool == 'WebFetch' and obs.input.get('url'):
             identities.add(obs.input['url'])
+        # Explicit identity fields in settled measurements are primary witnesses,
+        # including benchmark revisions; their format is independent of tool names.
+        if obs.tool == 'Bash':
+            for sha in re.findall(r'\b(?:revision|commit|sha(?:256)?)\s*[:=]\s*([0-9a-f]{7,64})(?![\w])', obs.output):
+                sources[sha] = digest(sha)
+        # git log/show are primary readings of commit identities, not relays.
+        if obs.tool == 'Bash' and any(len(argv) >= 2 and argv[0] == 'git'
+                and argv[1] in ('log', 'show')
+                for argv, _ in reader._segments(obs.input.get('command', ''))):
+            for sha in re.findall(r'(?m)^(?:commit\s+)?([0-9a-f]{7,64})(?=\s|$)', obs.output):
+                sources[sha] = digest(sha)
         # ls-remote is a primary reading of remote refs, including their SHA.
         if obs.tool == 'Bash' and any('ls-remote' in argv and 'git' in argv
                 for argv, _ in reader._segments(obs.input.get('command', ''))):
@@ -96,12 +109,19 @@ def cited_references(event, reader):
     decisions require a citation/dependency context. Written local dependencies
     must exist; a proposed output name is not an unread source.
     """
-    if event.get('hook_event_name') != 'PreToolUse' or event.get('tool_name') not in ('Write','Edit'):
-        return set()
-    if not str((event.get('tool_input') or {}).get('file_path', '')).endswith('.py'):
-        return set()
     text = output_text(event, reader)
     cwd = event.get('cwd') or ''
+    if (event.get('hook_event_name') != 'PreToolUse'
+            or event.get('tool_name') not in ('Write', 'Edit')
+            or not str((event.get('tool_input') or {}).get('file_path', '')).endswith('.py')):
+        # Explicit citation relationships differ from proposed output names and
+        # reminder lists. Only the cited referent incurs the reading obligation.
+        refs = references(text, cwd, reader)
+        return {name for name in refs if
+                re.search(r'(?i)\b(?:commit|revision|sha)\s+' + re.escape(name) + r'(?!\w)', text)
+                or re.search(r'(?i)\b(?:according to|source:|cites?|by|from)\s+`?'
+                    + re.escape(os.path.basename(name)) + r'(?![\w.-])', text)
+                or re.search(re.escape(os.path.basename(name)) + r'`?\s+(?:says|states)\b', text, re.I)}
     selected = set()
     try:
         tree = ast.parse(text)
@@ -258,6 +278,14 @@ def lineage_edit(record, event, reader):
     if event.get('hook_event_name') != 'PreToolUse' or event.get('tool_name') != 'Edit':
         return []
     new = args(event).get('new_string')
+    # Importing the same owner in two consumers unifies the rule; copying
+    # an implementation duplicates it. This distinction is structural.
+    try:
+        tree = ast.parse(new or '')
+    except (SyntaxError, TypeError):
+        tree = None
+    if tree is not None and tree.body and all(isinstance(n, (ast.Import, ast.ImportFrom)) for n in tree.body):
+        return []
     path = reader._norm(args(event).get('file_path', ''), event.get('cwd', ''))
     events = history(record)
     edits = [i for i, e in enumerate(events) if e.get('tool_name') == 'Edit'

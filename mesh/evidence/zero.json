@@ -1,15 +1,16 @@
 {
   "task": "zero",
-  "selected_input_digest": "a24b3c1c23bc202ec7718ae5989a16a928ff57b88da1f177d3ebbb0e29fb20c4",
+  "selected_input_digest": "1592f8cc6048b224b0ba326dd1fd83225d0cb6a1485e550fdc51427913c9801d",
   "source_pins": {
     "MESH.tsv": "a4e042a09ea1b4ce6077c3b00a9e6c958641942a47f183ade37799e2335e0e7d",
     "PLAN.md": "d22beb72c1f2a339c5818c63d10a19442c34857852bc2dc7fbbab22bbf7a17f6",
-    "TASKS.tsv": "6c1369aa3052ee4ccdcfb59640c9d672db7076a544d7e5741251a17bb2862432",
+    "TASKS.tsv": "32ea5667fed30a88716ea8fe016898d78c65a813aa04f6f2b2d18d9e150c689b",
     "mesh/ALREADY-MET.tsv": "3e45a7a4a1fe436892228582260a7ce8d692405b02f38d58863ee0ff5cab14e1",
     "mesh/CONSTRAINTS.tsv": "7db53d68a1d3ffb2aa6a63b59552e88b3f52c9f03b98316f66c9ffd7b4ee73a6",
     "mesh/COSTS.tsv": "94738bce9f03ba5150ac0c1bd1487b0fd82e38b8dcf911b7252c555029c177c4",
-    "mesh/FILLS.tsv": "81914afa23c5b20e8d4f8591d45fcb6f6ab6531a9cc9fafc1be59842c9a67179",
+    "mesh/FILLS.tsv": "0066bce622cba3f3d9d4ed36fd2ad9ab3c03b1e8878e9e237bc315468ac195e1",
     "mesh/PREDICTIONS.tsv": "476091179fe88d07f485e26af7e5d7c69b4d51d5e8334b83c285228c9389e82e",
+    "mesh/PROGRESS.md": "a1fe0f16fdad7f17fcf92f238373b2771bce9937596ba7ba635ddc8e652c23ba",
     "mesh/README.md": "762c9dd94234355abadd1077929f7a80511004bdc79fda4e84dc823676600bf7",
     "mesh/REQUIREMENTS.tsv": "5359eb6bda61036974f164a94049da3a1d6cb9c7106791dad4d341c8d6699535",
     "mesh/SLOTS.tsv": "7ed59136465d85b7990b21ccbfb7c8a398adc1a64fa1800946d80b7c6446edb8",
@@ -30,7 +31,7 @@
     "mesh/evidence/emit.json": "85ccd5697e524f13f9da5a29b8d887038105a8ff4918d32f667fb853f2b7b318",
     "mesh/evidence/evaluate.json": "c4d3cb417f885dba4eeff3bd18350157a1fef142a87993eeecc5d407a7586d08",
     "mesh/evidence/fresh.json": "630123081d10d55686db9b55e3b29489cf81eb8bc0e1b898d95ed9b6ebb583b1",
-    "mesh/evidence/goal.json": "749d66a5711fce1d5fc50da40463bdd2fb997efedfa47be6a1cdb7b7ea1f4425",
+    "mesh/evidence/goal.json": "3a810c697c825f9ae64e1cf67c27dbde5e60440ea0c890686fa3e0125044f602",
     "mesh/evidence/handoff.json": "acd2f134e98854c3590cbfe646ebb1b7454f8b1728e4276fa59c417e48001cc3",
     "mesh/evidence/join.json": "6fad59511be885af448f95e50e05c9ae94e638bd87375884d8d13a392e6374ff",
     "mesh/evidence/observe.json": "05bf182f0caf28c999da29eecf9fc641884bb7ca29900414e542b3407bf1a626",
@@ -496,103 +497,103 @@
     "decode": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.12s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "configure": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.14s\n",
       "stderr": ""
     },
     "rules": {
       "accepted": false,
       "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_rules __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-1050/test_rules0')\n\n    def test_rules(tmp_path):\n        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})\n>       assert rows and {r['id'] for r in rows} == {r['id'] for r in table(ROOT/'tests/sources.tsv')}\nE       AssertionError: assert ([{'id': 'R06', 'moment': 'PreToolUse,Stop', 'predicate': 'relayed_number', 'args': {'acts': 'say'}, ...}, {'id': 'R07'...ay'}, ...}, {'id': 'R12', 'moment': 'PreToolUse,Stop', 'predicate': 'count_unread_path', 'args': {'acts': 'say'}, ...}] and {'R06', 'R07'... 'R11', 'R12'} == {'R01', 'R03'...', 'R07', ...}\nE         \nE         Extra items in the right set:\nE         'R10'\nE         'R03'\nE         'R09'\nE         'R14'\nE         'R01'...\nE         \nE         ...Full output truncated (4 lines hidden), use '-vv' to show)\n\ntests/acceptance_tasks.py:50: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_rules - AssertionError: assert ([{'id'...\n1 failed in 0.12s\n",
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_rules __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-1239/test_rules0')\n\n    def test_rules(tmp_path):\n        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})\n>       assert rows and {r['id'] for r in rows} == {r['id'] for r in table(ROOT/'tests/sources.tsv')}\nE       AssertionError: assert ([{'id': 'R06', 'moment': 'PreToolUse,Stop', 'predicate': 'relayed_number', 'args': {'acts': 'say'}, ...}, {'id': 'R07'...ay'}, ...}, {'id': 'R12', 'moment': 'PreToolUse,Stop', 'predicate': 'count_unread_path', 'args': {'acts': 'say'}, ...}] and {'R06', 'R07'... 'R11', 'R12'} == {'R01', 'R03'...', 'R07', ...}\nE         \nE         Extra items in the right set:\nE         'R01'\nE         'R03'\nE         'R14'\nE         'R13'\nE         'R09'...\nE         \nE         ...Full output truncated (4 lines hidden), use '-vv' to show)\n\ntests/acceptance_tasks.py:50: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_rules - AssertionError: assert ([{'id'...\n1 failed in 0.14s\n",
       "stderr": ""
     },
     "observe": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.73s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.80s\n",
       "stderr": ""
     },
     "evaluate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.92s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.89s\n",
       "stderr": ""
     },
     "once": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "emit": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "advance": {
       "accepted": false,
       "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_advance _________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-1052/test_advance0')\n\n    def test_advance(tmp_path):\n        cfg = dict(state_dir=str(tmp_path/'state'))\n        records = []\n        def rec(events):\n            records.append(events); return observed.record(events)\n        def finding(rows, record, event):\n            assert not record.obs\n            return None\n        def run(name):\n            ev = dict(hook_event_name=name, session_id='s', tool_name='Read', tool_input={'file_path':'x'}, tool_response='text')\n            return hook.main(json.dumps(ev), cfg, [], rec, finding)\n        assert run('PreToolUse') == {} and records[-1] == []\n>       assert run('PostToolUse') == {} and len(records[-1]) == 1\nE       AssertionError: assert ({} == {}\nE         \nE         Use -v to get more diff and 2 == 1)\nE        +  where 2 = len([{'hook_event_name': 'PreToolUse', 'session_id': 's', 'tool_input': {'file_path': 'x'}, 'tool_name': 'Read', ...}, {'hook_event_name': 'PostToolUse', 'session_id': 's', 'tool_name': 'Read', 'tool_input': {'file_path': 'x'}, ...}])\n\ntests/acceptance_tasks.py:101: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_advance - AssertionError: assert ({} =...\n1 failed in 0.13s\n",
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_advance _________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-1241/test_advance0')\n\n    def test_advance(tmp_path):\n        cfg = dict(state_dir=str(tmp_path/'state'))\n        records = []\n        def rec(events):\n            records.append(events); return observed.record(events)\n        def finding(rows, record, event):\n            assert not record.obs\n            return None\n        def run(name):\n            ev = dict(hook_event_name=name, session_id='s', tool_name='Read', tool_input={'file_path':'x'}, tool_response='text')\n            return hook.main(json.dumps(ev), cfg, [], rec, finding)\n        assert run('PreToolUse') == {} and records[-1] == []\n>       assert run('PostToolUse') == {} and len(records[-1]) == 1\nE       AssertionError: assert ({} == {}\nE         \nE         Use -v to get more diff and 2 == 1)\nE        +  where 2 = len([{'hook_event_name': 'PreToolUse', 'session_id': 's', 'tool_input': {'file_path': 'x'}, 'tool_name': 'Read', ...}, {'hook_event_name': 'PostToolUse', 'session_id': 's', 'tool_name': 'Read', 'tool_input': {'file_path': 'x'}, ...}])\n\ntests/acceptance_tasks.py:101: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_advance - AssertionError: assert ({} =...\n1 failed in 0.13s\n",
       "stderr": ""
     },
     "persist": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.12s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "register": {
       "accepted": false,
       "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________________________________ test_register _________________________________\n\n    def test_register():\n        # Replay the CURRENT shipped register. Amendments are solely owner proposals.\n        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})\n>       assert [r['id'] for r in rows] == ['R01', 'R03', 'R04', 'R05', 'R06', 'R07',\n                                         'R08', 'R09', 'R10', 'R11', 'R12', 'R13', 'R14']\nE       AssertionError: assert ['R06', 'R07'... 'R11', 'R12'] == ['R01', 'R03'...', 'R07', ...]\nE         \nE         At index 0 diff: 'R06' != 'R01'\nE         Right contains 8 more items, first extra item: 'R07'\nE         Use -v to get more diff\n\ntests/acceptance_tasks.py:142: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_register - AssertionError: assert ['R0...\n1 failed in 0.13s\n",
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________________________________ test_register _________________________________\n\n    def test_register():\n        # Replay the CURRENT shipped register. Amendments are solely owner proposals.\n        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})\n>       assert [r['id'] for r in rows] == ['R01', 'R03', 'R04', 'R05', 'R06', 'R07',\n                                         'R08', 'R09', 'R10', 'R11', 'R12', 'R13', 'R14']\nE       AssertionError: assert ['R06', 'R07'... 'R11', 'R12'] == ['R01', 'R03'...', 'R07', ...]\nE         \nE         At index 0 diff: 'R06' != 'R01'\nE         Right contains 8 more items, first extra item: 'R07'\nE         Use -v to get more diff\n\ntests/acceptance_tasks.py:142: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_register - AssertionError: assert ['R0...\n1 failed in 0.15s\n",
       "stderr": ""
     },
     "validate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 1.01s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 1.02s\n",
       "stderr": ""
     },
     "package": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.69s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.78s\n",
       "stderr": ""
     },
     "fresh": {
       "accepted": false,
       "check_exit_code": 1,
-      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_fresh __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-1056/test_fresh0')\n\n    def test_fresh(tmp_path):\n        fresh = product_function('fresh')\n        slip = {'hook_event_name': 'Stop', 'session_id': 'new',\n                'last_assistant_message': 'Want me to push this?'}\n        control = dict(slip, last_assistant_message='Pushing next; that is the default.')\n>       assert fresh(ROOT/'plugin', tmp_path/'account', slip)['decision'] == 'block'\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'decision'\n\ntests/acceptance_tasks.py:204: KeyError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_fresh - KeyError: 'decision'\n1 failed in 0.24s\n",
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_fresh __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-1245/test_fresh0')\n\n    def test_fresh(tmp_path):\n        fresh = product_function('fresh')\n        slip = {'hook_event_name': 'Stop', 'session_id': 'new',\n                'last_assistant_message': 'Want me to push this?'}\n        control = dict(slip, last_assistant_message='Pushing next; that is the default.')\n>       assert fresh(ROOT/'plugin', tmp_path/'account', slip)['decision'] == 'block'\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'decision'\n\ntests/acceptance_tasks.py:204: KeyError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_fresh - KeyError: 'decision'\n1 failed in 0.25s\n",
       "stderr": ""
     },
     "audit": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.12s\n",
       "stderr": ""
     },
     "join": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "handoff": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     },
     "subtract": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.10s\n",
       "stderr": ""
     }
   },

@@ -131,7 +131,10 @@ def other_write(record, event, reader):
     ti = event.get('tool_input') or {}
     if event.get('tool_name') == 'Write':
         path = reader._norm(ti.get('file_path', ''), event.get('cwd', ''))
-        if path and os.path.exists(path):
+        # A whole write is ungrounded when it lacks a reading of the prior bytes.
+        from makoto2.family_lineage import readings
+        sources, owned = readings(record, reader)
+        if path and os.path.exists(path) and path not in sources and path not in owned:
             return [('D11', path)]
     if event.get('tool_name') == 'Bash':
         match = re.search(r'git\s+(checkout|switch|reset)\s+([^;\n&|]+)', ti.get('command', ''))

@@ -34,7 +34,9 @@ def switch_tree(source):
                 if isinstance(candidate, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node in list(ast.walk(candidate)):
                     scope = candidate
             loads = {n.id for n in ast.walk(scope) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
-            if names and not names & loads:
+            # Literal bindings can be exported configuration; only discarded call
+            # results witness an unused computation.
+            if names and not names & loads and isinstance(node.value, ast.Call):
                 emit('unused_result', node)
         elif isinstance(node, (ast.Try, ast.TryStar)):
             calls = {ast.dump(n, include_attributes=False) for stmt in node.body for n in ast.walk(stmt) if isinstance(n, ast.Call)}

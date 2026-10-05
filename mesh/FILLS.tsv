@@ -313,8 +313,8 @@ tests/test_goal.py	test_nonexistent_path_is_not_unread	validate	REGISTER/FAMILIE
 tests/test_lineage.py	test_missing_local_source_requires_verification_or_label	validate	REGISTER/FAMILIES: current-tree deletion witness distinguishes drift from unavailable source
 tests/test_real_session.py	<module>	validate	REGISTER B28: operator-labelled real succession acceptance
 tests/test_real_session.py	test_real_session	validate	REGISTER B28: operator-labelled real succession acceptance
-plugin/makoto2/family_lineage.py	cited_references	evaluate	Written import identities determine source dependencies; prose does not.
-plugin/makoto2/family_lineage.py	hook_lineage_refs	evaluate	Written dependencies require a successful source read.
+plugin/makoto2/family_lineage.py	cited_references	evaluate	Written imports and explicit citation identities determine source dependencies.
+plugin/makoto2/family_lineage.py	hook_lineage_refs	evaluate	Dependencies and explicit citations require a successful primary source read.
 plugin/makoto2/family_spec.py	shipping_observed	evaluate	Successful shipping observation across Bash and GitHub routes.
 tests/test_tells.py	<module>	validate	Existing independent native-hook corpus and population measurement.
 tests/test_tells.py	reason	validate	Existing independent native-hook corpus and population measurement.
@@ -325,3 +325,13 @@ tests/test_tells.py	test_fake_caught_and_named	validate	Existing independent nat
 tests/test_tells.py	test_register_and_tell_population	validate	Existing independent native-hook corpus and population measurement.
 tests/test_weaknesses.py	<module>	validate	Real-session weaknesses W1-W8: each fake fires, each honest twin stays silent
 tests/test_weaknesses.py	test_weaknesses	validate	Real-session weaknesses W1-W8: each fake fires, each honest twin stays silent
+tests/test_denominators.py	<module>	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_failure_counts_have_the_same_obligation_in_text_and_handoffs	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_residue_branch_must_belong_to_the_match	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_reading_the_prior_artifact_pays_the_overwrite_obligation	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_constant_exports_are_not_unused_computations	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_common_owner_imports_are_not_copied_implementations	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_explicit_commit_citations_require_primary_readings	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_native_terms_table_uses_the_same_empty_binding_predicate	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_shipment_status_is_distinct_from_a_modified_noun	validate	Evidence-boundary regressions across representations.
+tests/test_denominators.py	test_revision_field_in_primary_measurement_pays_citation	validate	Evidence-boundary regressions across representations.

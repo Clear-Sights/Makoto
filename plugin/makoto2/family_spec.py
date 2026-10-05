@@ -103,7 +103,26 @@ def spec_tree(record, event, cfg):
                 keys.append(value)
         if isinstance(node, (ast.For, ast.AsyncFor, ast.While)) and not node.orelse:
             body = ast.Module(body=node.body, type_ignores=[])
-            if any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            # Residue handling belongs to the match's branch, not the loop's else.
+            match_names = {target.id for assignment in ast.walk(body)
+                           if isinstance(assignment, ast.Assign)
+                           and isinstance(assignment.value, ast.Call)
+                           and isinstance(assignment.value.func, ast.Attribute)
+                           and isinstance(assignment.value.func.value, ast.Name)
+                           and assignment.value.func.value.id == 're'
+                           and assignment.value.func.attr in ('match', 'search')
+                           for target in assignment.targets if isinstance(target, ast.Name)}
+            has_residue = any(isinstance(n, ast.If) and n.orelse
+                              and isinstance(n.test, ast.Name) and n.test.id in match_names
+                              and any(isinstance(effect, (ast.Call, ast.Raise, ast.Return))
+                                      and any(isinstance(value, ast.Name)
+                                              and isinstance(value.ctx, ast.Load)
+                                              and value.id in {target.id for target in ast.walk(getattr(node, 'target', ast.Constant(None)))
+                                                               if isinstance(target, ast.Name)}
+                                              for value in ast.walk(effect))
+                                      for statement in n.orelse for effect in ast.walk(statement))
+                              for n in ast.walk(body))
+            if not has_residue and any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
                    and isinstance(n.func.value, ast.Name) and n.func.value.id == 're'
                    and n.func.attr in ('match','search') for n in ast.walk(body)):
                 out.append(finding(('B36',), node.lineno,
@@ -124,8 +143,22 @@ def spec_authorship(record, event, cfg):
 
 
 def spec_terms(record, event, cfg):
+    rows = list(event.get('terms', ()))
+    if pre(event) and event.get('tool_name') in ('Write', 'Edit'):
+        columns = None
+        for line in content(event).splitlines():
+            if not line.strip().startswith('|'):
+                columns = None
+                continue
+            cells = [cell.strip() for cell in line.strip().strip('|').split('|')]
+            if 'check' in cells and ('rule' in cells or 'term' in cells):
+                columns = cells
+            elif columns and len(cells) == len(columns) and not all(
+                    re.fullmatch(r'[: -]+', cell) for cell in cells):
+                row = dict(zip(columns, cells))
+                rows.append(dict(term=row.get('term', row.get('rule')), check=row['check']))
     return [finding(('B7',), row.get('term',''), 'a TERMS row with check column empty')
-            for row in event.get('terms', ()) if row.get('check') == '']
+            for row in rows if row.get('check') == '']
 
 
 def spec_write(record, event, cfg):
@@ -190,29 +223,35 @@ def claims(text, record):
     keys = verifier_keys(record)
     identities = set()
     for o in record.obs:
-        identities.update(re.findall(r'\b(?:FAILED|ERROR)\s+([\w./:\[\]-]+)',o.output))
+        identities.update(re.findall(r'\b(?:FAIL(?:ED)?|ERROR)\s+([\w./:\[\]-]+)',o.output))
     result=[]
-    for sentence in re.split(r'(?<=[.!?])\s+|\n|\s+[-—–]+\s+|;',str(text or '')):
+    for sentence in re.split(r'(?<=[.!?])\s+|\n|\s+[-—–]+\s+|;|,?\s+but\s+|,\s+(?=although\b)',str(text or '')):
         if sentence.rstrip().endswith('?'):
             result.append(Claim('question','',False,False));continue
         quoted = re.findall(r'`([^`]+)`',sentence)
         paths = re.findall(r'(?:[\w./-]+/)*[\w.-]+\.[A-Za-z][\w.-]*',sentence)
         # Subject is a complete quoted command/path, otherwise the named path or
         # the text beside the fixed claim word. No arbitrary word-window cutoff.
-        names = any(identity in str(text) or identity.rsplit('::',1)[-1] in str(text) for identity in identities)
+        names = bool(identities) and all(identity in str(text) or identity.rsplit('::',1)[-1] in str(text) for identity in identities)
         falsifier = bool(re.search(r'\bfalsifier\s*:',str(text),re.I) and
                          (re.findall(r'`([^`]+)`',str(text)) or re.findall(r'[\w/-]+\.[A-Za-z]+',str(text))))
         falsifier = falsifier or any(command in str(text) for command in keys)
         for kind,words in CLAIM_WORDS.items():
             rx = r'\b(?:'+ '|'.join(map(re.escape,words))+r')\b'
-            match = re.search(rx,sentence,re.I)
-            if not match or re.search(r'\b(?:not|never|no)\s*$',sentence[:match.start()],re.I):
+            assertion = re.sub(r'"[^"\n]*"|“[^”\n]*”', lambda m: ' ' * len(m.group()), sentence)
+            match = re.search(rx,assertion,re.I)
+            if (not match or re.search(r'\b(?:not|never|no)\s*$',sentence[:match.start()],re.I)
+                    or re.match(r'\s*(?:although|though|while)\b', sentence, re.I)):
                 continue
-            if kind=='count' and not re.search(r'\b\d+\b',sentence):continue
+            if (kind == 'shipped' and re.search(r'\b(?:the|a|an|this|that|our|your|its)\s*$',
+                                               sentence[:match.start()], re.I)
+                    and re.match(r'\s+\w', sentence[match.end():])):
+                continue
+            if kind=='count' and not re.search(r'\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b',sentence,re.I):continue
             if kind=='pass' and re.search(r'\b\d+\s+passed\b',sentence):continue
             before=sentence[:match.start()].strip(' :.,');after=sentence[match.end():].strip(' :.,')
             commands=[str(args(e).get('command','')) for e in history(record) if args(e).get('command') and str(args(e)['command']) in sentence]
-            subject=(quoted[0] if quoted else paths[0].rstrip('.') if paths else commands[0] if commands else (after or before) if kind in ('plan','retracted') else '')
+            subject=(quoted[0] if quoted else paths[0].rstrip('.') if paths else commands[0] if commands else (after or before) if kind in ('plan','retracted') else before if kind == 'pass' else '')
             result.append(Claim(kind,subject,names,falsifier))
     return result
 
@@ -236,7 +275,9 @@ def spec_claim(record, event, cfg):
         prompt=str(ti.get('prompt',''))
         if not all(re.search(r'(?m)^'+label+':',prompt) for label in ('READ','WRITE','ACCEPTANCE')):
             out.append(finding(('I1',),'brief','not (args.prompt matches "(?m)^READ:" and args.prompt matches "(?m)^WRITE:" and args.prompt matches "(?m)^ACCEPTANCE:")','R04'))
-    if not stop(event):return out
+    report = stop(event) or (pre(event) and event.get('tool_name') in ('Write','Edit')
+                            and not str(ti.get('file_path','')).endswith('.py'))
+    if not report:return out
     raw=history(record)
     from makoto2 import family_switch,family_lineage,family_other,observed
     boundary = (getattr(record, 'turn_start', 0) or 0) - 1
@@ -248,9 +289,17 @@ def spec_claim(record, event, cfg):
     commands = {args(e).get('command') for e in raw if settled(e) and e.get('tool_name') == 'Bash'}
     for value in read_claims(record,event):
         kind, subject = value.get('kind'), value.get('subject','')
+        if not stop(event) and kind != 'count':
+            continue
         runs = [e for e in raw[last_edit+1:] if settled(e)
                 and e.get('tool_name') == 'Bash'
                 and (subject not in commands or args(e).get('command') == subject)]
+        # A scoped report can cite one successful part while naming a different
+        # failed part. A literal subject in the run's output binds that scope.
+        scoped = [e for e in runs if subject and subject.lower() in
+                  observed._flatten(e.get('tool_response')).lower()]
+        if subject not in commands and scoped:
+            runs = scoped
         if kind == 'pass' and (not runs or exit_of(runs[-1]) != 0):
             out.append(finding(('A7','C3'),subject,'latest settled run after the last edit is not successful','R11'))
         if kind == 'shipped' and not shipping_observed(record):
@@ -292,14 +341,15 @@ def spec_history(record, event, cfg):
     if re.match(r'(?i)^\s*(?:my |the )?plan\s*:', event.get('last_assistant_message','')) and not any(re.search(r'(?i)\bplan\b',u) for u in users):
         out.append(finding(('G2',),'plan','explicit plan without user request'))
     boundary=max((i for i,e in enumerate(raw) if e.get('hook_event_name')=='UserPromptSubmit'),default=-1)
-    if any(c.kind=='cannot' for c in current) and not any(e.get('hook_event_name')=='PreToolUse' for e in raw[boundary+1:]):
+    if any(c.kind=='cannot' for c in current) and not any(
+            e.get('hook_event_name')=='PreToolUse' or settled(e) for e in raw[boundary+1:]):
         out.append(finding(('G5',),'cannot','claim.kind=cannot and unseen_since(event=Pre, event=User)'))
     return out
 
 
 def findings(record, event, cfg):
     """Native events and settled gate output supply the held-definition reading."""
-    checks = (spec_tree, spec_write, spec_claim, spec_repeat, spec_history)
+    checks = (spec_tree, spec_write, spec_terms, spec_claim, spec_repeat, spec_history)
     for check in checks:
         yield from check(record, event, cfg)
     from makoto2.family_other import _facts
