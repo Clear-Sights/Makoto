@@ -38,3 +38,5 @@ scope-why	WORDS.tsv:WHY	TRACED	tests/acceptance_tasks.py::test_handoff
 scope	SPIRIT.md#Out-of-scope	TRACED	tests/acceptance_tasks.py::test_handoff
 uninstall	docs-def:README.md#Uninstall	TRACED	tests/acceptance_tasks.py::test_package
 limits	docs-def:README.md#Runtime and rules	TRACED	tests/acceptance_tasks.py::test_evaluate
+register-head	WORDS.tsv:REGISTER	TRACED	tests/acceptance_tasks.py::test_evaluate
+register-families	WORDS.tsv:FAMILIES	TRACED	tests/acceptance_tasks.py::test_evaluate

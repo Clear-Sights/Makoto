@@ -1,2 +1,19 @@
-.                                                                        [100%]
-1 passed in 0.54s
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________________________ test_register _________________________________
+
+    def test_register():
+        # Replay the CURRENT shipped register. Amendments are solely owner proposals.
+        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})
+>       assert [r['id'] for r in rows] == ['R01', 'R03', 'R04', 'R05', 'R06', 'R07',
+                                         'R08', 'R09', 'R10', 'R11', 'R12', 'R13', 'R14']
+E       AssertionError: assert ['R06', 'R07'... 'R11', 'R12'] == ['R01', 'R03'...', 'R07', ...]
+E
+E         At index 0 diff: 'R06' != 'R01'
+E         Right contains 8 more items, first extra item: 'R07'
+E         Use -v to get more diff
+
+tests/acceptance_tasks.py:142: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_register - AssertionError: assert ['R0...
+1 failed in 0.12s

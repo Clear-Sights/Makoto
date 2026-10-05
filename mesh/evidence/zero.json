@@ -1,69 +1,73 @@
 {
   "task": "zero",
-  "selected_input_digest": "41c7ab9db9c60e39cf9b2ccbd8621fd479b376edaa93600551c951cb2e89b742",
+  "selected_input_digest": "0b67a842fef4a65c8aa58886f2fde1eaa33c59ba7fbbc61c4fb76641067187f9",
   "source_pins": {
-    "MESH.tsv": "8d7b53318252c209e5338b3d739bb15726125a900368e86acecdf593e2d80a42",
-    "PLAN.md": "e6d1a2bde87880ed50e966ea2160c1149dbcc0bba0b1069794ae0f615e5ce0f3",
-    "TASKS.tsv": "421383b86120daa6e02924d5dd6e48fddcd1cf10725f3aa3458d7531c8ee656e",
-    "mesh/ALREADY-MET.tsv": "09630e23ff2f617ae895a8bd2aa6c9760195d8331cd002e3c1936099062dbc16",
-    "mesh/CONSTRAINTS.tsv": "cf755b7c23fbeeacfd8da833d10c81d2b5ae15b2fa7b003f563ee14fced62667",
-    "mesh/COSTS.tsv": "3b4942bec9c79e60004d3f1de28e1331dc0b8e070e5fe24b4e3de545b66fa2f2",
-    "mesh/FILLS.tsv": "fdaa10b7e2e329dc56acaaaf3d904e5017777ae4e9bdabaa4fe88a75add764bb",
-    "mesh/PREDICTIONS.tsv": "129376436d31c0a37e12d85f39b336c0ca6d6edf9de7e931572e2f081401d21e",
-    "mesh/README.md": "1624b1ca40f4ab417e52228b80df8c270acf3a56deb3831b5e9ce52e63d4205c",
-    "mesh/REQUIREMENTS.tsv": "4848bf0581e71083cc54ff34d48c889ab1eeecc6dcb96040c18ea631313bbdbd",
-    "mesh/SLOTS.tsv": "be4ef91f0266a55e20a93573436aef06155c0d9d207ecbcda679b5fcd99923b1",
-    "mesh/SOURCES.tsv": "60abdceda8f319ad655fc35c96ae43889a489f4e52163e1e6ec78b5bc8ad5a87",
-    "mesh/SUBTRACT-KEPT.tsv": "31fe4051e8e82c45ffd30f6db12bae17e093a2e3897a088fcb318682a3e1dd5f",
+    "MESH.tsv": "a4e042a09ea1b4ce6077c3b00a9e6c958641942a47f183ade37799e2335e0e7d",
+    "PLAN.md": "d22beb72c1f2a339c5818c63d10a19442c34857852bc2dc7fbbab22bbf7a17f6",
+    "TASKS.tsv": "092655444d8c3ca4b4ff48b17453100ecfe4263ceca91cc6371e894bb15e3309",
+    "mesh/ALREADY-MET.tsv": "3e45a7a4a1fe436892228582260a7ce8d692405b02f38d58863ee0ff5cab14e1",
+    "mesh/CONSTRAINTS.tsv": "7db53d68a1d3ffb2aa6a63b59552e88b3f52c9f03b98316f66c9ffd7b4ee73a6",
+    "mesh/COSTS.tsv": "94738bce9f03ba5150ac0c1bd1487b0fd82e38b8dcf911b7252c555029c177c4",
+    "mesh/FILLS.tsv": "a2c9dd33e48bc62865c632f684848a898340cfff1a9fcf8fdb9f8d80a89b4932",
+    "mesh/PREDICTIONS.tsv": "476091179fe88d07f485e26af7e5d7c69b4d51d5e8334b83c285228c9389e82e",
+    "mesh/README.md": "762c9dd94234355abadd1077929f7a80511004bdc79fda4e84dc823676600bf7",
+    "mesh/REQUIREMENTS.tsv": "5359eb6bda61036974f164a94049da3a1d6cb9c7106791dad4d341c8d6699535",
+    "mesh/SLOTS.tsv": "7ed59136465d85b7990b21ccbfb7c8a398adc1a64fa1800946d80b7c6446edb8",
+    "mesh/SOURCES.tsv": "fda33d17b11deb576454460e779da7c417f4f7a407c6043eba7f547cbe4ef5f8",
+    "mesh/SUBTRACT-KEPT.tsv": "2ff0e980abcc51702a35f30cb58f53fe1af16cac021f67795595c00b1cde79db",
     "mesh/SUBTRACT.tsv": "80d53eb1cb875086c2f6110f3b75e45bc9099ab6d8bd83c218ceb6425a7ca3d4",
-    "mesh/TIGHTEN.tsv": "957e318c5400fd81f3d3bee6235a55ea4ef174ba2ee416ee10502ed4e4cf6fdb",
-    "mesh/TRACE.tsv": "ce7c1f9b218f3d44f6ebc3f010a641a89ef5926fa2a1b6ab94ed48a381072d7d",
+    "mesh/TELLS.tsv": "80a720941125674f0999b320861e789f885d80fa69954ecb664d12ae5cfe04b1",
+    "mesh/TIGHTEN.tsv": "1897fe7055f58e648ce36cf2b35daeae8c3b549cec8294bf4f6a7626c44ca259",
+    "mesh/TRACE.tsv": "af1b8bcd5cc44a7da960df732b6cc01f66c8b8b7f8246a8132db38973872f9d2",
     "mesh/WIRE-RULE.tsv": "dcde0b3d2957c3511f280cbc4ebcad828b84e2c7ab5087290b8ac2b7a1523a57",
-    "mesh/WIRES.tsv": "81fb6c153e2d6b9193306d05601d0e2778675b866645d82ad984e17692ac5aa4",
-    "mesh/acceptance.py": "06015d389dab0cbf537682fb7c15beb53bb710affbb9b5751bdc155643036acd",
+    "mesh/WIRES.tsv": "e17b7b55969bf80030df3643f92a2d27dd68997a0942c534a59a89cf4e218484",
+    "mesh/acceptance.py": "356fb53b83e11ef8647049d8a9ab93665e9225fbf9485dd359e9164cb5feb720",
     "mesh/check.py": "7a592d84d802f606ae41448d04ffd0c14f8f93e35374fd558972782ce7b6b970",
-    "mesh/evidence/advance.json": "56b0ed6bcb8328218ee4e4a1df5bd133ae6d4755d9d671861f30c6baacb92362",
-    "mesh/evidence/audit.json": "5a9a2ec32ce2861e3b74c336f01a0568368f310db2ec30f3217b9ab122912b92",
-    "mesh/evidence/configure.json": "ce04ef85b407a42ec1ecf49ecf234cfdfd45888bc0b653bc41c50450d517c744",
-    "mesh/evidence/decode.json": "82f19e09788d858b61a969c4ba7217b2999dbbc8026648427aaf89338bb1d360",
-    "mesh/evidence/emit.json": "40e7923187e76c9c75639b271a2ee8a08abf88e564ccc52724230c0b804b1f32",
-    "mesh/evidence/evaluate.json": "7e875bbf1eac6321570ca99efe16bd6795cd51279b57db39b1f5f04be6886f98",
-    "mesh/evidence/fresh.json": "a576aa2fd66f609c4d8d0f4831c249e1b74875623f47b5dfc7140072abbff589",
-    "mesh/evidence/handoff.json": "e968ec945a71d8cd90fcd7d5107afaa2426a1711a04822306771d2b6cf320a66",
-    "mesh/evidence/join.json": "874ebf8535c368608f660b06f91f45cee2c20eab193e9ff4ec8f2b4019bfee1b",
-    "mesh/evidence/observe.json": "8856de778b4ebdc4ba47130e2ae96ce87c3b9f73ac44d726e73359cdf24687c1",
-    "mesh/evidence/once.json": "834fafbd9dfc944de5a4d0dd759ecdfc67070918b1a9581d57613f195ccc66b6",
-    "mesh/evidence/package.json": "acb02642db959605d7340d9c9621b8126cabb87609183fb13a96c7c6a7f39938",
-    "mesh/evidence/persist.json": "d9239463f1ee97fafcb5b29960d69148fa2d05d9498e5c638e39efc51a0287a6",
-    "mesh/evidence/product-checks/advance.txt": "3be6ffcaecf85b5bd3eef3693ab214b0e7c9eb4e36d117fcf1825652de5eb298",
-    "mesh/evidence/product-checks/audit.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
-    "mesh/evidence/product-checks/configure.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
-    "mesh/evidence/product-checks/decode.txt": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
-    "mesh/evidence/product-checks/emit.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/evaluate.txt": "3dd8a455f93386b2d78b9d5605f1c2f52fd55f0962f89b0bd7d602cae0ead952",
-    "mesh/evidence/product-checks/fresh.txt": "d2d744b6b2df2bbb0d73cb7a43f6675bd03881bc2a2c2a74e54ecf18667789e2",
-    "mesh/evidence/product-checks/handoff.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/join.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/observe.txt": "1ab9905d8b0f34f6d791ff7da4efa2de0f7f3e282a078758cc0496cc0230c0f0",
-    "mesh/evidence/product-checks/once.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/package.txt": "06254aecdf245cc6f8784e134e36703bcc595ac0578b8c5f7f3591bcb399781b",
-    "mesh/evidence/product-checks/persist.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/register.txt": "06254aecdf245cc6f8784e134e36703bcc595ac0578b8c5f7f3591bcb399781b",
-    "mesh/evidence/product-checks/rules.txt": "142e711fac20a466998c8bbeb42619edb1e1722cf84dfe39f564f9b894494392",
-    "mesh/evidence/product-checks/subtract.txt": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
-    "mesh/evidence/product-checks/validate.txt": "142e711fac20a466998c8bbeb42619edb1e1722cf84dfe39f564f9b894494392",
+    "mesh/evidence/advance.json": "5996f8311034f903e44ac0b6ce48591095773fd31f096dfe563e1d05fc4e2f1c",
+    "mesh/evidence/audit.json": "b0906b7972616aa8c035afe8cfd141fd515cf47eaf3881e53acc31c0ebe66348",
+    "mesh/evidence/configure.json": "78b9dbc3a85117e1facee726119d6c868f9ceb9c2c5fc9f54c441399f232e4e9",
+    "mesh/evidence/decode.json": "cdd4bb836b98a4ee9cfb959b3e26508d67d7dc57975d2291067aa9d0485a6a47",
+    "mesh/evidence/emit.json": "85ccd5697e524f13f9da5a29b8d887038105a8ff4918d32f667fb853f2b7b318",
+    "mesh/evidence/evaluate.json": "c4d3cb417f885dba4eeff3bd18350157a1fef142a87993eeecc5d407a7586d08",
+    "mesh/evidence/fresh.json": "630123081d10d55686db9b55e3b29489cf81eb8bc0e1b898d95ed9b6ebb583b1",
+    "mesh/evidence/goal.json": "ab1600312a60217dfd33b8be1bad80054fccacf5a964751253a54878fb3f1867",
+    "mesh/evidence/handoff.json": "acd2f134e98854c3590cbfe646ebb1b7454f8b1728e4276fa59c417e48001cc3",
+    "mesh/evidence/join.json": "6fad59511be885af448f95e50e05c9ae94e638bd87375884d8d13a392e6374ff",
+    "mesh/evidence/observe.json": "05bf182f0caf28c999da29eecf9fc641884bb7ca29900414e542b3407bf1a626",
+    "mesh/evidence/once.json": "bdcd7fc0f06ae72ae53ca0f649577990e96f51665d28f2ae24cda901438f60d7",
+    "mesh/evidence/package.json": "dcd9082c3d50bdd17049cf969567ef744f78d1a24af66de93dc65f6ffbc9b0db",
+    "mesh/evidence/persist.json": "5d055bcec0b5071190c9304130dad29ebade8ef29bff936ccec210786fd91bda",
+    "mesh/evidence/product-checks/advance.txt": "38743e75b05ec39599f64e8b9323abd566de51aab764e643919e73d8696aad6a",
+    "mesh/evidence/product-checks/audit.txt": "3be6ffcaecf85b5bd3eef3693ab214b0e7c9eb4e36d117fcf1825652de5eb298",
+    "mesh/evidence/product-checks/configure.txt": "c91dad03511eb111dba9f317cdb7962c64ec389c7d259de488e167c78aac1b31",
+    "mesh/evidence/product-checks/decode.txt": "4e8b6c5a89da44bf05d17100903172be04033067c113a6831bdfafbd42b7da52",
+    "mesh/evidence/product-checks/emit.txt": "4e8b6c5a89da44bf05d17100903172be04033067c113a6831bdfafbd42b7da52",
+    "mesh/evidence/product-checks/evaluate.txt": "0fc44b226b21cdd63f1f4daf26c2593d72af191b3b773e774dd40f1980fb3cc2",
+    "mesh/evidence/product-checks/fresh.txt": "a532321710682ca3f39b95d7bac2e28a3aa02afe2e1d0adf800ebb11111f670a",
+    "mesh/evidence/product-checks/handoff.txt": "3be6ffcaecf85b5bd3eef3693ab214b0e7c9eb4e36d117fcf1825652de5eb298",
+    "mesh/evidence/product-checks/join.txt": "09229b326b028651d725fa47cd1bae9fd8e0145ff8779bdb84ae2762c00ab737",
+    "mesh/evidence/product-checks/observe.txt": "c6dfde3f9bcc0d41df6a577e59abe1633603cb8f3e01b81b8a9ad8e61bb6442c",
+    "mesh/evidence/product-checks/once.txt": "c91dad03511eb111dba9f317cdb7962c64ec389c7d259de488e167c78aac1b31",
+    "mesh/evidence/product-checks/package.txt": "c952b5c568a02b83362e5cf5a0f46f1c733434977b415fd71a83aa63e7031707",
+    "mesh/evidence/product-checks/persist.txt": "3be6ffcaecf85b5bd3eef3693ab214b0e7c9eb4e36d117fcf1825652de5eb298",
+    "mesh/evidence/product-checks/register.txt": "75a514aa2c870f7ca9a02d867a6738599dc7bce80047fc276a12af493e5bc6ad",
+    "mesh/evidence/product-checks/rules.txt": "f7a328a274a9427980afdade093c2a6f0a99e72a244f5ccf72656e8102946b9c",
+    "mesh/evidence/product-checks/subtract.txt": "3be6ffcaecf85b5bd3eef3693ab214b0e7c9eb4e36d117fcf1825652de5eb298",
+    "mesh/evidence/product-checks/validate.txt": "43db26f998bc22eb28c0a45cbdbba6a1e973537f513c2dcd663ff6df3a77cac6",
     "mesh/evidence/product-checks/zero.txt": "e8cb09fbd82f9f13d88d39855374707596a5f03acefda3d8c1c80b16fd7fed51",
-    "mesh/evidence/register-proposal.md": "f39ba65ca206fecb5ff7c4cadeba375c537f384235498665d3db8d420cecc3ca",
-    "mesh/evidence/register.json": "258db7e541948b68c89523b1c696dcaa858a7ebfbb7c3c4ff29905fe46ea7bef",
-    "mesh/evidence/rules.json": "defcda0be3b8008a348d2df8a5052a8bffcffdd76164430896f17d3b1fcf5591",
-    "mesh/evidence/validate.json": "1b996e790494fbafb9b77f8f569dd03e17dea77822786721f644f190301ba6b6",
-    "mesh/plants.py": "8f0593d35c9e08747bff1d407eb595b9d34b3f1082452003ed5b77fefd470edf",
+    "mesh/evidence/register.json": "d11dab5423e828e241a0a49fbf85452d27293c3eb551c574f9fc56aad63e3e70",
+    "mesh/evidence/rules.json": "797ff14f982339b805d90326cfc8788fd3bb16c967f2f1868a9699cb12d3da22",
+    "mesh/evidence/subtract.json": "425fbda1910f2b2a56d63c9a18865caa7ff8b1ce1c4a3d00e1e2b25bfbc752ab",
+    "mesh/evidence/validate.json": "b40899e4846f2ffe8e16695281c4155c27ba2a26635201b2f01f3f1ae64826e7",
+    "mesh/goal.py": "5e5d5323c3067b8656ad962122c88117e707b0d1c33ae60174f28a0dba1bee3b",
+    "mesh/plants.py": "d7568286bb68c4ba9d93f690562625a7b7d54eb8a449430384e5bcf6728d012e",
     "mesh/reference/docs-def-README.md": "0521aa12e46f151f72a529acf16da159b7d289d7b8dcc71486830a8a0fb62926",
     "mesh/reference/types.py": "6af27cd60f9a0d6a25340795473da98bf23bd8bf767491019d9dbd6fd053b19a",
     "mesh/route_preflight.py": "802c11b362f01bbdccb0e09abe138064719153b98370859d8b84aa462f7b04f8",
-    "mesh/seed.py": "e07ccf9d3174096c6124291be13f36df1be70d666a6b96fd561a662b0d873b51",
+    "mesh/seed.py": "696e3d36ae19c9b52eed8b19a500dd44335833593cd9ab223b24e3d43a39c758",
     "mesh/test_zero.py": "3e279e5d7b5c89b32081f89c7379a87c3c44324502e0a93c8a6a187c01e9d765",
     "mesh/tighten.py": "1e01a8d8fd30a54d1d13fa6978bad0588305b5bdab33c4a9b53bbc282091d881",
+    "mesh/weaknesses.py": "7638034bf6a76fc20658ec2819e2ec57cfda208eee0547a1581b8f96dcf4a4a1",
     "mesh/wire_rule.py": "0ef7e7260cbea0c00877d832cfcd109dea38446725e01d91c29c71c1e3232204",
     "mesh/zero.py": "6f8cd91425fa3bd0468de5a8083957a4d68ebf985ecf750ddebdddd02bb2afa2"
   },
@@ -461,6 +465,26 @@
         ],
         "missing": [],
         "over": []
+      },
+      {
+        "requirement": "register-head",
+        "accepted": [
+          "no_obligation:silent",
+          "paid_subject:silent",
+          "unpaid_subject:finding"
+        ],
+        "missing": [],
+        "over": []
+      },
+      {
+        "requirement": "register-families",
+        "accepted": [
+          "no_obligation:silent",
+          "paid_subject:silent",
+          "unpaid_subject:finding"
+        ],
+        "missing": [],
+        "over": []
       }
     ],
     "plan_matches": true,
@@ -478,97 +502,97 @@
     "configure": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.17s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
       "stderr": ""
     },
     "rules": {
-      "accepted": true,
-      "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.75s\n",
+      "accepted": false,
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_rules __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-2632/test_rules0')\n\n    def test_rules(tmp_path):\n        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})\n>       assert rows and {r['id'] for r in rows} == {r['id'] for r in table(ROOT/'tests/sources.tsv')}\nE       AssertionError: assert ([{'id': 'R06', 'moment': 'PreToolUse,Stop', 'predicate': 'relayed_number', 'args': {'acts': 'say'}, ...}, {'id': 'R07'...ay'}, ...}, {'id': 'R12', 'moment': 'PreToolUse,Stop', 'predicate': 'count_unread_path', 'args': {'acts': 'say'}, ...}] and {'R06', 'R07'... 'R11', 'R12'} == {'R01', 'R03'...', 'R07', ...}\nE         \nE         Extra items in the right set:\nE         'R14'\nE         'R10'\nE         'R09'\nE         'R03'\nE         'R05'...\nE         \nE         ...Full output truncated (4 lines hidden), use '-vv' to show)\n\ntests/acceptance_tasks.py:50: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_rules - AssertionError: assert ([{'id'...\n1 failed in 0.10s\n",
       "stderr": ""
     },
     "observe": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.72s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.55s\n",
       "stderr": ""
     },
     "evaluate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.81s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.65s\n",
       "stderr": ""
     },
     "once": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
       "stderr": ""
     },
     "emit": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
       "stderr": ""
     },
     "advance": {
-      "accepted": true,
-      "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.23s\n",
+      "accepted": false,
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_________________________________ test_advance _________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-2635/test_advance0')\n\n    def test_advance(tmp_path):\n        cfg = dict(state_dir=str(tmp_path/'state'))\n        records = []\n        def rec(events):\n            records.append(events); return observed.record(events)\n        def finding(rows, record, event):\n            assert not record.obs\n            return None\n        def run(name):\n            ev = dict(hook_event_name=name, session_id='s', tool_name='Read', tool_input={'file_path':'x'}, tool_response='text')\n            return hook.main(json.dumps(ev), cfg, [], rec, finding)\n        assert run('PreToolUse') == {} and records[-1] == []\n>       assert run('PostToolUse') == {} and len(records[-1]) == 1\nE       AssertionError: assert ({} == {}\nE         \nE         Use -v to get more diff and 2 == 1)\nE        +  where 2 = len([{'hook_event_name': 'PreToolUse', 'session_id': 's', 'tool_input': {'file_path': 'x'}, 'tool_name': 'Read', ...}, {'hook_event_name': 'PostToolUse', 'session_id': 's', 'tool_name': 'Read', 'tool_input': {'file_path': 'x'}, ...}])\n\ntests/acceptance_tasks.py:101: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_advance - AssertionError: assert ({} =...\n1 failed in 0.10s\n",
       "stderr": ""
     },
     "persist": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.13s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "register": {
-      "accepted": true,
-      "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.74s\n",
+      "accepted": false,
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________________________________ test_register _________________________________\n\n    def test_register():\n        # Replay the CURRENT shipped register. Amendments are solely owner proposals.\n        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})\n>       assert [r['id'] for r in rows] == ['R01', 'R03', 'R04', 'R05', 'R06', 'R07',\n                                         'R08', 'R09', 'R10', 'R11', 'R12', 'R13', 'R14']\nE       AssertionError: assert ['R06', 'R07'... 'R11', 'R12'] == ['R01', 'R03'...', 'R07', ...]\nE         \nE         At index 0 diff: 'R06' != 'R01'\nE         Right contains 8 more items, first extra item: 'R07'\nE         Use -v to get more diff\n\ntests/acceptance_tasks.py:142: AssertionError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_register - AssertionError: assert ['R0...\n1 failed in 0.09s\n",
       "stderr": ""
     },
     "validate": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 1.18s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.76s\n",
       "stderr": ""
     },
     "package": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 1.13s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.56s\n",
       "stderr": ""
     },
     "fresh": {
-      "accepted": true,
-      "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.31s\n",
+      "accepted": false,
+      "check_exit_code": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__________________________________ test_fresh __________________________________\n\ntmp_path = PosixPath('/tmp/pytest-of-root/pytest-2639/test_fresh0')\n\n    def test_fresh(tmp_path):\n        fresh = product_function('fresh')\n        slip = {'hook_event_name': 'Stop', 'session_id': 'new',\n                'last_assistant_message': 'Want me to push this?'}\n        control = dict(slip, last_assistant_message='Pushing next; that is the default.')\n>       assert fresh(ROOT/'plugin', tmp_path/'account', slip)['decision'] == 'block'\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       KeyError: 'decision'\n\ntests/acceptance_tasks.py:204: KeyError\n=========================== short test summary info ============================\nFAILED tests/acceptance_tasks.py::test_fresh - KeyError: 'decision'\n1 failed in 0.18s\n",
       "stderr": ""
     },
     "audit": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.13s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
       "stderr": ""
     },
     "join": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "handoff": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.07s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.08s\n",
       "stderr": ""
     },
     "subtract": {
       "accepted": true,
       "check_exit_code": 0,
-      "stdout": ".                                                                        [100%]\n1 passed in 0.15s\n",
+      "stdout": ".                                                                        [100%]\n1 passed in 0.09s\n",
       "stderr": ""
     }
   },
@@ -578,7 +602,7 @@
       "tasks": [
         "subtract"
       ],
-      "predicted_tokens": 407924
+      "predicted_tokens": 208231
     },
     {
       "wave": 2,
@@ -668,12 +692,17 @@
   "present": [
     "model:requirement_envelopes"
   ],
-  "absent": [],
+  "absent": [
+    "advance:product_acceptance",
+    "fresh:product_acceptance",
+    "register:product_acceptance",
+    "rules:product_acceptance"
+  ],
   "external": [],
-  "done": true,
-  "decision": "done",
-  "result": "pass",
-  "status": "DONE",
+  "done": false,
+  "decision": "not_done",
+  "result": "absent",
+  "status": "OPEN",
   "failure_edge": "Re-measure changed input and re-derive waves; unavailable operator or outside evidence = EXTERNAL.",
   "reproduction": "PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py",
   "scope": "Model pins describe the measurement; completion is determined by executable product checks, never receipt labels."

@@ -34,7 +34,9 @@ def switch_tree(source):
                 if isinstance(candidate, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node in list(ast.walk(candidate)):
                     scope = candidate
             loads = {n.id for n in ast.walk(scope) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
-            if names and not names & loads:
+            # Literal bindings can be exported configuration; only discarded call
+            # results witness an unused computation.
+            if names and not names & loads and isinstance(node.value, ast.Call):
                 emit('unused_result', node)
         elif isinstance(node, (ast.Try, ast.TryStar)):
             calls = {ast.dump(n, include_attributes=False) for stmt in node.body for n in ast.walk(stmt) if isinstance(n, ast.Call)}
@@ -63,6 +65,16 @@ def switch_run(response):
         out.append('own_tree')
     if 'shipped' in response and response['shipped'] != response['tested']:
         out.append('settings')
+    if response.get('run') == 'gate' and response.get('exitCode', 0) != 0:
+        out.append('crash')
+    if response.get('run') == 'removals' and isinstance(response.get('before'), list):
+        before = set(response['before'])
+        for removal in response.get('removals', ()):
+            after = set(removal['after'])
+            if before == after and 'simpler' not in out:
+                out.append('simpler')
+            if (before ^ after) - {removal['term']} and 'unrelated' not in out:
+                out.append('unrelated')
     return out
 
 
@@ -130,16 +142,23 @@ def findings(record, event, cfg):
             defects=[]
         entries={'gradient':'A6','fallthrough':'C5','unused_result':'E1','recovery':'E9'}
         for predicate,line in defects:
-            yield {'row':'SWITCH.'+predicate,'message':entries[predicate]+': '+predicate,'objects':[str(ti.get('file_path','')),str(line)]}
+            yield {'row':'SWITCH.'+predicate,'entries':[entries[predicate]],'message':entries[predicate]+': '+predicate,'objects':[str(ti.get('file_path','')),str(line)]}
+    if event.get('hook_event_name') == 'PreToolUse' and event.get('tool_name') in ('Write','Edit'):
         from makoto2.family_spec import read_claims,verifier_keys
         doc_paths=cfg.get('named_sets',{}).get('DOC_PATH',())
         observations=[{'verifier':o.input.get('command') in verifier_keys(record)} for o in record.obs]
         for claim in read_claims(record,event):
             adapted={'event':'Pre','tool':event.get('tool_name'),'path':ti.get('file_path',''),'claim':claim}
             if any(switch_doc(adapted,observations,path) for path in doc_paths):
-                yield {'row':'SWITCH.doc','message':'C11: no verifier seen','objects':[adapted['path']]}
+                yield {'row':'SWITCH.doc','entries':['C11'],'message':'C11: no verifier seen','objects':[adapted['path']]}
+    if event.get('hook_event_name') == 'Stop':
+        from makoto2 import observed
+        from makoto2.family_spec import finding
+        for response in _facts(record):
+            for subject in switch_supervisor(record, response, observed):
+                yield finding(('B1','D9','B26'), subject, 'switch_supervisor', 'SWITCH.supervisor')
     if event.get('hook_event_name')=='Stop':
-        entries={'clean_base':'B10','isolated_row':'B21','replay_sequence':'B28','own_tree':'B34','settings':'E8'}
+        entries={'crash':'C4','simpler':'B37','unrelated':'F6','clean_base':'B10','isolated_row':'B21','replay_sequence':'B28','own_tree':'B34','settings':'E8'}
         required={'suite_on_clean_base':('checks',),'plant':('reddened_rows','plant'),
                   'suite':('replay_sequence',),'gate_on_own_tree':('verdict',)}
         for response in _facts(record):
@@ -148,4 +167,9 @@ def findings(record, event, cfg):
             if any(k not in response for k in needs) or ('shipped' in response and 'tested' not in response):
                 continue
             for predicate in switch_run(response):
-                yield {'row':'SWITCH.'+predicate,'message':entries[predicate]+': '+predicate,'objects':[str(response)]}
+                yield {'row':'SWITCH.'+predicate,'entries':[entries[predicate]],'message':entries[predicate]+': '+predicate,'objects':[str(response)]}
+
+def switch_supervisor(record, event, reader):
+    if event.get('launch') and not event.get('planted_event', {}).get('fires'):
+        return ['planted launch event']
+    return []

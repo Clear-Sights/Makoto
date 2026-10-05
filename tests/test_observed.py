@@ -12,6 +12,23 @@ from observed import Obs, Record, record
 CWD = "/repo"
 
 
+def test_slash_words_need_path_evidence(tmp_path):
+    from observed import _norm, _text_objects
+
+    prose = 'add/subtract and/or read/write'
+    assert not _text_objects(prose, str(tmp_path))
+    assert not _text_objects('Choose add/subtract.', str(tmp_path))
+    (tmp_path / 'add').mkdir()
+    path = tmp_path / 'add' / 'subtract'
+    path.write_text('source')
+    assert _text_objects(prose, str(tmp_path)) == {_norm(str(path), str(tmp_path))}
+    path.unlink()
+    assert not _text_objects(prose, str(tmp_path))
+    for spelling in ('add/subtract.txt', './add/subtract', '../add/subtract',
+                     '/add/subtract', '~/add/subtract'):
+        assert _text_objects(spelling, str(tmp_path))
+
+
 def post(tool, ti, tr=None, failure=False, **extra):
     ev = {"hook_event_name": "PostToolUseFailure" if failure else "PostToolUse",
           "tool_name": tool, "tool_input": ti, "tool_response": tr, "cwd": CWD}

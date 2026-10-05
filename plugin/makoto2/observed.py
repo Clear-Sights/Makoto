@@ -10,7 +10,7 @@ which objects an executed event touched.
 
 Objects are paths and identifiers, normalised the same way on both sides:
   - a path-shaped token (holds a "/", or is name.ext) or a Bash operand word, joined onto the
-    event's cwd when relative, then posixpath.normpath'd; a trailing ":line[:col]" is dropped;
+    event's cwd when relative, then normalized in the payload's path dialect; a trailing ":line[:col]" is dropped;
   - a URL, kept verbatim;
   - a result count: a ratio "8/8", or "<n> passed|failed|skipped|error|..." lowercased.
 Equality is exact: observing a directory does not observe the files under it, nor the reverse
@@ -26,6 +26,7 @@ import copy
 import functools
 import json
 import os
+import ntpath
 import posixpath
 import re
 import shlex
@@ -114,16 +115,62 @@ def _nested_command(effective):
     return effective[pos + 1] if pos + 1 < len(effective) else None
 
 
+def _shell_path_escapes(command: str) -> str:
+    """Protect Windows separators from shlex, leaving POSIX escapes intact.
+
+    Single quotes already preserve backslashes. Only drive paths or tokens with
+    a backslash between path components need the Windows interpretation.
+    Escaped whitespace, quotes, dollars and shell operators remain shell escapes.
+    """
+    def protect(match):
+        token = match.group(0)
+        if token.startswith("'"):
+            return token
+        if not (re.search(r'[A-Za-z]:[\\/]', token)
+                or re.search(r'[\w.]\\[\w.]', token)):
+            return token
+        return re.sub(r'\\(?=[\w.\\/~-])', lambda _: '\\\\', token)
+
+    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|(?:\\.|[^\s'\"|;&<>])+",
+                  protect, command)
+
+
 @functools.lru_cache(maxsize=4096)
 def _segments(command: str):
     """((argv, following_operator), ...) for the literal statements of `command`; a heredoc body
     fed to a non-shell program is data and is skipped; () when it does not tokenize."""
+    lines, pending = [], []
+    for line in (command or "").splitlines(keepends=True):
+        if pending:
+            delimiter, tabs = pending[0]
+            if (line.lstrip("\t") if tabs else line).rstrip("\r\n") == delimiter:
+                pending.pop(0)
+                lines.append(line)
+            continue
+        lines.append(line)
+        try:
+            lexer = shlex.shlex(_shell_path_escapes(line), posix=True, punctuation_chars="|;&<>")
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError:
+            continue
+        # Shell-fed heredocs contain commands; the existing splitter reads those.
+        argv = _effective_argv(tokens)
+        if argv and _basename(argv[0]) in _NESTED_SHELL_PROGRAMS:
+            continue
+        for i, token in enumerate(tokens[:-1]):
+            if token == "<<":
+                word = tokens[i + 1]
+                pending.append((word[1:] if word.startswith("-") else word,
+                                word.startswith("-")))
+    command = "".join(lines)
     try:
-        lexer = shlex.shlex(command or "", posix=True, punctuation_chars="|;&<>\n")
+        lexer = shlex.shlex(_shell_path_escapes(command), posix=True, punctuation_chars="|;&<>\n")
         lexer.whitespace_split = True
         lexer.commenters = ""
         lexer.whitespace = " \t\r"
-        tokens = list(lexer)
+        tokens = [part for token in lexer for part in
+                  (re.split(r"(\n)", token) if re.fullmatch(r"[|;&<>\n]+", token) else [token]) if part]
     except (TypeError, ValueError):
         return ()
     segments, current = [], []
@@ -193,7 +240,8 @@ _PASSED_N_RX = re.compile(r"\b(passed|failed)\s+(\d+)(?:/\d+)?\b", re.I)
 # name directly followed by "(" or "[" is a call or an index in code (json.load(), d.items[), not
 # a file, so it is not read as one.
 _PATH_RX = re.compile(
-    r"(?<![\w.@+~/-])(?:~|\.{1,2})?/?(?:[\w.@+-]+/)+[\w.@+*-]*"
+    r"(?<![\w.@+~/-])(?:[A-Za-z]:/|//)(?:[\w.@+-]+/)*[\w.@+*-]+"
+    r"|(?<![\w.@+~/-])(?:~|\.{1,2})?/?(?:[\w.@+-]+/)+[\w.@+*-]*"
     r"|(?<![\w.@+~/-])[\w@+*-]+(?:\.[\w@+*-]+)*\.[A-Za-z][A-Za-z0-9]{0,7}(?![\w(\[.])")
 _LINE_REF_RX = re.compile(r"(?::\d+){1,2}$")
 _EDGE_PUNCT = "\"'`,;:()[]{}<>"
@@ -209,8 +257,16 @@ def _norm(token: str, cwd: str) -> str:
     if _URL_RX.fullmatch(t) or _RATIO_RX.fullmatch(t):
         return t
     t = os.path.expanduser(t) if t.startswith("~") else t
-    t = posixpath.join(cwd, t) if not t.startswith("/") and cwd.startswith("/") else t
-    out = posixpath.normpath(t)
+    cwd = str(cwd or "").replace("\\", "/")
+    # Select the path dialect from the payload, not the machine running the hook.
+    # Drive-rooted and UNC paths are Windows identities even on a POSIX host.
+    windows = bool(ntpath.splitdrive(t)[0] or ntpath.splitdrive(cwd)[0])
+    if windows:
+        t = ntpath.join(cwd, t) if ntpath.isabs(cwd) else t
+        out = ntpath.normcase(ntpath.normpath(t)).replace("\\", "/")
+    else:
+        t = posixpath.join(cwd, t) if not t.startswith("/") and cwd.startswith("/") else t
+        out = posixpath.normpath(t)
     return "" if out == "." else out
 
 
@@ -222,7 +278,15 @@ def _text_objects(text: str, cwd: str) -> set:
     out.update(m.group(0) for m in _RATIO_RX.finditer(rest))
     out.update(f"{m.group(1)} {m.group(2).lower()}" for m in _COUNT_RX.finditer(rest))
     out.update(f"{m.group(2)} {m.group(1).lower()}" for m in _PASSED_N_RX.finditer(rest))
-    out.update(_norm(m.group(0), cwd) for m in _PATH_RX.finditer(_RATIO_RX.sub(" ", rest)))
+    for match in _PATH_RX.finditer(_RATIO_RX.sub(" ", rest).replace("\\", "/")):
+        token = match.group(0)
+        name = _norm(token, cwd)
+        # Plain slash-joined words in prose need an existing path witness.
+        # Extensions and explicit path prefixes already distinguish paths.
+        if (re.fullmatch(r"[\w-]+/[\w-]+", token.rstrip('.'))
+                and not os.path.exists(_norm(token.rstrip('.'), cwd))):
+            continue
+        out.add(name)
     out.discard("")
     return out
 
@@ -430,6 +494,8 @@ def _read(ev: dict, seq: int, seen: set) -> Obs:
     failed = (ev.get("hook_event_name") == "PostToolUseFailure"
               or bool(trd.get("is_error") or trd.get("isError") or trd.get("interrupted"))
               or bool(_DENIAL_RX.search(output)))
+    if tool == "Bash" and exit_ is None and not failed:
+        exit_ = 0
     objects = _input_objects(ti, cwd)
     written, created, search = set(), set(), None
     command = ti.get("command")

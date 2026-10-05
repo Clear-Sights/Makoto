@@ -141,7 +141,7 @@ def test_register():
     rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})
     assert [r['id'] for r in rows] == ['R01', 'R03', 'R04', 'R05', 'R06', 'R07',
                                      'R08', 'R09', 'R10', 'R11', 'R12', 'R13', 'R14']
-    suite('tests/test_evaluate.py')
+    suite('tests/test_evaluate.py', 'tests/test_goal.py')
 
 
 def test_validate():
@@ -232,7 +232,7 @@ def test_audit(tmp_path):
     (hidden/'binary').write_bytes(b'\x00\xff' + b'ASIA' + b'B'*16)
     assert audit(tmp_path)['decision'] == 'reject'
     (hidden/'binary').unlink()
-    (hidden/'key').write_text('-----BEGIN PRIVATE KEY-----\n')
+    (hidden/'key').write_text('-----BEGIN ' + 'PRIVATE KEY-----\n')
     assert audit(tmp_path)['decision'] == 'reject'
     (hidden/'key').unlink()
     (hidden/'link').symlink_to(tmp_path/'source.py')

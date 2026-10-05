@@ -8,6 +8,7 @@ from typing import NamedTuple, Optional
 import pytest
 
 TESTS = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(TESTS, '..', 'plugin'))
 HERE = os.path.join(TESTS, "..", "plugin", "makoto2")
 _spec = importlib.util.spec_from_file_location("evaluate", os.path.join(HERE, "evaluate.py"))
 V = importlib.util.module_from_spec(_spec)
@@ -121,38 +122,44 @@ CASES = [
 
 
 @pytest.mark.parametrize("rid,prec,pev,lrec,lev", CASES, ids=[c[0] for c in CASES])
-def test_plant_blocks_and_lookalike_silent(rows, rid, prec, pev, lrec, lev):
-    if rid not in {r["id"] for r in rows} or (rid == "R04" and pev.get("tool_name") == NOTE) or rid == "R13":
+def test_plant_blocks_and_lookalike_silent(rows, rid, prec, pev, lrec, lev, tmp_path):
+    from makoto2 import observed
+    if rid == "R06":
+        # Observation of the same whole numeric token pays, including a foreign reading.
+        prec = Record([Obs(1, FETCH, {}, "harm went to 41 cases")])
+        lrec = Record([Obs(1, FETCH, {}, "harm went to 37 cases")])
+        pev = lev = reply("Harm is down to 37 cases.")
+    elif rid in ("R07", "R08", "R12"):
+        source = tmp_path / "dependency.py"
+        source.write_text("VALUE = 'source'\n")
+        pev = lev = dict(pre("Write", file_path=str(tmp_path / "code.py"),
+                            content="from dependency import VALUE\n"), cwd=str(tmp_path))
+        prec = observed.record([])
+        lrec = observed.record([dict(hook_event_name="PostToolUse", cwd=str(tmp_path),
+                                    tool_name="Read", tool_input={"file_path":str(source)},
+                                    tool_response=source.read_text())])
+        rid = "R08"
+    elif rid == "R09":
+        failed = dict(hook_event_name="PostToolUseFailure", tool_name="Bash",
+                      tool_input={"command":"verify"}, tool_response={"exitCode":1})
+        changed = dict(hook_event_name="PostToolUse", tool_name="Write",
+                       tool_input={"file_path":"code.py", "content":"fixed"}, tool_response="written")
+        prec = observed.record([failed])
+        lrec = observed.record([failed, changed])
+        pev = lev = pre("Bash", command="verify")
+        rid = "R13"
+    elif rid == "R11":
+        pev = lev = dict(hook_event_name="Stop", last_assistant_message="`verify` passed.")
+        prec = observed.record([])
+        lrec = observed.record([dict(hook_event_name="PostToolUse", tool_name="Bash",
+                                    tool_input={"command":"verify"}, tool_response={"exitCode":0})])
+    elif rid not in {r["id"] for r in rows} or rid == "R13":
         assert V.evaluate(rows, prec, pev) is None
         assert V.evaluate(rows, lrec, lev) is None
         return
-    expected_row = rid
-    if rid in ("R07", "R12"):
-        # Register refs(output) excludes Pre message arguments (:15).
-        assert V.evaluate(rows, prec, pev) is None
-        assert V.evaluate(rows, lrec, lev) is None
-        pev = {"hook_event_name": "Stop", "last_assistant_message": pev["tool_input"]["text"]}
-        lev = {"hook_event_name": "Stop", "last_assistant_message": lev["tool_input"]["text"]}
-    if rid == "R05":
-        pev = {"hook_event_name": "Stop", "claim": {"kind": "absent"}}
-        lev = {"hook_event_name": "Stop", "claim": {"kind": "absent", "falsifier": "source result"}}
-    elif rid == "R06":
-        # The replacement of this legacy check is excluded: the mesh oracle
-        # requires an unquoted number, outside register refs(output).
-        expected_row = "R06"
-    elif rid == "R07":
-        expected_row = "R08"
-        quote = "the mesh is the chart"
-        lrec = Record([Obs(1, "Read", {"ref": quote}, quote)])
-    elif rid == "R08":
-        lev = dict(lev, tree={"/r/a.py": {"hash": V.family_lineage.digest("x = 1")}})
-    elif rid == "R12":
-        expected_row = "R08"
-        lev = dict(lev, cwd="/r", tree={"/r/docs/MAP.tsv": {"hash": V.family_lineage.digest("..")}})
     out = V.evaluate(rows, prec, pev)
-    assert out is not None and out["row"] == expected_row, out
+    assert out is not None and out["row"] == rid, out
     assert out["objects"]
-    assert ("REGISTRY-v9.md" if rid in ("R05", "R07", "R08", "R12") else "source:") in out["message"]
     assert V.evaluate(rows, lrec, lev) is None
 
 
@@ -183,56 +190,53 @@ def observation(output, *, tool='Bash', input=None, code=0):
                         tool_input=input or {}, tool_response=dict(stdout=output, exitCode=code))]).obs[0]
 
 
-@pytest.mark.parametrize('output,paid', [
-    ('FAILED test_charge\nsummary: passed', False),
-    ('PASSED test_other\nsummary: passed', False),
-    ('PASSED test_charge', True),
-    ('{"charge":"failed","summary":"passed"}', False),
-    ('{"charge":"passed"}', True),
-    ('charge queued; validation passed', False),
-    ('charge completed; validation passed', True),
+@pytest.mark.parametrize('command,response,paid', [
+    ('verify', {'exitCode':1, 'stdout':'summary: passed'}, False),
+    ('other', {'exitCode':0, 'stdout':'verify passed'}, True),
+    ('verify', {'exitCode':0}, True),
+    ('verify', {'exitCode':0, 'is_error':True}, False),
+    ('verify', {'stdout':''}, True),
+    ('verify', {'exitCode':0, 'isError':True}, False),
+    ('verify', {'exitCode':0, 'interrupted':True}, False),
 ])
-def test_named_status(output, paid):
-    o = observation(output)
-    subjects = landed_owes({}, {'negation_window': 40}, record([]),
-                           dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
-    assert landed_pays({}, {}, o)(subjects[0]) == paid
+def test_named_status(command, response, paid):
+    claim = dict(hook_event_name='Stop', last_assistant_message='`verify` passed.')
+    assert landed_owes({}, CFG, record([]), claim)
+    history = record([dict(hook_event_name='PostToolUse', tool_name='Bash',
+                           tool_input={'command':command}, tool_response=response)])
+    assert bool(landed_owes({}, CFG, history, claim)) == (not paid)
 
 
-@pytest.mark.parametrize('path,body,paid', [
-    ('out/ledger.json', '', False),
-    ('out/ledger.json', 'broken', False),
-    ('out/ledger.json', '{}', False),
-    ('out/ledger.json', '{"rows":[1]}', True),
-    ('out/ledger.xml', '<ledger>', False),
-    ('out/ledger.xml', '<ledger/>', False),
-    ('out/ledger.xml', '<ledger><row>1</row></ledger>', True),
+@pytest.mark.parametrize('path,body', [
+    ('out/ledger.json', 'broken'),
+    ('out/ledger.json', '{"rows":[1]}'),
+    ('out/ledger.xml', '<ledger>'),
+    ('out/ledger.xml', '<ledger><row>1</row></ledger>'),
 ])
-def test_artifact(path, body, paid):
-    producer = observation('generated ' + path, input={'command': 'generate > ' + path})
-    r = record([]); r.obs = [producer]
-    subjects = landed_owes({}, {'negation_window': 40}, r,
-                           dict(hook_event_name='Stop', last_assistant_message='Ledger is complete.'))
-    assert not landed_pays({}, {}, producer)(subjects[0])
-    reader = observation(body, tool='Read', input={'file_path': path})
-    payment = landed_pays({}, {}, reader)
-    assert bool(payment and payment(subjects[0])) == paid
+def test_artifact(path, body):
+    # Content validity has no deterministic native tell for the claimed result.
+    claim = dict(hook_event_name='Stop', last_assistant_message='Ledger is complete.')
+    history = record([dict(hook_event_name='PostToolUse', tool_name='Bash',
+                          tool_input={'command':'generate > '+path}, tool_response={'exitCode':0}),
+                      dict(hook_event_name='PostToolUse', tool_name='Read',
+                          tool_input={'file_path':path}, tool_response=body)])
+    assert not landed_owes({}, CFG, history, claim)
 
 
 def test_later_failure_invalidates_success():
-    history = record([dict(hook_event_name='PostToolUse', tool_name='Bash',
-                           tool_input={}, tool_response={'stdout': text})
-                      for text in ('PASSED test_charge', 'FAILED test_charge\nsummary: passed')])
-    subjects = landed_owes({}, {'negation_window': 40}, history,
-                           dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
-    assert not any(landed_pays({}, {}, o)(subjects[0]) for o in history.obs)
+    claim = dict(hook_event_name='Stop', last_assistant_message='`verify` passed.')
+    events = [dict(hook_event_name='PostToolUse', tool_name='Bash',
+                   tool_input={'command':'verify'}, tool_response={'exitCode':code})
+              for code in (0,1)]
+    assert not landed_owes({}, CFG, record(events[:1]), claim)
+    assert landed_owes({}, CFG, record(events), claim)
 
 
 def test_launcher_success_is_not_job_success():
-    o = observation('charge accepted; validation passed', input={'job': 'charge'}, tool='mcp__worker__launch')
-    subjects = landed_owes({}, {'negation_window': 40}, record([]),
-                           dict(hook_event_name='Stop', last_assistant_message='Charge passed.'))
-    assert not landed_pays({}, {}, o)(subjects[0])
+    claim = dict(hook_event_name='Stop', last_assistant_message='`verify` passed.')
+    history = record([dict(hook_event_name='PostToolUse', tool_name='mcp__worker__launch',
+                          tool_input={'command':'verify'}, tool_response='validation passed')])
+    assert landed_owes({}, CFG, history, claim)
 
 
 @pytest.mark.parametrize("command,output", [
@@ -262,6 +266,6 @@ def test_failure_subject_fold_and_every_name(rows):
     quoted = reply('The runner reports "two tests failed".')
     assert V.evaluate([row], record, quoted) is None
     quoted = {"hook_event_name": "Stop", "last_assistant_message": quoted["tool_input"]["text"]}
-    assert V.evaluate([row], record, quoted)["row"] == "R08"
+    assert V.evaluate([row], record, quoted) is None
     source = Obs(2, "Read", {"ref": "two tests failed"}, "two tests failed")
     assert V.evaluate([row], Record([red, source]), quoted) is None

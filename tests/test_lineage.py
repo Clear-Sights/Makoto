@@ -50,3 +50,14 @@ def test_closing_reference_requires_read(tmp_path):
 def test_sentence_punctuation_is_not_part_of_the_source_name(tmp_path):
     source=tmp_path/'records/original.tsv';source.parent.mkdir();source.write_text('value')
     assert not unpaid(record([read(source,'value')]),act(tmp_path,'See records/original.tsv.'),observed)
+
+
+def test_missing_local_source_requires_verification_or_label(tmp_path):
+    source = tmp_path/'source.txt'
+    history = record([read(source, 'value')])
+    event = act(tmp_path, 'See source.txt')
+    assert unpaid(history, event, observed) == [('changed', ident(source))]
+    event = act(tmp_path, 'See source.txt (unverified)')
+    assert not unpaid(history, event, observed)
+    source.write_text('value')
+    assert not unpaid(history, act(tmp_path, 'See source.txt'), observed)

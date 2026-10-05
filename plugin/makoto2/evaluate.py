@@ -16,10 +16,7 @@ import csv
 import json
 import os
 import re
-import xml.etree.ElementTree as ET
-from makoto2.lineage import unpaid as lineage_unpaid
 from makoto2 import family_spec, family_lineage, family_switch
-from makoto2.family_other import findings as other_findings
 from typing import Optional
 
 
@@ -135,28 +132,18 @@ def _acts(args):
     return set(filter(None, args.get("acts", "").split(",")))
 
 
+def family_findings(record, event, cfg):
+    """One owner per register predicate; return all identities before arbitration."""
+    from makoto2 import family_other
+    for module in (family_spec, family_lineage, family_other, family_switch):
+        yield from module.findings(record, event, cfg)
+
+
 def evaluate(rows, record, event) -> Optional[dict]:
     """First row whose moment matches the event and has an unpaid subject -> block; else None."""
     moment = event.get("hook_event_name", "")
     cfg = rows[0].get("cfg", {}) if rows else {}
-    for finding in family_spec.evaluate(record, event, cfg):
-        return finding
-    if moment in ("PreToolUse", "Stop", "SubagentStop"):
-        if family_lineage.lineage_absence(record, event, _R):
-            return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
-        for predicate, row, citation in (
-            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:495,782 F2/H3"),
-            (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
-        ):
-            subjects = predicate(record, event, _R)
-            if subjects:
-                return {"row": row, "message": citation, "objects": subjects}
-        for state, name in lineage_unpaid(record, event, _R):
-            return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
-    cfg = rows[0].get("cfg", {}) if rows else {}
-    for finding in other_findings(record, event, _R, cfg.get("dispatch", False)):
-        return finding
-    for finding in family_switch.findings(record,event,cfg):
+    for finding in family_findings(record, event, cfg):
         return finding
     for row in rows:
         if moment not in row["moment"].split(","):
@@ -259,6 +246,7 @@ def _strip_quoted(text: str) -> str:
     text = re.sub(r"```.*?```", " ", text, flags=re.S)
     text = re.sub(r"`[^`]*`", " ", text)
     text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith(">"))
+    text = re.sub(r"(?<!\w)['‘][^'’\n]+['’](?!\w)", " ", text)
     return re.sub(r"[\"“][^\"”]*[\"”]", " ", text)
 
 
@@ -401,7 +389,7 @@ def absence_pays(args, cfg, o):
     return lambda thing: thing.rsplit("/", 1)[-1] in scope
 
 
-_NUM_RX = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?%?|\d{1,3}(?:,\d{3})+)(?![\w.])")
+_NUM_RX = re.compile(r"(?<![\w.$,:])(\$?\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,2}:\d{2}(?::\d{2})?(?:Z)?|\$?\d+(?:\.\d+)?%?)(?![\w,:]|\.\d)")
 
 
 def number_owes(args, cfg, record, event):
@@ -415,13 +403,13 @@ def number_owes(args, cfg, record, event):
             n = m.group(1)
             if len(re.sub(r"\D", "", n)) >= cfg["min_number_digits"] or "." in n or "%" in n:
                 out.append(n)
-    return [n for n in out if any(re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", t) for t in other)]
+    return out if other else []
 
 
 def number_pays(args, cfg, o):
-    if not _primary(o) or not o.output:
-        return None
-    return lambda n: re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w])", o.output) is not None
+    tokens = {m.group(1) for m in _NUM_RX.finditer(o.output)}
+    tokens.update(t[:5] for t in tuple(tokens) if re.fullmatch(r"\d{2}:\d{2}:\d{2}(?:Z)?", t))
+    return lambda n: n in tokens
 
 
 def _words_text(path: str) -> str:
@@ -469,7 +457,9 @@ def write_owes(args, cfg, record, event):
     ti = event.get("tool_input") or {}
     own = str(ti.get("file_path", ""))
     named = frozenset(p for p in _PATH_RX.findall(str(ti.get("content", ""))) if p != own)
-    known = frozenset(p for p in named if any(_names(o, p) or p in str(o.output) for o in record.obs))
+    cwd = event.get('cwd') or ''
+    known = frozenset(p for p in named if os.path.exists(_R._norm(p, cwd))
+                      and any(_names(o, p) or p in str(o.output) for o in record.obs))
     return [tuple(sorted(known))] if known else []
 
 
@@ -479,27 +469,8 @@ def read_pays(args, cfg, o):
     return lambda paths: any(_names(o, p) for p in (paths if isinstance(paths, tuple) else (paths,)))
 
 
-_LANDED = {
-    "merged": re.compile(r"\bmerged\b", re.I),
-    "landed": re.compile(r"\bmerged\b|\blanded\b|\b[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}\b", re.I),
-    "pushed": re.compile(r"\bpushed\b|\s->\s|Everything up-to-date", re.I),
-    "passed": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
-    "passes": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
-    "shipped": re.compile(r"\bmerged\b|\bshipped\b|\breleased\b", re.I),
-    "green": re.compile(r"\bpassed\b|\bsuccess\b|\bgreen\b", re.I),
-}
-_CLAIM_RX = re.compile(r"\b(merged|landed|pushed|passed|passes|shipped|green|completed?|ready)\b", re.I)
 _NEG_RX = re.compile(r"\b(not|never|no|yet|once|until|if|when|before)\b|n't\b", re.I)
 _PENDING_RX = re.compile(r"\b(queued|pending|running|started|launched)\b", re.I)
-
-
-def _subject_words(text):
-    # Identifier components also bind prose names to test nodes and job IDs.
-    return set(re.findall(r"[a-z][a-z0-9]*|\d+", text.lower())) - _STOP_WORDS - {
-        "all", "check", "checks", "test", "tests", "generation",
-        "successfully", "consumers", "and", "ci", "has", "was", "rest", "their", "failed", "passed", "suite", "run",
-        "now", "already", "still", "currently"}
-
 
 
 # Number grammar reused from gate.unnamed_failure (6afe37e); prose counts,
@@ -522,8 +493,12 @@ _TEST_OUTCOME_RX = re.compile(
 def _failed_test_subjects(record):
     # Reuse the observed shell tokenizer: displaying a log is not running tests.
     verdicts = {}
+    latest = {}
     for o in record.obs:
-        if o.tool != "Bash" or o.failed:
+        if o.seq >= (getattr(record, 'turn_start', 0) or 0) and o.tool == 'Bash':
+            latest[o.input.get('command', '')] = o
+    for o in sorted(latest.values(), key=lambda o: o.seq):
+        if o.tool != "Bash":
             continue
         runners = [argv for argv, _ in _R._segments(str(o.input.get("command", "")))
                    if argv and (os.path.basename(argv[0]) in ("pytest", "py.test") or
@@ -569,58 +544,10 @@ def landed_owes(args, cfg, record, event):
                        for seq, brief in getattr(record, "dispatch_briefs", ())
                        for command in _brief_fields(brief)["ACCEPTANCE"])
 
-    for s in _sentences(_strip_quoted(_text_of(event))):
-        if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
-            continue
-        for m in _CLAIM_RX.finditer(s):
-            if _NEG_RX.search(s[:m.start()][-cfg["negation_window"]:]):
-                continue
-            word = m.group(1).lower()
-            names = _subject_words(re.split(r"\band\b|;", s[:m.start()], flags=re.I)[-1])
-            artifacts = {p for o in record.obs for p in (o.written | o.created |
-                         set(re.findall(r"(?:--output(?:=|\s+)|-o\s+)([^\s;]+)",
-                                        str(o.input.get("command", "")))))
-                         if _subject_words(os.path.splitext(os.path.basename(p))[0]) <= names
-                         and _subject_words(os.path.splitext(os.path.basename(p))[0])}
-            # An artifact commits to its bytes, not a generator's exit or existence.
-            if word in ("complete", "completed", "ready"):
-                jobs = any(names & _subject_words(str(o.input.get("job_id", "")) +
-                           " ".join(re.findall(r"\bjob_id[=:]([\w-]+)", o.output)))
-                           for o in record.obs)
-                if not artifacts and not jobs:
-                    continue
-            else:
-                artifacts = set()
-            if artifacts:
-                out.extend((word, p, "artifact", max((o.seq for o in record.obs
-                           if _names(o, p)), default=-1))
-                           for p in sorted(artifacts))
-            else:
-                # Keep the claimed subject, including numeric identifiers. An unrelated
-                # status must not erase its name and turn it into an aggregate claim.
-                names = frozenset(names)
-                failed_at = max((o.seq for o in record.obs if any(
-                    names <= _subject_words(line + json.dumps(o.input)) and re.search(r"\b(fail(?:ed)?|error|queued|pending|running)\b", line, re.I)
-                    for line in o.output.splitlines())), default=-1)
-                out.append((word, names, "status", failed_at))
+    # The native family owns the settled-run condition for every outcome route.
+    out.extend(("settled", tuple(f['objects']), "settled", -1)
+               for f in family_spec.spec_claim(record, event, cfg) if f['row'] == 'R11')
     return out
-
-
-def _valid_artifact(o, path):
-    if o.tool not in ("Read", "Write") or not _names(o, path):
-        return False
-    body = str(o.input.get("content", "") if o.tool == "Write" else o.output).strip()
-    if not body:
-        return False
-    try:
-        if path.lower().endswith(".json"):
-            return bool(json.loads(body))
-        if path.lower().endswith(".xml"):
-            root = ET.fromstring(body)
-            return bool(len(root) or (root.text or "").strip())
-    except (ValueError, ET.ParseError):
-        return False
-    return True
 
 
 def landed_pays(args, cfg, o):
@@ -628,45 +555,12 @@ def landed_pays(args, cfg, o):
         return None
 
     def pays(subject):
-        word, names, kind, after = subject
-        if kind == "failure-report":
-            return False
-        if kind == "acceptance":
-            return (o.seq > after and o.tool == "Bash" and o.exit == 0
-                    and o.input.get("command", "").strip() == names
-                    and not o.input.get("run_in_background")
-                    and o.seq not in cfg.get("dispatch_background", ())
-                    and not _PENDING_RX.search(o.output))
-        if not (o.output.strip() or (o.tool == "Write" and o.input.get("content"))):
-            return False
-        if o.seq < after:
-            return False
-        if kind == "artifact":
-            return o.exit in (None, 0) and _valid_artifact(o, names)
-        if o.seq <= after or o.input.get("run_in_background") or o.tool.endswith("__launch") or _PENDING_RX.search(o.output):
-            return False
-        rx = _LANDED.get(word, re.compile(r"\b(completed?|ready)\b", re.I))
-        # JSON status fields and individual text lines keep named outcomes separate
-        # from summaries. Input identifiers bind status APIs, never launch acknowledgements.
-        for line in o.output.splitlines():
-            try:
-                value = json.loads(line)
-            except ValueError:
-                value = None
-            if isinstance(value, dict):
-                if any((not names or names <= _subject_words(str(k)) or
-                        (k in ("status", "state") and names <= _subject_words(json.dumps(o.input))))
-                       and rx.search(str(v)) and not _NEG_RX.search(str(v))
-                       for k, v in value.items()):
-                    return True
-                continue
-            if re.search(r"\b(fail(?:ed)?|error)\b", line, re.I):
-                continue
-            if rx.search(line) and not _NEG_RX.search(line[:rx.search(line).start()]) and (not names or names <= _subject_words(line)
-                                   or names <= _subject_words(json.dumps({k: v for k, v in o.input.items()
-                                       if k != "command" or word in ("merged", "landed", "pushed", "shipped")}))):
-                return True
-        return False
+        _, command, kind, after = subject
+        return (kind == "acceptance" and o.seq > after and o.tool == "Bash"
+                and o.exit == 0 and o.input.get("command", "").strip() == command
+                and not o.input.get("run_in_background")
+                and o.seq not in cfg.get("dispatch_background", ())
+                and not _PENDING_RX.search(o.output))
     return pays
 
 
