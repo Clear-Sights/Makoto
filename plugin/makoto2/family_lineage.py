@@ -53,6 +53,14 @@ def readings(record, reader):
                 identities.add(obs.input['ref'])
         elif obs.tool == 'WebFetch' and obs.input.get('url'):
             identities.add(obs.input['url'])
+        # ls-remote is a primary reading of remote refs, including their SHA.
+        if obs.tool == 'Bash' and any('ls-remote' in argv and 'git' in argv
+                for argv, _ in reader._segments(obs.input.get('command', ''))):
+            for sha, ref in re.findall(r'(?m)^([0-9a-f]{40})\s+(refs/heads/\S+)\s*$', obs.output):
+                sources[sha] = digest(sha)
+                for size in range(7, 40):
+                    sources[sha[:size]] = digest(sha[:size])
+                sources[reader._norm(ref.removeprefix('refs/heads/'), cwd)] = digest(sha)
         for name in identities:
             if name not in owned:
                 sources[name] = digest(obs.output)
@@ -99,6 +107,15 @@ def lineage_drift(record, event, reader):
     for name in sorted(refs - owned - {own}):
         if name not in sources:
             continue  # missing readings belong to lineage_refs
+        # A remote branch ref is not a local file with the same spelling.
+        if any(o.tool == 'Bash' and not o.failed
+               and any('ls-remote' in argv and 'git' in argv
+                       for argv, _ in reader._segments(o.input.get('command', '')))
+               and any(name == reader._norm(ref.removeprefix('refs/heads/'),
+                       getattr(record, 'reader_evidence', {}).get(o.seq, {}).get('cwd', ''))
+                       for ref in re.findall(r'(?m)^[0-9a-f]{40}\s+(refs/heads/\S+)\s*$', o.output))
+               for o in record.obs):
+            continue
         tree = event.get('tree') or {}
         if name in tree:
             current = tree[name].get('hash') if isinstance(tree[name], dict) else tree[name]
@@ -112,8 +129,15 @@ def lineage_drift(record, event, reader):
             try:
                 with open(path, encoding='utf-8') as source:
                     current = digest(source.read())
+            except FileNotFoundError:
+                # A receipt cannot verify a local source that is no longer
+                # available. An explicitly unverified reference makes no claim
+                # to current source bytes.
+                if re.search(r'\bunverified\b', output_text(event, reader), re.I):
+                    continue
+                current = None
             except OSError:
-                continue  # No current tree reading is available; do not invent drift.
+                continue  # Unavailable reading cannot establish a changed hash.
         if current != sources[name]:
             changed.append(name)
     return changed
@@ -193,3 +217,23 @@ def lineage_edit(record, event, reader):
         return []
     keys = verifier_keys(record)
     return [] if any(is_verifier(e, keys) for e in events[edits[-1]+1:]) else [path]
+
+
+def findings(record, event, cfg):
+    from makoto2 import observed as reader
+    from makoto2.family_spec import finding
+    if event.get('hook_event_name') not in ('PreToolUse','Stop','SubagentStop'):
+        return
+    checks = (
+        (lineage_absence, ('C2','B32'), 'R05'),
+        (lineage_refs, ('A2','G1','H1','H4','H5'), 'R08'),
+        (lineage_drift, ('D4','F7','F10','H2'), 'L.drift'),
+        (lineage_edit, ('F2','H3'), 'L.edit'),
+        (lineage_units, ('H6',), 'L.units'),
+    )
+    for check, entries, row in checks:
+        subjects = check(record, event, reader)
+        if subjects is True:
+            subjects = ['claim']
+        for subject in subjects or ():
+            yield finding(entries, subject, check.__name__ + ' -- source: REGISTER.md (origin REGISTRY-v9.md)', row)

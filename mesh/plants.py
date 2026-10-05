@@ -14,7 +14,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKS = ('schema','wires','reachable','trace','coverage','fills','missing','over','subtractions','route','fill-scope','wire-rule','tighten','costs','acceptance','acceptance-scope')
-COPY_PATHS = ('mesh','WORDS.tsv','SPIRIT.md','PLAN.md','TASKS.tsv','MESH.tsv','plugin','tests','README.md','HANDOFF.md','.claude-plugin','.github')
+COPY_PATHS = ('REGISTER.md','mesh','WORDS.tsv','SPIRIT.md','PLAN.md','TASKS.tsv','MESH.tsv','plugin','tests','README.md','HANDOFF.md','.claude-plugin','.github')
 
 
 def read(path):

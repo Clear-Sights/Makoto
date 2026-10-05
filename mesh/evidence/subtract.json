@@ -1,5 +1,5 @@
 {
-  "task": "configure",
+  "task": "subtract",
   "result": "pass",
   "scope": "Current local executable product acceptance; no remote CI or live operator receipt is inferred.",
   "source_pins": {
@@ -67,8 +67,8 @@
     "tests/test_repeat_register.py": "b8de8e4eb71e35f5471f59d9bbf63861d6fcf8e501b77f61d0bfe325be8fe890",
     "tests/test_restored_fixes.py": "4552edd55d6a2ee9df8d857805f0a313f55a3044d95f62cbfc0fd0ed5cf5df01"
   },
-  "reproduction": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/acceptance_tasks.py::test_configure",
+  "reproduction": "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests/acceptance_tasks.py::test_subtract",
   "exit_code": 0,
-  "stdout": ".                                                                        [100%]\n1 passed in 0.11s\n",
+  "stdout": ".                                                                        [100%]\n1 passed in 0.12s\n",
   "stderr": ""
 }

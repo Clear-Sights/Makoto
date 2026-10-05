@@ -17,9 +17,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
-from makoto2.lineage import unpaid as lineage_unpaid
 from makoto2 import family_spec, family_lineage, family_switch
-from makoto2.family_other import findings as other_findings
 from typing import Optional
 
 
@@ -135,28 +133,18 @@ def _acts(args):
     return set(filter(None, args.get("acts", "").split(",")))
 
 
+def family_findings(record, event, cfg):
+    """One owner per register predicate; return all identities before arbitration."""
+    from makoto2 import family_other
+    for module in (family_spec, family_other, family_switch, family_lineage):
+        yield from module.findings(record, event, cfg)
+
+
 def evaluate(rows, record, event) -> Optional[dict]:
     """First row whose moment matches the event and has an unpaid subject -> block; else None."""
     moment = event.get("hook_event_name", "")
     cfg = rows[0].get("cfg", {}) if rows else {}
-    for finding in family_spec.evaluate(record, event, cfg):
-        return finding
-    if moment in ("PreToolUse", "Stop", "SubagentStop"):
-        if family_lineage.lineage_absence(record, event, _R):
-            return {"row": "R05", "message": "claim has no falsifier -- REGISTRY-v9.md:739 B32/C2", "objects": ["claim"]}
-        for predicate, row, citation in (
-            (family_lineage.lineage_edit, "L.edit", "REGISTRY-v9.md:495,782 F2/H3"),
-            (family_lineage.lineage_units, "L.units", "REGISTRY-v9.md:814 H6"),
-        ):
-            subjects = predicate(record, event, _R)
-            if subjects:
-                return {"row": row, "message": citation, "objects": subjects}
-        for state, name in lineage_unpaid(record, event, _R):
-            return {"row": "R08", "message": f"R08 {state} source {name} -- source: REGISTRY-v9.md:13-16 H5/H2", "objects": [name]}
-    cfg = rows[0].get("cfg", {}) if rows else {}
-    for finding in other_findings(record, event, _R, cfg.get("dispatch", False)):
-        return finding
-    for finding in family_switch.findings(record,event,cfg):
+    for finding in family_findings(record, event, cfg):
         return finding
     for row in rows:
         if moment not in row["moment"].split(","):
@@ -259,6 +247,7 @@ def _strip_quoted(text: str) -> str:
     text = re.sub(r"```.*?```", " ", text, flags=re.S)
     text = re.sub(r"`[^`]*`", " ", text)
     text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith(">"))
+    text = re.sub(r"(?<!\w)['‘][^'’\n]+['’](?!\w)", " ", text)
     return re.sub(r"[\"“][^\"”]*[\"”]", " ", text)
 
 
@@ -469,7 +458,9 @@ def write_owes(args, cfg, record, event):
     ti = event.get("tool_input") or {}
     own = str(ti.get("file_path", ""))
     named = frozenset(p for p in _PATH_RX.findall(str(ti.get("content", ""))) if p != own)
-    known = frozenset(p for p in named if any(_names(o, p) or p in str(o.output) for o in record.obs))
+    cwd = event.get('cwd') or ''
+    known = frozenset(p for p in named if os.path.exists(_R._norm(p, cwd))
+                      and any(_names(o, p) or p in str(o.output) for o in record.obs))
     return [tuple(sorted(known))] if known else []
 
 
@@ -480,7 +471,7 @@ def read_pays(args, cfg, o):
 
 
 _LANDED = {
-    "merged": re.compile(r"\bmerged\b", re.I),
+    "merged": re.compile(r"\bmerged\b|\bMerge pull request\b", re.I),
     "landed": re.compile(r"\bmerged\b|\blanded\b|\b[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}\b", re.I),
     "pushed": re.compile(r"\bpushed\b|\s->\s|Everything up-to-date", re.I),
     "passed": re.compile(r"\bpassed\b|\bPASS(?:ED)?\b", re.I),
@@ -498,7 +489,7 @@ def _subject_words(text):
     return set(re.findall(r"[a-z][a-z0-9]*|\d+", text.lower())) - _STOP_WORDS - {
         "all", "check", "checks", "test", "tests", "generation",
         "successfully", "consumers", "and", "ci", "has", "was", "rest", "their", "failed", "passed", "suite", "run",
-        "now", "already", "still", "currently"}
+        "now", "already", "still", "currently", "later", "earlier", "are", "as", "placed"}
 
 
 
@@ -569,13 +560,38 @@ def landed_owes(args, cfg, record, event):
                        for seq, brief in getattr(record, "dispatch_briefs", ())
                        for command in _brief_fields(brief)["ACCEPTANCE"])
 
+    native_claims = family_spec.read_claims(record, event)
+    paid_words = set()
+    for claim in native_claims:
+        if claim.get('kind') == 'pass' and claim.get('subject') and any(
+                o.exit == 0 and o.input.get('command') == claim['subject'] for o in record.obs):
+            paid_words.update(('pass','passed','green','success'))
+        if claim.get('kind') == 'shipped' and any(
+                o.exit == 0 and re.search(r'git\s+push', str(o.input.get('command',''))) for o in record.obs):
+            paid_words.update(('shipped','pushed'))
     for s in _sentences(_strip_quoted(_text_of(event))):
         if s.rstrip().endswith("?") or _SOURCE_NAMED_RX.search(s):
             continue
         for m in _CLAIM_RX.finditer(s):
             if _NEG_RX.search(s[:m.start()][-cfg["negation_window"]:]):
                 continue
+            # A required future result is not a report of a settled outcome.
+            if re.search(r'\bneeds?\s+(?:all\s+)?(?:\w+\s+){0,3}checks?\s*$', s[:m.start()], re.I):
+                continue
             word = m.group(1).lower()
+            if word in paid_words:
+                continue
+            # A counted branch survey binds prose to the revision actually
+            # selected in the same Bash run, even after surveying another tree.
+            count = re.search(r'\b(\d+) tests\b', s)
+            if word == 'passes' and re.search(r'\bbranch passes all\b', s, re.I) and count:
+                revisions = [argv[-1] for o in record.obs if o.tool == 'Bash' and not o.failed
+                             and re.search(r'\b'+count[1]+r' passed\b', o.output)
+                             for argv, _ in _R._segments(o.input.get('command', ''))
+                             if len(argv) >= 3 and argv[:2] == ('git', 'checkout')]
+                if revisions:
+                    out.append((word, (revisions[-1], count[1]), 'branch-check', -1))
+                    continue
             names = _subject_words(re.split(r"\band\b|;", s[:m.start()], flags=re.I)[-1])
             artifacts = {p for o in record.obs for p in (o.written | o.created |
                          set(re.findall(r"(?:--output(?:=|\s+)|-o\s+)([^\s;]+)",
@@ -631,6 +647,15 @@ def landed_pays(args, cfg, o):
         word, names, kind, after = subject
         if kind == "failure-report":
             return False
+        if kind == 'branch-check':
+            segments = _R._segments(o.input.get('command', ''))
+            selected = any(len(argv) >= 3 and argv[:2] == ('git', 'checkout')
+                           and argv[-1] == names[0] for argv, _ in segments)
+            ran = any(any(token.endswith(('check.py', 'zero.py', 'plants.py')) or token == 'pytest'
+                          for token in argv) for argv, _ in segments)
+            return (o.tool == 'Bash' and selected and ran and not o.failed
+                    and not re.search(r'\b(?:FAIL(?:ED)?|[1-9]\d* failed)\b', o.output)
+                    and bool(re.search(r'\b'+names[1]+r' passed\b', o.output)))
         if kind == "acceptance":
             return (o.seq > after and o.tool == "Bash" and o.exit == 0
                     and o.input.get("command", "").strip() == names

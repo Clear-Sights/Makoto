@@ -1,2 +1,13 @@
 path	unit	reason
 mesh/seed.py	<module>	Retained live requirement-driven route generator used by check.py and plants.py; obsolete reference seed removed (git history retains it).
+plugin/makoto2/family_spec.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/family_other.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/family_switch.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/family_lineage.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/lineage.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+mesh/goal.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+REGISTER.md	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+tests/fixtures/goal.json	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+tests/fixtures/honest_writes.json	<module>	REGISTER/FAMILIES: routine legitimate hook sequences must remain silent
+tests/test_real_session.py	<module>	REGISTER B28: operator-labelled real succession must credit primary observations and retain unnamed-failure detection
+tests/fixtures/real_session.json	<module>	REGISTER B28: sanitized held-out real-session sequences

@@ -33,20 +33,30 @@ Revision 2026-10-02: `input-sources` declares each slot input's producer indepen
 
 Use `python3 mesh/wire_rule.py` to inspect current decisions, `python3 mesh/tighten.py` to regenerate tightening, and `python3 mesh/seed.py --plan-only` to regenerate the plan within the mesh/ and PLAN.md revision scope. Plants include an identity wire and stale tightening shape.
 
-Cleanup 2026-10-02: generated Python bytecode was removed. Keep active mesh
-infrastructure, subtraction references and `mesh/evidence/` receipts: they are
-outputs of checks and historical measurements;
-a passing model gate does not make stale receipts current. Re-run
-`PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py` after changing selected mesh or
-plan inputs. It executes every product acceptance and reports open implementation obligations. Cleanup results live outside the repository at
-`/home/user/route-out/makoto-r9/CLEANUP.txt`.
+Current register scope comes from WORDS ids REGISTER and FAMILIES and the
+received REGISTER.md. SPEC, OTHER POINT, SWITCH and LINEAGE are retained;
+shared predicates have one owner selected by their needs line. Dispatch I1-I3
+remain pending with Gabriel and keep their existing units.
 
-TASKS.tsv now selects executable product acceptance in tests/acceptance_tasks.py; TRACE.tsv names each requirement’s test. MESH.tsv keeps its separate model checks. plants.py verifies every product check is red when its fill is removed; an already red evidence task stays open. ALREADY-MET.tsv records only passing product checks, with SHA-256 output digests and retained output under mesh/evidence/product-checks/. Historical receipts alone do not establish current acceptance.
+TASKS.tsv selects executable product acceptance in tests/acceptance_tasks.py.
+TRACE.tsv connects requirements to those tests. ALREADY-MET.tsv records executed
+passing checks and their output hashes; receipts never override failing product
+acceptance. Re-run the commands after changing selected inputs:
 
-FIX16: register is local load/enforce/replay of the unchanged shipped rows.tsv. Gabriel owns amendments; register-proposal.md is outside the seed DAG. Local pytest, model checks, plants and fixed-input replay are authorized. Proof files are outputs and never accepted as implementation evidence.
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/tighten.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/goal.py
+PYTHONDONTWRITEBYTECODE=1 python3 mesh/zero.py
+```
 
-Fixed done-tail cleanup 2026-10-02: the current inventory contains no scratch,
-temporary, cache or untracked files to remove. All repository files are listed
-in the route’s PROTECTED.txt and retained, including plugin metadata, required
-references and evidence. The check and plant commands above remain unchanged.
-This cleanup records file hygiene; it does not establish implementation completion.
+The goal corpus pairs each evaluable register entry with an attack and an honest
+near-twin. Explicit NOT-EVALUABLE entries remain outside the catch numerator.
+Goal plants remove each predicate and each register family's predicate closure
+in disposable copies. Routine honest branch and write cases are measured too.
+The source-pinned report is mesh/evidence/goal.json. Zero runs every product
+acceptance and records DONE only when those checks pass. Local package and
+fresh-account tests execute current code; they do not certify remote CI or a
+live operator session. File hygiene excludes git history; uncommitted changes
+remain for the owner to review and commit.

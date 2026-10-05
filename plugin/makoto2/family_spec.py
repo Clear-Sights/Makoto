@@ -11,15 +11,6 @@ import re
 from pathlib import Path
 from typing import NamedTuple
 
-FUNCTIONS = dict.fromkeys(('A3','A4','B36'), 'spec_tree')
-FUNCTIONS.update(dict.fromkeys(('A13','E3'), 'spec_authorship'))
-FUNCTIONS.update(B7='spec_terms')
-FUNCTIONS.update(dict.fromkeys(('B2','B9','B23','B35','C6','E7'), 'spec_write'))
-FUNCTIONS.update(E12='spec_launch', E11='spec_budget', A2='spec_refs')
-FUNCTIONS.update(dict.fromkeys(('E13','G2','G5','D13'), 'spec_history'))
-FUNCTIONS.update(dict.fromkeys(('A11','E5','E10'), 'spec_repeat'))
-FUNCTIONS.update(dict.fromkeys(('A7','C2','C7','C10','C12','I1'), 'spec_claim'))
-
 
 def finding(entries, subject, predicate, row='SPEC'):
     return dict(row=row, entries=list(entries), message="/".join(entries)+": "+predicate,
@@ -152,8 +143,6 @@ def spec_write(record, event, cfg):
     new = str(ti.get('new',ti.get('new_string','')))
     if event.get('tool_name') == 'Edit' and test and re.search('==',old) and re.search(r'(<=|>=|\bin\b)',new):
         out.append(finding(('C6',),path,'args.new matches "(<=|>=|\\bin\\b)" and args.old matches "==" and path matches TEST_PATH','SPEC.write'))
-    if re.search(r'if\s+os\.environ',text):
-        out.append(finding(('E7',),path,'args.content matches "if\\s+os\\.environ"','SPEC.write'))
     return out
 
 
@@ -189,7 +178,7 @@ CLAIM_WORDS = {'pass':('pass','passed','green','success'), 'clean':('clean',),
                'absent':('absent','missing','none'), 'done':('done','fixed','finished','complete','completed','ready'),
                'shipped':('shipped','pushed','landed','merged'), 'running':('running',),
                'count':('failed','failures','passed'), 'plan':('plan','planned'),
-               'retracted':('retracted',), 'cannot':('cannot',"can't")}
+               'retracted':('retracted',), 'helps':('helps',), 'cannot':('cannot',"can't")}
 
 
 def claims(text, record):
@@ -218,7 +207,7 @@ def claims(text, record):
             if kind=='pass' and re.search(r'\b\d+\s+passed\b',sentence):continue
             before=sentence[:match.start()].strip(' :.,');after=sentence[match.end():].strip(' :.,')
             commands=[str(args(e).get('command','')) for e in history(record) if args(e).get('command') and str(args(e)['command']) in sentence]
-            subject=(quoted[0] if quoted else paths[0].rstrip('.') if paths else commands[0] if commands else '')
+            subject=(quoted[0] if quoted else paths[0].rstrip('.') if paths else commands[0] if commands else (after or before) if kind in ('plan','retracted') else '')
             result.append(Claim(kind,subject,names,falsifier))
     return result
 
@@ -250,10 +239,6 @@ def spec_claim(record, event, cfg):
         claim=Claim(value.get('kind',''),value.get('subject',''),value.get('names',False),bool(value.get('falsifier')))
         if claim.subject and family_switch.switch_pass({'event':'Stop','claim':value},observations):
             out.append(finding(('A7','C3'),claim.subject,'claim.kind=pass and not seen(exit=0 and args.command matches $claim.subject)','R11'))
-        if claim.kind in ('clean','absent') and family_lineage.lineage_absence(record,event,observed):
-            out.append(finding(('C2','B32'),claim.subject,'claim.kind in {clean,absent} and not claim.falsifier','R05'))
-        if claim.kind=='done' and any(entry=='D1' and subject==claim.subject for entry,subject in family_other.other_claim(record,event,observed,cfg.get('dispatch',False))):
-            out.append(finding(('C7','D1'),claim.subject,'claim.kind=done and not tree.$claim.subject.exists','R11'))
         if claim.kind=='shipped' and not any(settled(e) and exit_of(e)==0 and re.search(r'git\s+push',str(args(e).get('command',''))) for e in raw):
             out.append(finding(('C10',),claim.subject,'claim.kind=shipped and not seen(args.command matches "git\\s+push" and exit=0)','R11'))
         if claim.kind=='count' and not claim.names and verifier_keys(record):
@@ -293,20 +278,19 @@ def spec_history(record, event, cfg):
     boundary=max((i for i,e in enumerate(raw) if e.get('hook_event_name')=='UserPromptSubmit'),default=-1)
     if any(c.kind=='cannot' for c in current) and not any(e.get('hook_event_name')=='PreToolUse' for e in raw[boundary+1:]):
         out.append(finding(('G5',),'cannot','claim.kind=cannot and unseen_since(event=Pre, event=User)'))
-    planned={c.subject for c in earlier if c.kind=='plan'}
-    closed={c.subject for c in earlier if c.kind in ('done','retracted')}
-    for item in sorted(planned-closed):
-        out.append(finding(('D13','F8'),item,'not seen(claim.kind in {done,retracted} and claim.subject=$item) and seen(claim.kind=plan and claim.subject=$item)'))
     return out
 
 
-def spec_refs(record,event,cfg):
-    from makoto2 import observed, family_lineage
-    if not (pre(event) or stop(event)):return []
-    return [finding(('A2','G1','H1','H4','H5'), name,
-                    'refs(output)-source.read!={} -- source: REGISTRY-v9.md:79,543,761,793,803','R08')
-            for name in family_lineage.lineage_refs(record,event,observed)]
+def findings(record, event, cfg):
+    """Native events and settled gate output supply the held-definition reading."""
+    checks = (spec_tree, spec_write, spec_claim, spec_repeat, spec_history)
+    for check in checks:
+        yield from check(record, event, cfg)
+    from makoto2.family_other import _facts
+    for facts in _facts(record):
+        for check in (spec_authorship, spec_terms, spec_launch, spec_budget):
+            yield from check(record, facts, cfg)
 
 
-def evaluate(record,event,cfg):
-    return [f for fn in dict.fromkeys(FUNCTIONS.values()) for f in globals()[fn](record,event,cfg)]
+def evaluate(record, event, cfg):
+    return list(findings(record, event, cfg))

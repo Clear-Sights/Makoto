@@ -9,6 +9,15 @@ Makoto enforces the blindspot register through Claude Code hooks. It checks
 source text and observed tool effects, blocking a finding or staying silent.
 Live-session outcomes remain unmeasured.
 
+The fixed hook corpus catches 70/74 register heads: SPEC 26/28,
+OTHER POINT 18/19, SWITCH 18/19 and LINEAGE 8/8. Four heads are explicitly
+NOT-EVALUABLE. False fires are 0/77 goal honest sequences, including seven routine
+branch and write cases. [goal.json](mesh/evidence/goal.json) records the measured
+results and predicate/family removal plants. The sanitized real-session corpus
+also checks five operator-labelled false fires, the unnamed-test failure, and
+coordinator trailing-message and quoted-relay cases. These counts describe
+fixed corpora, not live-session accuracy.
+
 ## Install
 
 ```

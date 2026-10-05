@@ -39,17 +39,11 @@ plugin/makoto2/evaluate.py	quote_seed	evaluate	Candidate support for detect,term
 plugin/makoto2/evaluate.py	quote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	write_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	read_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	denied_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	ran_after_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	_ms	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	_sleep_ms	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	budget_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	_subject_words	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	landed_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	_valid_artifact	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	landed_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	landed_pays.pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
-plugin/makoto2/evaluate.py	cost_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	count_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	repeat_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
 plugin/makoto2/evaluate.py	wrote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
@@ -114,7 +108,6 @@ tests/test_evaluate.py	test_named_status	validate	Blocking plants, silent contro
 tests/test_evaluate.py	test_artifact	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_evaluate.py	test_later_failure_invalidates_success	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_evaluate.py	test_launcher_success_is_not_job_success	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
-tests/test_evaluate.py	test_cost_accounting_boundary	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_hook.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_hook.py	Rec	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
 tests/test_hook.py	Rec.__init__	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
@@ -188,3 +181,137 @@ plugin/makoto2/lifecycle.py	fresh	fresh	Install current plugin bytes in an isola
 plugin/makoto2/lifecycle.py	audit	audit	Scan current file bytes including ignored content, exclude Git history, and reject detected credentials or unreadable content without proof receipts.
 plugin/makoto2/lifecycle.py	handoff	handoff	Carry the current bounded verdict and explicit absences without evidence reads; wake on changed input.
 plugin/makoto2/lifecycle.py	join	join	Join current passing measurements for the selected head; missing, failed, malformed or mismatched inputs keep completion open.
+plugin/makoto2/evaluate.py	_brief_fields	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	_failed_test_subjects	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	_unnamed_failures	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	dispatch_pins_owes	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	dispatch_schema_owes	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	family_findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	anchor	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	digest	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_absence	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_drift	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_edit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_pin	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_refs	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_units	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	output_text	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	readings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	references	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	unpaid	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	_claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	_facts	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_environment	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_normalization	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_plan	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_run	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_witness	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	Claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	args	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	content	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	evaluate	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	exit_of	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	finding	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	history	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	is_verifier	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	matches	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	pre	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	read_claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	settled	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_authorship	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_budget	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_history	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_launch	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_repeat	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_terms	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	stop	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	verifier_keys	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_doc	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_exit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_pass	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_run	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_self	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_supervisor	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_tree.emit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_zero	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/lineage.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	run_session	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	run_session.send	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	test_only_settled_exact_acceptance_pays	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	test_optout_has_no_dispatch_contract	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	test_read_line_has_the_register_pin	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_evaluate.py	test_counted_failure_keeps_its_subject	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_evaluate.py	test_failure_subject_fold_and_every_name	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	candidate	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_agent_history_survives_dispatch_optout	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_switch_ast_is_routed_from_native_write	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_toml_assignment_is_not_a_python_ast	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_user_anchor_is_required_for_post_user_baseline	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_workspace_supplies_named_sets_without_a_default_vocabulary	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	post	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	pre	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	rec	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_agent_boundary_and_verifier_are_separate_history_variables	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_authorship_membership_is_exact_while_messages_match	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_budget_reads_elapsed_and_preserves_equality	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_i1_tests_label_presence_not_filled_cells_and_only_agent	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_loop_else_is_the_register_exclusion	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_named_sets_are_never_guessed	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_pre_events_never_become_settled_observations	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_repeat_uses_any_prior_qualifying_exit_and_last_command_boundary	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_zip_requires_literal_true_and_dict_uses_python_equality	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_failed_verifier_pays_doc_but_not_pass_claim	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_gate_invokes_each_check_and_denies_crash	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_gate_invokes_each_check_and_denies_crash.crash	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_match_capture_and_guard_are_not_wildcard	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_run_predicate_requires_its_run_context	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_test_write_operand_exclusions	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_zero_really_probes_every_removal_and_unrelated_rows	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_zero_really_probes_every_removal_and_unrelated_rows.read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	run_payloads	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_register_population_and_third_state	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	act	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	ident	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_closing_reference_requires_read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_each_reference_requires_its_own_read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_reading_own_answer_does_not_create_a_source	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_sentence_punctuation_is_not_part_of_the_source_name	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_source_changes_at_use_and_reread	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_repeat_register.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_repeat_register.py	history	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_repeat_register.py	test_repeat_scope_is_append_or_failed_command	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	_obs	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	test_changed_result_at_same_offset_fires_again	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	test_current_settled_event_joins_the_record	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_fake	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_honest	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_routine_honest	validate	REGISTER/FAMILIES: routine honest writes and nonexistent-path regression acceptance
+tests/test_goal.py	test_nonexistent_path_is_not_unread	validate	REGISTER/FAMILIES: routine honest writes and nonexistent-path regression acceptance
+tests/test_lineage.py	test_missing_local_source_requires_verification_or_label	validate	REGISTER/FAMILIES: current-tree deletion witness distinguishes drift from unavailable source
+tests/test_real_session.py	<module>	validate	REGISTER B28: operator-labelled real succession acceptance
+tests/test_real_session.py	test_real_session	validate	REGISTER B28: operator-labelled real succession acceptance

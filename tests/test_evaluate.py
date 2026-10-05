@@ -8,6 +8,7 @@ from typing import NamedTuple, Optional
 import pytest
 
 TESTS = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(TESTS, '..', 'plugin'))
 HERE = os.path.join(TESTS, "..", "plugin", "makoto2")
 _spec = importlib.util.spec_from_file_location("evaluate", os.path.join(HERE, "evaluate.py"))
 V = importlib.util.module_from_spec(_spec)
