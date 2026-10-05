@@ -245,11 +245,13 @@ def spec_claim(record, event, cfg):
     for e in raw[boundary+1:]:
         if settled(e) and e.get('tool_name') == 'Bash':
             latest[args(e).get('command','')] = exit_of(e)
+    commands = {args(e).get('command') for e in raw if settled(e) and e.get('tool_name') == 'Bash'}
     for value in read_claims(record,event):
         kind, subject = value.get('kind'), value.get('subject','')
-        runs = [e for e in raw[max(boundary,last_edit)+1:] if settled(e)
-                and e.get('tool_name') == 'Bash' and args(e).get('command') == subject]
-        if kind == 'pass' and subject and (not runs or exit_of(runs[-1]) != 0):
+        runs = [e for e in raw[last_edit+1:] if settled(e)
+                and e.get('tool_name') == 'Bash'
+                and (subject not in commands or args(e).get('command') == subject)]
+        if kind == 'pass' and (not runs or exit_of(runs[-1]) != 0):
             out.append(finding(('A7','C3'),subject,'latest settled run after the last edit is not successful','R11'))
         if kind == 'shipped' and not shipping_observed(record):
             out.append(finding(('C10',),subject,'no successful shipping observation','R11'))

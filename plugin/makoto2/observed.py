@@ -118,12 +118,38 @@ def _nested_command(effective):
 def _segments(command: str):
     """((argv, following_operator), ...) for the literal statements of `command`; a heredoc body
     fed to a non-shell program is data and is skipped; () when it does not tokenize."""
+    lines, pending = [], []
+    for line in (command or "").splitlines(keepends=True):
+        if pending:
+            delimiter, tabs = pending[0]
+            if (line.lstrip("\t") if tabs else line).rstrip("\r\n") == delimiter:
+                pending.pop(0)
+                lines.append(line)
+            continue
+        lines.append(line)
+        try:
+            lexer = shlex.shlex(line, posix=True, punctuation_chars="|;&<>")
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError:
+            continue
+        # Shell-fed heredocs contain commands; the existing splitter reads those.
+        argv = _effective_argv(tokens)
+        if argv and _basename(argv[0]) in _NESTED_SHELL_PROGRAMS:
+            continue
+        for i, token in enumerate(tokens[:-1]):
+            if token == "<<":
+                word = tokens[i + 1]
+                pending.append((word[1:] if word.startswith("-") else word,
+                                word.startswith("-")))
+    command = "".join(lines)
     try:
-        lexer = shlex.shlex(command or "", posix=True, punctuation_chars="|;&<>\n")
+        lexer = shlex.shlex(command, posix=True, punctuation_chars="|;&<>\n")
         lexer.whitespace_split = True
         lexer.commenters = ""
         lexer.whitespace = " \t\r"
-        tokens = list(lexer)
+        tokens = [part for token in lexer for part in
+                  (re.split(r"(\n)", token) if re.fullmatch(r"[|;&<>\n]+", token) else [token]) if part]
     except (TypeError, ValueError):
         return ()
     segments, current = [], []

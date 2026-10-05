@@ -389,7 +389,7 @@ def absence_pays(args, cfg, o):
     return lambda thing: thing.rsplit("/", 1)[-1] in scope
 
 
-_NUM_RX = re.compile(r"(?<![\w.$,:])(\$?\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,2}:\d{2}(?:Z)?|\$?\d+(?:\.\d+)?%?)(?![\w,:]|\.\d)")
+_NUM_RX = re.compile(r"(?<![\w.$,:])(\$?\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,2}:\d{2}(?::\d{2})?(?:Z)?|\$?\d+(?:\.\d+)?%?)(?![\w,:]|\.\d)")
 
 
 def number_owes(args, cfg, record, event):
@@ -407,7 +407,9 @@ def number_owes(args, cfg, record, event):
 
 
 def number_pays(args, cfg, o):
-    return lambda n: n in {m.group(1) for m in _NUM_RX.finditer(o.output)}
+    tokens = {m.group(1) for m in _NUM_RX.finditer(o.output)}
+    tokens.update(t[:5] for t in tuple(tokens) if re.fullmatch(r"\d{2}:\d{2}:\d{2}(?:Z)?", t))
+    return lambda n: n in tokens
 
 
 def _words_text(path: str) -> str:

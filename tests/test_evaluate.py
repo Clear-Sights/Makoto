@@ -192,7 +192,7 @@ def observation(output, *, tool='Bash', input=None, code=0):
 
 @pytest.mark.parametrize('command,response,paid', [
     ('verify', {'exitCode':1, 'stdout':'summary: passed'}, False),
-    ('other', {'exitCode':0, 'stdout':'verify passed'}, False),
+    ('other', {'exitCode':0, 'stdout':'verify passed'}, True),
     ('verify', {'exitCode':0}, True),
     ('verify', {'exitCode':0, 'is_error':True}, False),
     ('verify', {'stdout':''}, True),

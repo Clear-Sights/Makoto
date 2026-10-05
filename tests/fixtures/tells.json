@@ -506,10 +506,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "pwd"
+              "command": "pytest tests/test_api.py"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -531,10 +531,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "pwd"
+              "command": "pytest tests/test_api.py"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -573,10 +573,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "ls src"
+              "command": "python -m unittest checks.test_io"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -598,10 +598,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "ls src"
+              "command": "python -m unittest checks.test_io"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -640,10 +640,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "git status --short"
+              "command": "./scripts/verify --target schema"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -665,10 +665,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "git status --short"
+              "command": "./scripts/verify --target schema"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -10818,10 +10818,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "pwd"
+              "command": "pytest tests/test_api.py"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -10843,10 +10843,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "pwd"
+              "command": "pytest tests/test_api.py"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -10885,10 +10885,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "ls src"
+              "command": "python -m unittest checks.test_io"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -10910,10 +10910,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "ls src"
+              "command": "python -m unittest checks.test_io"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -10952,10 +10952,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "git status --short"
+              "command": "./scripts/verify --target schema"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
@@ -10977,10 +10977,10 @@
             "hook_event_name": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {
-              "command": "git status --short"
+              "command": "./scripts/verify --target schema"
             },
             "tool_response": {
-              "exitCode": 0,
+              "exitCode": 1,
               "stdout": ""
             }
           },
