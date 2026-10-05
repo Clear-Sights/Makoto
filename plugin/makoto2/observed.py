@@ -531,8 +531,13 @@ def record(events: Iterable[dict], event: Optional[dict] = None) -> Record:
     """events = decoded hook payloads, oldest first; settled ones become Obs, with seq = the
     event's position in `events` (so `before` can be the act's own position in the same list).
     Stop and UserPromptSubmit events are not Obs; they mark turns (Record.turn_start) and a
-    prompt's text joins Record.user_texts, as do user-authored entries of a fetched thread."""
-    events = tuple(copy.deepcopy(tuple(events or ())))
+    prompt's text joins Record.user_texts, as do user-authored entries of a fetched thread.
+    An optional current event follows the history only when settled; pending calls and current
+    turn boundaries cannot become witnesses or erase the turn being evaluated."""
+    events = list(events or ())
+    if isinstance(event, dict) and event.get("hook_event_name") in _SETTLED:
+        events.append(event)
+    events = tuple(copy.deepcopy(tuple(events)))
     obs, seen, users, boundary = [], set(), [], None
     readers = {}
     for i, ev in enumerate(events or ()):
@@ -548,7 +553,8 @@ def record(events: Iterable[dict], event: Optional[dict] = None) -> Record:
         obs.append(o)
         readers[i] = MappingProxyType({"cwd": str(ev.get("cwd") or ""),
                                       "source_reads": tuple(ev.get("source_reads") or ())})
-        seen |= o.objects
+        if _executed(o):
+            seen |= o.objects
         fetched = o.tool.endswith(_FETCH_TOOL_SUFFIXES) and _executed(o)
         users.extend(_user_entries(ev.get("tool_response")) if fetched else ())
     rec = Record(obs)
