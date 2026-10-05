@@ -52,11 +52,22 @@ def sigma_append(path, row):                     # Sigma: append-only write
 def o_once(finding, record, keys):               # O: at most once per (row, object, object state)
     if finding is None:
         return None, None
-    objs = sorted(finding.get("objects") or [])
-    state = [(o.seq, o.tool) for o in record.obs if set(objs) & (set(o.objects) | set(o.written) | set(o.created))]
+    objs = sorted(set(finding.get("objects") or []))
+    wanted = set(objs)
+    # Sequence positions are history offsets, not object state. Keep the
+    # settled evidence itself so changed results at the same offset can fire.
+    state = [
+        [o.tool, getattr(o, "input", {}), getattr(o, "output", ""),
+         getattr(o, "exit", None), getattr(o, "failed", False),
+         sorted(wanted & set(o.objects)), sorted(wanted & set(o.written)),
+         sorted(wanted & set(o.created)), getattr(o, "send", ""),
+         getattr(o, "search", None)]
+        for o in record.obs
+        if wanted & (set(o.objects) | set(o.written) | set(o.created))
+    ]
     if "predicate" in finding:
         state = getattr(record, "events", state)
-    key = hashlib.sha256(json.dumps([finding["row"], objs, state]).encode()).hexdigest()
+    key = hashlib.sha256(json.dumps([finding["row"], objs, state], sort_keys=True, default=str).encode()).hexdigest()
     return (None, None) if key in keys else (finding, key)
 
 def d_out(event, finding):                       # D_out: finding? -> hook JSON (two outputs only)
@@ -103,7 +114,9 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
                                   if e.get("hook_event_name") == "PreToolUse"
                                   and e.get("tool_name") in ("Agent", "Task")]
     config["settings"] = {"makoto": {"dispatch": config["dispatch"]}}
-    finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
+    finding, key = None, None
+    if ev.get("hook_event_name") in ("PreToolUse", "Stop", "SubagentStop"):   # only these can decide
+        finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
     if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
         sigma_append(path, {"event": ev})
     if key:
