@@ -115,6 +115,26 @@ def _nested_command(effective):
     return effective[pos + 1] if pos + 1 < len(effective) else None
 
 
+def _shell_path_escapes(command: str) -> str:
+    """Protect Windows separators from shlex, leaving POSIX escapes intact.
+
+    Single quotes already preserve backslashes. Only drive paths or tokens with
+    a backslash between path components need the Windows interpretation.
+    Escaped whitespace, quotes, dollars and shell operators remain shell escapes.
+    """
+    def protect(match):
+        token = match.group(0)
+        if token.startswith("'"):
+            return token
+        if not (re.search(r'[A-Za-z]:[\\/]', token)
+                or re.search(r'[\w.]\\[\w.]', token)):
+            return token
+        return re.sub(r'\\(?=[\w.\\/~-])', lambda _: '\\\\', token)
+
+    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|(?:\\.|[^\s'\"|;&<>])+",
+                  protect, command)
+
+
 @functools.lru_cache(maxsize=4096)
 def _segments(command: str):
     """((argv, following_operator), ...) for the literal statements of `command`; a heredoc body
@@ -129,7 +149,7 @@ def _segments(command: str):
             continue
         lines.append(line)
         try:
-            lexer = shlex.shlex(line, posix=True, punctuation_chars="|;&<>")
+            lexer = shlex.shlex(_shell_path_escapes(line), posix=True, punctuation_chars="|;&<>")
             lexer.whitespace_split = True
             tokens = list(lexer)
         except ValueError:
@@ -145,7 +165,7 @@ def _segments(command: str):
                                 word.startswith("-")))
     command = "".join(lines)
     try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars="|;&<>\n")
+        lexer = shlex.shlex(_shell_path_escapes(command), posix=True, punctuation_chars="|;&<>\n")
         lexer.whitespace_split = True
         lexer.commenters = ""
         lexer.whitespace = " \t\r"

@@ -13,7 +13,7 @@ CWD = "/repo"
 
 
 def test_slash_words_need_path_evidence(tmp_path):
-    from observed import _text_objects
+    from observed import _norm, _text_objects
 
     prose = 'add/subtract and/or read/write'
     assert not _text_objects(prose, str(tmp_path))
@@ -21,7 +21,7 @@ def test_slash_words_need_path_evidence(tmp_path):
     (tmp_path / 'add').mkdir()
     path = tmp_path / 'add' / 'subtract'
     path.write_text('source')
-    assert _text_objects(prose, str(tmp_path)) == {str(path)}
+    assert _text_objects(prose, str(tmp_path)) == {_norm(str(path), str(tmp_path))}
     path.unlink()
     assert not _text_objects(prose, str(tmp_path))
     for spelling in ('add/subtract.txt', './add/subtract', '../add/subtract',

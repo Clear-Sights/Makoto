@@ -86,7 +86,7 @@ def test_preserving_whole_write_must_keep_unrelated_lines(tmp_path):
     user = dict(hook_event_name='UserPromptSubmit', prompt='Change timeout; preserve the rest.')
     record = observed.record([user, read(source, old)])
     report = write(tmp_path, 'settings.txt', 'timeout: 4\n')
-    assert family_other.other_write(record, report, observed) == [('D11', str(source))]
+    assert family_other.other_write(record, report, observed) == [('D11', observed._norm(str(source), str(tmp_path)))]
     report['tool_input']['content'] = old.replace('3', '4')
     assert not family_other.other_write(record, report, observed)
     record = observed.record([dict(user, prompt='Replace this file with only the timeout.'), read(source, old)])

@@ -69,3 +69,67 @@ def test_posix_case_urls_and_counts_remain_distinct():
     assert reader._norm('Source.py', '/Repo') == '/Repo/Source.py'
     assert reader._norm('https://Example.com/Source.py', r'C:\Repo') == 'https://Example.com/Source.py'
     assert reader._norm('8/8', r'C:\Repo') == '8/8'
+
+
+class WindowsPath:
+    """Real temporary bytes with a Windows spelling, regardless of test host."""
+    def __init__(self, local, spelling=r'C:\Users\RunnerAdmin\Temp\Case'):
+        self.local, self.spelling = local, spelling
+
+    def __str__(self):
+        return self.spelling
+
+    def __truediv__(self, name):
+        return WindowsPath(self.local / name, self.spelling + '\\' + name)
+
+    def mkdir(self):
+        self.local.mkdir()
+
+    def write_text(self, text):
+        return self.local.write_text(text)
+
+    def unlink(self):
+        self.local.unlink()
+
+
+@pytest.fixture
+def windows_tmp(tmp_path, monkeypatch):
+    root = WindowsPath(tmp_path)
+    original_open, original_exists = builtins.open, reader.os.path.exists
+    prefix = reader._norm(str(root), '') + '/'
+
+    def local(path):
+        spelling = str(path)
+        return tmp_path / spelling[len(prefix):] if spelling.startswith(prefix) else path
+
+    monkeypatch.setattr(reader.os.path, 'exists', lambda path: original_exists(local(path)))
+    monkeypatch.setattr(builtins, 'open', lambda path, *a, **kw: original_open(local(path), *a, **kw))
+    return root
+
+
+def test_windows_slash_words_need_path_evidence(windows_tmp):
+    from test_observed import test_slash_words_need_path_evidence
+    test_slash_words_need_path_evidence(windows_tmp)
+
+
+def test_windows_preserving_whole_write_must_keep_unrelated_lines(windows_tmp):
+    from test_restored_fixes import test_preserving_whole_write_must_keep_unrelated_lines
+    test_preserving_whole_write_must_keep_unrelated_lines(windows_tmp)
+
+
+def test_windows_asserted_sources_require_direct_reading(windows_tmp):
+    from test_restored_fixes import test_asserted_sources_require_direct_reading
+    test_asserted_sources_require_direct_reading(windows_tmp)
+
+
+@pytest.mark.parametrize('path', [r'C:\Users\RunnerAdmin\policy.txt',
+                                  r'notes\policy.txt', r'.\notes\policy.txt',
+                                  r'\\server\share\policy.txt'])
+@pytest.mark.parametrize('quote', ['', '"', "'"])
+def test_windows_shell_path_arguments(path, quote):
+    assert reader._segments('cat ' + quote + path + quote) == ((('cat', path), ''),)
+
+
+def test_posix_shell_escapes():
+    assert reader._segments(r'cat some\ file.txt; echo \$HOME \"') == (
+        (('cat', 'some file.txt'), ';'), (('echo', '$HOME', '"'), ''))

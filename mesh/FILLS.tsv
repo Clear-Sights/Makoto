@@ -350,3 +350,19 @@ tests/test_restored_fixes.py	test_absence_requires_independent_probe_when_observ
 plugin/makoto2/family_lineage.py	observed_reference	evaluate	Settled inputs and outputs pay source identities, names and hash prefixes across tools.
 plugin/makoto2/family_lineage.py	observed_reference.input_text	evaluate	Flatten nested tool input values for observed reference evidence.
 plugin/makoto2/family_lineage.py	content_references	evaluate	Explicit source content claims require observations of that source content; identities accept any settled observation.
+plugin/makoto2/observed.py	_shell_path_escapes	observe	Preserve Windows shell path separators while retaining POSIX escapes
+plugin/makoto2/observed.py	_shell_path_escapes.protect	observe	Preserve Windows shell path separators while retaining POSIX escapes
+tests/test_windows_paths.py	WindowsPath	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.__init__	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.__str__	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.__truediv__	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.mkdir	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.write_text	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.unlink	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	windows_tmp	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	windows_tmp.local	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_slash_words_need_path_evidence	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_preserving_whole_write_must_keep_unrelated_lines	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_asserted_sources_require_direct_reading	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_shell_path_arguments	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_posix_shell_escapes	validate	Windows path regressions reproduce native spelling and direct reading on Linux
