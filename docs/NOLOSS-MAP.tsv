@@ -565,3 +565,29 @@ tests/test_surface.py:test_only_writer_replacement_values_are_bound_to_target	re
 tests/test_surface.py:test_registered_subject_without_receipt_is_still_named	replaced_by	Step 3 self-authored form/record plants, transcript and freshness plants; former surface/four-family behavior intentionally superseded.
 tests/test_surface.py:test_exact_host_alias_name_uses_canonical_freshness	replaced_by	Step 3 self-authored form/record plants, transcript and freshness plants; former surface/four-family behavior intentionally superseded.
 tests/test_surface.py:test_native_shebang_does_not_classify_unrelated_host_effect	replaced_by	Step 3 self-authored form/record plants, transcript and freshness plants; former surface/four-family behavior intentionally superseded.
+step4:rule_b_precision_values	subtracted	Rule b no longer treats numbers/units/plain or hyphenated words/prose/log lines as unread subjects; precision.extract still preserves them for DetIO.
+plugin/makoto2/precision.py:extract	kept	General precision owner retained; only URL curly-delimiter boundary corrected after a false c hold plant.
+plugin/makoto2/precision.py:name_kind	added	Closed NAME-form classifier independent of the common-English allowlist; documented decimal/hash ambiguities.
+plugin/makoto2/precision.py:names	added	NAME view retains exact offsets; quoted complete names, wrappers and unit exclusions have held/clear plants.
+plugin/makoto2/evaluate.py:output_name	added	Current native writer target and session-written canonical file identities exempt b; space-path slices require a complete boundary-matched output name.
+step4:rule_a_output_reference	replaced_by	False a holds reproduced against b5c1616 for out.txt/backticks; output-name references exempt literal-copy checks, never absence of original reading or unsupported own contents.
+step4:rule_a_quoted_source_reference	replaced_by	Quoted-name retry false hold reproduced; exact original name bytes pay formatting-only single-name references; own quoted prose still held.
+step4:rule_c_quoted_url	replaced_by	Curly quote was wrongly captured as URL bytes; strip delimiter and check NAME URL/package spans; current-turn successful-fetch contract retained.
+tests/test_shapes.py:test_b_absent_and_present_exact_form	replaced_by	Retained NAME plants; value/prose precision plants move to test_names exclusions and existing extractor plants.
+tests/test_shapes.py:test_b_near_miss_spelling_is_not_regenerated	replaced_by	Retained path/case/name near misses; numeric near miss becomes id731/id73, prose spacing no longer triggers b.
+tests/test_shapes.py:test_b_only_assistant_text_never_pays	kept	Assistant-only name id_731 stays unpaid; values retain rule a instead of b.
+tests/test_shapes.py:test_raw_tool_output_lines_are_exact	replaced_by	test_raw_tool_output_checks_names_only: whole lines remain precision, b holds only their embedded names.
+step4:borrowed_pins	kept	No new borrowed code; all three source commits retained and descriptions updated for NAME-only rule b.
+tests/test_names.py:test_each_name_form_unread_and_read	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_precision_values_and_words_do_not_trigger_b	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_excluded_names_remain_general_precision	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_current_writer_target_is_output_without_prompt_or_read	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_written_or_edited_file_in_final_is_output	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_output_reference_still_needs_original_artifact	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_output_exemption_cannot_hide_unread_name_in_content	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_own_file_contents_still_hold_a_and_b	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_rejected_or_no_effect_write_does_not_exempt_final_path	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_name_variants_still_hold	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_own_quoted_prose_still_needs_exact_artifact_bytes	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_quoted_path_with_spaces_is_one_exact_name	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_output_paths_with_spaces_clear_b_and_a	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.

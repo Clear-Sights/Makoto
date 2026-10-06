@@ -1,18 +1,18 @@
-Makoto step 3 now holds dependent steps on three literal session-record checks.
-Rule a holds without an original artifact reading or on unsupported own-answer copying.
-Rule b holds on an exact form span absent from prior tool input/response or user-given text.
-Rule c holds on an external subject lacking a current-turn online fetch/search.
-Write/Edit/MultiEdit/NotebookEdit, Bash git commit/push, and Stop are checked before admission.
-Every unpaid attempt stays held, including repeated stop_hook_active finals.
-Earlier-turn readings count until a recorded write makes their subject stale.
-Session-written file readbacks and earlier assistant/worker text remain own output.
-plugin/makoto2/precision.py is the single reusable exact-span extractor.
-Its documented offline catch-all uses the bundled sorted common-English allowlist.
-The lineage surface and four-family obligation layer were subtracted.
-DetIO string walking/store verification and Causality traced receipts were reused.
-BORROWED.tsv pins each source path and commit; the requested workspace copy also exists.
-170 self-authored and retained whole-suite tests passed in 10.01 seconds (under 15 s).
-Universal 100% and zero false positives is not established; the exact limits follow.
+Makoto step 4 narrows rule b to project/subject NAME forms.
+Rule b checks paths, URLs, emails and identifiers, including hashes/UUIDs/versions.
+Plain or hyphenated words, numbers and unit values do not trigger rule b.
+Quoted/backticked content is a name only when its payload has a NAME form.
+precision.extract remains general; precision.names supplies the NAME-only view.
+The name view does not depend on the bundled common-English word list.
+A step's own output target and session-written/edited files are exempt from b.
+Output exemptions identify paths; they never create an artifact reading.
+Rule a still holds without an independent reading or on unsupported own content.
+Earlier session readings count until a recorded write makes their subject stale.
+Current-turn successful online fetch/search remains required by rule c.
+Tests justified narrow a fixes for output references and independently read quoted names.
+Tests justified a c fix for quoted URLs; curly quotes no longer enter URL bytes.
+284 whole-suite tests passed in 10.39 seconds (under 15 s); ten NAME forms planted.
+Universal 100% and zero false positives remains unestablished; exact limits follow.
 
 Record contract
 
@@ -20,7 +20,7 @@ The sweep is independent of the subject and operates on ordered native tool call
 No checker invokes a model, executes recorded shell commands, or uses the network.
 Literal response field names, string leaves and numeric values are retained. Tool
 input may provide an exact name before its result, as required by rule b, but it
-cannot create an artifact reading for rule a. The candidate never pays itself.
+cannot create an artifact reading for rule a. The candidate never supplies reading evidence; its writer target is an output exemption.
 User prompts are given even when an earlier unpaid assistant repeats their text.
 
 Source evidence includes arbitrary native artifact-tool responses, Read/Grep/Glob,
@@ -63,7 +63,7 @@ The extractor preserves exact source slices for quoted/backtick/fenced payloads,
 paths, URLs, emails, digit/symbol tokens, snake_case/camelCase, versions, hashes,
 UUIDs, timestamps and numbers with units. Output mode preserves each complete
 nonempty tool line. Visible error/stack/log forms become whole exact line spans
-in proposed text. Nested lexical spans also remain checked. Token spelling and
+in proposed text. Nested lexical spans remain precision data; b checks only the names() view. Token spelling and
 internal whitespace are never regenerated or normalized. Sentence punctuation is
 separated lexically; URL wrappers are separated from Markdown links.
 
@@ -125,7 +125,76 @@ mutation records. These are remaining requirements for a universal guarantee,
 not silent claims of coverage. Native host enforcement before final delivery is
 assumed; the executable delivery wrapper validates the boundary it owns.
 
-No forbidden path or external pair corpus was read. No external network was
-accessed and no push was made. Git's configured signing helper attempted a local
+Step 3 recorded no forbidden path or external pair corpus reads. No external
+network was accessed and no push was made. Git's configured signing helper attempted a local
 service request that the sandbox blocked; signing was disabled for the offline
 commit. Commits use Clear-Sights on shapes with no attribution trailer.
+Step 4 changes and regression evidence
+
+Rule b calls precision.names(text), a view over the general extractor. Its closed
+lexical forms cover paths (including filenames, dotfiles and quoted space paths),
+URLs, emails, snake_case, camelCase, dotted module names, mixed letter/digit IDs,
+hex hashes, UUIDs, versions and versioned package names. Brackets and Markdown
+link wrappers do not hide names. Delimited complete names suppress partial names
+inside them; quoted prose and numbers are not promoted merely by quotation.
+Original text slices and offsets are preserved. The precision extractor still
+retains values, units, hyphenated number words, non-dictionary tokens and logs for
+DetIO's literal ledger. No DetIO source or store was changed.
+
+Decimals with two numeric components and bare integers remain values. Versions
+have three numeric components or an explicit v prefix, with optional prerelease
+and build suffixes. Short hashes require both hex letters and digits; all-letter
+hex hashes use fixed 32/40/64 widths so ordinary words such as defaced/acceded do
+not become names. All-digit strings remain numbers. These are deterministic form
+boundaries, not a semantic guarantee for ambiguous short hashes/decimal versions.
+Unit spans suppress their component tokens (including ms/kg); an explicit hash,
+UUID or version form takes precedence. Plain and hyphenated alphabetic words do
+not trigger b, regardless of common-word-list membership.
+
+Native writer effects identify the candidate's output target. Ledger.written
+identifies earlier session writes/edits, including imported native records and
+observed shell mutations. Canonical identity is used only for output/staleness
+tracking; unread names still require exact recorded spelling. Space paths exempt
+only token slices contained in a complete known output path with boundaries.
+Rejected or host-attested no-effect writes do not add a session-written subject.
+Output exemptions are recorded in the snapshot and never pay rule a or rule c.
+Other names inside the same write/final remain checked.
+
+Rules a/c changes are limited to false holds demonstrated by the plants. Against
+b5c1616, a final out.txt and its backticked form produced both a and b even with a
+fresh independent reading, because the writer input itself was own text. Rule a
+now exempts output-name references from its literal-copy checks while retaining
+its no-original-reading hold and all checks on the contents of own outputs.
+The own-file-content plant still holds a/b for an unsupported unread_subject.
+A path-only final after its last source reading goes stale still holds a alone.
+
+The quoted-name retry plants also exposed rule a holding `unread_subject` after
+an original artifact supplied unread_subject, solely because the earlier denied
+attempt had included backticks. A single quoted/backticked name with exact source
+bytes now clears that whole-answer-copy check. The general precision-copy check
+remains; a repeated own quoted prose phrase still needs independent exact bytes.
+
+The original URL regex captured the closing curly quote in
+‘https://example.test/a’, producing an unpayable c subject after fetching the real
+URL. Curly delimiters are now excluded from URL spans. Rule c uses lexical NAME
+URL/package spans as well as general spans, so quoted URLs consistently require
+and clear on the same current-turn fetch. Network success, turn, freshness and
+host-classified public-project rules are unchanged. No other a/c semantics changed.
+
+The 121 new plants exercise ten name forms in bare/backtick/straight/curly-quote
+spellings, each unread/read; all required exclusion categories; current targets
+for all four native writers; session Write/Edit/MultiEdit/NotebookEdit/Bash outputs
+in relative/absolute/quoted/prose finals; filenames with spaces; rejected/no-effect
+writes; own-file content, stale sources and retries; Markdown paths; hash/version
+variants; and the retained own-prose hold. Existing b plants now name subjects
+instead of demanding readings for values/prose. Raw log plants check only embedded
+names under b while extractor tests retain every complete output line.
+The full offline command was python3 -m pytest -q --tb=short: 284 passed in 10.39s.
+The live boundary/delivery/pair-driver and lifecycle/mesh tests all remain included.
+
+BORROWED.tsv retains the three exact source pins and records their unchanged roles
+in this narrower evaluator; no new borrowed code was introduced. All changes are
+inside /home/user/build/makoto on shapes, committed as Clear-Sights, without push
+or network. A preliminary filename discovery before reading BRIEF-3 returned
+brief path names beneath excluded trees; no case contents from those paths were
+opened. All subsequent inspection stayed within the authorized brief/repository.

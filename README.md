@@ -8,8 +8,11 @@ network is used by the checker.
 Rule a requires an original artifact reading. Assistant text, worker answers,
 writer acknowledgments, and readings of files this session wrote cannot supply
 one. Literal copying of an earlier answer also needs independent source bytes.
-Rule b requires each precision span's exact characters in prior tool input or
-original response bytes. A span copied from a user prompt is given. Paths are
+Rule b requires each NAME span's exact characters in prior tool input or
+original response bytes. Names are paths, URLs, emails and identifiers, including
+hashes, UUIDs and versions. Plain/hyphenated words, numbers, units and quoted prose
+do not trigger b. Current writer targets and session-written/edited file names
+are outputs and exempt from b; they never supply an original reading for a. A span copied from a user prompt is given. Paths are
 matched in their recorded spelling; normalized paths are used only to track
 writes and stale readings. Rule c requires an online fetch/search of a named URL,
 versioned package, or host-classified public project in the current turn.
@@ -29,6 +32,11 @@ are exact spans. This is an explicit offline allowlist, not an exhaustive Englis
 dictionary. The extractor returns original string offsets and never rewrites
 characters. `extract(text, tool_output=True)` preserves every output line;
 visible log/stack syntax is also recognized in proposed text.
+`makoto2.precision.names(text)` supplies the narrower NAME view, preserving exact
+source slices. Quoted/backticked names keep their payload bytes; quotation alone
+does not make a value or phrase a name. Output-path and independently read single
+quoted-name references clear literal-copy checks; own file contents still need
+independent evidence. Quoted URLs use the same current-turn online check.
 
 The locked, hash-linked session journal retains prior turns. An optional native
 `transcript_path` adds earlier tool-use/result and user-prompt records. Assistant

@@ -21,7 +21,7 @@ class Span:
 # Each delimited payload is one exact span, including its whitespace.
 DELIMITED = re.compile(r'```[^\n]*\n(?P<fence>[\s\S]*?)```|~~~[^\n]*\n(?P<tilde>[\s\S]*?)~~~|`(?P<tick>[^`\n]+)`|"(?P<double>(?:\\.|[^"\\])*)"|(?<!\w)\x27(?P<single>(?:\\.|[^\x27\\])*)\x27(?!\w)|“(?P<curly>[^”]*)”|‘(?P<quote>[^’]*)’')
 TOKEN = re.compile(r'[^\s<>"\x27`“”‘’]+(?:[\x27’][^\s<>"\x27`“”‘’]+)*', re.UNICODE)
-URL = re.compile(r'https?://[^\s<>"\x27`]+')
+URL = re.compile(r'https?://[^\s<>"\x27`“”‘’]+')
 VERSIONED = re.compile(r'(?<![\w/])(?:@?[A-Za-z][\w.-]*(?:/[\w.-]+)?)\s*(?:@|==|>=|<=|~=|\bv(?:ersion)?\s*|\s+(?=\d+\.\d))\s*\d[\w.+-]*')
 UNIT = re.compile(r'(?<!\w)[+-]?\d+(?:\.\d+)?\s*(?:[A-Za-zµμ°%]+(?:/[A-Za-z]+)?)(?!\w)')
 
@@ -81,6 +81,82 @@ def extract(text, *, tool_output=False):
         for line in text.splitlines(keepends=True):
             add(offset, offset + len(line.rstrip('\r\n')), 'output-line')
             offset += len(line)
+    return sorted(found.values(), key=lambda s: (s.start, -s.end, s.kind))
+
+
+UUID = re.compile(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}')
+HASH = re.compile(r'(?=[0-9a-fA-F]*[a-fA-F])(?=[0-9a-fA-F]*\d)[0-9a-fA-F]{7,64}|[a-fA-F]{32}|[a-fA-F]{40}|[a-fA-F]{64}')
+VERSION = re.compile(r'(?:v\d+(?:\.\d+)+|\d+(?:\.\d+){2,})(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?')
+EMAIL = re.compile(r'[A-Za-z0-9.!#$%&*+/=?^_{}|~+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+')
+MODULE = re.compile(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+')
+FILENAME = re.compile(r'(?:\.[A-Za-z_][\w.-]*|[\w-]+(?:\.[\w-]+)*\.[A-Za-z_][\w-]*)(?::\d+(?::\d+)?)?')
+IDENTIFIER = re.compile(r'[A-Za-z_]\w*')
+ALPHANUMERIC_ID = re.compile(r'(?=[A-Za-z0-9_-]*\d)[A-Za-z][A-Za-z0-9_-]*')
+PATH = re.compile(r'(?:[A-Za-z]:[\\/]|[.~]?[\\/]|\.\.[\\/])?[^\s<>"\x27`|?*()\[\]{}]+(?:[\\/][^\s<>"\x27`|?*()\[\]{}]+)*[\\/]?')
+
+
+def name_kind(value, *, quoted=False):
+    """Closed lexical NAME forms, independent of the common-word allowlist.
+
+    A dotted numeric pair is a decimal; versions have three numeric components
+    or an explicit v prefix. Short hex hashes require letters and digits; long
+    all-letter hashes use fixed 32/40/64 widths. All digits remain numbers.
+    Hyphenated alphabetic words and digit-leading unit values are not identifiers.
+    """
+    if re.fullmatch(r'https?://[^\s<>"\x27`“”‘’]+', value):
+        return 'url'
+    if EMAIL.fullmatch(value):
+        return 'email'
+    if UUID.fullmatch(value) or HASH.fullmatch(value) or VERSION.fullmatch(value):
+        return 'identifier'
+    if VERSIONED.fullmatch(value):
+        return 'external-package'
+    if MODULE.fullmatch(value) or FILENAME.fullmatch(value):
+        return 'path'  # Files and dotted modules share exact boundary matching.
+    if PATH.fullmatch(value) and ('/' in value or '\\' in value):
+        # A ratio of plain numbers is a value, not a file name.
+        if not re.fullmatch(r'[+-]?\d+(?:\.\d+)?/\d+(?:\.\d+)?', value):
+            return 'path'
+    if quoted and ' ' in value and '\n' not in value and '\r' not in value:
+        lexical = value.replace(' ', '_')
+        if FILENAME.fullmatch(lexical) or PATH.fullmatch(lexical) and ('/' in lexical or '\\' in lexical):
+            return 'path'
+    if IDENTIFIER.fullmatch(value) and ('_' in value or re.search(r'[a-z][A-Z]', value)):
+        return 'identifier'
+    if ALPHANUMERIC_ID.fullmatch(value):
+        return 'identifier'
+    return None
+
+
+def names(text):
+    """NAME-only view of extract(), retaining original bytes and offsets.
+
+    Quoting never promotes prose or values to names. Whole output lines and
+    unit spans stay in the general extractor, while names inside them still count.
+    Surrounding token brackets are punctuation, not part of a name.
+    """
+    found = {}
+    spans = extract(text)
+    units = [s for s in spans if s.kind == 'unit']
+    delimited_names = [s for s in spans if s.kind == 'delimited' and name_kind(s.text, quoted=True)]
+    for span in spans:
+        if any(s.start <= span.start and span.end <= s.end and (span.start, span.end) != (s.start, s.end) for s in delimited_names):
+            continue
+        if span.kind == 'output-line' or span.kind == 'unit' and not HASH.fullmatch(span.text):
+            continue
+        # Split token wrappers too: Markdown [label](path) and call(id_name)
+        # still name the enclosed path/identifier. A complete URL wins first.
+        candidates = [(span.start, span.end)]
+        if not name_kind(span.text, quoted=span.kind == 'delimited'):
+            candidates += [(span.start + m.start(), span.start + m.end())
+                           for m in re.finditer(r'[^\s()\[\]{}]+', span.text)]
+        for start, end in candidates:
+            value = text[start:end]
+            if any(u.start <= start and end <= u.end for u in units) and not (HASH.fullmatch(value) or UUID.fullmatch(value) or VERSION.fullmatch(value)):
+                continue
+            kind = name_kind(value, quoted=span.kind == 'delimited' and (start, end) == (span.start, span.end))
+            if kind:
+                found.setdefault((start, end), Span(value, start, end, kind))
     return sorted(found.values(), key=lambda s: (s.start, -s.end, s.kind))
 
 

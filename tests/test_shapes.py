@@ -108,7 +108,7 @@ def test_a_original_reading_required(tmp_path, origin):
     assert not held(s.send(output('731')))
 
 
-@pytest.mark.parametrize('value', ['731', 'id_abc', 'camelCase', '1.2.3', 'x@y.test', 'ab-91', '日本語', 'nondictionaryword', '2 ms', '"exact phrase"', '`print(value)`', '```py\nx = 19\n```'])
+@pytest.mark.parametrize('value', ['dir/file.txt', 'id_abc', 'camelCase', '1.2.3', 'x@y.test', 'ab-91'])
 def test_b_absent_and_present_exact_form(tmp_path, value):
     s = Session(tmp_path)
     s.feed(pair())
@@ -118,7 +118,7 @@ def test_b_absent_and_present_exact_form(tmp_path, value):
     assert not held(s.send(output(value)))
 
 
-@pytest.mark.parametrize('observed,proposed', [('dir/file.txt', './dir/file.txt'), ('./dir/file.txt', 'dir/file.txt'), ('/w/source.txt', 'source.txt'), ('source.txt', '/w/source.txt'), ('731', '73'), ('CamelCase', 'camelCase'), ('value_1', 'value_2'), ('"a  b"', '"a b"')])
+@pytest.mark.parametrize('observed,proposed', [('dir/file.txt', './dir/file.txt'), ('./dir/file.txt', 'dir/file.txt'), ('/w/source.txt', 'source.txt'), ('source.txt', '/w/source.txt'), ('id731', 'id73'), ('CamelCase', 'camelCase'), ('value_1', 'value_2')])
 def test_b_near_miss_spelling_is_not_regenerated(tmp_path, observed, proposed):
     s = Session(tmp_path)
     s.feed(pair(ti={'file_path': 'carrier.txt'}, text=observed))
@@ -129,12 +129,12 @@ def test_b_near_miss_spelling_is_not_regenerated(tmp_path, observed, proposed):
 def test_b_only_assistant_text_never_pays(tmp_path):
     s = Session(tmp_path)
     s.feed(pair())
-    s.send(event('AssistantMessage', content='731'))
+    s.send(event('AssistantMessage', content='id_731'))
     for _ in range(3):
-        assert held(s.send(output('731')))
+        assert held(s.send(output('id_731')))
         assert 'b' in s.rules()
-    s.feed(pair(text='731', tid='actual'))
-    assert not held(s.send(output('731')))
+    s.feed(pair(text='id_731', tid='actual'))
+    assert not held(s.send(output('id_731')))
 
 
 def test_user_copied_span_is_given_but_still_needs_artifact(tmp_path):
@@ -310,12 +310,12 @@ def test_git_syntax_is_a_boundary(tmp_path, command):
     assert 'a' in s.rules()
 
 
-@pytest.mark.parametrize('text', ['Error: file not found', '  at worker (file.py:19)', 'Traceback (most recent call last):'])
-def test_raw_tool_output_lines_are_exact(tmp_path, text):
+@pytest.mark.parametrize('text,named', [('Error: file not found', False), ('  at worker (file.py:19)', True), ('Traceback (most recent call last):', False)])
+def test_raw_tool_output_checks_names_only(tmp_path, text, named):
     s = Session(tmp_path)
     s.feed(pair())
-    assert held(s.send(output(text)))
-    assert 'b' in s.rules()
+    assert held(s.send(output(text))) == named
+    assert ('b' in s.rules()) == named
     s.feed(pair('Bash', {'command': 'probe'}, text, tid='log'))
     assert not held(s.send(output(text)))
 
