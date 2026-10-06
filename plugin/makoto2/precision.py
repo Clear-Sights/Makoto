@@ -27,6 +27,9 @@ URL = re.compile(r'https?://[^\s<>"\x27`“”‘’]+')
 PACKAGE_VERSION = r'\d(?:[\w.+-]*\w)?'
 VERSIONED = re.compile(r'(?<![\w/])(?P<package>@?[A-Za-z][\w.-]*(?:/[\w.-]+)?)\s*(?:@|==|>=|<=|~=|\bv(?:ersion)?\s*|\s+(?=\d+\.\d))\s*(?P<version>' + PACKAGE_VERSION + r')(?![\w+.-]*\w)')
 UNIT = re.compile(r'(?<!\w)[+-]?\d+(?:\.\d+)?\s*(?:[A-Za-zµμ°%]+(?:/[A-Za-z]+)?)(?!\w)')
+GRAMMAR_WORDS = frozenset('a an the is are was were be been being am has have had do does did of for to from in on at by with without as than and or but if then it its this that these those'.split())
+VERSION_LABELS = frozenset('version revision release edition build'.split())
+RESULT_VERBS = frozenset('outputs produces returns prints equals'.split())
 
 
 def extract(text, *, tool_output=False):
@@ -53,16 +56,26 @@ def extract(text, *, tool_output=False):
         for match in pattern.finditer(text):
             if kind == 'external-package':
                 separator = text[match.end('package'):match.start('version')]
+                if separator.isspace() and match['package'].lower() in GRAMMAR_WORDS:
+                    continue
+                if separator.isspace() and (match['package'].lower() in VERSION_LABELS
+                        or match['package'].lower() in RESULT_VERBS and re.fullmatch(r'\d+\.\d+', match['version'])):
+                    continue
                 # A whitespace pair can accidentally attach the preceding
                 # prose word to a measurement. Explicit package operators/v
                 # forms are still names; a numeric slice of a unit is a value.
                 if separator.isspace() and any(unit.start() <= match.start('version')
-                        and match.end('version') <= unit.end() for unit in UNIT.finditer(text)):
+                        and match.end('version') <= unit.end()
+                        and re.sub(r'^[+-]?\d+(?:\.\d+)?\s*', '', unit.group()).lower() not in GRAMMAR_WORDS
+                        for unit in UNIT.finditer(text)):
                     continue
             add(*match.span(), kind)
     for match in TOKEN.finditer(text):
         start, end = match.span()
         value = match.group()
+        if (start > 0 and text[start - 1] == '<' and end < len(text) and text[end] == '>'
+                and re.fullmatch(r'/?[A-Za-z][\w:-]*', value)):
+            continue  # Markup tags are syntax, not authored file paths.
         # Sentence punctuation is outside a token. Internal punctuation is exact.
         while value.endswith(('.', ',', ';', ':', '?', '!')):
             value = value[:-1]
@@ -118,7 +131,8 @@ def name_kind(value, *, quoted=False):
         return 'url'
     if EMAIL.fullmatch(value):
         return 'email'
-    if UUID.fullmatch(value) or HASH.fullmatch(value) or VERSION.fullmatch(value):
+    if (UUID.fullmatch(value) or HASH.fullmatch(value) or VERSION.fullmatch(value)
+            or re.fullmatch(r'[A-Za-z][\w-]*-\d+(?:\.\d+)+(?:[-+][\w.-]+)?', value)):
         return 'identifier'
     if VERSIONED.fullmatch(value):
         return 'external-package'
@@ -139,7 +153,7 @@ def name_kind(value, *, quoted=False):
     return None
 
 
-def names(text):
+def names(text, *, shell=False):
     """NAME-only view of extract(), retaining original bytes and offsets.
 
     Quoting never promotes prose or values to names. Whole output lines and
@@ -149,16 +163,26 @@ def names(text):
     found = {}
     spans = extract(text)
     units = [s for s in spans if s.kind == 'unit']
-    delimited_names = [s for s in spans if s.kind == 'delimited' and name_kind(s.text, quoted=True)]
+    # Shell quotes around commit messages delimit prose argv, not one filename.
+    messages = {(s.start, s.end) for s in spans if shell and s.kind == 'delimited'
+                and re.search(r'(?:-[A-Za-z]*m|--message)(?:\s+|=)[\x27"]$', text[:s.start])}
+    delimited_names = [s for s in spans if s.kind == 'delimited' and name_kind(s.text, quoted=True)
+                       and not re.match(r'^[A-Za-z_]\w*=', s.text) and (s.start, s.end) not in messages]
     for span in spans:
         if any(s.start <= span.start and span.end <= s.end and (span.start, span.end) != (s.start, s.end) for s in delimited_names):
             continue
         if span.kind == 'output-line' or span.kind == 'unit' and not HASH.fullmatch(span.text):
             continue
+        if (span.start, span.end) in messages:
+            continue
         # Split token wrappers too: Markdown [label](path) and call(id_name)
         # still name the enclosed path/identifier. A complete URL wins first.
         candidates = [(span.start, span.end)]
-        if not name_kind(span.text, quoted=span.kind == 'delimited'):
+        assignment = re.match(r'^[A-Za-z_]\w*=', span.text)
+        if assignment:
+            candidates = [(span.start, span.start + assignment.end() - 1),
+                          (span.start + assignment.end(), span.end)]
+        elif not name_kind(span.text, quoted=span.kind == 'delimited'):
             candidates += [(span.start + m.start(), span.start + m.end())
                            for m in re.finditer(r'[^\s()\[\]{}]+', span.text)]
         for start, end in candidates:
@@ -181,7 +205,12 @@ def contains(text, span, kind=None):
     """Exact characters with token boundaries; 731 is not evidence for 73."""
     strict = kind in ('path', 'email', 'url', 'identifier', 'digit', 'external-package')
     def edge(char):
-        return char.isalnum() or char == '_' or strict and char in '/\\.@:+~%#?=&$!*|-'
+        punctuation = '/\\.@+~%#?&$!*|-'
+        if kind in ('path', 'url', 'external-package'):
+            punctuation += ':'
+        if kind == 'url':
+            punctuation += '='
+        return char.isalnum() or char == '_' or strict and char in punctuation
     start = 0
     while (at := text.find(span, start)) >= 0:
         end = at + len(span)

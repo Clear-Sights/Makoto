@@ -8,18 +8,20 @@ import os
 import json
 import re
 import shlex
+import ast
 
 from .borrowed import leaves
 from .observed import FINAL, identity, git_action, text_of
 from .precision import contains, names
+from .shell import redirected_argv
 
 
-CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb'.split())
+CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb tcl awk'.split())
 CONFIG_SUFFIXES = frozenset('json jsonc yaml yml toml ini cfg conf config xml properties env'.split())
 RECORD_SUFFIXES = frozenset('md txt rst csv log'.split())
 DATA_SUFFIXES = CONFIG_SUFFIXES | RECORD_SUFFIXES
 CONFIG_FILES = frozenset(('Makefile', 'Dockerfile', 'Rakefile', 'Gemfile', 'Procfile', '.env'))
-RUNTIMES = re.compile(r'(?:python(?:\d+(?:\.\d+)*)?|pypy\d*|node|nodejs|deno|bun|bash|sh|zsh|fish|ruby|perl|php|lua|Rscript|pwsh)\Z')
+RUNTIMES = re.compile(r'(?:python(?:\d+(?:\.\d+)*)?|pypy\d*|node|nodejs|deno|bun|bash|sh|zsh|fish|ruby|perl|php|lua|Rscript|pwsh|tclsh(?:\d+(?:\.\d+)*)?|wish)\Z')
 DECLARATIONS = re.compile(r'(?m)(?:\b(?:def|class|function|fn|func)\s+([A-Za-z_]\w*)|^\s*(?:export\s+)?(?:const\s+|let\s+|var\s+)?([A-Za-z_]\w*)\s*(?:=|:))')
 
 
@@ -150,6 +152,12 @@ def execution_subjects(pre, changes, post=None):
         targets.extend(ti[key] for key in ('file_path', 'notebook_path', 'script', 'path') if ti.get(key))
     elif tool == 'Bash':
         words = simple_argv(ti.get('command', ''))
+        redirects = []
+        if not words:
+            parsed = redirected_argv(ti.get('command', ''))
+            if parsed:
+                words = simple_argv(shlex.join(parsed[0]))
+                redirects = parsed[1]
         if words:
             program = os.path.basename(words[0])
             if RUNTIMES.fullmatch(program):
@@ -168,6 +176,54 @@ def execution_subjects(pre, changes, post=None):
                         break
                     # Only interpreter options, before the script/module operand,
                     # select eval/help/check mode; script arguments never do.
+                    if program.startswith(('python', 'pypy')) and arg == '-c' and i + 1 < len(args):
+                        # Only unconditional, top-level import syntax identifies
+                        # modules run by an inline Python invocation.
+                        try:
+                            body = ast.parse(args[i + 1]).body
+                        except SyntaxError:
+                            body = []
+                        modules = []
+                        for statement in body:
+                            if isinstance(statement, ast.Import):
+                                modules.extend(alias.name for alias in statement.names)
+                            elif isinstance(statement, ast.ImportFrom) and not statement.level and statement.module:
+                                modules.append(statement.module)
+                            else:
+                                # Explicit whole-file config consumption, with
+                                # no arbitrary call/conditional before the load.
+                                expression = statement.value if isinstance(statement, ast.Expr) else None
+                                if isinstance(expression, ast.Call) and isinstance(expression.func, ast.Name) and expression.func.id == 'print' and len(expression.args) == 1 and not expression.keywords:
+                                    expression = expression.args[0]
+                                if (isinstance(expression, ast.Call) and isinstance(expression.func, ast.Attribute)
+                                        and isinstance(expression.func.value, ast.Name)
+                                        and expression.func.value.id in ('json', 'tomllib') and expression.func.attr == 'load'
+                                        and len(expression.args) == 1 and not expression.keywords):
+                                    opened = expression.args[0]
+                                    if (isinstance(opened, ast.Call) and isinstance(opened.func, ast.Name)
+                                            and opened.func.id == 'open' and not opened.keywords
+                                            and 1 <= len(opened.args) <= 2 and isinstance(opened.args[0], ast.Constant)
+                                            and isinstance(opened.args[0].value, str)
+                                            and (len(opened.args) == 1 or isinstance(opened.args[1], ast.Constant)
+                                                 and opened.args[1].value in ('r', 'rb'))):
+                                        path = opened.args[0].value
+                                        if changes.get(identity(path, pre), {}).get('data'):
+                                            targets.append(path)
+                                break  # Earlier arbitrary code may exit/raise.
+                        for module in modules:
+                            candidates = [identity(module.replace('.', '/') + ending, pre)
+                                          for ending in ('.py', '/__init__.py')]
+                            matches = [value for value in candidates if value in changes]
+                            if len(matches) == 1:
+                                targets.append(matches[0].removeprefix('file:'))
+                        break
+                    if program in ('node', 'nodejs') and arg in ('-e', '--eval') and i + 1 < len(args):
+                        literal = r'(\x27[^\x27\\]*\x27|"[^"\\]*")'
+                        vm = re.fullmatch(r'''\s*require\(['"](?:node:)?vm['"]\)\.runInNewContext\(\s*require\(['"](?:node:)?fs['"]\)\.readFileSync\(\s*'''
+                                          + literal + r'''\s*,\s*['"]utf8['"]\s*\)\s*,\s*\{\s*console\s*\}\s*\)\s*;?\s*''', args[i + 1])
+                        if vm:
+                            targets.append(vm[1][1:-1])
+                        break
                     if arg == '-' or arg.startswith(('-c', '-e', '--eval', '--print')) or arg in ('-p', '--help', '-h', '--version', '-V', '--check'):
                         break
                     if program in ('bash', 'sh', 'zsh', 'fish') and (re.fullmatch(r'-[A-Za-z]*[cns][A-Za-z]*', arg) or arg == '--noexec'):
@@ -185,6 +241,23 @@ def execution_subjects(pre, changes, post=None):
                                 targets.extend(w.split('::')[0] for w in remaining if not w.startswith('-'))
                         break
                     i += 2 if arg in operand_flags else 1
+            elif program in ('sqlite3', 'psql', 'mysql'):
+                targets.extend(target for operator, target in redirects if operator == '<'
+                               and not any(c in target for c in '$*?`'))
+                if program == 'psql' and '-f' in words and words.index('-f') + 1 < len(words):
+                    targets.append(words[words.index('-f') + 1])
+            elif program in ('awk', 'gawk', 'mawk', 'nawk'):
+                for i, word in enumerate(words[1:], 1):
+                    if word in ('-f', '--file') and i + 1 < len(words):
+                        targets.append(words[i + 1])
+                    elif word.startswith('--file='):
+                        targets.append(word.split('=', 1)[1])
+                    elif word.startswith('-f') and len(word) > 2:
+                        targets.append(word[2:])
+            elif program == 'go' and len(words) > 2 and words[1] == 'run':
+                targets.extend(w for w in words[2:] if w.endswith('.go') and not w.startswith('-'))
+            elif program == 'jupyter' and len(words) > 2 and words[1] == 'nbconvert' and '--execute' in words[2:]:
+                targets.extend(w for w in words[2:] if w.endswith('.ipynb') and not w.startswith('-'))
             elif program in ('.', 'source') and len(words) > 1:
                 targets.append(words[1])
             elif program not in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find', 'echo', 'printf', 'touch', 'cp', 'mv', 'rm', 'sed', 'tee'):
@@ -199,6 +272,26 @@ def execution_subjects(pre, changes, post=None):
                     elif word.startswith('--config='):
                         targets.append(word.split('=', 1)[1])
     return {identity(target, pre) for target in targets}
+
+
+def compiled_subjects(pre):
+    """An explicit native compiler source -> -o product link, never a run."""
+    words = simple_argv(pre.get('tool_input', {}).get('command', ''))
+    if not words:
+        return None
+    program = os.path.basename(words[0])
+    if program not in ('cc', 'gcc', 'clang', 'c++', 'g++', 'clang++', 'rustc'):
+        return None
+    if any(w in ('-c', '-S', '-E', '-fsyntax-only', '--emit=metadata') for w in words):
+        return None
+    if '-o' not in words or words.index('-o') + 1 >= len(words):
+        return None
+    output = words[words.index('-o') + 1]
+    sources = [w for w in words[1:] if w != output and not w.startswith('-')
+               and os.path.splitext(w)[1] in ('.c', '.cc', '.cpp', '.cxx', '.rs')]
+    if not sources:
+        return None
+    return identity(output, pre), {identity(source, pre) for source in sources}
 
 
 def run_output(post):

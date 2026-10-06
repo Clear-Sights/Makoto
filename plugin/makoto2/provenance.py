@@ -5,7 +5,8 @@ from .borrowed import get, leaves, fragments
 from .observed import (WRITERS, FINAL, identity, effects, failed,
                        reading_subjects, network_targets, response_text)
 from .precision import contains, VERSIONED, package_parts
-from .switch import edited_forms, execution_subjects, run_output, full_read_subjects
+from .switch import edited_forms, execution_subjects, run_output, full_read_subjects, compiled_subjects
+from .shell import selected_segments
 
 
 class Ledger:
@@ -31,11 +32,14 @@ class Ledger:
         self.executions = []
         self.readbacks = []
         self.shebangs = set()
+        self.compiled = {}
 
     def changed_code(self):
         result = dict(self.code_changes)
         for tid, pre in self.pending.items():
             for effect in effects(pre):
+                if effect.get('removed'):
+                    continue
                 form = edited_forms(pre, effect['subject'])
                 if form:
                     subject = form['subject']
@@ -51,6 +55,10 @@ class Ledger:
                 if not (form.get('record') and form.get('data'))}
 
     def change_code(self, event, subject):
+        if any(effect.get('removed') and self.subject(effect['subject'], event) == subject for effect in effects(event)):
+            self.code_changes.pop(subject, None)
+            self.shebangs.discard(subject)
+            return
         spelling = next((effect['subject'] for effect in effects(event)
                          if self.subject(effect['subject'], event) == subject), subject)
         form = edited_forms(event, spelling)
@@ -67,6 +75,7 @@ class Ledger:
                     self.shebangs.discard(subject)
             form['data'] = form['data'] and subject not in self.shebangs and (full_write or prior.get('data', True))
             form['q'] = self.q
+            form['tool_use_id'] = event.get('tool_use_id')
             self.code_changes[subject] = form
 
     def run_witnesses(self, change):
@@ -89,6 +98,71 @@ class Ledger:
 
     def source_readings(self):
         return [r for r in self.readings if r['source'] and self.fresh(r)]
+
+    def bash_order(self, pre, post, started, no_effect):
+        """Apply lexical acts inside one paired call at distinct positions.
+
+        Original read existence is independent of subsequent file changes;
+        aggregate bytes still use the ordinary freshness guard for rule b.
+        """
+        if pre.get('tool_name') != 'Bash':
+            return False
+        segments = selected_segments(pre.get('tool_input', {}).get('command', ''), post)
+        if segments is None:
+            return False
+        tid = pre['tool_use_id']
+        for index, command in enumerate(segments):
+            position = self.q + (index + 1) / (len(segments) + 1)
+            segment = dict(pre, tool_input=dict(pre.get('tool_input', {}), command=command))
+            # Host observations describe the whole call, never every segment.
+            segment.pop('makoto', None)
+            subjects = {self.subject(s, pre) for s in reading_subjects(segment)}
+            original = subjects - (self.written | self.tainted)
+            original -= set().union(*(s for key, s in self.reservations.items() if key != tid))
+            response = post.get('tool_response')
+            if (len(segments) > 1 and original and bool(list(leaves(response)))
+                    and not (isinstance(response, dict) and any(response.get(key)
+                             for key in ('backgroundTaskId', 'session_id', 'sessionId', 'running')))
+                    and not any(r.get('producer') or r.get('role') == 'relay'
+                                for ev in (pre, post) for r in ev.get('makoto', {}).get('reads', []))):
+                self.readings.append({'q': position, 'subjects': [], 'texts': [],
+                                      'source': True, 'tool_use_id': tid, 'tool': 'Bash',
+                                      'turn': self.turn, 'original_subjects': sorted(original)})
+            if not no_effect:
+                for effect in effects(segment):
+                    subject = self.subject(effect['subject'], pre)
+                    self.mutations[subject] = position
+                    self.written.add(subject)
+                    self.compiled.pop(subject, None)
+                    self.change_code(segment, subject)
+                    if subject in self.code_changes:
+                        self.code_changes[subject]['q'] = position
+            if run_output(post):
+                compiled = compiled_subjects(segment)
+                if compiled and not failed(post):
+                    product, sources = compiled
+                    self.compiled[product] = {'subjects': sources, 'q': position,
+                                              'starts': {s: position if self.code_changes.get(s, {}).get('tool_use_id') == tid
+                                                         else started for s in sources}}
+                invoked = execution_subjects(segment, self.code_changes)
+                if invoked:
+                    for subject in invoked:
+                        run_start = position if self.code_changes.get(subject, {}).get('tool_use_id') == tid else started
+                        self.executions.append({'q': position, 'started': run_start,
+                                                'subjects': {subject}, 'tool_use_id': tid})
+                    for product in invoked:
+                        build = self.compiled.get(product)
+                        if build and build['q'] < position:
+                            for subject in build['subjects']:
+                                self.executions.append({'q': position, 'started': build['starts'][subject],
+                                                        'subjects': {subject}, 'tool_use_id': tid})
+            complete = full_read_subjects(segment, post)
+            if complete:
+                for subject in complete:
+                    read_start = position if self.code_changes.get(subject, {}).get('tool_use_id') == tid else started
+                    self.readbacks.append({'q': position, 'started': read_start,
+                                           'subjects': {subject}, 'tool_use_id': tid})
+        return True
 
     def witnesses(self, span, kind=None):
         if any(contains(text, span, kind) for text in self.given):
@@ -154,8 +228,14 @@ class Ledger:
         self.seen.add(tid)
         targets = self.reservations.get(tid, set()) | {self.subject(r['subject'], pre) for r in effects(event)}
         no_effect = meta.get('no_effect') is True
+        ordered = self.bash_order(pre, event, started, no_effect)
+        native = dict(pre)
+        native.pop('makoto', None)
+        native_targets = {self.subject(r['subject'], pre) for r in effects(native)} if ordered else set()
         if not no_effect:
             for subject in targets:
+                if subject in native_targets:
+                    continue
                 self.mutations[subject] = self.q
                 self.written.add(subject)
                 self.change_code(pre, subject)
@@ -163,15 +243,16 @@ class Ledger:
             self.reservations.pop(tid, None)
         # Paired call plus returned response proves the act, even on failure.
         # Resolve the invocation against its recorded cwd, never final prose.
-        if run_output(event):
+        if run_output(event) and (not ordered or pre.get('makoto', {}).get('invocation') or meta.get('invocation')):
             invoked = execution_subjects(pre, self.code_changes, event)
             if invoked:
                 self.executions.append({'q': self.q, 'started': started,
                                         'subjects': invoked, 'tool_use_id': tid})
         complete = full_read_subjects(pre, event)
         if complete and pre.get('tool_name') not in WRITERS | {'Agent', 'Task'}:
-            self.readbacks.append({'q': self.q, 'started': started,
-                                   'subjects': complete, 'tool_use_id': tid})
+            if not ordered or pre.get('makoto', {}).get('reads') or meta.get('reads'):
+                self.readbacks.append({'q': self.q, 'started': started,
+                                       'subjects': complete, 'tool_use_id': tid})
             shebang = bool(re.search(r'(?m)^#!\s*\S+', response_text(event.get('tool_response'))))
             for subject in complete:
                 change = self.code_changes.get(subject)

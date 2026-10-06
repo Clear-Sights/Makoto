@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 from .borrowed import leaves
+from .shell import ordered_segments, redirected_argv
 
 WRITERS = {'Write', 'Edit', 'MultiEdit', 'NotebookEdit'}
 FINAL = {'Stop', 'SubagentStop', 'PreDelivery'}
@@ -45,7 +46,11 @@ def shell_segments(command):
 
 
 def programs(event):
-    for words in shell_segments(event.get('tool_input', {}).get('command', '')):
+    command = event.get('tool_input', {}).get('command', '')
+    ordered = ordered_segments(command)
+    segments = [(redirected_argv(text) or (shlex.split(text), []))[0]
+                for text, _ in ordered] if ordered is not None else shell_segments(command)
+    for words in segments:
         while words and (re.match(r'^[A-Za-z_]\w*=', words[0]) or words[0] in ('env', 'command', 'exec', 'sudo')):
             words = words[1:]
         if words:
@@ -93,6 +98,19 @@ def effects(event):
         if target:
             result.append({'subject': target})
     if tool == 'Bash':
+        ordered = ordered_segments(ti.get('command', ''))
+        if ordered is not None:
+            for command, _ in ordered:
+                parsed = redirected_argv(command)
+                if parsed:
+                    result.extend({'subject': target} for operator, target in parsed[1]
+                                  if operator in ('>', '>>', '>|') and not target.startswith('&')
+                                  and not any(c in target for c in '$*?`'))
+        else:
+            # Opaque calls retain the legacy conservative mutation adapter.
+            for words in shell_segments(ti.get('command', '')):
+                if words and words[0] in ('>', '>>', '>|') and len(words) > 1:
+                    result.append({'subject': words[1]})
         for words in programs(event):
             name = os.path.basename(words[0])
             if '>' in words[0] and len(words) > 1:
@@ -102,9 +120,11 @@ def effects(event):
             elif name in ('cp', 'mv') and len(words) > 2:
                 result.append({'subject': words[-1]})
                 if name == 'mv':
-                    result.append({'subject': words[-2]})
+                    result.append({'subject': words[-2], 'removed': True})
             elif name == 'sed' and any(w.startswith('-i') for w in words[1:]):
                 result.append({'subject': words[-1]})
+            elif name == 'gofmt' and '-w' in words[1:]:
+                result.extend({'subject': w} for w in words[1:] if w != '-w' and not w.startswith('-'))
     return result
 
 

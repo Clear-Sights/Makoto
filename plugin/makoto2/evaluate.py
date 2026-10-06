@@ -14,7 +14,7 @@ def evaluate(ledger, event, adapter='inferred'):
     readings = ledger.source_readings()
     findings, snapshot = [], []
     spans = extract(text)
-    name_spans = names(text)
+    name_spans = names(text, shell=event.get('tool_name') == 'Bash')
     output_subjects = ledger.written | {ledger.subject(r['subject'], event) for r in effects(event)}
     output_ranges = []
     # Whitespace in an output filename can split lexical tokens. Exempt those
