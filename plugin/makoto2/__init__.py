@@ -8,7 +8,7 @@ import shutil
 
 PLUGIN_METADATA = {
     'name': 'makoto',
-    'version': '5.0.0-dev',
+    'version': '5.0.0',
     'description': 'Hold dependent steps on missing original readings, exact spans and online fetches.',
 }
 

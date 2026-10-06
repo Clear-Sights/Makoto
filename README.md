@@ -1,4 +1,4 @@
-# Makoto 5.0.0-dev
+# Makoto 5.0.0
 
 Makoto holds dependent steps before Write, Edit, MultiEdit, NotebookEdit, Bash
 `git commit`/`git push`, and Stop. The live hook is `python3 -m makoto2` from

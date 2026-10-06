@@ -99,10 +99,10 @@ def test_package_current_bytes_and_fresh_install(tmp_path, monkeypatch):
     from makoto2.lifecycle import fresh
     artifact = tmp_path / 'artifact'
     result = build_package(ROOT, artifact)
-    assert result['version'] == '5.0.0-dev'
+    assert result['version'] == '5.0.0'
     assert result['contents']['makoto2/hook.py'] == (HERE / 'hook.py').read_bytes()
     assert not (artifact / 'makoto2/rows.tsv').exists()
-    assert json.loads((artifact / '.claude-plugin/plugin.json').read_text())['version'] == '5.0.0-dev'
+    assert json.loads((artifact / '.claude-plugin/plugin.json').read_text())['version'] == '5.0.0'
     with pytest.raises(FileExistsError):
         build_package(ROOT, artifact)
     with pytest.raises(ValueError):
