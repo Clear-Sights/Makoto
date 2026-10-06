@@ -1,9 +1,2 @@
-default_tool_timeout_ms	Bash tool call limit when tool_input.timeout is absent (R10)
-min_number_digits	a number with at least this many digits is a relayed-number subject (R06)
-quote_min_len	shortest quoted span, in characters, treated as a quote (R07)
-quote_window	characters after an attribution searched for its quote (R07)
-quote_gap	most characters allowed between attribution and the opening of its quote (R07)
-count_word_gap	most words between a count and its in/of/from path (R12)
-negation_window	characters before a claim word searched for a negation (R11)
-snippet_len	characters of a subject quoted in a finding message
-state_dir	directory for the per-session store (MAKOTO_STATE_DIR overrides)
+state_dir: append-only session journal directory; MAKOTO_STATE_DIR overrides.
+adapter: declared or inferred; MAKOTO_ADAPTER overrides.

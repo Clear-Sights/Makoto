@@ -1,203 +1,127 @@
-"""Deterministic token -> observation -> source/version ledger.
-
-Only settled record bytes participate. A token match is evidence of possible
-origin, never proof that an arbitrary prose conclusion follows from that source.
-"""
-import re
-import os
-from collections import defaultdict
-from dataclasses import dataclass
-
-_TOKEN = re.compile(r'(?<!\w)(?:\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?%?|[\w]+(?:[-_][\w]+)*)(?!\w)')
-_CHANGE = re.compile(r'\b(?:changed|updated|replaced|removed|recreated|cleared|unavailable)\b', re.I)
-_GRAMMAR = frozenset('the a an is are was were has have current now old prior previous source reading value maximum minimum of for to from in at as by this that it its and or with after before'.split())
-_UNVERIFIED = re.compile(r'\b(?:unverified|unknown|not evaluable|not-evaluable)\b', re.I)
+"""One session ledger reconstructed from durable, ordered receipts."""
+from .observed import identity, digest, native_reads, effects, completed, failed, response_text, values
 
 
-def tokens(text):
-    return frozenset(m.group().lower() for m in _TOKEN.finditer(str(text)))
-
-
-@dataclass(frozen=True)
-class Reading:
-    seq: int
-    source: str
-    text: str
-    values: frozenset
-    original: bool
-    dependencies: frozenset
-
-
-class Trace:
-    def __init__(self, record, reader):
+class Ledger:
+    def __init__(self):
+        self.q = 0
+        self.turn = '0'
+        self.pending = {}
+        self.seen = set()
         self.readings = []
-        self.by_token = defaultdict(list)
-        self.load_bearing = {'pass', 'passed', 'fail', 'failed', 'true', 'false'}
-        self.latest = {}
-        self.invalidated = {}
-        self.reader = reader
-        for obs in record.obs:
-            if obs.failed:
-                continue
-            cwd = getattr(record, 'reader_evidence', {}).get(obs.seq, {}).get('cwd', '')
-            if obs.tool in ('Write', 'Edit', 'MultiEdit'):
-                for path in obs.written:
-                    self.invalidated[path] = obs.seq
-                continue
-            identities = set(getattr(record, 'reader_evidence', {}).get(obs.seq, {}).get('source_reads', ()))
-            if obs.tool == 'Read':
-                identities.add(reader._norm(obs.input.get('file_path', ''), cwd))
-            elif obs.tool == 'WebFetch':
-                identities.add(obs.input.get('url', ''))
-            elif obs.tool == 'Bash':
-                segments = list(reader._segments(obs.input.get('command', '')))
-                if len(segments) == 1 and segments[0][0] and segments[0][0][0] == 'cat':
-                    identities.update(reader._norm(p, cwd) for p in segments[0][0][1:] if not p.startswith('-'))
-                else:
-                    identities.add('command:' + cwd + ':' + obs.input.get('command', ''))
-            original = bool(identities) and obs.tool not in ('Agent', 'Task')
-            if obs.tool == 'Read' and any(re.search(r'(?i)\b(?:answer|memo|receipt|digest|sweep|audit|summary)\b', os.path.basename(p).replace('-', ' ')) for p in identities):
-                original = False
-            if not identities:
-                identities.add('relay:' + str(obs.seq))
-            # Explicit citations inside a reading create edges to original sources.
-            dependencies = set()
-            for m in re.finditer(r'(?i)\bsource(?:\s+claimed)?\s*:\s*([^\n;]+)', obs.output):
-                dependencies.update(reader._text_objects(m.group(1).rstrip('.'), cwd))
-            for identity in identities - {''}:
-                reading = Reading(obs.seq, identity, obs.output, tokens(obs.output), original, frozenset(dependencies))
-                self.readings.append(reading)
-                self.latest[identity] = reading
-                for value in re.findall(r'(?:[:=]\s*[\"“]?)([\w-]+)', reading.text):
-                    self.load_bearing.update(tokens(value))
-                for match in re.finditer(r'[\"“]([^\"”]+)[\"”]', reading.text):
-                    if not reading.text[match.end():].lstrip().startswith(':'):
-                        self.load_bearing.update(tokens(match.group(1)))
-                for token in reading.values:
-                    self.by_token[token].append(reading)
-            # A command that reports a changed subject invalidates previous
-            # readings carrying the same measurement label and a changed value.
-            if _CHANGE.search(obs.output):
-                labels = tokens(re.sub(r'\b\d+(?:\.\d+)?\b', '', obs.output))
-                for prior in self.readings:
-                    if prior.seq >= obs.seq:
-                        continue
-                    if prior.source.startswith('command:'):
-                        command = prior.source.split(':')[-1]
-                        current = obs.input.get('command', '')
-                        before_segments = list(reader._segments(command))
-                        after_segments = list(reader._segments(current))
-                        same_program = (len(before_segments) == len(after_segments) == 1
-                                        and before_segments[0][0][:1] == after_segments[0][0][:1]
-                                        and before_segments[0][0][0] not in ('cat', 'grep', 'rg', 'sed', 'head', 'tail', 'nl', 'cd'))
-                        shared = (prior.values & labels) - {'the', 'is', 'a', 'current'}
-                        if same_program and shared:
-                            self.invalidated[prior.source] = obs.seq
+        self.definitions = []
+        self.epochs = {}
+        self.reservations = {}
+        self.written = set()
+        self.aliases = {}
+        self.mutations = {}
+        self.unknown = []
 
-    def current(self, reading):
-        return (self.latest.get(reading.source) == reading
-                and self.invalidated.get(reading.source, -1) < reading.seq)
+    def subject(self, value, event):
+        result = identity(value, event)
+        return self.aliases.get(result, result)
 
-    def origins(self, token):
-        return tuple(self.by_token.get(token.lower(), ()))
+    def place(self, event):
+        return event.get('makoto', {}).get('place', {'workspace': event.get('cwd', '')})
 
-    def stale(self, text):
-        out = []
-        for token in sorted(tokens(text)):
-            # Load-bearing exact values: numbers/hashes and explicitly quoted
-            # names. Ordinary connective words cannot establish a contradiction.
-            if not (re.search(r'\d', token) or token in self.load_bearing):
-                continue
-            origins = self.origins(token)
-            subject = tokens(text) - _GRAMMAR - {t for t in tokens(text) if re.search(r'\d', t)}
-            related = tuple(r for r in origins if subject & r.values)
-            if related:
-                origins = related
-            if origins and any(not self.current(r) for r in origins) and not any(self.current(r) and r.original for r in origins):
-                out.append(token)
-        return out
+    def advance(self, event):
+        self.q += 1
+        meta = event.get('makoto', {})
+        if meta.get('turn_id') is not None:
+            self.turn = str(meta['turn_id'])
+        elif event['hook_event_name'] == 'UserPromptSubmit':
+            self.turn = str(self.q)
 
-    def relay_sources(self, text):
-        out = []
-        if not re.search(r'(?i)\b(?:according to|based on|from|by)\b', text):
-            return out
-        for reading in self.readings:
-            for source in reading.dependencies:
-                if source not in self.latest:
-                    out.append(source)
-        if re.search(r'(?i)\b(?:prior answer|previous sweep|old audit)\b', text):
-            claimed = tokens(text) & {'safe', 'compliant', 'automatically', 'allowed', 'permitted'}
-            for reading in self.readings:
-                if not reading.original and claimed & reading.values and not any(
-                        r.original and r.seq > reading.seq and (claimed & r.values or tokens(text) & r.values - {'the', 'is', 'a', 'under', 'current'})
-                        for r in self.readings):
-                    out.append(reading.source)
-        return sorted(set(out))
+    def ingest(self, event, admitted=True):
+        self.advance(event)
+        meta = event.get('makoto', {})
+        name = event['hook_event_name']
+        for alias in meta.get('aliases', []):
+            self.aliases[identity(alias['alias'], event)] = self.subject(alias['subject'], event)
+        # Host definitions on nondependent registration events only.
+        if name in ('UserPromptSubmit', 'Register'):
+            for definition in meta.get('definitions', []):
+                item = dict(definition, subject=self.subject(definition['subject'], event), q=self.q)
+                same = [d for d in self.definitions if (d['id'], d.get('revision')) == (item['id'], item.get('revision'))]
+                if same and any(d != dict(item, q=d['q']) for d in same):
+                    raise ValueError('definition revision is immutable')
+                if not same:
+                    self.definitions.append(item)
+        if name == 'PreToolUse':
+            tid = event.get('tool_use_id')
+            if not admitted or not tid or tid in self.seen or tid in self.pending:
+                return
+            self.pending[tid] = (event, self.q, self.turn)
+            reserved = set()
+            for effect in effects(event):
+                subject = self.subject(effect['subject'], event)
+                reserved.add(subject)
+            self.reservations[tid] = reserved
+        elif name in ('PostToolUse', 'PostToolUseFailure'):
+            tid = event.get('tool_use_id')
+            if tid not in self.pending or tid in self.seen:
+                self.unknown.append({'q': self.q, 'reason': 'unpaired or replayed response'})
+                return
+            pre, pq, turn = self.pending[tid]
+            # An ID is not enough if supplied tool identity/input disagree.
+            if event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or ('tool_input' in event and event['tool_input'] != pre.get('tool_input', {})):
+                self.unknown.append({'q': self.q, 'reason': 'mismatched response'})
+                return
+            del self.pending[tid]
+            self.seen.add(tid)
+            reserved = self.reservations.get(tid, set())
+            no_effect = meta.get('no_effect') is True
+            if not no_effect:
+                for subject in reserved | {self.subject(x['subject'], pre) for x in effects(event)}:
+                    self.epochs[subject] = self.epochs.get(subject, 0) + 1
+                    self.written.add(subject)
+                    self.mutations[subject] = {'q': self.q, 'place': meta.get('destination', self.place(event))}
+            # Failure alone cannot clear a potentially effective mutation.
+            if not failed(event) or no_effect:
+                self.reservations.pop(tid, None)
+            if not completed(dict(event, tool_name=pre.get('tool_name'))):
+                self.unknown.append({'q': self.q, 'reason': 'response not completed'})
+                return
+            specs = native_reads(pre, event)
+            specs += meta.get('reads', [])
+            text = response_text(event.get('tool_response'))
+            # Every completed Bash invocation has an exact native command response.
+            if pre.get('tool_name') == 'Bash':
+                specs.append({'subject': 'command:' + digest([pre.get('cwd'), pre.get('tool_input', {}).get('command'), pre.get('makoto', {}).get('place', {})]),
+                              'selector': 'response', 'complete': True, 'role': 'response'})
+            for index, spec in enumerate(specs):
+                subject = self.subject(spec['subject'], pre)
+                invocation = pre.get('makoto', {}).get('invocation', {})
+                self.readings.append(dict(spec, subject=subject, selector=spec.get('selector', 'content'),
+                    receipt_id=f'{tid}:{index}', tool_use_id=tid, q=self.q, pre_q=pq, turn=turn,
+                    point=dict(self.place(event), turn_id=turn, sequence=self.q, **({'timestamp': event['timestamp']} if 'timestamp' in event else {})),
+                    epoch=self.epochs.get(subject, 0), version=spec.get('version'),
+                    complete=spec.get('complete') is True, value_sha256=spec.get('value_sha256', digest(text)),
+                    values=sorted(values(text)), role=spec.get('role', 'relay' if subject in self.written else 'source'),
+                    producer=spec.get('producer'), input_sha256=invocation.get('input_sha256'),
+                    invocation_subject=self.subject(invocation['subject'], pre) if invocation.get('subject') else None,
+                    invocation_selector=invocation.get('selector'), command=pre.get('tool_input', {}).get('command'),
+                    command_context=[pre.get('cwd'), pre.get('makoto', {}).get('place', {})]))
 
-    def replaced_receipt(self, text):
-        out = []
-        claim_values = tokens(text)
-        for reading in self.readings:
-            if reading.original or reading.source.startswith(('command:', 'relay:')):
-                continue
-            if not re.search(r'(?i)\b(?:verified|passed|digest|receipt|snapshot)\b', reading.text):
-                continue
-            # A receipt followed by explicit loss of its verification subject.
-            for later in self.readings:
-                if later.seq <= reading.seq or not later.source.startswith('command:'):
-                    continue
-                if not _CHANGE.search(later.text):
-                    continue
-                if not ((tokens(text) - _GRAMMAR - {'verified', 'verification', 'passed', 'snapshot'}) & later.values):
-                    continue
-                if not re.search(r'(?i)\b(?:old|yesterday|snapshot|build|verification)\b', later.text):
-                    continue
-                carried = (reading.values & claim_values) - {'the', 'is', 'a', 'current', 'at', 'against'}
-                if not any(re.search(r'\d', t) or t in ('passed', 'verified') for t in carried):
-                    continue
-                if any(r.seq > later.seq and r.original and r.source.startswith('command:')
-                       and ((carried <= r.values) or
-                            (re.search(r'(?i)verification complete|verified|passed', r.text)
-                             and {t for t in claim_values if re.search(r'\d', t)} <= r.values))
-                       for r in self.readings):
-                    continue
-                out.append(reading.source)
-        return sorted(set(out))
-
-
-def trace_for(record, reader):
-    """Reuse one ledger across all checks of this immutable record snapshot."""
-    cached = getattr(record, '_provenance_trace', None)
-    if cached is None or cached.reader is not reader:
-        cached = Trace(record, reader)
-        record._provenance_trace = cached
-    return cached
-
-
-def violations(record, event, reader):
-    from makoto2.family_lineage import output_text
-    text = output_text(event, reader)
-    if (not text
-            or (event.get('tool_name') in ('Write', 'Edit')
-                and str((event.get('tool_input') or {}).get('file_path', '')).endswith('.py'))):
-        return []
-    trace = trace_for(record, reader)
-    out = []
-    from makoto2.claim_reader import read_claims
-    for claim in read_claims(record, event):
-        if claim.get('kind') in ('question', 'cannot', 'plan', 'retracted'):
-            continue
-        sentence = claim.get('text', '')
-        if not sentence:
-            continue
-        if claim.get('kind') == 'running' and not re.search(r'\b(?:is|are|was|were|currently)\s+running\b', sentence, re.I):
-            continue
-        if _UNVERIFIED.search(sentence) or re.search(r'(?i)\bnot current evidence\b', sentence):
-            continue
-        historical = (re.search(r'(?i)\b(?:old|previous|yesterday|earlier)\b', sentence)
-                      and not re.search(r'(?i)\b(?:current|now|still|remain)\b', sentence))
+    def available(self, reading, obligation, event, historical=False):
+        if reading['q'] >= self.q + 1 or not reading['complete']:
+            return False
+        if reading['subject'] != self.subject(obligation['subject'], event) or reading['selector'] != obligation.get('selector', 'content'):
+            return False
+        if obligation.get('version') is not None and reading.get('version') != obligation['version']:
+            return False
+        if obligation.get('point') and not point_matches(reading['point'], obligation['point']):
+            return False
         if not historical:
-            out.extend(trace.stale(sentence))
-        out.extend(trace.relay_sources(sentence))
-        out.extend(trace.replaced_receipt(sentence))
-    return sorted(set(out))
+            if reading['epoch'] != self.epochs.get(reading['subject'], 0):
+                return False
+            if any(reading['subject'] in subjects for subjects in self.reservations.values()):
+                return False
+        return True
+
+    def matching(self, obligation, event, historical=False):
+        return [r for r in self.readings if self.available(r, obligation, event, historical)]
+
+
+def point_matches(actual, required):
+    return isinstance(required, dict) and all(actual.get(k) == v for k, v in required.items())

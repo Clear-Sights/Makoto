@@ -8,7 +8,7 @@ import shutil
 
 PLUGIN_METADATA = {
     'name': 'makoto',
-    'version': '4.0.1',
+    'version': '5.0.0-dev',
     'description': 'Executable lifecycle and hook decisions over current observations.',
 }
 
