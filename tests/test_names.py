@@ -91,7 +91,12 @@ def test_output_reference_still_needs_original_artifact(tmp_path):
     ev = output('source data', 'Write')
     assert not held(s.send(ev))
     s.send(dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
-    s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='stale'))
+    # Invalidate the only original reading with a native write acknowledgment.
+    # A Bash mutation's run response would itself be an artifact reading.
+    change = output('source data', 'Write', tid='stale')
+    change['tool_input']['file_path'] = 'source.txt'
+    assert not held(s.send(change))
+    s.send(dict(change, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
     for retry in (False, True):
         assert held(s.send(dict(output('out.txt'), stop_hook_active=retry)))
         assert s.rules() == {'a'}

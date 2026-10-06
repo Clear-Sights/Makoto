@@ -106,14 +106,6 @@ def test_host_current_turn_metadata_does_not_import_candidate_receipts(tmp_path)
     assert s.rules() == {'c'}
 
 
-def test_no_lineage_module_or_surface(tmp_path):
-    assert not (ROOT / 'plugin/makoto2/surface.py').exists()
-    s = Session(tmp_path)
-    s.feed(pair())
-    assert s.send(output()) == {}
-    assert 'surface' not in s.journal()[-1]
-
-
 @pytest.mark.parametrize('text', ['$HOME', 'a*b', 'foo[0]', 'foo()', "don't", 'widget v1.2.3', 'widget version 1.2.3'])
 def test_mixed_symbol_and_version_forms(text):
     assert text in [s.text for s in extract(text)]

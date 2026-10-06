@@ -122,10 +122,8 @@ def reading_subjects(pre):
         for words in programs(pre):
             if os.path.basename(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
                 result.extend(w for w in words[1:] if not w.startswith('-'))
-            elif os.path.basename(words[0]) in ('python', 'python3', 'node', 'bash', 'sh', 'ruby', 'perl') and len(words) > 1 and not words[1].startswith('-'):
-                result.append(words[1])
-            elif '/' in words[0]:
-                result.append(words[0])
+            # Executing a program reads its response, not the program file.
+            # Only direct file readers above inherit that file's own/stale status.
     return result
 
 

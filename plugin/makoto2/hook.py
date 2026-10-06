@@ -10,6 +10,9 @@ from .evaluate import evaluate
 from .transcript import history
 
 
+FOUR_QUESTIONS = "Before this step: (1) If it relies on a definition, did you read the thing itself against that definition? (2) If it carries a result to another place or time, did you read the same thing again where and when it lands? (3) If it says how a branch behaves, did you feed that branch an input and read its response? (4) Is it based on the original source, read this turn, rather than on an earlier answer?"
+
+
 def d_in(raw):
     event = json.loads(raw, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
     if not isinstance(event, dict) or not isinstance(event.get('hook_event_name'), str) or not event['hook_event_name']:
@@ -98,6 +101,16 @@ def d_out(event, reason):
     return {'decision': 'block', 'reason': reason}
 
 
+def questions(event):
+    if not dependent(event):
+        return {}
+    if event['hook_event_name'] == 'PreToolUse':
+        return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': FOUR_QUESTIONS}}
+    if not event.get('stop_hook_active'):
+        return {'decision': 'block', 'reason': FOUR_QUESTIONS}
+    return {}
+
+
 def main(raw, config):
     event = {}
     try:
@@ -137,7 +150,7 @@ def main(raw, config):
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
             # Active Stop retries still block. Audit records mark the unpaid
             # retry; no suppression can silently admit its final text.
-            response = d_out(event, reason)
+            response = d_out(event, reason) if reason else questions(event)
             return response
     except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:
         return d_out(event, 'makoto transport/contract failure: ' + str(error))

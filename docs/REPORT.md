@@ -1,18 +1,18 @@
-Makoto step 4 narrows rule b to project/subject NAME forms.
-Rule b checks paths, URLs, emails and identifiers, including hashes/UUIDs/versions.
-Plain or hyphenated words, numbers and unit values do not trigger rule b.
-Quoted/backticked content is a name only when its payload has a NAME form.
-precision.extract remains general; precision.names supplies the NAME-only view.
-The name view does not depend on the bundled common-English word list.
-A step's own output target and session-written/edited files are exempt from b.
-Output exemptions identify paths; they never create an artifact reading.
-Rule a still holds without an independent reading or on unsupported own content.
-Earlier session readings count until a recorded write makes their subject stale.
-Current-turn successful online fetch/search remains required by rule c.
-Tests justified narrow a fixes for output references and independently read quoted names.
-Tests justified a c fix for quoted URLs; curly quotes no longer enter URL bytes.
-284 whole-suite tests passed in 10.39 seconds (under 15 s); ten NAME forms planted.
-Universal 100% and zero false positives remains unestablished; exact limits follow.
+Makoto step 5 counts run responses as readings and uses Gabriel's four questions.
+A completed Bash/code/query/request response is an artifact reading for rule a.
+Echo, printf, inline programs and runs of session-written scripts now qualify.
+A run response also qualifies when the run mutates a file or returns only status.
+Direct readings of session-written/edited files and assistant text remain own output.
+Writer acknowledgments and Agent/Task assistant relays do not supply source evidence.
+Unsupported literal copies of earlier answers still hold under rule a.
+Rules b/c retain exact NAME witnesses, freshness and current-turn online checks.
+Every admitted PreToolUse dependent step receives the exact four questions as additionalContext.
+An otherwise admitted Stop receives the questions once through its block reason.
+stop_hook_active suppresses only the reminder; every unpaid retry remains held.
+Lineage surface code was already absent; its remaining regression test is removed.
+NOLOSS-MAP.tsv records replaced_by four questions: supplied measurement 80% to 91–93%, lineage added nothing.
+309 whole-suite tests passed in 11.07 seconds (under 15 s); no borrow changed.
+Changes stay on shapes as Clear-Sights; no network, forbidden reads or push.
 
 Record contract
 
@@ -24,9 +24,10 @@ cannot create an artifact reading for rule a. The candidate never supplies readi
 User prompts are given even when an earlier unpaid assistant repeats their text.
 
 Source evidence includes arbitrary native artifact-tool responses, Read/Grep/Glob,
-completed shell observations and actual error/log output. It excludes writer
-acknowledgments, Agent/Task relays, native echo/inline-program answers and known
-session-written executable/file outputs. Partially visible output pays only its
+completed code/query/request responses and actual error/log output, including
+echo/printf, inline programs, session-written executable runs and mutation runs.
+It excludes writer acknowledgments, Agent/Task assistant relays and direct
+readbacks of session-written files. Partially visible output pays only its
 visible bytes. Empty returned file content is a reading; a missing response is not.
 
 Native tool IDs must pair input and response. Mismatched, unpaired, replayed or
@@ -91,9 +92,13 @@ Causality history at 44103e9 was inspected: the public product's same receipt
 primitive remains available. BORROWED.tsv records all copied pieces; package
 artifacts carry the license, third-party license, notice and table.
 
-surface.py and obligations.py are removed. The four-family display, one-time Stop
-surface block, explicit semantic obligation contracts, definitions/aliases and
-point/version selection are superseded by this brief's three rules. Their old
+surface.py and obligations.py are removed. The lineage display is replaced by
+Gabriel's exact four questions in hook.FOUR_QUESTIONS. PreToolUse carries these
+as additionalContext without denying the tool; Stop presents them once as a
+block reason, then suppresses the reminder on stop_hook_active. Rule holds take
+precedence and never suppress unpaid retries. The old semantic obligation
+contracts, definitions/aliases and point/version selection remain superseded
+by the three rules. Their old
 plants were replaced, rather than falsely reported as retained passing behavior.
 Lifecycle/package/audit/current-measurement tests remain, with fresh-account Stop
 now correctly blocked for no reading. NOLOSS-MAP.tsv records these decisions and
@@ -118,9 +123,9 @@ one and a public project in the other. A form-only checker cannot distinguish
 those worlds; trusted external_subjects classification is necessary for bare
 names. The same record cannot expose which internal reading an assistant actually
 used, so rule a proves absence of original readings and literal own-answer copies,
-not arbitrary hidden semantic dependencies. Opaque shell programs may synthesize
-output or mutate undeclared subjects; effects/origin/network instrumentation is
-needed for those cases. Changes outside the observed session also need host
+not arbitrary hidden semantic dependencies. Opaque shell programs may mutate undeclared subjects; effects/network
+instrumentation is needed for those cases. Synthesized run output still counts
+as an artifact response under step 5; its origin does not require a semantic guess. Changes outside the observed session also need host
 mutation records. These are remaining requirements for a universal guarantee,
 not silent claims of coverage. Native host enforcement before final delivery is
 assumed; the executable delivery wrapper validates the boundary it owns.
@@ -198,3 +203,41 @@ inside /home/user/build/makoto on shapes, committed as Clear-Sights, without pus
 or network. A preliminary filename discovery before reading BRIEF-3 returned
 brief path names beneath excluded trees; no case contents from those paths were
 opened. All subsequent inspection stayed within the authorized brief/repository.
+
+Step 5 changes and regression evidence
+
+A paired tool response is read from outside the session, including a response to
+code, a query or a request. Removed the Bash echo/printf/inline-program exclusion.
+Executing a session-written script reads the run's response, so executable paths
+are no longer classified as file readbacks. Direct shell file readers (such as
+cat), native Read and host-recorded file reads still inherit own-file/freshness
+status. Runs with effects also supply external responses, including exit status;
+native Write/Edit acknowledgments still describe the session's own file output.
+Rule a's unsupported own-answer-copy checks remain intact. The new command
+plants really execute echo, printf, inline Python and a mutation-plus-print run;
+the query/request plants use native paired records. Imported writes followed
+only by Read or cat of the output still hold a on every Stop retry.
+
+The exact note lives directly in hook.py. It needs no lineage module, semantic
+selectors, caps or rendered history. It appears on every admitted dependent
+PreToolUse. At Stop (including the existing final adapters), the native block
+reason carries it once; stop_hook_active permits a paid retry without repetition.
+Journal admitted means the three rules are paid; the informational Stop block is
+still visible in tools/run_pairs.py's actual held/response transport and withholds
+tools/deliver.py stdout until the paid active retry. Holds for a/b/c or transport
+failure take precedence over the questions, including active retries.
+
+The starting head already had no surface.py. Removed the remaining
+no-lineage-surface regression and renamed tests/test_surface.py to
+tests/test_evidence.py (retaining its independent extractor/transcript/store
+plants). NOLOSS-MAP.tsv now marks the removed surface units as replaced_by the
+four questions. The measured reason is supplied by BRIEF.md: on a cheap model,
+reading-first before a step with missing reading rose from 80% to 91–93%; the
+lineage surface added nothing. This supplied result was not remeasured here.
+
+The full offline command was PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q
+--tb=short: 309 passed in 11.07s. Tests cover the precise note at all dependent
+boundaries, repeated PreToolUse steps, once-only Stop behavior across turns,
+nondependent events, held-rule precedence and live entry/delivery/pair transport.
+Updated older own-output plants to use native write acknowledgments when they
+need no external run reading. BORROWED.tsv and all borrowed code are unchanged.

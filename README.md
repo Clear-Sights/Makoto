@@ -7,7 +7,11 @@ network is used by the checker.
 
 Rule a requires an original artifact reading. Assistant text, worker answers,
 writer acknowledgments, and readings of files this session wrote cannot supply
-one. Literal copying of an earlier answer also needs independent source bytes.
+one. A completed code/query/request response is an artifact reading, including
+Bash echo/printf, inline programs, runs of session-written scripts and runs with
+mutations. Executing a script reads its response; directly reading an own file
+still reads own output. Literal copying of an earlier answer also needs independent
+source bytes.
 Rule b requires each NAME span's exact characters in prior tool input or
 original response bytes. Names are paths, URLs, emails and identifiers, including
 hashes, UUIDs and versions. Plain/hyphenated words, numbers, units and quoted prose
@@ -20,8 +24,13 @@ User-given external names still need that online call.
 
 Hold messages name the rule, quote the exact span, and say which reading clears
 it. PreToolUse returns a native deny, and Stop returns a native block. Every
-unpaid retry remains held, including `stop_hook_active`. Paid steps produce `{}`.
-The old lineage surface and four-family obligation layer have been removed.
+unpaid retry remains held, including `stop_hook_active`. Admitted dependent
+PreToolUse steps receive Gabriel's exact four questions as `additionalContext`.
+An otherwise admitted Stop presents them once as its block reason; a paid
+`stop_hook_active` retry produces `{}`. The old lineage surface and four-family
+obligation layer have been removed. The questions are:
+
+"Before this step: (1) If it relies on a definition, did you read the thing itself against that definition? (2) If it carries a result to another place or time, did you read the same thing again where and when it lands? (3) If it says how a branch behaves, did you feed that branch an input and read its response? (4) Is it based on the original source, read this turn, rather than on an earlier answer?"
 
 `makoto2.precision.extract` is the single reusable form extractor. It preserves
 quoted/backtick/fenced payloads, output/log lines, paths, URLs, emails, digit and

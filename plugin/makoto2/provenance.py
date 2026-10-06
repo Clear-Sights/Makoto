@@ -2,7 +2,7 @@
 import os
 import re
 from .borrowed import get, leaves, fragments
-from .observed import (WRITERS, FINAL, identity, effects, failed, programs,
+from .observed import (WRITERS, FINAL, identity, effects, failed,
                        reading_subjects, network_targets, response_text)
 from .precision import contains
 
@@ -90,12 +90,9 @@ class Ledger:
         texts = list(fragments(response))
         content_present = bool(list(leaves(response)))
         tool = pre.get('tool_name')
-        source = tool not in WRITERS | {'Agent', 'Task'} and not targets and not any(s in self.written for s in subjects)
-        if tool == 'Bash':
-            # Native shell-produced answer text is not an artifact reading.
-            for words in programs(pre):
-                if os.path.basename(words[0]) in ('echo', 'printf') or os.path.basename(words[0]) in ('python', 'python3', 'node', 'ruby', 'perl') and any(w in ('-c', '-e') for w in words):
-                    source = False
+        # A completed run reads an external response, even if it also mutates
+        # something. Direct readbacks of session-written files remain own output.
+        source = tool not in WRITERS | {'Agent', 'Task'} and not any(s in self.written for s in subjects)
         for spec in meta.get('reads', []) + pre.get('makoto', {}).get('reads', []):
             if spec.get('role') == 'relay' or spec.get('producer'):
                 source = False

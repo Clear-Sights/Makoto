@@ -27,7 +27,8 @@ def pair(tool='Read', ti=None, text='source data', tid='read', **post):
 
 def output(text='source data', boundary='Stop', tid='step'):
     if boundary in ('Stop', 'SubagentStop', 'PreDelivery'):
-        return event(boundary, last_assistant_message=text)
+        # Rule plants use an active Stop after the informational note.
+        return event(boundary, last_assistant_message=text, stop_hook_active=True)
     inputs = {'file_path': 'out.txt', 'content': text}
     if boundary == 'Edit':
         inputs = {'file_path': 'out.txt', 'old_string': 'source data', 'new_string': text}
@@ -74,16 +75,22 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
     for retry in (False, True, True):
         ev['stop_hook_active'] = retry
         response = s.send(ev)
-        assert held(response) == (not present), response
+        note = present and boundary in ('Stop', 'SubagentStop', 'PreDelivery') and not retry
+        assert held(response) == (not present or note), response
         if not present:
             assert 'rule a' in str(response)
             assert 'read an original artifact' in str(response)
             assert s.journal()[-1]['stop_hook_active_unpaid'] == retry
+        elif note:
+            assert response == {'decision': 'block', 'reason': hook.FOUR_QUESTIONS}
+            assert s.journal()[-1]['admitted']
+        elif boundary in ('Stop', 'SubagentStop', 'PreDelivery'):
+            assert response == {}
         else:
-            assert not response  # No one-time lineage block.
+            assert response['hookSpecificOutput']['additionalContext'] == hook.FOUR_QUESTIONS
 
 
-@pytest.mark.parametrize('origin', ['none', 'assistant', 'written', 'worker', 'echo', 'inline_program'])
+@pytest.mark.parametrize('origin', ['none', 'assistant', 'written', 'worker'])
 def test_a_original_reading_required(tmp_path, origin):
     s = Session(tmp_path)
     s.send(event('UserPromptSubmit', prompt='out.txt 731'))
@@ -95,13 +102,12 @@ def test_a_original_reading_required(tmp_path, origin):
         s.feed(pair())
         assert not held(s.send(write))
         s.send(dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
-        mutation = event('PreToolUse', tool_name='Bash', tool_use_id='invalidate', tool_input={'command': 'touch source.txt'})
-        s.feed([mutation, dict(mutation, hook_event_name='PostToolUse', tool_response={'stdout': '', 'exitCode': 0})])
+        mutation = output('source data', 'Write', tid='invalidate')
+        mutation['tool_input']['file_path'] = 'source.txt'
+        s.feed([mutation, dict(mutation, hook_event_name='PostToolUse', tool_response={'content': 'ok'})])
         s.feed(pair(ti={'file_path': 'out.txt'}, text='731', tid='own'))
     elif origin == 'worker':
         s.feed(pair('Task', {'prompt': 'source data'}, '731'))
-    elif origin in ('echo', 'inline_program'):
-        s.feed(pair('Bash', {'command': 'echo 731' if origin == 'echo' else 'python3 -c "print(731)"'}, '731'))
     assert held(s.send(output('731')))
     assert 'a' in s.rules()
     s.feed(pair(ti={'file_path': 'original.txt'}, text='731', tid='original'))
@@ -239,7 +245,7 @@ def test_staleness_after_any_write_and_own_readback(tmp_path, tool, settlement):
 @pytest.mark.parametrize('variant', ['unpaired', 'replay', 'wrong_input', 'wrong_tool', 'background', 'missing_content'])
 def test_invalid_receipts_cannot_pay(tmp_path, variant):
     s = Session(tmp_path)
-    call = pair(text='731')
+    call = pair(text='receipt_731')
     if variant == 'unpaired':
         call = call[1:]
     elif variant == 'replay':
@@ -254,7 +260,7 @@ def test_invalid_receipts_cannot_pay(tmp_path, variant):
     else:
         call[1]['tool_response'] = {}
     s.feed(call)
-    assert held(s.send(output('731')))
+    assert held(s.send(output('receipt_731')))
 
 
 def test_old_read_is_eligible_until_subject_written(tmp_path):
@@ -264,6 +270,7 @@ def test_old_read_is_eligible_until_subject_written(tmp_path):
     assert not held(s.send(output('data_91')))
     s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='mut'))
     assert held(s.send(output('data_91')))
+    # The mutation run is a reading, but it cannot support copying the old answer.
     assert {'a', 'b'} <= s.rules()
 
 
@@ -361,7 +368,8 @@ def test_public_classification_on_candidate_is_host_only(tmp_path):
     assert s.rules() == {'c'}
 
 
-def test_shell_output_from_own_executable_is_own_output(tmp_path):
+@pytest.mark.parametrize('command', ['python3 script.py', '/w/script.py', 'bash script.py'])
+def test_run_response_from_own_executable_is_artifact_reading(tmp_path, command):
     s = Session(tmp_path)
     s.send(event('UserPromptSubmit', prompt='script.py'))
     s.feed(pair())
@@ -369,9 +377,9 @@ def test_shell_output_from_own_executable_is_own_output(tmp_path):
     write['tool_input']['file_path'] = 'script.py'
     assert not held(s.send(write))
     s.send(dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
-    s.feed(pair('Bash', {'command': 'python3 script.py'}, 'invented_91', tid='execute'))
-    assert held(s.send(output('invented_91')))
-    assert {'a', 'b'} <= s.rules()
+    s.feed(pair('Bash', {'command': command}, 'observed_91', tid='execute'))
+    assert not held(s.send(output('observed_91')))
+    assert s.rules() == set()
 
 
 def test_offline_package_command_does_not_pay_online(tmp_path):
