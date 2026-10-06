@@ -83,7 +83,6 @@ def test_each_native_writer_tracks_code_script_and_config(tool, path):
 
 @pytest.mark.parametrize('path,content', [
     ('branch', '#!/bin/sh\necho response\n'),
-    ('branch', 'def dispatch():\n    return 1\n'),
     ('Dockerfile', 'FROM scratch\n'),
     ('.env', 'PORT=731\n'),
     ('branch.custom', 'def dispatch():\n    return 1\n'),
@@ -416,7 +415,7 @@ def test_full_data_readback_pays_reported_shell_edit_shapes(tmp_path, path, befo
                for row in s.journal()[-1]['snapshot'])
 
 
-@pytest.mark.parametrize('suffix', ['json', 'toml', 'ini', 'yaml', 'yml', 'cfg', 'conf', 'env', 'txt', 'md', 'csv'])
+@pytest.mark.parametrize('suffix', ['json', 'toml', 'ini', 'yaml', 'yml', 'cfg', 'conf', 'env'])
 @pytest.mark.parametrize('reader', ['Read', 'cat'])
 def test_data_forms_need_full_readback_after_edit(suffix, reader):
     ledger = Ledger()
@@ -525,4 +524,71 @@ def test_empty_full_data_read_is_a_witness():
     ledger = Ledger()
     feed(ledger, edit('settings.txt'))
     feed(ledger, pair(ti={'file_path': 'settings.txt'}, text='', tid='empty'))
+    assert not switch_holds(ledger)
+
+
+def test_wollemi_record_shape_passes_without_readback(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair(ti={'file_path': 'facts/mangrove.txt'}, text='The result is available.'))
+    change = edit('out/wollemi.md', tid='record')
+    for ev in change:
+        ev['tool_input']['content'] = 'The result is saved.'
+    s.feed(change)
+    s.feed(pair(ti={'file_path': 'origins/araucaria.txt'}, text='pelican_seed', tid='origin'))
+    assert not held(s.send(output('out/wollemi.md records the result from pelican_seed.')))
+    assert not any(row.get('instruments', '').startswith('makoto2.switch/')
+                   for row in s.journal()[-1]['snapshot'])
+
+
+@pytest.mark.parametrize('path', ['record.md', 'record.txt', 'record.rst', 'record.csv', 'record.log', 'record'])
+@pytest.mark.parametrize('boundary', ['Write', 'commit', 'push', 'Stop'])
+@pytest.mark.parametrize('pending', [False, True])
+def test_records_are_subtracted_even_with_code_like_contents(path, boundary, pending):
+    ledger = Ledger()
+    change = edit(path)
+    feed(ledger, change[:1] if pending else change)
+    assert not switch_holds(ledger, output(path, boundary))
+    assert not ledger.changed_code()
+
+
+@pytest.mark.parametrize('path,expect_hold', [('record.txt', False), ('worker.py', True), ('worker', True)])
+def test_commit_after_edit_preserves_script_obligations(tmp_path, path, expect_hold):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='git commit -m #!/bin/sh'))
+    s.feed(pair(text='The result is saved.'))
+    change = edit(path)
+    for ev in change:
+        ev['tool_input']['content'] = '#!/bin/sh\necho saved\n' if path == 'worker' else 'The result is saved.'
+    s.feed(change)
+    assert held(s.send(output('The result is saved.', 'commit'))) == expect_hold
+    if expect_hold:
+        assert s.rules() == {'d'}
+
+
+def test_extensionless_executable_without_shebang_still_requires_run(tmp_path):
+    path = tmp_path / 'worker'
+    path.write_text('echo response\n')
+    path.chmod(0o755)
+    ledger = Ledger()
+    feed(ledger, edit(str(path)))
+    assert switch_holds(ledger, output('Done', 'commit'))
+    feed(ledger, pair('Run', {'file_path': str(path)}, 'response', tid='run'))
+    assert not switch_holds(ledger)
+
+
+def test_observed_extensionless_shebang_survives_shell_edit():
+    ledger = Ledger()
+    feed(ledger, pair(ti={'file_path': 'worker'}, text='#!/bin/sh\necho 1\n'))
+    feed(ledger, pair('Bash', {'command': "sed -i 's/1/2/' worker"}, '', tid='change'))
+    assert switch_holds(ledger)
+
+
+def test_plain_full_replacement_subtracts_former_record_script():
+    ledger = Ledger()
+    change = edit('record.txt')
+    for ev in change:
+        ev['tool_input']['content'] = '#!/bin/sh\necho 1\n'
+    feed(ledger, change)
+    assert switch_holds(ledger)
+    feed(ledger, edit('record.txt', tid='replace'))
     assert not switch_holds(ledger)

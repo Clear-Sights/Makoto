@@ -284,7 +284,7 @@ def test_old_read_is_eligible_until_subject_written(tmp_path):
     s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='mut'))
     assert held(s.send(output('data_91')))
     # The mutation run is a reading for a; the stale name remains unpaid in b.
-    assert s.rules() == {'b', 'd'}
+    assert s.rules() == {'b'}
 
 
 def test_session_separation_and_corruption(tmp_path):

@@ -45,7 +45,10 @@ class Ledger:
                     form['q'] = self.pending_order[tid]
                     if form['q'] > prior.get('q', 0):
                         result[subject] = form
-        return result
+        # Records never run. Keep their observed forms internally so a shebang
+        # seen before a shell edit can still establish a script obligation.
+        return {subject: form for subject, form in result.items()
+                if not (form.get('record') and form.get('data'))}
 
     def change_code(self, event, subject):
         spelling = next((effect['subject'] for effect in effects(event)

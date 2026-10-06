@@ -16,7 +16,8 @@ from .precision import contains, names
 
 CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb'.split())
 CONFIG_SUFFIXES = frozenset('json jsonc yaml yml toml ini cfg conf config xml properties env'.split())
-DATA_SUFFIXES = CONFIG_SUFFIXES | frozenset('txt md csv'.split())
+RECORD_SUFFIXES = frozenset('md txt rst csv log'.split())
+DATA_SUFFIXES = CONFIG_SUFFIXES | RECORD_SUFFIXES
 CONFIG_FILES = frozenset(('Makefile', 'Dockerfile', 'Rakefile', 'Gemfile', 'Procfile', '.env'))
 RUNTIMES = re.compile(r'(?:python(?:\d+(?:\.\d+)*)?|pypy\d*|node|nodejs|deno|bun|bash|sh|zsh|fish|ruby|perl|php|lua|Rscript|pwsh)\Z')
 DECLARATIONS = re.compile(r'(?m)(?:\b(?:def|class|function|fn|func)\s+([A-Za-z_]\w*)|^\s*(?:export\s+)?(?:const\s+|let\s+|var\s+)?([A-Za-z_]\w*)\s*(?:=|:))')
@@ -36,9 +37,12 @@ def edited_forms(event, target):
         except (ValueError, TypeError):
             pass
     shebang = bool(re.search(r'(?m)^#!\s*\S+', content))
-    data_form = (suffix in DATA_SUFFIXES or os.path.basename(path) == '.env') and event.get('tool_name') != 'NotebookEdit'
+    absolute = identity(target, event)[5:]
+    executable = not suffix and os.path.isfile(absolute) and os.access(absolute, os.X_OK)
+    record = (suffix in RECORD_SUFFIXES or not suffix and os.path.basename(path) not in CONFIG_FILES and not executable) and event.get('tool_name') != 'NotebookEdit'
+    data_form = (suffix in DATA_SUFFIXES or os.path.basename(path) == '.env' or record) and event.get('tool_name') != 'NotebookEdit'
     data = data_form and not shebang
-    if not (suffix in CODE_SUFFIXES | DATA_SUFFIXES
+    if not (record or executable or suffix in CODE_SUFFIXES | DATA_SUFFIXES
             or os.path.basename(path) in CONFIG_FILES
             or event.get('tool_name') == 'NotebookEdit'
             or re.search(r'(?m)^#!\s*\S+', content)
@@ -51,13 +55,12 @@ def edited_forms(event, target):
     stem = os.path.splitext(os.path.basename(path))[0]
     if re.fullmatch(r'[A-Za-z_]\w*', stem):
         aliases.add(stem)
-    absolute = identity(target, event)[5:]
     relative = os.path.relpath(absolute, event.get('cwd') or os.getcwd())
     module = os.path.splitext(relative)[0].replace(os.sep, '.')
     if re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', module):
         aliases.add(module.removesuffix('.__init__'))
     return {'subject': identity(target, event), 'display': target, 'aliases': aliases,
-            'data': data, 'data_form': data_form}
+            'data': data, 'data_form': data_form, 'record': record}
 
 
 def full_read_subjects(pre, post):

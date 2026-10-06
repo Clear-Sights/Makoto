@@ -25,9 +25,12 @@ User-given external names still need that online call.
 Rule d holds an UNRUN CHANGE when a dependent writer names an edited code/script/
 config path, module or identifier, or a commit/push/final ships session edits.
 After the last edit, a paired call must execute that subject and return its
-output. For a data/config file without a shebang, a paired full read of the same
-path after its last edit also pays d. Data forms include .json, .toml, .ini,
-.yaml, .yml, .cfg, .conf, .env, .txt, .md and .csv. Code/scripts still need a run,
+output. For a configuration file without a shebang, a paired full read of the same
+path after its last edit also pays d. Configuration forms include .json, .toml,
+.ini, .yaml, .yml, .cfg, .conf and .env. Prose/data records (.md, .txt, .rst,
+.csv and .log) and extensionless files without executable permission or a
+shebang are excluded from d, even with code-like declarations or structured
+data. Observed shebangs still identify scripts. Code/scripts still need a run,
 including every edited code file before commit/push; reading code never pays d.
 A failed run counts; an earlier run, code readback, different execution
 path, missing output or background launch acknowledgment does not. An actual

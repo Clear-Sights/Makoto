@@ -1,6 +1,6 @@
-Makoto step 8 lets a full post-edit data/config readback pay rule d.
-Code and shebang scripts still require a post-edit run with returned output.
-The current step-8 measurement and record contract are appended below.
+Makoto step 9 subtracts prose/data records from rule d entirely.
+Configuration retains full post-edit readback payment; code/scripts require a run.
+The current step-9 measurement and record contract are appended below.
 
 Step 7 baseline (superseded for data/config readbacks)
 Makoto step 7 adds rule d: UNRUN CHANGE, protecting the switch.
@@ -450,3 +450,37 @@ Validation: PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q --tb=short passed
 550 tests in 10.21 seconds, under the 15-second limit. git diff --check passed.
 REPORT.md is mirrored under docs/. This step uses one local commit on shapes,
 with Clear-Sights identity, signing disabled, and no push or network operation.
+
+
+Step 9: rule d covers only things that run
+
+Prose/data records (.md, .txt, .rst, .csv and .log) and extensionless files
+without executable permission or a shebang are subtracted from rule d. Their
+code-like declarations and structured payloads do not create run obligations.
+They need neither a run nor a readback before dependent writers, commit/push or
+finals, and produce no switch receipt. Pending record edits are also excluded.
+The existing original-reading and exact-name rules remain independent.
+
+Configuration (.json, .toml, .ini, .yaml, .yml, .cfg, .conf and .env, plus the
+previous configuration forms) retains step 8's full paired post-edit readback
+rule. Code, notebook and script execution witnesses are unchanged. Observed
+shebangs survive shell edits, including extensionless scripts; extensionless
+files with executable permission also require a run. Full replacement of a
+record script with ordinary text removes its script obligation immediately.
+
+The supplied Read facts/mangrove.txt -> Write out/wollemi.md "The result is
+saved." -> Read origins/araucaria.txt -> Stop "out/wollemi.md records the result
+from pelican_seed." shape now passes without reading or running the output.
+Independent plants verify that an edited .txt ships in a commit without a run,
+an edited .py still holds, and an extensionless shebang script still holds.
+Additional plants cover every record suffix, extensionless declaration text,
+pending edits, dependent writers, commit/push/finals, executable permission,
+observed shebangs and full replacement. The previous extensionless declaration
+and prose-readback expectations are superseded. No spent-set vocabulary or
+subject-specific exception was added to the checker; no spent data was accessed.
+
+Validation: PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q --tb=short passed
+598 tests in 11.25 seconds, under the 15-second limit. git diff --check passed.
+REPORT.md is mirrored under docs/. This step uses one local commit on shapes,
+with the existing Clear-Sights author/committer identity, signing disabled,
+and no push or network operation.
