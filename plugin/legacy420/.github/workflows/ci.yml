@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: pytest (ubuntu, py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install pytest
+      - name: Test
+        run: python -m pytest -q tests
+
+  test-macos:
+    # public repo only: macOS minutes bill 10x on private repos (the dev mirror)
+    if: github.repository == 'Clear-Sights/Makoto'
+    name: pytest (macos, py3.13)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: python -m pip install pytest
+      - name: Test
+        run: python -m pytest -q tests
+
+  test-windows:
+    # public repo only, like macOS: Windows minutes bill 2x on private repos (the dev mirror)
+    if: github.repository == 'Clear-Sights/Makoto'
+    name: pytest (windows, py3.13)
+    runs-on: windows-latest
+    env:
+      # The plugin opens every text file as utf-8 explicitly (0 bare read_text/write_text/open
+      # under plugin/); the tests' fixtures do not, and Windows defaults to cp1252.
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: python -m pip install pytest
+      - name: Test
+        run: python -m pytest -q tests

@@ -1,0 +1,24 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________________________ test_rules __________________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-266/test_rules0')
+
+    def test_rules(tmp_path):
+        rows = evaluate.load_rows(str(HERE/'rows.tsv'), {})
+>       assert rows and {r['id'] for r in rows} == {r['id'] for r in table(ROOT/'tests/sources.tsv')}
+E       AssertionError: assert ([{'id': 'R06', 'moment': 'PreToolUse,Stop', 'predicate': 'relayed_number', 'args': {'acts': 'say'}, ...}, {'id': 'R07'...ay'}, ...}, {'id': 'R12', 'moment': 'PreToolUse,Stop', 'predicate': 'count_unread_path', 'args': {'acts': 'say'}, ...}] and {'R06', 'R07'... 'R11', 'R12'} == {'R01', 'R03'...', 'R07', ...}
+E
+E         Extra items in the right set:
+E         'R01'
+E         'R13'
+E         'R05'
+E         'R04'
+E         'R09'...
+E
+E         ...Full output truncated (4 lines hidden), use '-vv' to show)
+
+tests/acceptance_tasks.py:50: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_rules - AssertionError: assert ([{'id'...
+1 failed in 0.16s

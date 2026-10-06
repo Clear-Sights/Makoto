@@ -1,0 +1,87 @@
+entry	predicate	core_named	reason
+A2	family_lineage.hook_lineage_refs	true	core shape names this goal fake
+A3	family_spec.spec_tree	false	goal fake requires residual predicate
+A4	family_spec.spec_tree	false	goal fake requires residual predicate
+A7	family_spec.spec_claim	false	goal fake requires residual predicate
+A11	family_spec.spec_repeat	false	goal fake requires residual predicate
+A13	family_spec.spec_authorship	false	goal fake requires residual predicate
+B2	family_spec.spec_write	false	goal fake requires residual predicate
+B7	family_spec.spec_terms	false	goal fake requires residual predicate
+B9	family_spec.spec_write	false	goal fake requires residual predicate
+B23	family_spec.spec_write	false	goal fake requires residual predicate
+B35	family_spec.spec_write	false	goal fake requires residual predicate
+B36	family_spec.spec_tree	false	goal fake requires residual predicate
+C6	family_spec.spec_write	false	goal fake requires residual predicate
+C7	family_other.other_claim	false	goal fake requires residual predicate
+C10	family_spec.spec_claim	false	goal fake requires residual predicate
+C12	family_spec.spec_claim	false	goal fake requires residual predicate
+D13	family_other.other_plan	false	goal fake requires residual predicate
+E3	family_spec.spec_authorship	false	goal fake requires residual predicate
+E5	family_spec.spec_repeat	false	goal fake requires residual predicate
+E10	family_spec.spec_repeat	false	goal fake requires residual predicate
+E11	family_spec.spec_budget	false	goal fake requires residual predicate
+E12	family_spec.spec_launch	false	goal fake requires residual predicate
+E13	family_spec.spec_history	false	goal fake requires residual predicate
+G2	family_spec.spec_history	false	goal fake requires residual predicate
+G5	family_spec.spec_history	false	goal fake requires residual predicate
+A14	family_other.other_normalization	false	goal fake requires residual predicate
+B4	family_other.other_witness	false	goal fake requires residual predicate
+B11	family_other.other_witness	false	goal fake requires residual predicate
+B14	family_other.other_witness	false	goal fake requires residual predicate
+B26	family_switch.switch_supervisor	false	goal fake requires residual predicate
+C8	family_other.other_claim	false	goal fake requires residual predicate
+D1	family_other.other_claim	false	goal fake requires residual predicate
+D4	family_lineage.lineage_drift	true	core shape names this goal fake
+D8	family_other.other_run	false	goal fake requires residual predicate
+D11	family_other.other_write	false	goal fake requires residual predicate
+D12	family_other.other_write	false	goal fake requires residual predicate
+D14	family_other.other_run	false	goal fake requires residual predicate
+E7	family_other.other_environment	false	goal fake requires residual predicate
+F2	family_lineage.lineage_edit	false	goal fake requires residual predicate
+F7	family_lineage.lineage_drift	true	core shape names this goal fake
+F8	family_other.other_plan	false	goal fake requires residual predicate
+F14	family_other.other_run	false	goal fake requires residual predicate
+G1	family_lineage.hook_lineage_refs	true	core shape names this goal fake
+A6	family_switch.switch_tree	false	goal fake requires residual predicate
+B1	family_switch.switch_supervisor	false	goal fake requires residual predicate
+B5	family_spec.spec_write	false	goal fake requires residual predicate
+B10	family_switch.switch_run	false	goal fake requires residual predicate
+B20	family_spec.spec_write	false	goal fake requires residual predicate
+B21	family_switch.switch_run	false	goal fake requires residual predicate
+B28	family_switch.switch_run	false	goal fake requires residual predicate
+B34	family_switch.switch_run	false	goal fake requires residual predicate
+B37	family_switch.switch_run	false	goal fake requires residual predicate
+C3	family_spec.spec_claim	false	goal fake requires residual predicate
+C4	family_switch.switch_run	false	goal fake requires residual predicate
+C5	family_switch.switch_tree	false	goal fake requires residual predicate
+C11	family_switch.switch_doc	true	core shape names this goal fake
+D9	family_switch.switch_supervisor	false	goal fake requires residual predicate
+E1	family_switch.switch_tree	false	goal fake requires residual predicate
+E8	family_switch.switch_run	false	goal fake requires residual predicate
+E9	family_switch.switch_tree	false	goal fake requires residual predicate
+F6	family_switch.switch_run	false	goal fake requires residual predicate
+F10	family_lineage.lineage_drift	true	core shape names this goal fake
+H1	family_lineage.hook_lineage_refs	true	core shape names this goal fake
+H2	family_lineage.lineage_drift	true	core shape names this goal fake
+H3	family_lineage.lineage_edit	false	goal fake requires residual predicate
+H4	family_lineage.hook_lineage_refs	true	core shape names this goal fake
+H5	family_lineage.hook_lineage_refs	true	core shape names this goal fake
+H6	family_lineage.lineage_units	false	goal fake requires residual predicate
+A4	denominators.duplicates	false	dev fake record 9 requires this structural contract comparison
+A4	denominators.duplicates	false	dev fake record 11 requires this structural contract comparison
+B9	denominators.waiver	false	dev fake record 37 requires this structural contract comparison
+B9	denominators.waiver	false	dev fake record 39 requires this structural contract comparison
+E5	denominators.retry_bound	false	dev fake record 81 requires this structural contract comparison
+E5	denominators.retry_bound	false	dev fake record 83 requires this structural contract comparison
+E11	denominators.budget	false	dev fake record 89 requires this structural contract comparison
+D11	denominators.preservation	false	dev fake record 153 requires this structural contract comparison
+D11	denominators.preservation	false	dev fake record 155 requires this structural contract comparison
+F2	denominators.shared_owner	false	dev fake record 171 requires this structural contract comparison
+F14	denominators.behavior	false	dev fake record 181 requires this structural contract comparison
+F14	denominators.behavior	false	dev fake record 183 requires this structural contract comparison
+B5	denominators.literal_measurement	false	dev fake record 197 requires this structural contract comparison
+B10	denominators.constant_checker	false	dev fake record 203 requires this structural contract comparison
+C3	denominators.every_member	false	dev fake record 227 requires this structural contract comparison
+C4	denominators.fail_closed	false	dev fake record 229 requires this structural contract comparison
+E8	denominators.combined_options	false	dev fake record 251 requires this structural contract comparison
+H5	denominators.section_identity	false	dev fake record 291 requires this structural contract comparison

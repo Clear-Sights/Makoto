@@ -1,0 +1,23 @@
+{
+  "name": "makoto",
+  "owner": {
+    "name": "Clear-Sights",
+    "url": "https://github.com/Clear-Sights"
+  },
+  "plugins": [
+    {
+      "name": "makoto",
+      "source": "./plugin",
+      "description": "Checks statements against observed tool effects using 12 source-pinned rules; blocks findings or stays silent, with subject-bound completion witnesses.",
+      "category": "workflow",
+      "tags": [
+        "integrity",
+        "guardrails",
+        "hooks",
+        "claims"
+      ],
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/Clear-Sights/Makoto"
+    }
+  ]
+}

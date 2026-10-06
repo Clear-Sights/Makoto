@@ -1,0 +1,640 @@
+piece	status	reason
+step3:rule_a	added	Original artifact readings and literal own-answer copies checked before each dependent step.
+step3:rule_b	added	One exact form extractor; prior fresh tool inputs/responses or user-given spans pay literal names.
+step3:rule_c	added	Current-turn successful network observation for exact URLs/versioned packages/host-classified public projects.
+step3:earlier_turns	kept	All earlier session readings remain eligible until their subject is written; c stays current-turn only.
+step3:lineage_surface	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+step3:dictionary	added	Deterministic closed sorted offline common-English allowlist; gaps and scope explicitly documented.
+step3:unknown_public_names	bounded	A record alone cannot distinguish a local bare name from a public one; trusted host classification is required.
+step3:semantic_dependence	bounded	Original-reading presence and exact name witnesses do not measure arbitrary hidden prose dependencies; step 6 removes the stronger literal-copy predicate.
+step3:opaque_shell	bounded	Recorded effects/origins/network subjects are required for opaque shell behavior and external mutations.
+plugin/makoto2/hook.py:transport	kept	Locked hash-linked journal, session isolation, native deny/block, fail-closed validation and every unpaid retry.
+plugin/makoto2/provenance.py:Ledger	replaced_by	Agnostic fresh-source/own-output/tool-input/network sweep; removed definitions, aliases, semantic selectors and four-family contracts.
+tools/run_pairs.py	kept	Print held and actual response per session without executing recorded commands.
+tools/deliver.py	kept	Owns stdout final delivery and emits nothing on an unpaid Stop.
+tests/test_lifecycle.py	kept	Retained applicable lifecycle tests; fresh-account Stop assertion changed to rule-a hold.
+BORROWED.tsv	added	Pins DetIO walker/store verification and Causality trace receipt; identical requested workspace copy.
+NOTICE	added	Upstream license/notice/provenance shipped in built plugin artifact.
+REPORT.md	added	Requested root report mirrors updated existing docs/REPORT.md.
+NOLOSS-MAP.tsv	added	Requested root map mirrors updated existing docs/NOLOSS-MAP.tsv.
+plugin/makoto2/precision.py	added	Step 3 single precision owner, borrowed primitives or session transcript adaptation.
+plugin/makoto2/precision.py:Span	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/precision.py:extract	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/precision.py:contains	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/precision.py:add	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/precision.py:edge	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/borrowed.py	added	Step 3 single precision owner, borrowed primitives or session transcript adaptation.
+plugin/makoto2/borrowed.py:leaves	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/borrowed.py:get	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/borrowed.py:receipt	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/borrowed.py:fragments	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/transcript.py	added	Step 3 single precision owner, borrowed primitives or session transcript adaptation.
+plugin/makoto2/transcript.py:key	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/transcript.py:history	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/transcript.py:merge	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/transcript.py:occurrence_keys	added	Executable step-3 form/record unit; plants cover admission and edge cases.
+plugin/makoto2/four_checks.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/four_checks.py:terms	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:readings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:emit	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:lineage	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:spec	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:other_point	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:switch	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/four_checks.py:findings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/claim_reader.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/claim_reader.py:output_text	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/claim_reader.py:value_tokens	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/claim_reader.py:_read_claims	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/claim_reader.py:read_claims	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/claim_reader.py:named_failure_identities	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/family_spec.py:finding	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:args	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:pre	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:stop	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:content	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:matches	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:history	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:exit_of	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:settled	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:verifier_keys	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:is_verifier	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_tree	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_authorship	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_terms	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_write	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_launch	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_budget	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:Claim	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:claims	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:read_claims	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_claim	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_repeat	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:spec_history	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:findings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:evaluate	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_spec.py:shipping_observed	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/family_other.py:_facts	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:_claims	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:_tree	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_normalization	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_witness	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_run	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_write	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_plan	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_claim	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:other_environment	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_other.py:findings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/family_switch.py:switch_tree	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_self	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_run	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_write	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_zero	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_exit	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_pass	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_doc	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:findings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:switch_supervisor	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_switch.py:emit	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/family_lineage.py:digest	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:anchor	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:references	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:readings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:output_text	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:cited_references	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:content_references	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:hook_lineage_refs	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:observed_reference	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_refs	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_drift	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_absence	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_units	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_pin	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:unpaid	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_edit	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:lineage_provenance	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:findings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/family_lineage.py:input_text	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/lineage.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/denominators.py	excluded	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/denominators.py:contract	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:tree_of	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:waiver	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:constant_checker	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:budget	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:preservation	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:behavior	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:retry_bound	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:findings	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:duplicates	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:shared_owner	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:every_member	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:fail_closed	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:combined_options	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:literal_measurement	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/denominators.py:section_identity	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/rows.tsv	excluded	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/hook.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/hook.py:d_in	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/hook.py:sigma_path	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/hook.py:sigma_read	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/hook.py:sigma_append	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/hook.py:o_once	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/hook.py:d_out	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/hook.py:main	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/observed.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/observed.py:Obs	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_basename	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_effective_argv	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_normalize_segment_argv	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_nested_command	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_shell_path_escapes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_segments	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_norm	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_text_objects	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_flatten	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_exit_of	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_executed	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_mkdir	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_touch	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_tee	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_copy	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_truncate	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_inplace	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_w_none	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_s_ls	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_s_find	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_s_grep	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_search_of	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_bash_reading	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_value_objects	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_input_objects	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_read	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:Record	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_user_entries	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:record	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:act_kinds	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:text_of	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/observed.py:protect	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:close_segment	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:__init__	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:observed	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:objects_of	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/evaluate.py:unwitnessed	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:load_rows	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:load_cfg	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_load_r	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_acts	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:family_findings	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:evaluate	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/evaluate.py:Spec	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_brief_fields	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:dispatch_schema_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:dispatch_pins_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_text_of	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_sentences	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_strip_quoted	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_primary	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_norm	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_walk_user_texts	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_user_texts_of	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_last_same_call	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_names	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_is_act	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_denied	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:asks_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:thread_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_target	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:pile_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:pile_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:absence_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:absence_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:number_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:number_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_words_text	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:quote_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:quote_seed	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:quote_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:write_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:read_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_failed_test_subjects	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:_unnamed_failures	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:landed_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:landed_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:count_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:repeat_owes	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:wrote_pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:__init__	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py	replaced_by	One shared ledger and four presence predicates replace semantic and heuristic decisions.
+plugin/makoto2/provenance.py:tokens	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Reading	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Trace	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:trace_for	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:violations	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:__init__	replaced_by	precision/observed/provenance/transcript/evaluate/hook form record contract; legacy helper is not a separate decision owner.
+plugin/makoto2/provenance.py:current	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:origins	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:stale	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:relay_sources	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:replaced_receipt	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+config:state_dir	kept	State location retained.
+config:default_tool_timeout_ms	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:min_number_digits	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:quote_min_len	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:quote_window	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:quote_gap	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:count_word_gap	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:negation_window	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+config:snippet_len	excluded	Legacy word/number/timeout heuristic; no role in presence predicates.
+tests/test_tells.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_provenance.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_real_session.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_dispatch.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_claim_reader.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_windows_paths.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_restored_fixes.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_repeat_register.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_family_switch.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_family_integration.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_evaluate.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_structural_rules.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_observed.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_family_spec.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_weaknesses.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_lineage.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_denominators.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_goal.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+tests/test_hook.py	replaced_by	tests/test_shapes.py native live-hook plants and contract controls; legacy semantic assertions no longer apply.
+plugin/makoto2/evaluate.py:Spec.__init__	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/evaluate.py:landed_pays.pays	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/family_lineage.py:observed_reference.input_text	replaced_by	plugin/makoto2/{observed,provenance,obligations,evaluate,hook}.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+plugin/makoto2/family_switch.py:switch_tree.emit	replaced_by	plugin/makoto2/{observed,provenance,obligations,evaluate,hook}.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+plugin/makoto2/observed.py:Record.__init__	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:Record.objects_of	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:Record.observed	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_segments.close_segment	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/observed.py:_shell_path_escapes.protect	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Trace.__init__	replaced_by	plugin/makoto2/{observed,provenance,obligations,evaluate,hook}.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+plugin/makoto2/provenance.py:Trace.current	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Trace.origins	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Trace.relay_sources	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Trace.replaced_receipt	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+plugin/makoto2/provenance.py:Trace.stale	subtracted	Step 3: this former four-family/selector helper is superseded by exact spans and fresh-source/network record predicates.
+tests/acceptance_tasks.py	replaced_by	Shared ledger and presence predicates replace the old decision route; generated live-hook plants replace its semantic tests.
+tests/acceptance_tasks.py:product_function	kept	Retained in tests/test_lifecycle.py; outside four-shape decision scope.
+tests/acceptance_tasks.py:suite	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:table	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_advance	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_advance.finding	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_advance.rec	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_advance.run	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_audit	kept	Retained in tests/test_lifecycle.py; outside four-shape decision scope.
+tests/acceptance_tasks.py:test_configure	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_decode	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_emit	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_evaluate	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_fresh	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_handoff	kept	Retained in tests/test_lifecycle.py; outside four-shape decision scope.
+tests/acceptance_tasks.py:test_join	kept	Retained in tests/test_lifecycle.py; outside four-shape decision scope.
+tests/acceptance_tasks.py:test_observe	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_once	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_package	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_persist	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_register	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_rules	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_subtract	kept	Retained in tests/test_lifecycle.py; outside four-shape decision scope.
+tests/acceptance_tasks.py:test_validate	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/acceptance_tasks.py:test_zero	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_activity_mention_does_not_assert_a_current_verdict	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_changed_original_needs_reading_after_change	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_point_comparison_requires_the_same_subject	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_unique_parameter_names_failure_but_ambiguous_parameter_does_not	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_unit_comparison_binds_the_metric_not_just_its_number	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_unverified_changed_property_is_silent	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_written_property_has_subject_and_values	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_claim_reader.py:test_written_unverified_boolean_does_not_claim_a_decided_measurement	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_common_owner_imports_are_not_copied_implementations	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_constant_exports_are_not_unused_computations	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_explicit_commit_citations_require_primary_readings	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_failure_counts_have_the_same_obligation_in_text_and_handoffs	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_native_terms_table_uses_the_same_empty_binding_predicate	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_reading_the_prior_artifact_pays_the_overwrite_obligation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_residue_branch_must_belong_to_the_match	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_revision_field_in_primary_measurement_pays_citation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_denominators.py:test_shipment_status_is_distinct_from_a_modified_noun	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_dispatch.py:run_session	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_dispatch.py:run_session.send	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_dispatch.py:test_only_settled_exact_acceptance_pays	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_dispatch.py:test_optout_has_no_dispatch_contract	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_dispatch.py:test_read_line_has_the_register_pin	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:Obs	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:Record	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:Record.__init__	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:Record.objects_of	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:Record.observed	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:observation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:pre	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:reply	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:rows	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_artifact	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_config_keys_cover_config	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_counted_failure_keeps_its_subject	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_every_row_has_a_case_and_a_verbatim_source	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_failure_subject_fold_and_every_name	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_later_failure_invalidates_success	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_launcher_success_is_not_job_success	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_named_status	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_evaluate.py:test_plant_blocks_and_lookalike_silent	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_integration.py:candidate	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_integration.py:test_agent_history_survives_dispatch_optout	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_integration.py:test_switch_ast_is_routed_from_native_write	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_integration.py:test_toml_assignment_is_not_a_python_ast	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_integration.py:test_user_anchor_is_required_for_post_user_baseline	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_integration.py:test_workspace_supplies_named_sets_without_a_default_vocabulary	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:post	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:pre	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:rec	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_agent_boundary_and_verifier_are_separate_history_variables	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_authorship_membership_is_exact_while_messages_match	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_budget_reads_elapsed_and_preserves_equality	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_i1_tests_label_presence_not_filled_cells_and_only_agent	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_loop_else_is_the_register_exclusion	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_named_sets_are_never_guessed	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_pre_events_never_become_settled_observations	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_repeat_uses_any_prior_qualifying_exit_and_last_command_boundary	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_spec.py:test_zip_requires_literal_true_and_dict_uses_python_equality	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_failed_verifier_pays_doc_but_not_pass_claim	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_gate_invokes_each_check_and_denies_crash	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_gate_invokes_each_check_and_denies_crash.crash	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_match_capture_and_guard_are_not_wildcard	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_run_predicate_requires_its_run_context	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_test_write_operand_exclusions	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_zero_really_probes_every_removal_and_unrelated_rows	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_family_switch.py:test_zero_really_probes_every_removal_and_unrelated_rows.read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_goal.py:run_payloads	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_goal.py:test_fake	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_goal.py:test_honest	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_goal.py:test_nonexistent_path_is_not_unread	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_goal.py:test_register_population_and_third_state	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_goal.py:test_routine_honest	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:Rec	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:Rec.__init__	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:always	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:ev_	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:never	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:test_ci_receipt_controls	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_hook.py:test_hook_behavior	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:act	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:ident	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:test_closing_reference_requires_read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:test_each_reference_requires_its_own_read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:test_missing_local_source_requires_verification_or_label	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:test_reading_own_answer_does_not_create_a_source	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:test_sentence_punctuation_is_not_part_of_the_source_name	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_lineage.py:test_source_changes_at_use_and_reread	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:bash	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:post	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:pre	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:seen	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_deterministic	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_edit_writes_but_does_not_create	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_field_destruction_plant_neighbour_still_blocks	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_field_pasted_fix_read_only_snippets_change_no_file_and_count_as_observation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_field_report_before_run_heredoc_fixture_quoting_verdicts	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_field_report_before_run_printf_after_run_printed_the_results	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_field_unobserved_destruction_rm_of_dirs_created_by_mkdir	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_interface_shape	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_output_naming_an_object_observes_it	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_before_bound	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_code_call_is_not_a_file	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_denied_call_did_not_execute	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_empty_history	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_parent_directory_does_not_observe_child	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_program_name_is_not_an_object_of_observation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_unobserved_object_blocks	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_unsettled_event_observes_nothing	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_plant_verdict_with_no_earlier_run	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_read_object_is_observed	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_red_run_still_executed	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_redirect_writes_and_creates_new_file	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_search_fields	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_send_text	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_slash_words_need_path_evidence	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_turn_start_is_first_obs_after_last_boundary	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_turn_start_zero_without_boundary	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_user_texts_from_fetched_thread_user_entries_only	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_observed.py:test_written_object_is_observed	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:claim	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:run	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_changed_verdict_and_named_value	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_command_observation_and_subject_update	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_communicated_value_is_not_a_test_verdict	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_displayed_change_text_does_not_invalidate_another_command	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_edit_invalidates_value_without_reading_disk	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_historical_value_and_subject_local_unverified	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_primary_iso_timestamp_pays_minute_projection	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_receipt_after_subject_replacement	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_receipt_replacement_requires_same_claim_subject	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_relay_citation_requires_original	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_requirement_text_is_not_a_verification_receipt	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_superseded_value_and_latest_read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_time_value_is_not_a_number_fragment	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_provenance.py:test_unrelated_number_cannot_refresh_superseded_measurement	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_real_session.py:test_real_session	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_repeat_register.py:history	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_repeat_register.py:test_repeat_scope_is_append_or_failed_command	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:_obs	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:read	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:test_absence_requires_independent_probe_when_observed_basis_is_unpaid	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:test_asserted_sources_require_direct_reading	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:test_changed_result_at_same_offset_fires_again	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:test_current_settled_event_joins_the_record	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:test_explicit_inventory_allows_required_units_and_consumed_helpers	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:test_preserving_whole_write_must_keep_unrelated_lines	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_restored_fixes.py:write	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:detect	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_behavior_comparison	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_bounded_preservation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_combined_options	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_constant_checker	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_contamination_of_evaluation	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_declared_direction	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_duplicate_resolution	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_every_member_is_not_any	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_exact_cardinality	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_fail_closed_shell	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_literal_measurement	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_outer_budget	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_reply_word_limit_does_not_create_retry_contract	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_shared_rule_owner	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_subject_section_identity	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_temporary_waiver	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_unbounded_retry	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_structural_rules.py:test_unknown_probe_is_not_false	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_tells.py:measure	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_tells.py:reason	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_tells.py:run_session	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_tells.py:test_fake_caught_and_named	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_tells.py:test_honest_silent	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_tells.py:test_register_and_tell_population	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_weaknesses.py:test_weaknesses	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath.__init__	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath.__str__	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath.__truediv__	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath.mkdir	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath.unlink	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:WindowsPath.write_text	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_posix_case_urls_and_counts_remain_distinct	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_posix_shell_escapes	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_asserted_sources_require_direct_reading	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_fake_and_honest	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_fake_and_honest.local	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_preserving_whole_write_must_keep_unrelated_lines	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_record_identity	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_shell_path_arguments	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:test_windows_slash_words_need_path_evidence	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:windows_tmp	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+tests/test_windows_paths.py:windows_tmp.local	replaced_by	tests/test_shapes.py and tests/test_lifecycle.py implement the applicable record contract; obsolete semantic, drift, filename and vocabulary checks are excluded.
+workspace:dispatch	replaced_by	Host-owned dependencies and exact invocation obligations replace brief labels, completion-word checks and workspace probing.
+plugin/makoto2/lifecycle.py	kept	Packaging, audit and explicit caller lifecycle utilities remain outside the blindspot decision engine; no fifth predicate.
+plugin/makoto2/__init__.py:build_package	kept	Packaging and uninstall behavior retained; metadata bumped to 5.0.0-dev.
+plugin/hooks/hooks.json	kept	Native event routing retained to the one live hook entry.
+journals/receipts	kept	Historical evidence stays available; new journal is locked, append-only, hash-linked and retains all raw events and decision snapshots.
+tests/sources.tsv	kept	Historical quote pins retained as evidence, not loaded by a second rule engine.
+plugin/makoto2/rows.tsv:R06	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
+plugin/makoto2/rows.tsv:R07	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
+plugin/makoto2/rows.tsv:R08	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
+plugin/makoto2/rows.tsv:R11	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
+plugin/makoto2/rows.tsv:R12	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
+adapter:declared	removed	No added exact catch with zero false holds beyond inferred plus surface established; basis syntax/understatement imposes an extra declaration contract.
+plugin/makoto2/obligations.py:basis_text	subtracted	Step 3: replaced by rules a/b/c in evaluate.py; explicit four-family host contracts are outside the corrected scope.
+plugin/makoto2/obligations.py:parse_basis	subtracted	Step 3: replaced by rules a/b/c in evaluate.py; explicit four-family host contracts are outside the corrected scope.
+plugin/makoto2/obligations.py:declaration	subtracted	Step 3: replaced by rules a/b/c in evaluate.py; explicit four-family host contracts are outside the corrected scope.
+inferred:named_source_hold	replaced_by	Step 3 precision.py/evaluate.py enforce missing exact spans and unsupported own-output values as holds.
+inferred:trace_value_hold	replaced_by	Step 3 precision.py/evaluate.py enforce missing exact spans and unsupported own-output values as holds.
+inferred:synthetic_first_point	removed	No invented first point for unread mutations; exact destination read-back uses recorded sequence.
+config:adapter	replaced_by	Only inferred accepted; default changed from declared to inferred.
+hook:stop_surface	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+tools/run_pairs.py:surface	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+tests:declared_plants	replaced_by	Step 3 self-authored form/record plants, transcript and freshness plants; former surface/four-family behavior intentionally superseded.
+plugin/makoto2/surface.py	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:exact	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:named_subjects	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:fresh	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:hard_obligations	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:render	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:executable_inputs	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+plugin/makoto2/surface.py:emit	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:step	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:mutate	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_surface_line_present_absent	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_all_boundaries_emit_exact_surface	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_stale_record_holds_and_readback_releases	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_surface_stop_once_does_not_release_exact_hold	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_caps_are_counted_and_deterministic	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_command_inputs_and_nonzero_exit_exact	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_definition_binds_one_prior_reading	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_driver_reports_actual_emitted_text_only	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_declared_is_removed	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_stale_target_without_content_name	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_read_before_edit_does_not_pay_readback	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_script_edit_resets_run_record	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_transfer_destination_fact_uses_reserved_destination	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_relay_value_with_original_elsewhere_is_not_only_relay	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+hook:message_less_stop	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+surface:unseen_relative_path	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+surface:registered_subject_and_alias	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+surface:path_executable_identity	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+ledger:written_value_carrier	replaced_by	Only native writer replacement bytes bind to its target; replaced old text and arbitrary Bash arguments do not prove written content.
+ledger:native_script_identity	replaced_by	Native target script registration cannot transfer shebang/executable classification to unrelated host effects.
+tests:git_boundary_surface	subtracted	Step 3: the correction requires pre-step holds; the lineage display and one-time surface Stop block are unnecessary.
+tests/test_surface.py:test_stop_without_message_still_surfaces_once	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_unseen_relative_path_has_missing_reading_fact	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_path_resolution_does_not_invent_local_execution	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_only_writer_replacement_values_are_bound_to_target	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_registered_subject_without_receipt_is_still_named	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_exact_host_alias_name_uses_canonical_freshness	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+tests/test_surface.py:test_native_shebang_does_not_classify_unrelated_host_effect	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing.
+step4:rule_b_precision_values	subtracted	Rule b no longer treats numbers/units/plain or hyphenated words/prose/log lines as unread subjects; precision.extract still preserves them for DetIO.
+plugin/makoto2/precision.py:extract	kept	General precision owner retained; only URL curly-delimiter boundary corrected after a false c hold plant.
+plugin/makoto2/precision.py:name_kind	added	Closed NAME-form classifier independent of the common-English allowlist; documented decimal/hash ambiguities.
+plugin/makoto2/precision.py:names	added	NAME view retains exact offsets; quoted complete names, wrappers and unit exclusions have held/clear plants.
+plugin/makoto2/evaluate.py:output_name	added	Current native writer target and session-written canonical file identities exempt b; space-path slices require a complete boundary-matched output name.
+step4:rule_a_output_reference	replaced_by	False a holds reproduced against b5c1616 for out.txt/backticks; output-name references exempt literal-copy checks, never absence of original reading or unsupported own contents.
+step4:rule_a_quoted_source_reference	replaced_by	Quoted-name retry false hold reproduced; exact original name bytes pay formatting-only single-name references; own quoted prose still held.
+step4:rule_c_quoted_url	replaced_by	Curly quote was wrongly captured as URL bytes; strip delimiter and check NAME URL/package spans; current-turn successful-fetch contract retained.
+tests/test_shapes.py:test_b_absent_and_present_exact_form	replaced_by	Retained NAME plants; value/prose precision plants move to test_names exclusions and existing extractor plants.
+tests/test_shapes.py:test_b_near_miss_spelling_is_not_regenerated	replaced_by	Retained path/case/name near misses; numeric near miss becomes id731/id73, prose spacing no longer triggers b.
+tests/test_shapes.py:test_b_only_assistant_text_never_pays	kept	Assistant-only name id_731 stays unpaid; values retain rule a instead of b.
+tests/test_shapes.py:test_raw_tool_output_lines_are_exact	replaced_by	test_raw_tool_output_checks_names_only: whole lines remain precision, b holds only their embedded names.
+step4:borrowed_pins	kept	No new borrowed code; all three source commits retained and descriptions updated for NAME-only rule b.
+tests/test_names.py:test_each_name_form_unread_and_read	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_precision_values_and_words_do_not_trigger_b	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_excluded_names_remain_general_precision	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_current_writer_target_is_output_without_prompt_or_read	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_written_or_edited_file_in_final_is_output	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_output_reference_still_needs_original_artifact	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_output_exemption_cannot_hide_unread_name_in_content	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_own_file_contents_still_hold_a_and_b	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_rejected_or_no_effect_write_does_not_exempt_final_path	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_name_variants_still_hold	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_own_quoted_prose_still_needs_exact_artifact_bytes	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_quoted_path_with_spaces_is_one_exact_name	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+tests/test_names.py:test_output_paths_with_spaces_clear_b_and_a	added	Self-authored step 4 exclusion/NAME/output/a-c regression plant; whole suite 284 passed in 10.39s.
+step5:run_responses	replaced_by	Artifact-response readings replace Bash synthesis and own-executable exclusions; completed mutation runs count too. Direct own-file readbacks and assistant relays remain excluded.
+plugin/makoto2/hook.py:FOUR_QUESTIONS	added	Exact four-question text required by BRIEF.md; emitted only after the existing holds clear.
+plugin/makoto2/hook.py:questions	added	Every admitted dependent PreToolUse gets additionalContext; once at Stop via block reason, suppressed by stop_hook_active without suppressing rule holds.
+tests/test_surface.py:test_no_lineage_module_or_surface	replaced_by	Gabriel's four questions (plugin/makoto2/hook.py:FOUR_QUESTIONS/questions) replace the lineage surface; BRIEF.md's supplied cheap-model measurement raised reading-first for missing readings from 80% to 91–93%; lineage added nothing. Removed the regression requiring no reminder on admitted steps.
+tests/test_evidence.py	kept	Independent precision/transcript/freshness/DetIO plants moved out of the former surface-named file; no lineage surface plants retained.
+tests/test_shapes.py:test_run_response_from_own_executable_is_artifact_reading	replaced_by	Replaces the own-executable false hold with observed run-response admission for Python, shell and direct executable calls.
+tests/test_questions.py	added	Step 5 command/query/request and own-file plants, exact four questions at all boundaries, once-only Stops and held retry precedence; 309 whole-suite tests passed in 11.07s.
+step6:rule_a_literal_copy	replaced_by	Gabriel's original-artifact existence predicate; derived or repeated prose/values need not occur verbatim. Exact unread names remain under b; all-own readings still hold a.
+step6:denied_mutation	added	Matching host-reported mutation after denial invalidates old evidence and taints own-file readbacks; it cannot create source witnesses, output exemptions or admission.
+step6:version_punctuation	replaced_by	Terminal punctuation lies outside package/version lexical spans; retain exact compact prerelease, postrelease and build characters.
+step6:network_status	replaced_by	Completed paired native text/dictionary fetch responses pay c without a mandatory explicit zero-status field; reported failures, pending/background/unpaired/offline calls stay unpaid.
+step6:package_identity	added	Compare exact package and version components across @, ==, v/version and whitespace separators for c only; no case/version/URL aliasing and b still matches exact characters.
+step6:external_ambiguity	bounded	Bare public/local names and private-label/version versus package/version forms cannot be separated universally from form; use host external_subjects, never a development-set name or label list.
+tools/diagnose_pairs.py	added	Read-only record/grade diagnosis writes one TSV row per supplied session and a Markdown summary; optional later grade appends per-rule and native results without executing recorded commands.
+tests/test_names.py:test_own_file_contents_still_hold_a_and_b	replaced_by	test_own_file_contents_never_pay_unread_names: an independent artifact clears a, while session-owned contents cannot witness unread names in b.
+tests/test_names.py:test_own_quoted_prose_still_needs_exact_artifact_bytes	replaced_by	test_own_quoted_prose_needs_original_reading_not_literal_delimiters: no artifact holds a; source prose without answer delimiters clears it.
+tests/test_shapes.py:test_old_read_is_eligible_until_subject_written	kept	A mutation run is an original response for a, but the stale source name remains unpaid under b; removed obsolete literal-copy assertion.
+tests/test_record_forms.py	added	Independent held/clear plants for repeated computations, prior-turn source reads, denied mutation readbacks, fetch result forms, punctuation, exact package identity and external classification.
+step6:measurement_package_collision	replaced_by	A whitespace package/version candidate whose numeric release slice belongs to a number-with-unit span is a measured value. Explicit package operators/v forms remain names; unit substrings inside full versions cannot hide them.
+step6:verification	kept	360 whole-suite tests passed in 12.80s; final run_pairs_D replay has 600 rows, cohort a 100/100 and 0/100, b 92/97 and 7/103, c 62/100 and 0/100.
+step6:development_residuals	bounded	Any rule holds 254/297 present and 9/303 absent; retain 38 unclassified public-name c misses, five bare-name b misses, four ambiguous private-version c false holds and reported b/label conflicts. Native reminder-inclusive flags are 274/297 and 194/303, not rule-detection claims.
+step7:rule_d	added	UNRUN CHANGE holds dependent names and commit/push/finals after code edits until a paired execution starts after the latest edit and returns its response; no behavior word lists.
+step7:shape_tags	added	Every finding and native rule hold names its protected shape: a lineage, b spec, c other point, d switch.
+step7:edit_order	added	Native/shell/host effects track code/config versions and pending edits; a pre-edit run returning late cannot pay; no_effect preserves prior payment.
+step7:execution_witness	added	Exact cwd/path invocation plus paired returned output pays d, including failed/silent runs; readbacks, other paths, launch-only/unpaired/mismatched/replayed responses cannot pay.
+step7:opaque_execution	bounded	Conditional/compound shell, dynamic imports/expansion and opaque runners require host-owned actual invocation subjects on paired tool records; never infer a selected branch from aggregate output.
+step7:rule_abc	kept	Existing a/b/c predicates retained; only shape tags added. Output exemptions in b never pay d.
+step7:four_questions	kept	Gabriel's exact note and paid once-only Stop behavior retained; unpaid d takes precedence on every retry.
+step7:causality_run	adapted	Pinned Causality run's actual-execution/output capture design adapted to native tool pairing; unchanged borrowed receipt traces actual run IDs, with no checker subprocess execution.
+tests/test_switch.py	added	130 independent plants cover every switch clause and near miss, real failure output, live hooks, imported history, runner responses and all four shape tags.
+step7:notebook_plants	updated	Existing notebook output/reminder plants execute changed notebook before shipping/editing again; b output exclusion and exact four questions stay verified.
+step7:live_suite_setup	updated	Setup history uses identical in-process native journal records; all boundary/retry admission checks still cross CLI transport; 490 tests in 10.90 s.
+step10:ordered_bash	replaced_by	The simple-call-only execution gate is replaced by quote-aware lexical segment order at unquoted ; && || | and newlines; uncertain syntax or branch selection retains the aggregate adapter.
+step10:segment_edits	added	Native shell mutations and gofmt -w get segment positions; later exact runs with paired returned output pay, reversed order and subsequent edits do not; external overlapping edits preserve call-start freshness.
+step10:original_reader	added	An eligible file-reader operand before a same-call write gives a lineage existence witness without attributed aggregate bytes; own/tainted/other pending writes and relays remain excluded.
+step10:quote_heredoc	added	Quotes escapes comments nested substitutions and heredoc bodies protect separators; static unquoted redirects identify writes without stealing mutator operands or treating quoted > as syntax.
+step10:short_circuit	bounded	Literal true/false branches resolve; successful host completion selects &&; unknown || and failing unknown && keep prior behavior; pipelines use the requested lexical contract.
+step10:host_scope	kept	Actual invocation subjects complete reads and effects remain call-scoped; no segment duplication or loss of host metadata; pairing denial mismatch replay no_effect and launch-only rules remain covered.
+step10:compiled_runs	added	Explicit cc/gcc/clang/C++/rustc source -> -o product links pay only after that product runs; old builds syntax checks compile-only and product replacement do not pay.
+step10:native_operands	added	Tcl/AWK suffixes and interpreter operands; Go run SQL stdin/-f and Jupyter --execute recognize actual native execution positions with independent reversed-order plants.
+step10:inline_execution	replaced_by	Opaque inline mode stays unpaid except definite top-level Python imports literal whole-file json/tomllib config consumption and a complete literal builtin Node VM execution call; no conditional or quoted-mention guesses.
+step10:opaque_dependencies	bounded	Unread test/wrapper imports config consumers semantic report dependencies and unclassified public names require host authority; no fixture inspection filename-pair heuristic or spent-subject vocabulary.
+step10:precision_forms	replaced_by	Assignment RHS names syntactic =/identifier-colon boundaries dotted tags markup tags commit prose grammar/version labels decimal results and version-followed-by-verb unit collisions are corrected; exact spelling and near misses remain.
+step10:step8_step9	kept	Post-edit full configuration readbacks and explicit consumption pay; prose/data records remain excluded from d; code readbacks own-name evidence and prior-turn online observations remain unpaid.
+step10:questions_receipts	kept	Exact four questions all four shape tags once-only note hard-hold retry precedence and execution-v1/readback-v1 trace receipts stay unchanged.
+tests/test_shell_order.py	added	181 independent plants plus all 598 existing plants pass: 779 tests in 12.38 seconds; covers clauses reversals lexer uncertainty pairing concurrency host scope native/compiled/inline forms and precision boundaries.
+step10:development_audit	bounded	Final hard holds devE 330/400 present 18/400 absent; devD 257/297 present 3/303 absent. REPORT.md lists all 70 E misses 18 E false holds 40 D misses and 3 D false holds with observed-form or labeling reasons; four-question notes excluded.

@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________________________________ test_advance _________________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-256/test_advance0')
+
+    def test_advance(tmp_path):
+        cfg = dict(state_dir=str(tmp_path/'state'))
+        records = []
+        def rec(events):
+            records.append(events); return observed.record(events)
+        def finding(rows, record, event):
+            assert not record.obs
+            return None
+        def run(name):
+            ev = dict(hook_event_name=name, session_id='s', tool_name='Read', tool_input={'file_path':'x'}, tool_response='text')
+            return hook.main(json.dumps(ev), cfg, [], rec, finding)
+        assert run('PreToolUse') == {} and records[-1] == []
+>       assert run('PostToolUse') == {} and len(records[-1]) == 1
+E       AssertionError: assert ({} == {}
+E
+E         Use -v to get more diff and 2 == 1)
+E        +  where 2 = len([{'hook_event_name': 'PreToolUse', 'session_id': 's', 'tool_input': {'file_path': 'x'}, 'tool_name': 'Read', ...}, {'hook_event_name': 'PostToolUse', 'session_id': 's', 'tool_name': 'Read', 'tool_input': {'file_path': 'x'}, ...}])
+
+tests/acceptance_tasks.py:101: AssertionError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_advance - AssertionError: assert ({} =...
+1 failed in 0.21s

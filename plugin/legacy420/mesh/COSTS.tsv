@@ -1,0 +1,7 @@
+repo	task	class	tokens	passed	source
+makoto	subtract	subtract	208231	yes	route-out/makoto/run/RUN.json 2026-10-02
+makoto	subtract	subtract	407924	yes	route-out/makoto/run/RUN.json candidates.subtract[0] 2026-10-02
+makoto	subtract	subtract	215235	yes	route-out/makoto/run/RUN.json candidates.subtract[1] 2026-10-02
+makoto	subtract	subtract	67483	no	route-out/makoto/run/RUN.json candidates.subtract[2] 2026-10-02
+tiller	subtract	subtract	388369	yes	route-out/tiller/run/RUN.json 2026-10-02
+tiller	fill-intake	fill	593606	yes	route-out/tiller/run/RUN.json candidates.fill-intake[0] PRESENT intake acceptance; rejected for cost overrun 2026-10-02

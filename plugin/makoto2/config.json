@@ -1,11 +1,4 @@
 {
- "state_dir": "~/.claude/makoto2_state",
- "default_tool_timeout_ms": 120000,
- "min_number_digits": 2,
- "quote_min_len": 4,
- "quote_window": 400,
- "quote_gap": 40,
- "count_word_gap": 5,
- "negation_window": 30,
- "snippet_len": 80
+  "state_dir": "~/.claude/makoto2_state",
+  "adapter": "inferred"
 }

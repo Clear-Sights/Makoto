@@ -8,7 +8,7 @@
     {
       "name": "makoto",
       "source": "./plugin",
-      "description": "Checks statements against observed tool effects using 12 source-pinned rules; blocks findings or stays silent, with subject-bound completion witnesses.",
+      "description": "Four reading shapes enforced before dependent steps; declared and inferred obligation adapters.",
       "category": "workflow",
       "tags": [
         "integrity",

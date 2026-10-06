@@ -1,0 +1,19 @@
+hole	check	plant	piece	citation	status	realization
+decode	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task decode	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy decode	decode	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+configure	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task configure	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy configure	configure	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+rules	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task rules	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy rules	rules	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+observe	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task observe	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy observe	observe	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+evaluate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task evaluate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy evaluate	evaluate	WHY	SHAPE_PRESENT	CANDIDATE
+once	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task once	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy once	once	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+emit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task emit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy emit	emit	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+advance	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task advance	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy advance	advance	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+persist	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task persist	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy persist	persist	Runtime and rules	SHAPE_PRESENT	CANDIDATE
+register	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task register	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy register	register	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task validate	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy validate	validate	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task package	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy package	package	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task fresh	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy fresh	fresh	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+audit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task audit	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy audit	audit	Acceptance checks	SHAPE_PRESENT	CANDIDATE
+join	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task join	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy join	join	DONE	SHAPE_PRESENT	CANDIDATE
+handoff	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task handoff	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy handoff	handoff	HANDOFF	SHAPE_PRESENT	CANDIDATE
+subtract	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task subtract	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy subtract	subtract	DONE	SHAPE_PRESENT	MODEL_ONLY
+zero	PYTHONDONTWRITEBYTECODE=1 python3 mesh/check.py --task zero	PYTHONDONTWRITEBYTECODE=1 python3 mesh/plants.py --copy zero	zero	DONE	SHAPE_PRESENT	MODEL_ONLY

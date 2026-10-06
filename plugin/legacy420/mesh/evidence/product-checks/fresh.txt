@@ -1,0 +1,19 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________________________ test_fresh __________________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-261/test_fresh0')
+
+    def test_fresh(tmp_path):
+        fresh = product_function('fresh')
+        slip = {'hook_event_name': 'Stop', 'session_id': 'new',
+                'last_assistant_message': 'Want me to push this?'}
+        control = dict(slip, last_assistant_message='Pushing next; that is the default.')
+>       assert fresh(ROOT/'plugin', tmp_path/'account', slip)['decision'] == 'block'
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'decision'
+
+tests/acceptance_tasks.py:204: KeyError
+=========================== short test summary info ============================
+FAILED tests/acceptance_tasks.py::test_fresh - KeyError: 'decision'
+1 failed in 0.28s

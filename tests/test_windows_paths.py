@@ -1,135 +1,161 @@
-"""Windows payloads use Windows identities even when evaluated on Linux."""
-import builtins
-import copy
-import importlib
-import json
-from pathlib import Path
-import sys
+"""Windows record plants that also run on a POSIX host."""
+import ntpath
+import os
+from pathlib import PureWindowsPath
+from types import SimpleNamespace
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin'))
-from makoto2 import observed as reader
-
-CASES = json.loads((Path(__file__).parent / 'fixtures/goal.json').read_text())
-IDS = {'A2', 'D4', 'D11', 'F7', 'G1', 'F10', 'H1', 'H2', 'H4', 'H5', 'C7', 'D1', 'H6'}
-
-
-@pytest.mark.parametrize('cwd', [r'C:\Users\RunnerAdmin\Temp\Fake', 'c:/USERS/runneradmin/TEMP/fake'])
-@pytest.mark.parametrize('case', [c for c in CASES if c['id'] in IDS], ids=lambda c: c['id'])
-def test_windows_fake_and_honest(case, cwd, tmp_path, monkeypatch):
-    # A small filesystem adapter supplies real harness files under a Windows root.
-    # It deliberately does not normalize identities: consumers must pass absolute paths.
-    root = 'c:/users/runneradmin/temp/fake/'
-    original_open, original_exists, original_isfile = builtins.open, reader.os.path.exists, reader.os.path.isfile
-
-    def local(path):
-        spelling = str(path).replace('\\', '/').lower()
-        return tmp_path / spelling[len(root):] if spelling.startswith(root) else path
-
-    monkeypatch.setattr(builtins, 'open', lambda path, *a, **kw: original_open(local(path), *a, **kw))
-    monkeypatch.setattr(reader.os.path, 'exists', lambda path: original_exists(local(path)))
-    monkeypatch.setattr(reader.os.path, 'isfile', lambda path: original_isfile(local(path)))
-    module, name = case['predicate'].split('.')
-    predicate = getattr(importlib.import_module('makoto2.' + module), name)
-    for side in ('fake', 'honest'):
-        for old in tmp_path.rglob('*'):
-            if old.is_file():
-                old.unlink()
-        for path, content in dict(case.get('files', {}), **case.get(side + '_files', {})).items():
-            target = tmp_path / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
-        events = copy.deepcopy(case[side])
-        for event in events:
-            event['cwd'] = cwd
-        # Mix absolute, case-varied reads with relative current dependencies/claims.
-        for event in events[:-1]:
-            ti = event.get('tool_input', {})
-            if 'file_path' in ti:
-                ti['file_path'] = cwd.upper() + '\\' + ti['file_path'].upper().replace('/', '\\')
-        result = predicate(reader.record(events[:-1]), events[-1], reader)
-        assert bool(result) == (side == 'fake'), (case['id'], side, result)
-
-
-@pytest.mark.parametrize('path', [r'C:\REPO\Output\..\Source.py:12:3', 'c:/repo/source.py', r'.\SOURCE.py'])
-def test_windows_record_identity(path):
-    history = [dict(hook_event_name='PostToolUse', tool_name='Read', cwd=r'C:\Repo',
-                    tool_input={'file_path': path}, tool_response='value')]
-    rec = reader.record(history)
-    current = dict(tool_name='Edit', cwd='c:/REPO', tool_input={'file_path': 'source.py'})
-    assert rec.observed(rec.objects_of(current))
-    assert reader._text_objects(r'Source C:\REPO\Source.py', '') == {'c:/repo/source.py'}
-    assert not rec.observed({'c:/repo/other.py'})
-    assert reader._text_objects(r'Source C:\Source.py', '') == {'c:/source.py'}
-    assert reader._text_objects(r'Source \\SERVER\Share\Source.py', '') == {'//server/share/source.py'}
-
-
-def test_posix_case_urls_and_counts_remain_distinct():
-    assert reader._norm('Source.py', '/Repo') == '/Repo/Source.py'
-    assert reader._norm('https://Example.com/Source.py', r'C:\Repo') == 'https://Example.com/Source.py'
-    assert reader._norm('8/8', r'C:\Repo') == '8/8'
-
-
-class WindowsPath:
-    """Real temporary bytes with a Windows spelling, regardless of test host."""
-    def __init__(self, local, spelling=r'C:\Users\RunnerAdmin\Temp\Case'):
-        self.local, self.spelling = local, spelling
-
-    def __str__(self):
-        return self.spelling
-
-    def __truediv__(self, name):
-        return WindowsPath(self.local / name, self.spelling + '\\' + name)
-
-    def mkdir(self):
-        self.local.mkdir()
-
-    def write_text(self, text):
-        return self.local.write_text(text)
-
-    def unlink(self):
-        self.local.unlink()
+from test_shapes import output, pair
+from test_switch import edit, feed, switch_holds
+from test_questions import bash_executable
+import makoto2
+from makoto2 import evaluate as evaluation, observed, switch
+from makoto2.provenance import Ledger
 
 
 @pytest.fixture
-def windows_tmp(tmp_path, monkeypatch):
-    root = WindowsPath(tmp_path)
-    original_open, original_exists = builtins.open, reader.os.path.exists
-    prefix = reader._norm(str(root), '') + '/'
-
-    def local(path):
-        spelling = str(path)
-        return tmp_path / spelling[len(prefix):] if spelling.startswith(prefix) else path
-
-    monkeypatch.setattr(reader.os.path, 'exists', lambda path: original_exists(local(path)))
-    monkeypatch.setattr(builtins, 'open', lambda path, *a, **kw: original_open(local(path), *a, **kw))
-    return root
+def windows_paths(monkeypatch):
+    # Patch only the product modules, leaving pytest's real filesystem alone.
+    windows = SimpleNamespace(path=ntpath, sep='\\', getcwd=lambda: 'D:\\work',
+                              access=os.access, X_OK=os.X_OK)
+    for module in (observed, evaluation, switch):
+        monkeypatch.setattr(module, 'os', windows)
 
 
-def test_windows_slash_words_need_path_evidence(windows_tmp):
-    from test_observed import test_slash_words_need_path_evidence
-    test_slash_words_need_path_evidence(windows_tmp)
+def test_package_keys_use_slashes_with_windows_relative_paths(tmp_path, monkeypatch):
+    path_type = type(tmp_path)
+    relative_to = path_type.relative_to
+    with monkeypatch.context() as patch:
+        patch.setattr(path_type, 'relative_to',
+                      lambda path, *args, **kwargs: PureWindowsPath(
+                          *relative_to(path, *args, **kwargs).parts))
+        result = makoto2.build_package(makoto2.Path(__file__).resolve().parents[1],
+                                      tmp_path / 'package')
+    assert result['contents']['makoto2/hook.py']
+    assert all('\\' not in key for key in result['contents'])
 
 
-def test_windows_preserving_whole_write_must_keep_unrelated_lines(windows_tmp):
-    from test_restored_fixes import test_preserving_whole_write_must_keep_unrelated_lines
-    test_preserving_whole_write_must_keep_unrelated_lines(windows_tmp)
+@pytest.mark.parametrize('path,cwd,expected', [
+    ('loom.py', '/w', 'file:/w/loom.py'),
+    ('pkg\\loom.py', '/w', 'file:/w/pkg/loom.py'),
+    ('C:\\work\\pkg\\..\\loom.py', 'D:\\work', 'file:C:/work/loom.py'),
+    ('pkg/loom.py', 'C:\\work', 'file:C:/work/pkg/loom.py'),
+    ('\\\\server\\share\\loom.py', 'D:\\work', 'file://server/share/loom.py'),
+])
+def test_record_identity_accepts_either_separator(windows_paths, path, cwd, expected):
+    assert observed.identity(path, {'cwd': cwd}) == expected
 
 
-def test_windows_asserted_sources_require_direct_reading(windows_tmp):
-    from test_restored_fixes import test_asserted_sources_require_direct_reading
-    test_asserted_sources_require_direct_reading(windows_tmp)
+def test_mixed_separators_invalidate_readings_but_not_exact_name_bytes(windows_paths):
+    ledger = Ledger()
+    feed(ledger, pair(ti={'file_path': 'C:/work/source.txt'}))
+    assert ledger.witnesses('C:/work/source.txt', 'path')
+    assert not ledger.witnesses('C:\\work\\source.txt', 'path')
+    feed(ledger, edit('C:\\work\\source.txt'))
+    assert not ledger.source_readings()
+    assert not ledger.witnesses('C:/work/source.txt', 'path')
 
 
-@pytest.mark.parametrize('path', [r'C:\Users\RunnerAdmin\policy.txt',
-                                  r'notes\policy.txt', r'.\notes\policy.txt',
-                                  r'\\server\share\policy.txt'])
-@pytest.mark.parametrize('quote', ['', '"', "'"])
-def test_windows_shell_path_arguments(path, quote):
-    assert reader._segments('cat ' + quote + path + quote) == ((('cat', path), ''),)
+def test_mixed_separator_edit_and_module_run(windows_paths):
+    ledger = Ledger()
+    change = edit('C:\\work\\pkg\\branch.py')
+    for ev in change:
+        ev['cwd'] = 'C:\\work'
+    feed(ledger, change)
+    assert switch_holds(ledger)
+    assert 'pkg.branch' in next(iter(ledger.changed_code().values()))['aliases']
+    call = pair('Bash', {'command': 'python.exe -m pkg.branch'}, 'response', tid='run')
+    for ev in call:
+        ev['cwd'] = 'C:/work'
+    feed(ledger, call)
+    assert not switch_holds(ledger)
 
 
-def test_posix_shell_escapes():
-    assert reader._segments(r'cat some\ file.txt; echo \$HOME \"') == (
-        (('cat', 'some file.txt'), ';'), (('echo', '$HOME', '"'), ''))
+@pytest.mark.parametrize('reference', ['/w/my report.txt', '\\w\\my report.txt'])
+def test_spaced_output_keeps_recorded_separator_exemption(windows_paths, reference):
+    ledger = Ledger()
+    feed(ledger, pair())
+    change = edit('my report.txt')
+    for ev in change:
+        ev['tool_input']['content'] = 'source data'
+    feed(ledger, change)
+    findings, _ = evaluation.evaluate(ledger, output(reference))
+    assert not findings
+    findings, _ = evaluation.evaluate(ledger, output(reference + 'Extra'))
+    assert any(f['rule'] == 'b' for f in findings)
+
+
+def test_windows_python_executable_failed_response_pays(windows_paths):
+    ledger = Ledger()
+    change = edit('branch.py')
+    for ev in change:
+        ev['cwd'] = 'C:\\work'
+    feed(ledger, change)
+    candidate = dict(output('Done'), cwd='C:\\work')
+    assert switch_holds(ledger, candidate)
+    call = pair('Bash', {'command': '"C:/Program Files/Python/python.exe" branch.py'},
+                'RuntimeError: response', tid='run')
+    for ev in call:
+        ev['cwd'] = 'C:\\work'
+    call[1]['hook_event_name'] = 'PostToolUseFailure'
+    call[1]['tool_response']['exitCode'] = 1
+    feed(ledger, call)
+    assert not switch_holds(ledger, candidate)
+
+
+@pytest.mark.parametrize('command', [
+    '"C:/Python/python.exe" -c "print(1)" branch.py',
+    '"C:/Python/python.exe" --help branch.py',
+    '"C:/Python/python.exe" other.py branch.py',
+])
+def test_windows_interpreter_near_misses_do_not_pay(windows_paths, command):
+    ledger = Ledger()
+    feed(ledger, edit())
+    feed(ledger, pair('Bash', {'command': command}, 'response', tid='run'))
+    assert switch_holds(ledger)
+
+
+def test_windows_bash_fixture_chooses_git_bash(monkeypatch):
+    import test_questions
+    monkeypatch.setattr(test_questions.sys, 'platform', 'win32')
+    monkeypatch.setenv('ProgramFiles', 'C:/Program Files')
+    monkeypatch.setattr(test_questions.Path, 'is_file', lambda path: path.as_posix() ==
+                        'C:/Program Files/Git/bin/bash.exe')
+    assert str(bash_executable.__wrapped__()).replace('\\', '/') == \
+        'C:/Program Files/Git/bin/bash.exe'
+
+
+def test_cross_drive_edit_and_writer_reference_need_no_relpath(windows_paths, monkeypatch):
+    def same_drive_relpath(path, start):
+        # A cross-drive relpath must never be attempted, even inside a try.
+        assert ntpath.splitdrive(path)[0].lower() == ntpath.splitdrive(start)[0].lower()
+        return original_relpath(path, start)
+
+    original_relpath = ntpath.relpath
+    monkeypatch.setattr(ntpath, 'relpath', same_drive_relpath)
+    monkeypatch.setattr(ntpath, 'isfile', lambda path: path == 'C:/bin/worker')
+    monkeypatch.setattr(switch.os, 'access', lambda path, mode: True)
+    ledger = Ledger()
+    change = edit('C:/bin/worker')
+    for ev in change:
+        ev['cwd'] = 'D:\\work'
+    feed(ledger, change)
+    candidate = dict(output('C:/bin/worker', 'Write'), cwd='D:\\work')
+    assert switch_holds(ledger, candidate)
+    unrelated = dict(output('unrelated text', 'Write'), cwd='D:\\work')
+    assert not switch_holds(ledger, unrelated)
+    feed(ledger, pair('Run', {'file_path': 'C:/bin/worker'}, 'response', tid='run'))
+    assert not switch_holds(ledger, candidate)
+
+
+def test_cross_drive_spaced_output_exemption(windows_paths):
+    ledger = Ledger()
+    feed(ledger, pair())
+    change = edit('C:/reports/my report.txt')
+    for ev in change:
+        ev['tool_input']['content'] = 'source data'
+    feed(ledger, change)
+    candidate = dict(output('C:/reports/my report.txt'), cwd='D:\\work')
+    findings, _ = evaluation.evaluate(ledger, candidate)
+    assert not findings

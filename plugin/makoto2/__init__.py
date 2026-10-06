@@ -8,8 +8,8 @@ import shutil
 
 PLUGIN_METADATA = {
     'name': 'makoto',
-    'version': '4.0.1',
-    'description': 'Executable lifecycle and hook decisions over current observations.',
+    'version': '5.0.0',
+    'description': 'Hold dependent steps on missing original readings, exact spans and online fetches.',
 }
 
 
@@ -34,6 +34,8 @@ def build_package(root, destination):
     try:
         ignore = shutil.ignore_patterns('__pycache__', '*.pyc', '*.pyo')
         shutil.copytree(source, destination, dirs_exist_ok=True, ignore=ignore)
+        for name in ('LICENSE', 'THIRD-PARTY-LICENSE.txt', 'NOTICE', 'BORROWED.tsv'):
+            shutil.copyfile(root / name, destination / name)
         metadata_dir = destination / '.claude-plugin'
         metadata_dir.mkdir(exist_ok=True)
         (metadata_dir / 'plugin.json').write_text(
@@ -43,7 +45,7 @@ def build_package(root, destination):
             'you configured to invoke it. Session state is separate; remove '
             'your configured state directory only if you also want to erase '
             'the retained session history.\n', encoding='utf-8')
-        contents = {str(path.relative_to(destination)): path.read_bytes()
+        contents = {path.relative_to(destination).as_posix(): path.read_bytes()
                     for path in sorted(destination.rglob('*')) if path.is_file()}
         pins = {name: hashlib.sha256(data).hexdigest()
                 for name, data in contents.items()}

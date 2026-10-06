@@ -126,11 +126,6 @@ def fresh(plugin, account, event):
     home.mkdir(parents=True, exist_ok=False)
     installed = home / '.claude' / 'plugins' / 'makoto2'
     package(source.parent, installed)
-    # The runtime resolves its shipped rule-source pins two levels above
-    # makoto2. Preserve that layout inside the new account as well.
-    pins = installed.parent / 'tests' / 'sources.tsv'
-    pins.parent.mkdir()
-    shutil.copyfile(source.parent / 'tests' / 'sources.tsv', pins)
     env = dict(os.environ)
     env.pop('PYTHONPATH', None)
     env.pop('PYTHONHOME', None)

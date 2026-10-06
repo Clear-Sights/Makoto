@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.DS_Store
+build/
+
+# Never public: the review ledger and the assumption audit (audit trail).
+docs/ASSUMPTIONS.tsv
+docs/LEDGER.tsv
+docs/ledger/
+
+# Codex login: written from $CODEX_AUTH_JSON at launch, never committed.
+auth.json
