@@ -367,15 +367,20 @@ def lineage_edit(record, event, reader):
     return [] if any(is_verifier(e, keys) for e in events[edits[-1]+1:]) else [path]
 
 
-def findings(record, event, cfg):
+def lineage_provenance(record, event, reader):
+    from makoto2.provenance import violations
+    return violations(record, event, reader)
+
+
+def findings(record, event, cfg, *, residual_only=False):
     from makoto2 import observed as reader
     from makoto2.family_spec import finding
     if event.get('hook_event_name') not in ('PreToolUse','Stop','SubagentStop'):
         return
+    if not residual_only:
+        from makoto2.four_checks import lineage
+        yield from lineage(record, event, cfg)
     checks = (
-        (lineage_absence, ('C2','B32'), 'R05'),
-        (hook_lineage_refs, ('A2','G1','H1','H4','H5'), 'R08'),
-        (lineage_drift, ('D4','F7','F10','H2'), 'L.drift'),
         (lineage_edit, ('F2','H3'), 'L.edit'),
         (lineage_units, ('H6',), 'L.units'),
     )

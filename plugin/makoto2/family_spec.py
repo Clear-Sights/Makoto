@@ -232,14 +232,19 @@ def claims(text, record):
         paths = re.findall(r'(?:[\w./-]+/)*[\w.-]+\.[A-Za-z][\w.-]*',sentence)
         # Subject is a complete quoted command/path, otherwise the named path or
         # the text beside the fixed claim word. No arbitrary word-window cutoff.
-        names = bool(identities) and all(identity in str(text) or identity.rsplit('::',1)[-1] in str(text) for identity in identities)
+        from makoto2.claim_reader import named_failure_identities
+        names = bool(identities) and identities <= named_failure_identities(identities, str(text))
         falsifier = bool(re.search(r'\bfalsifier\s*:',str(text),re.I) and
                          (re.findall(r'`([^`]+)`',str(text)) or re.findall(r'[\w/-]+\.[A-Za-z]+',str(text))))
         falsifier = falsifier or any(command in str(text) for command in keys)
         for kind,words in CLAIM_WORDS.items():
+            if kind in ('pass', 'count') and re.search(r'\bpass(?:ed|es)?\s+(?:along|on)\b', sentence, re.I):
+                continue
             rx = r'\b(?:'+ '|'.join(map(re.escape,words))+r')\b'
             assertion = re.sub(r'"[^"\n]*"|“[^”\n]*”', lambda m: ' ' * len(m.group()), sentence)
             match = re.search(rx,assertion,re.I)
+            if kind in ('pass', 'count') and re.search(r'(?i)\b(?:I|we|you|they|he|she)\s+passed\s+(?:on|along)\b', assertion):
+                continue
             if (not match or re.search(r'\b(?:not|never|no)\s*$',sentence[:match.start()],re.I)
                     or re.match(r'\s*(?:although|though|while)\b', sentence, re.I)):
                 continue
@@ -257,15 +262,8 @@ def claims(text, record):
 
 
 def read_claims(record,event):
-    explicit=event.get('claim')
-    if not isinstance(explicit,dict):
-        from makoto2 import observed
-        return [c._asdict() for c in claims(observed.text_of(event),record)]
-    claim=dict(explicit)
-    if 'falsifier' not in claim:
-        subject=claim.get('subject')
-        claim['falsifier']=bool(subject and subject in verifier_keys(record))
-    return [claim]
+    from makoto2.claim_reader import read_claims as shared_reader
+    return shared_reader(record, event)
 
 
 def spec_claim(record, event, cfg):

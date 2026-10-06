@@ -117,6 +117,8 @@ def main(raw, config, rows, record_fn, evaluate_fn):   # the equation, wired onc
     finding, key = None, None
     if ev.get("hook_event_name") in ("PreToolUse", "Stop", "SubagentStop"):   # only these can decide
         finding, key = o_once(evaluate_fn(rows, record, ev), record, keys)
+    # Pending calls are history for attempt/order checks, never settled Obs.
+    # Keep them even when dispatch is off; record_fn owns the witness boundary.
     if ev.get("hook_event_name") in SETTLED + TURN_MARKS + ("PreToolUse",):
         sigma_append(path, {"event": ev})
     if key:

@@ -143,14 +143,6 @@ def findings(record, event, cfg):
         entries={'gradient':'A6','fallthrough':'C5','unused_result':'E1','recovery':'E9'}
         for predicate,line in defects:
             yield {'row':'SWITCH.'+predicate,'entries':[entries[predicate]],'message':entries[predicate]+': '+predicate,'objects':[str(ti.get('file_path','')),str(line)]}
-    if event.get('hook_event_name') == 'PreToolUse' and event.get('tool_name') in ('Write','Edit'):
-        from makoto2.family_spec import read_claims,verifier_keys
-        doc_paths=cfg.get('named_sets',{}).get('DOC_PATH',())
-        observations=[{'verifier':o.input.get('command') in verifier_keys(record)} for o in record.obs]
-        for claim in read_claims(record,event):
-            adapted={'event':'Pre','tool':event.get('tool_name'),'path':ti.get('file_path',''),'claim':claim}
-            if any(switch_doc(adapted,observations,path) for path in doc_paths):
-                yield {'row':'SWITCH.doc','entries':['C11'],'message':'C11: no verifier seen','objects':[adapted['path']]}
     if event.get('hook_event_name') == 'Stop':
         from makoto2 import observed
         from makoto2.family_spec import finding

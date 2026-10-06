@@ -1,0 +1,81 @@
+entry	fake	family	reason
+A2	1	SPEC	SPEC does not bind display-value equality to stable identity fields.
+A2	2	SPEC	SPEC does not bind display-value equality to stable identity fields.
+A3	2	SPEC	SPEC does not bind each reported number to its keyed member across reordered sequences.
+A11	1	SPEC	SPEC does not derive a distinct-event count from repeated stable event identities.
+A13	1	SPEC	SPEC does not encode the scope distinction between configuration and an intrinsic guarantee.
+A13	2	SPEC	SPEC does not encode the scope distinction between configuration and an intrinsic guarantee.
+B2	1	SPEC	SPEC does not resolve a discovered iteration domain to its required nonempty population.
+B7	2	SPEC	SPEC does not map a prose requirement to all enforcement entrypoints.
+B35	1	SPEC	SPEC does not derive universal policy coverage from control-flow exclusions.
+B35	2	SPEC	SPEC does not derive universal policy coverage from control-flow exclusions.
+B36	2	SPEC	SPEC does not bind a prose completeness claim to the recorded unmatched residue.
+C10	1	SPEC	SPEC does not expand a global absence claim into its independently readable alternate routes.
+C10	2	SPEC	SPEC does not expand a global absence claim into its independently readable alternate routes.
+D13	1	SPEC	SPEC does not expand destructive shell selectors into a held complete member inventory.
+D13	2	SPEC	SPEC does not expand destructive shell selectors into a held complete member inventory.
+E3	1	SPEC	SPEC does not distinguish intentional approval or attribution from quoted matching syntax.
+E3	2	SPEC	SPEC does not distinguish intentional approval or attribution from quoted matching syntax.
+E12	1	SPEC	SPEC does not bind authenticated principal fields to their authorization definition.
+E12	2	SPEC	SPEC does not bind authenticated principal fields to their authorization definition.
+E13	1	SPEC	SPEC does not derive detached-process input obligations from the recorded terminal protocol.
+E13	2	SPEC	SPEC does not derive detached-process input obligations from the recorded terminal protocol.
+G2	1	SPEC	The shared reader treats questions as nonassertions, even when the record already determines their answer.
+G2	2	SPEC	The shared reader treats questions as nonassertions, even when the record already determines their answer.
+G3	1	SPEC	SPEC does not bind separate delegated field claims to one producer-consumer boundary reading.
+A14	1	OTHER_POINT	OTHER POINT does not compare normalization input identities with all returned output identities.
+A14	2	OTHER_POINT	OTHER POINT does not compare normalization input identities with all returned output identities.
+B4	1	OTHER_POINT	OTHER POINT does not bind a surrogate observation to the actual target behavior it omits.
+B4	2	OTHER_POINT	OTHER POINT does not bind a surrogate observation to the actual target behavior it omits.
+B11	1	OTHER_POINT	OTHER POINT does not expand a causal attribution into a required graded baseline.
+B11	2	OTHER_POINT	OTHER POINT does not expand a causal attribution into a required graded baseline.
+B14	1	OTHER_POINT	OTHER POINT does not bind mechanism activity to a with/without outcome measurement.
+B14	2	OTHER_POINT	OTHER POINT does not bind mechanism activity to a with/without outcome measurement.
+B26	1	OTHER_POINT	OTHER POINT does not bind delivery or queue state to the guarantor process state.
+B26	2	OTHER_POINT	OTHER POINT does not bind delivery or queue state to the guarantor process state.
+C8	1	OTHER_POINT	OTHER POINT does not bind launcher success to the asynchronous worker completion or service response.
+C8	2	OTHER_POINT	OTHER POINT does not bind launcher success to the asynchronous worker completion or service response.
+D1	1	OTHER_POINT	OTHER POINT does not bind a successful write to the consumer that must read the landed state.
+D1	2	OTHER_POINT	OTHER POINT does not bind a successful write to the consumer that must read the landed state.
+D4	1	OTHER_POINT	OTHER POINT lacks the derivative-to-original dependency edge needed to invalidate the cached result.
+D4	2	OTHER_POINT	OTHER POINT lacks the derivative-to-original dependency edge needed to invalidate the cached result.
+D12	1	OTHER_POINT	OTHER POINT does not infer the shared destruction boundary of a claimed durable copy.
+D12	2	OTHER_POINT	OTHER POINT does not infer the shared destruction boundary of a claimed durable copy.
+D14	1	OTHER_POINT	OTHER POINT does not require a recorded target restoration response before the destructive trial.
+D14	2	OTHER_POINT	OTHER POINT does not require a recorded target restoration response before the destructive trial.
+E7	2	OTHER_POINT	OTHER POINT does not derive a reproducibility claim from inherited environment dependencies.
+F7	1	OTHER_POINT	OTHER POINT does not bind action operands or executable code use to the earlier verification point.
+F7	2	OTHER_POINT	OTHER POINT does not bind action operands or executable code use to the earlier verification point.
+F8	1	OTHER_POINT	OTHER POINT does not bind repeated alert output to content-change and cadence readings.
+F8	2	OTHER_POINT	OTHER POINT does not bind repeated alert output to content-change and cadence readings.
+G1	1	OTHER_POINT	OTHER POINT does not bind capability or purchase evidence to the requested deployed or delivered state.
+G1	2	OTHER_POINT	OTHER POINT does not bind capability or purchase evidence to the requested deployed or delivered state.
+A6	2	SWITCH	SWITCH does not compare a claimed continuous measurement with its recorded threshold collapse.
+B1	2	SWITCH	SWITCH recognizes selected input spellings but does not prove that the corruption was actually fed.
+B5	2	SWITCH	SWITCH does not bind a literal structured measurement to the response of its named measurement act.
+B10	1	SWITCH	SWITCH does not bind a usefulness claim to a recorded benign-input abstention response.
+B20	1	SWITCH	SWITCH does not trace the planted input version through refresh or a no-op mutation to the verifier.
+B20	2	SWITCH	SWITCH does not trace the planted input version through refresh or a no-op mutation to the verifier.
+B21	1	SWITCH	SWITCH does not isolate one selected condition from simultaneously failing sibling conditions.
+B21	2	SWITCH	SWITCH does not isolate one selected condition from simultaneously failing sibling conditions.
+B28	1	SWITCH	SWITCH does not derive the required stateful succession from fresh-instance tests or reset replays.
+B28	2	SWITCH	SWITCH does not derive the required stateful succession from fresh-instance tests or reset replays.
+B34	1	SWITCH	SWITCH does not expand a claimed invariant to include its own checker implementation.
+B34	2	SWITCH	SWITCH does not expand a claimed invariant to include its own checker implementation.
+B37	1	SWITCH	SWITCH does not compare irreducibility claims with every recorded equivalent removal response.
+B37	2	SWITCH	SWITCH does not compare irreducibility claims with every recorded equivalent removal response.
+C3	1	SWITCH	SWITCH does not bind a combined verdict to every independently selected member response.
+C4	2	SWITCH	SWITCH does not bind the guarded publishing action to the prerequisite verifier response.
+C5	2	SWITCH	SWITCH does not bind unknown-input identity to the recorded fallthrough return value.
+D9	1	SWITCH	SWITCH does not exclude the detector identity from the target set defined by its own pattern.
+D9	2	SWITCH	SWITCH does not exclude the detector identity from the target set defined by its own pattern.
+E1	1	SWITCH	SWITCH does not bind the selected input to the first reachable branch rather than a shadowed branch.
+E1	2	SWITCH	SWITCH does not bind the selected input to the first reachable branch rather than a shadowed branch.
+E8	1	SWITCH	SWITCH does not bind a prose combination claim to the exact joint input settings of recorded runs.
+E9	1	SWITCH	SWITCH does not bind fallback viability to a response under the original failure trigger.
+F6	1	SWITCH	SWITCH does not compare monotonicity prose with the full recorded cross-row transition table.
+F6	2	SWITCH	SWITCH does not compare monotonicity prose with the full recorded cross-row transition table.
+F12	1	SWITCH	SWITCH does not turn a causal assertion into a discriminating intervention and response obligation.
+F12	2	SWITCH	SWITCH does not turn a causal assertion into a discriminating intervention and response obligation.
+B32	2	LINEAGE	LINEAGE does not recognize the unqualified uniqueness restatement as a load-bearing unsourced verdict.
+H6	2	LINEAGE	LINEAGE does not map a closing plural-unit requirement claim to every source-bound or consumed function.

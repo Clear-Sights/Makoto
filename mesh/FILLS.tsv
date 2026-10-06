@@ -192,10 +192,10 @@ plugin/makoto2/family_lineage.py	digest	evaluate	REGISTER/FAMILIES: live predica
 plugin/makoto2/family_lineage.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_lineage.py	lineage_absence	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_lineage.py	lineage_drift	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_lineage.py	lineage_edit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_edit	evaluate	Retained residual: core misses F2,H3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
 plugin/makoto2/family_lineage.py	lineage_pin	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_lineage.py	lineage_refs	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_lineage.py	lineage_units	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_units	evaluate	Retained residual: core misses H6 goal/dev witnesses; see mesh/RESIDUALS.tsv.
 plugin/makoto2/family_lineage.py	output_text	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_lineage.py	readings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_lineage.py	references	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
@@ -205,13 +205,13 @@ plugin/makoto2/family_other.py	_claims	evaluate	REGISTER/FAMILIES: live predicat
 plugin/makoto2/family_other.py	_facts	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_other.py	_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_other.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_environment	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_normalization	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_plan	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_run	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_witness	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_other.py	other_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_claim	evaluate	Retained residual: core misses C7,C8,D1 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_environment	evaluate	Retained residual: core misses E7 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_normalization	evaluate	Retained residual: core misses A14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_plan	evaluate	Retained residual: core misses D13,F8 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_run	evaluate	Retained residual: core misses D8,D14,F14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_witness	evaluate	Retained residual: core misses B4,B11,B14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_write	evaluate	Retained residual: core misses D11,D12 goal/dev witnesses; see mesh/RESIDUALS.tsv.
 plugin/makoto2/family_spec.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_spec.py	Claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_spec.py	args	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
@@ -227,15 +227,15 @@ plugin/makoto2/family_spec.py	matches	evaluate	REGISTER/FAMILIES: live predicate
 plugin/makoto2/family_spec.py	pre	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_spec.py	read_claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_spec.py	settled	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_authorship	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_budget	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_history	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_launch	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_repeat	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_terms	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_spec.py	spec_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_authorship	evaluate	Retained residual: core misses A13,E3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_budget	evaluate	Retained residual: core misses E11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_claim	evaluate	Retained residual: core misses A7,C10,C12,C3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_history	evaluate	Retained residual: core misses E13,G2,G5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_launch	evaluate	Retained residual: core misses E12 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_repeat	evaluate	Retained residual: core misses A11,E5,E10 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_terms	evaluate	Retained residual: core misses B7 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_tree	evaluate	Retained residual: core misses A3,A4,B36 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_write	evaluate	Retained residual: core misses B2,B9,B23,B35,C6,B5,B20 goal/dev witnesses; see mesh/RESIDUALS.tsv.
 plugin/makoto2/family_spec.py	stop	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_spec.py	verifier_keys	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_switch.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
@@ -243,10 +243,10 @@ plugin/makoto2/family_switch.py	findings	evaluate	REGISTER/FAMILIES: live predic
 plugin/makoto2/family_switch.py	switch_doc	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_switch.py	switch_exit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_switch.py	switch_pass	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_switch.py	switch_run	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_run	evaluate	Retained residual: core misses B10,B21,B28,B34,B37,C4,E8,F6 goal/dev witnesses; see mesh/RESIDUALS.tsv.
 plugin/makoto2/family_switch.py	switch_self	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_switch.py	switch_supervisor	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
-plugin/makoto2/family_switch.py	switch_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_supervisor	evaluate	Retained residual: core misses B26,B1,D9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_switch.py	switch_tree	evaluate	Retained residual: core misses A6,C5,E1,E9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
 plugin/makoto2/family_switch.py	switch_tree.emit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_switch.py	switch_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
 plugin/makoto2/family_switch.py	switch_zero	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
@@ -366,3 +366,95 @@ tests/test_windows_paths.py	test_windows_preserving_whole_write_must_keep_unrela
 tests/test_windows_paths.py	test_windows_asserted_sources_require_direct_reading	validate	Windows path regressions reproduce native spelling and direct reading on Linux
 tests/test_windows_paths.py	test_windows_shell_path_arguments	validate	Windows path regressions reproduce native spelling and direct reading on Linux
 tests/test_windows_paths.py	test_posix_shell_escapes	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+plugin/makoto2/claim_reader.py	<module>	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/claim_reader.py	output_text	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/claim_reader.py	value_tokens	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/claim_reader.py	read_claims	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	<module>	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	terms	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	readings	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	emit	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	lineage	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	spec	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	other_point	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	switch	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	findings	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	<module>	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	test_written_property_has_subject_and_values	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	test_changed_original_needs_reading_after_change	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	test_unverified_changed_property_is_silent	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/provenance.py	<module>	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	tokens	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Reading	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.__init__	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.current	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.origins	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.stale	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.relay_sources	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.replaced_receipt	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	violations	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	<module>	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	contract	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	tree_of	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	waiver	evaluate	Retained residual: core misses B9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	constant_checker	evaluate	Retained residual: core misses B10 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	budget	evaluate	Retained residual: core misses E11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	preservation	evaluate	Retained residual: core misses D11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	behavior	evaluate	Retained residual: core misses F14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	retry_bound	evaluate	Retained residual: core misses E5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	findings	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	<module>	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	read	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	run	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	claim	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_superseded_value_and_latest_read	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_edit_invalidates_value_without_reading_disk	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_command_observation_and_subject_update	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_receipt_after_subject_replacement	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_relay_citation_requires_original	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	<module>	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	detect	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_exact_cardinality	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_declared_direction	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_temporary_waiver	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_constant_checker	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_outer_budget	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_bounded_preservation	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_behavior_comparison	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_unbounded_retry	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/family_lineage.py	lineage_provenance	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	duplicates	evaluate	Retained residual: core misses A4 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	shared_owner	evaluate	Retained residual: core misses F2 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	every_member	evaluate	Retained residual: core misses C3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	fail_closed	evaluate	Retained residual: core misses C4 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	combined_options	evaluate	Retained residual: core misses E8 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	literal_measurement	evaluate	Retained residual: core misses B5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	section_identity	evaluate	Retained residual: core misses H5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_receipt_replacement_requires_same_claim_subject	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_unrelated_number_cannot_refresh_superseded_measurement	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_duplicate_resolution	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_shared_rule_owner	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_every_member_is_not_any	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_fail_closed_shell	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_combined_options	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_literal_measurement	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_subject_section_identity	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_unknown_probe_is_not_false	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_contamination_of_evaluation	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	trace_for	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_changed_verdict_and_named_value	validate	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_historical_value_and_subject_local_unverified	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+plugin/makoto2/claim_reader.py	_read_claims	evaluate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_displayed_change_text_does_not_invalidate_another_command	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_time_value_is_not_a_number_fragment	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_primary_iso_timestamp_pays_minute_projection	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_reply_word_limit_does_not_create_retry_contract	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_claim_reader.py	test_activity_mention_does_not_assert_a_current_verdict	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_requirement_text_is_not_a_verification_receipt	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_communicated_value_is_not_a_test_verdict	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+plugin/makoto2/claim_reader.py	named_failure_identities	evaluate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_unique_parameter_names_failure_but_ambiguous_parameter_does_not	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_written_unverified_boolean_does_not_claim_a_decided_measurement	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_point_comparison_requires_the_same_subject	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_unit_comparison_binds_the_metric_not_just_its_number	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
