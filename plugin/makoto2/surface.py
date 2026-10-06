@@ -14,17 +14,19 @@ def exact(value):
 def named_subjects(ledger, event):
     text = text_of(event)
     subjects = {r['subject'] for r in ledger.readings} | set(ledger.mutations)
+    subjects |= {d['subject'] for d in ledger.definitions} | set(ledger.aliases.values())
     subjects |= {ledger.subject(o['subject'], event) for o in manifest(event) if 'subject' in o}
     result = set()
     for subject in subjects:
-        spellings = [subject]
-        if subject.startswith('file:'):
-            path = subject[5:]
-            spellings += [path, os.path.relpath(path, event.get('cwd') or os.getcwd())]
+        spellings = [subject] + [alias for alias, canonical in ledger.aliases.items() if canonical == subject]
+        for spelling in list(spellings):
+            if spelling.startswith('file:'):
+                path = spelling[5:]
+                spellings += [path, os.path.relpath(path, event.get('cwd') or os.getcwd())]
         if any(re.search(r'(?<![\w/])' + re.escape(s) + r'(?![\w/])', text) for s in spellings):
             result.add(subject)
     for token in values(text):
-        if token.startswith(('/', './', '../', 'https://', 'http://')):
+        if '/' in token:
             result.add(ledger.subject(token, event))
     return result
 
@@ -88,7 +90,8 @@ def executable_inputs(pre):
     words = argv(pre)
     if not words or any(c in pre.get('tool_input', {}).get('command', '') for c in '|;&<>`$\n'):
         return []
-    targets = [words[0]]
+    # A bare executable uses PATH, whose resolution is not in this record.
+    targets = [words[0]] if '/' in words[0] else []
     if os.path.basename(words[0]) in ('python', 'python3', 'bash', 'sh', 'node', 'ruby', 'perl') and len(words) > 1 and not words[1].startswith('-'):
         targets.append(words[1])
     return [identity(t, pre) for t in targets]

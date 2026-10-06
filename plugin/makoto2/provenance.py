@@ -79,8 +79,19 @@ class Ledger:
             self.seen.add(tid)
             reserved = self.reservations.get(tid, {})
             no_effect = meta.get('no_effect') is True
-            if reserved and not no_effect:
-                self.relay_values.append({'subject': next(iter(reserved)), 'values': values(text_of(pre))})
+            if reserved and not no_effect and pre.get('tool_name') in WRITERS:
+                ti = pre.get('tool_input', {})
+                target = ti.get('file_path') or ti.get('notebook_path')
+                if target:
+                    # Only replacement bytes belong to the native writer target.
+                    # Shell arguments and unrelated host effects carry no such link.
+                    replacement = {k: v for k, v in ti.items() if k in
+                                   ('content', 'new_string', 'new_source', 'cells')}
+                    if isinstance(ti.get('edits'), list):
+                        replacement['edits'] = [{'new_string': e['new_string']} for e in ti['edits']
+                                                if isinstance(e, dict) and 'new_string' in e]
+                    self.relay_values.append({'subject': self.subject(target, pre),
+                                              'values': values(text_of(dict(pre, tool_input=replacement)))})
             if not no_effect:
                 for subject in set(reserved) | {self.subject(x['subject'], pre) for x in effects(event)}:
                     place = reserved.get(subject, meta.get('destination', self.place(event)))
@@ -89,7 +100,8 @@ class Ledger:
                     self.written.add(subject)
                     self.mutations[subject] = {'q': self.q, 'place': place}
                     content = text_of(pre)
-                    if pre.get('tool_name') in WRITERS and (subject in self.scripts or subject.endswith(('.py', '.sh', '.js', '.rb', '.pl')) or content.startswith('#!') or pre.get('makoto', {}).get('executable') is True):
+                    target = pre.get('tool_input', {}).get('file_path') or pre.get('tool_input', {}).get('notebook_path')
+                    if pre.get('tool_name') in WRITERS and target and subject == self.subject(target, pre) and (subject in self.scripts or subject.endswith(('.py', '.sh', '.js', '.rb', '.pl')) or content.startswith('#!') or pre.get('makoto', {}).get('executable') is True):
                         self.scripts[subject] = self.q
             # Failure alone cannot clear a potentially effective mutation.
             if not failed(event) or no_effect:

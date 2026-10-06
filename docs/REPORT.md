@@ -10,19 +10,23 @@ Named subjects and traced values with missing readings are awareness facts.
 Hard holds require explicit host contracts or recorded mutation/read order.
 Six hard-hold rules are listed below, with the reason each obligation is exact.
 The declared adapter and basis grammar are removed; inferred is the sole adapter.
-126 self-authored and retained regression tests passed in 3.03 seconds.
+142 self-authored and retained regression tests passed in 3.11 seconds.
 The driver prints held and the exact surface emitted at the selected step_index.
 No pairs file or forbidden path was read, no recorded command executed, no push made.
 
 Surface contract
 
 LINEAGE reports complete prior readings this turn with subject, tool, selector,
-origin and exact point. Exact delimited ledger identities and structural paths/URLs
-in the candidate, plus matching trace values, identify named/value-bearing subjects.
+origin and exact point. Exact delimited ledger identities, host-bound aliases, and structural paths/URLs
+in the candidate, including unseen relative paths, plus matching trace values,
+identify named/value-bearing subjects. Registered definition subjects are known
+identities even before their first receipt.
 Subjects without a complete reading this turn are reported. A separate line shows
 values whose only recorded carriers are assistant/worker relays or session-written
 text; an independent original receipt anywhere in the record removes that value
-from this line. Equal values establish only recorded overlap, never causation.
+from this line. Native writer replacement bytes are bound only to their native
+target; old_string text and Bash transfer arguments do not establish written
+value carriers. Equal values establish only recorded overlap, never causation.
 
 OTHER POINT reports subjects with exactly one complete receipt, subjects whose
 latest reading sequence precedes their latest recorded mutation, and recorded
@@ -34,11 +38,13 @@ SWITCH reports completed, paired Bash commands this turn with exact tool inputs,
 host invocation inputs, pre/completion sequence and exit status, including nonzero
 status. Pending/background calls are not described as completed commands. Scripts
 are identified by writer targets ending .py/.sh/.js/.rb/.pl, a leading shebang,
-or a trusted executable flag; later edits retain that registered script identity.
+or a trusted executable flag on the native writer target; later edits retain
+that registered script identity. Unrelated host effects do not inherit its shebang.
 The surface reports those with no completed direct invocation after the edit.
-Direct executable calls and explicit python/python3/bash/sh/node/ruby/perl script
+Direct executable paths and explicit python/python3/bash/sh/node/ruby/perl script
 arguments are structurally bound. Shell wrappers/options, PATH resolution and
 arbitrary executable types need host instrumentation; execution is not guessed.
+Bare PATH command names never identify an executable in the current directory.
 A failed completed invocation counts as a run, without asserting success.
 
 SPEC reports only previously host-registered immutable definitions, with exact
@@ -53,6 +59,8 @@ JSON encoding preserves exact text while escaping embedded line breaks. Long
 individual inputs/definitions remain exact rather than being silently truncated.
 The current candidate's readings/definitions/effects never pay its own check.
 The candidate's trusted turn metadata applies before both surface and holds.
+Stop is always a dependent boundary, including absent or empty final-message
+text; a nonempty ledger surface still emits once, then active retries suppress it.
 
 Hard-hold rules (six)
 
@@ -112,12 +120,16 @@ applicable ledger, predicate, native transport and lifecycle regressions remain.
 
 Validation and delivery
 
-python3 -m pytest -q tests: 126 passed in 3.03 seconds (entire suite under 15 s).
+python3 -m pytest -q tests: 142 passed in 3.11 seconds (entire suite under 15 s).
 Own plants cover each of nine surface lines present/absent, all seven requested
 boundaries, four host hard contracts present/absent, stale targets and named
 mutations present/absent, partial-reading exclusion, script edit/run ordering,
 nonzero command inputs/status, deterministic counted caps, definition receipt
 binding, destination preservation, relay/source controls and Stop once/retry.
+Resume audit plants also cover absent/empty Stop text, unseen relative paths,
+PATH versus direct executable paths, replacement-only writer value carriers,
+registered unread subjects, exact alias freshness, and native-target shebangs.
+Structural git plants now seed readings so they prove surface delivery.
 Live subprocess plants, stdout interception, integrity and package regressions
 remain. The driver was tested only with self-authored in-memory events.
 No external pairs file was run. No universal free-prose accuracy claim is made.
@@ -130,7 +142,7 @@ stdout delivery wrapper continues to withhold blocked final bytes. Hosts must
 apply the native gate before execution/delivery; production host timing was not
 independently tested. Runtime does not execute commands or probe missing sources.
 
-Branch shapes. One step-2 commit authored as
+Branch shapes. Two step-2 commits authored as
 Clear-Sights <clear-sights@users.noreply.github.com>, without attribution lines.
 Canonical outputs: /home/user/build/REPORT.md and /home/user/build/NOLOSS-MAP.tsv.
 Identical copies under makoto/docs are committed with implementation and tests.

@@ -224,3 +224,102 @@ def test_relay_value_with_original_elsewhere_is_not_only_relay(tmp_path):
     s.send(output('', text='731'))
     s.feed(read_pair('different', text='731'))
     assert LABELS[2] not in emitted_surface(s.send(step('731')))
+
+
+@pytest.mark.parametrize('message', [None, ''])
+def test_stop_without_message_still_surfaces_once(tmp_path, message):
+    s = Session(tmp_path)
+    s.feed(read_pair())
+    candidate = event('Stop')
+    if message is not None:
+        candidate['last_assistant_message'] = message
+    first = s.send(candidate)
+    assert held(first) and LABELS[0] in emitted_surface(first)
+    candidate['stop_hook_active'] = True
+    retry = s.send(candidate)
+    assert not held(retry) and emitted_surface(retry) == ''
+
+
+@pytest.mark.parametrize('present', [False, True])
+def test_unseen_relative_path_has_missing_reading_fact(tmp_path, present):
+    s = Session(tmp_path)
+    if present:
+        s.feed(read_pair('dir/unread.txt'))
+    response = s.send(step('dir/unread.txt'))
+    assert not held(response)
+    assert (LABELS[1] in emitted_surface(response)) == (not present)
+    assert 'file:/w/dir/unread.txt' in emitted_surface(response)
+
+
+@pytest.mark.parametrize('command,ran', [('python3 -V', False), ('./python3 -V', True)])
+def test_path_resolution_does_not_invent_local_execution(tmp_path, command, ran):
+    s = Session(tmp_path)
+    mutate(s, 'python3', '#!/bin/sh\nexit 0')
+    pre = event('PreToolUse', tool_name='Bash', tool_use_id='run', tool_input={'command': command})
+    s.send(pre)
+    s.send(dict(pre, hook_event_name='PostToolUse', tool_response={'exitCode': 0, 'stdout': ''}))
+    assert (LABELS[7] in emitted_surface(s.send(step()))) == (not ran)
+
+
+@pytest.mark.parametrize('tool', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Bash'])
+def test_only_writer_replacement_values_are_bound_to_target(tmp_path, tool):
+    s = Session(tmp_path)
+    if tool == 'Write':
+        ti = {'file_path': 'source', 'content': '731'}
+    elif tool == 'Edit':
+        ti = {'file_path': 'source', 'old_string': '619', 'new_string': '731'}
+    elif tool == 'MultiEdit':
+        ti = {'file_path': 'source', 'edits': [{'old_string': '619', 'new_string': '731'}]}
+    elif tool == 'NotebookEdit':
+        ti = {'notebook_path': 'source', 'new_source': '731'}
+    else:
+        ti = {'command': 'transfer 619 731'}
+    pre = event('PreToolUse', tool_name=tool, tool_use_id='mutation', tool_input=ti,
+                makoto={'effects': [{'subject': 'unrelated'}]})
+    assert not held(s.send(pre))
+    s.send(dict(pre, hook_event_name='PostToolUse', tool_response={'exitCode': 0, 'stdout': ''}))
+    surface = emitted_surface(s.send(step('619 731')))
+    relay_lines = [line for line in surface.splitlines() if line.startswith(LABELS[2])]
+    if tool == 'Bash':
+        assert not relay_lines
+    else:
+        assert len(relay_lines) == 1
+        assert '"subject":"file:/w/source"' in relay_lines[0]
+        assert '"values":["731"]' in relay_lines[0]
+        assert '619' not in relay_lines[0] and 'unrelated' not in relay_lines[0]
+
+
+@pytest.mark.parametrize('present', [False, True])
+def test_registered_subject_without_receipt_is_still_named(tmp_path, present):
+    s = Session(tmp_path)
+    s.send(event('Register', makoto={'definitions': [{'id': 'd', 'subject': 'source'}]}))
+    if present:
+        s.feed(read_pair())
+    response = s.send(step('source'))
+    assert not held(response)
+    assert (LABELS[1] in emitted_surface(response)) == (not present)
+
+
+@pytest.mark.parametrize('present', [False, True])
+def test_exact_host_alias_name_uses_canonical_freshness(tmp_path, present):
+    s = Session(tmp_path)
+    mutate(s)
+    s.send(event('Register', makoto={'aliases': [{'alias': 'destination', 'subject': 'source'}]}))
+    if present:
+        s.feed(read_pair('destination', tid='after'))
+    response = s.send(step('destination'))
+    assert held(response) == (not present)
+    assert (LABELS[4] in emitted_surface(response)) is False
+    assert (LABELS[5] in emitted_surface(response)) == (not present)
+
+
+def test_native_shebang_does_not_classify_unrelated_host_effect(tmp_path):
+    s = Session(tmp_path)
+    pre = event('PreToolUse', tool_name='Write', tool_use_id='mutation',
+                tool_input={'file_path': 'executable', 'content': '#!/bin/sh\nexit 0'},
+                makoto={'effects': [{'subject': 'unrelated'}]})
+    assert not held(s.send(pre))
+    s.send(dict(pre, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+    surface = emitted_surface(s.send(step()))
+    script_line = next(line for line in surface.splitlines() if line.startswith(LABELS[7]))
+    assert 'file:/w/executable' in script_line and 'unrelated' not in script_line

@@ -94,9 +94,8 @@ def plant(family, present, adapter):
             pair = read_pair(tool='Bash', selector='content')
             pair[0]['makoto']['invocation'] = {'subject': 'source', 'selector': 'content', 'input_sha256': 'input-z'}
             events += pair
-    # Declared exercises the basis grammar itself; inferred receives exact
-    # host obligations for SPEC/SWITCH and exact point requirements here.
-    events.append(output(basis, obligations if adapter == 'inferred' else None))
+    # These obligations are host-owned; basis-like prose has no authority.
+    events.append(output(basis, obligations))
     return events
 
 
@@ -340,10 +339,10 @@ def test_grading_driver_on_generated_events_only():
 @pytest.mark.parametrize('command', ['# makoto-basis:\ngit commit -m change', 'echo ready && git push', 'git --git-dir=repo commit', 'git -c x=y push'])
 def test_git_boundaries_are_structural(tmp_path, command):
     session = Session(tmp_path)
+    session.feed(read_pair())
     ev = event('PreToolUse', tool_name='Bash', tool_use_id='git', tool_input={'command': command})
-    # Only the leading comment actually declares a novel output.
     assert not held(session.send(ev))
-    assert session.journal()[-1]['surface'] == ''
+    assert 'LINEAGE: read this turn:' in session.journal()[-1]['surface']
 
 
 def test_inferred_written_subject_is_recorded_even_without_read(tmp_path):

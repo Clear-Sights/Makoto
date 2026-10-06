@@ -70,7 +70,7 @@ def git_action(event):
 def dependent(event):
     name = event['hook_event_name']
     if name in FINAL:
-        return bool(event.get('last_assistant_message')) or bool(event.get('makoto', {}).get('obligations')) or bool(event.get('makoto', {}).get('dependencies'))
+        return True
     return name == 'PreToolUse' and (event.get('tool_name') in WRITERS or
            (event.get('tool_name') == 'Bash' and git_action(event)) or
            bool(event.get('makoto', {}).get('dependencies')) or

@@ -517,3 +517,17 @@ tests/test_surface.py:test_read_before_edit_does_not_pay_readback	added	Shared-l
 tests/test_surface.py:test_script_edit_resets_run_record	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
 tests/test_surface.py:test_transfer_destination_fact_uses_reserved_destination	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
 tests/test_surface.py:test_relay_value_with_original_elsewhere_is_not_only_relay	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+hook:message_less_stop	kept	Stop always checks the shared ledger and emits a nonempty surface once, even without final-message text.
+surface:unseen_relative_path	kept	Structural relative path tokens name unread subjects for awareness without inventing a hard obligation.
+surface:registered_subject_and_alias	kept	Registered definition subjects and exact host aliases participate in canonical subject naming and freshness.
+surface:path_executable_identity	replaced_by	Explicit executable paths or interpreter script arguments bind local subjects; bare PATH names cannot prove a local file ran.
+ledger:written_value_carrier	replaced_by	Only native writer replacement bytes bind to its target; replaced old text and arbitrary Bash arguments do not prove written content.
+ledger:native_script_identity	replaced_by	Native target script registration cannot transfer shebang/executable classification to unrelated host effects.
+tests:git_boundary_surface	kept	Structural git plants now contain prior receipts, proving actual context delivery at each recognized commit/push boundary.
+tests/test_surface.py:test_stop_without_message_still_surfaces_once	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
+tests/test_surface.py:test_unseen_relative_path_has_missing_reading_fact	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
+tests/test_surface.py:test_path_resolution_does_not_invent_local_execution	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
+tests/test_surface.py:test_only_writer_replacement_values_are_bound_to_target	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
+tests/test_surface.py:test_registered_subject_without_receipt_is_still_named	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
+tests/test_surface.py:test_exact_host_alias_name_uses_canonical_freshness	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
+tests/test_surface.py:test_native_shebang_does_not_classify_unrelated_host_effect	added	Self-authored resume audit plant for exact ledger facts and boundary delivery; no external pairs input.
