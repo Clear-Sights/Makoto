@@ -1,0 +1,105 @@
+path	unit	reason
+mesh/seed.py	<module>	Retained live requirement-driven route generator used by check.py and plants.py; obsolete reference seed removed (git history retains it).
+plugin/makoto2/family_spec.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/family_other.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/family_switch.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/family_lineage.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+plugin/makoto2/lineage.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+mesh/goal.py	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+REGISTER.md	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+tests/fixtures/goal.json	<module>	REGISTER/FAMILIES: required family detection, source ledger, corpus or measured acceptance; retained by owner instruction
+tests/fixtures/honest_writes.json	<module>	REGISTER/FAMILIES: routine legitimate hook sequences must remain silent
+tests/test_real_session.py	<module>	REGISTER B28: operator-labelled real succession must credit primary observations and retain unnamed-failure detection
+tests/fixtures/real_session.json	<module>	REGISTER B28: sanitized held-out real-session sequences
+plugin/makoto2/provenance.py	<module>	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	tokens	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Reading	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.__init__	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.current	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.origins	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.stale	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.relay_sources	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.replaced_receipt	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	violations	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	<module>	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	contract	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	tree_of	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	waiver	Retained residual: core misses B9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	constant_checker	Retained residual: core misses B10 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	budget	Retained residual: core misses E11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	preservation	Retained residual: core misses D11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	behavior	Retained residual: core misses F14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	retry_bound	Retained residual: core misses E5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	findings	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	<module>	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	read	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	run	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	claim	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_superseded_value_and_latest_read	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_edit_invalidates_value_without_reading_disk	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_command_observation_and_subject_update	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_receipt_after_subject_replacement	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_relay_citation_requires_original	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	<module>	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	detect	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_exact_cardinality	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_declared_direction	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_temporary_waiver	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_constant_checker	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_outer_budget	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_bounded_preservation	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_behavior_comparison	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_unbounded_retry	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/family_lineage.py	lineage_provenance	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	duplicates	Retained residual: core misses A4 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	shared_owner	Retained residual: core misses F2 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	every_member	Retained residual: core misses C3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	fail_closed	Retained residual: core misses C4 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	combined_options	Retained residual: core misses E8 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	literal_measurement	Retained residual: core misses B5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	section_identity	Retained residual: core misses H5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_receipt_replacement_requires_same_claim_subject	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_unrelated_number_cannot_refresh_superseded_measurement	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_duplicate_resolution	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_shared_rule_owner	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_every_member_is_not_any	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_fail_closed_shell	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_combined_options	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_literal_measurement	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_subject_section_identity	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_unknown_probe_is_not_false	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_contamination_of_evaluation	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	trace_for	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/claim_reader.py	<module>	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/claim_reader.py	output_text	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/claim_reader.py	value_tokens	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/claim_reader.py	read_claims	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	<module>	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	terms	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	readings	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	emit	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	lineage	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	spec	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	other_point	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	switch	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+plugin/makoto2/four_checks.py	findings	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_claim_reader.py	<module>	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_claim_reader.py	test_written_property_has_subject_and_values	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_claim_reader.py	test_changed_original_needs_reading_after_change	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_claim_reader.py	test_unverified_changed_property_is_silent	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_changed_verdict_and_named_value	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_historical_value_and_subject_local_unverified	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+plugin/makoto2/claim_reader.py	_read_claims	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_displayed_change_text_does_not_invalidate_another_command	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_time_value_is_not_a_number_fragment	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_primary_iso_timestamp_pays_minute_projection	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_reply_word_limit_does_not_create_retry_contract	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_claim_reader.py	test_activity_mention_does_not_assert_a_current_verdict	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_requirement_text_is_not_a_verification_receipt	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_communicated_value_is_not_a_test_verdict	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+plugin/makoto2/claim_reader.py	named_failure_identities	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_unique_parameter_names_failure_but_ambiguous_parameter_does_not	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_written_unverified_boolean_does_not_claim_a_decided_measurement	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_point_comparison_requires_the_same_subject	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_unit_comparison_binds_the_metric_not_just_its_number	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.

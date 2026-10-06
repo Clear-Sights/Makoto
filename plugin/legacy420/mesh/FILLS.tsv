@@ -1,0 +1,460 @@
+path	unit	slot	reason
+plugin/makoto2/__init__.py	<module>	package	Runtime packaging and independent removal instructions; acceptance measures behavior
+plugin/makoto2/__init__.py	build_package	package	Copy current runtime and metadata, preserve rule bytes, and reject replacing existing destinations
+plugin/makoto2/lifecycle.py	package	package	Executable artifact builder using current source bytes rather than retained evidence
+plugin/makoto2/__main__.py	<module>	decode	Candidate support for decode; existence does not certify behavior
+plugin/makoto2/__main__.py	run	decode	Candidate support for decode; existence does not certify behavior
+plugin/makoto2/evaluate.py	<module>	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	unwitnessed	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	load_rows	rules	Candidate support for sources; existence does not certify behavior
+plugin/makoto2/evaluate.py	load_cfg	configure	Candidate support for configuration; existence does not certify behavior
+plugin/makoto2/evaluate.py	_load_r	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_acts	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	evaluate	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	Spec	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	Spec.__init__	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_text_of	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_sentences	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_strip_quoted	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_primary	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_norm	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_walk_user_texts	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_user_texts_of	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_last_same_call	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_names	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_is_act	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_denied	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	asks_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	thread_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_target	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	pile_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	pile_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	absence_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	absence_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	number_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	number_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	_words_text	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	quote_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	quote_seed	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	quote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	write_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	read_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	landed_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	landed_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	landed_pays.pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	count_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	repeat_owes	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/evaluate.py	wrote_pays	evaluate	Candidate support for detect,terminal,rule-permission,rule-worker,rule-rebrief,rule-absence,rule-thread,rule-quote,rule-plan,rule-retry,rule-time,rule-completion,rule-count,rule-probe,limits; existence does not certify behavior
+plugin/makoto2/hook.py	<module>	advance	Candidate support for boundaries; existence does not certify behavior
+plugin/makoto2/hook.py	d_in	decode	Candidate support for decode; existence does not certify behavior
+plugin/makoto2/hook.py	sigma_path	persist	Candidate support for store; existence does not certify behavior
+plugin/makoto2/hook.py	sigma_read	persist	Candidate support for store; existence does not certify behavior
+plugin/makoto2/hook.py	sigma_append	persist	Candidate support for store; existence does not certify behavior
+plugin/makoto2/hook.py	o_once	once	Candidate support for once; existence does not certify behavior
+plugin/makoto2/hook.py	d_out	emit	Candidate support for output; existence does not certify behavior
+plugin/makoto2/hook.py	main	advance	Candidate support for boundaries; existence does not certify behavior
+plugin/makoto2/observed.py	<module>	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Obs	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_basename	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_effective_argv	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_normalize_segment_argv	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_nested_command	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_segments	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_segments.close_segment	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_norm	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_text_objects	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_flatten	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_exit_of	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_executed	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_mkdir	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_touch	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_tee	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_copy	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_truncate	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_inplace	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_w_none	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_s_ls	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_s_find	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_s_grep	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_search_of	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_bash_reading	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_value_objects	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_input_objects	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_read	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record.__init__	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record.observed	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	Record.objects_of	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	_user_entries	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	record	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	act_kinds	observe	Candidate support for settled; existence does not certify behavior
+plugin/makoto2/observed.py	text_of	observe	Candidate support for settled; existence does not certify behavior
+tests/test_evaluate.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Obs	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record.__init__	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record.observed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	Record.objects_of	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	rows	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	pre	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	reply	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_plant_blocks_and_lookalike_silent	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_every_row_has_a_case_and_a_verbatim_source	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_config_keys_cover_config	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	observation	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_named_status	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_artifact	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_later_failure_invalidates_success	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_evaluate.py	test_launcher_success_is_not_job_success	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	Rec	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	Rec.__init__	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	ev_	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	always	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_hook.py	never	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	<module>	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	post	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	pre	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	bash	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	seen	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_interface_shape	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_deterministic	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_slash_words_need_path_evidence	validate	W13 prose controls and path witnesses distinguish valid references
+tests/test_observed.py	test_plant_unobserved_object_blocks	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_empty_history	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_unsettled_event_observes_nothing	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_denied_call_did_not_execute	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_parent_directory_does_not_observe_child	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_before_bound	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_verdict_with_no_earlier_run	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_program_name_is_not_an_object_of_observation	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_plant_code_call_is_not_a_file	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_read_object_is_observed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_written_object_is_observed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_edit_writes_but_does_not_create	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_output_naming_an_object_observes_it	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_red_run_still_executed	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_redirect_writes_and_creates_new_file	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_search_fields	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_send_text	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_pasted_fix_read_only_snippets_change_no_file_and_count_as_observation	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_report_before_run_printf_after_run_printed_the_results	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_report_before_run_heredoc_fixture_quoting_verdicts	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_unobserved_destruction_rm_of_dirs_created_by_mkdir	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_field_destruction_plant_neighbour_still_blocks	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_turn_start_is_first_obs_after_last_boundary	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_turn_start_zero_without_boundary	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/test_observed.py	test_user_texts_from_fetched_thread_user_entries_only	validate	Blocking plants, silent controls and observation acceptance required by SPIRIT.md
+tests/acceptance_tasks.py	<module>	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	table	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	suite	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_decode	decode	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_configure	configure	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_rules	rules	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_observe	observe	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_evaluate	evaluate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_once	once	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_emit	emit	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_advance	advance	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_persist	persist	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	product_function	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_register	register	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_validate	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_package	package	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_fresh	fresh	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_audit	audit	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_join	join	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_handoff	handoff	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_subtract	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_zero	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_advance.rec	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_advance.finding	validate	Executable product acceptance; positive and negative controls, current evidence required
+tests/acceptance_tasks.py	test_advance.run	validate	Executable product acceptance; positive and negative controls, current evidence required
+plugin/makoto2/evaluate.py	load_rows	register	Load the CURRENT shipped register without amendments
+plugin/makoto2/evaluate.py	evaluate	register	Enforce current predicates against fixed replay cases
+plugin/makoto2/lifecycle.py	<module>	validate	Executable validation decision over current local and selected-head CI results.
+plugin/makoto2/lifecycle.py	validate	validate	Executable validation decision over current local and selected-head CI results.
+tests/test_hook.py	test_hook_behavior	validate	Collected hook behavior controls
+tests/test_hook.py	test_ci_receipt_controls	validate	Collected CI receipt hostile controls
+plugin/makoto2/lifecycle.py	fresh	fresh	Install current plugin bytes in an isolated fresh account and execute the installed hook; receipts are not inputs.
+plugin/makoto2/lifecycle.py	audit	audit	Scan current file bytes including ignored content, exclude Git history, and reject detected credentials or unreadable content without proof receipts.
+plugin/makoto2/lifecycle.py	handoff	handoff	Carry the current bounded verdict and explicit absences without evidence reads; wake on changed input.
+plugin/makoto2/lifecycle.py	join	join	Join current passing measurements for the selected head; missing, failed, malformed or mismatched inputs keep completion open.
+plugin/makoto2/evaluate.py	_brief_fields	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	_failed_test_subjects	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	_unnamed_failures	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	dispatch_pins_owes	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	dispatch_schema_owes	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/evaluate.py	family_findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	anchor	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	digest	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_absence	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_drift	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_edit	evaluate	Retained residual: core misses F2,H3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_lineage.py	lineage_pin	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_refs	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	lineage_units	evaluate	Retained residual: core misses H6 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_lineage.py	output_text	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	readings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	references	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_lineage.py	unpaid	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	_claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	_facts	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	_tree	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_other.py	other_claim	evaluate	Retained residual: core misses C7,C8,D1 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_environment	evaluate	Retained residual: core misses E7 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_normalization	evaluate	Retained residual: core misses A14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_plan	evaluate	Retained residual: core misses D13,F8 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_run	evaluate	Retained residual: core misses D8,D14,F14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_witness	evaluate	Retained residual: core misses B4,B11,B14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_other.py	other_write	evaluate	Retained residual: core misses D11,D12 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	Claim	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	args	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	content	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	evaluate	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	exit_of	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	finding	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	history	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	is_verifier	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	matches	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	pre	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	read_claims	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	settled	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	spec_authorship	evaluate	Retained residual: core misses A13,E3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_budget	evaluate	Retained residual: core misses E11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_claim	evaluate	Retained residual: core misses A7,C10,C12,C3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_history	evaluate	Retained residual: core misses E13,G2,G5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_launch	evaluate	Retained residual: core misses E12 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_repeat	evaluate	Retained residual: core misses A11,E5,E10 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_terms	evaluate	Retained residual: core misses B7 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_tree	evaluate	Retained residual: core misses A3,A4,B36 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	spec_write	evaluate	Retained residual: core misses B2,B9,B23,B35,C6,B5,B20 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_spec.py	stop	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_spec.py	verifier_keys	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	findings	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_doc	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_exit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_pass	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_run	evaluate	Retained residual: core misses B10,B21,B28,B34,B37,C4,E8,F6 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_switch.py	switch_self	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_supervisor	evaluate	Retained residual: core misses B26,B1,D9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_switch.py	switch_tree	evaluate	Retained residual: core misses A6,C5,E1,E9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/family_switch.py	switch_tree.emit	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_write	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/family_switch.py	switch_zero	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+plugin/makoto2/lineage.py	<module>	evaluate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	run_session	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	run_session.send	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	test_only_settled_exact_acceptance_pays	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	test_optout_has_no_dispatch_contract	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_dispatch.py	test_read_line_has_the_register_pin	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_evaluate.py	test_counted_failure_keeps_its_subject	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_evaluate.py	test_failure_subject_fold_and_every_name	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	candidate	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_agent_history_survives_dispatch_optout	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_switch_ast_is_routed_from_native_write	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_toml_assignment_is_not_a_python_ast	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_user_anchor_is_required_for_post_user_baseline	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_integration.py	test_workspace_supplies_named_sets_without_a_default_vocabulary	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	post	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	pre	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	rec	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_agent_boundary_and_verifier_are_separate_history_variables	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_authorship_membership_is_exact_while_messages_match	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_budget_reads_elapsed_and_preserves_equality	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_i1_tests_label_presence_not_filled_cells_and_only_agent	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_loop_else_is_the_register_exclusion	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_named_sets_are_never_guessed	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_pre_events_never_become_settled_observations	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_repeat_uses_any_prior_qualifying_exit_and_last_command_boundary	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_spec.py	test_zip_requires_literal_true_and_dict_uses_python_equality	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_failed_verifier_pays_doc_but_not_pass_claim	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_gate_invokes_each_check_and_denies_crash	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_gate_invokes_each_check_and_denies_crash.crash	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_match_capture_and_guard_are_not_wildcard	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_run_predicate_requires_its_run_context	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_test_write_operand_exclusions	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_zero_really_probes_every_removal_and_unrelated_rows	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_family_switch.py	test_zero_really_probes_every_removal_and_unrelated_rows.read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	run_payloads	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_register_population_and_third_state	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	act	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	ident	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_closing_reference_requires_read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_each_reference_requires_its_own_read	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_reading_own_answer_does_not_create_a_source	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_sentence_punctuation_is_not_part_of_the_source_name	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_lineage.py	test_source_changes_at_use_and_reread	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_repeat_register.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_repeat_register.py	history	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_repeat_register.py	test_repeat_scope_is_append_or_failed_command	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	<module>	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	_obs	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	test_changed_result_at_same_offset_fires_again	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_restored_fixes.py	test_current_settled_event_joins_the_record	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_fake	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_honest	validate	REGISTER/FAMILIES: live predicate or fixed hook-payload acceptance; behavior proven by corpus and removal plants
+tests/test_goal.py	test_routine_honest	validate	REGISTER/FAMILIES: routine honest writes and nonexistent-path regression acceptance
+tests/test_goal.py	test_nonexistent_path_is_not_unread	validate	REGISTER/FAMILIES: routine honest writes and nonexistent-path regression acceptance
+tests/test_lineage.py	test_missing_local_source_requires_verification_or_label	validate	REGISTER/FAMILIES: current-tree deletion witness distinguishes drift from unavailable source
+tests/test_real_session.py	<module>	validate	REGISTER B28: operator-labelled real succession acceptance
+tests/test_real_session.py	test_real_session	validate	REGISTER B28: operator-labelled real succession acceptance
+plugin/makoto2/family_lineage.py	cited_references	evaluate	Written imports and explicit citation identities determine source dependencies.
+plugin/makoto2/family_lineage.py	hook_lineage_refs	evaluate	Dependencies and explicit citations require a prior settled observation carrying the reference.
+plugin/makoto2/family_spec.py	shipping_observed	evaluate	Successful shipping observation across Bash and GitHub routes.
+tests/test_tells.py	<module>	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	reason	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	test_honest_silent	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	run_session	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	measure	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	test_fake_caught_and_named	validate	Existing independent native-hook corpus and population measurement.
+tests/test_tells.py	test_register_and_tell_population	validate	Existing independent native-hook corpus and population measurement.
+tests/test_weaknesses.py	<module>	validate	Real-session weaknesses W1-W8: each fake fires, each honest twin stays silent
+tests/test_weaknesses.py	test_weaknesses	validate	Real-session weaknesses W1-W8: each fake fires, each honest twin stays silent
+tests/test_denominators.py	<module>	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_failure_counts_have_the_same_obligation_in_text_and_handoffs	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_residue_branch_must_belong_to_the_match	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_reading_the_prior_artifact_pays_the_overwrite_obligation	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_constant_exports_are_not_unused_computations	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_common_owner_imports_are_not_copied_implementations	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_explicit_commit_citations_require_primary_readings	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_native_terms_table_uses_the_same_empty_binding_predicate	validate	Evidence-boundary regressions across representations; unrelated else branches and relay citations do not pay.
+tests/test_denominators.py	test_shipment_status_is_distinct_from_a_modified_noun	validate	Evidence-boundary regressions across representations.
+tests/test_denominators.py	test_revision_field_in_primary_measurement_pays_citation	validate	Evidence-boundary regressions across representations.
+tests/test_windows_paths.py	<module>	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_windows_fake_and_honest	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_windows_fake_and_honest.local	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_windows_record_identity	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_windows_paths.py	test_posix_case_urls_and_counts_remain_distinct	validate	Windows payload path identity, fake and honest regression acceptance
+tests/test_restored_fixes.py	read	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	write	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_asserted_sources_require_direct_reading	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_explicit_inventory_allows_required_units_and_consumed_helpers	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_preserving_whole_write_must_keep_unrelated_lines	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+tests/test_restored_fixes.py	test_absence_requires_independent_probe_when_observed_basis_is_unpaid	validate	REGISTER/FAMILIES: paired witnesses for source, absence, closed inventory and preservation obligations
+plugin/makoto2/family_lineage.py	observed_reference	evaluate	Settled inputs and outputs pay source identities, names and hash prefixes across tools.
+plugin/makoto2/family_lineage.py	observed_reference.input_text	evaluate	Flatten nested tool input values for observed reference evidence.
+plugin/makoto2/family_lineage.py	content_references	evaluate	Explicit source content claims require observations of that source content; identities accept any settled observation.
+plugin/makoto2/observed.py	_shell_path_escapes	observe	Preserve Windows shell path separators while retaining POSIX escapes
+plugin/makoto2/observed.py	_shell_path_escapes.protect	observe	Preserve Windows shell path separators while retaining POSIX escapes
+tests/test_windows_paths.py	WindowsPath	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.__init__	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.__str__	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.__truediv__	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.mkdir	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.write_text	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	WindowsPath.unlink	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	windows_tmp	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	windows_tmp.local	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_slash_words_need_path_evidence	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_preserving_whole_write_must_keep_unrelated_lines	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_asserted_sources_require_direct_reading	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_windows_shell_path_arguments	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+tests/test_windows_paths.py	test_posix_shell_escapes	validate	Windows path regressions reproduce native spelling and direct reading on Linux
+plugin/makoto2/claim_reader.py	<module>	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/claim_reader.py	output_text	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/claim_reader.py	value_tokens	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/claim_reader.py	read_claims	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	<module>	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	terms	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	readings	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	emit	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	lineage	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	spec	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	other_point	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	switch	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/four_checks.py	findings	evaluate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	<module>	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	test_written_property_has_subject_and_values	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	test_changed_original_needs_reading_after_change	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+tests/test_claim_reader.py	test_unverified_changed_property_is_silent	validate	REGISTER four shapes: shared deterministic claims and event-ordered source comparisons; independent paired fixtures.
+plugin/makoto2/provenance.py	<module>	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	tokens	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Reading	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.__init__	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.current	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.origins	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.stale	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.relay_sources	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	Trace.replaced_receipt	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	violations	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	<module>	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	contract	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	tree_of	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	waiver	evaluate	Retained residual: core misses B9 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	constant_checker	evaluate	Retained residual: core misses B10 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	budget	evaluate	Retained residual: core misses E11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	preservation	evaluate	Retained residual: core misses D11 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	behavior	evaluate	Retained residual: core misses F14 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	retry_bound	evaluate	Retained residual: core misses E5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	findings	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	<module>	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	read	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	run	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	claim	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_superseded_value_and_latest_read	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_edit_invalidates_value_without_reading_disk	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_command_observation_and_subject_update	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_receipt_after_subject_replacement	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_relay_citation_requires_original	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	<module>	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	detect	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_exact_cardinality	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_declared_direction	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_temporary_waiver	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_constant_checker	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_outer_budget	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_bounded_preservation	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_behavior_comparison	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_unbounded_retry	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/family_lineage.py	lineage_provenance	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/denominators.py	duplicates	evaluate	Retained residual: core misses A4 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	shared_owner	evaluate	Retained residual: core misses F2 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	every_member	evaluate	Retained residual: core misses C3 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	fail_closed	evaluate	Retained residual: core misses C4 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	combined_options	evaluate	Retained residual: core misses E8 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	literal_measurement	evaluate	Retained residual: core misses B5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+plugin/makoto2/denominators.py	section_identity	evaluate	Retained residual: core misses H5 goal/dev witnesses; see mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_receipt_replacement_requires_same_claim_subject	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_unrelated_number_cannot_refresh_superseded_measurement	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_duplicate_resolution	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_shared_rule_owner	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_every_member_is_not_any	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_fail_closed_shell	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_combined_options	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_literal_measurement	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_subject_section_identity	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_unknown_probe_is_not_false	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_contamination_of_evaluation	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+plugin/makoto2/provenance.py	trace_for	evaluate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_changed_verdict_and_named_value	validate	Four-check claim/provenance infrastructure with independent tests; retained exceptions have goal/dev witnesses in mesh/RESIDUALS.tsv.
+tests/test_provenance.py	test_historical_value_and_subject_local_unverified	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+plugin/makoto2/claim_reader.py	_read_claims	evaluate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_displayed_change_text_does_not_invalidate_another_command	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_time_value_is_not_a_number_fragment	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_provenance.py	test_primary_iso_timestamp_pays_minute_projection	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_structural_rules.py	test_reply_word_limit_does_not_create_retry_contract	validate	Shared deterministic provenance and structural contract predicates, with independent counterexample fixtures
+tests/test_claim_reader.py	test_activity_mention_does_not_assert_a_current_verdict	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_requirement_text_is_not_a_verification_receipt	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_provenance.py	test_communicated_value_is_not_a_test_verdict	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+plugin/makoto2/claim_reader.py	named_failure_identities	evaluate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_unique_parameter_names_failure_but_ambiguous_parameter_does_not	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_written_unverified_boolean_does_not_claim_a_decided_measurement	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_point_comparison_requires_the_same_subject	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
+tests/test_claim_reader.py	test_unit_comparison_binds_the_metric_not_just_its_number	validate	Shared deterministic claim/provenance reading or independent paired regression; residual exceptions measured against goal/dev.
