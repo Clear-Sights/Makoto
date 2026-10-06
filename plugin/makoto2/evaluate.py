@@ -29,22 +29,13 @@ def evaluate(ledger, event, adapter='inferred'):
     def output_name(span):
         return span.kind == 'path' and ledger.subject(span.text, event) in output_subjects or any(start <= span.start and span.end <= end for start, end in output_ranges)
 
-    output_spans = {(s.start, s.end) for s in spans if any(start <= s.start and s.end <= end for start, end in output_ranges)}
-    output_spans.update((s.start, s.end) for s in name_spans if output_name(s))
-    # A path-only final may literally repeat the writer's target. It references
-    # the output, rather than copying the answer stored in that output.
-    output_reference = any(s.text == text.strip(' \n\t`"\x27“”‘’') and output_name(s) for s in name_spans)
-    output_reference |= any(not text[:start].strip(' \n\t`"\x27“”‘’') and not text[end:].strip(' \n\t`"\x27“”‘’') for start, end in output_ranges)
-    source_reference = any(s.text == text.strip(' \n\t`"\x27“”‘’') and any(any(contains(t, s.text, s.kind) for t in r['texts']) for r in readings) for s in name_spans)
     if not readings:
         span = spans[0].text if spans else text
         findings.append({'rule': 'a', 'family': 'a', 'subject': span,
                          'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact before this step; assistant text and files this session wrote do not clear it'})
-    if text and readings and not (output_reference or source_reference) and not any(contains(given, text) for given in ledger.given) and any(contains(own, text) for own in ledger.own) and not any(any(contains(t, text) for t in r['texts']) for r in readings):
-        findings.append({'rule': 'a', 'family': 'a', 'subject': text, 'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact containing this text before copying the session answer'})
-    for span in spans:
-        if (span.start, span.end) not in output_spans and any(contains(own, span.text) for own in ledger.own) and not any(contains(given, span.text) for given in ledger.given) and not any(any(contains(t, span.text) for t in r['texts']) for r in readings):
-            findings.append({'rule': 'a', 'family': 'a', 'subject': span.text, 'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact containing these exact characters; own output cannot clear it'})
+    # Rule a asks whether an original artifact was read. It does not require
+    # a derived result or repeated answer to occur verbatim in that artifact.
+    # Exact unread names remain governed independently by rule b.
     for span in name_spans:
         if output_name(span):
             snapshot.append({'span': span.text, 'kind': span.kind, 'output': True})

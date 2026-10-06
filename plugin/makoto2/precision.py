@@ -22,7 +22,10 @@ class Span:
 DELIMITED = re.compile(r'```[^\n]*\n(?P<fence>[\s\S]*?)```|~~~[^\n]*\n(?P<tilde>[\s\S]*?)~~~|`(?P<tick>[^`\n]+)`|"(?P<double>(?:\\.|[^"\\])*)"|(?<!\w)\x27(?P<single>(?:\\.|[^\x27\\])*)\x27(?!\w)|“(?P<curly>[^”]*)”|‘(?P<quote>[^’]*)’')
 TOKEN = re.compile(r'[^\s<>"\x27`“”‘’]+(?:[\x27’][^\s<>"\x27`“”‘’]+)*', re.UNICODE)
 URL = re.compile(r'https?://[^\s<>"\x27`“”‘’]+')
-VERSIONED = re.compile(r'(?<![\w/])(?:@?[A-Za-z][\w.-]*(?:/[\w.-]+)?)\s*(?:@|==|>=|<=|~=|\bv(?:ersion)?\s*|\s+(?=\d+\.\d))\s*\d[\w.+-]*')
+# Retain compact prerelease/postrelease/build spellings. Only terminal sentence
+# punctuation is excluded; this is a lexical slice, not a version validator.
+PACKAGE_VERSION = r'\d(?:[\w.+-]*\w)?'
+VERSIONED = re.compile(r'(?<![\w/])(?P<package>@?[A-Za-z][\w.-]*(?:/[\w.-]+)?)\s*(?:@|==|>=|<=|~=|\bv(?:ersion)?\s*|\s+(?=\d+\.\d))\s*(?P<version>' + PACKAGE_VERSION + r')(?![\w+.-]*\w)')
 UNIT = re.compile(r'(?<!\w)[+-]?\d+(?:\.\d+)?\s*(?:[A-Za-zµμ°%]+(?:/[A-Za-z]+)?)(?!\w)')
 
 
@@ -48,6 +51,14 @@ def extract(text, *, tool_output=False):
         add(start, end, 'url')
     for pattern, kind in ((VERSIONED, 'external-package'), (UNIT, 'unit')):
         for match in pattern.finditer(text):
+            if kind == 'external-package':
+                separator = text[match.end('package'):match.start('version')]
+                # A whitespace pair can accidentally attach the preceding
+                # prose word to a measurement. Explicit package operators/v
+                # forms are still names; a numeric slice of a unit is a value.
+                if separator.isspace() and any(unit.start() <= match.start('version')
+                        and match.end('version') <= unit.end() for unit in UNIT.finditer(text)):
+                    continue
             add(*match.span(), kind)
     for match in TOKEN.finditer(text):
         start, end = match.span()
@@ -158,6 +169,12 @@ def names(text):
             if kind:
                 found.setdefault((start, end), Span(value, start, end, kind))
     return sorted(found.values(), key=lambda s: (s.start, -s.end, s.kind))
+
+
+def package_parts(value):
+    """Exact package/version components, independent of separator spelling."""
+    match = VERSIONED.fullmatch(value)
+    return (match['package'], match['version']) if match else None
 
 
 def contains(text, span, kind=None):

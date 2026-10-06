@@ -4,7 +4,7 @@ import re
 from .borrowed import get, leaves, fragments
 from .observed import (WRITERS, FINAL, identity, effects, failed,
                        reading_subjects, network_targets, response_text)
-from .precision import contains
+from .precision import contains, VERSIONED, package_parts
 
 
 class Ledger:
@@ -12,11 +12,13 @@ class Ledger:
         self.q = 0
         self.turn = '0'
         self.pending = {}
+        self.denied = {}
         self.seen = set()
         self.given = []
         self.readings = []
         self.inputs = []
         self.written = set()
+        self.tainted = set()
         self.mutations = {}
         self.reservations = {}
         self.online = []
@@ -39,7 +41,10 @@ class Ledger:
         return [r for r in self.source_readings() + [i for i in self.inputs if self.fresh(i)] if any(contains(text, span, kind) for text in r['texts'])]
 
     def fetched(self, span, kind=None):
-        return [r for r in self.online if r['turn'] == self.turn and self.fresh(r) and any(contains(t, span) for t in r['texts'])]
+        parts = package_parts(span)
+        return [r for r in self.online if r['turn'] == self.turn and self.fresh(r) and any(
+            contains(t, span) or parts and any(package_parts(m.group()) == parts for m in VERSIONED.finditer(t))
+            for t in r['texts'])]
 
     def ingest(self, event, admitted=True):
         self.q += 1
@@ -56,7 +61,10 @@ class Ledger:
             self.given.append(event.get('prompt', ''))
         if name == 'PreToolUse':
             tid = event.get('tool_use_id')
-            if not admitted or tid in self.pending or tid in self.seen:
+            if not admitted:
+                self.denied.setdefault(tid, event)
+                return
+            if tid in self.pending or tid in self.seen:
                 return
             targets = {self.subject(r['subject'], event) for r in effects(event)}
             self.pending[tid] = event
@@ -69,6 +77,18 @@ class Ledger:
             return  # Assistant text, even a paid final, never supplies evidence.
         tid = event.get('tool_use_id')
         pre = self.pending.get(tid)
+        if pre is None and tid in self.denied and tid not in self.seen:
+            denied = self.denied[tid]
+            if (event.get('tool_name', denied.get('tool_name')) == denied.get('tool_name')
+                    and ('tool_input' not in event or event['tool_input'] == denied.get('tool_input', {}))
+                    and meta.get('no_effect') is not True):
+                # A host-reported completion after denial cannot pay evidence,
+                # but its mutation must invalidate old reads and taint readbacks.
+                for effect in effects(denied) + effects(event):
+                    subject = self.subject(effect['subject'], denied)
+                    self.mutations[subject] = self.q
+                    self.tainted.add(subject)
+                self.seen.add(tid)
         if pre is None or tid in self.seen or event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or 'tool_input' in event and event['tool_input'] != pre.get('tool_input', {}):
             self.unknown.append({'q': self.q, 'reason': 'unpaired, replayed or mismatched tool result'})
             return
@@ -92,7 +112,7 @@ class Ledger:
         tool = pre.get('tool_name')
         # A completed run reads an external response, even if it also mutates
         # something. Direct readbacks of session-written files remain own output.
-        source = tool not in WRITERS | {'Agent', 'Task'} and not any(s in self.written for s in subjects)
+        source = tool not in WRITERS | {'Agent', 'Task'} and not any(s in self.written | self.tainted for s in subjects)
         for spec in meta.get('reads', []) + pre.get('makoto', {}).get('reads', []):
             if spec.get('role') == 'relay' or spec.get('producer'):
                 source = False
@@ -117,6 +137,5 @@ class Ledger:
             self.own.extend(v for _, v in leaves(pre.get('tool_input', {})))
         if source and not failed(event):
             network = network_targets(pre, event)
-            status = next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), None) if isinstance(response, dict) else None
-            if network and (tool != 'Bash' or status == 0):
+            if network and content_present:
                 self.online.append(dict(item, texts=network + texts))

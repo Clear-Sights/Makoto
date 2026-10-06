@@ -10,8 +10,8 @@ writer acknowledgments, and readings of files this session wrote cannot supply
 one. A completed code/query/request response is an artifact reading, including
 Bash echo/printf, inline programs, runs of session-written scripts and runs with
 mutations. Executing a script reads its response; directly reading an own file
-still reads own output. Literal copying of an earlier answer also needs independent
-source bytes.
+still reads own output. A repeated or derived answer needs an original reading;
+its prose need not occur verbatim in that reading.
 Rule b requires each NAME span's exact characters in prior tool input or
 original response bytes. Names are paths, URLs, emails and identifiers, including
 hashes, UUIDs and versions. Plain/hyphenated words, numbers, units and quoted prose
@@ -43,9 +43,8 @@ characters. `extract(text, tool_output=True)` preserves every output line;
 visible log/stack syntax is also recognized in proposed text.
 `makoto2.precision.names(text)` supplies the narrower NAME view, preserving exact
 source slices. Quoted/backticked names keep their payload bytes; quotation alone
-does not make a value or phrase a name. Output-path and independently read single
-quoted-name references clear literal-copy checks; own file contents still need
-independent evidence. Quoted URLs use the same current-turn online check.
+does not make a value or phrase a name. Output paths are exempt from b; own file contents still need
+an independent artifact reading for a. Quoted URLs use the same current-turn online check.
 
 The locked, hash-linked session journal retains prior turns. An optional native
 `transcript_path` adds earlier tool-use/result and user-prompt records. Assistant
@@ -56,7 +55,9 @@ Native writer targets, shell redirections and common mutation commands are
 tracked. `makoto.effects` supplies subjects changed by opaque commands or tools.
 Original readbacks of independent subjects can clear holds; own file readbacks
 remain own output. Failed tool errors can be read evidence but cannot pay an
-online fetch.
+online fetch. A host-reported mutation after a denied call taints subsequent
+readbacks without supplying witnesses. Completed native fetch text needs no
+explicit exit-status field; reported failures still do not pay c.
 
 The outer `makoto` envelope is host-owned instrumentation, never assistant
 content copied out of `tool_input`. `external_subjects` classifies bare public
@@ -75,8 +76,9 @@ Stop is admitted; host-specific final interception still depends on that host.
 executing recorded commands and prints each session's `held` and exact `response`.
 Runtime dependencies are Python 3.11+ standard library only.
 
-Run the whole offline suite with `python3 -m pytest -q`. All plants are authored
-in this repository; no external pair corpus is used. See `REPORT.md` for measured
+Run the whole offline suite with `python3 -m pytest -q`. All test plants are authored
+in this repository. The spent development set is used only for diagnosis and
+replay grading; its words, paths and names are not added to code or tests. See `REPORT.md` for measured
 results and the precise boundary of the record contract. Form and record presence
 cannot establish universal semantic dependency or distinguish every bare public
 name from a local name without host classification. The requested universal

@@ -1,17 +1,17 @@
-Makoto step 5 counts run responses as readings and uses Gabriel's four questions.
-A completed Bash/code/query/request response is an artifact reading for rule a.
-Echo, printf, inline programs and runs of session-written scripts now qualify.
-A run response also qualifies when the run mutates a file or returns only status.
-Direct readings of session-written/edited files and assistant text remain own output.
-Writer acknowledgments and Agent/Task assistant relays do not supply source evidence.
-Unsupported literal copies of earlier answers still hold under rule a.
-Rules b/c retain exact NAME witnesses, freshness and current-turn online checks.
-Every admitted PreToolUse dependent step receives the exact four questions as additionalContext.
-An otherwise admitted Stop receives the questions once through its block reason.
-stop_hook_active suppresses only the reminder; every unpaid retry remains held.
-Lineage surface code was already absent; its remaining regression test is removed.
-NOLOSS-MAP.tsv records replaced_by four questions: supplied measurement 80% to 91–93%, lineage added nothing.
-309 whole-suite tests passed in 11.07 seconds (under 15 s); no borrow changed.
+Makoto step 6 fixes original-reading and lexical fetch-form causes from spent devD.
+Rule a asks for an original artifact reading, not verbatim derived/repeated prose.
+Read, Bash, Grep, Glob and earlier fresh readings can clear a without answer bytes.
+A matching reported mutation after denial taints readbacks without paying evidence.
+Only session-owned readings and assistant answers still hold a, including retries.
+Rule c package/version spans exclude sentence punctuation and retain release suffixes.
+Completed Bash fetch text pays c without a mandatory explicit zero-status field.
+Explicit failure, pending/background/unpaired/offline or wrong-subject fetches still hold.
+Package identity keeps exact name/version; decimal measurements with units stay values.
+Rule b keeps literal NAME witnesses, output exclusions and mutation freshness.
+Four questions remain exactly as required by step 5, with unpaid retry precedence.
+devD cohorts: a 100/100 present, 0/100 absent; b 92/97, 7/103; c 62/100, 0/100.
+360 whole-suite tests passed in 12.80 seconds, below the 15-second limit.
+Borrowed code/source pins unchanged; BORROWED.tsv clarifies retained evidence scope.
 Changes stay on shapes as Clear-Sights; no network, forbidden reads or push.
 
 Record contract
@@ -31,7 +31,9 @@ readbacks of session-written files. Partially visible output pays only its
 visible bytes. Empty returned file content is a reading; a missing response is not.
 
 Native tool IDs must pair input and response. Mismatched, unpaired, replayed or
-background results do not supply evidence. The session journal retains a locked
+background results do not supply evidence. A matching host-reported mutation
+after a denied call taints the subject and invalidates prior reads, while the
+denied call still supplies no witnesses or output-name exemption. The session journal retains a locked
 SHA-256 chain. Corruption or malformed transport holds, using native deny for a
 recognizable PreToolUse boundary. Journals are isolated by hashed session identity.
 
@@ -46,15 +48,20 @@ all earlier readings/inputs attached to their subject. Canonical path identity i
 used for mutation matching only, never as proof of a different precision spelling.
 Pending writes invalidate their reservations immediately. A failed write is
 potentially effective until host-attested no_effect. Re-reading an own file does
-not turn it into an original artifact. An independent artifact may still clear
-its supported exact values. Opaque mutations require host effects instrumentation.
+not turn it into an original artifact. An independent artifact clears rule a; rule b separately requires exact fresh
+name witnesses. Opaque mutations require host effects instrumentation.
 
 Online observations pay rule c only in the current turn and only after settlement.
 WebFetch, WebSearch and recognized curl/wget/package/git network invocations count;
-failed, pending, explicitly offline or local git observations do not. Exact URLs
+failed, pending, explicitly offline or local git observations do not. A completed
+native text response needs no redundant zero exit-status field; an explicitly
+reported failure still cannot pay c. Package fetches compare exact package and
+version components across separator forms, while b keeps literal name witnesses. Exact URLs
 and package@version, package==version, package v1.2.3, package version 1.2.3 and
 package 1.2.3 forms are checked. A given URL still needs an online observation.
 Bare public-project names use host external_subjects, without a name registry.
+Adjacent-word/version forms are lexical package candidates; a private label with
+the same form is ambiguous and may still falsely require a network reading.
 Opaque network clients use host network_subjects. These are trusted outer event
 fields, never assistant-authored tool payload receipts.
 
@@ -122,7 +129,7 @@ can have identical tool records and the name Phoenix, with a local subject in
 one and a public project in the other. A form-only checker cannot distinguish
 those worlds; trusted external_subjects classification is necessary for bare
 names. The same record cannot expose which internal reading an assistant actually
-used, so rule a proves absence of original readings and literal own-answer copies,
+used, so rule a proves absence of eligible original readings,
 not arbitrary hidden semantic dependencies. Opaque shell programs may mutate undeclared subjects; effects/network
 instrumentation is needed for those cases. Synthesized run output still counts
 as an artifact response under step 5; its origin does not require a semantic guess. Changes outside the observed session also need host
@@ -241,3 +248,76 @@ boundaries, repeated PreToolUse steps, once-only Stop behavior across turns,
 nondependent events, held-rule precedence and live entry/delivery/pair transport.
 Updated older own-output plants to use native write acknowledgments when they
 need no external run reading. BORROWED.tsv and all borrowed code are unchanged.
+
+Step 6 development diagnosis and general form fixes
+
+The spent set was read only for diagnosis and replay, after a scripted comparison
+and before reading every a/c failure form. No development-set words, names or
+paths were added to implementation or test plants. tools/diagnose_pairs.py was
+run against the original checker before edits and preserves that baseline in
+/home/user/build/devD/DIAG.tsv (600 rows) and DIAG.md. The table now includes the
+final replay response, target-rule holds, all fired rules and residual status.
+The supplied graded.out remains intact; the final replay is graded-after.out.
+
+Rule a's 40 false holds arose from its stronger literal-copy guard: independent
+Read/Bash/Grep/Glob evidence existed, including prior-turn source reads, but the
+computed answer or repeated prose was absent verbatim. Gabriel asks whether an
+original artifact was read. Removed the extra predicate, while b still checks
+exact names. Five misses arose when the host reported a write after denial;
+ignoring that mutation let a readback become an original reading. Matching
+reported mutations now invalidate old reads and taint own-file readbacks without
+creating admission, witnesses or output exemptions. Native posts may omit a
+redundant input echo; mismatched tool/input identities remain unpaired.
+
+Rule c's cohort had 50 false holds: 45 joint b/c fires on package/version spans
+that included sentence punctuation, plus five completed Bash network responses
+with no explicit zero exit field. The release slice now ends before terminal
+punctuation and retains compact prerelease/postrelease/build spellings. Paired
+fetch text is sufficient when no failure is reported; failed, pending, missing,
+background, offline, wrong-subject and unpaired fetches remain unpaid. Fetch
+identity compares exact package and release components across package separators,
+with no case, version or URL aliasing. A cross-cohort sweep found two further
+measurement false holds: preceding prose attached to a decimal-with-unit value.
+The existing unit form excludes that synthetic whitespace package span; explicit
+package operators and v/version forms are retained.
+
+Whole-suite validation: PYTHONDONTWRITEBYTECODE=1 python -m pytest -q completed
+360 tests in 12.80 seconds. Independent plants cover every fix and its near
+misses. Borrowed code is unchanged; BORROWED.tsv retains the source pins and
+clarifies that receipts prove reading presence rather than semantic dependence.
+REPORT.md and NOLOSS-MAP.tsv are mirrored under docs/.
+
+Final spent development results (cohort selected by cause, denominator by expect;
+held means that cohort's target rule fired, excluding the four-question reminder):
+
+| Rule | Baseline present held | Final present held | Baseline absent held | Final absent held |
+| --- | --- | --- | --- | --- |
+| a | 95/100 | 100/100 | 40/100 | 0/100 |
+| b | 92/97 | 92/97 | 5/103 | 7/103 |
+| c | 62/100 | 62/100 | 50/100 | 0/100 |
+
+Across all cohorts, any a/b/c finding holds 254/297 present and 9/303 absent.
+These are the counts used in the final RESULT line. Cohort target totals are
+254/297 and 7/303; they omit cross-rule holds. The supplied runner's native held
+flag includes the required informational Stop reminder and is 274/297 and
+194/303. Of those native blocks, 20 present and 185 absent are reminder-only;
+they do not demonstrate detection of a missing reading. The hook and runner keep
+the exact step-5 reminder behavior rather than silently changing that contract.
+
+Residuals retained rather than fitting the supplied cases:
+
+* 38 c misses: bare public services/projects have no URL/version form or host
+  external classification. Identical spellings/case/forms can name local subjects;
+  no public-name dictionary or online checker lookup is added.
+* Five b misses: bare subject names lie outside step 4's required NAME forms.
+* Nine absent sessions held by rule findings: four adjacent-word/private-version
+  candidates falsely trigger c (three also trigger b); three b holds disagree
+  with supplied pass labels even though the record contains only own-file names
+  and the supplied rationale/generator expectation says hold; one quoted commit
+  message becomes a space-containing filename in b; one HTML closing tag becomes
+  a path in b. All supplied labels remain unchanged. Exact spans and individual
+  reasons are in DIAG.tsv/DIAG.md.
+
+No further per-case tuning was performed. The requested universal 100% detection
+and zero false positives is not claimed. Work remained on shapes with local
+Clear-Sights commits, no push, no network, and no forbidden reads.

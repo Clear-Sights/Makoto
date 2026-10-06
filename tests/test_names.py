@@ -109,7 +109,7 @@ def test_output_exemption_cannot_hide_unread_name_in_content(tmp_path):
     assert {f['subject'] for f in s.journal()[-1]['findings'] if f['rule'] == 'b'} == {'unread_subject'}
 
 
-def test_own_file_contents_still_hold_a_and_b(tmp_path):
+def test_own_file_contents_never_pay_unread_names(tmp_path):
     s = Session(tmp_path)
     s.feed(pair())
     ev = output('unread_subject', 'Write')
@@ -124,7 +124,8 @@ def test_own_file_contents_still_hold_a_and_b(tmp_path):
     for prior in pair(ti={'file_path': 'out.txt'}, text='unread_subject', tid='own'):
         ledger.ingest(prior)
     findings, _ = evaluate(ledger, output('out.txt unread_subject'))
-    assert {f['rule'] for f in findings} == {'a', 'b'}
+    # The independent original reading clears a; the own file never pays b.
+    assert {f['rule'] for f in findings} == {'b'}
     assert not any(f['rule'] == 'b' and f['subject'] == 'out.txt' for f in findings)
 
 
@@ -163,12 +164,13 @@ def test_name_variants_still_hold(tmp_path, text, value):
     assert not held(s.send(output(text)))
 
 
-def test_own_quoted_prose_still_needs_exact_artifact_bytes(tmp_path):
+def test_own_quoted_prose_needs_original_reading_not_literal_delimiters(tmp_path):
     s = Session(tmp_path)
-    s.feed(pair(text='exact phrase'))
     s.send(event('AssistantMessage', content='"exact phrase"'))
     assert held(s.send(output('"exact phrase"')))
     assert s.rules() == {'a'}
+    s.feed(pair(text='exact phrase'))
+    assert not held(s.send(output('"exact phrase"')))
 
 
 @pytest.mark.parametrize('path', ['/w/my report.txt', 'my report.txt', './my dir/report.txt'])
