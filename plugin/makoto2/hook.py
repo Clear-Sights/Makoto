@@ -8,6 +8,7 @@ from .observed import dependent, FINAL
 from .provenance import Ledger
 from .evaluate import evaluate
 from .obligations import ContractError
+from .surface import render
 
 
 def d_in(raw):
@@ -97,9 +98,9 @@ def main(raw, config):
     event = {}
     try:
         event = d_in(raw)
-        adapter = config.get('adapter', 'declared')
-        if adapter not in ('declared', 'inferred'):
-            raise ValueError('adapter must be declared or inferred')
+        adapter = config.get('adapter', 'inferred')
+        if adapter != 'inferred':
+            raise ValueError('adapter must be inferred')
         path = sigma_path(config['state_dir'], event['session_id'])
         with session_lock(path):
             journal = sigma_read(path, event['session_id'])
@@ -110,6 +111,7 @@ def main(raw, config):
             if event.get('makoto', {}).get('turn_id') is not None:
                 ledger.turn = str(event['makoto']['turn_id'])
             findings, snapshot, contract = [], [], None
+            surface = render(ledger, event) if dependent(event) else ''
             if dependent(event):
                 try:
                     findings, snapshot = evaluate(ledger, event, adapter)
@@ -122,13 +124,19 @@ def main(raw, config):
                 reason = '; '.join('makoto ' + f['family'].replace('_', ' ') + ': ' + f['subject'] + ': ' + f['missing'] for f in findings)
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
-                   'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
+                   'surface': surface, 'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
                    'unknown': ledger.unknown}
             # Validate transitions before persisting invalid host records.
             ledger.ingest(event, row['admitted'])
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
             # Active Stop retries still block. Audit records mark the unpaid
             # retry; no suppression can silently admit its final text.
-            return d_out(event, reason)
+            response = d_out(event, reason)
+            if surface and event['hook_event_name'] == 'PreToolUse':
+                specific = response.setdefault('hookSpecificOutput', {'hookEventName': 'PreToolUse'})
+                specific['additionalContext'] = surface
+            elif surface and event['hook_event_name'] in FINAL and not event.get('stop_hook_active'):
+                response = d_out(event, (reason + '\n' if reason else '') + surface)
+            return response
     except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:
         return d_out(event, 'makoto transport/contract failure: ' + str(error))

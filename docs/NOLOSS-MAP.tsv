@@ -481,3 +481,39 @@ plugin/makoto2/rows.tsv:R07	excluded	Row-specific heuristics removed; obligation
 plugin/makoto2/rows.tsv:R08	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
 plugin/makoto2/rows.tsv:R11	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
 plugin/makoto2/rows.tsv:R12	excluded	Row-specific heuristics removed; obligations now use four presence predicates only.
+adapter:declared	removed	No added exact catch with zero false holds beyond inferred plus surface established; basis syntax/understatement imposes an extra declaration contract.
+plugin/makoto2/obligations.py:basis_text	removed	Basis grammar removed with declared adapter.
+plugin/makoto2/obligations.py:parse_basis	removed	Basis grammar removed with declared adapter.
+plugin/makoto2/obligations.py:declaration	removed	Missing and understated declarations are not exact record-only reading obligations.
+inferred:named_source_hold	replaced_by	Missing turn readings for named subjects are facts in LINEAGE surface; only recorded stale mutation names still hold.
+inferred:trace_value_hold	replaced_by	Value overlap and assistant/written origins are surfaced without assuming a prose obligation.
+inferred:synthetic_first_point	removed	No invented first point for unread mutations; exact destination read-back uses recorded sequence.
+config:adapter	replaced_by	Only inferred accepted; default changed from declared to inferred.
+hook:stop_surface	replaced_by	Block once for surface when stop_hook_active is false; hard unpaid retries still block.
+tools/run_pairs.py:surface	kept	Exact emitted surface extracted from additionalContext or family lines in Stop reason, including empty active retries.
+tests:declared_plants	replaced_by	Own surface present/absent plants plus retained explicit host-contract plants; syntax-only holds subtracted.
+plugin/makoto2/surface.py	added	Step-2 factual surface and self-authored present/absent controls.
+plugin/makoto2/surface.py:exact	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+plugin/makoto2/surface.py:named_subjects	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+plugin/makoto2/surface.py:fresh	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+plugin/makoto2/surface.py:hard_obligations	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+plugin/makoto2/surface.py:render	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+plugin/makoto2/surface.py:executable_inputs	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+plugin/makoto2/surface.py:emit	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py	added	Step-2 factual surface and self-authored present/absent controls.
+tests/test_surface.py:step	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:mutate	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_surface_line_present_absent	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_all_boundaries_emit_exact_surface	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_stale_record_holds_and_readback_releases	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_surface_stop_once_does_not_release_exact_hold	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_caps_are_counted_and_deterministic	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_command_inputs_and_nonzero_exit_exact	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_definition_binds_one_prior_reading	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_driver_reports_actual_emitted_text_only	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_declared_is_removed	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_stale_target_without_content_name	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_read_before_edit_does_not_pay_readback	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_script_edit_resets_run_record	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_transfer_destination_fact_uses_reserved_destination	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.
+tests/test_surface.py:test_relay_value_with_original_elsewhere_is_not_only_relay	added	Shared-ledger factual rendering or its own generated plant; no external pairs input.

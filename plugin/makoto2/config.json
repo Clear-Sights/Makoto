@@ -1,4 +1,4 @@
 {
   "state_dir": "~/.claude/makoto2_state",
-  "adapter": "declared"
+  "adapter": "inferred"
 }

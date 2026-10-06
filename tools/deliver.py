@@ -14,7 +14,7 @@ from run_pairs import invoke, held
 def main():
     event = json.load(sys.stdin)
     event['hook_event_name'] = 'Stop'
-    response = invoke(event, Path(os.environ['MAKOTO_STATE_DIR']), os.environ.get('MAKOTO_ADAPTER', 'declared'))
+    response = invoke(event, Path(os.environ['MAKOTO_STATE_DIR']), os.environ.get('MAKOTO_ADAPTER', 'inferred'))
     if held(response):
         print(json.dumps(response), file=sys.stderr)
         return 2

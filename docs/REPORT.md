@@ -1,136 +1,136 @@
-Makoto 5.0.0-dev now uses one session reading ledger and four presence predicates.
-The legacy heuristic decision route and rows engine have been removed.
-Both obligation adapters use the same live hook, ledger, predicates and journals.
-Declared requires a makoto-basis line on dependent writes, git commit/push and finals.
-Declared covers source, second-point, exact-act and definition-bound reading obligations.
-Declared also holds trace values from this turn's sources omitted from the basis line.
-Declared cannot recover dependencies that neither the basis nor host record exposes.
-Inferred covers exact recorded paths/URLs and trace values with current original sources.
-Inferred adds destination read-back after recorded mutation, transfer, push or deployment.
-Inferred gets SPEC and SWITCH only from exact host obligation records, without word lists.
-Inferred cannot infer free-prose meaning, hidden branches or unrecorded external changes.
-Native paired Read, Grep, WebFetch and restricted cat receipts feed the shared ledger.
-PreToolUse and Stop/SubagentStop hold every unpaid attempt, including unchanged retries.
-97 tests passed in 4.13 seconds; all eight family/adapter present-absent pairs use live hooks.
-No forbidden input or pairs file was read; nothing was pushed.
+Makoto now emits a deterministic lineage surface from the shared session ledger.
+The four groups are LINEAGE, OTHER POINT, SWITCH and SPEC.
+PreToolUse emits additionalContext for Write, Edit, MultiEdit and NotebookEdit.
+Bash git commit/push emits the same factual surface before admission.
+Stop blocks once with the surface; stop_hook_active suppresses surface repetition.
+Exact unpaid hard obligations continue to block on active Stop retries.
+Empty categories are silent; each category caps entries at four with an omitted count.
+The summary has at most nine lines and makes no judgment about prose meaning.
+Named subjects and traced values with missing readings are awareness facts.
+Hard holds require explicit host contracts or recorded mutation/read order.
+Six hard-hold rules are listed below, with the reason each obligation is exact.
+The declared adapter and basis grammar are removed; inferred is the sole adapter.
+126 self-authored and retained regression tests passed in 3.03 seconds.
+The driver prints held and the exact surface emitted at the selected step_index.
+No pairs file or forbidden path was read, no recorded command executed, no push made.
 
-Implementation and supported contract
+Surface contract
 
-A session is identified exactly and has a locked, hash-linked append-only event
-journal. The ledger reconstructs ordered source receipts, immutable definitions,
-turns, places, versions, pending calls, effects, mutation reservations and aliases.
-Only settled responses paired to admitted PreToolUse IDs create receipts. Replayed,
-mismatched, denied, pending, truncated and background observations cannot pay a
-source obligation. Empty complete content and attributable nonzero completed
-probe responses are valid. Writes and unimported worker answers are never originals.
-Read-back of a session-written subject defaults to relay origin; a trusted host
-can explicitly attest source origin. Outstanding or partially failed mutations
-invalidate current evidence; only attested no-effect clearance releases failures.
+LINEAGE reports complete prior readings this turn with subject, tool, selector,
+origin and exact point. Exact delimited ledger identities and structural paths/URLs
+in the candidate, plus matching trace values, identify named/value-bearing subjects.
+Subjects without a complete reading this turn are reported. A separate line shows
+values whose only recorded carriers are assistant/worker relays or session-written
+text; an independent original receipt anywhere in the record removes that value
+from this line. Equal values establish only recorded overlap, never causation.
 
-The host-owned makoto envelope is trusted instrumentation, outside tool_input.
-It supplies identities, origin roles, selector completeness, versions, points,
-invocation digests, dependencies and affected subjects for arbitrary tool effects.
-Native paths are lexically canonical within cwd; verified symlink/transfer aliases
-require host mappings. URL queries/fragments and typed authorities remain distinct.
-No tool response, file, command or source is independently executed or probed by
-this detector. Cross-session original-receipt imports are not implemented; separate
-session IDs cannot share receipts. Unsupported general Bash subject/effect coverage
-is recorded as unknown, separate from missing-reading and transport errors.
+OTHER POINT reports subjects with exactly one complete receipt, subjects whose
+latest reading sequence precedes their latest recorded mutation, and recorded
+mutation destinations or host-required points with no matching complete receipt.
+Unrecorded places/times are not invented. Mutation destinations use the destination
+reserved at admission, including when settlement omits the destination metadata.
 
-Declared grammar
+SWITCH reports completed, paired Bash commands this turn with exact tool inputs,
+host invocation inputs, pre/completion sequence and exit status, including nonzero
+status. Pending/background calls are not described as completed commands. Scripts
+are identified by writer targets ending .py/.sh/.js/.rb/.pl, a leading shebang,
+or a trusted executable flag; later edits retain that registered script identity.
+The surface reports those with no completed direct invocation after the edit.
+Direct executable calls and explicit python/python3/bash/sh/node/ruby/perl script
+arguments are structurally bound. Shell wrappers/options, PATH resolution and
+arbitrary executable types need host instrumentation; execution is not guessed.
+A failed completed invocation counts as a run, without asserting success.
 
-makoto-basis: source=<subject>[,..]; second=<subject>@<point>[,..]; act=<command>-><subject>[,..]; def=<definition id>:<subject>[,..]
+SPEC reports only previously host-registered immutable definitions, with exact
+registration fields and one deterministic bound reading receipt ID (or null).
+The binding selects the latest complete reading after registration for that
+subject, selector and any registered version/point. It does not compare meanings
+or assert agreement. With no definitions registered, SPEC is silent.
 
-A tool description or leading content/command comment carries the line. A final
-message carries a standalone line. MultiEdit and NotebookEdit can use description.
-An empty basis line declares a novel output. Every declared source requires a
-current original source reading this turn. second resolves a host named point or
-an exact revision and retains the first observation as its initial point. def
-requires prior operator/host registration; content disagreement never triggers
-SPEC. act matches exact command/context plus its paired subject response; general
-commands need wrapper invocation/reading receipts. Commas and semicolons delimit
-this compact grammar; richer commands/selectors use host obligations. A missing
-line, invalid field or understated traced value is an explicit contract hold.
+Each nonempty factual category contributes one line. Entries are sorted,
+deduplicated, capped at four and followed by the exact omitted-entry count.
+JSON encoding preserves exact text while escaping embedded line breaks. Long
+individual inputs/definitions remain exact rather than being silently truncated.
+The current candidate's readings/definitions/effects never pay its own check.
+The candidate's trusted turn metadata applies before both surface and holds.
 
-Inferred structural coverage
+Hard-hold rules (six)
 
-Content names are bound to exact ledger subjects using absolute and cwd-relative
-path spellings, URL identities and typed host manifests. Recorded mutations also
-establish subjects, so a newly written file named before any read remains unpaid.
-Trace values include paths, URLs, id: identifiers, hexadecimal identifiers and
-numbers of at least three digits. Values observed only in admitted assistant
-answers, worker relays or session-written content cannot replace this turn's
-original source response. Named path/URL identity obligations are separate from
-copy-value obligations. A recorded mutation adds the prior and destination points
-and requires a read after its settlement. Transfers need host identity aliases.
-SPEC and SWITCH are exact only when the host supplies their obligation identity,
-held definition/revision or invocation selector/input digest respectively.
+1. Host LINEAGE/dependency: require the explicitly identified original source,
+selector/version/point, complete and current this turn, without a worker producer.
+Exact because the trusted host explicitly states the obligation; merely naming
+or copying a value does not create it. Written-file read-back defaults to relay.
 
-Prevention and delivery
+2. Host OTHER POINT: require distinct prior receipt IDs at the two exact host
+points, with the second available and after any specified sequence. Exact because
+the host supplies both subject and points; a single observation cannot satisfy
+a two-receipt contract. Native inference no longer fabricates a first point.
 
-Every dependent PreToolUse is checked before admission and effect reservation.
-Bash git commit/push recognition handles global git options, leading basis
-comments and shell command boundaries. Arbitrary shell wrappers, aliases and
-effects require trusted host adapters; shell semantics are not guessed.
-All simultaneous unpaid families are retained in the audit row, along with the
-output's obligation/receipt snapshot. Repeated unpaid Stop attempts still block;
-stop_hook_active_unpaid records the retry rather than suppressing enforcement.
-Malformed input, missing session/tool identity and corrupted journal data fail
-closed as transport/contract errors, not as invented shape findings.
+3. Host SWITCH: require the exact host input digest, subject, selector and paired
+completed response, or the explicit command at the same cwd/place context.
+Exact because the invocation obligation and response identity are in the record.
+An unrelated successful command or background launch cannot satisfy this rule.
 
-Native Stop is wired as the requested final gate. This build has not independently
-validated another host's Stop-before-delivery timing. tools/deliver.py demonstrates
-an actual stdout interception: denied final bytes never reach stdout, while a
-paid final is emitted. It is a host integration example, not an installed Claude
-interception. Hosts must apply denies before tool side effects and blocks before
-final delivery. The suite's delivery-marker probe proves the included wrapper.
+4. Host SPEC: require the explicitly named immutable held definition/revision
+and its identified subject reading. Exact because host registration and obligation
+identify the definition, subject and selector; content agreement is never tested.
+A missing requested registration or reading leaves that explicit contract unpaid.
 
-Validation and scope
+5. Existing recorded writer target: Write/Edit/MultiEdit/NotebookEdit targeting
+a subject with a recorded session mutation requires a complete content reading
+strictly after the last mutation at its recorded destination. Exact because target,
+mutation sequence, destination and read order are all recorded. No filesystem
+probe infers whether an unseen target already exists. New targets without a
+recorded mutation are not held by this rule. Read-back can be a relay here:
+this is a freshness obligation, distinct from original-source provenance.
 
-python3 -m pytest -q tests: 97 passed in 4.13 seconds, below the 15-second bar.
-The 16 isolated live cases form a present/absent pair for every family under each
-adapter. Declared plants exercise basis syntax itself; inferred SPEC/SWITCH plants
-use exact host obligations. Additional controls cover every write/final/git gate,
-repeated holds, host turn changes, region/query/representation selectors, empty
-content, nonzero responses, immutable definition revisions, mutation epochs,
-pending/failed mutations, partial failures, relay origins, replay/mismatched IDs,
-session separation, typed authorities, transfer aliases, multiple findings,
-corruption, malformed envelopes and destination read-back. Applicable lifecycle,
-audit, packaging and subtraction regression assertions were retained.
+6. Named mutated subject: a dependent candidate naming an exact recorded subject
+with a session mutation has the same destination read-back requirement. Exact
+because exact identity, mutation and missing later full reading are in the record.
+Aliases are host-bound. Old-turn readings alone, assistant text alone and copied
+values alone do not trigger this rule. No free-prose required reading is inferred.
 
-These are generated plants built from SHAPES.md, not any external test set.
-No supplied pairs file was run. No 4,096-session construction campaign, mutation
-certificate campaign, independent real-transcript grading, production latency
-benchmark or universal 100%-accuracy claim is made. The structural record contract
-cannot supply absent instrumentation or determine arbitrary prose dependencies.
-The historical 74 issue names were read only as the specified family inventory;
-no case vocabulary was imported into predicates or obligation inference.
+These six rules share the existing four family predicates; native freshness uses
+OTHER POINT, without adding another family. Multiple hard findings are retained.
+Pending effects invalidate explicit host-contract receipts as before. Malformed
+inputs, invalid adapter selection and journal corruption fail closed as transport/
+contract failures, separately from the six reading rules. Surface-only Stop blocks
+are context delivery, not hard-hold findings; the driver held flag faithfully
+includes that actual native block. stop_hook_active admits only a paid retry.
 
-Grading entry
+Declared subtraction
 
-python3 /home/user/build/makoto/tools/run_pairs.py PAIRS.json --adapter declared|inferred
+Removed declaration(), basis_text(), parse_basis() and the declared adapter option
+from runtime/config/CLI. Its added catches were missing/invalid basis syntax and
+understated declared value coverage. Those impose a self-declaration contract
+that can hold a novel or otherwise adequately recorded step; they do not prove
+an exact reading owed by prose. No added catch with zero false holds beyond
+inferred plus surface was established. Host contracts remain available directly.
+NOLOSS-MAP.tsv records this removal and the replacement of copy/name holds with
+factual surface lines. Obsolete declaration-contract tests were subtracted;
+applicable ledger, predicate, native transport and lifecycle regressions remain.
 
-The implementation accepts a session list or a sessions wrapper. Each session has
-id, events, zero-based step_index and optional files mapping relative paths to
-text. It writes files only under a temporary cwd, uses a fresh state directory
-per session, serializes every event through python -m makoto2 in plugin/, and
-prints the selected step's held flag plus its actual response. It never executes
-recorded commands or opens recorded subjects. The suite calls the driver only
-with self-authored in-memory events, never a pairs file.
+Validation and delivery
 
-Inventory and commits
+python3 -m pytest -q tests: 126 passed in 3.03 seconds (entire suite under 15 s).
+Own plants cover each of nine surface lines present/absent, all seven requested
+boundaries, four host hard contracts present/absent, stale targets and named
+mutations present/absent, partial-reading exclusion, script edit/run ordering,
+nonzero command inputs/status, deterministic counted caps, definition receipt
+binding, destination preservation, relay/source controls and Stop once/retry.
+Live subprocess plants, stdout interception, integrity and package regressions
+remain. The driver was tested only with self-authored in-memory events.
+No external pairs file was run. No universal free-prose accuracy claim is made.
 
-NOLOSS-MAP.tsv has 482 explicit file/function/config/row inventory entries,
-including every removed runtime/test file and every removed baseline function.
-29 files were removed relative to e8032ec: 9 legacy runtime files and 20 old test
-files. Historical evidence, quote pins and receipts remain in the repository.
-Packaging/lifecycle utilities stay outside the four-shape decision engine.
+The locked hash-linked append-only journal retains the candidate surface and hard
+findings independently. PreToolUse returns the surface as additionalContext even
+when denied. Stop/SubagentStop/PreDelivery include it in the blocking reason only
+when stop_hook_active is false; paid active retries return no surface. The example
+stdout delivery wrapper continues to withhold blocked final bytes. Hosts must
+apply the native gate before execution/delivery; production host timing was not
+independently tested. Runtime does not execute commands or probe missing sources.
 
-Branch: shapes. Author: Clear-Sights <clear-sights@users.noreply.github.com>.
-There are four commits after e8032ec: two inherited build/WIP commits and two
-resume commits (implementation/tests, then reviewable report/inventory).
-The environment's signing backend was unavailable, so resume commits are unsigned.
-There are no AI attribution lines and no push was performed.
-
-The canonical requested outputs are /home/user/build/REPORT.md and
-/home/user/build/NOLOSS-MAP.tsv; identical copies are committed under makoto/docs/.
+Branch shapes. One step-2 commit authored as
+Clear-Sights <clear-sights@users.noreply.github.com>, without attribution lines.
+Canonical outputs: /home/user/build/REPORT.md and /home/user/build/NOLOSS-MAP.tsv.
+Identical copies under makoto/docs are committed with implementation and tests.

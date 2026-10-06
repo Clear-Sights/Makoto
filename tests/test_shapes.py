@@ -36,16 +36,17 @@ def read_pair(subject='source', tid='r', text='original', place=None, tool='Read
 
 
 def output(basis='source=source', obligations=None, boundary='Stop', text='a statement', **meta):
-    if obligations is not None:
-        meta['obligations'] = obligations
+    if obligations is None:
+        obligations = [{'shape': 'LINEAGE', 'subject': 'source'}] if basis == 'source=source' else [{'shape': 'SPEC', 'subject': 'source', 'definition_id': 'd'}] if basis == 'def=d:source' else []
+    meta['obligations'] = obligations
     if boundary == 'Stop':
-        return event(boundary, last_assistant_message='makoto-basis: ' + basis + '\n' + text, makoto=meta)
+        return event(boundary, stop_hook_active=True, last_assistant_message='makoto-basis: ' + basis + '\n' + text, makoto=meta)
     return event('PreToolUse', tool_name=boundary, tool_use_id='write',
                  tool_input={'file_path': 'new', 'content': text, 'description': 'makoto-basis: ' + basis}, makoto=meta)
 
 
 class Session:
-    def __init__(self, tmp_path, adapter='declared', live=False):
+    def __init__(self, tmp_path, adapter='inferred', live=False):
         self.config = {'state_dir': str(tmp_path / 'state'), 'adapter': adapter}
         self.live = live
         self.events = []
@@ -99,7 +100,7 @@ def plant(family, present, adapter):
     return events
 
 
-@pytest.mark.parametrize('adapter', ['declared', 'inferred'])
+@pytest.mark.parametrize('adapter', ['inferred'])
 @pytest.mark.parametrize('family', ['SPEC', 'OTHER_POINT', 'SWITCH', 'LINEAGE'])
 @pytest.mark.parametrize('present', [False, True])
 def test_live_present_absent_plants(tmp_path, adapter, family, present):
@@ -116,7 +117,7 @@ def test_live_present_absent_plants(tmp_path, adapter, family, present):
         assert row['snapshot'] and all(s['reading_receipt_ids'] for s in row['snapshot'])
 
 
-@pytest.mark.parametrize('adapter', ['declared', 'inferred'])
+@pytest.mark.parametrize('adapter', ['inferred'])
 @pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Stop', 'SubagentStop', 'commit', 'push'])
 def test_every_boundary_and_retry_is_held(tmp_path, adapter, boundary):
     session = Session(tmp_path, adapter)
@@ -194,16 +195,8 @@ def test_mutation_epochs_and_reservations(tmp_path, settlement):
         assert held(session.send(output()))  # self-written bytes remain a relay
 
 
-def test_understated_declared_basis(tmp_path):
-    session = Session(tmp_path)
-    session.feed(read_pair(text='id:fruit 731 https://example.test/item'))
-    response = session.send(output('', text='731'))
-    assert held(response) and 'understated basis' in str(response)
-    assert not held(session.send(output('source=source', text='731')))
-
-
 @pytest.mark.parametrize('origin', ['assistant', 'written', 'old_read', 'relay_read'])
-def test_inferred_trace_values_require_current_source(tmp_path, origin):
+def test_inferred_trace_values_are_awareness_only(tmp_path, origin):
     session = Session(tmp_path, 'inferred')
     if origin == 'assistant':
         assert not held(session.send(output('', text='731')))
@@ -215,7 +208,7 @@ def test_inferred_trace_values_require_current_source(tmp_path, origin):
         session.feed(read_pair(text='731', **({'role': 'relay'} if origin == 'relay_read' else {})))
         if origin == 'old_read':
             session.send(event('UserPromptSubmit', prompt='next'))
-    assert held(session.send(output('', text='731')))
+    assert not held(session.send(output('', text='731')))
     session.feed(read_pair(tid='original', text='731'))
     assert not held(session.send(output('', text='731')))
 
@@ -255,7 +248,7 @@ def test_multiple_shapes_and_subjects_are_audited(tmp_path):
 
 
 def test_transport_corruption_and_missing_identity_fail_closed(tmp_path):
-    cfg = {'state_dir': str(tmp_path), 'adapter': 'declared'}
+    cfg = {'state_dir': str(tmp_path), 'adapter': 'inferred'}
     for raw in ('null', '[]', '{}', 'bad', '{"hook_event_name":"Stop","session_id":"","x":NaN}'):
         assert held(hook.main(raw, cfg))
     session = Session(tmp_path)
@@ -292,7 +285,7 @@ def test_inferred_relative_subject_and_mutated_destination(tmp_path):
     session = Session(tmp_path, 'inferred')
     session.feed(read_pair('dir/source.txt'))
     session.send(event('UserPromptSubmit', prompt='next'))
-    assert held(session.send(output('', text='dir/source.txt')))
+    assert not held(session.send(output('', text='dir/source.txt')))
     session.feed(read_pair('dir/source.txt', tid='fresh'))
     assert not held(session.send(output('', text='dir/source.txt')))
     mutation = event('PreToolUse', tool_name='Bash', tool_use_id='transfer', tool_input={'command': 'transfer'}, makoto={'effects': [{'subject': 'dir/source.txt'}], 'destination': {'authority': 'remote'}})
@@ -322,26 +315,26 @@ def test_session_separation(tmp_path):
 
 
 def test_delivery_wrapper_prevents_final_bytes(tmp_path):
-    env = dict(os.environ, MAKOTO_STATE_DIR=str(tmp_path / 'state'), MAKOTO_ADAPTER='declared', PYTHONDONTWRITEBYTECODE='1')
+    env = dict(os.environ, MAKOTO_STATE_DIR=str(tmp_path / 'state'), MAKOTO_ADAPTER='inferred', PYTHONDONTWRITEBYTECODE='1')
     def deliver(ev):
         return subprocess.run([sys.executable, str(ROOT / 'tools/deliver.py')], input=json.dumps(ev), env=env, capture_output=True, text=True)
     denied = deliver(output(text='DELIVERY_MARKER'))
     assert denied.returncode == 2 and denied.stdout == ''
     for ev in read_pair():
-        invoke(ev, tmp_path / 'state', 'declared')
+        invoke(ev, tmp_path / 'state', 'inferred')
     admitted = deliver(output(text='DELIVERY_MARKER'))
     assert admitted.returncode == 0 and 'DELIVERY_MARKER' in admitted.stdout
 
 
 def test_grading_driver_on_generated_events_only():
     # Call the driver with our own in-memory plant; never read a pairs file.
-    for adapter in ('declared', 'inferred'):
+    for adapter in ('inferred',):
         for present in (False, True):
             events = plant('LINEAGE', present, adapter)
             session = {'id': 'generated', 'events': events, 'step_index': len(events) - 1, 'files': {'source': 'original'}}
             assert drive_session(session, adapter)['held'] == (not present)
     with pytest.raises(ValueError):
-        drive_session({'events': [output()], 'step_index': 0, 'files': {'../escape': 'x'}}, 'declared')
+        drive_session({'events': [output()], 'step_index': 0, 'files': {'../escape': 'x'}}, 'inferred')
 
 
 @pytest.mark.parametrize('command', ['# makoto-basis:\ngit commit -m change', 'echo ready && git push', 'git --git-dir=repo commit', 'git -c x=y push'])
@@ -349,7 +342,8 @@ def test_git_boundaries_are_structural(tmp_path, command):
     session = Session(tmp_path)
     ev = event('PreToolUse', tool_name='Bash', tool_use_id='git', tool_input={'command': command})
     # Only the leading comment actually declares a novel output.
-    assert held(session.send(ev)) == (not command.startswith('# makoto-basis:'))
+    assert not held(session.send(ev))
+    assert session.journal()[-1]['surface'] == ''
 
 
 def test_inferred_written_subject_is_recorded_even_without_read(tmp_path):
@@ -360,17 +354,11 @@ def test_inferred_written_subject_is_recorded_even_without_read(tmp_path):
     assert held(session.send(output('', text='/w/new')))
 
 
-def test_declared_host_manifest_cannot_hide_understated_basis(tmp_path):
-    session = Session(tmp_path)
-    session.feed(read_pair(text='731'))
-    assert held(session.send(output('', [{'shape': 'LINEAGE', 'subject': 'source'}], text='731')))
-
-
 def test_worker_answer_is_relay_not_original(tmp_path):
     session = Session(tmp_path, 'inferred')
     pair = [event('PreToolUse', tool_name='Task', tool_use_id='worker', tool_input={'prompt': 'research'}), event('PostToolUse', tool_name='Task', tool_use_id='worker', tool_response={'content': '731'})]
     session.feed(pair)
-    assert held(session.send(output('', text='731')))
+    assert not held(session.send(output('', text='731')))
     session.feed(read_pair(text='731'))
     assert not held(session.send(output('', text='731')))
 

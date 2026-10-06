@@ -17,6 +17,8 @@ class Ledger:
         self.mutations = {}
         self.unknown = []
         self.relay_values = []
+        self.commands = []
+        self.scripts = {}
 
     def subject(self, value, event):
         result = identity(value, event)
@@ -85,13 +87,23 @@ class Ledger:
                     key = self.epoch_key(subject, place)
                     self.epochs[key] = self.epochs.get(key, 0) + 1
                     self.written.add(subject)
-                    self.mutations[subject] = {'q': self.q, 'place': meta.get('destination', self.place(event))}
+                    self.mutations[subject] = {'q': self.q, 'place': place}
+                    content = text_of(pre)
+                    if pre.get('tool_name') in WRITERS and (subject in self.scripts or subject.endswith(('.py', '.sh', '.js', '.rb', '.pl')) or content.startswith('#!') or pre.get('makoto', {}).get('executable') is True):
+                        self.scripts[subject] = self.q
             # Failure alone cannot clear a potentially effective mutation.
             if not failed(event) or no_effect:
                 self.reservations.pop(tid, None)
             if not completed(dict(event, tool_name=pre.get('tool_name'))):
                 self.unknown.append({'q': self.q, 'reason': 'response not completed'})
                 return
+            if pre.get('tool_name') == 'Bash':
+                from .surface import executable_inputs
+                response = event.get('tool_response', {})
+                self.commands.append({'command': pre.get('tool_input', {}).get('command', ''),
+                    'inputs': pre.get('tool_input', {}), 'invocation': pre.get('makoto', {}).get('invocation', {}),
+                    'exit_status': next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), None),
+                    'turn': turn, 'pre_sequence': pq, 'sequence': self.q, 'executables': [self.subject(s, pre) for s in executable_inputs(pre)]})
             specs = native_reads(pre, event)
             wrapped = meta.get('reads', [])
             overridden = {(self.subject(x['subject'], pre), x.get('selector', 'content')) for x in wrapped}
@@ -111,7 +123,7 @@ class Ledger:
                 subject = self.subject(spec['subject'], pre)
                 invocation = pre.get('makoto', {}).get('invocation', {})
                 self.readings.append(dict(spec, subject=subject, selector=spec.get('selector', 'content'),
-                    receipt_id=f'{tid}:{index}', tool_use_id=tid, q=self.q, pre_q=pq, turn=turn,
+                    tool=pre.get('tool_name'), receipt_id=f'{tid}:{index}', tool_use_id=tid, q=self.q, pre_q=pq, turn=turn,
                     point=dict(self.place(event), turn_id=turn, sequence=self.q, **({'timestamp': event['timestamp']} if 'timestamp' in event else {})),
                     epoch=self.epochs.get(self.epoch_key(subject, self.place(event)), 0), place=self.place(event), version=spec.get('version'),
                     complete=spec.get('complete') is True, value_sha256=spec.get('value_sha256', digest(text)),

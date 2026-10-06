@@ -15,6 +15,11 @@ def spec(ledger, event, obligation):
 
 
 def other(ledger, event, obligation):
+    if obligation.get('recorded_freshness'):
+        from .surface import fresh
+        if not fresh(ledger, ledger.subject(obligation['subject'], event)):
+            return 'no reading after the last recorded mutation at its destination'
+        return None
     points = obligation.get('points')
     if not isinstance(points, list) or len(points) != 2 or any(not isinstance(p, dict) or not p for p in points):
         raise ContractError('OTHER POINT requires two exact point records')

@@ -1,41 +1,21 @@
 # Makoto 5.0.0-dev
 
-Makoto holds dependent steps until their required readings are in the session's
-hook record. It checks presence, not whether a reading agrees with a claim.
-One ledger and four predicates replace the previous heuristic decision engine.
+Makoto surfaces the session's reading lineage before dependent writes, git
+commit/push and final answers. The summary reports facts under LINEAGE, OTHER
+POINT, SWITCH and SPEC, with empty categories silent and counted list caps.
+PreToolUse receives `additionalContext`. Stop blocks once to show the surface;
+`stop_hook_active` suppresses its repetition while exact unpaid obligations
+continue to block. An empty ledger produces an empty surface.
 
-The four shapes are SPEC (a held definition and its subject reading), OTHER
-POINT (two distinct readings of the same subject at required points), SWITCH
-(an exact input invocation and its paired completed response), and LINEAGE
-(original source readings this turn before the dependent output).
+`inferred` is the only adapter and the default. Exact path/URL names and trace
+values identify record gaps for awareness; they do not create source obligations.
+Only host-registered obligations and recorded stale mutation subjects cause hard
+holds. An existing target changed this session, or a named mutated subject, needs
+a complete content reading after the recorded mutation at its destination.
+The declared adapter and its basis grammar have been removed.
 
-Choose `declared` or `inferred` with `MAKOTO_ADAPTER`, or the `adapter` key in
-`plugin/makoto2/config.json`. `declared` is the default.
-
-The declared adapter requires a basis line in a tool input's `description` or
-leading comment, and in the final assistant message:
-
-```text
-makoto-basis: source=path; second=path@revision; act=cat path->path; def=definition-id:path
-```
-
-Each field accepts comma-separated entries. An empty `makoto-basis:` declares
-a novel output with no dependencies. Write, Edit, MultiEdit, NotebookEdit,
-Bash git commit/push and final messages require the line. A trace value from
-this turn's source readings also needs coverage in the line. Definitions must
-already be registered by the operator/host. Named second points resolve through
-host `makoto.points`, or an exact revision string. Commands with commas or
-semicolons need host obligation records instead of this compact grammar.
-
-The inferred adapter binds exact recorded paths/URLs named in content and exact
-trace values to source receipts. A named mutated subject also requires an
-observation after the mutation at its recorded destination. SPEC and SWITCH
-come only from exact host obligation records; arbitrary prose does not establish
-a definition or a selected branch. Numeric tokens have at least three digits;
-paths, URLs, `id:` tokens and hexadecimal identifiers use structural parsing.
-
-Both adapters accept host-owned `makoto.obligations` and `makoto.dependencies`.
-The host envelope is trusted instrumentation outside tool inputs: it must never
+Host-owned `makoto.obligations` and `makoto.dependencies` specify exact reading
+contracts for the four families. The host envelope is trusted instrumentation outside tool inputs: it must never
 be copied from assistant-authored receipt declarations. Its `turn_id`, `place`,
 `definitions`, `reads`, `effects`, `invocation`, `aliases` and `destination`
 provide exact identities, selectors, origins, versions and points. Definitions
@@ -82,11 +62,11 @@ Run the generated plants and retained applicable regressions with:
 python3 -m pytest -q tests
 ```
 
-The grading entry point is `tools/run_pairs.py INPUT.json --adapter declared|inferred`.
+The grading entry point is `tools/run_pairs.py INPUT.json --adapter inferred`.
 It accepts a session list or `{"sessions": [...]}`. Each session contains `id`,
 `events`, zero-based `step_index`, and optional relative-path `files`. It uses
 fresh temporary state/cwd and the live `python -m makoto2` entry for every event,
-then prints JSON with the selected step's `held` flag. It never executes recorded
+then prints JSON with the selected step's `held` flag and exact emitted `surface`. It never executes recorded
 commands or opens recorded source subjects. Historical evidence remains in the
 repository for audit; old corpus accuracy counts do not grade these predicates.
 
