@@ -5,6 +5,7 @@ from .precision import extract, names, contains
 from .observed import text_of, effects
 from .borrowed import receipt
 from .switch import names_change
+from .paths import path_spellings
 
 
 def evaluate(ledger, event, adapter='inferred'):
@@ -22,8 +23,7 @@ def evaluate(ledger, event, adapter='inferred'):
     for subject in output_subjects:
         if subject.startswith('file:') and ' ' in subject:
             absolute = subject[5:]
-            relative = os.path.relpath(absolute, event.get('cwd') or os.getcwd())
-            for path in {absolute, relative, './' + relative}:
+            for path in path_spellings(absolute, event.get('cwd') or os.getcwd()):
                 pattern = r'(?<![\w/\\.@:+~%#?=&$!*|-])' + re.escape(path) + r'(?![\w/\\.@:+~%#?=&$!*|-])'
                 output_ranges.extend(m.span() for m in re.finditer(pattern, text))
 

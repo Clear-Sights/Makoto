@@ -5,6 +5,7 @@ Invocation positions classify executions, never words about claimed behavior.
 Opaque/conditional calls need the host's actual makoto.invocation subject.
 """
 import os
+import ntpath
 import json
 import re
 import shlex
@@ -14,6 +15,7 @@ from .borrowed import leaves
 from .observed import FINAL, identity, git_action, text_of
 from .precision import contains, names
 from .shell import redirected_argv
+from .paths import relative_path, path_spellings, program_name
 
 
 CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb tcl awk'.split())
@@ -28,7 +30,7 @@ DECLARATIONS = re.compile(r'(?m)(?:\b(?:def|class|function|fn|func)\s+([A-Za-z_]
 def edited_forms(event, target):
     """Return code/data name forms for a recorded effect, or None."""
     path = target.removeprefix('file:')
-    suffix = os.path.splitext(path)[1].lstrip('.').lower()
+    suffix = ntpath.splitext(path)[1].lstrip('.').lower()
     content = '\n'.join(value for _, value in leaves(event.get('tool_input', {})))
     payloads = [value for key, value in leaves(event.get('tool_input', {}))
                 if key and key[-1] in ('content', 'new_string', 'old_string', 'new_source')]
@@ -41,11 +43,11 @@ def edited_forms(event, target):
     shebang = bool(re.search(r'(?m)^#!\s*\S+', content))
     absolute = identity(target, event)[5:]
     executable = not suffix and os.path.isfile(absolute) and os.access(absolute, os.X_OK)
-    record = (suffix in RECORD_SUFFIXES or not suffix and os.path.basename(path) not in CONFIG_FILES and not executable) and event.get('tool_name') != 'NotebookEdit'
-    data_form = (suffix in DATA_SUFFIXES or os.path.basename(path) == '.env' or record) and event.get('tool_name') != 'NotebookEdit'
+    record = (suffix in RECORD_SUFFIXES or not suffix and ntpath.basename(path) not in CONFIG_FILES and not executable) and event.get('tool_name') != 'NotebookEdit'
+    data_form = (suffix in DATA_SUFFIXES or ntpath.basename(path) == '.env' or record) and event.get('tool_name') != 'NotebookEdit'
     data = data_form and not shebang
     if not (record or executable or suffix in CODE_SUFFIXES | DATA_SUFFIXES
-            or os.path.basename(path) in CONFIG_FILES
+            or ntpath.basename(path) in CONFIG_FILES
             or event.get('tool_name') == 'NotebookEdit'
             or re.search(r'(?m)^#!\s*\S+', content)
             or suffix not in ('md', 'rst', 'adoc') and (DECLARATIONS.search(content) or structured)):
@@ -54,11 +56,11 @@ def edited_forms(event, target):
     aliases.update(value for match in DECLARATIONS.finditer(content) for value in match.groups() if value)
     # JSON/YAML keys and dotted module names are also syntactic identifiers.
     aliases.update(re.findall(r'(?:^|[\n{,])\s*["\x27]([A-Za-z_]\w*)["\x27]\s*:', content))
-    stem = os.path.splitext(os.path.basename(path))[0]
+    stem = ntpath.splitext(ntpath.basename(path))[0]
     if re.fullmatch(r'[A-Za-z_]\w*', stem):
         aliases.add(stem)
-    relative = os.path.relpath(absolute, event.get('cwd') or os.getcwd())
-    module = os.path.splitext(relative)[0].replace(os.sep, '.')
+    relative = relative_path(absolute, event.get('cwd') or os.getcwd())
+    module = ntpath.splitext(relative)[0].replace('/', '.') if relative is not None else ''
     if re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', module):
         aliases.add(module.removesuffix('.__init__'))
     return {'subject': identity(target, event), 'display': target, 'aliases': aliases,
@@ -85,7 +87,7 @@ def full_read_subjects(pre, post):
             targets.append(ti['file_path'])
     elif tool == 'Bash':
         words = simple_argv(ti.get('command', ''))
-        if words and os.path.basename(words[0]) == 'cat':
+        if words and program_name(words[0]) == 'cat':
             args = words[1:]
             if args and args[0] == '--':
                 args = args[1:]
@@ -112,8 +114,7 @@ def names_change(event, change):
     if any(identity(ti[key], event) == change['subject'] for key in ('file_path', 'notebook_path') if ti.get(key)):
         return True
     absolute = change['subject'][5:]
-    relative = os.path.relpath(absolute, event.get('cwd') or os.getcwd())
-    return any(contains(text, value, 'path') for value in (absolute, relative, './' + relative)) or any(
+    return any(contains(text, value, 'path') for value in path_spellings(absolute, event.get('cwd') or os.getcwd())) or any(
         contains(text, alias, 'identifier') for alias in change['aliases'])
 
 
@@ -159,7 +160,7 @@ def execution_subjects(pre, changes, post=None):
                 words = simple_argv(shlex.join(parsed[0]))
                 redirects = parsed[1]
         if words:
-            program = os.path.basename(words[0])
+            program = program_name(words[0])
             if RUNTIMES.fullmatch(program):
                 args = words[1:]
                 operand_flags = {'-W', '-X', '--require', '-r', '--loader', '--import', '--input-type', '--conditions', '--inspect-port'}
@@ -279,7 +280,7 @@ def compiled_subjects(pre):
     words = simple_argv(pre.get('tool_input', {}).get('command', ''))
     if not words:
         return None
-    program = os.path.basename(words[0])
+    program = program_name(words[0])
     if program not in ('cc', 'gcc', 'clang', 'c++', 'g++', 'clang++', 'rustc'):
         return None
     if any(w in ('-c', '-S', '-E', '-fsyntax-only', '--emit=metadata') for w in words):
@@ -288,7 +289,7 @@ def compiled_subjects(pre):
         return None
     output = words[words.index('-o') + 1]
     sources = [w for w in words[1:] if w != output and not w.startswith('-')
-               and os.path.splitext(w)[1] in ('.c', '.cc', '.cpp', '.cxx', '.rs')]
+               and ntpath.splitext(w)[1] in ('.c', '.cc', '.cpp', '.cxx', '.rs')]
     if not sources:
         return None
     return identity(output, pre), {identity(source, pre) for source in sources}

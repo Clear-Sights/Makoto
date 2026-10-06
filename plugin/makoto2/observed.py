@@ -6,6 +6,7 @@ import re
 import shlex
 from .borrowed import leaves
 from .shell import ordered_segments, redirected_argv
+from .paths import normalized_path, program_name
 
 WRITERS = {'Write', 'Edit', 'MultiEdit', 'NotebookEdit'}
 FINAL = {'Stop', 'SubagentStop', 'PreDelivery'}
@@ -22,7 +23,7 @@ def identity(value, event):
         raise ValueError('subject identity must be nonempty')
     if value.startswith(('https://', 'http://', 'id:', 'command:')):
         return value
-    return 'file:' + os.path.normpath(os.path.join(event.get('cwd') or os.getcwd(), value.removeprefix('file:')))
+    return 'file:' + normalized_path(value.removeprefix('file:'), event.get('cwd') or os.getcwd())
 
 
 def shell_segments(command):
@@ -59,7 +60,7 @@ def programs(event):
 
 def git_action(event):
     for words in programs(event):
-        if os.path.basename(words[0]) != 'git':
+        if program_name(words[0]) != 'git':
             continue
         i = 1
         while i < len(words) and words[i].startswith('-'):
@@ -112,7 +113,7 @@ def effects(event):
                 if words and words[0] in ('>', '>>', '>|') and len(words) > 1:
                     result.append({'subject': words[1]})
         for words in programs(event):
-            name = os.path.basename(words[0])
+            name = program_name(words[0])
             if '>' in words[0] and len(words) > 1:
                 result.append({'subject': words[1]})
             elif name in ('touch', 'rm', 'mkdir', 'rmdir', 'truncate', 'tee'):
@@ -140,7 +141,7 @@ def reading_subjects(pre):
         result.append(ti['url'])
     elif name == 'Bash':
         for words in programs(pre):
-            if os.path.basename(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
+            if program_name(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
                 result.extend(w for w in words[1:] if not w.startswith('-'))
             # Executing a program reads its response, not the program file.
             # Only direct file readers above inherit that file's own/stale status.
@@ -160,9 +161,9 @@ def network_targets(pre, post):
         for words in programs(pre):
             if any(w in ('--offline', '--no-index') for w in words):
                 continue
-            if os.path.basename(words[0]) in ('curl', 'wget', 'http', 'https', 'fetch'):
+            if program_name(words[0]) in ('curl', 'wget', 'http', 'https', 'fetch'):
                 result.extend(w for w in words[1:] if not w.startswith('-'))
-            elif (os.path.basename(words[0]) in ('pip', 'pip3', 'npm', 'pnpm', 'yarn', 'cargo', 'go') and any(w in ('install', 'add', 'get', 'view') for w in words[1:])) or os.path.basename(words[0]) == 'git' and any(w in ('fetch', 'clone', 'pull') for w in words[1:]):
+            elif (program_name(words[0]) in ('pip', 'pip3', 'npm', 'pnpm', 'yarn', 'cargo', 'go') and any(w in ('install', 'add', 'get', 'view') for w in words[1:])) or program_name(words[0]) == 'git' and any(w in ('fetch', 'clone', 'pull') for w in words[1:]):
                 result.extend(words[1:])
     result.extend(pre.get('makoto', {}).get('network_subjects', []))
     return result

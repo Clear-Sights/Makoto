@@ -1,5 +1,10 @@
 """Step 5: run responses are readings; four questions precede admitted steps."""
+import os
+from pathlib import Path
+import shlex
+import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -11,9 +16,23 @@ from run_pairs import held
 EXPECTED = "Before this step: (1) If it relies on a definition, did you read the thing itself against that definition? (2) If it carries a result to another place or time, did you read the same thing again where and when it lands? (3) If it says how a branch behaves, did you feed that branch an input and read its response? (4) Is it based on the original source, read this turn, rather than on an earlier answer?"
 
 
+@pytest.fixture
+def bash_executable():
+    if sys.platform == 'win32':
+        # PATH may resolve to WSL without a distro on windows-latest.
+        git_bash = Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'Git/bin/bash.exe'
+        assert git_bash.is_file(), f'Git Bash is required: {git_bash}'
+        return str(git_bash)
+    bash = shutil.which('bash')
+    assert bash, 'Bash is required for the real command plants'
+    return bash
+
+
 @pytest.mark.parametrize('command', ['echo 731', "printf '731\\n'", 'python3 -c "print(731)"', 'touch out.txt; echo 731'])
-def test_answer_after_command_printed_output_is_not_held(tmp_path, command):
-    result = subprocess.run(['bash', '-c', command], cwd=tmp_path, capture_output=True, text=True, check=True)
+def test_answer_after_command_printed_output_is_not_held(tmp_path, command, bash_executable):
+    if command.startswith('python3 '):
+        command = shlex.join([sys.executable.replace('\\', '/'), '-c', 'print(731)'])
+    result = subprocess.run([bash_executable, '-c', command], cwd=tmp_path, capture_output=True, text=True, check=True)
     assert result.stdout == '731\n'
     s = Session(tmp_path)
     s.feed(pair('Bash', {'command': command}, result.stdout))

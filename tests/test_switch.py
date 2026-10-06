@@ -1,5 +1,6 @@
 """Independent plants for every switch clause and its form/ordering near misses."""
 import json
+import shlex
 import subprocess
 import sys
 
@@ -368,7 +369,8 @@ def test_live_failed_real_run_response_pays(tmp_path):
     (tmp_path / 'branch.py').write_text(code)
     result = subprocess.run([sys.executable, 'branch.py'], cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 1 and 'RuntimeError: response' in result.stderr
-    call = pair('Bash', {'command': f'{sys.executable} branch.py'}, tid='run')
+    command = shlex.join([sys.executable.replace('\\', '/'), 'branch.py'])
+    call = pair('Bash', {'command': command}, tid='run')
     for ev in call:
         ev['cwd'] = str(tmp_path)
     call[1]['hook_event_name'] = 'PostToolUseFailure'

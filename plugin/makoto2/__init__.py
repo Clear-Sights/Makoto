@@ -45,7 +45,7 @@ def build_package(root, destination):
             'you configured to invoke it. Session state is separate; remove '
             'your configured state directory only if you also want to erase '
             'the retained session history.\n', encoding='utf-8')
-        contents = {str(path.relative_to(destination)): path.read_bytes()
+        contents = {path.relative_to(destination).as_posix(): path.read_bytes()
                     for path in sorted(destination.rglob('*')) if path.is_file()}
         pins = {name: hashlib.sha256(data).hexdigest()
                 for name, data in contents.items()}
