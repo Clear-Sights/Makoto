@@ -9,7 +9,7 @@ import shutil
 PLUGIN_METADATA = {
     'name': 'makoto',
     'version': '5.0.0-dev',
-    'description': 'Executable lifecycle and hook decisions over current observations.',
+    'description': 'Hold dependent steps on missing original readings, exact spans and online fetches.',
 }
 
 
@@ -34,6 +34,8 @@ def build_package(root, destination):
     try:
         ignore = shutil.ignore_patterns('__pycache__', '*.pyc', '*.pyo')
         shutil.copytree(source, destination, dirs_exist_ok=True, ignore=ignore)
+        for name in ('LICENSE', 'THIRD-PARTY-LICENSE.txt', 'NOTICE', 'BORROWED.tsv'):
+            shutil.copyfile(root / name, destination / name)
         metadata_dir = destination / '.claude-plugin'
         metadata_dir.mkdir(exist_ok=True)
         (metadata_dir / 'plugin.json').write_text(

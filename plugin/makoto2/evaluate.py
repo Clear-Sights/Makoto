@@ -1,72 +1,39 @@
-"""Four presence predicates, one dispatch. Values are never compared."""
-from .obligations import ADAPTERS, ContractError
-from .provenance import point_matches
+"""Three pre-step holds derived only from literal session observations."""
+from .precision import extract, contains
+from .observed import text_of
+from .borrowed import receipt
 
 
-def spec(ledger, event, obligation):
-    defs = [d for d in ledger.definitions if d['id'] == obligation.get('definition_id') and
-            d['subject'] == ledger.subject(obligation['subject'], event) and
-            d.get('selector', 'content') == obligation.get('selector', 'content') and
-            (obligation.get('definition_revision', obligation.get('revision')) is None or d.get('revision') == obligation.get('definition_revision', obligation.get('revision')))]
-    if not defs:
-        return 'register the held definition ' + str(obligation.get('definition_id'))
-    if not ledger.matching(obligation, event):
-        return 'read the subject under its held definition'
-
-
-def other(ledger, event, obligation):
-    if obligation.get('recorded_freshness'):
-        from .surface import fresh
-        if not fresh(ledger, ledger.subject(obligation['subject'], event)):
-            return 'no reading after the last recorded mutation at its destination'
-        return None
-    points = obligation.get('points')
-    if not isinstance(points, list) or len(points) != 2 or any(not isinstance(p, dict) or not p for p in points):
-        raise ContractError('OTHER POINT requires two exact point records')
-    first = [r for r in ledger.matching(obligation, event, historical=True) if point_matches(r['point'], points[0])]
-    second = [r for r in ledger.matching(obligation, event) if point_matches(r['point'], points[1]) and r['q'] > obligation.get('after_sequence', -1)]
-    if not any(a['receipt_id'] != b['receipt_id'] for a in first for b in second):
-        return 'read the same subject at both required points: ' + str(points)
-
-
-def switch(ledger, event, obligation):
-    if obligation.get('command'):
-        # Restricted native cat binds command, input, subject and response;
-        # general commands require trusted invocation + read receipts.
-        for reading in ledger.matching(obligation, event):
-            if reading.get('command') == obligation['command'] and reading['pre_q'] < reading['q'] and reading['command_context'] == [event.get('cwd'), event.get('makoto', {}).get('place', {})]:
-                return None
-        return 'feed the exact input with ' + obligation['command'] + ', then read its corresponding response'
-    if not obligation.get('input_sha256'):
-        raise ContractError('SWITCH needs a host-owned exact input digest and selector')
-    subject = ledger.subject(obligation['subject'], event)
-    for reading in ledger.matching(obligation, event):
-        if reading['invocation_subject'] == subject and reading['invocation_selector'] == obligation.get('selector', 'content') and reading['input_sha256'] == obligation['input_sha256'] and reading['pre_q'] < reading['q']:
-            return None
-    return 'feed the required input ' + obligation['input_sha256'] + ', then read that invocation response'
-
-
-def lineage(ledger, event, obligation):
-    if not any(r['role'] == 'source' and r['turn'] == ledger.turn and not r.get('producer') and (not obligation.get('trace_value') or obligation['trace_value'] in r['values']) for r in ledger.matching(obligation, event)):
-        return 'read the original source this turn before writing or answering'
-
-
-PREDICATES = {'SPEC': spec, 'OTHER_POINT': other, 'SWITCH': switch, 'LINEAGE': lineage}
-
-
-def evaluate(ledger, event, adapter):
-    obligations = ADAPTERS[adapter](event, ledger)
-    findings = []
-    snapshots = []
-    for obligation in obligations:
-        shape = obligation.get('shape')
-        if shape not in PREDICATES or 'subject' not in obligation:
-            raise ContractError('unknown shape or missing exact subject')
-        missing = PREDICATES[shape](ledger, event, obligation)
-        if missing:
-            findings.append({'family': shape, 'subject': ledger.subject(obligation['subject'], event), 'missing': missing})
-        candidates = ledger.matching(obligation, event, historical=shape == 'OTHER_POINT')
-        if shape == 'LINEAGE':
-            candidates = [r for r in candidates if r['role'] == 'source' and r['turn'] == ledger.turn and not r.get('producer')]
-        snapshots.append({'obligation': obligation, 'reading_receipt_ids': [r['receipt_id'] for r in candidates]})
-    return findings, snapshots
+def evaluate(ledger, event, adapter='inferred'):
+    if adapter != 'inferred':
+        raise ValueError('adapter must be inferred')
+    text = text_of(event)
+    readings = ledger.source_readings()
+    findings, snapshot = [], []
+    spans = extract(text)
+    if not readings:
+        span = spans[0].text if spans else text
+        findings.append({'rule': 'a', 'family': 'a', 'subject': span,
+                         'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact before this step; assistant text and files this session wrote do not clear it'})
+    if text and readings and not any(contains(given, text) for given in ledger.given) and any(contains(own, text) for own in ledger.own) and not any(any(contains(t, text) for t in r['texts']) for r in readings):
+        findings.append({'rule': 'a', 'family': 'a', 'subject': text, 'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact containing this text before copying the session answer'})
+    for span in spans:
+        witnesses = ledger.witnesses(span.text, span.kind)
+        if any(contains(own, span.text) for own in ledger.own) and not any(contains(given, span.text) for given in ledger.given) and not any(any(contains(t, span.text) for t in r['texts']) for r in readings):
+            findings.append({'rule': 'a', 'family': 'a', 'subject': span.text, 'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact containing these exact characters; own output cannot clear it'})
+        if not witnesses:
+            findings.append({'rule': 'b', 'family': 'b', 'subject': span.text,
+                             'missing': 'NAMED WITHOUT READING: read a source whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it'})
+        else:
+            snapshot.append({'span': span.text, 'kind': span.kind,
+                             'reading_receipt_ids': [w.get('tool_use_id', 'user prompt') for w in witnesses]})
+    external = [s.text for s in spans if s.kind in ('url', 'external-package')]
+    # Host-classified public projects are checked by the same literal sweep.
+    external += [s for s in ledger.external + event.get('makoto', {}).get('external_subjects', []) if contains(text, s)]
+    for span in dict.fromkeys(external):
+        if not ledger.fetched(span):
+            findings.append({'rule': 'c', 'family': 'c', 'subject': span,
+                             'missing': 'DID NOT LOOK ONLINE: fetch or search this exact external subject with WebFetch, WebSearch or a Bash network call in this turn'})
+    if not findings:
+        snapshot.append(receipt(text, [r['tool_use_id'] for r in readings], 'makoto2.precision/form-v1'))
+    return list({(f['rule'], f['subject']): f for f in findings}.values()), snapshot

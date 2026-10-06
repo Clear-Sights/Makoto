@@ -4,11 +4,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from .observed import dependent, FINAL
+from .observed import dependent
 from .provenance import Ledger
 from .evaluate import evaluate
-from .obligations import ContractError
-from .surface import render
+from .transcript import history
 
 
 def d_in(raw):
@@ -26,6 +25,11 @@ def d_in(raw):
     for key in ('place', 'destination', 'points', 'invocation'):
         if key in meta and not isinstance(meta[key], dict):
             raise ValueError('makoto.' + key + ' must be an object')
+    if 'prompt' in event and not isinstance(event['prompt'], str):
+        raise ValueError('prompt must be text')
+    for key in ('external_subjects', 'network_subjects'):
+        if key in meta and (not isinstance(meta[key], list) or any(not isinstance(v, str) or not v for v in meta[key])):
+            raise ValueError(key + ' must contain nonempty strings')
     if 'last_assistant_message' in event and not isinstance(event['last_assistant_message'], str):
         raise ValueError('last_assistant_message must be text')
     if event['hook_event_name'] in ('PreToolUse', 'PostToolUse', 'PostToolUseFailure') and (not isinstance(event.get('tool_use_id'), str) or not event['tool_use_id']):
@@ -97,6 +101,9 @@ def d_out(event, reason):
 def main(raw, config):
     event = {}
     try:
+        envelope = json.loads(raw)
+        if isinstance(envelope, dict):
+            event = envelope  # Preserve boundary type for fail-closed transport.
         event = d_in(raw)
         adapter = config.get('adapter', 'inferred')
         if adapter != 'inferred':
@@ -105,26 +112,25 @@ def main(raw, config):
         with session_lock(path):
             journal = sigma_read(path, event['session_id'])
             ledger = Ledger()
-            for row in journal:
-                ledger.ingest(row['event'], row['admitted'])
+            for prior, admitted in history(event, journal):
+                ledger.ingest(prior, admitted)
             # Turn metadata on the candidate belongs to this check; its receipts do not.
             if event.get('makoto', {}).get('turn_id') is not None:
                 ledger.turn = str(event['makoto']['turn_id'])
             findings, snapshot, contract = [], [], None
-            surface = render(ledger, event) if dependent(event) else ''
             if dependent(event):
                 try:
                     findings, snapshot = evaluate(ledger, event, adapter)
-                except (ContractError, KeyError, TypeError, ValueError) as error:
+                except (KeyError, TypeError, ValueError) as error:
                     contract = str(error)
             reason = None
             if contract:
                 reason = 'makoto contract: ' + contract
             elif findings:
-                reason = '; '.join('makoto ' + f['family'].replace('_', ' ') + ': ' + f['subject'] + ': ' + f['missing'] for f in findings)
+                reason = '; '.join('makoto rule ' + f['rule'] + ': ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
-                   'surface': surface, 'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
+                   'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
                    'unknown': ledger.unknown}
             # Validate transitions before persisting invalid host records.
             ledger.ingest(event, row['admitted'])
@@ -132,11 +138,6 @@ def main(raw, config):
             # Active Stop retries still block. Audit records mark the unpaid
             # retry; no suppression can silently admit its final text.
             response = d_out(event, reason)
-            if surface and event['hook_event_name'] == 'PreToolUse':
-                specific = response.setdefault('hookSpecificOutput', {'hookEventName': 'PreToolUse'})
-                specific['additionalContext'] = surface
-            elif surface and event['hook_event_name'] in FINAL and not event.get('stop_hook_active'):
-                response = d_out(event, (reason + '\n' if reason else '') + surface)
             return response
     except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:
         return d_out(event, 'makoto transport/contract failure: ' + str(error))

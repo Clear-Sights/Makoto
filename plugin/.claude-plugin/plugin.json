@@ -1,6 +1,6 @@
 {
   "name": "makoto",
-  "description": "Four reading shapes enforced before dependent steps.",
+  "description": "Form-based session record holds before writes, commit/push and final answers.",
   "version": "5.0.0-dev",
   "author": {
     "name": "Clear-Sights"

@@ -1,2 +1,7 @@
-state_dir: append-only session journal directory; MAKOTO_STATE_DIR overrides.
-adapter: declared or inferred; MAKOTO_ADAPTER overrides.
+state_dir: locked hash-linked session journal directory; MAKOTO_STATE_DIR overrides.
+adapter: inferred only; MAKOTO_ADAPTER overrides.
+transcript_path: native event field, earlier session record; never assistant prose evidence.
+makoto.effects: host-observed mutation subjects for opaque tools or shell scripts.
+makoto.external_subjects: host-classified bare public project names.
+makoto.network_subjects: host-observed network subjects for opaque network clients.
+makoto.detio_store: host-recorded store root; only witnessed hash-verified references are expanded.

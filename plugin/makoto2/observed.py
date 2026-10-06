@@ -1,63 +1,60 @@
-"""Native settled evidence adapters. No filesystem probes or prose semantics."""
+"""Lexical native tool adapters; no subject-specific vocabulary or execution."""
 import hashlib
 import json
 import os
 import re
 import shlex
+from .borrowed import leaves
 
 WRITERS = {'Write', 'Edit', 'MultiEdit', 'NotebookEdit'}
 FINAL = {'Stop', 'SubagentStop', 'PreDelivery'}
 
 
 def digest(value):
-    data = value if isinstance(value, str) else json.dumps(value, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(data.encode()).hexdigest()
+    return hashlib.sha256((value if isinstance(value, str) else json.dumps(value, sort_keys=True, ensure_ascii=False)).encode()).hexdigest()
 
 
 def identity(value, event):
     if isinstance(value, dict):
-        # Typed identities are host-owned; do not flatten authority/namespace.
         return json.dumps(value, sort_keys=True, separators=(',', ':'))
     if not isinstance(value, str) or not value:
         raise ValueError('subject identity must be nonempty')
-    if value.startswith(('https://', 'http://', 'id:', 'git:', 'command:')):
+    if value.startswith(('https://', 'http://', 'id:', 'command:')):
         return value
-    if value.startswith('file:'):
-        value = value[5:]
-    # Lexical canonical path: verified symlink aliases require host mappings.
-    return 'file:' + os.path.normpath(os.path.abspath(os.path.join(event.get('cwd') or os.getcwd(), value)))
+    return 'file:' + os.path.normpath(os.path.join(event.get('cwd') or os.getcwd(), value.removeprefix('file:')))
 
 
-def command(event):
-    return event.get('tool_input', {}).get('command', '')
-
-
-def argv(event):
+def shell_segments(command):
     try:
-        return shlex.split(command(event))
+        lex = shlex.shlex(command, posix=True, punctuation_chars=';&|()<>\n')
+        lex.whitespace = ' \t\r'
+        lex.whitespace_split = True
+        segments, current = [], []
+        for word in lex:
+            if word and all(c in ';&|()<>\n' for c in word):
+                if current:
+                    segments.append(current)
+                current = [word] if '<' in word or '>' in word else []
+            else:
+                current.append(word)
+        if current:
+            segments.append(current)
+        return segments
     except ValueError:
         return []
 
 
+def programs(event):
+    for words in shell_segments(event.get('tool_input', {}).get('command', '')):
+        while words and (re.match(r'^[A-Za-z_]\w*=', words[0]) or words[0] in ('env', 'command', 'exec', 'sudo')):
+            words = words[1:]
+        if words:
+            yield words
+
+
 def git_action(event):
-    # Shell punctuation establishes command boundaries; comments cannot hide
-    # a git call behind a leading basis declaration. No prose classification.
-    try:
-        lexer = shlex.shlex(command(event), posix=True, punctuation_chars=';&|()\n')
-        lexer.whitespace = ' \t\r'
-        lexer.whitespace_split = True
-        segments, current = [], []
-        for word in lexer:
-            if word and all(c in ';&|()\n' for c in word):
-                segments.append(current)
-                current = []
-            else:
-                current.append(word)
-        segments.append(current)
-    except ValueError:
-        return False
-    for words in segments:
-        if not words or words[0] != 'git':
+    for words in programs(event):
+        if os.path.basename(words[0]) != 'git':
             continue
         i = 1
         while i < len(words) and words[i].startswith('-'):
@@ -68,90 +65,86 @@ def git_action(event):
 
 
 def dependent(event):
-    name = event['hook_event_name']
-    if name in FINAL:
-        return True
-    return name == 'PreToolUse' and (event.get('tool_name') in WRITERS or
-           (event.get('tool_name') == 'Bash' and git_action(event)) or
-           bool(event.get('makoto', {}).get('dependencies')) or
-           bool(event.get('makoto', {}).get('obligations')))
+    return event['hook_event_name'] in FINAL or event['hook_event_name'] == 'PreToolUse' and (event.get('tool_name') in WRITERS or event.get('tool_name') == 'Bash' and git_action(event))
 
 
 def text_of(event):
     if event['hook_event_name'] in FINAL:
         return event.get('last_assistant_message', '')
     ti = event.get('tool_input', {})
-    keys = ('content', 'new_string', 'old_string', 'edits', 'cells', 'new_source', 'command')
-    return '\n'.join(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
-                     for k in keys if (v := ti.get(k)) is not None)
-
-
-def effects(event):
-    result = list(event.get('makoto', {}).get('effects', []))
-    if event.get('tool_name') in WRITERS:
-        ti = event.get('tool_input', {})
-        target = ti.get('file_path') or ti.get('notebook_path')
-        if target:
-            result.append({'subject': target})
-    return result
+    # Inputs' keys are protocol, not authored content. Include writer targets.
+    return '\n'.join(value for _, value in leaves(ti))
 
 
 def response_text(response):
-    if isinstance(response, str):
-        return response
-    if isinstance(response, dict):
-        if 'stdout' in response or 'stderr' in response:
-            return str(response.get('stdout', '')) + '\n' + str(response.get('stderr', ''))
-        if isinstance(response.get('file'), dict):
-            return response['file'].get('content', '')
-        for key in ('content', 'stdout', 'output'):
-            if key in response:
-                value = response[key]
-                return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
-    return json.dumps(response, ensure_ascii=False)
+    return '\n'.join(value for _, value in leaves(response))
 
 
 def failed(event):
     response = event.get('tool_response', {})
-    return event['hook_event_name'] == 'PostToolUseFailure' or (isinstance(response, dict) and
-            bool(response.get('is_error') or response.get('isError')))
+    return event['hook_event_name'] == 'PostToolUseFailure' or isinstance(response, dict) and bool(response.get('is_error') or response.get('isError') or next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), 0))
 
 
-def completed(event):
-    response = event.get('tool_response')
-    if response is None or (isinstance(response, dict) and response.get('backgroundTaskId')):
-        return False
-    if event.get('tool_name') == 'Bash':
-        return isinstance(response, dict) and any(type(response.get(k)) is int for k in ('exitCode', 'exit_code', 'exit'))
-    return not failed(event)
+def effects(event):
+    result = list(event.get('makoto', {}).get('effects', []))
+    ti, tool = event.get('tool_input', {}), event.get('tool_name')
+    if tool in WRITERS:
+        target = ti.get('file_path') or ti.get('notebook_path')
+        if target:
+            result.append({'subject': target})
+    if tool == 'Bash':
+        for words in programs(event):
+            name = os.path.basename(words[0])
+            if '>' in words[0] and len(words) > 1:
+                result.append({'subject': words[1]})
+            elif name in ('touch', 'rm', 'mkdir', 'rmdir', 'truncate', 'tee'):
+                result.extend({'subject': w} for w in words[1:] if not w.startswith('-'))
+            elif name in ('cp', 'mv') and len(words) > 2:
+                result.append({'subject': words[-1]})
+                if name == 'mv':
+                    result.append({'subject': words[-2]})
+            elif name == 'sed' and any(w.startswith('-i') for w in words[1:]):
+                result.append({'subject': words[-1]})
+    return result
 
 
-def native_reads(pre, post):
-    ti = pre.get('tool_input', {})
-    name = pre.get('tool_name')
-    response = post.get('tool_response', {})
-    if failed(post) or (isinstance(response, dict) and (response.get('truncated') or response.get('is_truncated'))):
-        return []
-    has_content = isinstance(response, str) or (isinstance(response, dict) and ('content' in response or isinstance(response.get('file'), dict) and 'content' in response['file']))
-    if name == 'Read' and ti.get('file_path') and has_content:
-        selector = 'content' if not any(k in ti for k in ('offset', 'limit')) else 'region:' + json.dumps([ti.get('offset'), ti.get('limit')])
-        return [{'subject': ti['file_path'], 'selector': selector, 'complete': True}]
-    if name == 'WebFetch' and ti.get('url') and has_content:
-        return [{'subject': ti['url'], 'selector': 'representation:' + ti.get('prompt', ''), 'complete': True}]
-    if name == 'Grep':
-        subject = ti.get('path') or pre.get('cwd') or os.getcwd()
-        return [{'subject': subject, 'selector': 'query:' + json.dumps(ti, sort_keys=True), 'complete': True}]
-    words = argv(pre)
-    if name == 'Bash' and len(words) in (2, 3) and words[0] == 'cat' and (len(words) == 2 or words[1] == '--') and not any(c in command(pre) for c in '|;&<>`$\n'):
-        response = post.get('tool_response', {})
-        if next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), None) == 0:
-            return [{'subject': words[-1], 'selector': 'content', 'complete': True}]
-    return []
+def reading_subjects(pre):
+    ti, name = pre.get('tool_input', {}), pre.get('tool_name')
+    result = [r['subject'] for r in pre.get('makoto', {}).get('reads', [])]
+    if name in ('Read', 'NotebookRead'):
+        if target := ti.get('file_path') or ti.get('notebook_path'):
+            result.append(target)
+    elif name in ('Grep', 'Glob'):
+        result.append(ti.get('path') or pre.get('cwd') or '.')
+    elif name == 'WebFetch' and ti.get('url'):
+        result.append(ti['url'])
+    elif name == 'Bash':
+        for words in programs(pre):
+            if os.path.basename(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
+                result.extend(w for w in words[1:] if not w.startswith('-'))
+            elif os.path.basename(words[0]) in ('python', 'python3', 'node', 'bash', 'sh', 'ruby', 'perl') and len(words) > 1 and not words[1].startswith('-'):
+                result.append(words[1])
+            elif '/' in words[0]:
+                result.append(words[0])
+    return result
 
 
-# Structural trace values, never vocabulary/meaning classification.
-VALUE = re.compile(r'https?://[^\s<>"\x27,;]+|(?<![\w/])(?:[\w.~-]+/|\.?\.?/|/)[^\s<>"\x27,;]+|\b[a-fA-F0-9]{7,64}\b|\b\d{3,}(?:\.\d+)?\b|\bid:[\w.:-]+')
-
-
-def values(text):
-    return set(VALUE.findall(text))
+def network_targets(pre, post):
+    ti, name = pre.get('tool_input', {}), pre.get('tool_name')
+    result = []
+    if name == 'WebFetch' and ti.get('url'):
+        result.append(ti['url'])
+    elif name == 'WebSearch':
+        # A search pays subjects in its query and returned source links.
+        result.extend(v for _, v in leaves(ti))
+        result.extend(v for _, v in leaves(post.get('tool_response')))
+    elif name == 'Bash':
+        for words in programs(pre):
+            if any(w in ('--offline', '--no-index') for w in words):
+                continue
+            if os.path.basename(words[0]) in ('curl', 'wget', 'http', 'https', 'fetch'):
+                result.extend(w for w in words[1:] if not w.startswith('-'))
+            elif (os.path.basename(words[0]) in ('pip', 'pip3', 'npm', 'pnpm', 'yarn', 'cargo', 'go') and any(w in ('install', 'add', 'get', 'view') for w in words[1:])) or os.path.basename(words[0]) == 'git' and any(w in ('fetch', 'clone', 'pull') for w in words[1:]):
+                result.extend(words[1:])
+    result.extend(pre.get('makoto', {}).get('network_subjects', []))
+    return result

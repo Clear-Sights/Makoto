@@ -1,5 +1,10 @@
-"""One session ledger reconstructed from durable, ordered receipts."""
-from .observed import identity, digest, native_reads, effects, completed, failed, response_text, text_of, values, WRITERS, FINAL
+"""Agnostic ordered sweep: source bytes, own output, writes, and online calls."""
+import os
+import re
+from .borrowed import get, leaves, fragments
+from .observed import (WRITERS, FINAL, identity, effects, failed, programs,
+                       reading_subjects, network_targets, response_text)
+from .precision import contains
 
 
 class Ledger:
@@ -8,162 +13,113 @@ class Ledger:
         self.turn = '0'
         self.pending = {}
         self.seen = set()
+        self.given = []
         self.readings = []
-        self.definitions = []
-        self.epochs = {}
-        self.reservations = {}
+        self.inputs = []
         self.written = set()
-        self.aliases = {}
         self.mutations = {}
+        self.reservations = {}
+        self.online = []
+        self.external = []
+        self.own = []
         self.unknown = []
-        self.relay_values = []
-        self.commands = []
-        self.scripts = {}
 
     def subject(self, value, event):
-        result = identity(value, event)
-        return self.aliases.get(result, result)
+        return identity(value, event)
 
-    def place(self, event):
-        return event.get('makoto', {}).get('place', {'workspace': event.get('cwd', '')})
+    def fresh(self, item):
+        return all(self.mutations.get(s, 0) < item['q'] and not any(s in targets for targets in self.reservations.values()) for s in item['subjects'])
 
-    def epoch_key(self, subject, place):
-        return subject + '@' + digest(place)
+    def source_readings(self):
+        return [r for r in self.readings if r['source'] and self.fresh(r)]
 
-    def advance(self, event):
-        self.q += 1
-        meta = event.get('makoto', {})
-        if meta.get('turn_id') is not None:
-            self.turn = str(meta['turn_id'])
-        elif event['hook_event_name'] == 'UserPromptSubmit':
-            self.turn = str(self.q)
+    def witnesses(self, span, kind=None):
+        if any(contains(text, span, kind) for text in self.given):
+            return [{'given': True}]
+        return [r for r in self.source_readings() + [i for i in self.inputs if self.fresh(i)] if any(contains(text, span, kind) for text in r['texts'])]
+
+    def fetched(self, span, kind=None):
+        return [r for r in self.online if r['turn'] == self.turn and self.fresh(r) and any(contains(t, span) for t in r['texts'])]
 
     def ingest(self, event, admitted=True):
-        self.advance(event)
-        meta = event.get('makoto', {})
-        name = event['hook_event_name']
-        for alias in meta.get('aliases', []):
-            self.aliases[identity(alias['alias'], event)] = self.subject(alias['subject'], event)
-        # Host definitions on nondependent registration events only.
+        self.q += 1
+        name, meta = event['hook_event_name'], event.get('makoto', {})
+        if meta.get('turn_id') is not None:
+            self.turn = str(meta['turn_id'])
+        elif name == 'UserPromptSubmit':
+            self.turn = str(self.q)
         if name in ('UserPromptSubmit', 'Register'):
-            for definition in meta.get('definitions', []):
-                item = dict(definition, subject=self.subject(definition['subject'], event), q=self.q)
-                same = [d for d in self.definitions if (d['id'], d.get('revision')) == (item['id'], item.get('revision'))]
-                if same and any(d != dict(item, q=d['q']) for d in same):
-                    raise ValueError('definition revision is immutable')
-                if not same:
-                    self.definitions.append(item)
-        if name in FINAL and admitted:
-            self.relay_values.append({'subject': 'id:assistant:' + str(self.q), 'values': values(text_of(event))})
+            self.external.extend(meta.get('external_subjects', []))
+        if name in FINAL or name == 'AssistantMessage':
+            self.own.extend(v for _, v in leaves(event.get('last_assistant_message', event.get('content', ''))))
+        if name == 'UserPromptSubmit':
+            self.given.append(event.get('prompt', ''))
         if name == 'PreToolUse':
             tid = event.get('tool_use_id')
-            if not admitted or not tid or tid in self.seen or tid in self.pending:
+            if not admitted or tid in self.pending or tid in self.seen:
                 return
-            self.pending[tid] = (event, self.q, self.turn)
-            reserved = {}
-            for effect in effects(event):
-                subject = self.subject(effect['subject'], event)
-                reserved[subject] = meta.get('destination', self.place(event))
-            self.reservations[tid] = reserved
-        elif name in ('PostToolUse', 'PostToolUseFailure'):
-            tid = event.get('tool_use_id')
-            if tid not in self.pending or tid in self.seen:
-                self.unknown.append({'q': self.q, 'reason': 'unpaired or replayed response'})
-                return
-            pre, pq, turn = self.pending[tid]
-            # An ID is not enough if supplied tool identity/input disagree.
-            if event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or ('tool_input' in event and event['tool_input'] != pre.get('tool_input', {})):
-                self.unknown.append({'q': self.q, 'reason': 'mismatched response'})
-                return
-            del self.pending[tid]
-            self.seen.add(tid)
-            reserved = self.reservations.get(tid, {})
-            no_effect = meta.get('no_effect') is True
-            if reserved and not no_effect and pre.get('tool_name') in WRITERS:
-                ti = pre.get('tool_input', {})
-                target = ti.get('file_path') or ti.get('notebook_path')
-                if target:
-                    # Only replacement bytes belong to the native writer target.
-                    # Shell arguments and unrelated host effects carry no such link.
-                    replacement = {k: v for k, v in ti.items() if k in
-                                   ('content', 'new_string', 'new_source', 'cells')}
-                    if isinstance(ti.get('edits'), list):
-                        replacement['edits'] = [{'new_string': e['new_string']} for e in ti['edits']
-                                                if isinstance(e, dict) and 'new_string' in e]
-                    self.relay_values.append({'subject': self.subject(target, pre),
-                                              'values': values(text_of(dict(pre, tool_input=replacement)))})
-            if not no_effect:
-                for subject in set(reserved) | {self.subject(x['subject'], pre) for x in effects(event)}:
-                    place = reserved.get(subject, meta.get('destination', self.place(event)))
-                    key = self.epoch_key(subject, place)
-                    self.epochs[key] = self.epochs.get(key, 0) + 1
-                    self.written.add(subject)
-                    self.mutations[subject] = {'q': self.q, 'place': place}
-                    content = text_of(pre)
-                    target = pre.get('tool_input', {}).get('file_path') or pre.get('tool_input', {}).get('notebook_path')
-                    if pre.get('tool_name') in WRITERS and target and subject == self.subject(target, pre) and (subject in self.scripts or subject.endswith(('.py', '.sh', '.js', '.rb', '.pl')) or content.startswith('#!') or pre.get('makoto', {}).get('executable') is True):
-                        self.scripts[subject] = self.q
-            # Failure alone cannot clear a potentially effective mutation.
-            if not failed(event) or no_effect:
-                self.reservations.pop(tid, None)
-            if not completed(dict(event, tool_name=pre.get('tool_name'))):
-                self.unknown.append({'q': self.q, 'reason': 'response not completed'})
-                return
-            if pre.get('tool_name') == 'Bash':
-                from .surface import executable_inputs
-                response = event.get('tool_response', {})
-                self.commands.append({'command': pre.get('tool_input', {}).get('command', ''),
-                    'inputs': pre.get('tool_input', {}), 'invocation': pre.get('makoto', {}).get('invocation', {}),
-                    'exit_status': next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), None),
-                    'turn': turn, 'pre_sequence': pq, 'sequence': self.q, 'executables': [self.subject(s, pre) for s in executable_inputs(pre)]})
-            specs = native_reads(pre, event)
-            wrapped = meta.get('reads', [])
-            overridden = {(self.subject(x['subject'], pre), x.get('selector', 'content')) for x in wrapped}
-            specs = [x for x in specs if (self.subject(x['subject'], pre), x.get('selector', 'content')) not in overridden] + wrapped
-            if pre.get('tool_name') in WRITERS or reserved:
-                specs = []  # Writes never create source receipts, even with read metadata.
-            text = response_text(event.get('tool_response'))
-            if pre.get('tool_name') in ('Agent', 'Task') and not wrapped:
-                specs.append({'subject': 'id:relay:' + tid, 'complete': True, 'role': 'relay', 'producer': tid})
-            if pre.get('tool_name') == 'Bash' and not native_reads(pre, event) and not pre.get('makoto', {}).get('invocation') and not reserved:
-                self.unknown.append({'q': self.q, 'reason': 'general Bash subject/effects need host instrumentation'})
-            # Every completed Bash invocation has an exact native command response.
-            if pre.get('tool_name') == 'Bash':
-                specs.append({'subject': 'command:' + digest([pre.get('cwd'), pre.get('tool_input', {}).get('command'), pre.get('makoto', {}).get('place', {})]),
-                              'selector': 'response', 'complete': True, 'role': 'response'})
-            for index, spec in enumerate(specs):
-                subject = self.subject(spec['subject'], pre)
-                invocation = pre.get('makoto', {}).get('invocation', {})
-                self.readings.append(dict(spec, subject=subject, selector=spec.get('selector', 'content'),
-                    tool=pre.get('tool_name'), receipt_id=f'{tid}:{index}', tool_use_id=tid, q=self.q, pre_q=pq, turn=turn,
-                    point=dict(self.place(event), turn_id=turn, sequence=self.q, **({'timestamp': event['timestamp']} if 'timestamp' in event else {})),
-                    epoch=self.epochs.get(self.epoch_key(subject, self.place(event)), 0), place=self.place(event), version=spec.get('version'),
-                    complete=spec.get('complete') is True, value_sha256=spec.get('value_sha256', digest(text)),
-                    values=sorted(values(text)), role=spec.get('role', 'relay' if subject in self.written else 'source'),
-                    producer=spec.get('producer'), input_sha256=invocation.get('input_sha256'),
-                    invocation_subject=self.subject(invocation['subject'], pre) if invocation.get('subject') else None,
-                    invocation_selector=invocation.get('selector'), command=pre.get('tool_input', {}).get('command'),
-                    command_context=[pre.get('cwd'), pre.get('makoto', {}).get('place', {})]))
-
-    def available(self, reading, obligation, event, historical=False):
-        if reading['q'] >= self.q + 1 or not reading['complete']:
-            return False
-        if reading['subject'] != self.subject(obligation['subject'], event) or reading['selector'] != obligation.get('selector', 'content'):
-            return False
-        if obligation.get('version') is not None and reading.get('version') != obligation['version']:
-            return False
-        if obligation.get('point') and not point_matches(reading['point'], obligation['point']):
-            return False
-        if not historical:
-            if reading['epoch'] != self.epochs.get(self.epoch_key(reading['subject'], reading['place']), 0):
-                return False
-            if any(subjects.get(reading['subject']) == reading['place'] for subjects in self.reservations.values()):
-                return False
-        return True
-
-    def matching(self, obligation, event, historical=False):
-        return [r for r in self.readings if self.available(r, obligation, event, historical)]
-
-
-def point_matches(actual, required):
-    return isinstance(required, dict) and all(actual.get(k) == v for k, v in required.items())
+            targets = {self.subject(r['subject'], event) for r in effects(event)}
+            self.pending[tid] = event
+            self.reservations[tid] = targets
+            if event.get('tool_name') not in WRITERS and not targets and event.get('tool_name') not in ('Agent', 'Task'):
+                self.inputs.append({'q': self.q, 'subjects': [self.subject(s, event) for s in reading_subjects(event)],
+                                    'texts': list(fragments(event.get('tool_input', {}))), 'tool_use_id': tid})
+            return
+        if name not in ('PostToolUse', 'PostToolUseFailure'):
+            return  # Assistant text, even a paid final, never supplies evidence.
+        tid = event.get('tool_use_id')
+        pre = self.pending.get(tid)
+        if pre is None or tid in self.seen or event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or 'tool_input' in event and event['tool_input'] != pre.get('tool_input', {}):
+            self.unknown.append({'q': self.q, 'reason': 'unpaired, replayed or mismatched tool result'})
+            return
+        del self.pending[tid]
+        self.seen.add(tid)
+        targets = self.reservations.get(tid, set()) | {self.subject(r['subject'], pre) for r in effects(event)}
+        no_effect = meta.get('no_effect') is True
+        if not no_effect:
+            for subject in targets:
+                self.mutations[subject] = self.q
+                self.written.add(subject)
+        if not failed(event) or no_effect:
+            self.reservations.pop(tid, None)
+        response = event.get('tool_response')
+        if response is None or isinstance(response, dict) and response.get('backgroundTaskId'):
+            return
+        subjects = [self.subject(s, pre) for s in reading_subjects(pre)]
+        subjects += [self.subject(r['subject'], pre) for r in meta.get('reads', [])]
+        texts = list(fragments(response))
+        content_present = bool(list(leaves(response)))
+        tool = pre.get('tool_name')
+        source = tool not in WRITERS | {'Agent', 'Task'} and not targets and not any(s in self.written for s in subjects)
+        if tool == 'Bash':
+            # Native shell-produced answer text is not an artifact reading.
+            for words in programs(pre):
+                if os.path.basename(words[0]) in ('echo', 'printf') or os.path.basename(words[0]) in ('python', 'python3', 'node', 'ruby', 'perl') and any(w in ('-c', '-e') for w in words):
+                    source = False
+        for spec in meta.get('reads', []) + pre.get('makoto', {}).get('reads', []):
+            if spec.get('role') == 'relay' or spec.get('producer'):
+                source = False
+        # Expand only references actually present in this response, never a store scan.
+        if source:
+            store = meta.get('detio_store') or pre.get('makoto', {}).get('detio_store') or os.environ.get('DETIO_STORE_DIR')
+            for text in list(texts):
+                refs = re.findall(r'detio://([0-9a-f]{64}|[0-9a-f]{12})(?![0-9a-f])', text)
+                if store:
+                    refs += re.findall(re.escape(str(os.path.expanduser(store)).rstrip('/') + '/objects/') + r'([0-9a-f]{64}|[0-9a-f]{12})(?![0-9a-f])', text)
+                for address in refs:
+                    if not store:
+                        raise ValueError('DetIO reference needs a recorded store directory')
+                    texts.append(get(store, address))
+        item = {'q': self.q, 'subjects': subjects, 'texts': texts,
+                'source': source, 'tool_use_id': tid, 'tool': tool, 'turn': self.turn}
+        # Empty file content is a reading; empty writer acknowledgments are not.
+        if content_present:
+            self.readings.append(item)
+        if not source:
+            self.own.extend(texts)
+            self.own.extend(v for _, v in leaves(pre.get('tool_input', {})))
+        if source and not failed(event):
+            network = network_targets(pre, event)
+            status = next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), None) if isinstance(response, dict) else None
+            if network and (tool != 'Bash' or status == 0):
+                self.online.append(dict(item, texts=network + texts))

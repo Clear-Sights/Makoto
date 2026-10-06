@@ -1,76 +1,66 @@
 # Makoto 5.0.0-dev
 
-Makoto surfaces the session's reading lineage before dependent writes, git
-commit/push and final answers. The summary reports facts under LINEAGE, OTHER
-POINT, SWITCH and SPEC, with empty categories silent and counted list caps.
-PreToolUse receives `additionalContext`. Stop blocks once to show the surface;
-`stop_hook_active` suppresses its repetition while exact unpaid obligations
-continue to block. An empty ledger produces an empty surface.
+Makoto holds dependent steps before Write, Edit, MultiEdit, NotebookEdit, Bash
+`git commit`/`git push`, and Stop. The live hook is `python3 -m makoto2` from
+`plugin/`; `plugin/hooks/hooks.json` wires native events into it. No model or
+network is used by the checker.
 
-`inferred` is the only adapter and the default. Exact path/URL names and trace
-values identify record gaps for awareness; they do not create source obligations.
-Only host-registered obligations and recorded stale mutation subjects cause hard
-holds. An existing target changed this session, or a named mutated subject, needs
-a complete content reading after the recorded mutation at its destination.
-The declared adapter and its basis grammar have been removed.
+Rule a requires an original artifact reading. Assistant text, worker answers,
+writer acknowledgments, and readings of files this session wrote cannot supply
+one. Literal copying of an earlier answer also needs independent source bytes.
+Rule b requires each precision span's exact characters in prior tool input or
+original response bytes. A span copied from a user prompt is given. Paths are
+matched in their recorded spelling; normalized paths are used only to track
+writes and stale readings. Rule c requires an online fetch/search of a named URL,
+versioned package, or host-classified public project in the current turn.
+User-given external names still need that online call.
 
-Host-owned `makoto.obligations` and `makoto.dependencies` specify exact reading
-contracts for the four families. The host envelope is trusted instrumentation outside tool inputs: it must never
-be copied from assistant-authored receipt declarations. Its `turn_id`, `place`,
-`definitions`, `reads`, `effects`, `invocation`, `aliases` and `destination`
-provide exact identities, selectors, origins, versions and points. Definitions
-register on UserPromptSubmit or an internal Register event. Instrument arbitrary
-shell effects and commit/push snapshot dependencies explicitly. Cross-session
-receipt imports are not implemented; parent and worker ledgers stay separate.
+Hold messages name the rule, quote the exact span, and say which reading clears
+it. PreToolUse returns a native deny, and Stop returns a native block. Every
+unpaid retry remains held, including `stop_hook_active`. Paid steps produce `{}`.
+The old lineage surface and four-family obligation layer have been removed.
 
-Native Read, Grep, WebFetch and restricted single-file `cat` observations require
-paired PreToolUse/PostToolUse IDs. Grep supplies its exact query selector,
-WebFetch its requested representation selector, and partial Read its region
-selector. Empty returned content counts. Completed nonzero probe responses
-count; pending calls, replayed IDs, background launches and failed reads do not.
-Writes never pay source obligations. Read-back of a session-written subject is
-a relay unless the host explicitly attests an original source role. General
-Bash calls without subject/effect instrumentation are journaled as unknown.
+`makoto2.precision.extract` is the single reusable form extractor. It preserves
+quoted/backtick/fenced payloads, output/log lines, paths, URLs, emails, digit and
+symbol tokens, camelCase, versions, timestamps, IDs, and numbers with units.
+Its deterministic non-dictionary substitute is membership in the bundled,
+sorted `common-english.txt`: ordinary alphabetic tokens outside that closed list
+are exact spans. This is an explicit offline allowlist, not an exhaustive English
+dictionary. The extractor returns original string offsets and never rewrites
+characters. `extract(text, tool_output=True)` preserves every output line;
+visible log/stack syntax is also recognized in proposed text.
 
-PreToolUse denies every unpaid attempt. Stop and SubagentStop block every unpaid
-final, including retries with `stop_hook_active`; those retries are recorded.
-The host must enforce these decisions before execution/delivery. The example
-`tools/deliver.py` owns final stdout and emits text only after an admitted Stop.
-It does not install final-message interception into another host. Native Stop
-pre-delivery timing has not been independently validated here.
+The locked, hash-linked session journal retains prior turns. An optional native
+`transcript_path` adds earlier tool-use/result and user-prompt records. Assistant
+prose from the transcript never becomes evidence. A recorded write invalidates
+that subject's earlier inputs and readings; pending writes reserve it immediately.
+Failed mutations remain reserved unless the host attests `makoto.no_effect`.
+Native writer targets, shell redirections and common mutation commands are
+tracked. `makoto.effects` supplies subjects changed by opaque commands or tools.
+Original readbacks of independent subjects can clear holds; own file readbacks
+remain own output. Failed tool errors can be read evidence but cannot pay an
+online fetch.
 
-Session state is a locked, hash-linked append-only journal in
-`~/.claude/makoto2_state`; `MAKOTO_STATE_DIR` overrides it. Every output records
-its obligations and prior reading IDs. Mutation reservations invalidate affected
-current receipts before settlement; partial failure keeps the reservation until
-host-attested no-effect clearance. Corruption and invalid input fail closed as
-transport/contract errors. Unknown instrumentation is recorded separately from
-missing-reading findings. External changes require host epoch/effect records.
-The runtime does not probe source files or execute missing checks itself.
+The outer `makoto` envelope is host-owned instrumentation, never assistant
+content copied out of `tool_input`. `external_subjects` classifies bare public
+project names without a subject-specific registry; `network_subjects` records
+opaque network clients. `turn_id` provides a stable host turn identity.
+`detio_store` or `DETIO_STORE_DIR` identifies a DetIO store. Only references
+already witnessed in a successful source response are expanded, and their SHA
+addresses are verified. Unreferenced stored objects never become evidence.
+`BORROWED.tsv` pins the reused DetIO and Causality pieces. Packages carry their
+licenses, notices and provenance table.
 
-Install through the existing marketplace:
+The host must enforce hook decisions before executing a tool or delivering a
+final answer. `tools/deliver.py` demonstrates this by withholding stdout until a
+Stop is admitted; host-specific final interception still depends on that host.
+`tools/run_pairs.py INPUT.json --adapter inferred` replays supplied events without
+executing recorded commands and prints each session's `held` and exact `response`.
+Runtime dependencies are Python 3.11+ standard library only.
 
-```text
-/plugin marketplace add Clear-Sights/Makoto
-/plugin install makoto@makoto
-```
-
-Python 3.11 or later is required; runtime dependencies are standard library only.
-Run the generated plants and retained applicable regressions with:
-
-```sh
-python3 -m pytest -q tests
-```
-
-The grading entry point is `tools/run_pairs.py INPUT.json --adapter inferred`.
-It accepts a session list or `{"sessions": [...]}`. Each session contains `id`,
-`events`, zero-based `step_index`, and optional relative-path `files`. It uses
-fresh temporary state/cwd and the live `python -m makoto2` entry for every event,
-then prints JSON with the selected step's `held` flag and exact emitted `surface`. It never executes recorded
-commands or opens recorded source subjects. Historical evidence remains in the
-repository for audit; old corpus accuracy counts do not grade these predicates.
-
-These checks establish exact presence under their record contract. They cannot
-recover undeclared prose dependencies, unobserved external mutations, hidden
-branch choices or unavailable source provenance. Universal 100% accuracy over
-free prose has not been established.
+Run the whole offline suite with `python3 -m pytest -q`. All plants are authored
+in this repository; no external pair corpus is used. See `REPORT.md` for measured
+results and the precise boundary of the record contract. Form and record presence
+cannot establish universal semantic dependency or distinguish every bare public
+name from a local name without host classification. The requested universal
+100% and zero false positives is not claimed.

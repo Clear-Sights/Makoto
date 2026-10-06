@@ -31,14 +31,6 @@ def held(response):
     return response.get('decision') == 'block' or response.get('hookSpecificOutput', {}).get('permissionDecision') == 'deny'
 
 
-def emitted_surface(response):
-    context = response.get('hookSpecificOutput', {}).get('additionalContext')
-    if context is not None:
-        return context
-    return '\n'.join(line for line in response.get('reason', '').splitlines()
-                     if line.startswith(('LINEAGE:', 'OTHER POINT:', 'SWITCH:', 'SPEC:')))
-
-
 def drive_session(session, adapter):
     events = session['events']
     index = session['step_index']
@@ -64,7 +56,6 @@ def drive_session(session, adapter):
             responses.append(invoke(event, base / 'state', adapter))
         return {'session': session.get('id', events[index].get('session_id', 'session')),
                 'step_index': index, 'held': held(responses[index]),
-                'surface': emitted_surface(responses[index]),
                 'response': responses[index]}
 
 

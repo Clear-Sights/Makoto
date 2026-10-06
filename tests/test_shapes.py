@@ -1,7 +1,7 @@
-"""Self-authored witness plants from SHAPES.md; no external pair corpus."""
+"""Self-authored native plants for the three record holds, no external corpus."""
 import copy
+import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -11,50 +11,44 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'plugin'), str(ROOT / 'tools')]
 from makoto2 import hook
-from run_pairs import invoke, held, drive_session
+from run_pairs import held, invoke, drive_session
 
 
 def event(name, **fields):
     return dict(hook_event_name=name, session_id='plant', cwd='/w', **fields)
 
 
-def read_pair(subject='source', tid='r', text='original', place=None, tool='Read', selector=None, **receipt):
-    ti = {'file_path': subject}
-    if tool == 'Bash':
-        ti = {'command': 'probe --input z'}
-    elif tool == 'WebFetch':
-        ti = {'url': subject, 'prompt': 'body'}
-    elif tool == 'Grep':
-        ti = {'path': subject, 'pattern': 'z'}
-    pre_meta = {'place': place} if place else {}
-    post_meta = dict(pre_meta)
-    if receipt or selector:
-        post_meta['reads'] = [dict(subject=subject, selector=selector or 'content', complete=True, **receipt)]
-    response = {'stdout': text, 'stderr': '', 'exitCode': 1} if tool == 'Bash' else {'content': text}
-    return [event('PreToolUse', tool_use_id=tid, tool_name=tool, tool_input=ti, makoto=pre_meta),
-            event('PostToolUse', tool_use_id=tid, tool_name=tool, tool_input=ti, tool_response=response, makoto=post_meta)]
+def pair(tool='Read', ti=None, text='source data', tid='read', **post):
+    ti = ti or {'file_path': 'source.txt'}
+    response = {'stdout': text, 'exitCode': 0} if tool == 'Bash' else {'content': text}
+    return [event('PreToolUse', tool_name=tool, tool_use_id=tid, tool_input=ti),
+            event('PostToolUse', tool_name=tool, tool_use_id=tid, tool_input=ti, tool_response=response, **post)]
 
 
-def output(basis='source=source', obligations=None, boundary='Stop', text='a statement', **meta):
-    if obligations is None:
-        obligations = [{'shape': 'LINEAGE', 'subject': 'source'}] if basis == 'source=source' else [{'shape': 'SPEC', 'subject': 'source', 'definition_id': 'd'}] if basis == 'def=d:source' else []
-    meta['obligations'] = obligations
-    if boundary == 'Stop':
-        return event(boundary, stop_hook_active=True, last_assistant_message='makoto-basis: ' + basis + '\n' + text, makoto=meta)
-    return event('PreToolUse', tool_name=boundary, tool_use_id='write',
-                 tool_input={'file_path': 'new', 'content': text, 'description': 'makoto-basis: ' + basis}, makoto=meta)
+def output(text='source data', boundary='Stop', tid='step'):
+    if boundary in ('Stop', 'SubagentStop', 'PreDelivery'):
+        return event(boundary, last_assistant_message=text)
+    inputs = {'file_path': 'out.txt', 'content': text}
+    if boundary == 'Edit':
+        inputs = {'file_path': 'out.txt', 'old_string': 'source data', 'new_string': text}
+    elif boundary == 'MultiEdit':
+        inputs = {'file_path': 'out.txt', 'edits': [{'old_string': 'source data', 'new_string': text}]}
+    elif boundary == 'NotebookEdit':
+        inputs = {'notebook_path': 'out.txt', 'new_source': text}
+    elif boundary in ('commit', 'push'):
+        inputs = {'command': 'git ' + boundary + (' -m "source data"' if boundary == 'commit' else '')}
+        boundary = 'Bash'
+    return event('PreToolUse', tool_name=boundary, tool_use_id=tid, tool_input=inputs)
 
 
 class Session:
-    def __init__(self, tmp_path, adapter='inferred', live=False):
-        self.config = {'state_dir': str(tmp_path / 'state'), 'adapter': adapter}
+    def __init__(self, tmp_path, live=False):
+        self.config = {'state_dir': str(tmp_path / 'state'), 'adapter': 'inferred'}
         self.live = live
-        self.events = []
 
     def send(self, ev):
-        self.events.append(copy.deepcopy(ev))
         if self.live:
-            return invoke(ev, self.config['state_dir'], self.config['adapter'])
+            return invoke(ev, self.config['state_dir'], 'inferred')
         return hook.main(json.dumps(ev), self.config)
 
     def feed(self, events):
@@ -64,356 +58,332 @@ class Session:
     def journal(self):
         return hook.sigma_read(hook.sigma_path(self.config['state_dir'], 'plant'), 'plant')
 
-
-def plant(family, present, adapter):
-    """Construction expected result chosen before live hook sees any event."""
-    events = [event('UserPromptSubmit', prompt='turn')]
-    basis = ''
-    obligations = []
-    if family == 'LINEAGE':
-        basis = 'source=source'
-        obligations = [{'shape': family, 'subject': 'source'}]
-        if present:
-            events += read_pair()
-    elif family == 'SPEC':
-        events[0]['makoto'] = {'definitions': [{'id': 'd', 'subject': 'source', 'revision': 'v', 'content': 'any definition'}]}
-        basis = 'def=d:source'
-        obligations = [{'shape': family, 'subject': 'source', 'definition_id': 'd', 'definition_revision': 'v'}]
-        if present:
-            events += read_pair(text='contradicts held definition')
-    elif family == 'OTHER_POINT':
-        events += read_pair(tid='first', place={'revision': 'before'})
-        basis = 'second=source@after'
-        obligations = [{'shape': family, 'subject': 'source', 'points': [{'revision': 'before'}, {'revision': 'after'}]}]
-        if present:
-            events += read_pair(tid='second', place={'revision': 'after'}, text='different value')
-    elif family == 'SWITCH':
-        basis = 'act=probe --input z->source'
-        obligations = [{'shape': family, 'subject': 'source', 'input_sha256': 'input-z', 'selector': 'content'}]
-        if present:
-            pair = read_pair(tool='Bash', selector='content')
-            pair[0]['makoto']['invocation'] = {'subject': 'source', 'selector': 'content', 'input_sha256': 'input-z'}
-            events += pair
-    # These obligations are host-owned; basis-like prose has no authority.
-    events.append(output(basis, obligations))
-    return events
+    def rules(self):
+        return {f['rule'] for f in self.journal()[-1]['findings']}
 
 
-@pytest.mark.parametrize('adapter', ['inferred'])
-@pytest.mark.parametrize('family', ['SPEC', 'OTHER_POINT', 'SWITCH', 'LINEAGE'])
+@pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'commit', 'push', 'Stop', 'SubagentStop', 'PreDelivery'])
 @pytest.mark.parametrize('present', [False, True])
-def test_live_present_absent_plants(tmp_path, adapter, family, present):
-    session = Session(tmp_path, adapter, live=True)
-    events = plant(family, present, adapter)
-    session.feed(events[:-1])
-    response = session.send(events[-1])
-    assert held(response) == (not present), response
-    row = session.journal()[-1]
-    assert bool(row['findings']) == (not present)
-    if not present:
-        assert family in {f['family'] for f in row['findings']}
-    else:
-        assert row['snapshot'] and all(s['reading_receipt_ids'] for s in row['snapshot'])
+def test_all_boundaries_and_retries(tmp_path, boundary, present):
+    s = Session(tmp_path, live=True)
+    # Supplied destinations and executable spelling are given, not unread.
+    s.send(event('UserPromptSubmit', prompt='out.txt git commit push -m'))
+    if present:
+        s.feed(pair())
+    ev = output(boundary=boundary)
+    for retry in (False, True, True):
+        ev['stop_hook_active'] = retry
+        response = s.send(ev)
+        assert held(response) == (not present), response
+        if not present:
+            assert 'rule a' in str(response)
+            assert 'read an original artifact' in str(response)
+            assert s.journal()[-1]['stop_hook_active_unpaid'] == retry
+        else:
+            assert not response  # No one-time lineage block.
 
 
-@pytest.mark.parametrize('adapter', ['inferred'])
-@pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Stop', 'SubagentStop', 'commit', 'push'])
-def test_every_boundary_and_retry_is_held(tmp_path, adapter, boundary):
-    session = Session(tmp_path, adapter)
-    ev = output('source=source', [{'shape': 'LINEAGE', 'subject': 'source'}], boundary='Write')
-    if boundary in ('Stop', 'SubagentStop'):
-        ev = output('source=source', [{'shape': 'LINEAGE', 'subject': 'source'}])
-        ev['hook_event_name'] = boundary
-    elif boundary in ('commit', 'push'):
-        ev['tool_name'] = 'Bash'
-        ev['tool_input'] = {'command': 'git -C /w ' + boundary, 'description': 'makoto-basis: source=source'}
-    else:
-        ev['tool_name'] = boundary
-    assert held(session.send(ev))
-    ev['stop_hook_active'] = True
-    assert held(session.send(ev))
-    assert session.journal()[-1]['stop_hook_active_unpaid']
-    session.feed(read_pair())
-    assert not held(session.send(ev))
+@pytest.mark.parametrize('origin', ['none', 'assistant', 'written', 'worker', 'echo', 'inline_program'])
+def test_a_original_reading_required(tmp_path, origin):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='out.txt 731'))
+    if origin == 'assistant':
+        s.send(event('AssistantMessage', content='731'))
+    elif origin == 'written':
+        # Rejected writes do not mutate; host transcript may contain executed old writes.
+        write = output('731', 'Write')
+        s.feed(pair())
+        assert not held(s.send(write))
+        s.send(dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+        mutation = event('PreToolUse', tool_name='Bash', tool_use_id='invalidate', tool_input={'command': 'touch source.txt'})
+        s.feed([mutation, dict(mutation, hook_event_name='PostToolUse', tool_response={'stdout': '', 'exitCode': 0})])
+        s.feed(pair(ti={'file_path': 'out.txt'}, text='731', tid='own'))
+    elif origin == 'worker':
+        s.feed(pair('Task', {'prompt': 'source data'}, '731'))
+    elif origin in ('echo', 'inline_program'):
+        s.feed(pair('Bash', {'command': 'echo 731' if origin == 'echo' else 'python3 -c "print(731)"'}, '731'))
+    assert held(s.send(output('731')))
+    assert 'a' in s.rules()
+    s.feed(pair(ti={'file_path': 'original.txt'}, text='731', tid='original'))
+    assert not held(s.send(output('731')))
 
 
-@pytest.mark.parametrize('variant', ['pending', 'denied', 'replay', 'wrong_id', 'wrong_input', 'wrong_tool', 'failure', 'background', 'truncated', 'missing_content', 'partial', 'old_turn', 'similar_subject', 'relay', 'producer'])
-def test_invalid_read_cannot_pay(tmp_path, variant):
-    session = Session(tmp_path)
-    pair = read_pair()
-    if variant == 'pending':
-        pair = pair[:1]
-    elif variant == 'denied':
-        pair[0]['makoto']['dependencies'] = [{'subject': 'missing'}]
-        assert held(session.send(pair[0]))
-        pair = pair[1:]
-    elif variant == 'replay':
-        session.feed(pair)
-        session.send(event('UserPromptSubmit', prompt='next'))
-    elif variant == 'wrong_id':
-        pair[1]['tool_use_id'] = 'other'
-    elif variant == 'wrong_input':
-        pair[1]['tool_input'] = {'file_path': 'other'}
-    elif variant == 'wrong_tool':
-        pair[1]['tool_name'] = 'Bash'
-    elif variant == 'failure':
-        pair[1]['hook_event_name'] = 'PostToolUseFailure'
-    elif variant == 'background':
-        pair[1]['tool_response']['backgroundTaskId'] = 'task'
-    elif variant == 'truncated':
-        pair[1]['tool_response']['truncated'] = True
-    elif variant == 'missing_content':
-        pair[1]['tool_response'] = {}
-    elif variant == 'partial':
-        for ev in pair:
-            ev['tool_input']['limit'] = 2
-    elif variant == 'similar_subject':
-        pair = read_pair('Source')
-    elif variant in ('relay', 'producer'):
-        pair[1]['makoto']['reads'] = [{'subject': 'source', 'complete': True, 'role': 'relay' if variant == 'relay' else 'source', 'producer': 'upstream' if variant == 'producer' else None}]
-    session.feed(pair)
-    if variant == 'old_turn':
-        session.send(event('UserPromptSubmit', prompt='next'))
-    assert held(session.send(output()))
+@pytest.mark.parametrize('value', ['731', 'id_abc', 'camelCase', '1.2.3', 'x@y.test', 'ab-91', '日本語', 'nondictionaryword', '2 ms', '"exact phrase"', '`print(value)`', '```py\nx = 19\n```'])
+def test_b_absent_and_present_exact_form(tmp_path, value):
+    s = Session(tmp_path)
+    s.feed(pair())
+    assert held(s.send(output(value)))
+    assert 'b' in s.rules()
+    s.feed(pair(text=value, tid='value'))
+    assert not held(s.send(output(value)))
 
 
-@pytest.mark.parametrize('settlement', ['pending', 'success', 'partial_failure', 'no_effect'])
-def test_mutation_epochs_and_reservations(tmp_path, settlement):
-    session = Session(tmp_path)
-    session.feed(read_pair())
-    mutation = event('PreToolUse', tool_name='Write', tool_use_id='mutate', tool_input={'file_path': 'source', 'content': 'new', 'description': 'makoto-basis:'})
-    assert not held(session.send(mutation))
+@pytest.mark.parametrize('observed,proposed', [('dir/file.txt', './dir/file.txt'), ('./dir/file.txt', 'dir/file.txt'), ('/w/source.txt', 'source.txt'), ('source.txt', '/w/source.txt'), ('731', '73'), ('CamelCase', 'camelCase'), ('value_1', 'value_2'), ('"a  b"', '"a b"')])
+def test_b_near_miss_spelling_is_not_regenerated(tmp_path, observed, proposed):
+    s = Session(tmp_path)
+    s.feed(pair(ti={'file_path': 'carrier.txt'}, text=observed))
+    assert held(s.send(output(proposed)))
+    assert 'b' in s.rules()
+
+
+def test_b_only_assistant_text_never_pays(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair())
+    s.send(event('AssistantMessage', content='731'))
+    for _ in range(3):
+        assert held(s.send(output('731')))
+        assert 'b' in s.rules()
+    s.feed(pair(text='731', tid='actual'))
+    assert not held(s.send(output('731')))
+
+
+def test_user_copied_span_is_given_but_still_needs_artifact(tmp_path):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='Use `user_value_91`'))
+    assert held(s.send(output('`user_value_91`')))
+    assert s.rules() == {'a'}
+    s.feed(pair())
+    assert not held(s.send(output('`user_value_91`')))
+
+
+@pytest.mark.parametrize('tool', ['Read', 'Grep', 'Glob', 'Bash', 'CustomArtifact'])
+def test_agnostic_tool_response_and_prior_input(tmp_path, tool):
+    s = Session(tmp_path)
+    ti = {'file_path': 'source.txt', 'query': 'query_91'}
+    if tool == 'Bash':
+        ti = {'command': 'cat source.txt', 'query': 'query_91'}
+    s.feed(pair(tool, ti, 'observed_92'))
+    assert not held(s.send(output('query_91 observed_92')))
+
+
+@pytest.mark.parametrize('subject', ['https://example.test/a', 'widget@1.2.3', 'widget 1.2.3', 'widget==1.2.3'])
+@pytest.mark.parametrize('tool', ['WebFetch', 'WebSearch', 'Bash'])
+def test_c_external_subject_needs_current_online_call(tmp_path, subject, tool):
+    s = Session(tmp_path)
+    s.feed(pair(text=subject))  # Read locally: b paid, c unpaid.
+    assert held(s.send(output(subject)))
+    assert s.rules() == {'c'}
+    ti = {'url': subject, 'prompt': 'source data'} if tool == 'WebFetch' else {'query': subject} if tool == 'WebSearch' else {'command': 'curl https://example.test/a'}
+    s.feed(pair(tool, ti, subject, tid='online'))
+    assert not held(s.send(output(subject)))
+    s.send(event('UserPromptSubmit', prompt='next turn'))
+    assert held(s.send(output(subject)))
+    assert s.rules() == {'c'}
+
+
+def test_c_bare_public_project_uses_host_classification(tmp_path):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='project', makoto={'external_subjects': ['PublicWidget']}))
+    s.feed(pair(text='PublicWidget'))
+    assert held(s.send(output('PublicWidget')))
+    assert s.rules() == {'c'}
+    s.feed(pair('WebSearch', {'query': 'PublicWidget'}, 'PublicWidget', tid='online'))
+    assert not held(s.send(output('PublicWidget')))
+
+
+@pytest.mark.parametrize('variant', ['failed_fetch', 'local_git', 'echo_url', 'comment_url', 'wrong_url', 'pending_fetch'])
+def test_c_network_near_misses(tmp_path, variant):
+    s = Session(tmp_path)
+    subject = 'https://example.test/a'
+    s.feed(pair(text=subject))
+    call = pair('Bash', {'command': 'curl ' + subject}, subject, tid='online')
+    if variant == 'failed_fetch':
+        call[1]['tool_response']['exitCode'] = 1
+    elif variant == 'local_git':
+        call[0]['tool_input']['command'] = 'git show HEAD'
+    elif variant == 'echo_url':
+        call[0]['tool_input']['command'] = 'echo ' + subject
+    elif variant == 'comment_url':
+        call[0]['tool_input']['command'] = 'cat source.txt # curl ' + subject
+    elif variant == 'wrong_url':
+        call = pair('WebFetch', {'url': 'https://example.test/other'}, 'other data', tid='online')
+    elif variant == 'pending_fetch':
+        call = call[:1]
+    s.feed(call)
+    assert held(s.send(output(subject)))
+    assert 'c' in s.rules()
+
+
+def test_prompt_url_still_requires_online(tmp_path):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='https://example.test/a'))
+    s.feed(pair())
+    assert held(s.send(output('https://example.test/a')))
+    assert s.rules() == {'c'}
+
+
+@pytest.mark.parametrize('tool', ['Write', 'Bash'])
+@pytest.mark.parametrize('settlement', ['pending', 'success', 'failure', 'no_effect'])
+def test_staleness_after_any_write_and_own_readback(tmp_path, tool, settlement):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='source.txt'))
+    s.feed(pair(text='data_91'))
+    s.feed(pair(ti={'file_path': 'other.txt'}, text='other data', tid='other'))
+    change = output('source data', 'Write', 'change') if tool == 'Write' else event('PreToolUse', tool_name='Bash', tool_use_id='change', tool_input={'command': 'touch source.txt'})
+    if tool == 'Write':
+        change['tool_input']['file_path'] = 'source.txt'
+    assert not held(s.send(change))
     if settlement != 'pending':
-        post = dict(mutation, hook_event_name='PostToolUse' if settlement == 'success' else 'PostToolUseFailure', tool_response={'content': 'ok'})
+        post = dict(change, hook_event_name='PostToolUseFailure' if settlement == 'failure' else 'PostToolUse', tool_response={'content': 'ok', 'exitCode': 0})
         if settlement == 'no_effect':
             post['makoto'] = {'no_effect': True}
-        assert not held(session.send(post))
-    assert held(session.send(output())) == (settlement != 'no_effect')
+        s.send(post)
+    assert held(s.send(output('data_91'))) == (settlement != 'no_effect')
     if settlement == 'success':
-        session.feed(read_pair(tid='reread'))
-        assert held(session.send(output()))  # self-written bytes remain a relay
+        s.feed(pair(text='data_91', tid='own'))
+        assert held(s.send(output('data_91')))
+        s.feed(pair(ti={'file_path': 'independent.txt'}, text='data_91', tid='independent'))
+        assert not held(s.send(output('data_91')))
 
 
-@pytest.mark.parametrize('origin', ['assistant', 'written', 'old_read', 'relay_read'])
-def test_inferred_trace_values_are_awareness_only(tmp_path, origin):
-    session = Session(tmp_path, 'inferred')
-    if origin == 'assistant':
-        assert not held(session.send(output('', text='731')))
-    elif origin == 'written':
-        write = output('', boundary='Write', text='731')
-        assert not held(session.send(write))
-        session.send(dict(write, hook_event_name='PostToolUse', tool_response={}))
+@pytest.mark.parametrize('variant', ['unpaired', 'replay', 'wrong_input', 'wrong_tool', 'background', 'missing_content'])
+def test_invalid_receipts_cannot_pay(tmp_path, variant):
+    s = Session(tmp_path)
+    call = pair(text='731')
+    if variant == 'unpaired':
+        call = call[1:]
+    elif variant == 'replay':
+        s.feed(call)
+        s.feed([event('PreToolUse', tool_name='Bash', tool_use_id='mut', tool_input={'command': 'touch source.txt'}), event('PostToolUse', tool_name='Bash', tool_use_id='mut', tool_response={'stdout': '', 'exitCode': 0})])
+    elif variant == 'wrong_input':
+        call[1]['tool_input'] = {'file_path': 'other.txt'}
+    elif variant == 'wrong_tool':
+        call[1]['tool_name'] = 'Bash'
+    elif variant == 'background':
+        call[1]['tool_response']['backgroundTaskId'] = 'job'
     else:
-        session.feed(read_pair(text='731', **({'role': 'relay'} if origin == 'relay_read' else {})))
-        if origin == 'old_read':
-            session.send(event('UserPromptSubmit', prompt='next'))
-    assert not held(session.send(output('', text='731')))
-    session.feed(read_pair(tid='original', text='731'))
-    assert not held(session.send(output('', text='731')))
+        call[1]['tool_response'] = {}
+    s.feed(call)
+    assert held(s.send(output('731')))
 
 
-@pytest.mark.parametrize('tool,subject,selector', [('Read', 'a b/日本語', 'content'), ('Bash', 'source', 'content'), ('WebFetch', 'https://example.test/a?x=1#part', 'representation:body'), ('Grep', 'tree', 'query:{"path": "tree", "pattern": "z"}')])
-def test_native_adapters_empty_content(tmp_path, tool, subject, selector):
-    session = Session(tmp_path)
-    pair = read_pair(subject, tool=tool, text='')
-    if tool == 'Bash':
-        for ev in pair:
-            ev['tool_input'] = {'command': 'cat source'}
-        pair[1]['tool_response']['exitCode'] = 0
-    session.feed(pair)
-    assert not held(session.send(output('', [{'shape': 'LINEAGE', 'subject': subject, 'selector': selector}])))
+def test_old_read_is_eligible_until_subject_written(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair(text='data_91'))
+    s.send(event('UserPromptSubmit', prompt='next turn'))
+    assert not held(s.send(output('data_91')))
+    s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='mut'))
+    assert held(s.send(output('data_91')))
+    assert {'a', 'b'} <= s.rules()
 
 
-@pytest.mark.parametrize('change', ['digest', 'selector', 'version', 'subject', 'background'])
-def test_switch_exact_invocation(tmp_path, change):
-    session = Session(tmp_path, 'inferred')
-    pair = read_pair(tool='Bash', selector='branch', version='v')
-    pair[0]['makoto']['invocation'] = {'subject': 'source', 'selector': 'branch', 'input_sha256': 'z'}
-    obligation = {'shape': 'SWITCH', 'subject': 'source', 'selector': 'branch', 'version': 'v', 'input_sha256': 'z'}
-    if change == 'background':
-        pair[1]['tool_response']['backgroundTaskId'] = 'b'
-    else:
-        obligation[{'digest': 'input_sha256'}.get(change, change)] = 'different'
-    session.feed(pair)
-    assert held(session.send(output('', [obligation])))
+def test_session_separation_and_corruption(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair(text='data_91'))
+    assert held(s.send(dict(output('data_91'), session_id='other')))
+    assert not held(s.send(output('data_91')))
+    path = hook.sigma_path(s.config['state_dir'], 'plant')
+    path.write_text(path.read_text().replace('data_91', 'invented_91'))
+    assert held(s.send(output('data_91')))
 
 
-def test_multiple_shapes_and_subjects_are_audited(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    obligations = [{'shape': 'LINEAGE', 'subject': 'a'}, {'shape': 'LINEAGE', 'subject': 'b'}, {'shape': 'SPEC', 'subject': 'a', 'definition_id': 'd'}, {'shape': 'OTHER_POINT', 'subject': 'a', 'points': [{'revision': 'x'}, {'revision': 'y'}]}, {'shape': 'SWITCH', 'subject': 'a', 'input_sha256': 'x'}]
-    assert held(session.send(output('', obligations)))
-    findings = session.journal()[-1]['findings']
-    assert len(findings) == 5 and {f['family'] for f in findings} == {'SPEC', 'OTHER_POINT', 'SWITCH', 'LINEAGE'}
+@pytest.mark.parametrize('raw', ['null', '[]', '{}', 'bad', '{"hook_event_name":"Stop","session_id":"x","x":NaN}'])
+def test_malformed_transport_blocks(tmp_path, raw):
+    assert held(hook.main(raw, {'state_dir': str(tmp_path), 'adapter': 'inferred'}))
 
 
-def test_transport_corruption_and_missing_identity_fail_closed(tmp_path):
-    cfg = {'state_dir': str(tmp_path), 'adapter': 'inferred'}
-    for raw in ('null', '[]', '{}', 'bad', '{"hook_event_name":"Stop","session_id":"","x":NaN}'):
-        assert held(hook.main(raw, cfg))
-    session = Session(tmp_path)
-    session.feed(read_pair())
-    path = hook.sigma_path(session.config['state_dir'], 'plant')
-    path.write_text(path.read_text().replace('original', 'changed'))
-    assert held(session.send(output()))
-
-
-def test_definition_is_prior_immutable_and_subject_bound(tmp_path):
-    session = Session(tmp_path)
-    register = event('UserPromptSubmit', makoto={'definitions': [{'id': 'd', 'revision': 'v', 'subject': 'source', 'content': 'definition'}]})
-    session.send(register)
-    session.feed(read_pair('other'))
-    assert held(session.send(output('def=d:source')))
-    session.feed(read_pair(tid='actual-source'))
-    assert not held(session.send(output('def=d:source')))
-    register['makoto']['definitions'][0]['content'] = 'changed'
-    assert held(session.send(register))
-
-
-def test_other_point_replay_cannot_be_second_receipt(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    pair = read_pair(place={'revision': 'x'})
-    session.feed(pair)
-    session.feed(pair)
-    obligation = {'shape': 'OTHER_POINT', 'subject': 'source', 'points': [{'revision': 'x'}, {'revision': 'x'}]}
-    assert held(session.send(output('', [obligation])))
-    session.feed(read_pair(tid='second', place={'revision': 'x'}))
-    assert not held(session.send(output('', [obligation])))
-
-
-def test_inferred_relative_subject_and_mutated_destination(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    session.feed(read_pair('dir/source.txt'))
-    session.send(event('UserPromptSubmit', prompt='next'))
-    assert not held(session.send(output('', text='dir/source.txt')))
-    session.feed(read_pair('dir/source.txt', tid='fresh'))
-    assert not held(session.send(output('', text='dir/source.txt')))
-    mutation = event('PreToolUse', tool_name='Bash', tool_use_id='transfer', tool_input={'command': 'transfer'}, makoto={'effects': [{'subject': 'dir/source.txt'}], 'destination': {'authority': 'remote'}})
-    assert not held(session.send(mutation))
-    session.send(dict(mutation, hook_event_name='PostToolUse', tool_response={'exitCode': 0, 'stdout': ''}))
-    assert held(session.send(output('', text='dir/source.txt')))
-    session.feed(read_pair('dir/source.txt', tid='landed', place={'authority': 'remote'}, role='source'))
-    assert not held(session.send(output('', text='dir/source.txt')))
-
-
-def test_writes_and_unpaired_posts_cannot_forge_source_receipts(tmp_path):
-    session = Session(tmp_path)
-    write = output('', boundary='Write')
-    session.send(write)
-    post = dict(write, hook_event_name='PostToolUse', tool_response={'content': 'invented'}, makoto={'reads': [{'subject': 'source', 'complete': True}]})
-    session.send(post)
-    session.send(read_pair(tid='unpaired')[1])
-    assert held(session.send(output()))
-    assert session.journal()[-1]['unknown']
-
-
-def test_session_separation(tmp_path):
-    session = Session(tmp_path)
-    session.feed(read_pair())
-    assert held(session.send(dict(output(), session_id='child')))
-    assert not held(session.send(output()))
-
-
-def test_delivery_wrapper_prevents_final_bytes(tmp_path):
-    env = dict(os.environ, MAKOTO_STATE_DIR=str(tmp_path / 'state'), MAKOTO_ADAPTER='inferred', PYTHONDONTWRITEBYTECODE='1')
-    def deliver(ev):
+def test_delivery_and_pairs_print_actual_admission(tmp_path):
+    s = Session(tmp_path)
+    ev = output('data_91')
+    import os
+    env = dict(os.environ, MAKOTO_STATE_DIR=s.config['state_dir'], PYTHONDONTWRITEBYTECODE='1')
+    def deliver():
         return subprocess.run([sys.executable, str(ROOT / 'tools/deliver.py')], input=json.dumps(ev), env=env, capture_output=True, text=True)
-    denied = deliver(output(text='DELIVERY_MARKER'))
+    denied = deliver()
     assert denied.returncode == 2 and denied.stdout == ''
-    for ev in read_pair():
-        invoke(ev, tmp_path / 'state', 'inferred')
-    admitted = deliver(output(text='DELIVERY_MARKER'))
-    assert admitted.returncode == 0 and 'DELIVERY_MARKER' in admitted.stdout
+    s.feed(pair(text='data_91'))
+    admitted = deliver()
+    assert admitted.returncode == 0 and admitted.stdout == 'data_91'
+    for present in (False, True):
+        events = pair(text='data_91') if present else []
+        events.append(ev)
+        result = drive_session({'id': 'generated', 'events': events, 'step_index': len(events)-1}, 'inferred')
+        assert result['held'] == (not present)
+        assert 'response' in result
 
 
-def test_grading_driver_on_generated_events_only():
-    # Call the driver with our own in-memory plant; never read a pairs file.
-    for adapter in ('inferred',):
-        for present in (False, True):
-            events = plant('LINEAGE', present, adapter)
-            session = {'id': 'generated', 'events': events, 'step_index': len(events) - 1, 'files': {'source': 'original'}}
-            assert drive_session(session, adapter)['held'] == (not present)
-    with pytest.raises(ValueError):
-        drive_session({'events': [output()], 'step_index': 0, 'files': {'../escape': 'x'}}, 'inferred')
-
-
-@pytest.mark.parametrize('command', ['# makoto-basis:\ngit commit -m change', 'echo ready && git push', 'git --git-dir=repo commit', 'git -c x=y push'])
-def test_git_boundaries_are_structural(tmp_path, command):
-    session = Session(tmp_path)
-    session.feed(read_pair())
+@pytest.mark.parametrize('command', ['# comment\ngit commit -m source', 'echo ready && git push', 'git --git-dir=repo commit', 'git -c x=y push', 'env X=1 git push', '/usr/bin/git push'])
+def test_git_syntax_is_a_boundary(tmp_path, command):
+    s = Session(tmp_path)
     ev = event('PreToolUse', tool_name='Bash', tool_use_id='git', tool_input={'command': command})
-    assert not held(session.send(ev))
-    assert 'LINEAGE: read this turn:' in session.journal()[-1]['surface']
+    assert held(s.send(ev))
+    assert 'a' in s.rules()
 
 
-def test_inferred_written_subject_is_recorded_even_without_read(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    write = output('', boundary='Write', text='novel')
-    assert not held(session.send(write))
-    session.send(dict(write, hook_event_name='PostToolUse', tool_response={}))
-    assert held(session.send(output('', text='/w/new')))
+@pytest.mark.parametrize('text', ['Error: file not found', '  at worker (file.py:19)', 'Traceback (most recent call last):'])
+def test_raw_tool_output_lines_are_exact(tmp_path, text):
+    s = Session(tmp_path)
+    s.feed(pair())
+    assert held(s.send(output(text)))
+    assert 'b' in s.rules()
+    s.feed(pair('Bash', {'command': 'probe'}, text, tid='log'))
+    assert not held(s.send(output(text)))
 
 
-def test_worker_answer_is_relay_not_original(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    pair = [event('PreToolUse', tool_name='Task', tool_use_id='worker', tool_input={'prompt': 'research'}), event('PostToolUse', tool_name='Task', tool_use_id='worker', tool_response={'content': '731'})]
-    session.feed(pair)
-    assert not held(session.send(output('', text='731')))
-    session.feed(read_pair(text='731'))
-    assert not held(session.send(output('', text='731')))
+def test_error_output_is_read_even_when_command_fails(tmp_path):
+    s = Session(tmp_path)
+    call = pair('Bash', {'command': 'probe'}, 'Error: file not found')
+    call[1]['tool_response']['exitCode'] = 1
+    s.feed(call)
+    assert not held(s.send(output('Error: file not found')))
 
 
-def test_host_turn_id_changes_apply_before_candidate_check(tmp_path):
-    session = Session(tmp_path)
-    pair = read_pair()
-    for ev in pair:
-        ev['makoto']['turn_id'] = 'first'
-    session.feed(pair)
-    assert held(session.send(output(turn_id='second')))
-    pair = read_pair(tid='new-turn')
-    for ev in pair:
-        ev['makoto']['turn_id'] = 'second'
-    session.feed(pair)
-    assert not held(session.send(output(turn_id='second')))
+def test_candidate_content_and_tool_metadata_do_not_pay_themselves(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair())
+    ev = output('invented_91')
+    ev['makoto'] = {'reads': [{'subject': 'invented_91', 'complete': True}]}
+    assert held(s.send(ev))
+    assert 'b' in s.rules()
 
 
-def test_host_alias_binds_transfer_without_merging_equal_bytes(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    session.feed(read_pair('origin', place={'authority': 'local'}))
-    pair = read_pair('destination', tid='dest', place={'authority': 'remote'})
-    pair[0]['makoto']['aliases'] = [{'alias': 'destination', 'subject': 'origin'}]
-    session.feed(pair)
-    obligation = {'shape': 'OTHER_POINT', 'subject': 'origin', 'points': [{'authority': 'local'}, {'authority': 'remote'}]}
-    assert not held(session.send(output('', [obligation])))
-    assert held(session.send(output('', [dict(obligation, subject='another')])))
+def test_numeric_and_protocol_field_values_are_actual_tool_bytes(tmp_path):
+    s = Session(tmp_path)
+    call = pair()
+    call[1]['tool_response'] = {'data_value': 731}
+    s.feed(call)
+    assert not held(s.send(output('data_value 731 file_path')))
 
 
-def test_spec_definition_revision_is_exact(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    session.send(event('Register', makoto={'definitions': [{'id': 'd', 'subject': 'source', 'revision': 'one'}]}))
-    session.feed(read_pair())
-    assert held(session.send(output('', [{'shape': 'SPEC', 'subject': 'source', 'definition_id': 'd', 'revision': 'two'}])))
+def test_pending_tool_input_counts_for_b_but_does_not_create_reading(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair())
+    s.feed(pair(ti={'file_path': 'new_91.txt'}, tid='pending')[:1])
+    assert not held(s.send(output('new_91.txt')))
 
 
-def test_typed_identity_authorities_stay_separate(tmp_path):
-    session = Session(tmp_path, 'inferred')
-    subject = {'kind': 'object', 'authority': 'a', 'namespace': 'n', 'object': 'x', 'selector': 'content'}
-    pair = read_pair(tool='Bash', selector='content')
-    pair[1]['makoto']['reads'][0]['subject'] = subject
-    session.feed(pair)
-    assert not held(session.send(output('', [{'shape': 'LINEAGE', 'subject': subject}])))
-    assert held(session.send(output('', [{'shape': 'LINEAGE', 'subject': dict(subject, authority='b')}])))
+def test_public_classification_on_candidate_is_host_only(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair(text='PublicWidget'))
+    ev = output('PublicWidget')
+    ev['makoto'] = {'external_subjects': ['PublicWidget']}
+    assert held(s.send(ev))
+    assert s.rules() == {'c'}
 
 
-@pytest.mark.parametrize('fields', [{'makoto': []}, {'tool_input': []}, {'last_assistant_message': {}}, {'makoto': {'obligations': ['malformed']}}, {'makoto': {'place': 'malformed', 'reads': []}}])
-def test_malformed_envelopes_fail_closed(tmp_path, fields):
-    session = Session(tmp_path)
-    ev = output('source=source')
-    ev.update(fields)
-    assert held(session.send(ev))
+def test_shell_output_from_own_executable_is_own_output(tmp_path):
+    s = Session(tmp_path)
+    s.send(event('UserPromptSubmit', prompt='script.py'))
+    s.feed(pair())
+    write = output('source data', 'Write')
+    write['tool_input']['file_path'] = 'script.py'
+    assert not held(s.send(write))
+    s.send(dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+    s.feed(pair('Bash', {'command': 'python3 script.py'}, 'invented_91', tid='execute'))
+    assert held(s.send(output('invented_91')))
+    assert {'a', 'b'} <= s.rules()
 
 
-def test_mutation_without_tool_id_is_transport_failure(tmp_path):
-    session = Session(tmp_path)
-    ev = output('', boundary='Write')
-    del ev['tool_use_id']
-    assert held(session.send(ev))
+def test_offline_package_command_does_not_pay_online(tmp_path):
+    s = Session(tmp_path)
+    s.feed(pair(text='widget@1.2.3'))
+    s.feed(pair('Bash', {'command': 'npm install --offline widget@1.2.3'}, 'widget@1.2.3', tid='offline'))
+    assert held(s.send(output('widget@1.2.3')))
+    assert s.rules() == {'c'}
+
+
+def test_malformed_pretool_uses_native_deny_transport(tmp_path):
+    ev = output('data_91', 'Write')
+    del ev['session_id']
+    response = hook.main(json.dumps(ev), {'state_dir': str(tmp_path), 'adapter': 'inferred'})
+    assert response['hookSpecificOutput']['permissionDecision'] == 'deny'
