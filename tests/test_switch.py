@@ -100,12 +100,12 @@ def test_extensionless_code_and_config_forms(path, content):
     assert not switch_holds(ledger)
 
 
-@pytest.mark.parametrize('variant', ['no_edits', 'source_read_only', 'prose', 'no_effect', 'denied_without_mutation'])
+@pytest.mark.parametrize('variant', ['no_edits', 'source_read_only', 'no_effect', 'denied_without_mutation'])
 def test_near_miss_no_executable_change(variant):
     ledger = Ledger()
     feed(ledger, pair(ti={'file_path': 'branch.py'}, text=CONTENT))
     if variant not in ('no_edits', 'source_read_only'):
-        change = edit('report.md' if variant == 'prose' else 'branch.py')
+        change = edit('branch.py')
         if variant == 'no_effect':
             change[1]['makoto'] = {'no_effect': True}
             change[1]['hook_event_name'] = 'PostToolUseFailure'
@@ -274,7 +274,7 @@ def test_run_consumes_exact_config_option(command):
     assert not switch_holds(ledger)
 
 
-@pytest.mark.parametrize('command', ['cat plan.toml', 'echo --config plan.toml', 'service --config other.toml plan.toml'])
+@pytest.mark.parametrize('command', ['head plan.toml', 'echo --config plan.toml', 'service --config other.toml plan.toml'])
 def test_config_mentions_and_different_config_do_not_pay(command):
     ledger = ledger_with_edit('plan.toml')
     feed(ledger, pair('Bash', {'command': command}, 'response', tid='run'))
@@ -397,3 +397,132 @@ def test_imported_edits_and_pair_runner_keep_exact_switch_response(tmp_path):
     s = Session(tmp_path)
     assert held(s.send(dict(output('Done'), transcript_path=str(transcript))))
     assert s.rules() == {'d'}
+
+
+@pytest.mark.parametrize('path,before,after,final', [
+    ('./state/violet.json', '{"n":1}', '{"n":2}', './state/violet.json contains two.'),
+    ('./settings/birch.toml', 'n = 1', 'n = 2', './settings/birch.toml contains two.'),
+    ('./flags/cedar.ini', '[flags]\nn=1', '[flags]\nn=2', './flags/cedar.ini contains two.'),
+])
+def test_full_data_readback_pays_reported_shell_edit_shapes(tmp_path, path, before, after, final):
+    s = Session(tmp_path)
+    s.feed(pair(ti={'file_path': path}, text=before))
+    s.feed(pair('Bash', {'command': "sed -i 's/1/2/' " + path}, '', tid='change'))
+    assert held(s.send(output(final)))
+    assert s.rules() == {'d'}
+    s.feed(pair(ti={'file_path': path}, text=after, tid='readback'))
+    assert not held(s.send(output(final)))
+    assert any(row.get('trace') == ['readback'] and row.get('instruments') == 'makoto2.switch/readback-v1'
+               for row in s.journal()[-1]['snapshot'])
+
+
+@pytest.mark.parametrize('suffix', ['json', 'toml', 'ini', 'yaml', 'yml', 'cfg', 'conf', 'env', 'txt', 'md', 'csv'])
+@pytest.mark.parametrize('reader', ['Read', 'cat'])
+def test_data_forms_need_full_readback_after_edit(suffix, reader):
+    ledger = Ledger()
+    path = 'settings.' + suffix
+    feed(ledger, edit(path))  # Declarations inside data do not select code mode.
+    assert switch_holds(ledger)
+    tool, ti = ('Read', {'file_path': path}) if reader == 'Read' else ('Bash', {'command': 'cat ' + path})
+    feed(ledger, pair(tool, ti, 'new contents', tid='readback'))
+    assert not switch_holds(ledger)
+
+
+@pytest.mark.parametrize('variant', ['before_edit', 'later_edit', 'pending_edit', 'started_before_edit',
+                                    'partial', 'search', 'wrong_path', 'missing', 'failed', 'truncated',
+                                    'status_only', 'unpaired', 'relay'])
+def test_data_readback_near_misses_still_hold(variant):
+    ledger = Ledger()
+    call = pair(ti={'file_path': 'settings.json'}, text='{"n":2}', tid='readback')
+    if variant == 'before_edit':
+        feed(ledger, call)
+        feed(ledger, edit('settings.json'))
+    elif variant == 'started_before_edit':
+        feed(ledger, call[:1])
+        feed(ledger, edit('settings.json'))
+        feed(ledger, call[1:])
+    else:
+        feed(ledger, edit('settings.json'))
+        if variant == 'partial':
+            for ev in call:
+                ev['tool_input']['limit'] = 1
+        elif variant == 'search':
+            call = pair('Bash', {'command': 'grep n settings.json'}, 'n', tid='readback')
+        elif variant == 'wrong_path':
+            call = pair(ti={'file_path': '/elsewhere/settings.json'}, tid='readback')
+        elif variant == 'missing':
+            call = call[:1]
+        elif variant == 'failed':
+            call[1]['hook_event_name'] = 'PostToolUseFailure'
+        elif variant == 'truncated':
+            call[1]['tool_response']['truncated'] = True
+        elif variant == 'status_only':
+            call[1]['tool_response'] = {'exitCode': 0}
+        elif variant == 'unpaired':
+            call = call[1:]
+        elif variant == 'relay':
+            call = pair('Task', {'request': 'read settings.json'}, 'contents', tid='readback',
+                        makoto={'reads': [{'subject': 'settings.json', 'complete': True}]})
+        feed(ledger, call)
+        if variant in ('later_edit', 'pending_edit'):
+            assert not switch_holds(ledger)
+            again = edit('settings.json', tid='again')
+            feed(ledger, again[:1] if variant == 'pending_edit' else again)
+    assert switch_holds(ledger)
+
+
+@pytest.mark.parametrize('path', ['worker.py', 'worker.sh', 'worker.js', 'worker.ts', 'worker.json', 'worker.txt'])
+@pytest.mark.parametrize('boundary', ['Stop', 'commit', 'push'])
+def test_code_and_shebangs_still_require_runs_after_readback(path, boundary):
+    ledger = Ledger()
+    change = edit(path)
+    if path.endswith(('.json', '.txt')):
+        for ev in change:
+            ev['tool_input']['content'] = '#!/bin/sh\necho hello\n'
+    feed(ledger, change)
+    feed(ledger, pair(ti={'file_path': path}, text=change[0]['tool_input']['content'], tid='readback'))
+    assert switch_holds(ledger, output('Done', boundary))
+    feed(ledger, pair('Run', {'file_path': path}, 'hello', tid='run'))
+    assert not switch_holds(ledger, output('Done', boundary))
+
+
+def test_shell_edit_of_observed_shebang_data_path_requires_run():
+    ledger = Ledger()
+    feed(ledger, pair(ti={'file_path': 'settings.json'}, text='#!/bin/sh\necho 1\n'))
+    feed(ledger, pair('Bash', {'command': "sed -i 's/1/2/' settings.json"}, '', tid='change'))
+    feed(ledger, pair(ti={'file_path': 'settings.json'}, text='#!/bin/sh\necho 2\n', tid='readback'))
+    assert switch_holds(ledger)
+
+
+def test_mixed_data_and_code_commit_requires_every_code_run():
+    ledger = Ledger()
+    feed(ledger, edit('settings.json'))
+    feed(ledger, edit('first.py', tid='first'))
+    feed(ledger, edit('second.py', tid='second'))
+    feed(ledger, pair(ti={'file_path': 'settings.json'}, tid='data'))
+    feed(ledger, pair(ti={'file_path': 'second.py'}, tid='code'))
+    feed(ledger, pair('Run', {'file_path': 'first.py'}, 'response', tid='run_first'))
+    assert [f['subject'] for f in switch_holds(ledger, output('Done', 'commit'))] == ['second.py']
+    feed(ledger, pair('Run', {'file_path': 'second.py'}, 'response', tid='run_second'))
+    assert not switch_holds(ledger, output('Done', 'commit'))
+
+
+@pytest.mark.parametrize('writer', ['Write', 'Edit'])
+def test_full_data_replacement_removes_a_previous_shebang_obligation(writer):
+    ledger = Ledger()
+    change = edit('settings.txt')
+    for ev in change:
+        ev['tool_input']['content'] = '#!/bin/sh\necho 1\n'
+    feed(ledger, change)
+    feed(ledger, pair(ti={'file_path': 'settings.txt'}, text='#!/bin/sh\necho 1\n', tid='script'))
+    assert switch_holds(ledger)
+    feed(ledger, edit('settings.txt', tool=writer, tid='replace'))
+    feed(ledger, pair(ti={'file_path': 'settings.txt'}, text=CONTENT, tid='data'))
+    assert not switch_holds(ledger)
+
+
+def test_empty_full_data_read_is_a_witness():
+    ledger = Ledger()
+    feed(ledger, edit('settings.txt'))
+    feed(ledger, pair(ti={'file_path': 'settings.txt'}, text='', tid='empty'))
+    assert not switch_holds(ledger)

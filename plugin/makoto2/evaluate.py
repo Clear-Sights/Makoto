@@ -59,13 +59,15 @@ def evaluate(ledger, event, adapter='inferred'):
         if not names_change(event, change):
             continue
         runs = ledger.run_witnesses(change)
-        if not runs:
+        readbacks = ledger.readback_witnesses(change)
+        if not runs and not readbacks:
             findings.append({'rule': 'd', 'family': 'd', 'shape': 'switch',
                              'subject': change['display'],
                              'missing': 'UNRUN CHANGE: run it and read the output before this step'})
         else:
-            snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in runs],
-                                    'makoto2.switch/execution-v1'))
+            witnesses = runs or readbacks
+            snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in witnesses],
+                                    'makoto2.switch/execution-v1' if runs else 'makoto2.switch/readback-v1'))
     if not findings:
         snapshot.append(receipt(text, [r['tool_use_id'] for r in readings], 'makoto2.precision/form-v1'))
     return list({(f['rule'], f['subject']): f for f in findings}.values()), snapshot

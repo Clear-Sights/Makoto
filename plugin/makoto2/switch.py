@@ -16,13 +16,14 @@ from .precision import contains, names
 
 CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb'.split())
 CONFIG_SUFFIXES = frozenset('json jsonc yaml yml toml ini cfg conf config xml properties env'.split())
+DATA_SUFFIXES = CONFIG_SUFFIXES | frozenset('txt md csv'.split())
 CONFIG_FILES = frozenset(('Makefile', 'Dockerfile', 'Rakefile', 'Gemfile', 'Procfile', '.env'))
 RUNTIMES = re.compile(r'(?:python(?:\d+(?:\.\d+)*)?|pypy\d*|node|nodejs|deno|bun|bash|sh|zsh|fish|ruby|perl|php|lua|Rscript|pwsh)\Z')
 DECLARATIONS = re.compile(r'(?m)(?:\b(?:def|class|function|fn|func)\s+([A-Za-z_]\w*)|^\s*(?:export\s+)?(?:const\s+|let\s+|var\s+)?([A-Za-z_]\w*)\s*(?:=|:))')
 
 
 def edited_forms(event, target):
-    """Return code/config name forms for a recorded effect, or None for prose."""
+    """Return code/data name forms for a recorded effect, or None."""
     path = target.removeprefix('file:')
     suffix = os.path.splitext(path)[1].lstrip('.').lower()
     content = '\n'.join(value for _, value in leaves(event.get('tool_input', {})))
@@ -34,7 +35,10 @@ def edited_forms(event, target):
             structured |= isinstance(json.loads(value), (dict, list))
         except (ValueError, TypeError):
             pass
-    if not (suffix in CODE_SUFFIXES | CONFIG_SUFFIXES
+    shebang = bool(re.search(r'(?m)^#!\s*\S+', content))
+    data_form = (suffix in DATA_SUFFIXES or os.path.basename(path) == '.env') and event.get('tool_name') != 'NotebookEdit'
+    data = data_form and not shebang
+    if not (suffix in CODE_SUFFIXES | DATA_SUFFIXES
             or os.path.basename(path) in CONFIG_FILES
             or event.get('tool_name') == 'NotebookEdit'
             or re.search(r'(?m)^#!\s*\S+', content)
@@ -52,7 +56,41 @@ def edited_forms(event, target):
     module = os.path.splitext(relative)[0].replace(os.sep, '.')
     if re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', module):
         aliases.add(module.removesuffix('.__init__'))
-    return {'subject': identity(target, event), 'display': target, 'aliases': aliases}
+    return {'subject': identity(target, event), 'display': target, 'aliases': aliases,
+            'data': data, 'data_form': data_form}
+
+
+def full_read_subjects(pre, post):
+    """Only completed full-file reads, never a search, slice or status receipt."""
+    from .observed import failed
+    response = post.get('tool_response')
+    if failed(post) or response is None:
+        return set()
+    if isinstance(response, dict):
+        if any(response.get(key) for key in ('backgroundTaskId', 'session_id', 'sessionId', 'running', 'truncated', 'is_truncated')):
+            return set()
+        if not any(isinstance(response.get(key), str) for key in ('content', 'stdout', 'output')):
+            return set()
+    elif not isinstance(response, str):
+        return set()
+    ti, tool = pre.get('tool_input', {}), pre.get('tool_name')
+    targets = []
+    if tool == 'Read' and not any(key in ti for key in ('offset', 'limit', 'start_line', 'end_line', 'pages')):
+        if ti.get('file_path'):
+            targets.append(ti['file_path'])
+    elif tool == 'Bash':
+        words = simple_argv(ti.get('command', ''))
+        if words and os.path.basename(words[0]) == 'cat':
+            args = words[1:]
+            if args and args[0] == '--':
+                args = args[1:]
+            # One operand keeps returned bytes attributable to that same file.
+            if len(args) == 1 and args[0] != '-' and not args[0].startswith('-'):
+                targets.extend(args)
+    for event in (pre, post):
+        targets.extend(spec['subject'] for spec in event.get('makoto', {}).get('reads', [])
+                       if spec.get('complete') is True and not spec.get('producer') and spec.get('role') != 'relay')
+    return {identity(target, pre) for target in targets}
 
 
 def names_change(event, change):

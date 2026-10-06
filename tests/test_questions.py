@@ -17,6 +17,8 @@ def test_answer_after_command_printed_output_is_not_held(tmp_path, command):
     assert result.stdout == '731\n'
     s = Session(tmp_path)
     s.feed(pair('Bash', {'command': command}, result.stdout))
+    if command.startswith('touch'):
+        s.feed(pair(ti={'file_path': 'out.txt'}, text='', tid='readback'))
     assert not held(s.send(output('731')))
     assert s.rules() == set()
 
@@ -24,6 +26,7 @@ def test_answer_after_command_printed_output_is_not_held(tmp_path, command):
 def test_run_status_is_response_even_without_printed_text(tmp_path):
     s = Session(tmp_path)
     s.feed(pair('Bash', {'command': 'touch out.txt'}, ''))
+    s.feed(pair(ti={'file_path': 'out.txt'}, text='', tid='readback'))
     assert not held(s.send(output('Done')))
 
 
@@ -68,10 +71,13 @@ def test_questions_on_every_admitted_pretool_step(tmp_path, boundary):
         response = s.send(output(boundary=boundary, tid=f'step-{i}'))
         assert not held(response)
         assert response == {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': EXPECTED}}
-        if boundary == 'NotebookEdit':
+        if boundary in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
             change = output(boundary=boundary, tid=f'step-{i}')
             s.send(dict(change, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
-            s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid=f'run-{i}'))
+            if boundary == 'NotebookEdit':
+                s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid=f'run-{i}'))
+            else:
+                s.feed(pair(ti={'file_path': 'out.txt'}, tid=f'readback-{i}'))
 
 
 @pytest.mark.parametrize('boundary', ['Stop', 'SubagentStop', 'PreDelivery'])

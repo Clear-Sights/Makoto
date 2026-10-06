@@ -5,7 +5,7 @@ from .borrowed import get, leaves, fragments
 from .observed import (WRITERS, FINAL, identity, effects, failed,
                        reading_subjects, network_targets, response_text)
 from .precision import contains, VERSIONED, package_parts
-from .switch import edited_forms, execution_subjects, run_output
+from .switch import edited_forms, execution_subjects, run_output, full_read_subjects
 
 
 class Ledger:
@@ -29,6 +29,8 @@ class Ledger:
         self.unknown = []
         self.code_changes = {}
         self.executions = []
+        self.readbacks = []
+        self.shebangs = set()
 
     def changed_code(self):
         result = dict(self.code_changes)
@@ -39,6 +41,7 @@ class Ledger:
                     subject = form['subject']
                     prior = result.get(subject, {})
                     form['aliases'] |= prior.get('aliases', set())
+                    form['data'] = form['data'] and subject not in self.shebangs and prior.get('data', True)
                     form['q'] = self.pending_order[tid]
                     if form['q'] > prior.get('q', 0):
                         result[subject] = form
@@ -52,12 +55,27 @@ class Ledger:
             prior = self.code_changes.get(subject, {})
             form = form or dict(prior)
             form['aliases'] = form['aliases'] | prior.get('aliases', set())
+            replacement = event.get('tool_input', {}).get('content')
+            full_write = event.get('tool_name') == 'Write' and isinstance(replacement, str)
+            if full_write:
+                if re.search(r'(?m)^#!\s*\S+', replacement):
+                    self.shebangs.add(subject)
+                else:
+                    self.shebangs.discard(subject)
+            form['data'] = form['data'] and subject not in self.shebangs and (full_write or prior.get('data', True))
             form['q'] = self.q
             self.code_changes[subject] = form
 
     def run_witnesses(self, change):
         return [run for run in self.executions if run['started'] > change['q']
                 and change['subject'] in run['subjects']
+                and not any(change['subject'] in self.reservations.get(tid, set()) for tid in self.pending)]
+
+    def readback_witnesses(self, change):
+        if not change.get('data') or change['subject'] in self.shebangs:
+            return []
+        return [read for read in self.readbacks if read['started'] > change['q']
+                and change['subject'] in read['subjects']
                 and not any(change['subject'] in self.reservations.get(tid, set()) for tid in self.pending)]
 
     def subject(self, value, event):
@@ -147,6 +165,21 @@ class Ledger:
             if invoked:
                 self.executions.append({'q': self.q, 'started': started,
                                         'subjects': invoked, 'tool_use_id': tid})
+        complete = full_read_subjects(pre, event)
+        if complete and pre.get('tool_name') not in WRITERS | {'Agent', 'Task'}:
+            self.readbacks.append({'q': self.q, 'started': started,
+                                   'subjects': complete, 'tool_use_id': tid})
+            shebang = bool(re.search(r'(?m)^#!\s*\S+', response_text(event.get('tool_response'))))
+            for subject in complete:
+                change = self.code_changes.get(subject)
+                if change and started <= change['q']:
+                    continue
+                if shebang:
+                    self.shebangs.add(subject)
+                else:
+                    self.shebangs.discard(subject)
+                if change and change.get('data_form'):
+                    change['data'] = not shebang
         response = event.get('tool_response')
         if response is None or isinstance(response, dict) and response.get('backgroundTaskId'):
             return

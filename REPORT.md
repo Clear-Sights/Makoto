@@ -1,3 +1,8 @@
+Makoto step 8 lets a full post-edit data/config readback pay rule d.
+Code and shebang scripts still require a post-edit run with returned output.
+The current step-8 measurement and record contract are appended below.
+
+Step 7 baseline (superseded for data/config readbacks)
 Makoto step 7 adds rule d: UNRUN CHANGE, protecting the switch.
 Writers naming edited code/script/config paths, modules or identifiers must run first.
 Commit/push and every final after executable edits ship them, regardless of wording.
@@ -409,3 +414,39 @@ without AI attribution, push or network access.
 The configured Git signer could not reach its local service inside the sandbox.
 The local commit uses signing disabled and the requested Clear-Sights identity;
 no push or external network operation was performed.
+
+
+Step 8: full data/config readback pays the switch
+
+Rule d now accepts a paired, completed full read of the same data/config path
+started after its last edit. The data forms include .json, .toml, .ini, .yaml,
+.yml, .cfg, .conf, .env, .txt, .md and .csv, plus the existing configuration
+suffixes. Data-form contents with declarations remain data; a shebang makes the
+file executable. Code suffixes and notebook edits still require execution.
+Observed shebangs survive shell mutations; a later full replacement/readback
+without a shebang can establish the current data form. Code readback never pays
+d, including before commit/push, and each edited code file needs its own run.
+
+Full native Read calls have no slice/limit/page parameters. A simple cat with
+one exact file operand also counts. Opaque readers need host-owned reads records
+with complete=true and returned content. Failed, partial, truncated, pending,
+unpaired, background, wrong-path and status-only reads do not count. Read start
+order must follow edit completion; an earlier read, a read started before an edit,
+a later edit or a pending edit cannot pay. Empty returned full content counts.
+Admitted data readbacks have readback-v1 receipts with the paired tool-use ID.
+The existing execution-v1 receipts remain unchanged. This does not promote own
+file content to original-source evidence for a or fresh exact-name evidence for b.
+
+Independent plants reproduce the three Read -> sed edit -> Read -> final shapes
+with newly authored JSON/TOML/INI paths and payloads. Additional plants cover all
+listed data suffixes, native and cat reads, unread/stale data, Python/other code
+readbacks, shebang scripts and removal, mixed code/data shipping and empty files.
+Existing output-exemption and reminder plants now settle/read back their data
+edits so their original a/b/reminder assertions remain isolated. The old prose
+no-change expectation is superseded because .md is now an explicit data form.
+No spent-set vocabulary or subject-specific exception was added to the checker.
+
+Validation: PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q --tb=short passed
+550 tests in 10.21 seconds, under the 15-second limit. git diff --check passed.
+REPORT.md is mirrored under docs/. This step uses one local commit on shapes,
+with Clear-Sights identity, signing disabled, and no push or network operation.

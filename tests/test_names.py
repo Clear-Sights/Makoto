@@ -84,6 +84,8 @@ def test_written_or_edited_file_in_final_is_output(tmp_path, writer, reference):
     if writer == 'NotebookEdit':
         # Output names remain exempt from b, while executable edits must pay d.
         s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid='run'))
+    else:
+        s.feed(pair(ti={'file_path': 'out.txt'}, text='source data', tid='readback'))
     assert not held(s.send(output(reference)))
     assert s.rules() == set()
 
@@ -100,6 +102,8 @@ def test_output_reference_still_needs_original_artifact(tmp_path):
     change['tool_input']['file_path'] = 'source.txt'
     assert not held(s.send(change))
     s.send(dict(change, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+    s.feed(pair(ti={'file_path': 'out.txt'}, text='source data', tid='out-readback'))
+    s.feed(pair(ti={'file_path': 'source.txt'}, text='source data', tid='source-readback'))
     for retry in (False, True):
         assert held(s.send(dict(output('out.txt'), stop_hook_active=retry)))
         assert s.rules() == {'a'}
@@ -141,6 +145,7 @@ def test_rejected_or_no_effect_write_does_not_exempt_final_path(tmp_path):
     assert held(s.send(output('out.txt')))
     assert 'b' in s.rules()
     ev = output('source data', 'Write', tid='no-effect')
+    ev['tool_input']['file_path'] = 'other.txt'
     assert not held(s.send(ev))
     s.send(dict(ev, hook_event_name='PostToolUseFailure', tool_response={'content': 'failed'}, makoto={'no_effect': True}))
     assert held(s.send(output('out.txt')))
@@ -196,4 +201,5 @@ def test_output_paths_with_spaces_clear_b_and_a(tmp_path, reference):
     ev['tool_input']['file_path'] = 'my report.txt'
     assert not held(s.send(ev))
     s.send(dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+    s.feed(pair(ti={'file_path': 'my report.txt'}, text='source data', tid='readback'))
     assert not held(s.send(output(reference)))

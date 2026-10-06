@@ -25,7 +25,11 @@ User-given external names still need that online call.
 Rule d holds an UNRUN CHANGE when a dependent writer names an edited code/script/
 config path, module or identifier, or a commit/push/final ships session edits.
 After the last edit, a paired call must execute that subject and return its
-output. A failed run counts; an earlier run, file readback, different execution
+output. For a data/config file without a shebang, a paired full read of the same
+path after its last edit also pays d. Data forms include .json, .toml, .ini,
+.yaml, .yml, .cfg, .conf, .env, .txt, .md and .csv. Code/scripts still need a run,
+including every edited code file before commit/push; reading code never pays d.
+A failed run counts; an earlier run, code readback, different execution
 path, missing output or background launch acknowledgment does not. An actual
 stdout/stderr response from a background run counts. Silent completed runs can
 return an exit status. Selection is by input form, without behavior word lists.

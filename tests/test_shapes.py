@@ -92,10 +92,13 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
             assert response == {}
         else:
             assert response['hookSpecificOutput']['additionalContext'] == hook.FOUR_QUESTIONS
-        if present and boundary == 'NotebookEdit':
+        if present and boundary in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
             s.live = False
             s.send(dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
-            s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid=f'run-{index}'))
+            if boundary == 'NotebookEdit':
+                s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid=f'run-{index}'))
+            else:
+                s.feed(pair(ti={'file_path': 'out.txt'}, tid=f'readback-{index}'))
             s.live = True
 
 
@@ -115,6 +118,7 @@ def test_a_original_reading_required(tmp_path, origin):
         mutation['tool_input']['file_path'] = 'source.txt'
         s.feed([mutation, dict(mutation, hook_event_name='PostToolUse', tool_response={'content': 'ok'})])
         s.feed(pair(ti={'file_path': 'out.txt'}, text='731', tid='own'))
+        s.feed(pair(ti={'file_path': 'source.txt'}, tid='source-readback'))
     elif origin == 'worker':
         s.feed(pair('Task', {'prompt': 'source data'}, '731'))
     assert held(s.send(output('731')))
@@ -280,7 +284,7 @@ def test_old_read_is_eligible_until_subject_written(tmp_path):
     s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='mut'))
     assert held(s.send(output('data_91')))
     # The mutation run is a reading for a; the stale name remains unpaid in b.
-    assert s.rules() == {'b'}
+    assert s.rules() == {'b', 'd'}
 
 
 def test_session_separation_and_corruption(tmp_path):
