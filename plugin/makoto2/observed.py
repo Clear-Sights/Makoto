@@ -110,7 +110,8 @@ def completed(event):
 def native_reads(pre, post):
     ti = pre.get('tool_input', {})
     name = pre.get('tool_name')
-    if failed(post):
+    response = post.get('tool_response', {})
+    if failed(post) or (isinstance(response, dict) and (response.get('truncated') or response.get('is_truncated'))):
         return []
     if name == 'Read' and ti.get('file_path'):
         selector = 'content' if not any(k in ti for k in ('offset', 'limit')) else 'region:' + json.dumps([ti.get('offset'), ti.get('limit')])

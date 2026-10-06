@@ -42,7 +42,7 @@ def switch(ledger, event, obligation):
 
 
 def lineage(ledger, event, obligation):
-    if not any(r['role'] == 'source' and r['turn'] == ledger.turn and not r.get('producer') for r in ledger.matching(obligation, event)):
+    if not any(r['role'] == 'source' and r['turn'] == ledger.turn and not r.get('producer') and (not obligation.get('trace_value') or obligation['trace_value'] in r['values']) for r in ledger.matching(obligation, event)):
         return 'read the original source this turn before writing or answering'
 
 

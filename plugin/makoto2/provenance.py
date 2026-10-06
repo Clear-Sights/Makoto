@@ -1,5 +1,5 @@
 """One session ledger reconstructed from durable, ordered receipts."""
-from .observed import identity, digest, native_reads, effects, completed, failed, response_text, values
+from .observed import identity, digest, native_reads, effects, completed, failed, response_text, values, WRITERS
 
 
 class Ledger:
@@ -23,6 +23,9 @@ class Ledger:
 
     def place(self, event):
         return event.get('makoto', {}).get('place', {'workspace': event.get('cwd', '')})
+
+    def epoch_key(self, subject, place):
+        return subject + '@' + digest(place)
 
     def advance(self, event):
         self.q += 1
@@ -52,10 +55,10 @@ class Ledger:
             if not admitted or not tid or tid in self.seen or tid in self.pending:
                 return
             self.pending[tid] = (event, self.q, self.turn)
-            reserved = set()
+            reserved = {}
             for effect in effects(event):
                 subject = self.subject(effect['subject'], event)
-                reserved.add(subject)
+                reserved[subject] = meta.get('destination', self.place(event))
             self.reservations[tid] = reserved
         elif name in ('PostToolUse', 'PostToolUseFailure'):
             tid = event.get('tool_use_id')
@@ -69,11 +72,13 @@ class Ledger:
                 return
             del self.pending[tid]
             self.seen.add(tid)
-            reserved = self.reservations.get(tid, set())
+            reserved = self.reservations.get(tid, {})
             no_effect = meta.get('no_effect') is True
             if not no_effect:
-                for subject in reserved | {self.subject(x['subject'], pre) for x in effects(event)}:
-                    self.epochs[subject] = self.epochs.get(subject, 0) + 1
+                for subject in set(reserved) | {self.subject(x['subject'], pre) for x in effects(event)}:
+                    place = reserved.get(subject, meta.get('destination', self.place(event)))
+                    key = self.epoch_key(subject, place)
+                    self.epochs[key] = self.epochs.get(key, 0) + 1
                     self.written.add(subject)
                     self.mutations[subject] = {'q': self.q, 'place': meta.get('destination', self.place(event))}
             # Failure alone cannot clear a potentially effective mutation.
@@ -83,7 +88,11 @@ class Ledger:
                 self.unknown.append({'q': self.q, 'reason': 'response not completed'})
                 return
             specs = native_reads(pre, event)
-            specs += meta.get('reads', [])
+            wrapped = meta.get('reads', [])
+            overridden = {(self.subject(x['subject'], pre), x.get('selector', 'content')) for x in wrapped}
+            specs = [x for x in specs if (self.subject(x['subject'], pre), x.get('selector', 'content')) not in overridden] + wrapped
+            if pre.get('tool_name') in WRITERS:
+                specs = []  # Writes never create source receipts, even with read metadata.
             text = response_text(event.get('tool_response'))
             # Every completed Bash invocation has an exact native command response.
             if pre.get('tool_name') == 'Bash':
@@ -95,7 +104,7 @@ class Ledger:
                 self.readings.append(dict(spec, subject=subject, selector=spec.get('selector', 'content'),
                     receipt_id=f'{tid}:{index}', tool_use_id=tid, q=self.q, pre_q=pq, turn=turn,
                     point=dict(self.place(event), turn_id=turn, sequence=self.q, **({'timestamp': event['timestamp']} if 'timestamp' in event else {})),
-                    epoch=self.epochs.get(subject, 0), version=spec.get('version'),
+                    epoch=self.epochs.get(self.epoch_key(subject, self.place(event)), 0), place=self.place(event), version=spec.get('version'),
                     complete=spec.get('complete') is True, value_sha256=spec.get('value_sha256', digest(text)),
                     values=sorted(values(text)), role=spec.get('role', 'relay' if subject in self.written else 'source'),
                     producer=spec.get('producer'), input_sha256=invocation.get('input_sha256'),
@@ -113,9 +122,9 @@ class Ledger:
         if obligation.get('point') and not point_matches(reading['point'], obligation['point']):
             return False
         if not historical:
-            if reading['epoch'] != self.epochs.get(reading['subject'], 0):
+            if reading['epoch'] != self.epochs.get(self.epoch_key(reading['subject'], reading['place']), 0):
                 return False
-            if any(reading['subject'] in subjects for subjects in self.reservations.values()):
+            if any(subjects.get(reading['subject']) == reading['place'] for subjects in self.reservations.values()):
                 return False
         return True
 

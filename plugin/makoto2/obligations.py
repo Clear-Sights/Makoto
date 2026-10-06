@@ -87,7 +87,7 @@ def inference(event, ledger):
         subject = reading['subject']
         spelling = subject[5:] if subject.startswith('file:') else subject
         # Exact delimited identities only; relative aliases are parsed structurally.
-        if spelling in values(text) or subject in values(text):
+        if re.search(r'(?<![\w/])' + re.escape(spelling) + r'(?![\w/])', text) or re.search(r'(?<![\w/])' + re.escape(subject) + r'(?![\w/])', text):
             named.add(subject)
     for token in values(text):
         if token.startswith(('/', './', '../', 'http://', 'https://')):
@@ -108,7 +108,7 @@ def inference(event, ledger):
             # A traceable value has an exact eligible source, not just a relay.
             eligible = [r for r in origins if r['turn'] == ledger.turn and r['role'] == 'source' and not r.get('producer') and ledger.available(r, r, event)]
             if not eligible:
-                obligations.append({'shape': 'LINEAGE', 'subject': origins[-1]['subject'], 'selector': origins[-1]['selector']})
+                obligations.append({'shape': 'LINEAGE', 'subject': origins[-1]['subject'], 'selector': origins[-1]['selector'], 'trace_value': token})
     # SPEC and SWITCH are inferred only from exact host obligation records;
     # no numeric relation, adjective, or arbitrary successful Bash is inferred.
     return obligations
