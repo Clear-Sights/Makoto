@@ -5,6 +5,7 @@ from .borrowed import get, leaves, fragments
 from .observed import (WRITERS, FINAL, identity, effects, failed,
                        reading_subjects, network_targets, response_text)
 from .precision import contains, VERSIONED, package_parts
+from .switch import edited_forms, execution_subjects, run_output
 
 
 class Ledger:
@@ -12,6 +13,7 @@ class Ledger:
         self.q = 0
         self.turn = '0'
         self.pending = {}
+        self.pending_order = {}
         self.denied = {}
         self.seen = set()
         self.given = []
@@ -25,6 +27,38 @@ class Ledger:
         self.external = []
         self.own = []
         self.unknown = []
+        self.code_changes = {}
+        self.executions = []
+
+    def changed_code(self):
+        result = dict(self.code_changes)
+        for tid, pre in self.pending.items():
+            for effect in effects(pre):
+                form = edited_forms(pre, effect['subject'])
+                if form:
+                    subject = form['subject']
+                    prior = result.get(subject, {})
+                    form['aliases'] |= prior.get('aliases', set())
+                    form['q'] = self.pending_order[tid]
+                    if form['q'] > prior.get('q', 0):
+                        result[subject] = form
+        return result
+
+    def change_code(self, event, subject):
+        spelling = next((effect['subject'] for effect in effects(event)
+                         if self.subject(effect['subject'], event) == subject), subject)
+        form = edited_forms(event, spelling)
+        if form or subject in self.code_changes:
+            prior = self.code_changes.get(subject, {})
+            form = form or dict(prior)
+            form['aliases'] = form['aliases'] | prior.get('aliases', set())
+            form['q'] = self.q
+            self.code_changes[subject] = form
+
+    def run_witnesses(self, change):
+        return [run for run in self.executions if run['started'] > change['q']
+                and change['subject'] in run['subjects']
+                and not any(change['subject'] in self.reservations.get(tid, set()) for tid in self.pending)]
 
     def subject(self, value, event):
         return identity(value, event)
@@ -68,6 +102,7 @@ class Ledger:
                 return
             targets = {self.subject(r['subject'], event) for r in effects(event)}
             self.pending[tid] = event
+            self.pending_order[tid] = self.q
             self.reservations[tid] = targets
             if event.get('tool_name') not in WRITERS and not targets and event.get('tool_name') not in ('Agent', 'Task'):
                 self.inputs.append({'q': self.q, 'subjects': [self.subject(s, event) for s in reading_subjects(event)],
@@ -88,11 +123,13 @@ class Ledger:
                     subject = self.subject(effect['subject'], denied)
                     self.mutations[subject] = self.q
                     self.tainted.add(subject)
+                    self.change_code(denied, subject)
                 self.seen.add(tid)
         if pre is None or tid in self.seen or event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or 'tool_input' in event and event['tool_input'] != pre.get('tool_input', {}):
             self.unknown.append({'q': self.q, 'reason': 'unpaired, replayed or mismatched tool result'})
             return
         del self.pending[tid]
+        started = self.pending_order.pop(tid)
         self.seen.add(tid)
         targets = self.reservations.get(tid, set()) | {self.subject(r['subject'], pre) for r in effects(event)}
         no_effect = meta.get('no_effect') is True
@@ -100,8 +137,16 @@ class Ledger:
             for subject in targets:
                 self.mutations[subject] = self.q
                 self.written.add(subject)
+                self.change_code(pre, subject)
         if not failed(event) or no_effect:
             self.reservations.pop(tid, None)
+        # Paired call plus returned response proves the act, even on failure.
+        # Resolve the invocation against its recorded cwd, never final prose.
+        if run_output(event):
+            invoked = execution_subjects(pre, self.code_changes, event)
+            if invoked:
+                self.executions.append({'q': self.q, 'started': started,
+                                        'subjects': invoked, 'tool_use_id': tid})
         response = event.get('tool_response')
         if response is None or isinstance(response, dict) and response.get('backgroundTaskId'):
             return

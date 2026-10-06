@@ -68,6 +68,10 @@ def test_questions_on_every_admitted_pretool_step(tmp_path, boundary):
         response = s.send(output(boundary=boundary, tid=f'step-{i}'))
         assert not held(response)
         assert response == {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': EXPECTED}}
+        if boundary == 'NotebookEdit':
+            change = output(boundary=boundary, tid=f'step-{i}')
+            s.send(dict(change, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+            s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid=f'run-{i}'))
 
 
 @pytest.mark.parametrize('boundary', ['Stop', 'SubagentStop', 'PreDelivery'])

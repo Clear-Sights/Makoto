@@ -1,18 +1,18 @@
-Makoto step 6 fixes original-reading and lexical fetch-form causes from spent devD.
-Rule a asks for an original artifact reading, not verbatim derived/repeated prose.
-Read, Bash, Grep, Glob and earlier fresh readings can clear a without answer bytes.
-A matching reported mutation after denial taints readbacks without paying evidence.
-Only session-owned readings and assistant answers still hold a, including retries.
-Rule c package/version spans exclude sentence punctuation and retain release suffixes.
-Completed Bash fetch text pays c without a mandatory explicit zero-status field.
-Explicit failure, pending/background/unpaired/offline or wrong-subject fetches still hold.
-Package identity keeps exact name/version; decimal measurements with units stay values.
-Rule b keeps literal NAME witnesses, output exclusions and mutation freshness.
-Four questions remain exactly as required by step 5, with unpaid retry precedence.
-devD cohorts: a 100/100 present, 0/100 absent; b 92/97, 7/103; c 62/100, 0/100.
-360 whole-suite tests passed in 12.80 seconds, below the 15-second limit.
-Borrowed code/source pins unchanged; BORROWED.tsv clarifies retained evidence scope.
-Changes stay on shapes as Clear-Sights; no network, forbidden reads or push.
+Makoto step 7 adds rule d: UNRUN CHANGE, protecting the switch.
+Writers naming edited code/script/config paths, modules or identifiers must run first.
+Commit/push and every final after executable edits ship them, regardless of wording.
+A paired execution must start after the subject's last edit and return its output.
+Earlier runs, readbacks, other paths and missing output cannot pay d.
+Failed runs with returned output count; a completed silent run may return its status.
+A background launch alone cannot pay; actual returned stdout/stderr can.
+Every unpaid Stop retry holds with the edited subject and the required run instruction.
+Every rule hold is tagged: a lineage, b spec, c other point, d switch.
+Existing a/b/c predicates and Gabriel's exact four questions are retained.
+Native writers, shell effects and host-recorded mutations update executable freshness.
+Opaque execution/conditional branches need an actual host invocation subject witness.
+490 whole-suite tests passed in 10.90 seconds, below the 15-second limit.
+Causality trace receipts now witness runs; its capture design is adapted, source pinned.
+Changes stay in makoto on shapes as Clear-Sights; no network, forbidden reads or push.
 
 Record contract
 
@@ -321,3 +321,91 @@ Residuals retained rather than fitting the supplied cases:
 No further per-case tuning was performed. The requested universal 100% detection
 and zero false positives is not claimed. Work remained on shapes with local
 Clear-Sights commits, no push, no network, and no forbidden reads.
+
+
+Step 7: the fourth check (the switch)
+
+Gabriel's mapping is explicit in every finding and native hold message: rule a
+protects lineage, b protects spec, c protects the other point, and the new d
+protects the switch. The a/b/c predicates are unchanged. The exact four questions
+still accompany admitted dependent steps and appear once at Stop; d findings
+precede that reminder and remain unpaid on every stop_hook_active retry.
+
+Rule d uses only recorded tool input, paired output, ordered edits and host-owned
+instrumentation. A writer naming a previously edited executable/config path,
+module stem or syntactically observed identifier is dependent by form. A native
+commit/push or any final after those edits ships them by form. There is no list
+of behavior verbs, success words or subject-specific cases. Initial code writes
+are not held by d merely for introducing their own target. Subsequent dependent
+steps require a run after that target's last edit. Ordinary prose-file writes
+have no executable obligation. Native notebook edits remain executable even
+when their target uses an unconventional extension.
+
+switch.py classifies subjects by code/config suffixes, standard config filenames,
+shebangs, declaration syntax or structured JSON writer payloads. Documentation
+suffixes are not classified merely for embedded declarations. Module names come
+from recorded paths; declaration/config-key syntax supplies identifiers. Source
+identities include the recorded cwd and normalized path, so another directory's
+same basename cannot pay. This preserves b's independent exact-spelling contract.
+
+The shared ledger records edit completion order and invocation start order. Both
+must precede the corresponding output in a paired, admitted tool call. A run
+started before an edit cannot become paid merely because it returns afterward.
+Pending edits reserve their subject; no_effect restores the previous obligation.
+A failed mutation or a reported mutation after denial conservatively requires a
+new run, while the denied call never supplies an execution receipt. A subsequent
+run can clear d after the mutation has finished, including a failed run whose
+error/status response was returned. A run with its own effects does not certify
+code that it changed after starting. Only the latest version has to be run.
+
+A direct executable, an interpreter script/module operand, explicit pytest test
+file, sourced script, native Run/Execute/NotebookExecute/NotebookRun target or
+explicit --config consumer can provide the executed subject. Tool input alone,
+Read/cat readback, echoing a filename, a worker answer or a final's invocation
+metadata cannot provide the act. Returned stdout/stderr/content or a completed
+exit status witnesses the response; missing/unpaired/mismatched/replayed results
+cannot pay. A launch identifier with no process output is unpaid. Background
+process output in a returned stdout/stderr/output field can pay without requiring
+success. The implementation never invokes recorded code, imports a subject to
+inspect it, contacts a model or uses the network.
+
+Compound/conditional shell, hidden imports, ambiguous module resolution, shell
+expansion and opaque runners need an actual host-recorded execution target in
+makoto.invocation.subject or subjects on the paired pre/post tool event. This is
+the same trusted outer-envelope contract as existing reads/effects/network
+instrumentation; copying that metadata into tool_input does not pay. A conditional
+command string plus aggregate output does not establish which branch executed.
+The new check proves an act and observed response, not branch coverage or semantic
+correctness; a failing run is intentionally sufficient. Unknown languages or
+unobserved dynamic effects remain limited by visible forms/host instrumentation;
+no universal dynamic dependency or zero-false-positive guarantee is claimed.
+
+Reuse before building: inspected causality/__init__.py at its existing pinned
+0d76999a2f81e9e00d2fe550ce3d2859dd568d16. Its run captures an actual process's
+stdout/stderr before observing it. Adapted that witness design to native paired
+tool calls rather than copying its subprocess runner into a prevention hook.
+The already borrowed receipt function is reused unchanged for admitted switch
+subjects, with actual execution tool-use IDs as trace and execution-v1 as the
+instrument. BORROWED.tsv records both uses and the upstream run design pin;
+DetIO primitives and upstream source pins remain unchanged.
+
+Validation: PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q --tb=short passed
+490 tests in 10.90 seconds. The 130 new independent plants cover each rule-d
+clause and near miss, native writer/ship/final boundaries, aliases, code/config
+forms, edit/run ordering, separate paths/cwds, readbacks, pending/background
+receipts, completed silent and failing runs, opaque host witnesses, imported
+history, live unpaid retries, shape tags and tools/run_pairs.py's actual response.
+One plant executes a real failing Python program and records its returned stderr.
+Existing notebook output-exemption/reminder plants now execute their notebook
+before a final or another edit: b's output exemption does not pay d. Live boundary
+and retry checks still invoke the actual CLI; only independent history setup was
+moved in-process, reducing redundant interpreter launches and bringing the suite
+comfortably below 15 seconds. No spent-development-set case content was needed.
+
+REPORT.md and NOLOSS-MAP.tsv are mirrored under docs/. All changed files remain
+inside /home/user/build/makoto; the commit uses Clear-Sights identity on shapes,
+without AI attribution, push or network access.
+
+The configured Git signer could not reach its local service inside the sandbox.
+The local commit uses signing disabled and the requested Clear-Sights identity;
+no push or external network operation was performed.

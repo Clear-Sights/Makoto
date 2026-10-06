@@ -612,3 +612,14 @@ tests/test_record_forms.py	added	Independent held/clear plants for repeated comp
 step6:measurement_package_collision	replaced_by	A whitespace package/version candidate whose numeric release slice belongs to a number-with-unit span is a measured value. Explicit package operators/v forms remain names; unit substrings inside full versions cannot hide them.
 step6:verification	kept	360 whole-suite tests passed in 12.80s; final run_pairs_D replay has 600 rows, cohort a 100/100 and 0/100, b 92/97 and 7/103, c 62/100 and 0/100.
 step6:development_residuals	bounded	Any rule holds 254/297 present and 9/303 absent; retain 38 unclassified public-name c misses, five bare-name b misses, four ambiguous private-version c false holds and reported b/label conflicts. Native reminder-inclusive flags are 274/297 and 194/303, not rule-detection claims.
+step7:rule_d	added	UNRUN CHANGE holds dependent names and commit/push/finals after code edits until a paired execution starts after the latest edit and returns its response; no behavior word lists.
+step7:shape_tags	added	Every finding and native rule hold names its protected shape: a lineage, b spec, c other point, d switch.
+step7:edit_order	added	Native/shell/host effects track code/config versions and pending edits; a pre-edit run returning late cannot pay; no_effect preserves prior payment.
+step7:execution_witness	added	Exact cwd/path invocation plus paired returned output pays d, including failed/silent runs; readbacks, other paths, launch-only/unpaired/mismatched/replayed responses cannot pay.
+step7:opaque_execution	bounded	Conditional/compound shell, dynamic imports/expansion and opaque runners require host-owned actual invocation subjects on paired tool records; never infer a selected branch from aggregate output.
+step7:rule_abc	kept	Existing a/b/c predicates retained; only shape tags added. Output exemptions in b never pay d.
+step7:four_questions	kept	Gabriel's exact note and paid once-only Stop behavior retained; unpaid d takes precedence on every retry.
+step7:causality_run	adapted	Pinned Causality run's actual-execution/output capture design adapted to native tool pairing; unchanged borrowed receipt traces actual run IDs, with no checker subprocess execution.
+tests/test_switch.py	added	130 independent plants cover every switch clause and near miss, real failure output, live hooks, imported history, runner responses and all four shape tags.
+step7:notebook_plants	updated	Existing notebook output/reminder plants execute changed notebook before shipping/editing again; b output exclusion and exact four questions stay verified.
+step7:live_suite_setup	updated	Setup history uses identical in-process native journal records; all boundary/retry admission checks still cross CLI transport; 490 tests in 10.90 s.

@@ -22,8 +22,30 @@ writes and stale readings. Rule c requires an online fetch/search of a named URL
 versioned package, or host-classified public project in the current turn.
 User-given external names still need that online call.
 
-Hold messages name the rule, quote the exact span, and say which reading clears
-it. PreToolUse returns a native deny, and Stop returns a native block. Every
+Rule d holds an UNRUN CHANGE when a dependent writer names an edited code/script/
+config path, module or identifier, or a commit/push/final ships session edits.
+After the last edit, a paired call must execute that subject and return its
+output. A failed run counts; an earlier run, file readback, different execution
+path, missing output or background launch acknowledgment does not. An actual
+stdout/stderr response from a background run counts. Silent completed runs can
+return an exit status. Selection is by input form, without behavior word lists.
+The hold says: "run it and read the output before this step".
+
+`makoto2.switch` recognizes code/config suffixes, notebooks, shebangs, declarations
+and structured JSON payloads. Module stems, declared identifiers and config keys
+join normalized file paths as edited subjects' name forms. Simple direct runs,
+interpreter script/module operands, explicit pytest files, sourced scripts,
+native Run/Execute/NotebookExecute/NotebookRun and `--config` consumers provide
+execution subjects. Conditional/compound shell, indirect imports, generated
+commands and opaque runners need host-owned `makoto.invocation.subject` or
+`subjects` on the paired pre/post tool event, identifying what actually executed.
+Interpreter eval/check/help flags do not establish execution of a file named as
+an argument; arguments after a script/module operand do not select interpreter
+mode. The checker never executes the recorded program itself.
+
+Hold messages name the rule, tag its shape (a lineage, b spec, c other point,
+d switch), quote the exact subject, and say which reading or run clears it.
+PreToolUse returns a native deny, and Stop returns a native block. Every
 unpaid retry remains held, including `stop_hook_active`. Admitted dependent
 PreToolUse steps receive Gabriel's exact four questions as `additionalContext`.
 An otherwise admitted Stop presents them once as its block reason; a paid

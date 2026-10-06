@@ -81,6 +81,9 @@ def test_written_or_edited_file_in_final_is_output(tmp_path, writer, reference):
     ev = output('source data', writer) if writer != 'Bash' else event('PreToolUse', tool_name='Bash', tool_use_id='write', tool_input={'command': 'touch out.txt'})
     assert not held(s.send(ev))
     s.send(dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'ok', 'exitCode': 0}))
+    if writer == 'NotebookEdit':
+        # Output names remain exempt from b, while executable edits must pay d.
+        s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid='run'))
     assert not held(s.send(output(reference)))
     assert s.rules() == set()
 

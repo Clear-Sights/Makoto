@@ -66,13 +66,17 @@ class Session:
 @pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'commit', 'push', 'Stop', 'SubagentStop', 'PreDelivery'])
 @pytest.mark.parametrize('present', [False, True])
 def test_all_boundaries_and_retries(tmp_path, boundary, present):
-    s = Session(tmp_path, live=True)
+    s = Session(tmp_path)
     # Supplied destinations and executable spelling are given, not unread.
     s.send(event('UserPromptSubmit', prompt='out.txt git commit push -m'))
     if present:
         s.feed(pair())
+    # Seed identical native journal records in-process; all admission/retry
+    # boundaries below still cross the real CLI transport.
+    s.live = True
     ev = output(boundary=boundary)
-    for retry in (False, True, True):
+    for index, retry in enumerate((False, True, True)):
+        ev['tool_use_id'] = f'step-{index}'
         ev['stop_hook_active'] = retry
         response = s.send(ev)
         note = present and boundary in ('Stop', 'SubagentStop', 'PreDelivery') and not retry
@@ -88,6 +92,11 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
             assert response == {}
         else:
             assert response['hookSpecificOutput']['additionalContext'] == hook.FOUR_QUESTIONS
+        if present and boundary == 'NotebookEdit':
+            s.live = False
+            s.send(dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
+            s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid=f'run-{index}'))
+            s.live = True
 
 
 @pytest.mark.parametrize('origin', ['none', 'assistant', 'written', 'worker'])

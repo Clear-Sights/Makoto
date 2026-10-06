@@ -1,9 +1,10 @@
-"""Three pre-step holds derived only from literal session observations."""
+"""Four pre-step holds derived only from literal session observations."""
 import os
 import re
 from .precision import extract, names, contains
 from .observed import text_of, effects
 from .borrowed import receipt
+from .switch import names_change
 
 
 def evaluate(ledger, event, adapter='inferred'):
@@ -31,7 +32,7 @@ def evaluate(ledger, event, adapter='inferred'):
 
     if not readings:
         span = spans[0].text if spans else text
-        findings.append({'rule': 'a', 'family': 'a', 'subject': span,
+        findings.append({'rule': 'a', 'family': 'a', 'shape': 'lineage', 'subject': span,
                          'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact before this step; assistant text and files this session wrote do not clear it'})
     # Rule a asks whether an original artifact was read. It does not require
     # a derived result or repeated answer to occur verbatim in that artifact.
@@ -42,7 +43,7 @@ def evaluate(ledger, event, adapter='inferred'):
             continue
         witnesses = ledger.witnesses(span.text, span.kind)
         if not witnesses:
-            findings.append({'rule': 'b', 'family': 'b', 'subject': span.text,
+            findings.append({'rule': 'b', 'family': 'b', 'shape': 'spec', 'subject': span.text,
                              'missing': 'NAMED WITHOUT READING: read a source whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it'})
         else:
             snapshot.append({'span': span.text, 'kind': span.kind,
@@ -52,8 +53,19 @@ def evaluate(ledger, event, adapter='inferred'):
     external += [s for s in ledger.external + event.get('makoto', {}).get('external_subjects', []) if contains(text, s)]
     for span in dict.fromkeys(external):
         if not ledger.fetched(span):
-            findings.append({'rule': 'c', 'family': 'c', 'subject': span,
+            findings.append({'rule': 'c', 'family': 'c', 'shape': 'other point', 'subject': span,
                              'missing': 'DID NOT LOOK ONLINE: fetch or search this exact external subject with WebFetch, WebSearch or a Bash network call in this turn'})
+    for change in ledger.changed_code().values():
+        if not names_change(event, change):
+            continue
+        runs = ledger.run_witnesses(change)
+        if not runs:
+            findings.append({'rule': 'd', 'family': 'd', 'shape': 'switch',
+                             'subject': change['display'],
+                             'missing': 'UNRUN CHANGE: run it and read the output before this step'})
+        else:
+            snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in runs],
+                                    'makoto2.switch/execution-v1'))
     if not findings:
         snapshot.append(receipt(text, [r['tool_use_id'] for r in readings], 'makoto2.precision/form-v1'))
     return list({(f['rule'], f['subject']): f for f in findings}.values()), snapshot

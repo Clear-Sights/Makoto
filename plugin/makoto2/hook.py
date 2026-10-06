@@ -28,6 +28,11 @@ def d_in(raw):
     for key in ('place', 'destination', 'points', 'invocation'):
         if key in meta and not isinstance(meta[key], dict):
             raise ValueError('makoto.' + key + ' must be an object')
+    invocation = meta.get('invocation', {})
+    if 'subject' in invocation and (not isinstance(invocation['subject'], str) or not invocation['subject']):
+        raise ValueError('makoto.invocation.subject must be a nonempty string')
+    if 'subjects' in invocation and (not isinstance(invocation['subjects'], list) or any(not isinstance(s, str) or not s for s in invocation['subjects'])):
+        raise ValueError('makoto.invocation.subjects must contain nonempty strings')
     if 'prompt' in event and not isinstance(event['prompt'], str):
         raise ValueError('prompt must be text')
     for key in ('external_subjects', 'network_subjects'):
@@ -140,7 +145,7 @@ def main(raw, config):
             if contract:
                 reason = 'makoto contract: ' + contract
             elif findings:
-                reason = '; '.join('makoto rule ' + f['rule'] + ': ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
+                reason = '; '.join('makoto rule ' + f['rule'] + ' [' + f['shape'] + ']: ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
                    'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
