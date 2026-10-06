@@ -40,20 +40,37 @@ def argv(event):
 
 
 def git_action(event):
-    words = argv(event)
-    if not words or words[0] != 'git':
+    # Shell punctuation establishes command boundaries; comments cannot hide
+    # a git call behind a leading basis declaration. No prose classification.
+    try:
+        lexer = shlex.shlex(command(event), posix=True, punctuation_chars=';&|()\n')
+        lexer.whitespace = ' \t\r'
+        lexer.whitespace_split = True
+        segments, current = [], []
+        for word in lexer:
+            if word and all(c in ';&|()\n' for c in word):
+                segments.append(current)
+                current = []
+            else:
+                current.append(word)
+        segments.append(current)
+    except ValueError:
         return False
-    # Recognize git's global arguments structurally, including -C and -c.
-    i = 1
-    while i < len(words) and words[i].startswith('-'):
-        i += 2 if words[i] in ('-C', '-c', '--git-dir', '--work-tree') else 1
-    return i < len(words) and words[i] in ('commit', 'push')
+    for words in segments:
+        if not words or words[0] != 'git':
+            continue
+        i = 1
+        while i < len(words) and words[i].startswith('-'):
+            i += 2 if words[i] in ('-C', '-c', '--git-dir', '--work-tree') else 1
+        if i < len(words) and words[i] in ('commit', 'push'):
+            return True
+    return False
 
 
 def dependent(event):
     name = event['hook_event_name']
     if name in FINAL:
-        return bool(event.get('last_assistant_message')) or bool(event.get('makoto', {}).get('obligations'))
+        return bool(event.get('last_assistant_message')) or bool(event.get('makoto', {}).get('obligations')) or bool(event.get('makoto', {}).get('dependencies'))
     return name == 'PreToolUse' and (event.get('tool_name') in WRITERS or
            (event.get('tool_name') == 'Bash' and git_action(event)) or
            bool(event.get('makoto', {}).get('dependencies')) or
@@ -83,6 +100,8 @@ def response_text(response):
     if isinstance(response, str):
         return response
     if isinstance(response, dict):
+        if 'stdout' in response or 'stderr' in response:
+            return str(response.get('stdout', '')) + '\n' + str(response.get('stderr', ''))
         if isinstance(response.get('file'), dict):
             return response['file'].get('content', '')
         for key in ('content', 'stdout', 'output'):
@@ -113,10 +132,11 @@ def native_reads(pre, post):
     response = post.get('tool_response', {})
     if failed(post) or (isinstance(response, dict) and (response.get('truncated') or response.get('is_truncated'))):
         return []
-    if name == 'Read' and ti.get('file_path'):
+    has_content = isinstance(response, str) or (isinstance(response, dict) and ('content' in response or isinstance(response.get('file'), dict) and 'content' in response['file']))
+    if name == 'Read' and ti.get('file_path') and has_content:
         selector = 'content' if not any(k in ti for k in ('offset', 'limit')) else 'region:' + json.dumps([ti.get('offset'), ti.get('limit')])
         return [{'subject': ti['file_path'], 'selector': selector, 'complete': True}]
-    if name == 'WebFetch' and ti.get('url'):
+    if name == 'WebFetch' and ti.get('url') and has_content:
         return [{'subject': ti['url'], 'selector': 'representation:' + ti.get('prompt', ''), 'complete': True}]
     if name == 'Grep':
         subject = ti.get('path') or pre.get('cwd') or os.getcwd()
@@ -130,7 +150,7 @@ def native_reads(pre, post):
 
 
 # Structural trace values, never vocabulary/meaning classification.
-VALUE = re.compile(r'https?://[^\s<>"\x27,;]+|(?:\.?\.?/|/)[^\s<>"\x27,;]+|\b[a-fA-F0-9]{7,64}\b|\b\d{3,}(?:\.\d+)?\b|\bid:[\w.:-]+')
+VALUE = re.compile(r'https?://[^\s<>"\x27,;]+|(?<![\w/])(?:[\w.~-]+/|\.?\.?/|/)[^\s<>"\x27,;]+|\b[a-fA-F0-9]{7,64}\b|\b\d{3,}(?:\.\d+)?\b|\bid:[\w.:-]+')
 
 
 def values(text):

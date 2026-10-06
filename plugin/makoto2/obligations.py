@@ -1,5 +1,6 @@
 """Two replaceable O(e) adapters. Obligations and receipt ownership are distinct."""
 import re
+import os
 from .observed import text_of, values, identity, digest
 
 
@@ -15,8 +16,8 @@ def manifest(event):
 def basis_text(event):
     ti = event.get('tool_input', {})
     description = ti.get('description', '')
-    content = event.get('last_assistant_message', '') if event['hook_event_name'] in ('Stop', 'SubagentStop', 'PreDelivery') else '\n'.join(str(ti.get(k, '')) for k in ('content', 'new_string', 'new_source', 'command'))
-    candidates = description.splitlines() + content.splitlines()[:1]
+    content = event.get('last_assistant_message', '') if event['hook_event_name'] in ('Stop', 'SubagentStop', 'PreDelivery') else '\n'.join(str(ti[k]) for k in ('content', 'new_string', 'new_source', 'command') if k in ti)
+    candidates = description.splitlines() + (content.splitlines() if event['hook_event_name'] in ('Stop', 'SubagentStop', 'PreDelivery') else content.splitlines()[:1])
     for line in candidates:
         line = re.sub(r'^\s*(?:#|//|/\*|<!--)\s*', '', line).strip()
         if line.startswith('makoto-basis:'):
@@ -44,6 +45,7 @@ def declaration(event, ledger):
         raise ContractError('LINEAGE: add a makoto-basis line naming the readings this step uses (an empty line declares a novel output)')
     fields = parse_basis(line)
     obligations = manifest(event)
+    host_count = len(obligations)
     for subject in fields.get('source', []):
         obligations.append({'shape': 'LINEAGE', 'subject': subject})
     for entry in fields.get('def', []):
@@ -69,7 +71,7 @@ def declaration(event, ledger):
         if not sep or not command or not subject:
             raise ContractError('SWITCH: use act=<command>-><subject>')
         obligations.append({'shape': 'SWITCH', 'subject': subject, 'command': command, 'selector': 'content'})
-    covered = {ledger.subject(o['subject'], event) for o in obligations if 'subject' in o}
+    covered = {ledger.subject(o['subject'], event) for o in obligations[host_count:] if 'subject' in o}
     content = text_of(event)
     trace = values(content)
     # Exact values already known from this turn cannot be silently omitted.
@@ -83,11 +85,13 @@ def inference(event, ledger):
     obligations = manifest(event)
     text = text_of(event)
     named = set()
-    for reading in ledger.readings:
-        subject = reading['subject']
+    for subject in {r['subject'] for r in ledger.readings} | set(ledger.mutations):
         spelling = subject[5:] if subject.startswith('file:') else subject
         # Exact delimited identities only; relative aliases are parsed structurally.
-        if re.search(r'(?<![\w/])' + re.escape(spelling) + r'(?![\w/])', text) or re.search(r'(?<![\w/])' + re.escape(subject) + r'(?![\w/])', text):
+        spellings = [spelling, subject]
+        if subject.startswith('file:'):
+            spellings.append(os.path.relpath(spelling, event.get('cwd') or os.getcwd()))
+        if any(re.search(r'(?<![\w/])' + re.escape(s) + r'(?![\w/])', text) for s in spellings):
             named.add(subject)
     for token in values(text):
         if token.startswith(('/', './', '../', 'http://', 'https://')):
@@ -103,12 +107,18 @@ def inference(event, ledger):
             obligations.append({'shape': 'OTHER_POINT', 'subject': subject,
                                 'points': [first, mutation['place']], 'after_sequence': mutation['q']})
     for token in values(text):
+        # A named path/URL is bound by its identity obligation above, rather
+        # than reclassified as an assistant-only copy of its spelling.
+        if ('/' in token) and ledger.subject(token, event) in named:
+            continue
         origins = [r for r in ledger.readings if token in r['values']]
-        if origins:
+        relays = [r for r in ledger.relay_values if token in r['values']]
+        if origins or relays:
             # A traceable value has an exact eligible source, not just a relay.
             eligible = [r for r in origins if r['turn'] == ledger.turn and r['role'] == 'source' and not r.get('producer') and ledger.available(r, r, event)]
             if not eligible:
-                obligations.append({'shape': 'LINEAGE', 'subject': origins[-1]['subject'], 'selector': origins[-1]['selector'], 'trace_value': token})
+                origin = origins[-1] if origins else relays[-1]
+                obligations.append({'shape': 'LINEAGE', 'subject': origin['subject'], 'selector': origin.get('selector', 'content'), 'trace_value': token})
     # SPEC and SWITCH are inferred only from exact host obligation records;
     # no numeric relation, adjective, or arbitrary successful Bash is inferred.
     return obligations

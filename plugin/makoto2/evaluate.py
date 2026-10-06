@@ -7,7 +7,7 @@ def spec(ledger, event, obligation):
     defs = [d for d in ledger.definitions if d['id'] == obligation.get('definition_id') and
             d['subject'] == ledger.subject(obligation['subject'], event) and
             d.get('selector', 'content') == obligation.get('selector', 'content') and
-            (obligation.get('definition_revision') is None or d.get('revision') == obligation['definition_revision'])]
+            (obligation.get('definition_revision', obligation.get('revision')) is None or d.get('revision') == obligation.get('definition_revision', obligation.get('revision')))]
     if not defs:
         return 'register the held definition ' + str(obligation.get('definition_id'))
     if not ledger.matching(obligation, event):
@@ -60,5 +60,8 @@ def evaluate(ledger, event, adapter):
         missing = PREDICATES[shape](ledger, event, obligation)
         if missing:
             findings.append({'family': shape, 'subject': ledger.subject(obligation['subject'], event), 'missing': missing})
-        snapshots.append({'obligation': obligation, 'reading_receipt_ids': [r['receipt_id'] for r in ledger.matching(obligation, event)]})
+        candidates = ledger.matching(obligation, event, historical=shape == 'OTHER_POINT')
+        if shape == 'LINEAGE':
+            candidates = [r for r in candidates if r['role'] == 'source' and r['turn'] == ledger.turn and not r.get('producer')]
+        snapshots.append({'obligation': obligation, 'reading_receipt_ids': [r['receipt_id'] for r in candidates]})
     return findings, snapshots

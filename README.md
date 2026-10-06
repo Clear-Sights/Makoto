@@ -1,100 +1,96 @@
-# Makoto 4.0.1
+# Makoto 5.0.0-dev
 
-[![CI](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml/badge.svg)](https://github.com/Clear-Sights/Makoto/actions/workflows/ci.yml)
+Makoto holds dependent steps until their required readings are in the session's
+hook record. It checks presence, not whether a reading agrees with a claim.
+One ledger and four predicates replace the previous heuristic decision engine.
 
-“Makoto prevents blindspots through detection”
-(cmsg_01CZb217TBsj7a1uAAdtXepP3dgKHAVmDP8Nk9f2nVV5uu, 2026-10-01T21:41Z).
+The four shapes are SPEC (a held definition and its subject reading), OTHER
+POINT (two distinct readings of the same subject at required points), SWITCH
+(an exact input invocation and its paired completed response), and LINEAGE
+(original source readings this turn before the dependent output).
 
-Makoto enforces the blindspot register through Claude Code hooks. It checks
-source text and observed tool effects, blocking a finding or staying silent.
-Live-session outcomes remain unmeasured.
+Choose `declared` or `inferred` with `MAKOTO_ADAPTER`, or the `adapter` key in
+`plugin/makoto2/config.json`. `declared` is the default.
 
-The fixed hook corpus catches 70/74 register heads: SPEC 26/28,
-OTHER POINT 18/19, SWITCH 18/19 and LINEAGE 8/8. Four heads are explicitly
-NOT-EVALUABLE. False fires are 0/77 goal honest sequences, including seven routine
-branch and write cases. [goal.json](mesh/evidence/goal.json) records the measured
-results and predicate/family removal plants. The sanitized real-session corpus
-also checks five operator-labelled false fires, the unnamed-test failure, and
-coordinator trailing-message and quoted-relay cases. These counts describe
-fixed corpora, not live-session accuracy.
+The declared adapter requires a basis line in a tool input's `description` or
+leading comment, and in the final assistant message:
 
-## Install
-
+```text
+makoto-basis: source=path; second=path@revision; act=cat path->path; def=definition-id:path
 ```
+
+Each field accepts comma-separated entries. An empty `makoto-basis:` declares
+a novel output with no dependencies. Write, Edit, MultiEdit, NotebookEdit,
+Bash git commit/push and final messages require the line. A trace value from
+this turn's source readings also needs coverage in the line. Definitions must
+already be registered by the operator/host. Named second points resolve through
+host `makoto.points`, or an exact revision string. Commands with commas or
+semicolons need host obligation records instead of this compact grammar.
+
+The inferred adapter binds exact recorded paths/URLs named in content and exact
+trace values to source receipts. A named mutated subject also requires an
+observation after the mutation at its recorded destination. SPEC and SWITCH
+come only from exact host obligation records; arbitrary prose does not establish
+a definition or a selected branch. Numeric tokens have at least three digits;
+paths, URLs, `id:` tokens and hexadecimal identifiers use structural parsing.
+
+Both adapters accept host-owned `makoto.obligations` and `makoto.dependencies`.
+The host envelope is trusted instrumentation outside tool inputs: it must never
+be copied from assistant-authored receipt declarations. Its `turn_id`, `place`,
+`definitions`, `reads`, `effects`, `invocation`, `aliases` and `destination`
+provide exact identities, selectors, origins, versions and points. Definitions
+register on UserPromptSubmit or an internal Register event. Instrument arbitrary
+shell effects and commit/push snapshot dependencies explicitly. Cross-session
+receipt imports are not implemented; parent and worker ledgers stay separate.
+
+Native Read, Grep, WebFetch and restricted single-file `cat` observations require
+paired PreToolUse/PostToolUse IDs. Grep supplies its exact query selector,
+WebFetch its requested representation selector, and partial Read its region
+selector. Empty returned content counts. Completed nonzero probe responses
+count; pending calls, replayed IDs, background launches and failed reads do not.
+Writes never pay source obligations. Read-back of a session-written subject is
+a relay unless the host explicitly attests an original source role. General
+Bash calls without subject/effect instrumentation are journaled as unknown.
+
+PreToolUse denies every unpaid attempt. Stop and SubagentStop block every unpaid
+final, including retries with `stop_hook_active`; those retries are recorded.
+The host must enforce these decisions before execution/delivery. The example
+`tools/deliver.py` owns final stdout and emits text only after an admitted Stop.
+It does not install final-message interception into another host. Native Stop
+pre-delivery timing has not been independently validated here.
+
+Session state is a locked, hash-linked append-only journal in
+`~/.claude/makoto2_state`; `MAKOTO_STATE_DIR` overrides it. Every output records
+its obligations and prior reading IDs. Mutation reservations invalidate affected
+current receipts before settlement; partial failure keeps the reservation until
+host-attested no-effect clearance. Corruption and invalid input fail closed as
+transport/contract errors. Unknown instrumentation is recorded separately from
+missing-reading findings. External changes require host epoch/effect records.
+The runtime does not probe source files or execute missing checks itself.
+
+Install through the existing marketplace:
+
+```text
 /plugin marketplace add Clear-Sights/Makoto
 /plugin install makoto@makoto
 ```
 
-The marketplace points at `plugin/`. [hooks.json](plugin/hooks/hooks.json) wires
-PreToolUse, PostToolUse, PostToolUseFailure, Stop, SubagentStop and UserPromptSubmit
-to `cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2`. Python 3.11 or newer is
-required; the runtime uses only the standard library.
+Python 3.11 or later is required; runtime dependencies are standard library only.
+Run the generated plants and retained applicable regressions with:
 
-## Runtime and rules
-
-[observed.py](plugin/makoto2/observed.py) records settled tool effects.
-[rows.tsv](plugin/makoto2/rows.tsv) holds historical rules and source quotes.
-[evaluate.py](plugin/makoto2/evaluate.py) runs the register's SPEC, OTHER POINT,
-SWITCH and LINEAGE families before the remaining historical rules, and
-[hook.py](plugin/makoto2/hook.py) emits a pre-tool denial or a Stop/SubagentStop
-block. Other events record effects or mark turn boundaries. Findings are
-deduplicated by rule, object and recorded state; SPEC findings
-include event history in that state. There is no advisory output.
-
-The claim reader uses a fixed word table, with no semantic classifier. Source
-references require prior readings; available current readings are checked for
-drift. This is a bounded evaluator.
-
-State is appended lazily to session JSONL files in `~/.claude/makoto2_state`.
-Set `MAKOTO_STATE_DIR` to choose another directory. Runtime defaults are in
-[config.json](plugin/makoto2/config.json), with keys documented in
-[CONFIG_KEYS.txt](plugin/makoto2/CONFIG_KEYS.txt). Some historical rule inputs
-refer to external words files; those are not bundled or created by installation.
-
-For a workspace that wants explicit worker contracts, set `dispatch = true` in
-its `makoto.toml`. The default is off; false, absent or invalid declarations
-keep the existing behavior. R04 requires case-sensitive `READ:`,
-`WRITE:` and `ACCEPTANCE:` labels on Agent briefs. R08 checks Agent briefs for `@` followed by at least 12 lowercase
-hexadecimal digits on a `READ:` line; it does not validate every input token.
-READ lists can span lines and use whitespace or commas. With dispatch enabled,
-Stop requires an observed exit-zero execution of each Agent ACCEPTANCE command
-even when the closing text makes no completion claim. Recognized completion
-claims also require later settled acceptance executions for Agent/Task briefs.
-Background launches and results from workers do not pay that obligation.
-Accepted Pre briefs are stored as contracts and never treated as settled effects.
-These checks do not prove snapshots or causal validity.
-
-## Verify
-
-```
-python -m pip install pytest
-python -m pytest -q tests
+```sh
+python3 -m pytest -q tests
 ```
 
-CI runs the suite on Linux with Python 3.11, 3.12 and 3.13, and on macOS and
-Windows with Python 3.13. Tests cover register-family predicates, observed
-effects, dispatch contracts, completion witnesses, and six hook assertions
-executed during collection. [sources.tsv](tests/sources.tsv) pins
-historical quotes inside the repository; tests do not depend on changing live
-memory files. A pin records historical text, not independently verified provenance.
+The grading entry point is `tools/run_pairs.py INPUT.json --adapter declared|inferred`.
+It accepts a session list or `{"sessions": [...]}`. Each session contains `id`,
+`events`, zero-based `step_index`, and optional relative-path `files`. It uses
+fresh temporary state/cwd and the live `python -m makoto2` entry for every event,
+then prints JSON with the selected step's `held` flag. It never executes recorded
+commands or opens recorded source subjects. Historical evidence remains in the
+repository for audit; old corpus accuracy counts do not grade these predicates.
 
-Manual release reads the version from the plugin manifest to derive its tag.
-The old catalog, CLI, packaging and replay tooling have been replaced by this
-runtime and suite.
-
-## Mesh and handoff
-
-[mesh/README.md](mesh/README.md) describes the requirement model and its checks.
-[PLAN.md](PLAN.md) records dependency waves; [HANDOFF.md](HANDOFF.md) describes
-how to resume and distinguish model validity from implementation evidence.
-The pinned README in `mesh/reference/` is a historical source snapshot.
-
-## Uninstall
-
-```
-/plugin uninstall makoto
-```
-
-Uninstall preserves the state directory. Earlier standalone installations should
-remove their old manually managed hook entries before enabling the plugin to
-avoid running both implementations.
+These checks establish exact presence under their record contract. They cannot
+recover undeclared prose dependencies, unobserved external mutations, hidden
+branch choices or unavailable source provenance. Universal 100% accuracy over
+free prose has not been established.

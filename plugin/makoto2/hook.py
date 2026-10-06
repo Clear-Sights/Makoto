@@ -12,10 +12,23 @@ from .obligations import ContractError
 
 def d_in(raw):
     event = json.loads(raw, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
-    if not isinstance(event, dict) or not isinstance(event.get('hook_event_name'), str):
+    if not isinstance(event, dict) or not isinstance(event.get('hook_event_name'), str) or not event['hook_event_name']:
         raise ValueError('missing hook event')
     if not isinstance(event.get('session_id'), str) or not event['session_id']:
         raise ValueError('missing session identity')
+    if not isinstance(event.get('makoto', {}), dict) or not isinstance(event.get('tool_input', {}), dict):
+        raise ValueError('makoto and tool_input must be objects')
+    meta = event.get('makoto', {})
+    for key in ('definitions', 'reads', 'effects', 'obligations', 'dependencies', 'aliases'):
+        if key in meta and (not isinstance(meta[key], list) or any(not isinstance(item, dict) for item in meta[key])):
+            raise ValueError('makoto.' + key + ' must be an object list')
+    for key in ('place', 'destination', 'points', 'invocation'):
+        if key in meta and not isinstance(meta[key], dict):
+            raise ValueError('makoto.' + key + ' must be an object')
+    if 'last_assistant_message' in event and not isinstance(event['last_assistant_message'], str):
+        raise ValueError('last_assistant_message must be text')
+    if event['hook_event_name'] in ('PreToolUse', 'PostToolUse', 'PostToolUseFailure') and (not isinstance(event.get('tool_use_id'), str) or not event['tool_use_id']):
+        raise ValueError('tool events require an exact tool_use_id')
     return event
 
 
@@ -117,5 +130,5 @@ def main(raw, config):
             # Active Stop retries still block. Audit records mark the unpaid
             # retry; no suppression can silently admit its final text.
             return d_out(event, reason)
-    except (OSError, ValueError, KeyError, TypeError, RecursionError) as error:
+    except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:
         return d_out(event, 'makoto transport/contract failure: ' + str(error))

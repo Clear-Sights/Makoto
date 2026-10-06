@@ -1,5 +1,5 @@
 """One session ledger reconstructed from durable, ordered receipts."""
-from .observed import identity, digest, native_reads, effects, completed, failed, response_text, values, WRITERS
+from .observed import identity, digest, native_reads, effects, completed, failed, response_text, text_of, values, WRITERS, FINAL
 
 
 class Ledger:
@@ -16,6 +16,7 @@ class Ledger:
         self.aliases = {}
         self.mutations = {}
         self.unknown = []
+        self.relay_values = []
 
     def subject(self, value, event):
         result = identity(value, event)
@@ -50,6 +51,8 @@ class Ledger:
                     raise ValueError('definition revision is immutable')
                 if not same:
                     self.definitions.append(item)
+        if name in FINAL and admitted:
+            self.relay_values.append({'subject': 'id:assistant:' + str(self.q), 'values': values(text_of(event))})
         if name == 'PreToolUse':
             tid = event.get('tool_use_id')
             if not admitted or not tid or tid in self.seen or tid in self.pending:
@@ -74,6 +77,8 @@ class Ledger:
             self.seen.add(tid)
             reserved = self.reservations.get(tid, {})
             no_effect = meta.get('no_effect') is True
+            if reserved and not no_effect:
+                self.relay_values.append({'subject': next(iter(reserved)), 'values': values(text_of(pre))})
             if not no_effect:
                 for subject in set(reserved) | {self.subject(x['subject'], pre) for x in effects(event)}:
                     place = reserved.get(subject, meta.get('destination', self.place(event)))
@@ -91,9 +96,13 @@ class Ledger:
             wrapped = meta.get('reads', [])
             overridden = {(self.subject(x['subject'], pre), x.get('selector', 'content')) for x in wrapped}
             specs = [x for x in specs if (self.subject(x['subject'], pre), x.get('selector', 'content')) not in overridden] + wrapped
-            if pre.get('tool_name') in WRITERS:
+            if pre.get('tool_name') in WRITERS or reserved:
                 specs = []  # Writes never create source receipts, even with read metadata.
             text = response_text(event.get('tool_response'))
+            if pre.get('tool_name') in ('Agent', 'Task') and not wrapped:
+                specs.append({'subject': 'id:relay:' + tid, 'complete': True, 'role': 'relay', 'producer': tid})
+            if pre.get('tool_name') == 'Bash' and not native_reads(pre, event) and not pre.get('makoto', {}).get('invocation') and not reserved:
+                self.unknown.append({'q': self.q, 'reason': 'general Bash subject/effects need host instrumentation'})
             # Every completed Bash invocation has an exact native command response.
             if pre.get('tool_name') == 'Bash':
                 specs.append({'subject': 'command:' + digest([pre.get('cwd'), pre.get('tool_input', {}).get('command'), pre.get('makoto', {}).get('place', {})]),
