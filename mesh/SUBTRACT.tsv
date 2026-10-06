@@ -11,3 +11,7 @@ mesh/types.py	extract.body_calls	Bottom-up inventory/extraction or SCC seed gene
 mesh/types.py	extract.body_calls.walk	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
 mesh/types.py	extract.expression_type	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
 mesh/types.py	write	Bottom-up inventory/extraction or SCC seed generator; no final-program requirement needs this unit. Remove from seed; retain only reference.
+plugin/makoto2/denominators.py	cardinality	Subsumed by shared SPEC/OTHER POINT comparisons; dev twins remain named after removal.
+plugin/makoto2/denominators.py	direction	Subsumed by shared SPEC/OTHER POINT comparisons; dev twins remain named after removal.
+plugin/makoto2/denominators.py	independent_evaluation	Subsumed by shared SPEC/OTHER POINT comparisons; dev twins remain named after removal.
+plugin/makoto2/denominators.py	unknown_probe	Subsumed by shared SPEC/OTHER POINT comparisons; dev twins remain named after removal.

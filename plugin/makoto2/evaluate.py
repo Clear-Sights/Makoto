@@ -134,9 +134,8 @@ def _acts(args):
 
 def family_findings(record, event, cfg):
     """One owner per register predicate; return all identities before arbitration."""
-    from makoto2 import family_other
-    for module in (family_spec, family_lineage, family_other, family_switch):
-        yield from module.findings(record, event, cfg)
+    from makoto2 import four_checks
+    yield from four_checks.findings(record, event, cfg)
 
 
 def evaluate(rows, record, event) -> Optional[dict]:
@@ -408,6 +407,7 @@ def number_owes(args, cfg, record, event):
 
 def number_pays(args, cfg, o):
     tokens = {m.group(1) for m in _NUM_RX.finditer(o.output)}
+    tokens.update(t[:5] for t in re.findall(r'(?<!\d)\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?', o.output))
     tokens.update(t[:5] for t in tuple(tokens) if re.fullmatch(r"\d{2}:\d{2}:\d{2}(?:Z)?", t))
     return lambda n: n in tokens
 
@@ -525,10 +525,10 @@ def _unnamed_failures(record, event, cfg):
     if not reports:
         return []
     # Inline code can NAME a failure even though quoted counts are not assertions.
-    tokens = {token.rstrip(".:/-") for token in re.findall(r"[\w./:-]+(?:\[[^\]\n]+\])?", text)}
-    missing = [node for node in _failed_test_subjects(record)
-               if not tokens.intersection({node, node.rsplit("::", 1)[-1].split("[", 1)[0],
-                   os.path.splitext(os.path.basename(node.split("::", 1)[0]))[0]})]
+    from makoto2.claim_reader import named_failure_identities
+    failures = _failed_test_subjects(record)
+    named = named_failure_identities(failures, text)
+    missing = [node for node in failures if node not in named]
     return [("failed", frozenset(missing), "failure-report", -1)] if missing else []
 
 
