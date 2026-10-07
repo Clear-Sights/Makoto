@@ -45,7 +45,7 @@ def switch_holds(ledger, candidate=None):
 @pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'commit', 'push', 'Stop', 'SubagentStop', 'PreDelivery'])
 def test_unrun_code_holds_each_dependent_boundary(boundary):
     ledger = ledger_with_edit()
-    candidate = output('branch.py', boundary)
+    candidate = output('Done' if boundary in ('commit', 'push') else 'branch.py', boundary)
     if boundary in ('commit', 'push'):
         # Shipping needs no literal reference to the edited file.
         assert 'branch.py' not in candidate['tool_input']['command']
@@ -379,11 +379,13 @@ def test_live_failed_real_run_response_pays(tmp_path):
     assert not held(s.send(dict(output('Done'), cwd=str(tmp_path))))
 
 
-@pytest.mark.parametrize('rule,shape,subject', [('a', 'lineage', 'source'), ('b', 'spec', 'unread_identifier'), ('c', 'other point', 'https://source.example.test/item')])
+@pytest.mark.parametrize('rule,shape,subject', [('a', 'lineage', 'unread_91'), ('b', 'spec', 'unread.txt'), ('c', 'other point', 'https://source.example.test/item')])
 def test_other_hold_shapes_appear_in_transport_and_journal(tmp_path, rule, shape, subject):
     s = Session(tmp_path)
     if rule != 'a':
-        s.feed(pair(text=subject if rule == 'c' else 'source'))
+        s.feed(pair(text=subject))
+    if rule == 'c':
+        s.feed(pair('WebFetch', {'url': 'https://other.example.test/item'}, subject, tid='other-point'))
     response = s.send(output(subject))
     assert f'rule {rule} [{shape}]' in response['reason']
     assert next(f for f in s.journal()[-1]['findings'] if f['rule'] == rule)['shape'] == shape
@@ -412,8 +414,10 @@ def test_full_data_readback_pays_reported_shell_edit_shapes(tmp_path, path, befo
     assert held(s.send(output(final)))
     assert s.rules() == {'c', 'd'}
     s.feed(pair(ti={'file_path': path}, text=after, tid='readback'))
+    assert held(s.send(output(final))) and s.rules() == {'d'}
+    s.feed(pair('Run', {'file_path': path}, 'consumed', tid='run'))
     assert not held(s.send(output(final)))
-    assert any(row.get('trace') == ['readback'] and row.get('instruments') == 'makoto2.switch/readback-v1'
+    assert any(row.get('trace') == ['run'] and row.get('instruments') == 'makoto2.switch/execution-v1'
                for row in s.journal()[-1]['snapshot'])
 
 
@@ -426,6 +430,8 @@ def test_data_forms_need_full_readback_after_edit(suffix, reader):
     assert switch_holds(ledger)
     tool, ti = ('Read', {'file_path': path}) if reader == 'Read' else ('Bash', {'command': 'cat ' + path})
     feed(ledger, pair(tool, ti, 'new contents', tid='readback'))
+    assert switch_holds(ledger)
+    feed(ledger, pair('Run', {'file_path': path}, 'consumed', tid='run'))
     assert not switch_holds(ledger)
 
 
@@ -466,7 +472,7 @@ def test_data_readback_near_misses_still_hold(variant):
                         makoto={'reads': [{'subject': 'settings.json', 'complete': True}]})
         feed(ledger, call)
         if variant in ('later_edit', 'pending_edit'):
-            assert not switch_holds(ledger)
+            assert switch_holds(ledger)
             again = edit('settings.json', tid='again')
             feed(ledger, again[:1] if variant == 'pending_edit' else again)
     assert switch_holds(ledger)
@@ -503,8 +509,10 @@ def test_mixed_data_and_code_commit_requires_every_code_run():
     feed(ledger, pair(ti={'file_path': 'settings.json'}, tid='data'))
     feed(ledger, pair(ti={'file_path': 'second.py'}, tid='code'))
     feed(ledger, pair('Run', {'file_path': 'first.py'}, 'response', tid='run_first'))
-    assert [f['subject'] for f in switch_holds(ledger, output('Done', 'commit'))] == ['second.py']
+    assert [f['subject'] for f in switch_holds(ledger, output('Done', 'commit'))] == ['settings.json', 'second.py']
     feed(ledger, pair('Run', {'file_path': 'second.py'}, 'response', tid='run_second'))
+    assert [f['subject'] for f in switch_holds(ledger, output('Done', 'commit'))] == ['settings.json']
+    feed(ledger, pair('Run', {'file_path': 'settings.json'}, 'consumed', tid='config'))
     assert not switch_holds(ledger, output('Done', 'commit'))
 
 
@@ -537,6 +545,9 @@ def test_wollemi_record_shape_passes_without_readback(tmp_path):
         ev['tool_input']['content'] = 'The result is saved.'
     s.feed(change)
     s.feed(pair(ti={'file_path': 'origins/araucaria.txt'}, text='pelican_seed', tid='origin'))
+    assert held(s.send(output('out/wollemi.md records the result from pelican_seed.')))
+    assert s.rules() == {'a', 'b'}
+    s.feed(pair(ti={'file_path': 'out/wollemi.md'}, text='The result is saved.', tid='state'))
     assert not held(s.send(output('out/wollemi.md records the result from pelican_seed.')))
     assert not any(row.get('instruments', '').startswith('makoto2.switch/')
                    for row in s.journal()[-1]['snapshot'])
@@ -558,6 +569,9 @@ def test_commit_after_edit_preserves_script_obligations(tmp_path, path, expect_h
     s = Session(tmp_path)
     s.send(event('UserPromptSubmit', prompt='git commit -m #!/bin/sh'))
     s.feed(pair(text='The result is saved.'))
+    if path == 'worker':
+        s.feed(pair(ti={'file_path': '/bin/sh'}, text='interpreter', tid='interpreter'))
+        s.feed(pair('Run', {'file_path': '/bin/sh'}, 'ready', tid='interpreter-run'))
     change = edit(path)
     for ev in change:
         ev['tool_input']['content'] = '#!/bin/sh\necho saved\n' if path == 'worker' else 'The result is saved.'

@@ -31,13 +31,17 @@ def test_each_name_form_unread_and_read(tmp_path, form, value, wrapper):
     s = Session(tmp_path)
     s.feed(pair())
     assert held(s.send(output(text)))
-    assert 'b' in s.rules()
-    assert any(f['rule'] == 'b' and f['subject'] == value for f in s.journal()[-1]['findings'])
+    assert 'a' in s.rules()
+    assert any(f['rule'] == 'a' and f['subject'] == value for f in s.journal()[-1]['findings'])
     s.feed(pair(text=value, tid='name'))
     response = s.send(output(text))
     if form == 'url':
-        assert held(response) and s.rules() == {'c'}
+        assert held(response) and s.rules() == {'b'}
         s.feed(pair('WebFetch', {'url': value}, value, tid='web'))
+        assert not held(s.send(output(text)))
+    elif form in ('path', 'dotted_module'):
+        assert held(response) and s.rules() == {'b'}
+        s.feed(pair(ti={'file_path': value}, text='actual content', tid='thing'))
         assert not held(s.send(output(text)))
     else:
         assert not held(response), response
@@ -54,8 +58,13 @@ def test_precision_values_and_words_do_not_trigger_b(tmp_path, value):
     assert names(value) == []
     s = Session(tmp_path)
     s.feed(pair())
+    response = s.send(output(value))
+    plain = {'nondictionaryword', '日本語', 'ordinary', 'defaced', 'acceded',
+             'well-considered', 'twenty-three', 'Error: file not found', '1/2'}
+    assert s.rules() == (set() if value in plain else {'a'})
+    assert held(response) == (value not in plain)
+    s.feed(pair(text=value, tid='literal'))
     assert not held(s.send(output(value)))
-    assert 'b' not in s.rules()
 
 
 @pytest.mark.parametrize('value', ['731', '2 ms/kg', 'twenty-three', 'nondictionaryword', '"exact phrase"', '```py\nx = 19\n```'])
@@ -82,10 +91,9 @@ def test_written_or_edited_file_in_final_is_output(tmp_path, writer, reference):
     assert not held(s.send(ev))
     s.send(dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'ok', 'exitCode': 0}))
     if writer == 'NotebookEdit':
-        # Output names remain exempt from b, while executable edits must pay d.
+        # Execution pays d; the separate file read below establishes its state.
         s.feed(pair('NotebookExecute', {'notebook_path': 'out.txt'}, 'source data', tid='run'))
-    else:
-        s.feed(pair(ti={'file_path': 'out.txt'}, text='source data', tid='readback'))
+    s.feed(pair(ti={'file_path': 'out.txt'}, text='source data', tid='readback'))
     assert not held(s.send(output(reference)))
     assert s.rules() == set()
 
@@ -105,15 +113,16 @@ def test_output_reference_still_needs_original_artifact(tmp_path):
     s.feed(pair(ti={'file_path': 'out.txt'}, text='source data', tid='out-readback'))
     s.feed(pair(ti={'file_path': 'source.txt'}, text='source data', tid='source-readback'))
     for retry in (False, True):
-        assert held(s.send(dict(output('out.txt'), stop_hook_active=retry)))
-        assert s.rules() == {'a'}
+        # DESIGN D4: the readback establishes its own file, without sourcing its bytes.
+        assert not held(s.send(dict(output('out.txt'), stop_hook_active=retry)))
+        assert s.rules() == set()
 
 
 def test_output_exemption_cannot_hide_unread_name_in_content(tmp_path):
     s = Session(tmp_path)
     s.feed(pair())
     assert held(s.send(output('unread_subject', 'Write')))
-    assert {f['subject'] for f in s.journal()[-1]['findings'] if f['rule'] == 'b'} == {'unread_subject'}
+    assert {f['subject'] for f in s.journal()[-1]['findings'] if f['rule'] == 'a'} == {'unread_subject'}
 
 
 def test_own_file_contents_never_pay_unread_names(tmp_path):
@@ -131,8 +140,8 @@ def test_own_file_contents_never_pay_unread_names(tmp_path):
     for prior in pair(ti={'file_path': 'out.txt'}, text='unread_subject', tid='own'):
         ledger.ingest(prior)
     findings, _ = evaluate(ledger, output('out.txt unread_subject'))
-    # The independent original reading clears a; the own file never pays b.
-    assert {f['rule'] for f in findings} == {'b'}
+    # An unrelated reading cannot supply origin for a literal copied from own output.
+    assert {f['rule'] for f in findings} == {'a'}
     assert not any(f['rule'] == 'b' and f['subject'] == 'out.txt' for f in findings)
 
 
@@ -167,8 +176,11 @@ def test_name_variants_still_hold(tmp_path, text, value):
     s = Session(tmp_path)
     s.feed(pair())
     assert held(s.send(output(text)))
-    assert 'b' in s.rules()
+    assert 'a' in s.rules()
     s.feed(pair(text=text, tid='name'))
+    if any(span.kind == 'path' for span in names(text)):
+        assert held(s.send(output(text))) and s.rules() == {'b'}
+        s.feed(pair(ti={'file_path': value}, text='actual content', tid='thing'))
     assert not held(s.send(output(text)))
 
 
@@ -190,6 +202,8 @@ def test_quoted_path_with_spaces_is_one_exact_name(tmp_path, path):
     assert held(s.send(output(text)))
     assert any(f['rule'] == 'b' and f['subject'] == path for f in s.journal()[-1]['findings'])
     s.feed(pair(text=text, tid='name'))
+    assert held(s.send(output(text))) and s.rules() == {'b'}
+    s.feed(pair(ti={'file_path': path}, text='actual content', tid='thing'))
     assert not held(s.send(output(text)))
 
 

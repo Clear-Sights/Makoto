@@ -38,6 +38,8 @@ def test_located_twins(boundary, subject, case, fresh):
     ledger.ingest(event('UserPromptSubmit', prompt=claim))
     feed(ledger, pair(text='source data', tid='original'))
     old = '/w/left/' + subject if case == 'path' else target
+    if case == 'path':
+        ledger.ingest(event('Register', makoto={'aliases': [{'subject': target, 'alias': old}]}))
     read = pair(ti={'file_path': old}, tid='old')
     read[0]['makoto'] = {'place': {case: 'violet'} if point else {}}
     feed(ledger, read)
@@ -58,7 +60,7 @@ def test_no_reading_is_not_other_point(boundary):
     ledger = Ledger()
     feed(ledger, pair())
     findings, _ = evaluate(ledger, candidate('/w/unseen/quartz.txt', boundary))
-    assert {f['rule'] for f in findings} == {'b'}
+    assert {f['rule'] for f in findings} == {'a', 'b'}
 
 
 @pytest.mark.parametrize('command,claim', [
@@ -115,6 +117,7 @@ def test_native_admission_twins(tmp_path, boundary, subject, fresh):
     session = Session(tmp_path)
     target = '/w/right/' + subject
     session.send(event('UserPromptSubmit', prompt=target))
+    session.send(event('Register', makoto={'aliases': [{'subject': target, 'alias': '/w/left/' + subject}]}))
     session.feed(pair(ti={'file_path': '/w/left/' + subject}))
     if fresh:
         session.feed(pair(ti={'file_path': target}, tid='right'))
@@ -150,6 +153,7 @@ def test_same_absolute_path_accepts_equivalent_spelling(spelling):
 def test_shell_selection_and_read_change_order(command, paid):
     ledger = Ledger()
     ledger.ingest(event('UserPromptSubmit', prompt='/w/fern.txt'))
+    ledger.ingest(event('Register', makoto={'aliases': [{'subject': '/w/fern.txt', 'alias': '/other/fern.txt'}]}))
     feed(ledger, pair(ti={'file_path': '/other/fern.txt'}, tid='other'))
     feed(ledger, pair('Bash', {'command': command}, 'source data'))
     findings, _ = evaluate(ledger, candidate('/w/fern.txt', 'Stop'))

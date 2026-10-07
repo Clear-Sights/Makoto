@@ -19,7 +19,7 @@ def windows_paths(monkeypatch):
     # Patch only the product modules, leaving pytest's real filesystem alone.
     windows = SimpleNamespace(path=ntpath, sep='\\', getcwd=lambda: 'D:\\work',
                               access=os.access, X_OK=os.X_OK)
-    for module in (observed, evaluation, switch):
+    for module in (observed, switch):
         monkeypatch.setattr(module, 'os', windows)
 
 
@@ -80,6 +80,8 @@ def test_spaced_output_keeps_recorded_separator_exemption(windows_paths, referen
     for ev in change:
         ev['tool_input']['content'] = 'source data'
     feed(ledger, change)
+    assert {f['rule'] for f in evaluation.evaluate(ledger, output(reference))[0]} == {'a', 'b'}
+    feed(ledger, pair(ti={'file_path': 'my report.txt'}, text='source data', tid='readback'))
     findings, _ = evaluation.evaluate(ledger, output(reference))
     assert not findings
     findings, _ = evaluation.evaluate(ledger, output(reference + 'Extra'))
@@ -157,5 +159,7 @@ def test_cross_drive_spaced_output_exemption(windows_paths):
         ev['tool_input']['content'] = 'source data'
     feed(ledger, change)
     candidate = dict(output('C:/reports/my report.txt'), cwd='D:\\work')
+    assert {f['rule'] for f in evaluation.evaluate(ledger, candidate)[0]} == {'a', 'b'}
+    feed(ledger, pair(ti={'file_path': 'C:/reports/my report.txt'}, text='source data', tid='readback'))
     findings, _ = evaluation.evaluate(ledger, candidate)
     assert not findings

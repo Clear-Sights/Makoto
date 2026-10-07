@@ -52,7 +52,8 @@ def test_original_reader_before_edit_is_lineage(reader, reverse):
         segments.reverse()
     call(ledger, '; '.join(segments), 'original_mark changed_mark')
     findings, _ = evaluate(ledger, output('Done'))
-    assert ('a' in {f['rule'] for f in findings}) == reverse
+    assert 'a' not in {f['rule'] for f in findings}
+    assert bool(ledger.source_readings()) == (not reverse)
     assert switch_holds(ledger)
     # Original-read existence does not make now-stale aggregate bytes fresh.
     assert not ledger.witnesses('original_mark', 'identifier')
@@ -73,7 +74,9 @@ def test_readback_after_data_edit_and_reversed_order(reverse):
     if reverse:
         segments.reverse()
     call(ledger, '; '.join(segments))
-    assert bool(switch_holds(ledger)) == reverse
+    assert switch_holds(ledger)  # DESIGN D18: readback is never execution.
+    call(ledger, 'consumer --config loom.toml', tid='run')
+    assert not switch_holds(ledger)
 
 
 @pytest.mark.parametrize('command,paid', [
@@ -170,10 +173,10 @@ def test_unread_assignment_and_version_tag_hold(value):
     ledger = Ledger()
     feed(ledger, pair(text='unrelated source'))
     findings, _ = evaluate(ledger, output('field=' + value))
-    assert any(f['rule'] == 'b' and f['subject'] == value for f in findings)
+    assert any(f['rule'] == 'a' and f['subject'] == value for f in findings)
     feed(ledger, pair(text=value, tid='exact'))
     findings, _ = evaluate(ledger, output('field=' + value))
-    assert not any(f['rule'] == 'b' for f in findings)
+    assert not any(f['rule'] == 'a' for f in findings)
 
 
 @pytest.mark.parametrize('compiler,source', [('cc', 'loom.c'), ('c++', 'loom.cpp'), ('rustc', 'loom.rs')])
@@ -251,6 +254,8 @@ def test_markup_tags_and_commit_prose_do_not_become_paths():
     assert names('<strong>18</strong>') == []
     ledger = Ledger()
     feed(ledger, pair(text='maple.log.Reader'))
+    feed(ledger, pair(ti={'file_path': 'maple.log.Reader'}, text='class declaration', tid='thing'))
+    feed(ledger, pair('Run', {'file_path': 'maple.log.Reader'}, 'response', tid='run'))
     findings, _ = evaluate(ledger, event('PreToolUse', tool_name='Bash', tool_input={'command': "git commit -am 'Update maple.log.Reader'"}))
     assert not findings
     assert [s.text for s in names('`my report.txt`')] == ['my report.txt']
@@ -308,6 +313,9 @@ def test_host_effects_and_complete_reads_keep_their_call_scope():
     assert switch_holds(ledger)
     events = pair('Bash', {'command': 'opaque_read'}, 'full bytes', tid='host-read')
     events[1]['makoto'] = {'reads': [{'subject': 'loom.toml', 'complete': True}]}
+    feed(ledger, events)
+    assert switch_holds(ledger)
+    events = pair('Run', {'file_path': 'loom.toml'}, 'consumed', tid='run')
     feed(ledger, events)
     assert not switch_holds(ledger)
 
@@ -374,7 +382,7 @@ def test_formatter_write_participates_in_order(reverse):
 def test_package_version_before_sentence_verb_is_not_a_physical_unit(tmp_path):
     s = Session(tmp_path)
     s.feed(pair(text='Sapling 8.4'))
-    assert held(s.send(output('Sapling 8.4 is a tool.')))
-    assert s.rules() == {'c'}
+    assert not held(s.send(output('Sapling 8.4 is a tool.')))
+    assert s.rules() == set()
     s.feed(pair('WebSearch', {'query': 'Sapling 8.4'}, 'Sapling 8.4 is a tool.', tid='online'))
     assert not held(s.send(output('Sapling 8.4 is a tool.')))

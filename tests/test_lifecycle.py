@@ -108,6 +108,6 @@ def test_package_current_bytes_and_fresh_install(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         build_package(ROOT, ROOT / 'package-output')
     monkeypatch.setenv('MAKOTO_ADAPTER', 'inferred')
-    response = fresh(ROOT / 'plugin', tmp_path / 'account', {'session_id': 'fresh', 'hook_event_name': 'Stop', 'last_assistant_message': 'a claim'})
+    response = fresh(ROOT / 'plugin', tmp_path / 'account', {'session_id': 'fresh', 'hook_event_name': 'Stop', 'last_assistant_message': 'unread_731'})
     assert response.get('decision') == 'block'
     assert 'rule a' in response['reason']  # Fresh account has read no artifact.

@@ -112,12 +112,14 @@ def test_clean_stop_has_no_questions_across_retries_and_turns(tmp_path, boundary
         s.send(event('UserPromptSubmit', prompt='next turn'))
 
 
-@pytest.mark.parametrize('text,rule', [('source data', 'a'), ('unread_subject', 'b'), ('https://example.test/a', 'c')])
+@pytest.mark.parametrize('text,rule', [('unread_91', 'a'), ('unread.txt', 'b'), ('https://example.test/a', 'c')])
 @pytest.mark.parametrize('boundary', ['Write', 'Stop'])
 def test_rule_holds_take_precedence_over_questions(tmp_path, text, rule, boundary):
     s = Session(tmp_path)
     if rule != 'a':
-        s.feed(pair(text=text if rule == 'c' else 'source data'))
+        s.feed(pair(text=text))
+    if rule == 'c':
+        s.feed(pair('WebFetch', {'url': 'https://other.test/a'}, text, tid='other-point'))
     for active in (False, True, True):
         response = s.send(dict(output(text, boundary), stop_hook_active=active))
         assert held(response)

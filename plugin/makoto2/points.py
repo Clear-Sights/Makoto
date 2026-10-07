@@ -3,7 +3,7 @@ import re
 import shlex
 from urllib.parse import urlsplit
 
-from .observed import WRITERS, programs, reading_subjects
+from .observed import WRITERS, programs, reading_subjects, network_targets
 from .paths import normalized_path, program_name
 from .precision import names
 
@@ -33,6 +33,8 @@ def read_locations(pre):
     point = dict(pre.get('makoto', {}).get('place', {}))
     point = {k: str(v) for k, v in point.items()}
     subjects = reading_subjects(pre)
+    if pre.get('tool_name') != 'WebSearch':
+        subjects += [s for s in network_targets(pre, {}) if s.startswith(('https://', 'http://'))]
     if pre.get('tool_name') == 'Bash':
         for words in programs(pre):
             if program_name(words[0]) == 'git' and len(words) > 2 and words[1] == 'show':
@@ -45,40 +47,37 @@ def read_locations(pre):
     return [located(s, pre, point) for s in subjects if isinstance(s, str)]
 
 
-def claim_locations(event):
-    """Writer destinations and replaced text are not claims about their contents."""
-    ti = event.get('tool_input', {})
-    if event.get('tool_name') in WRITERS:
-        text = '\n'.join(str(ti[k]) for k in ('content', 'new_string', 'new_source') if k in ti)
-        text += '\n' + '\n'.join(e.get('new_string', '') for e in ti.get('edits', []))
-    elif event.get('tool_name') == 'Bash':
-        try:
-            words = shlex.split(ti.get('command', ''))
-        except ValueError:
-            return []
-        text = '\n'.join(words[i + 1] for i, word in enumerate(words[:-1]) if word in ('-m', '--message'))
-        text += '\n' + '\n'.join(w.split('=', 1)[1] for w in words if w.startswith('--message='))
-    else:
-        text = event.get('last_assistant_message', '')
+def claim_locations(event, ledger=None):
+    """Locate only authored claim paths, never writer destinations or old text."""
+    from .claims import authored_text, claims, literals
+    text, spans = claims(ledger, event) if ledger is not None else (authored_text(event), literals(authored_text(event)))
     result = []
-    for line in text.splitlines():
-        point = coordinates(line)
-        for span in names(line):
-            if span.kind not in ('path', 'url'):
-                continue
-            if any(m.start() <= span.start < m.end() for m in COORDINATE.finditer(line)):
-                continue
-            result.append((span.text, located(span.text, event, point)))
+    for span in spans:
+        if span.kind not in ('path', 'url'):
+            continue
+        start = text.rfind('\n', 0, span.start) + 1
+        end = text.find('\n', span.end)
+        line = text[start:end if end >= 0 else len(text)]
+        if any(start + m.start() <= span.start < start + m.end() for m in COORDINATE.finditer(line)):
+            continue
+        result.append((span.text, located(span.text, event, coordinates(line))))
     return result
+
+
+def related_readings(ledger, path):
+    """Same subject identity or a host-recorded copy relation, never basename."""
+    paths = {path}
+    while True:
+        expanded = paths | {p for pair in ledger.point_aliases if paths.intersection(pair) for p in pair}
+        if expanded == paths:
+            return [r for r in ledger.point_readings if r['path'] in paths]
+        paths = expanded
 
 
 def other_point(ledger, event):
     findings = []
-    for spelling, (path, point) in claim_locations(event):
-        # Equal final path components identify a possible other copy. A wholly
-        # unread subject belongs to a/b, never to this extension of c.
-        related = [r for r in ledger.point_readings
-                   if r['path'].rsplit('/', 1)[-1] == path.rsplit('/', 1)[-1]]
+    for spelling, (path, point) in claim_locations(event, ledger):
+        related = related_readings(ledger, path)
         if not related:
             continue
         subject = ledger.subject(path, event) if not spelling.startswith(('http://', 'https://')) else spelling

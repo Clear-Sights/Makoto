@@ -7,7 +7,7 @@ from .observed import (WRITERS, FINAL, identity, effects, failed,
 from .precision import contains, VERSIONED, package_parts
 from .switch import edited_forms, execution_subjects, run_output, full_read_subjects, compiled_subjects
 from .shell import selected_segments
-from .points import read_locations
+from .points import read_locations, located
 
 
 class Ledger:
@@ -35,6 +35,8 @@ class Ledger:
         self.shebangs = set()
         self.compiled = {}
         self.point_readings = []
+        self.definitions = []
+        self.point_aliases = []
 
     def changed_code(self):
         result = dict(self.code_changes)
@@ -180,6 +182,10 @@ class Ledger:
     def ingest(self, event, admitted=True):
         self.q += 1
         name, meta = event['hook_event_name'], event.get('makoto', {})
+        if admitted:
+            self.definitions.extend(meta.get('definitions', []))
+            self.point_aliases.extend(frozenset((located(a['subject'], event)[0], located(a['alias'], event)[0]))
+                                      for a in meta.get('aliases', []))
         if meta.get('turn_id') is not None:
             self.turn = str(meta['turn_id'])
         elif name == 'UserPromptSubmit':

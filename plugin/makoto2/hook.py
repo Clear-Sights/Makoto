@@ -25,6 +25,12 @@ def d_in(raw):
     for key in ('definitions', 'reads', 'effects', 'obligations', 'dependencies', 'aliases'):
         if key in meta and (not isinstance(meta[key], list) or any(not isinstance(item, dict) for item in meta[key])):
             raise ValueError('makoto.' + key + ' must be an object list')
+    for alias in meta.get('aliases', []):
+        if any(not isinstance(alias.get(k), str) or not alias[k] for k in ('subject', 'alias')):
+            raise ValueError('aliases require subject and alias strings')
+    for definition in meta.get('definitions', []):
+        if any(not isinstance(definition.get(k), str) or not definition[k] for k in ('subject', 'definition')):
+            raise ValueError('definitions require subject and definition strings')
     for key in ('place', 'destination', 'points', 'invocation'):
         if key in meta and not isinstance(meta[key], dict):
             raise ValueError('makoto.' + key + ' must be an object')

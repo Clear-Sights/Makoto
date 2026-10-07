@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import shlex
 
 import pytest
 
@@ -37,7 +38,7 @@ def output(text='source data', boundary='Stop', tid='step'):
     elif boundary == 'NotebookEdit':
         inputs = {'notebook_path': 'out.txt', 'new_source': text}
     elif boundary in ('commit', 'push'):
-        inputs = {'command': 'git ' + boundary + (' -m "source data"' if boundary == 'commit' else '')}
+        inputs = {'command': 'git ' + boundary + (' -m ' + shlex.quote(text) if boundary == 'commit' else '')}
         boundary = 'Bash'
     return event('PreToolUse', tool_name=boundary, tool_use_id=tid, tool_input=inputs)
 
@@ -67,20 +68,21 @@ class Session:
 @pytest.mark.parametrize('present', [False, True])
 def test_all_boundaries_and_retries(tmp_path, boundary, present):
     s = Session(tmp_path)
-    # Supplied destinations and executable spelling are given, not unread.
+    # Destination and command syntax do not become authored claim literals.
     s.send(event('UserPromptSubmit', prompt='out.txt git commit push -m'))
     if present:
-        s.feed(pair())
+        s.feed(pair(text='literal_91'))
     # Seed identical native journal records in-process; all admission/retry
     # boundaries below still cross the real CLI transport.
     s.live = True
-    ev = output(boundary=boundary)
+    ev = output('literal_91', boundary=boundary)
+    expected_hold = not present and boundary != 'push'
     for index, retry in enumerate((False, True, True)):
         ev['tool_use_id'] = f'step-{index}'
         ev['stop_hook_active'] = retry
         response = s.send(ev)
-        assert held(response) == (not present), response
-        if not present:
+        assert held(response) == expected_hold, response
+        if expected_hold:
             assert 'rule a' in str(response)
             assert 'read an original artifact' in str(response)
             assert s.journal()[-1]['stop_hook_active_unpaid'] == retry
@@ -101,14 +103,14 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
 @pytest.mark.parametrize('origin', ['none', 'assistant', 'written', 'worker'])
 def test_a_original_reading_required(tmp_path, origin):
     s = Session(tmp_path)
-    s.send(event('UserPromptSubmit', prompt='out.txt 731'))
+    s.send(event('UserPromptSubmit', prompt='out.txt'))
     if origin == 'assistant':
         s.send(event('AssistantMessage', content='731'))
     elif origin == 'written':
         # Rejected writes do not mutate; host transcript may contain executed old writes.
         write = output('731', 'Write')
         s.feed(pair())
-        assert not held(s.send(write))
+        assert held(s.send(write))
         s.send(dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
         mutation = output('source data', 'Write', tid='invalidate')
         mutation['tool_input']['file_path'] = 'source.txt'
@@ -128,8 +130,11 @@ def test_b_absent_and_present_exact_form(tmp_path, value):
     s = Session(tmp_path)
     s.feed(pair())
     assert held(s.send(output(value)))
-    assert 'b' in s.rules()
+    assert 'a' in s.rules()
     s.feed(pair(text=value, tid='value'))
+    if value == 'dir/file.txt':
+        assert held(s.send(output(value))) and s.rules() == {'b'}
+        s.feed(pair(ti={'file_path': value}, tid='thing'))
     assert not held(s.send(output(value)))
 
 
@@ -138,7 +143,8 @@ def test_b_near_miss_spelling_is_not_regenerated(tmp_path, observed, proposed):
     s = Session(tmp_path)
     s.feed(pair(ti={'file_path': 'carrier.txt'}, text=observed))
     assert held(s.send(output(proposed)))
-    assert 'b' in s.rules()
+    # DESIGN D15: a different spelling in carrier bytes is not literal origin.
+    assert 'a' in s.rules()
 
 
 def test_b_only_assistant_text_never_pays(tmp_path):
@@ -147,7 +153,7 @@ def test_b_only_assistant_text_never_pays(tmp_path):
     s.send(event('AssistantMessage', content='id_731'))
     for _ in range(3):
         assert held(s.send(output('id_731')))
-        assert 'b' in s.rules()
+        assert s.rules() == {'a'}
     s.feed(pair(text='id_731', tid='actual'))
     assert not held(s.send(output('id_731')))
 
@@ -155,8 +161,9 @@ def test_b_only_assistant_text_never_pays(tmp_path):
 def test_user_copied_span_is_given_but_still_needs_artifact(tmp_path):
     s = Session(tmp_path)
     s.send(event('UserPromptSubmit', prompt='Use `user_value_91`'))
-    assert held(s.send(output('`user_value_91`')))
-    assert s.rules() == {'a'}
+    # CAUSES: user messages are source statements; own answers are not.
+    assert not held(s.send(output('`user_value_91`')))
+    assert s.rules() == set()
     s.feed(pair())
     assert not held(s.send(output('`user_value_91`')))
 
@@ -168,6 +175,9 @@ def test_agnostic_tool_response_and_prior_input(tmp_path, tool):
     if tool == 'Bash':
         ti = {'command': 'cat source.txt', 'query': 'query_91'}
     s.feed(pair(tool, ti, 'observed_92'))
+    assert held(s.send(output('query_91 observed_92')))
+    assert s.rules() == {'a'}
+    s.feed(pair(text='query_91', tid='returned'))
     assert not held(s.send(output('query_91 observed_92')))
 
 
@@ -175,23 +185,26 @@ def test_agnostic_tool_response_and_prior_input(tmp_path, tool):
 @pytest.mark.parametrize('tool', ['WebFetch', 'WebSearch', 'Bash'])
 def test_c_external_subject_needs_current_online_call(tmp_path, subject, tool):
     s = Session(tmp_path)
-    s.feed(pair(text=subject))  # Read locally: b paid, c unpaid.
-    assert held(s.send(output(subject)))
-    assert s.rules() == {'c'}
+    s.feed(pair(text=subject))  # Origin is paid; a named page still needs its own reading.
+    assert held(s.send(output(subject))) == subject.startswith('https://')
+    assert s.rules() == ({'b'} if subject.startswith('https://') else set())
     ti = {'url': subject, 'prompt': 'source data'} if tool == 'WebFetch' else {'query': subject} if tool == 'WebSearch' else {'command': 'curl https://example.test/a'}
     s.feed(pair(tool, ti, subject, tid='online'))
+    if tool == 'WebSearch' and subject.startswith('https://'):
+        assert held(s.send(output(subject))) and s.rules() == {'b'}
+        s.feed(pair('WebFetch', {'url': subject}, subject, tid='page'))
     assert not held(s.send(output(subject)))
     s.send(event('UserPromptSubmit', prompt='next turn'))
-    assert held(s.send(output(subject)))
-    assert s.rules() == {'c'}
+    assert not held(s.send(output(subject)))
+    assert s.rules() == set()
 
 
 def test_c_bare_public_project_uses_host_classification(tmp_path):
     s = Session(tmp_path)
     s.send(event('UserPromptSubmit', prompt='project', makoto={'external_subjects': ['PublicWidget']}))
     s.feed(pair(text='PublicWidget'))
-    assert held(s.send(output('PublicWidget')))
-    assert s.rules() == {'c'}
+    assert not held(s.send(output('PublicWidget')))
+    assert s.rules() == set()
     s.feed(pair('WebSearch', {'query': 'PublicWidget'}, 'PublicWidget', tid='online'))
     assert not held(s.send(output('PublicWidget')))
 
@@ -216,7 +229,7 @@ def test_c_network_near_misses(tmp_path, variant):
         call = call[:1]
     s.feed(call)
     assert held(s.send(output(subject)))
-    assert 'c' in s.rules()
+    assert s.rules() == {'b'}
 
 
 def test_prompt_url_still_requires_online(tmp_path):
@@ -224,7 +237,7 @@ def test_prompt_url_still_requires_online(tmp_path):
     s.send(event('UserPromptSubmit', prompt='https://example.test/a'))
     s.feed(pair())
     assert held(s.send(output('https://example.test/a')))
-    assert s.rules() == {'c'}
+    assert s.rules() == {'b'}
 
 
 @pytest.mark.parametrize('tool', ['Write', 'Bash'])
@@ -279,8 +292,8 @@ def test_old_read_is_eligible_until_subject_written(tmp_path):
     assert not held(s.send(output('data_91')))
     s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='mut'))
     assert held(s.send(output('data_91')))
-    # The mutation run is a reading for a; the stale name remains unpaid in b.
-    assert s.rules() == {'b'}
+    # The origin still exists; freshness is exclusively rule c.
+    assert s.rules() == {'c'}
 
 
 def test_session_separation_and_corruption(tmp_path):
@@ -322,8 +335,12 @@ def test_delivery_and_pairs_print_actual_admission(tmp_path):
 def test_git_syntax_is_a_boundary(tmp_path, command):
     s = Session(tmp_path)
     ev = event('PreToolUse', tool_name='Bash', tool_use_id='git', tool_input={'command': command})
-    assert held(s.send(ev))
-    assert 'a' in s.rules()
+    from makoto2.observed import dependent
+    assert dependent(ev)
+    assert not held(s.send(ev))
+    claim = output('unread_91', 'commit', tid='claim')
+    assert held(s.send(claim))
+    assert s.rules() == {'a'}
 
 
 @pytest.mark.parametrize('text,named', [('Error: file not found', False), ('  at worker (file.py:19)', True), ('Traceback (most recent call last):', False)])
@@ -331,8 +348,11 @@ def test_raw_tool_output_checks_names_only(tmp_path, text, named):
     s = Session(tmp_path)
     s.feed(pair())
     assert held(s.send(output(text))) == named
-    assert ('b' in s.rules()) == named
+    assert ('a' in s.rules()) == named
     s.feed(pair('Bash', {'command': 'probe'}, text, tid='log'))
+    if named:
+        s.feed(pair(ti={'file_path': 'file.py:19'}, text='source code', tid='thing'))
+        s.feed(pair('Run', {'file_path': 'file.py:19'}, text='response', tid='run'))
     assert not held(s.send(output(text)))
 
 
@@ -350,7 +370,7 @@ def test_candidate_content_and_tool_metadata_do_not_pay_themselves(tmp_path):
     ev = output('invented_91')
     ev['makoto'] = {'reads': [{'subject': 'invented_91', 'complete': True}]}
     assert held(s.send(ev))
-    assert 'b' in s.rules()
+    assert s.rules() == {'a'}
 
 
 def test_numeric_and_protocol_field_values_are_actual_tool_bytes(tmp_path):
@@ -358,13 +378,18 @@ def test_numeric_and_protocol_field_values_are_actual_tool_bytes(tmp_path):
     call = pair()
     call[1]['tool_response'] = {'data_value': 731}
     s.feed(call)
-    assert not held(s.send(output('data_value 731 file_path')))
+    assert held(s.send(output('data_value 731 file_path')))
+    assert {f['subject'] for f in s.journal()[-1]['findings']} == {'file_path'}
+    assert not held(s.send(output('data_value 731')))
 
 
 def test_pending_tool_input_counts_for_b_but_does_not_create_reading(tmp_path):
     s = Session(tmp_path)
     s.feed(pair())
     s.feed(pair(ti={'file_path': 'new_91.txt'}, tid='pending')[:1])
+    assert held(s.send(output('new_91.txt')))
+    assert s.rules() == {'a', 'b'}
+    s.send(pair(ti={'file_path': 'new_91.txt'}, tid='pending')[1])
     assert not held(s.send(output('new_91.txt')))
 
 
@@ -373,8 +398,8 @@ def test_public_classification_on_candidate_is_host_only(tmp_path):
     s.feed(pair(text='PublicWidget'))
     ev = output('PublicWidget')
     ev['makoto'] = {'external_subjects': ['PublicWidget']}
-    assert held(s.send(ev))
-    assert s.rules() == {'c'}
+    assert not held(s.send(ev))
+    assert s.rules() == set()
 
 
 @pytest.mark.parametrize('command', ['python3 script.py', '/w/script.py', 'bash script.py'])
@@ -395,8 +420,8 @@ def test_offline_package_command_does_not_pay_online(tmp_path):
     s = Session(tmp_path)
     s.feed(pair(text='widget@1.2.3'))
     s.feed(pair('Bash', {'command': 'npm install --offline widget@1.2.3'}, 'widget@1.2.3', tid='offline'))
-    assert held(s.send(output('widget@1.2.3')))
-    assert s.rules() == {'c'}
+    assert not held(s.send(output('widget@1.2.3')))
+    assert s.rules() == set()
 
 
 def test_malformed_pretool_uses_native_deny_transport(tmp_path):

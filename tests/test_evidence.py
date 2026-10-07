@@ -57,7 +57,7 @@ def test_transcript_includes_earlier_turns_and_excludes_assistant(tmp_path, form
     transcript.write_text(''.join(json.dumps(r)+'\n' for r in rows))
     assert not held(s.send(dict(output('original_91'), transcript_path=str(transcript))))
     assert held(s.send(dict(output('invented_92'), transcript_path=str(transcript))))
-    assert 'b' in s.rules()
+    assert s.rules() == {'a'}
 
 
 def test_transcript_prior_write_invalidates_old_read(tmp_path):
@@ -67,7 +67,7 @@ def test_transcript_prior_write_invalidates_old_read(tmp_path):
     transcript = tmp_path / 'transcript.jsonl'
     transcript.write_text(''.join(json.dumps(r)+'\n' for r in rows))
     assert held(s.send(dict(output('original_91'), transcript_path=str(transcript))))
-    assert {'a', 'b'} <= s.rules()
+    assert s.rules() == {'c'}  # Origin exists; its source changed (DESIGN D17).
 
 
 def test_transcript_import_cannot_overrule_denial(tmp_path):
@@ -100,10 +100,10 @@ def test_detio_store_only_witnessed_verified_bytes(tmp_path, variant):
 def test_host_current_turn_metadata_does_not_import_candidate_receipts(tmp_path):
     s = Session(tmp_path)
     s.feed(pair('WebFetch', {'url': 'https://example.test/a'}, 'data_91'))
-    ev = output('https://example.test/a')
+    ev = output('paid_93')
     ev['makoto'] = {'turn_id': 'next', 'reads': [{'subject': 'invented', 'content': 'paid_93'}]}
     assert held(s.send(ev))
-    assert s.rules() == {'c'}
+    assert s.rules() == {'a'}
 
 
 @pytest.mark.parametrize('text', ['$HOME', 'a*b', 'foo[0]', 'foo()', "don't", 'widget v1.2.3', 'widget version 1.2.3'])
@@ -153,8 +153,8 @@ def test_repeated_identical_prompt_is_a_new_online_turn(tmp_path):
     rows = [prompt] + pair('WebFetch', {'url': 'https://example.test/a'}, 'data_91') + [prompt]
     transcript = tmp_path / 'transcript.jsonl'
     transcript.write_text(''.join(json.dumps(r)+'\n' for r in rows))
-    assert held(s.send(dict(output('https://example.test/a'), transcript_path=str(transcript))))
-    assert s.rules() == {'c'}
+    assert not held(s.send(dict(output('https://example.test/a'), transcript_path=str(transcript))))
+    assert s.rules() == set()
 
 
 @pytest.mark.parametrize('text', ['alpha–beta', '⛄abc', 'foo^bar'])
@@ -167,6 +167,6 @@ def test_markdown_url_still_requires_online_read(tmp_path):
     text = '[source](https://example.test/a)'
     s.feed(pair(text=text))
     assert held(s.send(output(text)))
-    assert s.rules() == {'c'}
+    assert s.rules() == {'b'}
     s.feed(pair('WebFetch', {'url': 'https://example.test/a'}, text, tid='web'))
     assert not held(s.send(output(text)))
