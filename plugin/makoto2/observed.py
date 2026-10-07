@@ -1,4 +1,5 @@
 """Lexical native tool adapters; no subject-specific vocabulary or execution."""
+import ast
 import hashlib
 import json
 import os
@@ -124,8 +125,57 @@ def effects(event):
                     result.append({'subject': words[-2], 'removed': True})
             elif name == 'sed' and any(w.startswith('-i') for w in words[1:]):
                 result.append({'subject': words[-1]})
+            elif re.fullmatch(r'python(?:\d+(?:\.\d+)*)?', name) and '-c' in words:
+                index = words.index('-c') + 1
+                if index < len(words):
+                    result.extend(python_effects(words[index]))
             elif name == 'gofmt' and '-w' in words[1:]:
                 result.extend({'subject': w} for w in words[1:] if w != '-w' and not w.startswith('-'))
+    return result
+
+
+def python_effects(script):
+    """D10/D13: literal pathlib writes in straight-line native Python syntax."""
+    try:
+        body = ast.parse(script).body
+    except SyntaxError:
+        return []
+    modules, constructors, paths, result = set(), set(), {}, []
+
+    def path(node):
+        if isinstance(node, ast.Name):
+            return paths.get(node.id)
+        if isinstance(node, ast.Call) and len(node.args) == 1 and not node.keywords:
+            func = node.func
+            constructor = (isinstance(func, ast.Name) and func.id in constructors or
+                           isinstance(func, ast.Attribute) and func.attr == 'Path'
+                           and isinstance(func.value, ast.Name) and func.value.id in modules)
+            value = node.args[0]
+            if constructor and isinstance(value, ast.Constant) and isinstance(value.value, str):
+                return value.value
+        return None
+
+    for statement in body:
+        if isinstance(statement, ast.Import):
+            modules.update(a.asname or a.name for a in statement.names if a.name == 'pathlib')
+        elif isinstance(statement, ast.ImportFrom) and statement.module == 'pathlib' and not statement.level:
+            constructors.update(a.asname or a.name for a in statement.names if a.name == 'Path')
+        elif isinstance(statement, ast.Assign):
+            value = path(statement.value)
+            for target in statement.targets:
+                if isinstance(target, ast.Name):
+                    paths.pop(target.id, None)
+                    modules.discard(target.id)
+                    constructors.discard(target.id)
+                    if value is not None:
+                        paths[target.id] = value
+        elif isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call):
+            func = statement.value.func
+            if isinstance(func, ast.Attribute) and func.attr in ('write_text', 'write_bytes'):
+                if target := path(func.value):
+                    result.append({'subject': target})
+        else:
+            break  # No effects guessed through branches or control flow.
     return result
 
 
@@ -154,8 +204,11 @@ def reading_subjects(pre):
             # Executing a program reads its response, not the program file.
             # Only direct file readers above inherit that file's own/stale status.
     elif name not in WRITERS | {'Agent', 'Task'}:
-        if target := ti.get('file_path') or ti.get('notebook_path') or ti.get('path'):
-            result.append(target)
+        # D4: input location fields are independent of a tool's name.
+        result.extend(value for key, value in ti.items()
+                      if isinstance(value, str) and value
+                      and not (key == 'program_path' and isinstance(ti.get('argv'), list))
+                      and (key in ('path', 'url', 'uri') or key.endswith(('_path', '_url', '_uri'))))
     return result
 
 

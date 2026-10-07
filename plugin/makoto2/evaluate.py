@@ -58,7 +58,7 @@ def other(ledger, event, text, spans):
     return other_point(ledger, event)
 
 
-BEHAVIOR = re.compile(r'\b(?:returns?|outputs?|prints?|produces?|responds?|runs?|executes?|behaves?|(?:behavior|response)\s+(?:is|was)|works?|fails?|crashes?|raises?|emits?|when (?:run|fed))\b', re.I)
+BEHAVIOR = re.compile(r'\b(?:returns?|outputs?|prints?|produces?|responds?|runs?|executes?|behaves?|(?:behavior|response)\s+(?:is|was)|works|fails?|crashes?|raises?|emits?|when (?:run|fed))\b', re.I)
 
 
 def switch(ledger, event, text, spans):

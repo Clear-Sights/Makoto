@@ -107,3 +107,64 @@ def test_unread_behavior_subject_needs_run():
 def test_only_introduced_values_are_creations(body):
     findings = evaluate(Ledger(), output(body, 'Write'))[0]
     assert not any(f['subject'] == '731' for f in findings)
+
+
+@pytest.mark.parametrize('key', ['record_uri', 'document_url', 'resource_path', 'uri'])
+def test_generic_location_input_needs_successful_matched_result(key):
+    ledger = Ledger()
+    uri = 'mcp://archive/objects/23'
+    rows = pair('mcp__archive__fetch', {key: uri}, 'value', tid='location')
+    ledger.ingest(rows[0])
+    assert 'b' in rules(ledger, uri)
+    ledger.ingest(rows[1])
+    assert rules(ledger, uri) == set()
+    assert 'b' in rules(ledger, 'mcp://archive/objects/24')
+
+
+@pytest.mark.parametrize('response,executed', [
+    ({'content': 'opaque failure', 'isError': True}, False),
+    ({'content': 'opaque failure', 'error': 'transport'}, False),
+    ({'stderr': 'program failure', 'exit_code': 1}, True),
+    ({'content': 'Runner connection failed before process creation'}, True),
+])
+def test_run_failure_uses_structured_status_only(response, executed):
+    ledger = Ledger()
+    rows = pair('mcp__runner__execute', {'program_path': './worker.py', 'argv': ['7']}, tid='run')
+    rows[1]['tool_response'] = response
+    feed(ledger, rows)
+    assert bool(ledger.executions) == executed
+
+
+@pytest.mark.parametrize('path', ['/tmp/object.txt', r'C:\Some Place\object.txt'])
+def test_inline_python_mutation_requires_a_later_read(path):
+    import shlex
+    ledger = Ledger()
+    feed(ledger, pair(ti={'file_path': path}, text='before'))
+    script = f'import pathlib as fs; p=fs.Path({path!r}); p.write_text("after")'
+    feed(ledger, pair('Bash', {'command': 'python3 -c ' + shlex.quote(script)}, '', tid='mutate'))
+    assert rules(ledger, path) == {'c'}
+    feed(ledger, pair(ti={'file_path': path}, text='after', tid='reread'))
+    assert rules(ledger, path) == set()
+
+
+def test_inline_python_unselected_write_does_not_mutate():
+    import shlex
+    ledger = Ledger()
+    feed(ledger, pair(ti={'file_path': '/tmp/object.txt'}, text='before'))
+    script = 'from pathlib import Path\nif False:\n    Path("/tmp/object.txt").write_text("after")'
+    feed(ledger, pair('Bash', {'command': 'python3 -c ' + shlex.quote(script)}, '', tid='conditional'))
+    assert not ledger.mutations
+
+
+def test_acceptance_value_with_work_noun_is_not_behavior():
+    ledger = Ledger()
+    text = 'maintenance order accepts code word work order-56'
+    feed(ledger, pair(text=text))
+    assert rules(ledger, text, 'commit') == set()
+
+
+def test_mcp_run_response_is_distinct_from_session_written_program():
+    ledger = Ledger()
+    feed(ledger, pair('Write', {'file_path': './worker.py', 'content': 'print(731)'}, tid='write'))
+    feed(ledger, pair('mcp__runner__execute', {'program_path': './worker.py', 'argv': []}, 'result_id', tid='run'))
+    assert rules(ledger, './worker.py returns result_id') == set()

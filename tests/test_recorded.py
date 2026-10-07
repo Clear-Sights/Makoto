@@ -14,6 +14,7 @@ CASES = json.loads((Path(__file__).parent / 'data' / 'recorded-cases.json').read
 # (held definitions, prose-only failures, a path given as a value). Strict marks
 # keep a later change from silently flipping one.
 CONFLICTS = {
+    'h110': 'D4/D13: prose-only failure',
     'h009': 'D6/D17: the landing read explicitly records branch grove-preview, not the claimed grove-release.',
     'h030': 'D16: the attachment path is mentioned in a register but never read itself.',
     'h553': 'D16: the attachment path is mentioned in a register but never read itself.',

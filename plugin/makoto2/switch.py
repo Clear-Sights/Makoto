@@ -12,7 +12,7 @@ import shlex
 import ast
 
 from .borrowed import leaves
-from .observed import FINAL, identity, git_action, text_of
+from .observed import failed, FINAL, identity, git_action, text_of
 from .precision import contains, names
 from .shell import redirected_argv
 from .paths import relative_path, path_spellings, program_name
@@ -323,6 +323,11 @@ def run_output(post):
     """An error response counts; an absent response or launch receipt does not."""
     response = post.get('tool_response')
     if response is None:
+        return False
+    # D4/D11: a tool failure is not a program response unless the host
+    # records that a process exited. Nonzero program exits still count.
+    if failed(post) and not (isinstance(response, dict) and any(
+            response.get(key) not in (None, '') for key in ('exitCode', 'exit_code', 'exit'))):
         return False
     if isinstance(response, dict):
         if any(str(response.get(key)) in ('126', '127') for key in ('exitCode', 'exit_code', 'exit')):

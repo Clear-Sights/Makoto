@@ -69,3 +69,11 @@ reuse the entire collection with each decision function disabled separately.
 
 Recorded cases retain their supplied expectations. Strict xfail reasons in
 `test_recorded.py` identify conflicts with the D-lines; they do not change labels.
+
+## Recorded-session refit (round 3)
+
+- `test_recorded[h110]`: strict xfail under D4/D13 (prose-only failure).
+  Contrary to the plan's diagnosis, the exact path was read before mutation
+  and again afterward; the latter matched Read has no structured failure.
+  Its error sentence cannot invalidate the reading under D13. The supplied
+  hold expectation is retained.
