@@ -392,3 +392,13 @@ def test_package_version_before_sentence_verb_is_not_a_physical_unit(tmp_path):
     assert s.rules() == set()
     s.feed(pair('WebSearch', {'query': 'Sapling 8.4'}, 'Sapling 8.4 is a tool.', tid='online'))
     assert not held(s.send(output('Sapling 8.4 is a tool.')))
+
+
+@pytest.mark.parametrize('assign', ['O=/w/out', 'export O=/w/out'])
+@pytest.mark.parametrize('ref', ['$O', '${O}', '"$O"'])
+def test_assigned_variable_names_its_literal_subject(assign, ref):
+    # A path held in a variable assigned earlier in the same command is that literal path.
+    ledger = Ledger()
+    call(ledger, f"{assign}; printf 'new' > {ref}/loom.py; python3 /w/out/loom.py")
+    assert not switch_holds(ledger)
+    assert ordered_segments(f"{assign}; echo '$O' {ref}")[-1][0] == "echo '$O' " + ref.replace('$O', '/w/out').replace('${O}', '/w/out')

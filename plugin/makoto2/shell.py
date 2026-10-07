@@ -152,7 +152,29 @@ def ordered_segments(command):
             return None
         if first in ('if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'until', 'do', 'done', 'case', 'esac', 'function', 'select', '!', 'coproc'):
             return None
-    return tuple(parts)
+    return tuple(expand_assigned(parts))
+
+
+ASSIGN = re.compile(r'(?:export\s+)?([A-Za-z_]\w*)=(\S*)')
+
+
+def expand_assigned(parts):
+    """Expand $NAME and ${NAME} from an earlier literal NAME=value segment of the same command."""
+    env, out = {}, []
+    for text, link in parts:
+        words = text.split("'")
+        text = "'".join(w if i % 2 else re.sub(r'\$(?:\{(\w+)\}|([A-Za-z_]\w*))',
+                        lambda m: env.get(m[1] or m[2], m[0]), w) for i, w in enumerate(words))
+        out.append((text, link))
+        match = ASSIGN.fullmatch(text.strip())
+        if match:
+            try:
+                value = shlex.split(match[2])
+            except ValueError:
+                value = []
+            if len(value) == 1 and re.fullmatch(r'[\w./:@%+,=-]+', value[0]):
+                env[match[1]] = value[0]
+    return out
 
 
 def selected_segments(command, post):
