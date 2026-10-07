@@ -3443,8 +3443,8 @@
     }
    }
   ],
-  "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "expect": "hold",
+  "why": "LABEL by his words: a Task reply is an answer, not a run (\"answered from an answer, not the source\", UjoxyKBmxdEmk9TCBSBN3r); D4/D11/D18",
   "group": [
    "FP",
    "h",
@@ -3787,8 +3787,8 @@
     }
    }
   ],
-  "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "expect": "hold",
+  "why": "LABEL by his words: a Task reply is an answer, not a run; D4/D11/D18",
   "group": [
    "FP",
    "h",
@@ -5266,8 +5266,8 @@
     "last_assistant_message": "At C:\\Field Work\\mycel\\installed\\labelkit-5.3\\card.txt (package labelkit 5.3), mycel.reference.r70 has tray moisture 61 %."
    }
   ],
-  "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "expect": "hold",
+  "why": "LABEL by his words: a Task reply is an answer, not a reading; D4/D17",
   "group": [
    "FP",
    "h",
@@ -7315,8 +7315,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: lineage needs \"the readings themselves\", and an original reading supplies the literal; D15",
   "group": [
    "FN",
    "i",
@@ -7376,8 +7376,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: lineage needs \"the readings themselves\", and an original reading supplies the literal; D15",
   "group": [
    "FN",
    "i",
@@ -7436,8 +7436,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: lineage needs \"the readings themselves\", and an original reading supplies the literal; D15",
   "group": [
    "FN",
    "i",
@@ -7497,8 +7497,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: lineage needs \"the readings themselves\", and an original reading supplies the literal; D15",
   "group": [
    "FN",
    "i",
@@ -7834,8 +7834,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: a bare push asserts nothing (QuYB4ee8hy7hwJm4LF7vdX); D1",
   "group": [
    "FN",
    "i",
@@ -7893,8 +7893,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: a bare push asserts nothing (QuYB4ee8hy7hwJm4LF7vdX); D1",
   "group": [
    "FN",
    "i",
@@ -7952,8 +7952,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: a bare push asserts nothing (QuYB4ee8hy7hwJm4LF7vdX); D1",
   "group": [
    "FN",
    "i",
@@ -8790,8 +8790,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: switch needs \"an act first: feed an input, then read the response\", and a completed run after the change supplies it; D11/D18",
   "group": [
    "FN",
    "i",
@@ -8845,8 +8845,8 @@
     "last_assistant_message": "The research permits application returns run-578 for the standard input."
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: switch needs \"an act first: feed an input, then read the response\", and a completed run after the change supplies it; D11/D18",
   "group": [
    "FN",
    "i",
@@ -8900,8 +8900,8 @@
     "last_assistant_message": "The tidal observatory sensor returns QX-031 for the standard input."
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: switch needs \"an act first: feed an input, then read the response\", and a completed run after the change supplies it; D11/D18",
   "group": [
    "FN",
    "i",
@@ -8980,8 +8980,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "LABEL by his words: switch needs \"an act first: feed an input, then read the response\", and a completed run after the change supplies it; D11/D18",
   "group": [
    "FN",
    "i",
