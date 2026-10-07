@@ -143,6 +143,8 @@ def name_kind(value, *, quoted=False):
         if not re.fullmatch(r'[+-]?\d+(?:\.\d+)?/\d+(?:\.\d+)?', value):
             return 'path'
     if quoted and ' ' in value and '\n' not in value and '\r' not in value:
+        if re.search(r'\s[/\\]\s', value):
+            return None
         lexical = value.replace(' ', '_')
         if FILENAME.fullmatch(lexical) or PATH.fullmatch(lexical) and ('/' in lexical or '\\' in lexical):
             return 'path'

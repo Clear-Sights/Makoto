@@ -9,7 +9,7 @@ from .precision import names
 
 
 # These are coordinate syntax, not words used to classify a subject's meaning.
-COORDINATE = re.compile(r'\b(host|branch|environment|copy|target)(?:[=:]\s*|\s+)[`\"\x27]?([\w./@-]+)')
+COORDINATE = re.compile(r'\b(host|branch|environment|copy|target|mount)(?:[=:]\s*|\s+)[`\"\x27]?([\w./@-]+)')
 
 
 def coordinates(text):

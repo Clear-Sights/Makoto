@@ -379,7 +379,7 @@ def test_live_failed_real_run_response_pays(tmp_path):
     assert not held(s.send(dict(output('Done'), cwd=str(tmp_path))))
 
 
-@pytest.mark.parametrize('rule,shape,subject', [('a', 'lineage', 'unread_91'), ('b', 'spec', 'unread.txt'), ('c', 'other point', 'https://source.example.test/item')])
+@pytest.mark.parametrize('rule,shape,subject', [('a', 'lineage', 'unread_91'), ('b', 'spec', './unread.txt'), ('c', 'other point', 'https://source.example.test/item')])
 def test_other_hold_shapes_appear_in_transport_and_journal(tmp_path, rule, shape, subject):
     s = Session(tmp_path)
     if rule != 'a':
@@ -527,7 +527,8 @@ def test_full_data_replacement_removes_a_previous_shebang_obligation(writer):
     assert switch_holds(ledger)
     feed(ledger, edit('settings.txt', tool=writer, tid='replace'))
     feed(ledger, pair(ti={'file_path': 'settings.txt'}, text=CONTENT, tid='data'))
-    assert not switch_holds(ledger)
+    # D18: this replacement is still a program, even without its shebang.
+    assert switch_holds(ledger)
 
 
 def test_empty_full_data_read_is_a_witness():
@@ -560,8 +561,9 @@ def test_records_are_subtracted_even_with_code_like_contents(path, boundary, pen
     ledger = Ledger()
     change = edit(path)
     feed(ledger, change[:1] if pending else change)
-    assert not switch_holds(ledger, output(path, boundary))
-    assert not ledger.changed_code()
+    # D18: syntactically declared code ships regardless of its suffix.
+    assert bool(switch_holds(ledger, output(path, boundary))) == (boundary != 'Write')
+    assert ledger.changed_code()
 
 
 @pytest.mark.parametrize('path,expect_hold', [('record.txt', False), ('worker.py', True), ('worker', True)])
@@ -606,5 +608,8 @@ def test_plain_full_replacement_subtracts_former_record_script():
         ev['tool_input']['content'] = '#!/bin/sh\necho 1\n'
     feed(ledger, change)
     assert switch_holds(ledger)
-    feed(ledger, edit('record.txt', tid='replace'))
+    replacement = edit('record.txt', tid='replace')
+    for ev in replacement:
+        ev['tool_input']['content'] = 'A plain record.'
+    feed(ledger, replacement)
     assert not switch_holds(ledger)

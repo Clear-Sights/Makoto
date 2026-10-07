@@ -100,7 +100,7 @@ def build(rule, kind, variant, clean):
         return build_double(rule, kind, clean)
     if isinstance(variant, str):
         return build_extra(rule, kind, variant, clean)
-    subject = ('cedar.txt', 'juniper.txt')[variant]
+    subject = ('./cedar.txt', './juniper.txt')[variant]
     value = ('317', '619')[variant]
     events = []
     if rule == 'a':
@@ -173,5 +173,5 @@ def test_creation_and_claim_share_a_writer(tmp_path, kind):
     # DESIGN D7–D8: a new function is a creation; an external reference is a claim.
     plain = candidate('def new_leaf():\n    return 23\n', kind)
     assert replay([], plain) == []
-    mixed = candidate('def new_leaf():\n    return "outside.txt"\n', kind)
+    mixed = candidate('def new_leaf():\n    return "./outside.txt"\n', kind)
     assert {f['rule'] for f in replay([], mixed)} == {'a', 'b'}

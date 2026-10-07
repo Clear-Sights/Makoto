@@ -41,11 +41,12 @@ def edited_forms(event, target):
         except (ValueError, TypeError):
             pass
     shebang = bool(re.search(r'(?m)^#!\s*\S+', content))
+    program = any(re.search(r'(?m)^\s*(?:async\s+)?(?:def|class|function|fn|func)\s+[A-Za-z_]\w*', value) for value in payloads)
     absolute = identity(target, event)[5:]
     executable = not suffix and os.path.isfile(absolute) and os.access(absolute, os.X_OK)
     record = (suffix in RECORD_SUFFIXES or not suffix and ntpath.basename(path) not in CONFIG_FILES and not executable) and event.get('tool_name') != 'NotebookEdit'
     data_form = (suffix in DATA_SUFFIXES or ntpath.basename(path) == '.env' or record) and event.get('tool_name') != 'NotebookEdit'
-    data = data_form and not shebang
+    data = data_form and not shebang and not program
     if not (record or executable or suffix in CODE_SUFFIXES | DATA_SUFFIXES
             or ntpath.basename(path) in CONFIG_FILES
             or event.get('tool_name') == 'NotebookEdit'
@@ -53,6 +54,9 @@ def edited_forms(event, target):
             or suffix not in ('md', 'rst', 'adoc') and (DECLARATIONS.search(content) or structured)):
         return None
     aliases = {s.text for s in names(content) if s.kind == 'identifier'}
+    # A source heading explicitly names the recorded program (D5/D18).
+    aliases.update(m.group(1).strip() for value in payloads
+                   for m in re.finditer(r'(?m)^#(?![#!])\s+([^\n]+)$', value))
     aliases.update(value for match in DECLARATIONS.finditer(content) for value in match.groups() if value)
     # JSON/YAML keys and dotted module names are also syntactic identifiers.
     aliases.update(re.findall(r'(?:^|[\n{,])\s*["\x27]([A-Za-z_]\w*)["\x27]\s*:', content))
@@ -149,18 +153,20 @@ def execution_subjects(pre, changes, post=None):
         if meta.get('subject'):
             targets.append(meta['subject'])
     tool, ti = pre.get('tool_name'), pre.get('tool_input', {})
+    if ti.get('program_path') and isinstance(ti.get('argv'), list):
+        targets.append(ti['program_path'])
     if tool in ('Run', 'Execute', 'NotebookExecute', 'NotebookRun'):
         targets.extend(ti[key] for key in ('file_path', 'notebook_path', 'script', 'path') if ti.get(key))
     elif tool == 'Bash':
-        words = simple_argv(ti.get('command', ''))
-        redirects = []
-        if not words:
-            parsed = redirected_argv(ti.get('command', ''))
-            if parsed:
-                words = simple_argv(shlex.join(parsed[0]))
-                redirects = parsed[1]
+        parsed = redirected_argv(ti.get('command', ''))
+        words = list(parsed[0]) if parsed else simple_argv(ti.get('command', ''))
+        redirects = list(parsed[1]) if parsed else []
+        while words and (re.match(r'^[A-Za-z_]\w*=', words[0]) or words[0] in ('env', 'command', 'exec')):
+            words = words[1:]
         if words:
             program = program_name(words[0])
+            if program != 'jq' and not simple_argv(shlex.join(words)):
+                return {identity(target, pre) for target in targets}
             if RUNTIMES.fullmatch(program):
                 args = words[1:]
                 operand_flags = {'-W', '-X', '--require', '-r', '--loader', '--import', '--input-type', '--conditions', '--inspect-port'}
@@ -242,6 +248,24 @@ def execution_subjects(pre, changes, post=None):
                                 targets.extend(w.split('::')[0] for w in remaining if not w.startswith('-'))
                         break
                     i += 2 if arg in operand_flags else 1
+            elif program == 'jq':
+                args = words[1:]
+                i, filter_seen = 0, False
+                while i < len(args):
+                    arg = args[i]
+                    if arg in ('--arg', '--argjson', '--slurpfile', '--rawfile'):
+                        i += 3
+                        continue
+                    if arg in ('-f', '--from-file'):
+                        i += 2
+                        filter_seen = True
+                        continue
+                    if not arg.startswith('-'):
+                        if filter_seen:
+                            targets.append(arg)
+                        else:
+                            filter_seen = True
+                    i += 1
             elif program in ('sqlite3', 'psql', 'mysql'):
                 targets.extend(target for operator, target in redirects if operator == '<'
                                and not any(c in target for c in '$*?`'))

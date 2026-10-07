@@ -7,7 +7,7 @@ from .observed import (WRITERS, FINAL, identity, effects, failed,
 from .precision import contains, VERSIONED, package_parts, names
 from .switch import edited_forms, execution_subjects, run_output, full_read_subjects, compiled_subjects
 from .shell import selected_segments
-from .points import read_locations, located
+from .points import read_locations, located, coordinates
 
 
 class Ledger:
@@ -66,6 +66,19 @@ class Ledger:
         spelling = next((effect['subject'] for effect in effects(event)
                          if self.subject(effect['subject'], event) == subject), subject)
         form = edited_forms(event, spelling)
+        observed = None
+        for reading in self.readings:
+            if subject in reading['subjects']:
+                candidate = edited_forms(dict(event, tool_name='Write', tool_input={
+                    'file_path': spelling, 'content': '\n'.join(reading['texts'])}), spelling)
+                if candidate and not candidate['data']:
+                    observed = candidate
+        if observed and not (event.get('tool_name') == 'Write' and 'content' in event.get('tool_input', {})):
+            if form:
+                form['aliases'] |= observed['aliases']
+                form['data'] = False
+            else:
+                form = observed
         if form or subject in self.code_changes:
             prior = self.code_changes.get(subject, {})
             form = form or dict(prior)
@@ -264,7 +277,8 @@ class Ledger:
             if not ordered or pre.get('makoto', {}).get('reads') or meta.get('reads'):
                 self.readbacks.append({'q': self.q, 'started': started,
                                        'subjects': complete, 'tool_use_id': tid})
-            shebang = bool(re.search(r'(?m)^#!\s*\S+', response_text(event.get('tool_response'))))
+            body = response_text(event.get('tool_response'))
+            shebang = bool(re.search(r'(?m)^#!\s*\S+|^\s*(?:async\s+)?(?:def|class|function|fn|func)\s+[A-Za-z_]\w*', body))
             for subject in complete:
                 change = self.code_changes.get(subject)
                 if change and started <= change['q']:
@@ -305,6 +319,10 @@ class Ledger:
                     if not store:
                         raise ValueError('DetIO reference needs a recorded store directory')
                     texts.append(get(store, address))
+        # D4/D11: a successful execution reads the subject's response,
+        # independently of whether its program was authored in this session.
+        runs = [r for r in self.executions if r['tool_use_id'] == tid]
+        subjects += [s for r in runs for s in r['subjects']]
         item = {'q': self.q, 'subjects': subjects, 'texts': texts,
                 'source': source, 'tool_use_id': tid, 'tool': tool, 'turn': self.turn}
         # Empty file content is a reading; empty writer acknowledgments are not.
@@ -324,10 +342,19 @@ class Ledger:
                 for index, command in enumerate(segments or []):
                     position = self.q + (index + 1) / (len(segments) + 1)
                     acts.append((dict(pre, tool_input=dict(pre.get('tool_input', {}), command=command)), position))
-            place = dict(pre.get('makoto', {}).get('place', {}), **meta.get('place', {}))
+            # D6: literal coordinate declarations in returned source records
+            # locate the reading; host observations take precedence.
+            place = {}
+            for text in texts:
+                for line in text.splitlines():
+                    if ':' in line:
+                        place.update(coordinates(line.split(':', 1)[1]))
+            place.update(pre.get('makoto', {}).get('place', {}))
+            place.update(meta.get('place', {}))
             returned_locations = [located(r['subject'], pre, place) for r in meta.get('reads', [])]
             if tool == 'WebSearch':
                 returned_locations += [located(s.text, pre, place) for t in texts for s in names(t) if s.kind == 'url']
+            returned_locations += [location for run in runs for location in run.get('locations', [])]
             for act, position in acts:
                 act = dict(act, makoto=dict(act.get('makoto', {}), place=place))
                 for path, point in read_locations(act) + returned_locations:

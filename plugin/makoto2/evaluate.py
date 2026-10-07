@@ -77,11 +77,18 @@ def switch(ledger, event, text, spans):
                 form['q'] = ledger.mutations.get(subject, 0)
                 changes[subject] = form
     # A behavior claim selects its named subject even before its first reading.
-    behavior_subjects = [line[:match.start()]
-                         for line in re.split(r'[\n]|(?<=[.!?])\s+', text)
-                         if (match := BEHAVIOR.search(line))]
+    # A word inside a located path is not a behavior predicate (D7/D18).
+    masked = list(text)
+    for span in spans:
+        if span.kind in ('path', 'url', 'identifier'):
+            masked[span.start:span.end] = ' ' * (span.end - span.start)
+    behavior_subjects = []
+    for match in BEHAVIOR.finditer(''.join(masked)):
+        start = text.rfind('\n', 0, match.start()) + 1
+        behavior_subjects.append(text[start:match.start()])
     for subject_text in behavior_subjects:
-        for span in spans:
+        located_spans = [s for s in spans if s.kind in ('path', 'url') and contains(subject_text, s.text, s.kind)]
+        for span in located_spans or spans:
             if span.kind not in ('path', 'url', 'identifier') or not contains(subject_text, span.text, span.kind) or VERSION.fullmatch(span.text):
                 continue
             if any(span.text in c['aliases'] for c in changes.values()):

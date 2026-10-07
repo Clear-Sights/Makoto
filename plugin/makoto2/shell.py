@@ -14,6 +14,14 @@ def redirected_argv(command):
         lex = shlex.shlex(parts[0][0], posix=False, punctuation_chars='<>')
         lex.whitespace_split = True
         raw = list(lex)
+        if not any(word in ('<', '>', '>>', '>|', '<<', '<<-') for word in raw):
+            # Decode adjacent shell quote fragments together. Preserve native
+            # Windows path operands that the host recorded without quoting.
+            native = parts[0][0]
+            for word in raw:
+                if re.match(r'^(?:[A-Za-z]:\\|\\\\)[^\s]+$', word):
+                    native = native.replace(word, shlex.quote(word))
+            return tuple(shlex.split(native)), ()
         words, redirects = [], []
         i = 0
         while i < len(raw):
@@ -27,7 +35,8 @@ def redirected_argv(command):
                 redirects.append((word, target))
                 i += 2
                 continue
-            decoded = shlex.split(word)
+            # Native recorded Windows operands retain their path separators.
+            decoded = [word] if re.match(r'^(?:[A-Za-z]:\\|\\\\)[^\s]+$', word) else shlex.split(word)
             if len(decoded) != 1:
                 return None
             words.append(decoded[0])

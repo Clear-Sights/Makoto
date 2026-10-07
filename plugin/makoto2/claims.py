@@ -6,7 +6,7 @@ import re
 import shlex
 from .paths import path_spellings
 from .observed import WRITERS, FINAL
-from .precision import Span, names, contains, DELIMITED, VERSIONED
+from .precision import Span, names, contains, DELIMITED, VERSIONED, name_kind
 
 
 def authored_text(event):
@@ -47,15 +47,32 @@ def literals(text):
         start, end = match.span(match.lastgroup)
         if not any(start <= s.start and s.end <= end for s in result):
             result.append(Span(text[start:end], start, end, 'delimited'))
+    # D9: separators in a quoted prose value do not name a root directory.
+    for match in DELIMITED.finditer(text):
+        start, end = match.span(match.lastgroup)
+        if re.search(r'\s[/\\]\s', text[start:end]):
+            result = [s for s in result if not (start <= s.start and s.end <= end)]
+            result.append(Span(text[start:end], start, end, 'delimited'))
     return sorted(result, key=lambda s: (s.start, s.end))
 
 
 def claims(ledger, event):
     text = authored_text(event)
     spans = literals(text)
+    # D7/D18: the grammatical subject of an acceptance assertion is a
+    # subject even when its identifier consists of ordinary words.
+    for match in re.finditer(r'(?m)^(?:#\s*|[Tt]he\s+)?([A-Za-z][A-Za-z -]*?)\s+accepts\b', text):
+        start, end = match.span(1)
+        if not any(start <= s.start and s.end <= end for s in spans):
+            spans.append(Span(match[1], start, end, 'identifier'))
     # A known space-containing path remains one literal, including unquoted
     # references. Its component filenames cannot become separate subjects.
-    known = ledger.written | {s for r in ledger.readings for s in r['subjects']}
+    known = ledger.written | {s for r in ledger.readings + ledger.inputs for s in r['subjects']}
+    known |= {s for r in ledger.executions for s in r['subjects']}
+    # D5/D16: dotted identifier syntax does not itself locate a file.
+    spans = [Span(s.text, s.start, s.end, 'identifier')
+             if s.kind == 'path' and '/' not in s.text and '\\' not in s.text
+             and ledger.subject(s.text, event) not in known else s for s in spans]
     for subject in known:
         if not subject.startswith('file:') or ' ' not in subject:
             continue
@@ -63,6 +80,17 @@ def claims(ledger, event):
             for match in re.finditer(r'(?<![\w/\\.])' + re.escape(spelling) + r'(?![\w/\\.])', text):
                 spans = [s for s in spans if not (match.start() <= s.start and s.end <= match.end())]
                 spans.append(Span(spelling, *match.span(), 'path'))
+    # D9: a returned record's path value can preserve spaces in later prose.
+    for reading in ledger.readings:
+        for returned in reading['texts']:
+            for line in returned.splitlines():
+                _, separator, value = line.partition(': ')
+                if (separator and ' ' in value and reading['source']
+                        and re.match(r'^(?:[A-Za-z]:[/\\]|[/\\]|\.{1,2}[/\\])', value)
+                        and name_kind(value, quoted=True) == 'path'):
+                    for match in re.finditer(re.escape(value), text):
+                        spans = [s for s in spans if not (match.start() <= s.start and s.end <= match.end())]
+                        spans.append(Span(value, *match.span(), 'path'))
     spans.sort(key=lambda s: (s.start, s.end))
     if event.get('tool_name') not in WRITERS:
         return text, spans

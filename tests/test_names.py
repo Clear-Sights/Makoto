@@ -39,7 +39,7 @@ def test_each_name_form_unread_and_read(tmp_path, form, value, wrapper):
         assert held(response) and s.rules() == {'b'}
         s.feed(pair('WebFetch', {'url': value}, value, tid='web'))
         assert not held(s.send(output(text)))
-    elif form in ('path', 'dotted_module'):
+    elif form == 'path':
         assert held(response) and s.rules() == {'b'}
         s.feed(pair(ti={'file_path': value}, text='actual content', tid='thing'))
         assert not held(s.send(output(text)))
@@ -178,7 +178,7 @@ def test_name_variants_still_hold(tmp_path, text, value):
     assert held(s.send(output(text)))
     assert 'a' in s.rules()
     s.feed(pair(text=text, tid='name'))
-    if any(span.kind == 'path' for span in names(text)):
+    if any(span.kind == 'path' and ('/' in span.text or '\\' in span.text) for span in names(text)):
         assert held(s.send(output(text))) and s.rules() == {'b'}
         s.feed(pair(ti={'file_path': value}, text='actual content', tid='thing'))
     assert not held(s.send(output(text)))
@@ -202,7 +202,7 @@ def test_quoted_path_with_spaces_is_one_exact_name(tmp_path, path):
     assert held(s.send(output(text)))
     assert any(f['rule'] == 'b' and f['subject'] == path for f in s.journal()[-1]['findings'])
     s.feed(pair(text=text, tid='name'))
-    assert held(s.send(output(text))) and s.rules() == {'b'}
+    assert held(s.send(output(text))) == ('/' in path or '\\' in path)
     s.feed(pair(ti={'file_path': path}, text='actual content', tid='thing'))
     assert not held(s.send(output(text)))
 

@@ -88,7 +88,7 @@ def response_text(response):
 
 def failed(event):
     response = event.get('tool_response', {})
-    return event['hook_event_name'] == 'PostToolUseFailure' or isinstance(response, dict) and bool(response.get('is_error') or response.get('isError') or any(response.get(k) not in (None, 0, '0', '') for k in ('exitCode', 'exit_code', 'exit')))
+    return event['hook_event_name'] == 'PostToolUseFailure' or isinstance(response, dict) and bool(response.get('error') or response.get('is_error') or response.get('isError') or any(response.get(k) not in (None, 0, '0', '') for k in ('exitCode', 'exit_code', 'exit')))
 
 
 def effects(event):
@@ -143,8 +143,19 @@ def reading_subjects(pre):
         for words in programs(pre):
             if program_name(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
                 result.extend(w for w in words[1:] if not w.startswith('-'))
+            if program_name(words[0]).lower() in ('powershell', 'pwsh') and '-Command' in words:
+                index = words.index('-Command') + 1
+                if index < len(words):
+                    script = shlex.split(words[index], posix=False)
+                    if script and script[0].lower() == 'get-content':
+                        for i, word in enumerate(script[:-1]):
+                            if word.lower() in ('-literalpath', '-path'):
+                                result.append(script[i + 1].strip("\"'"))
             # Executing a program reads its response, not the program file.
             # Only direct file readers above inherit that file's own/stale status.
+    elif name not in WRITERS | {'Agent', 'Task'}:
+        if target := ti.get('file_path') or ti.get('notebook_path') or ti.get('path'):
+            result.append(target)
     return result
 
 

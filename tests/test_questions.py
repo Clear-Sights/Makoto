@@ -112,7 +112,7 @@ def test_clean_stop_has_no_questions_across_retries_and_turns(tmp_path, boundary
         s.send(event('UserPromptSubmit', prompt='next turn'))
 
 
-@pytest.mark.parametrize('text,rule', [('unread_91', 'a'), ('unread.txt', 'b'), ('https://example.test/a', 'c')])
+@pytest.mark.parametrize('text,rule', [('unread_91', 'a'), ('./unread.txt', 'b'), ('https://example.test/a', 'c')])
 @pytest.mark.parametrize('boundary', ['Write', 'Stop'])
 def test_rule_holds_take_precedence_over_questions(tmp_path, text, rule, boundary):
     s = Session(tmp_path)

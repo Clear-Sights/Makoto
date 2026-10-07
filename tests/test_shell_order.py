@@ -61,7 +61,10 @@ def test_original_reader_before_edit_is_lineage(reader, reverse):
 
 def test_multiple_reader_operands_and_prior_own_file():
     ledger = Ledger()
-    feed(ledger, edit('own.md'))
+    own = edit('own.md')
+    for ev in own:
+        ev['tool_input']['content'] = 'A plain record.'
+    feed(ledger, own)
     call(ledger, "cat own.md loom.py; sed -i 's/old/new/' loom.py; ruby loom.py")
     assert ledger.source_readings()
     assert not switch_holds(ledger)
@@ -329,7 +332,10 @@ def test_host_effects_and_complete_reads_keep_their_call_scope():
 def test_inline_config_consumption_requires_literal_unconditional_load(code, paid):
     import shlex
     ledger = Ledger()
-    feed(ledger, edit('loom.toml'))
+    config = edit('loom.toml')
+    for ev in config:
+        ev['tool_input']['content'] = 'threshold = 3'
+    feed(ledger, config)
     call(ledger, 'python -c ' + shlex.quote(code))
     assert bool(switch_holds(ledger)) != paid
 

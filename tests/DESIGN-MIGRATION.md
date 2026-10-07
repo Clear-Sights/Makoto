@@ -1,8 +1,9 @@
 # Existing regression expectations and DESIGN.md
 
 Test function identities are retained for continuity with the prior suite.
-Some historical names still refer to the former rule assignment. No test is
-skipped or marked as an expected failure.
+Some historical names still refer to the former rule assignment. Historical
+regressions are not skipped or marked as expected failures; recorded-label
+conflicts added in round 2 are documented separately below.
 
 | Previous expectation | Replacement required by DESIGN.md | Retained/added discriminator |
 |---|---|---|
@@ -45,3 +46,26 @@ reuse the entire collection with each decision function disabled separately.
 - `test_switch::test_package_module_name_and_run_resolve_the_same_recorded_path`: D18: assert behavior.
 - `test_switch::test_compact_json_key_is_a_named_edited_identifier`: D18: assert behavior.
 - `test_other_point::test_url_host_is_a_point_even_after_online_search`: D16 requires fetching the claimed URL or returning it in search; fetching a different host also leaves b.
+
+## Recorded-session refit (round 2)
+
+- `test_built_pairs::build` and `test_creation_and_claim_share_a_writer`: D5/D16
+  require a separator or an earlier file-addressing input to distinguish a path
+  from a dotted identifier; path plants now use explicit relative paths.
+- `test_names::test_each_name_form_unread_and_read`, `test_name_variants_still_hold`,
+  and `test_quoted_path_with_spaces_is_one_exact_name`: D5/D16 let source bytes
+  pay bare dotted identifiers until a tool addresses them as files.
+- `test_questions::test_rule_holds_take_precedence_over_questions` and
+  `test_switch::test_other_hold_shapes_appear_in_transport_and_journal`: D5/D16;
+  the isolated unread-path plants now use `./unread.txt`.
+- `test_switch::test_records_are_subtracted_even_with_code_like_contents` and
+  `test_full_data_replacement_removes_a_previous_shebang_obligation`: D8/D18;
+  a declared program remains code under a record suffix or without a shebang.
+  Shipping it requires a run; a writer merely naming it does not assert behavior.
+- `test_switch::test_plain_full_replacement_subtracts_former_record_script`,
+  `test_shell_order::test_multiple_reader_operands_and_prior_own_file`, and
+  `test_inline_config_consumption_requires_literal_unconditional_load`: D8/D18;
+  data fixtures now contain actual prose/TOML instead of Python declarations.
+
+Recorded cases retain their supplied expectations. Strict xfail reasons in
+`test_recorded.py` identify conflicts with the D-lines; they do not change labels.
