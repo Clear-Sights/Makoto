@@ -410,7 +410,7 @@ def test_full_data_readback_pays_reported_shell_edit_shapes(tmp_path, path, befo
     s.feed(pair(ti={'file_path': path}, text=before))
     s.feed(pair('Bash', {'command': "sed -i 's/1/2/' " + path}, '', tid='change'))
     assert held(s.send(output(final)))
-    assert s.rules() == {'d'}
+    assert s.rules() == {'c', 'd'}
     s.feed(pair(ti={'file_path': path}, text=after, tid='readback'))
     assert not held(s.send(output(final)))
     assert any(row.get('trace') == ['readback'] and row.get('instruments') == 'makoto2.switch/readback-v1'

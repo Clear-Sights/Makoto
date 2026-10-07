@@ -7,6 +7,7 @@ from .observed import (WRITERS, FINAL, identity, effects, failed,
 from .precision import contains, VERSIONED, package_parts
 from .switch import edited_forms, execution_subjects, run_output, full_read_subjects, compiled_subjects
 from .shell import selected_segments
+from .points import read_locations
 
 
 class Ledger:
@@ -33,6 +34,7 @@ class Ledger:
         self.readbacks = []
         self.shebangs = set()
         self.compiled = {}
+        self.point_readings = []
 
     def changed_code(self):
         result = dict(self.code_changes)
@@ -294,6 +296,28 @@ class Ledger:
         # Empty file content is a reading; empty writer acknowledgments are not.
         if content_present:
             self.readings.append(item)
+        # A direct readback can establish the state of that file itself even
+        # though its bytes cannot serve as an original source for rule a.
+        relay = any(r.get('producer') or r.get('role') == 'relay'
+                    for ev in (pre, event) for r in ev.get('makoto', {}).get('reads', []))
+        ongoing = isinstance(response, dict) and any(response.get(k) for k in
+                  ('backgroundTaskId', 'session_id', 'sessionId', 'running'))
+        if content_present and not ongoing and not failed(event) and tool not in WRITERS | {'Agent', 'Task'} and not relay:
+            acts = [(pre, started)]
+            if tool == 'Bash':
+                segments = selected_segments(pre.get('tool_input', {}).get('command', ''), event)
+                acts = []
+                for index, command in enumerate(segments or []):
+                    position = self.q + (index + 1) / (len(segments) + 1)
+                    acts.append((dict(pre, tool_input=dict(pre.get('tool_input', {}), command=command)), position))
+            for act, position in acts:
+                for path, point in read_locations(act):
+                    # Only an ordered mutation inside this call can move the
+                    # reading past its start; overlapping calls stay unpaid.
+                    mutation = self.mutations.get(self.subject(path, pre), 0)
+                    read_start = position if mutation > self.q else started
+                    self.point_readings.append({'path': path, 'point': point,
+                                                'started': read_start, 'tool_use_id': tid})
         if not source:
             self.own.extend(texts)
             self.own.extend(v for _, v in leaves(pre.get('tool_input', {})))

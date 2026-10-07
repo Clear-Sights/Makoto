@@ -6,6 +6,7 @@ from .observed import text_of, effects
 from .borrowed import receipt
 from .switch import names_change
 from .paths import path_spellings
+from .points import other_point
 
 
 def evaluate(ledger, event, adapter='inferred'):
@@ -55,6 +56,7 @@ def evaluate(ledger, event, adapter='inferred'):
         if not ledger.fetched(span):
             findings.append({'rule': 'c', 'family': 'c', 'shape': 'other point', 'subject': span,
                              'missing': 'DID NOT LOOK ONLINE: fetch or search this exact external subject with WebFetch, WebSearch or a Bash network call in this turn'})
+    findings.extend(other_point(ledger, event))
     for change in ledger.changed_code().values():
         if not names_change(event, change):
             continue
