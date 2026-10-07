@@ -79,15 +79,11 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
         ev['tool_use_id'] = f'step-{index}'
         ev['stop_hook_active'] = retry
         response = s.send(ev)
-        note = present and boundary in ('Stop', 'SubagentStop', 'PreDelivery') and not retry
-        assert held(response) == (not present or note), response
+        assert held(response) == (not present), response
         if not present:
             assert 'rule a' in str(response)
             assert 'read an original artifact' in str(response)
             assert s.journal()[-1]['stop_hook_active_unpaid'] == retry
-        elif note:
-            assert response == {'decision': 'block', 'reason': hook.FOUR_QUESTIONS}
-            assert s.journal()[-1]['admitted']
         elif boundary in ('Stop', 'SubagentStop', 'PreDelivery'):
             assert response == {}
         else:

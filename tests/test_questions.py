@@ -100,13 +100,13 @@ def test_questions_on_every_admitted_pretool_step(tmp_path, boundary):
 
 
 @pytest.mark.parametrize('boundary', ['Stop', 'SubagentStop', 'PreDelivery'])
-def test_questions_once_at_stop_and_again_next_turn(tmp_path, boundary):
+def test_clean_stop_has_no_questions_across_retries_and_turns(tmp_path, boundary):
     s = Session(tmp_path)
     s.feed(pair())
     for turn in range(2):
         for active in (False, True, True):
             response = s.send(dict(output(boundary=boundary), stop_hook_active=active))
-            assert response == ({} if active else {'decision': 'block', 'reason': EXPECTED})
+            assert response == {}
             assert s.journal()[-1]['admitted']
             assert s.rules() == set()
         s.send(event('UserPromptSubmit', prompt='next turn'))

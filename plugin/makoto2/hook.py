@@ -111,8 +111,6 @@ def questions(event):
         return {}
     if event['hook_event_name'] == 'PreToolUse':
         return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': FOUR_QUESTIONS}}
-    if not event.get('stop_hook_active'):
-        return {'decision': 'block', 'reason': FOUR_QUESTIONS}
     return {}
 
 
