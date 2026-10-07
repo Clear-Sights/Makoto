@@ -45,7 +45,7 @@ def switch_holds(ledger, candidate=None):
 @pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'commit', 'push', 'Stop', 'SubagentStop', 'PreDelivery'])
 def test_unrun_code_holds_each_dependent_boundary(boundary):
     ledger = ledger_with_edit()
-    candidate = output('Done' if boundary in ('commit', 'push') else 'branch.py', boundary)
+    candidate = output('Done' if boundary in ('commit', 'push') else 'branch.py returns a response', boundary)
     if boundary in ('commit', 'push'):
         # Shipping needs no literal reference to the edited file.
         assert 'branch.py' not in candidate['tool_input']['command']
@@ -59,9 +59,9 @@ def test_unrun_code_holds_each_dependent_boundary(boundary):
 @pytest.mark.parametrize('reference', ['branch.py', './branch.py', '/w/branch.py', '`branch.py`', 'branch.py:19', 'branch.py:19:4', 'branch', 'dispatch', 'input_value'])
 def test_writer_references_path_module_or_declared_identifier(reference):
     ledger = ledger_with_edit()
-    assert switch_holds(ledger, output(reference, 'Write'))
-    # Behaving words are not consulted: merely naming a changed subject holds.
-    assert switch_holds(ledger, output('branch.py recorded', 'Write'))
+    assert switch_holds(ledger, output(reference + ' returns a response', 'Write'))
+    # D18: a value claim does not select a run.
+    assert not switch_holds(ledger, output('branch.py recorded', 'Write'))
 
 
 @pytest.mark.parametrize('text', ['Works correctly and is done', 'branchExtra.py', 'dispatchExtra', 'unrelated text'])
@@ -203,7 +203,7 @@ def test_replayed_run_receipt_cannot_pay_a_later_edit():
 
 def test_package_module_name_and_run_resolve_the_same_recorded_path():
     ledger = ledger_with_edit('pkg/branch.py')
-    assert switch_holds(ledger, output('pkg.branch', 'Write'))
+    assert switch_holds(ledger, output('pkg.branch returns a response', 'Write'))
     feed(ledger, pair('Bash', {'command': 'python3 -m pkg.branch'}, 'response', tid='run'))
     assert not switch_holds(ledger)
 
@@ -317,7 +317,7 @@ def test_compact_json_key_is_a_named_edited_identifier():
     for ev in change:
         ev['tool_input']['content'] = '{"enabled": true}'
     feed(ledger, change)
-    assert switch_holds(ledger, output('enabled', 'Write'))
+    assert switch_holds(ledger, output('enabled returns a response', 'Write'))
 
 
 def test_recorded_command_write_requires_execution_of_that_script():

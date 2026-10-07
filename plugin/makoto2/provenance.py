@@ -4,7 +4,7 @@ import re
 from .borrowed import get, leaves, fragments
 from .observed import (WRITERS, FINAL, identity, effects, failed,
                        reading_subjects, network_targets, response_text)
-from .precision import contains, VERSIONED, package_parts
+from .precision import contains, VERSIONED, package_parts, names
 from .switch import edited_forms, execution_subjects, run_output, full_read_subjects, compiled_subjects
 from .shell import selected_segments
 from .points import read_locations, located
@@ -124,7 +124,7 @@ class Ledger:
             original = subjects - (self.written | self.tainted)
             original -= set().union(*(s for key, s in self.reservations.items() if key != tid))
             response = post.get('tool_response')
-            if (len(segments) > 1 and original and bool(list(leaves(response)))
+            if (not failed(post) and len(segments) > 1 and original and bool(list(leaves(response)))
                     and not (isinstance(response, dict) and any(response.get(key)
                              for key in ('backgroundTaskId', 'session_id', 'sessionId', 'running')))
                     and not any(r.get('producer') or r.get('role') == 'relay'
@@ -251,11 +251,14 @@ class Ledger:
             self.reservations.pop(tid, None)
         # Paired call plus returned response proves the act, even on failure.
         # Resolve the invocation against its recorded cwd, never final prose.
-        if run_output(event) and (not ordered or pre.get('makoto', {}).get('invocation') or meta.get('invocation')):
+        if pre.get('tool_name') not in WRITERS | {'Agent', 'Task'} and run_output(event) and (not ordered or pre.get('makoto', {}).get('invocation') or meta.get('invocation')):
             invoked = execution_subjects(pre, self.code_changes, event)
             if invoked:
                 self.executions.append({'q': self.q, 'started': started,
                                         'subjects': invoked, 'tool_use_id': tid})
+        for run in self.executions:
+            if run['tool_use_id'] == tid and 'locations' not in run:
+                run['locations'] = [located(s.removeprefix('file:'), pre, dict(pre.get('makoto', {}).get('place', {}), **meta.get('place', {}))) for s in run['subjects']]
         complete = full_read_subjects(pre, event)
         if complete and pre.get('tool_name') not in WRITERS | {'Agent', 'Task'}:
             if not ordered or pre.get('makoto', {}).get('reads') or meta.get('reads'):
@@ -273,10 +276,15 @@ class Ledger:
                 if change and change.get('data_form'):
                     change['data'] = not shebang
         response = event.get('tool_response')
+        if pre.get('tool_name') in WRITERS | {'Agent', 'Task'} or failed(event):
+            self.own.extend(fragments(response))
+            return
         if response is None or isinstance(response, dict) and response.get('backgroundTaskId'):
             return
         subjects = [self.subject(s, pre) for s in reading_subjects(pre)]
         subjects += [self.subject(r['subject'], pre) for r in meta.get('reads', [])]
+        if pre.get('tool_name') != 'WebSearch':
+            subjects += [s for s in network_targets(pre, {}) if s.startswith(('https://', 'http://'))]
         texts = list(fragments(response))
         content_present = bool(list(leaves(response)))
         tool = pre.get('tool_name')
@@ -316,8 +324,13 @@ class Ledger:
                 for index, command in enumerate(segments or []):
                     position = self.q + (index + 1) / (len(segments) + 1)
                     acts.append((dict(pre, tool_input=dict(pre.get('tool_input', {}), command=command)), position))
+            place = dict(pre.get('makoto', {}).get('place', {}), **meta.get('place', {}))
+            returned_locations = [located(r['subject'], pre, place) for r in meta.get('reads', [])]
+            if tool == 'WebSearch':
+                returned_locations += [located(s.text, pre, place) for t in texts for s in names(t) if s.kind == 'url']
             for act, position in acts:
-                for path, point in read_locations(act):
+                act = dict(act, makoto=dict(act.get('makoto', {}), place=place))
+                for path, point in read_locations(act) + returned_locations:
                     # Only an ordered mutation inside this call can move the
                     # reading past its start; overlapping calls stay unpaid.
                     mutation = self.mutations.get(self.subject(path, pre), 0)

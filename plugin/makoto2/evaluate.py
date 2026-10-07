@@ -1,10 +1,11 @@
 """Four independent decisions over one claim projection; see DESIGN.md."""
+import re
 from .claims import claims, literals
-from .precision import contains
+from .precision import contains, VERSION
 from .borrowed import receipt
 from .switch import names_change, edited_forms
 from .points import other_point, claim_locations, located, related_readings
-from .observed import effects
+from .observed import effects, FINAL, git_action
 
 
 def finding(rule, subject, missing):
@@ -37,8 +38,13 @@ def spec(ledger, event, text, spans):
         if spelling not in {s.text for s in spans}:
             continue
         related = related_readings(ledger, path)
-        if not related:
-            findings.append(finding('b', spelling, 'THING NOT READ: read the named subject itself; typed input and a mention in another artifact are not readings of it'))
+        searched = spelling.startswith(('http://', 'https://')) and any(r['tool'] == 'WebSearch' and r['source'] and any(contains(t, spelling, 'url') for t in r['texts']) for r in ledger.readings)
+        read = any(r['source'] and spelling in r['subjects'] for r in ledger.readings) if spelling.startswith(('http://', 'https://')) else bool(related)
+        if not read and not searched:
+            findings.append(finding('b', spelling, 'SUBJECT NOT READ: read this path or fetch/search this URL'))
+    for span in spans:
+        if span.kind == 'identifier' and not VERSION.fullmatch(span.text) and not re.fullmatch(r'\d{4}-\d{2}-\d{2}T[\d:.]+Z?', span.text) and not any(contains(t, span.text, span.kind) for t in ledger.given + [t for r in ledger.readings if r['source'] for t in r['texts']]):
+            findings.append(finding('b', span.text, 'IDENTIFIER NOT READ: read source bytes containing this identifier'))
     for definition in ledger.definitions:
         if not contains(text, definition['subject']):
             continue
@@ -49,15 +55,10 @@ def spec(ledger, event, text, spans):
 
 
 def other(ledger, event, text, spans):
-    findings = other_point(ledger, event)
-    located = {s for s, _ in claim_locations(event, ledger)}
-    for span in spans:
-        if span.text in located:
-            continue
-        readings = literal_readings(ledger, span, event)
-        if readings and not any(ledger.fresh(r) for r in readings):
-            findings.append(finding('c', span.text, 'OTHER PLACE OR TIME: read this literal from its source after its last change'))
-    return findings
+    return other_point(ledger, event)
+
+
+BEHAVIOR = re.compile(r'\b(?:returns?|outputs?|prints?|produces?|responds?|runs?|executes?|behaves?|(?:behavior|response)\s+(?:is|was)|works?|fails?|crashes?|raises?|emits?|when (?:run|fed))\b', re.I)
 
 
 def switch(ledger, event, text, spans):
@@ -75,12 +76,25 @@ def switch(ledger, event, text, spans):
             if form and not (form.get('record') and form.get('data')):
                 form['q'] = ledger.mutations.get(subject, 0)
                 changes[subject] = form
+    # A behavior claim selects its named subject even before its first reading.
+    behavior_subjects = [line[:match.start()]
+                         for line in re.split(r'[\n]|(?<=[.!?])\s+', text)
+                         if (match := BEHAVIOR.search(line))]
+    for subject_text in behavior_subjects:
+        for span in spans:
+            if span.kind not in ('path', 'url', 'identifier') or not contains(subject_text, span.text, span.kind) or VERSION.fullmatch(span.text):
+                continue
+            if any(span.text in c['aliases'] for c in changes.values()):
+                continue
+            subject = ledger.subject(span.text, event)
+            changes.setdefault(subject, {'subject': subject, 'display': span.text, 'aliases': {span.text}, 'q': ledger.mutations.get(subject, 0)})
     for change in changes.values():
         # Existing, unedited programs are selected only when named. Shipping
         # session edits keeps the established commit/final implicit selection.
-        selected = names_change(event, change)
-        if change['subject'] not in ledger.changed_code():
-            selected = any(contains(text, alias) for alias in change['aliases'])
+        shipped = change['subject'] in ledger.changed_code() and (event['hook_event_name'] in FINAL or event.get('tool_name') == 'Bash' and git_action(event))
+        selected = shipped or any(
+            names_change(dict(event, hook_event_name='PreToolUse', tool_name='Write', tool_input={'content': subject_text}), change)
+            for subject_text in behavior_subjects)
         if selected and not ledger.run_witnesses(change):
             findings.append(finding('d', change['display'], 'UNRUN CHANGE: run it and read the output before this step'))
     return findings

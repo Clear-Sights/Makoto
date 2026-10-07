@@ -22,6 +22,6 @@ def test_findings_alone_hold(tmp_path, boundary, subject, read):
     candidate['stop_hook_active'] = False
     response = session.send(candidate)
     assert held(response) == (not read)
-    assert session.rules() == (set() if read else {'a'})
+    assert session.rules() == (set() if read else {'a', 'b'})
     if read and boundary == 'Stop':
         assert response == {}

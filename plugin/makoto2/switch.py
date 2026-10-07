@@ -301,6 +301,8 @@ def run_output(post):
     if response is None:
         return False
     if isinstance(response, dict):
+        if any(str(response.get(key)) in ('126', '127') for key in ('exitCode', 'exit_code', 'exit')):
+            return False
         if response.get('backgroundTaskId') or response.get('session_id') or response.get('sessionId') or response.get('running'):
             return any(isinstance(response.get(key), str) and bool(response[key])
                        for key in ('stdout', 'stderr', 'output'))

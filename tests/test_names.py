@@ -141,7 +141,7 @@ def test_own_file_contents_never_pay_unread_names(tmp_path):
         ledger.ingest(prior)
     findings, _ = evaluate(ledger, output('out.txt unread_subject'))
     # An unrelated reading cannot supply origin for a literal copied from own output.
-    assert {f['rule'] for f in findings} == {'a'}
+    assert {f['rule'] for f in findings} == {'a', 'b'}
     assert not any(f['rule'] == 'b' and f['subject'] == 'out.txt' for f in findings)
 
 

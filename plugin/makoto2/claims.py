@@ -1,5 +1,7 @@
 """One form projection for dependent-step claims (DESIGN D1–D11)."""
 import ast
+import io
+import tokenize
 import re
 import shlex
 from .paths import path_spellings
@@ -68,12 +70,21 @@ def claims(ledger, event):
     # earlier recorded things and external locations still make claims in it.
     try:
         tree = ast.parse(text)
-        program = any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Assign, ast.AnnAssign, ast.Import, ast.ImportFrom))
-                      or isinstance(n, ast.Expr) and isinstance(n.value, (ast.Dict, ast.List, ast.Tuple))
+        program = any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Assign, ast.AnnAssign, ast.Import, ast.ImportFrom, ast.Raise, ast.Assert, ast.If, ast.For, ast.While, ast.With, ast.Try))
+                      or isinstance(n, ast.Expr) and isinstance(n.value, (ast.Dict, ast.List, ast.Tuple, ast.Call))
                       for n in tree.body)
     except SyntaxError:
         program = False
     if not program:
         return text, spans
     prior = ledger.given + ledger.own + [t for r in ledger.readings + ledger.inputs for t in r['texts']]
-    return text, [s for s in spans if s.kind in ('path', 'url', 'external-package') or any(contains(t, s.text, s.kind) for t in prior)]
+    # Comments and sentence-shaped strings assert facts even inside programs.
+    assertions = []
+    lines = text.splitlines(keepends=True)
+    offsets = [0]
+    for line in lines:
+        offsets.append(offsets[-1] + len(line))
+    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+        if token.type == tokenize.COMMENT or token.type == tokenize.STRING and re.search(r'\b(?:is|are|was|were|has|have|returns?|outputs?|produces?|accepts?|contains?|does|will)\b', token.string):
+            assertions.append((offsets[token.start[0] - 1] + token.start[1], offsets[token.end[0] - 1] + token.end[1]))
+    return text, [s for s in spans if any(start <= s.start and s.end <= end for start, end in assertions) or s.kind in ('path', 'url', 'external-package') or any(contains(t, s.text, s.kind) for t in prior)]

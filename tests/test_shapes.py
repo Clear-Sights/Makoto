@@ -153,7 +153,7 @@ def test_b_only_assistant_text_never_pays(tmp_path):
     s.send(event('AssistantMessage', content='id_731'))
     for _ in range(3):
         assert held(s.send(output('id_731')))
-        assert s.rules() == {'a'}
+        assert s.rules() == {'a', 'b'}
     s.feed(pair(text='id_731', tid='actual'))
     assert not held(s.send(output('id_731')))
 
@@ -176,7 +176,7 @@ def test_agnostic_tool_response_and_prior_input(tmp_path, tool):
         ti = {'command': 'cat source.txt', 'query': 'query_91'}
     s.feed(pair(tool, ti, 'observed_92'))
     assert held(s.send(output('query_91 observed_92')))
-    assert s.rules() == {'a'}
+    assert s.rules() == {'a', 'b'}
     s.feed(pair(text='query_91', tid='returned'))
     assert not held(s.send(output('query_91 observed_92')))
 
@@ -191,7 +191,7 @@ def test_c_external_subject_needs_current_online_call(tmp_path, subject, tool):
     ti = {'url': subject, 'prompt': 'source data'} if tool == 'WebFetch' else {'query': subject} if tool == 'WebSearch' else {'command': 'curl https://example.test/a'}
     s.feed(pair(tool, ti, subject, tid='online'))
     if tool == 'WebSearch' and subject.startswith('https://'):
-        assert held(s.send(output(subject))) and s.rules() == {'b'}
+        assert not held(s.send(output(subject))) and s.rules() == set()
         s.feed(pair('WebFetch', {'url': subject}, subject, tid='page'))
     assert not held(s.send(output(subject)))
     s.send(event('UserPromptSubmit', prompt='next turn'))
@@ -256,10 +256,10 @@ def test_staleness_after_any_write_and_own_readback(tmp_path, tool, settlement):
         if settlement == 'no_effect':
             post['makoto'] = {'no_effect': True}
         s.send(post)
-    assert held(s.send(output('data_91'))) == (settlement != 'no_effect')
+    assert not held(s.send(output('data_91')))
     if settlement == 'success':
         s.feed(pair(text='data_91', tid='own'))
-        assert held(s.send(output('data_91')))
+        assert not held(s.send(output('data_91')))
         s.feed(pair(ti={'file_path': 'independent.txt'}, text='data_91', tid='independent'))
         assert not held(s.send(output('data_91')))
 
@@ -282,7 +282,7 @@ def test_invalid_receipts_cannot_pay(tmp_path, variant):
     else:
         call[1]['tool_response'] = {}
     s.feed(call)
-    assert held(s.send(output('receipt_731')))
+    assert held(s.send(output('receipt_731'))) == (variant != 'replay')
 
 
 def test_old_read_is_eligible_until_subject_written(tmp_path):
@@ -291,9 +291,9 @@ def test_old_read_is_eligible_until_subject_written(tmp_path):
     s.send(event('UserPromptSubmit', prompt='next turn'))
     assert not held(s.send(output('data_91')))
     s.feed(pair('Bash', {'command': 'touch source.txt'}, '', tid='mut'))
-    assert held(s.send(output('data_91')))
-    # The origin still exists; freshness is exclusively rule c.
-    assert s.rules() == {'c'}
+    assert not held(s.send(output('data_91')))
+    # D17 needs a claimed point; the historical identifier reading still exists.
+    assert s.rules() == set()
 
 
 def test_session_separation_and_corruption(tmp_path):
@@ -340,7 +340,7 @@ def test_git_syntax_is_a_boundary(tmp_path, command):
     assert not held(s.send(ev))
     claim = output('unread_91', 'commit', tid='claim')
     assert held(s.send(claim))
-    assert s.rules() == {'a'}
+    assert s.rules() == {'a', 'b'}
 
 
 @pytest.mark.parametrize('text,named', [('Error: file not found', False), ('  at worker (file.py:19)', True), ('Traceback (most recent call last):', False)])
@@ -370,7 +370,7 @@ def test_candidate_content_and_tool_metadata_do_not_pay_themselves(tmp_path):
     ev = output('invented_91')
     ev['makoto'] = {'reads': [{'subject': 'invented_91', 'complete': True}]}
     assert held(s.send(ev))
-    assert s.rules() == {'a'}
+    assert s.rules() == {'a', 'b'}
 
 
 def test_numeric_and_protocol_field_values_are_actual_tool_bytes(tmp_path):

@@ -134,7 +134,7 @@ def test_url_host_is_a_point_even_after_online_search(fresh):
     if fresh:
         feed(ledger, pair('WebFetch', {'url': target}, target, tid='right'))
     findings, _ = evaluate(ledger, candidate(target, 'Stop'))
-    assert {f['rule'] for f in findings} == (set() if fresh else {'c'})
+    assert {f['rule'] for f in findings} == (set() if fresh else {'b', 'c'})
 
 
 @pytest.mark.parametrize('spelling', ['/w/fern.txt', './fern.txt', 'fern.txt'])

@@ -64,20 +64,24 @@ def claim_locations(event, ledger=None):
     return result
 
 
-def related_readings(ledger, path):
+def related_readings(ledger, path, *, runs=False):
     """Same subject identity or a host-recorded copy relation, never basename."""
     paths = {path}
     while True:
         expanded = paths | {p for pair in ledger.point_aliases if paths.intersection(pair) for p in pair}
         if expanded == paths:
-            return [r for r in ledger.point_readings if r['path'] in paths]
+            records = list(ledger.point_readings)
+            if runs:
+                records += [dict(path=p, point=point, started=r['started'], tool_use_id=r['tool_use_id'])
+                            for r in ledger.executions for p, point in r.get('locations', [])]
+            return [r for r in records if r['path'] in paths]
         paths = expanded
 
 
 def other_point(ledger, event):
     findings = []
     for spelling, (path, point) in claim_locations(event, ledger):
-        related = related_readings(ledger, path)
+        related = related_readings(ledger, path, runs=True)
         if not related:
             continue
         subject = ledger.subject(path, event) if not spelling.startswith(('http://', 'https://')) else spelling

@@ -88,7 +88,7 @@ def response_text(response):
 
 def failed(event):
     response = event.get('tool_response', {})
-    return event['hook_event_name'] == 'PostToolUseFailure' or isinstance(response, dict) and bool(response.get('is_error') or response.get('isError') or next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), 0))
+    return event['hook_event_name'] == 'PostToolUseFailure' or isinstance(response, dict) and bool(response.get('is_error') or response.get('isError') or any(response.get(k) not in (None, 0, '0', '') for k in ('exitCode', 'exit_code', 'exit')))
 
 
 def effects(event):

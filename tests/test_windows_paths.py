@@ -143,7 +143,7 @@ def test_cross_drive_edit_and_writer_reference_need_no_relpath(windows_paths, mo
     for ev in change:
         ev['cwd'] = 'D:\\work'
     feed(ledger, change)
-    candidate = dict(output('C:/bin/worker', 'Write'), cwd='D:\\work')
+    candidate = dict(output('C:/bin/worker returns a response', 'Write'), cwd='D:\\work')
     assert switch_holds(ledger, candidate)
     unrelated = dict(output('unrelated text', 'Write'), cwd='D:\\work')
     assert not switch_holds(ledger, unrelated)

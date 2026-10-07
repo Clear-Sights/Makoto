@@ -57,7 +57,7 @@ def test_transcript_includes_earlier_turns_and_excludes_assistant(tmp_path, form
     transcript.write_text(''.join(json.dumps(r)+'\n' for r in rows))
     assert not held(s.send(dict(output('original_91'), transcript_path=str(transcript))))
     assert held(s.send(dict(output('invented_92'), transcript_path=str(transcript))))
-    assert s.rules() == {'a'}
+    assert s.rules() == {'a', 'b'}
 
 
 def test_transcript_prior_write_invalidates_old_read(tmp_path):
@@ -66,8 +66,8 @@ def test_transcript_prior_write_invalidates_old_read(tmp_path):
     rows = pair(text='original_91') + [write, dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'})] + pair(text='original_91', tid='own-read')
     transcript = tmp_path / 'transcript.jsonl'
     transcript.write_text(''.join(json.dumps(r)+'\n' for r in rows))
-    assert held(s.send(dict(output('original_91'), transcript_path=str(transcript))))
-    assert s.rules() == {'c'}  # Origin exists; its source changed (DESIGN D17).
+    assert not held(s.send(dict(output('original_91'), transcript_path=str(transcript))))
+    assert s.rules() == set()  # D17 selects a claimed point, not historical literal origin.
 
 
 def test_transcript_import_cannot_overrule_denial(tmp_path):
@@ -103,7 +103,7 @@ def test_host_current_turn_metadata_does_not_import_candidate_receipts(tmp_path)
     ev = output('paid_93')
     ev['makoto'] = {'turn_id': 'next', 'reads': [{'subject': 'invented', 'content': 'paid_93'}]}
     assert held(s.send(ev))
-    assert s.rules() == {'a'}
+    assert s.rules() == {'a', 'b'}
 
 
 @pytest.mark.parametrize('text', ['$HOME', 'a*b', 'foo[0]', 'foo()', "don't", 'widget v1.2.3', 'widget version 1.2.3'])

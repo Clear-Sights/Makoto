@@ -55,9 +55,9 @@ def build_extra(rule, kind, variant, clean):
         text = 'cedar.txt'
         repair = pair(ti={'file_path': 'cedar-spec.txt'}, text='definition', tid='definition')
     elif variant == 'unchanged':
-        # DESIGN D18: naming existing code needs a run even without an edit.
+        # DESIGN D18: behavior of existing code needs a run without an edit.
         events = pair(ti={'file_path': 'cedar.py'}, text='def leaf():\n    return 7\n')
-        text = 'cedar.py'
+        text = 'cedar.py returns a response'
         repair = pair('Run', {'file_path': 'cedar.py'}, 'returned', tid='run')
     elif variant == 'stale':
         # DESIGN D15/D17: a mutation changes freshness, never historical origin.
@@ -65,8 +65,8 @@ def build_extra(rule, kind, variant, clean):
         change = event('PreToolUse', tool_name='Write', tool_use_id='change',
                        tool_input={'file_path': 'cedar.txt', 'content': 'updated'})
         events += [change, dict(change, hook_event_name='PostToolUse', tool_response={'content': 'ok'})]
-        text = 'result_317'
-        repair = pair(ti={'file_path': 'independent.txt'}, text=text, tid='fresh')
+        text = 'cedar.txt'
+        repair = pair(ti={'file_path': 'cedar.txt'}, text='updated', tid='fresh')
     else:
         raise AssertionError(variant)
     return events + (repair if clean else []), candidate(text, kind)
@@ -78,9 +78,9 @@ def build_double(rules, kind, clean):
     events = pair(ti={'file_path': 'cedar.py'}, text='def leaf():\n    return 7\n')
     events[0]['makoto'] = {'place': {'host': 'staging'}}
     events += pair(ti={'file_path': 'catalog.txt'}, text='cedar.py host=production', tid='catalog')
-    text = 'cedar.py host=production contains value_317'
+    text = 'cedar.py host=production returns 317'
     if 'a' not in rules or clean:
-        events += pair(ti={'file_path': 'measurement.txt'}, text='value_317', tid='origin')
+        events += pair(ti={'file_path': 'measurement.txt'}, text='317', tid='origin')
     events += [event('UserPromptSubmit', makoto={'definitions': [
         {'subject': 'cedar.py', 'definition': 'cedar-spec.txt'}]})]
     if 'b' not in rules or clean:
@@ -129,7 +129,7 @@ def build(rule, kind, variant, clean):
         write = event('PreToolUse', tool_name='Write', tool_use_id='change', tool_input={'file_path': subject, 'content': body})
         events += [write, dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'})]
         events += pair(ti={'file_path': subject}, text=body)
-        text = subject
+        text = subject + ' returns a response'
         repair = pair('Run', {'file_path': subject}, 'completed', tid='repair')
     if clean:
         events += repair
