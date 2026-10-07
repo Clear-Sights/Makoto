@@ -122,7 +122,8 @@ class Ledger:
         Original read existence is independent of subsequent file changes;
         aggregate bytes still use the ordinary freshness guard for rule b.
         """
-        if pre.get('tool_name') != 'Bash':
+        # D4/D11: any non-writer, non-worker command tool can execute.
+        if pre.get('tool_name') in WRITERS | {'Agent', 'Task'} or not isinstance(pre.get('tool_input', {}).get('command'), str):
             return False
         segments = selected_segments(pre.get('tool_input', {}).get('command', ''), post)
         if segments is None:

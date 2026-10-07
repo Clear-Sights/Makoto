@@ -168,3 +168,22 @@ def test_mcp_run_response_is_distinct_from_session_written_program():
     feed(ledger, pair('Write', {'file_path': './worker.py', 'content': 'print(731)'}, tid='write'))
     feed(ledger, pair('mcp__runner__execute', {'program_path': './worker.py', 'argv': []}, 'result_id', tid='run'))
     assert rules(ledger, './worker.py returns result_id') == set()
+
+
+@pytest.mark.parametrize('kind', ['branch', 'host', 'environment', 'copy', 'target'])
+def test_coordinate_literal_needs_original_reading(kind):
+    ledger = Ledger()
+    claim = f'The result is recorded as {kind} maple.'
+    assert rules(ledger, claim) == {'a'}
+    feed(ledger, pair(text='maple'))
+    assert rules(ledger, claim) == set()
+
+
+@pytest.mark.parametrize('command', ['awk -v n=3 -f /w/worker.awk', 'python /w/worker.py', 'node /w/worker.js', 'bash /w/worker.sh'])
+@pytest.mark.parametrize('tool', ['Bash', 'mcp__process__invoke', 'Task'])
+def test_command_tool_interpreter_subject(command, tool):
+    ledger = Ledger()
+    feed(ledger, pair(tool, {'command': command + " && printf done"}, 'answer'))
+    subjects = {s for run in ledger.executions for s in run['subjects']}
+    target = 'file:' + command.split()[-1]
+    assert (target in subjects) == (tool != 'Task')

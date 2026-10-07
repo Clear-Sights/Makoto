@@ -47,6 +47,15 @@ def literals(text):
         start, end = match.span(match.lastgroup)
         if not any(start <= s.start and s.end <= end for s in result):
             result.append(Span(text[start:end], start, end, 'delimited'))
+    # D6/D9: the name following a coordinate kind is its value literal.
+    from .points import COORDINATE
+    for match in COORDINATE.finditer(text):
+        if match[1] == 'mount':
+            continue
+        start, end = match.span(2)
+        end = start + len(text[start:end].rstrip('.'))
+        if start < end and not any(s.start <= start and end <= s.end for s in result):
+            result.append(Span(text[start:end], start, end, 'coordinate-name'))
     # D9: separators in a quoted prose value do not name a root directory.
     for match in DELIMITED.finditer(text):
         start, end = match.span(match.lastgroup)

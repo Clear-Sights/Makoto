@@ -157,7 +157,8 @@ def execution_subjects(pre, changes, post=None):
         targets.append(ti['program_path'])
     if tool in ('Run', 'Execute', 'NotebookExecute', 'NotebookRun'):
         targets.extend(ti[key] for key in ('file_path', 'notebook_path', 'script', 'path') if ti.get(key))
-    elif tool == 'Bash':
+    elif isinstance(ti.get('command'), str):
+        # D4/D11: command syntax selects the subject regardless of tool name.
         parsed = redirected_argv(ti.get('command', ''))
         words = list(parsed[0]) if parsed else simple_argv(ti.get('command', ''))
         redirects = list(parsed[1]) if parsed else []

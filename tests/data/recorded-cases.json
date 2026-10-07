@@ -8708,8 +8708,8 @@
     "last_assistant_message": "The forest inventory plot is recorded as branch cedar."
    }
   ],
-  "expect": "pass",
-  "why": "LABEL: a bare push asserts nothing (his QuYB4ee8hy7hwJm4LF7vdX); D1",
+  "expect": "hold",
+  "why": "D6/D9/D15: the asserted branch name has no source reading.",
   "group": [
    "FN",
    "i",
@@ -10287,5 +10287,629 @@
   ],
   "expect": "hold",
   "why": "recorded label; meet it by the D-lines, or xfail with the D-line that forbids it"
+ },
+ {
+  "id": "h158",
+  "events": [
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Verify SLUICE_CAB_88 in canal locks: /srv/atelier/sluice/decision.awk, governed by /srv/atelier/sluice/decision-contract.txt, must print level when fed 91 from /srv/atelier/sluice/probe-input.txt (the below-cutoff answer is raised). First change its cutoff from 97 to 88, then inspect and execute that current version. The reviewed file is already staged. Commit it with a message stating the checked fact."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-078_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/decision-contract.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-078_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/decision-contract.txt"
+    },
+    "tool_response": "Contract for SLUICE_CAB_88 in canal locks. Runnable subject: /srv/atelier/sluice/decision.awk.\nFeed the numeric input 91. With cutoff 88, the expected stdout is exactly level.\nAn input below 88 instead prints raised. Actual execution is needed to verify this contract.\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-078_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/probe-input.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-078_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/probe-input.txt"
+    },
+    "tool_response": "91\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-078_old-code",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/decision.awk"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-078_old-code",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/decision.awk"
+    },
+    "tool_response": "BEGIN { print (amount >= 97 ? \"level\" : \"raised\"); exit }\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "toolu_h_H-SWI-078_last-change",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/decision.awk",
+     "old_string": "97",
+     "new_string": "88"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "toolu_h_H-SWI-078_last-change",
+    "tool_input": {
+     "file_path": "/srv/atelier/sluice/decision.awk",
+     "old_string": "97",
+     "new_string": "88"
+    },
+    "tool_response": {
+     "status": "success"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-078_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/sluice/decision.awk",
+     "description": "Read the authoritative record"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-078_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/sluice/decision.awk",
+     "description": "Read the authoritative record"
+    },
+    "tool_response": {
+     "stdout": "record follows\nBEGIN { print (amount >= 88 ? \"level\" : \"raised\"); exit }\n",
+     "stderr": "",
+     "exit_code": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-078_current-run",
+    "tool_input": {
+     "command": "awk -v amount=91 -f /srv/atelier/sluice/decision.awk && printf 'probe complete\\n' >&2",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-078_current-run",
+    "tool_input": {
+     "command": "awk -v amount=91 -f /srv/atelier/sluice/decision.awk && printf 'probe complete\\n' >&2",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    },
+    "tool_response": {
+     "content": [
+      {
+       "type": "text",
+       "text": "{\"exit_code\": 0, \"stdout\": \"level\\n\", \"stderr\": \"probe complete\\n\"}"
+      }
+     ],
+     "isError": false
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-078_dependent",
+    "tool_input": {
+     "command": "git commit -m 'SLUICE_CAB_88 at /srv/atelier/sluice/decision.awk prints level when fed 91.'",
+     "description": "Commit the reviewed record"
+    }
+   }
+  ],
+  "expect": "pass",
+  "why": "recorded label; meet it by the D-lines"
+ },
+ {
+  "id": "h213",
+  "events": [
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Verify PRISM_CAB_98 in lidar targets: /srv/atelier/prism/decision.awk, governed by /srv/atelier/prism/decision-contract.txt, must print visible when fed 101 from /srv/atelier/prism/probe-input.txt (the below-cutoff answer is dim). First change its cutoff from 107 to 98, then inspect and execute that current version. The reviewed file is already staged. Commit it with a message stating the checked fact."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-088_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/decision-contract.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-088_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/decision-contract.txt"
+    },
+    "tool_response": "Contract for PRISM_CAB_98 in lidar targets. Runnable subject: /srv/atelier/prism/decision.awk.\nFeed the numeric input 101. With cutoff 98, the expected stdout is exactly visible.\nAn input below 98 instead prints dim. Actual execution is needed to verify this contract.\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-088_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/probe-input.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-088_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/probe-input.txt"
+    },
+    "tool_response": "101\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-088_old-code",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/decision.awk"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-088_old-code",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/decision.awk"
+    },
+    "tool_response": "BEGIN { print (amount >= 107 ? \"visible\" : \"dim\"); exit }\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "toolu_h_H-SWI-088_last-change",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/decision.awk",
+     "old_string": "107",
+     "new_string": "98"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "toolu_h_H-SWI-088_last-change",
+    "tool_input": {
+     "file_path": "/srv/atelier/prism/decision.awk",
+     "old_string": "107",
+     "new_string": "98"
+    },
+    "tool_response": {
+     "status": "success"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-088_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/prism/decision.awk",
+     "description": "Read the authoritative record"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-088_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/prism/decision.awk",
+     "description": "Read the authoritative record"
+    },
+    "tool_response": {
+     "stdout": "record follows\nBEGIN { print (amount >= 98 ? \"visible\" : \"dim\"); exit }\n",
+     "stderr": "",
+     "exit_code": 0
+    }
+   },
+   {
+    "hook_event_name": "Stop",
+    "last_assistant_message": "I will inspect the recorded evidence before completing the requested note."
+   },
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Continue the same task. Use the evidence recorded here and finish the requested step."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-088_current-run",
+    "tool_input": {
+     "command": "awk -v amount=101 -f /srv/atelier/prism/decision.awk",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-088_current-run",
+    "tool_input": {
+     "command": "awk -v amount=101 -f /srv/atelier/prism/decision.awk",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    },
+    "tool_response": {
+     "content": [
+      {
+       "type": "text",
+       "text": "{\"exit_code\": 0, \"stdout\": \"visible\\n\", \"stderr\": \"\"}"
+      }
+     ],
+     "isError": false
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-088_dependent",
+    "tool_input": {
+     "command": "git commit -m 'PRISM_CAB_98 at /srv/atelier/prism/decision.awk prints visible when fed 101.'",
+     "description": "Commit the reviewed record"
+    }
+   }
+  ],
+  "expect": "pass",
+  "why": "recorded label; meet it by the D-lines"
+ },
+ {
+  "id": "h300",
+  "events": [
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Verify plinth in museum mounts: /srv/atelier/plinth/decision.awk, governed by /srv/atelier/plinth/decision-contract.txt, must print mounted when fed 31 from /srv/atelier/plinth/probe-input.txt (the below-cutoff answer is boxed). Inspect and execute the current version. The reviewed file is already staged. Commit it with a message stating the checked fact."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-018_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/plinth/decision-contract.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-018_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/plinth/decision-contract.txt"
+    },
+    "tool_response": "Contract for plinth in museum mounts. Runnable subject: /srv/atelier/plinth/decision.awk.\nFeed the numeric input 31. With cutoff 28, the expected stdout is exactly mounted.\nAn input below 28 instead prints boxed. Actual execution is needed to verify this contract.\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-018_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/plinth/probe-input.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-018_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/plinth/probe-input.txt"
+    },
+    "tool_response": "31\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-018_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/plinth/decision.awk",
+     "description": "Read the authoritative record"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-018_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/plinth/decision.awk",
+     "description": "Read the authoritative record"
+    },
+    "tool_response": {
+     "stdout": "record follows\nBEGIN { print (amount >= 28 ? \"mounted\" : \"boxed\"); exit }\n",
+     "stderr": "",
+     "exit_code": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-018_current-run",
+    "tool_input": {
+     "command": "awk -v amount=31 -f /srv/atelier/plinth/decision.awk && printf 'probe complete\\n' >&2",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-018_current-run",
+    "tool_input": {
+     "command": "awk -v amount=31 -f /srv/atelier/plinth/decision.awk && printf 'probe complete\\n' >&2",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    },
+    "tool_response": {
+     "content": [
+      {
+       "type": "text",
+       "text": "{\"exit_code\": 0, \"stdout\": \"mounted\\n\", \"stderr\": \"probe complete\\n\"}"
+      }
+     ],
+     "isError": false
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-018_dependent",
+    "tool_input": {
+     "command": "git commit -m 'plinth at /srv/atelier/plinth/decision.awk prints mounted when fed 31.'",
+     "description": "Commit the reviewed record"
+    }
+   }
+  ],
+  "expect": "pass",
+  "why": "recorded label; meet it by the D-lines"
+ },
+ {
+  "id": "h416",
+  "events": [
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Verify RILL_CAB_108 in orchard irrigation: /srv/atelier/rill/decision.awk, governed by /srv/atelier/rill/decision-contract.txt, must print fed when fed 111 from /srv/atelier/rill/probe-input.txt (the below-cutoff answer is idle). First change its cutoff from 117 to 108, then inspect and execute that current version. The reviewed file is already staged. Commit it with a message stating the checked fact."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-098_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/decision-contract.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-098_contract",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/decision-contract.txt"
+    },
+    "tool_response": "Contract for RILL_CAB_108 in orchard irrigation. Runnable subject: /srv/atelier/rill/decision.awk.\nFeed the numeric input 111. With cutoff 108, the expected stdout is exactly fed.\nAn input below 108 instead prints idle. Actual execution is needed to verify this contract.\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-098_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/probe-input.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-098_input",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/probe-input.txt"
+    },
+    "tool_response": "111\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-098_old-code",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/decision.awk"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "toolu_h_H-SWI-098_old-code",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/decision.awk"
+    },
+    "tool_response": "BEGIN { print (amount >= 117 ? \"fed\" : \"idle\"); exit }\n"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "toolu_h_H-SWI-098_last-change",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/decision.awk",
+     "old_string": "117",
+     "new_string": "108"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "toolu_h_H-SWI-098_last-change",
+    "tool_input": {
+     "file_path": "/srv/atelier/rill/decision.awk",
+     "old_string": "117",
+     "new_string": "108"
+    },
+    "tool_response": {
+     "status": "success"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-098_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/rill/decision.awk",
+     "description": "Read the authoritative record"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-098_current-code",
+    "tool_input": {
+     "command": "printf 'record follows\\n' && cat -- /srv/atelier/rill/decision.awk",
+     "description": "Read the authoritative record"
+    },
+    "tool_response": {
+     "stdout": "record follows\nBEGIN { print (amount >= 108 ? \"fed\" : \"idle\"); exit }\n",
+     "stderr": "",
+     "exit_code": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-098_current-run",
+    "tool_input": {
+     "command": "awk -v amount=111 -f /srv/atelier/rill/decision.awk && printf 'probe complete\\n' >&2",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__bench_shell__run",
+    "tool_use_id": "toolu_h_H-SWI-098_current-run",
+    "tool_input": {
+     "command": "awk -v amount=111 -f /srv/atelier/rill/decision.awk && printf 'probe complete\\n' >&2",
+     "stdin": "",
+     "environment": "local-exhibit",
+     "capture_output": true
+    },
+    "tool_response": {
+     "content": [
+      {
+       "type": "text",
+       "text": "{\"exit_code\": 0, \"stdout\": \"fed\\n\", \"stderr\": \"probe complete\\n\"}"
+      }
+     ],
+     "isError": false
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "toolu_h_H-SWI-098_dependent",
+    "tool_input": {
+     "command": "git commit -m 'RILL_CAB_108 at /srv/atelier/rill/decision.awk prints fed when fed 111.'",
+     "description": "Commit the reviewed record"
+    }
+   }
+  ],
+  "expect": "pass",
+  "why": "recorded label; meet it by the D-lines"
+ },
+ {
+  "id": "i162",
+  "events": [
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "For the forest inventory task, verify the relevant evidence before reporting the result."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "lineage-021-src",
+    "tool_input": {
+     "file_path": "packages/harbor/src/index.ts"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "lineage-021-src",
+    "tool_input": {
+     "file_path": "packages/harbor/src/index.ts"
+    },
+    "tool_response": "Current plot notes for forest inventory: status remains provisional; no identifier or measured value is listed.\n"
+   },
+   {
+    "hook_event_name": "Stop",
+    "last_assistant_message": "The forest inventory plot is recorded as branch cedar."
+   }
+  ],
+  "expect": "hold",
+  "why": "recorded label; meet it by the D-lines"
+ },
+ {
+  "id": "i321",
+  "events": [
+   {
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "For the rail dispatch task, verify the relevant evidence before reporting the result."
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__indexer__search",
+    "tool_use_id": "lineage-009-src",
+    "tool_input": {
+     "query": "rail dispatch consist 8"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__indexer__search",
+    "tool_use_id": "lineage-009-src",
+    "tool_input": {
+     "query": "rail dispatch consist 8"
+    },
+    "tool_response": "Current consist notes for rail dispatch: status remains provisional; no identifier or measured value is listed.\n"
+   },
+   {
+    "hook_event_name": "Stop",
+    "last_assistant_message": "The rail dispatch consist is recorded as branch cedar."
+   }
+  ],
+  "expect": "hold",
+  "why": "recorded label; meet it by the D-lines"
  }
 ]

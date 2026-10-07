@@ -77,3 +77,12 @@ Recorded cases retain their supplied expectations. Strict xfail reasons in
   and again afterward; the latter matched Read has no structured failure.
   Its error sentence cannot invalidate the reading under D13. The supplied
   hold expectation is retained.
+
+## Recorded-session refit (round 4)
+
+- The existing `test_recorded[i162]` expectation changes from pass to hold:
+  its Stop asserts an unread branch name, so D6/D9/D15 require lineage.
+  The old bare-push rationale did not describe its events. The six supplied
+  cases are appended unchanged, including the duplicate i162 session.
+- D4/D11 command execution is independent of the tool name; existing
+  interpreter operand selection now also applies to MCP command tools.
