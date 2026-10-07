@@ -41,7 +41,7 @@ def build_extra(rule, kind, variant, clean):
     elif variant in ('unrelated', 'copy'):
         # DESIGN D5/D16/D17: only an explicit copy relation joins different paths.
         text = '/w/right/cedar.txt'
-        events = pair(ti={'file_path': 'catalog.txt'}, text=text)
+        events = [event('UserPromptSubmit', prompt=text)]
         if variant == 'copy':
             events += [event('UserPromptSubmit', makoto={'aliases': [
                 {'subject': text, 'alias': '/w/left/cedar.txt'}]})]
@@ -109,8 +109,8 @@ def build(rule, kind, variant, clean):
         text = subject + ' contains ' + value
         repair = pair(ti={'file_path': 'measurement.txt'}, text=value, tid='repair')
     elif rule == 'b':
-        # DESIGN D16: exact source bytes naming a thing are not its own reading.
-        events += pair(ti={'file_path': 'catalog.txt'}, text=subject)
+        # DESIGN D16: a name given only in the prompt is not a reading.
+        events += [event('UserPromptSubmit', prompt=subject)]
         text = subject
         repair = pair(ti={'file_path': subject}, text='plain content', tid='repair')
     elif rule == 'c':

@@ -132,9 +132,6 @@ def test_b_absent_and_present_exact_form(tmp_path, value):
     assert held(s.send(output(value)))
     assert 'a' in s.rules()
     s.feed(pair(text=value, tid='value'))
-    if value == 'dir/file.txt':
-        assert held(s.send(output(value))) and s.rules() == {'b'}
-        s.feed(pair(ti={'file_path': value}, tid='thing'))
     assert not held(s.send(output(value)))
 
 

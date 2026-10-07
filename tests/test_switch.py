@@ -382,7 +382,9 @@ def test_live_failed_real_run_response_pays(tmp_path):
 @pytest.mark.parametrize('rule,shape,subject', [('a', 'lineage', 'unread_91'), ('b', 'spec', './unread.txt'), ('c', 'other point', 'https://source.example.test/item')])
 def test_other_hold_shapes_appear_in_transport_and_journal(tmp_path, rule, shape, subject):
     s = Session(tmp_path)
-    if rule != 'a':
+    if rule == 'b':
+        s.send(event('UserPromptSubmit', prompt=subject))
+    if rule == 'c':
         s.feed(pair(text=subject))
     if rule == 'c':
         s.feed(pair('WebFetch', {'url': 'https://other.example.test/item'}, subject, tid='other-point'))

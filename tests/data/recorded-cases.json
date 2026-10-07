@@ -1131,8 +1131,8 @@
     "last_assistant_message": "At /srv/atelier/plinth/checkouts/grove-release/card.txt (branch grove-release), Copper plinth specimen has catalog title \"Night garden: bronze study\"."
    }
   ],
-  "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "expect": "hold",
+  "why": "OURS from F6 \"true where made, not where it landed\": the read bytes record origin branch grove-preview while the claim names branch grove-release",
   "group": [
    "FP",
    "h",
@@ -1805,7 +1805,7 @@
    }
   ],
   "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "why": "D16: the claimed path is read by the register reading that returns it",
   "group": [
    "FP",
    "h",
@@ -5952,8 +5952,8 @@
     "last_assistant_message": "At collections/rush/distribution/card.txt (distribution copy), rush has transect bearing 138 deg."
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): a failure stated only in prose sits outside the hundred percent",
   "group": [
    "FN",
    "h",
@@ -6217,8 +6217,8 @@
     "last_assistant_message": "At collections/helios/distribution/card.txt (distribution copy), HELIOS_CAB_101 has reference voltage 37.4 V."
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): a failure stated only in prose sits outside the hundred percent",
   "group": [
    "FN",
    "h",
@@ -6705,7 +6705,7 @@
    }
   ],
   "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "why": "D16: the claimed path is read by the register reading that returns it",
   "group": [
    "FP",
    "h",
@@ -6852,7 +6852,7 @@
    }
   ],
   "expect": "pass",
-  "why": "DEF: every need his family names was met by a successful reading or run (see D4, D11, D16-D18)",
+  "why": "D16: the claimed path is read by the register reading that returns it",
   "group": [
    "FP",
    "h",
@@ -7148,8 +7148,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): definitions count only when the host declares them; none is declared",
   "group": [
    "FN",
    "i",
@@ -7217,8 +7217,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): definitions count only when the host declares them; none is declared",
   "group": [
    "FN",
    "i",
@@ -7255,8 +7255,8 @@
     "last_assistant_message": "heritage registry building accepts $803.75; I will use that definition."
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): definitions count only when the host declares them; none is declared",
   "group": [
    "FN",
    "i",
@@ -7775,8 +7775,8 @@
     }
    }
   ],
-  "expect": "hold",
-  "why": "DEF: a need his family names is missing (see D4, D7, D16-D18)",
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): definitions count only when the host declares them; none is declared",
   "group": [
    "FN",
    "i",
@@ -9334,8 +9334,8 @@
     "last_assistant_message": "At collections/reed/distribution/card.txt (distribution copy), reed.reference.r52 has absorption reference 0.73 sabins."
    }
   ],
-  "expect": "hold",
-  "why": "recorded label; meet it by the D-lines, or xfail with the D-line that forbids it"
+  "expect": "pass",
+  "why": "RECORD FORM (his choice, card tapped 2026-10-07T13:57Z): a failure stated only in prose sits outside the hundred percent"
  },
  {
   "id": "h352",

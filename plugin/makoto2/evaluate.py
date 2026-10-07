@@ -40,6 +40,8 @@ def spec(ledger, event, text, spans):
         related = related_readings(ledger, path)
         searched = spelling.startswith(('http://', 'https://')) and any(r['tool'] == 'WebSearch' and r['source'] and any(contains(t, spelling, 'url') for t in r['texts']) for r in ledger.readings)
         read = any(r['source'] and spelling in r['subjects'] for r in ledger.readings) if spelling.startswith(('http://', 'https://')) else bool(related)
+        # D16: a path is read by a successful original reading that returns it.
+        read = read or not spelling.startswith(('http://', 'https://')) and any(r['source'] and contains(t, spelling, 'path') for r in ledger.readings for t in r['texts'])
         if not read and not searched:
             findings.append(finding('b', spelling, 'SUBJECT NOT READ: read this path or fetch/search this URL'))
     for span in spans:

@@ -116,7 +116,9 @@ def test_clean_stop_has_no_questions_across_retries_and_turns(tmp_path, boundary
 @pytest.mark.parametrize('boundary', ['Write', 'Stop'])
 def test_rule_holds_take_precedence_over_questions(tmp_path, text, rule, boundary):
     s = Session(tmp_path)
-    if rule != 'a':
+    if rule == 'b':
+        s.send(event('UserPromptSubmit', prompt=text))
+    if rule == 'c':
         s.feed(pair(text=text))
     if rule == 'c':
         s.feed(pair('WebFetch', {'url': 'https://other.test/a'}, text, tid='other-point'))
