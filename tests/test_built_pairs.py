@@ -16,9 +16,12 @@ LITERAL_CASES = [
     ('latency is 12 ms.', '12 ms'), ('count is 9.', '9'),
     ('stamp is 2026-10-06T19:24Z', '2026-10-06T19:24Z'),
 ]
+DOUBLE_RULES = ('ab', 'ac', 'ad', 'bc', 'bd', 'cd')
 CASES = [(rule, kind, variant) for rule in 'abcd' for kind in KINDS for variant in range(2)]
 CASES += [('a', kind, 'literal-' + str(i)) for kind in KINDS for i in range(len(LITERAL_CASES))]
 CASES += [(rule, kind, variant) for rule, variant in [('b', 'definition'), ('b', 'unrelated'), ('c', 'stale'), ('c', 'copy'), ('d', 'unchanged')] for kind in KINDS]
+
+CASES += [(rules, kind, 'double') for rules in DOUBLE_RULES for kind in KINDS]
 
 
 def candidate(text, kind):
@@ -40,13 +43,13 @@ def build_extra(rule, kind, variant, clean):
         text = '/w/right/cedar.txt'
         events = pair(ti={'file_path': 'catalog.txt'}, text=text)
         if variant == 'copy':
-            events += [event('Register', makoto={'aliases': [
+            events += [event('UserPromptSubmit', makoto={'aliases': [
                 {'subject': text, 'alias': '/w/left/cedar.txt'}]})]
         events += pair(ti={'file_path': '/w/left/cedar.txt'}, text='plain content', tid='left')
         repair = pair(ti={'file_path': text}, text='plain content', tid='right')
     elif variant == 'definition':
         # DESIGN D16: a thing reading cannot stand in for its named definition.
-        events = [event('Register', makoto={'definitions': [
+        events = [event('UserPromptSubmit', makoto={'definitions': [
             {'subject': 'cedar.txt', 'definition': 'cedar-spec.txt'}]})]
         events += pair(ti={'file_path': 'cedar.txt'}, text='plain content')
         text = 'cedar.txt'
@@ -69,8 +72,32 @@ def build_extra(rule, kind, variant, clean):
     return events + (repair if clean else []), candidate(text, kind)
 
 
+def build_double(rules, kind, clean):
+    # DESIGN D14, D19: each of ab, ac, ad, bc, bd, cd retains both
+    # independent findings; repairing both needs clears exactly that set.
+    events = pair(ti={'file_path': 'cedar.py'}, text='def leaf():\n    return 7\n')
+    events[0]['makoto'] = {'place': {'host': 'staging'}}
+    events += pair(ti={'file_path': 'catalog.txt'}, text='cedar.py host=production', tid='catalog')
+    text = 'cedar.py host=production contains value_317'
+    if 'a' not in rules or clean:
+        events += pair(ti={'file_path': 'measurement.txt'}, text='value_317', tid='origin')
+    events += [event('UserPromptSubmit', makoto={'definitions': [
+        {'subject': 'cedar.py', 'definition': 'cedar-spec.txt'}]})]
+    if 'b' not in rules or clean:
+        events += pair(ti={'file_path': 'cedar-spec.txt'}, text='definition', tid='definition')
+    if 'c' not in rules or clean:
+        reading = pair(ti={'file_path': 'cedar.py'}, text='def leaf():\n    return 7\n', tid='destination')
+        reading[0]['makoto'] = {'place': {'host': 'production'}}
+        events += reading
+    if 'd' not in rules or clean:
+        events += pair('Run', {'file_path': 'cedar.py'}, 'completed', tid='run')
+    return events, candidate(text, kind)
+
+
 def build(rule, kind, variant, clean):
-    """Each clean twin adds exactly one paired source reading or execution."""
+    """Each clean twin supplies the missing evidence."""
+    if variant == 'double':
+        return build_double(rule, kind, clean)
     if isinstance(variant, str):
         return build_extra(rule, kind, variant, clean)
     subject = ('cedar.txt', 'juniper.txt')[variant]
@@ -121,7 +148,7 @@ def test_built_pair(tmp_path, rule, kind, variant):
     for clean in (False, True):
         events, proposed = build(rule, kind, variant, clean)
         findings = replay(events, proposed)
-        assert {f['rule'] for f in findings} == (set() if clean else {rule}), findings
+        assert {f['rule'] for f in findings} == (set() if clean else set(rule)), findings
         # Cross the real hook with recorded historical events, then inspect the
         # persisted answer; do not execute the invented subjects.
         transcript = tmp_path / ('clean.jsonl' if clean else 'fault.jsonl')
