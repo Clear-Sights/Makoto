@@ -23,7 +23,13 @@ def history(candidate, journal):
         return [(row['event'], row['admitted']) for row in journal]
     imported, pending = [], {}
     current_id = candidate.get('tool_use_id')
-    with Path(path).open(encoding='utf-8') as stream:
+    try:
+        stream = Path(path).open(encoding='utf-8')
+    except FileNotFoundError:
+        # The host can submit a prompt before writing its first transcript.
+        # Missing history adds no evidence and never replaces the verified journal.
+        return merge([], journal)
+    with stream:
         for line in stream:
             row = json.loads(line)
             if row.get('session_id', row.get('sessionId', candidate['session_id'])) != candidate['session_id']:

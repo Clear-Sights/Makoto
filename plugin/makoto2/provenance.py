@@ -33,12 +33,15 @@ class Ledger:
         self.readbacks = []
         self.shebangs = set()
         self.compiled = {}
+        self.staged_code = {}
+        self.git_tracked = set()
+        self.committed_code = {}
 
     def changed_code(self):
         result = dict(self.code_changes)
         for tid, pre in self.pending.items():
             for effect in effects(pre):
-                if effect.get('removed'):
+                if effect.get('removed') or effect.get('renamed_from'):
                     continue
                 form = edited_forms(pre, effect['subject'])
                 if form:
@@ -55,6 +58,26 @@ class Ledger:
                 if not (form.get('record') and form.get('data'))}
 
     def change_code(self, event, subject):
+        rename = next((effect for effect in effects(event)
+                       if effect.get('renamed_from') and self.subject(effect['subject'], event) == subject), None)
+        if rename:
+            source = self.subject(rename['renamed_from'], event)
+            prior = self.code_changes.get(source)
+            if prior:
+                form = edited_forms(event, rename['subject'])
+                aliases = prior['aliases'] | (form['aliases'] if form else set())
+                self.code_changes[subject] = dict(prior, subject=subject, display=rename['subject'], aliases=aliases)
+                for run in self.executions + self.readbacks:
+                    # A prior run of the overwritten destination is a different
+                    # program. Only source witnesses travel with the rename.
+                    run['subjects'] = run['subjects'] - {subject}
+                    if source in run['subjects']:
+                        run['subjects'] = run['subjects'] | {subject}
+                self.shebangs.discard(subject)
+                if source in self.shebangs:
+                    self.shebangs.add(subject)
+            # A rename moves an existing obligation; it does not author code.
+            return
         if any(effect.get('removed') and self.subject(effect['subject'], event) == subject for effect in effects(event)):
             self.code_changes.pop(subject, None)
             self.shebangs.discard(subject)
@@ -135,7 +158,7 @@ class Ledger:
                     self.written.add(subject)
                     self.compiled.pop(subject, None)
                     self.change_code(segment, subject)
-                    if subject in self.code_changes:
+                    if subject in self.code_changes and not effect.get('renamed_from'):
                         self.code_changes[subject]['q'] = position
             if run_output(post):
                 compiled = compiled_subjects(segment)
@@ -173,7 +196,7 @@ class Ledger:
         parts = package_parts(span)
         return [r for r in self.online if r['turn'] == self.turn and self.fresh(r) and any(
             contains(t, span) or parts and any(package_parts(m.group()) == parts for m in VERSIONED.finditer(t))
-            for t in r['texts'])]
+            for t in (r.get('targets', []) if span.startswith(('https://', 'http://')) else r['texts']))]
 
     def ingest(self, event, admitted=True):
         self.q += 1
@@ -241,6 +264,8 @@ class Ledger:
                 self.change_code(pre, subject)
         if not failed(event) or no_effect:
             self.reservations.pop(tid, None)
+        from .shipping import record_git
+        record_git(self, pre, event)
         # Paired call plus returned response proves the act, even on failure.
         # Resolve the invocation against its recorded cwd, never final prose.
         if run_output(event) and (not ordered or pre.get('makoto', {}).get('invocation') or meta.get('invocation')):
@@ -300,4 +325,4 @@ class Ledger:
         if source and not failed(event):
             network = network_targets(pre, event)
             if network and content_present:
-                self.online.append(dict(item, texts=network + texts))
+                self.online.append(dict(item, targets=network, texts=network + texts))
