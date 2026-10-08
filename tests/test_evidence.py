@@ -142,7 +142,7 @@ def test_transcript_cross_session_is_transport_failure(tmp_path):
     s = Session(tmp_path)
     transcript = tmp_path / 'transcript.jsonl'
     transcript.write_text(json.dumps(dict(pair()[0], session_id='other'))+'\n')
-    response = s.send(dict(output(), transcript_path=str(transcript)))
+    response = s.send(dict(output(), transcript_path=str(transcript), stop_hook_active=False))
     assert held(response)
     assert 'session identity mismatch' in response['reason']
 
