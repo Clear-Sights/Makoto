@@ -57,6 +57,7 @@ def test_version_pair_does_not_include_sentence_punctuation(tmp_path, suffix):
     assert value in [span.text for span in extract(text)]
     assert value + '.' not in [span.text for span in extract(text)]
     s = Session(tmp_path)
+    s.send(event('Register', makoto={'external_subjects': [value]}))
     s.feed(pair(text=value))
     assert held(s.send(output(text))) and s.rules() == {'c'}
     s.feed(pair('WebFetch', {'url': 'https://packages.example.test/q'}, value, tid='fetch'))
@@ -126,6 +127,7 @@ def test_missing_or_failed_network_receipt_still_holds(tmp_path, variant):
 def test_package_subject_is_same_exact_name_and_release_across_separators(tmp_path, form):
     assert package_parts(form) == ('quivora', '17.24.6')
     s = Session(tmp_path)
+    s.send(event('Register', makoto={'external_subjects': ['quivora 17.24.6']}))
     s.feed(pair(text='quivora 17.24.6'))
     s.feed(pair('WebFetch', {'url': 'https://proof.example.test/pkg'}, form, tid='fetch'))
     assert not held(s.send(output('quivora 17.24.6')))
@@ -134,6 +136,7 @@ def test_package_subject_is_same_exact_name_and_release_across_separators(tmp_pa
 @pytest.mark.parametrize('other', ['quivora 17.24.5', 'quivoraExtra 17.24.6', 'Quivora 17.24.6'])
 def test_package_identity_keeps_exact_name_and_version(tmp_path, other):
     s = Session(tmp_path)
+    s.send(event('Register', makoto={'external_subjects': ['quivora 17.24.6']}))
     s.feed(pair(text='quivora 17.24.6'))
     s.feed(pair('WebFetch', {'url': 'https://proof.example.test/pkg'}, other, tid='fetch'))
     assert held(s.send(output('quivora 17.24.6'))) and s.rules() == {'c'}

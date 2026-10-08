@@ -26,6 +26,10 @@ def call(ledger, command, text='observed result', tid='compound', **response):
 @pytest.mark.parametrize('reverse', [False, True])
 def test_mutation_and_run_order(separator, mutation, reverse):
     ledger = Ledger()
+    if mutation.startswith('mv '):
+        # Moving an existing unrun edit preserves its obligation and ordering.
+        from test_switch import edit, feed
+        feed(ledger, edit('template.py', tid='template'))
     segments = [mutation, 'python3 loom.py']
     if reverse:
         segments.reverse()
@@ -373,6 +377,7 @@ def test_formatter_write_participates_in_order(reverse):
 
 def test_package_version_before_sentence_verb_is_not_a_physical_unit(tmp_path):
     s = Session(tmp_path)
+    s.send(event('Register', makoto={'external_subjects': ['Sapling 8.4']}))
     s.feed(pair(text='Sapling 8.4'))
     assert held(s.send(output('Sapling 8.4 is a tool.')))
     assert s.rules() == {'c'}

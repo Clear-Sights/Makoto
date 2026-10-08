@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import shlex
 
 import pytest
 
@@ -37,7 +38,7 @@ def output(text='source data', boundary='Stop', tid='step'):
     elif boundary == 'NotebookEdit':
         inputs = {'notebook_path': 'out.txt', 'new_source': text}
     elif boundary in ('commit', 'push'):
-        inputs = {'command': 'git ' + boundary + (' -m "source data"' if boundary == 'commit' else '')}
+        inputs = {'command': 'git ' + boundary + (' -m ' + shlex.quote(text) if boundary == 'commit' else '')}
         boundary = 'Bash'
     return event('PreToolUse', tool_name=boundary, tool_use_id=tid, tool_input=inputs)
 
@@ -74,7 +75,15 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
     # Seed identical native journal records in-process; all admission/retry
     # boundaries below still cross the real CLI transport.
     s.live = True
-    ev = output(boundary=boundary)
+    ev = output('unread_subject' if not present and boundary == 'commit' else 'source data', boundary=boundary)
+    if not present and boundary == 'push':
+        # A push holds an imported committed revision that has never run.
+        rows = pair('Write', {'file_path': 'unrun.sh', 'content': 'echo hello\n'}, 'written', tid='unrun')
+        rows += pair('Bash', {'command': 'git add unrun.sh'}, '', tid='add')
+        rows += pair('Bash', {'command': 'git commit -m Update'}, 'committed', tid='commit')
+        transcript = tmp_path / 'unrun.jsonl'
+        transcript.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+        ev['transcript_path'] = str(transcript)
     for index, retry in enumerate((False, True, True)):
         ev['tool_use_id'] = f'step-{index}'
         ev['stop_hook_active'] = retry
@@ -82,8 +91,8 @@ def test_all_boundaries_and_retries(tmp_path, boundary, present):
         note = present and boundary in ('Stop', 'SubagentStop', 'PreDelivery') and not retry
         assert held(response) == (not present or note), response
         if not present:
-            assert 'rule a' in str(response)
-            assert 'read an original artifact' in str(response)
+            assert ('rule d' if boundary == 'push' else 'rule a') in str(response)
+            assert ('run it and read the output' if boundary == 'push' else 'read an original artifact') in str(response)
             assert s.journal()[-1]['stop_hook_active_unpaid'] == retry
         elif note:
             assert response == {'decision': 'block', 'reason': hook.FOUR_QUESTIONS}
@@ -179,6 +188,7 @@ def test_agnostic_tool_response_and_prior_input(tmp_path, tool):
 @pytest.mark.parametrize('tool', ['WebFetch', 'WebSearch', 'Bash'])
 def test_c_external_subject_needs_current_online_call(tmp_path, subject, tool):
     s = Session(tmp_path)
+    s.send(event('Register', makoto={'external_subjects': [subject]}))
     s.feed(pair(text=subject))  # Read locally: b paid, c unpaid.
     assert held(s.send(output(subject)))
     assert s.rules() == {'c'}
@@ -325,9 +335,16 @@ def test_delivery_and_pairs_print_actual_admission(tmp_path):
 @pytest.mark.parametrize('command', ['# comment\ngit commit -m source', 'echo ready && git push', 'git --git-dir=repo commit', 'git -c x=y push', 'env X=1 git push', '/usr/bin/git push'])
 def test_git_syntax_is_a_boundary(tmp_path, command):
     s = Session(tmp_path)
-    ev = event('PreToolUse', tool_name='Bash', tool_use_id='git', tool_input={'command': command})
+    # Git syntax remains a boundary when the record selects unrun code.
+    rows = pair('Write', {'file_path': 'unrun.sh', 'content': 'echo hello\n'}, 'written', tid='unrun')
+    rows += pair('Bash', {'command': 'git add unrun.sh'}, '', tid='add')
+    rows += pair('Bash', {'command': 'git commit -m Update'}, 'committed', tid='commit')
+    rows += pair('Bash', {'command': 'git add unrun.sh'}, '', tid='restage')
+    transcript = tmp_path / 'unrun.jsonl'
+    transcript.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+    ev = event('PreToolUse', tool_name='Bash', tool_use_id='git', tool_input={'command': command}, transcript_path=str(transcript))
     assert held(s.send(ev))
-    assert 'a' in s.rules()
+    assert 'd' in s.rules()
 
 
 @pytest.mark.parametrize('text,named', [('Error: file not found', False), ('  at worker (file.py:19)', True), ('Traceback (most recent call last):', False)])

@@ -29,6 +29,16 @@ def edit(path='branch.py', tool='Write', tid='edit', **fields):
     return [ev, dict(ev, hook_event_name='PostToolUse', tool_response={'content': 'written'})]
 
 
+def shipping_scope(ledger, boundary, paths):
+    """Supply the staging/commit records that make these shipping holds real."""
+    if boundary not in ('commit', 'push'):
+        return
+    feed(ledger, pair('Bash', {'command': 'git add -- ' + shlex.join(paths)}, '', tid='scope-add'))
+    if boundary == 'push':
+        # Imported receipts can include a commit made before hook enforcement.
+        feed(ledger, pair('Bash', {'command': 'git commit -m Update'}, 'committed', tid='scope-commit'))
+
+
 def ledger_with_edit(path='branch.py', tool='Write'):
     ledger = Ledger()
     feed(ledger, pair(text=CONTENT + '\nbranch.py branch branchExtra.py pkg.branch input_value --config plan.toml'))
@@ -45,7 +55,8 @@ def switch_holds(ledger, candidate=None):
 @pytest.mark.parametrize('boundary', ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'commit', 'push', 'Stop', 'SubagentStop', 'PreDelivery'])
 def test_unrun_code_holds_each_dependent_boundary(boundary):
     ledger = ledger_with_edit()
-    candidate = output('branch.py', boundary)
+    shipping_scope(ledger, boundary, ['branch.py'])
+    candidate = output('Done' if boundary in ('commit', 'push') else 'branch.py', boundary)
     if boundary in ('commit', 'push'):
         # Shipping needs no literal reference to the edited file.
         assert 'branch.py' not in candidate['tool_input']['command']
@@ -482,6 +493,7 @@ def test_code_and_shebangs_still_require_runs_after_readback(path, boundary):
             ev['tool_input']['content'] = '#!/bin/sh\necho hello\n'
     feed(ledger, change)
     feed(ledger, pair(ti={'file_path': path}, text=change[0]['tool_input']['content'], tid='readback'))
+    shipping_scope(ledger, boundary, [path])
     assert switch_holds(ledger, output('Done', boundary))
     feed(ledger, pair('Run', {'file_path': path}, 'hello', tid='run'))
     assert not switch_holds(ledger, output('Done', boundary))
@@ -503,6 +515,7 @@ def test_mixed_data_and_code_commit_requires_every_code_run():
     feed(ledger, pair(ti={'file_path': 'settings.json'}, tid='data'))
     feed(ledger, pair(ti={'file_path': 'second.py'}, tid='code'))
     feed(ledger, pair('Run', {'file_path': 'first.py'}, 'response', tid='run_first'))
+    shipping_scope(ledger, 'commit', ['settings.json', 'first.py', 'second.py'])
     assert [f['subject'] for f in switch_holds(ledger, output('Done', 'commit'))] == ['second.py']
     feed(ledger, pair('Run', {'file_path': 'second.py'}, 'response', tid='run_second'))
     assert not switch_holds(ledger, output('Done', 'commit'))
@@ -562,6 +575,7 @@ def test_commit_after_edit_preserves_script_obligations(tmp_path, path, expect_h
     for ev in change:
         ev['tool_input']['content'] = '#!/bin/sh\necho saved\n' if path == 'worker' else 'The result is saved.'
     s.feed(change)
+    s.feed(pair('Bash', {'command': 'git add -- ' + path}, '', tid='stage'))
     assert held(s.send(output('The result is saved.', 'commit'))) == expect_hold
     if expect_hold:
         assert s.rules() == {'d'}
@@ -573,6 +587,7 @@ def test_extensionless_executable_without_shebang_still_requires_run(tmp_path):
     path.chmod(0o755)
     ledger = Ledger()
     feed(ledger, edit(str(path)))
+    shipping_scope(ledger, 'commit', [str(path)])
     assert switch_holds(ledger, output('Done', 'commit'))
     feed(ledger, pair('Run', {'file_path': str(path)}, 'response', tid='run'))
     assert not switch_holds(ledger)

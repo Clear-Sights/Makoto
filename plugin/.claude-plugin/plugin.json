@@ -1,7 +1,7 @@
 {
   "name": "makoto",
   "description": "Form-based session record holds before writes, commit/push and final answers.",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "author": {
     "name": "Clear-Sights"
   },

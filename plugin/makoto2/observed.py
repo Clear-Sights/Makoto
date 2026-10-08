@@ -119,14 +119,14 @@ def effects(event):
             elif name in ('touch', 'rm', 'mkdir', 'rmdir', 'truncate', 'tee'):
                 result.extend({'subject': w} for w in words[1:] if w and not w.startswith('-'))
             elif name in ('cp', 'mv') and len(words) > 2:
-                result.append({'subject': words[-1]})
+                result.append(dict(subject=words[-1], **({'renamed_from': words[-2]} if name == 'mv' else {})))
                 if name == 'mv':
                     result.append({'subject': words[-2], 'removed': True})
             elif name == 'sed' and any(w.startswith('-i') for w in words[1:]):
                 result.append({'subject': words[-1]})
             elif name == 'gofmt' and '-w' in words[1:]:
                 result.extend({'subject': w} for w in words[1:] if w != '-w' and not w.startswith('-'))
-    return list(event.get('makoto', {}).get('effects', [])) + [r for r in result if r['subject'] != '']
+    return list(event.get('makoto', {}).get('effects', [])) + [r for r in result if r['subject'] != '' and not any(c in r['subject'] for c in '$*?`')]
 
 
 def reading_subjects(pre):

@@ -159,6 +159,15 @@ def execution_subjects(pre, changes, post=None):
             if parsed:
                 words = simple_argv(shlex.join(parsed[0]))
                 redirects = parsed[1]
+        # The launcher records the script payload after --. The normal parser
+        # keeps interpreter check/eval flags and output requirements intact.
+        launcher = words[1:] if words and program_name(words[0]) in ('sh', 'bash', 'zsh') else words
+        if (len(launcher) >= 4 and program_name(launcher[0]) == 'codex-job.sh'
+                and launcher[1] == 'start' and '--' in launcher[3:]):
+            payload = launcher[launcher.index('--', 3) + 1:]
+            if payload:
+                nested = dict(pre, tool_input=dict(ti, command=shlex.join(payload)))
+                targets.extend(s.removeprefix('file:') for s in execution_subjects(nested, changes, post))
         if words:
             program = program_name(words[0])
             if RUNTIMES.fullmatch(program):
