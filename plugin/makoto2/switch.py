@@ -92,7 +92,7 @@ def full_read_subjects(pre, post):
             if args and args[0] == '--':
                 args = args[1:]
             # One operand keeps returned bytes attributable to that same file.
-            if len(args) == 1 and args[0] != '-' and not args[0].startswith('-'):
+            if len(args) == 1 and args[0] and args[0] != '-' and not args[0].startswith('-'):
                 targets.extend(args)
     for event in (pre, post):
         targets.extend(spec['subject'] for spec in event.get('makoto', {}).get('reads', [])
@@ -208,7 +208,7 @@ def execution_subjects(pre, changes, post=None):
                                             and (len(opened.args) == 1 or isinstance(opened.args[1], ast.Constant)
                                                  and opened.args[1].value in ('r', 'rb'))):
                                         path = opened.args[0].value
-                                        if changes.get(identity(path, pre), {}).get('data'):
+                                        if path and changes.get(identity(path, pre), {}).get('data'):
                                             targets.append(path)
                                 break  # Earlier arbitrary code may exit/raise.
                         for module in modules:
@@ -272,7 +272,7 @@ def execution_subjects(pre, changes, post=None):
                         targets.append(words[i + 1])
                     elif word.startswith('--config='):
                         targets.append(word.split('=', 1)[1])
-    return {identity(target, pre) for target in targets}
+    return {identity(target, pre) for target in targets if target != ''}
 
 
 def compiled_subjects(pre):
@@ -290,7 +290,7 @@ def compiled_subjects(pre):
     output = words[words.index('-o') + 1]
     sources = [w for w in words[1:] if w != output and not w.startswith('-')
                and ntpath.splitext(w)[1] in ('.c', '.cc', '.cpp', '.cxx', '.rs')]
-    if not sources:
+    if not output or not sources:
         return None
     return identity(output, pre), {identity(source, pre) for source in sources}
 
