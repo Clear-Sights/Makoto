@@ -1,6 +1,7 @@
 """Recorded file paths are portable identities, independent of the hook host."""
 import ntpath
 import posixpath
+import re
 
 
 def flavour(*paths):
@@ -36,3 +37,11 @@ def program_name(path):
     """Bash may invoke a Windows executable with either separator."""
     name = ntpath.basename(path)
     return name[:-4] if name.lower().endswith('.exe') else name
+
+
+def subject_path(path):
+    """Reject syntax tokens and unresolved shell names before path identity."""
+    token = ntpath.basename(path.removeprefix('file:'))
+    return bool(token and any(c.isalnum() for c in token)
+                and not re.fullmatch(r'\d+:', token)
+                and not re.search(r'\$(?:[A-Za-z_]\w*|\{[^}]+\})', path))

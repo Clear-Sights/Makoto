@@ -34,7 +34,7 @@ def test_repeated_derived_prose_only_needs_original_reading(tmp_path, tool, ti, 
 @pytest.mark.parametrize('tool,ti', [('Read', {'file_path': 'draft.txt'}), ('Bash', {'command': 'cat draft.txt'})])
 @pytest.mark.parametrize('confirmed', [False, True])
 @pytest.mark.parametrize('post_input', [False, True])
-def test_denied_writer_never_creates_evidence_and_reported_mutation_taints(tmp_path, tool, ti, confirmed, post_input):
+def test_denied_writer_never_creates_evidence_or_mutation(tmp_path, tool, ti, confirmed, post_input):
     s = Session(tmp_path)
     s.send(event('UserPromptSubmit', prompt='draft.txt'))
     write = output('The difference equals 9.', 'Write')
@@ -45,12 +45,11 @@ def test_denied_writer_never_creates_evidence_and_reported_mutation_taints(tmp_p
         if not post_input:
             del post['tool_input']
         s.send(post)
+    assert held(s.send(output('The difference equals 9.')))
+    assert s.rules() == {'a'}
     s.feed(pair(tool, ti, 'The difference equals 9.', tid='readback'))
-    assert held(s.send(output('The difference equals 9.'))) == confirmed
-    if confirmed:
-        assert s.rules() == {'a'}
-        s.feed(pair(ti={'file_path': 'raw.txt'}, text='9', tid='original'))
-        assert not held(s.send(output('The difference equals 9.')))
+    assert not held(s.send(output('The difference equals 9.')))
+    assert s.rules() == set()
 
 
 @pytest.mark.parametrize('suffix', ['.', ',', ';', ')', '`'])
@@ -154,3 +153,17 @@ def test_nonexternal_name_forms_do_not_require_network(tmp_path, subject):
     s.send(event('Register', makoto={'external_subjects': [subject]}))
     # Classification is not evidence of movement or a last change (DESIGN D17).
     assert not held(s.send(output(subject))) and s.rules() == set()
+
+
+@pytest.mark.parametrize('path,partial', [
+    ('./packages/juniper/config.yaml', './packages/juni'),
+    ('/opt/lab/juniper/schema.json', '/opt/lab/juni'),
+    (r'C:\work\juniper\runner.ts', r'C:\work\juniper'),
+    (r'\\share\juniper\manifest.ini', r'\\share\juni'),
+])
+def test_commit_path_prefix_is_not_the_read_subject(tmp_path, path, partial):
+    s = Session(tmp_path)
+    s.feed(pair(ti={'file_path': path}, text='The value is available.'))
+    assert held(s.send(output(partial + ' is recorded.', 'commit')))
+    assert {'a', 'b'} <= s.rules()
+    assert not held(s.send(output(path + ' is recorded.', 'commit', tid='exact')))

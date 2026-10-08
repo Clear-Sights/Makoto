@@ -40,19 +40,6 @@ class Ledger:
 
     def changed_code(self):
         result = dict(self.code_changes)
-        for tid, pre in self.pending.items():
-            for effect in effects(pre):
-                if effect.get('removed'):
-                    continue
-                form = edited_forms(pre, effect['subject'])
-                if form:
-                    subject = form['subject']
-                    prior = result.get(subject, {})
-                    form['aliases'] |= prior.get('aliases', set())
-                    form['data'] = form['data'] and subject not in self.shebangs and prior.get('data', True)
-                    form['q'] = self.pending_order[tid]
-                    if form['q'] > prior.get('q', 0):
-                        result[subject] = form
         # Records never run. Keep their observed forms internally so a shebang
         # seen before a shell edit can still establish a script obligation.
         return {subject: form for subject, form in result.items()
@@ -229,19 +216,6 @@ class Ledger:
             return  # Assistant text, even a paid final, never supplies evidence.
         tid = event.get('tool_use_id')
         pre = self.pending.get(tid)
-        if pre is None and tid in self.denied and tid not in self.seen:
-            denied = self.denied[tid]
-            if (event.get('tool_name', denied.get('tool_name')) == denied.get('tool_name')
-                    and ('tool_input' not in event or event['tool_input'] == denied.get('tool_input', {}))
-                    and meta.get('no_effect') is not True):
-                # A host-reported completion after denial cannot pay evidence,
-                # but its mutation must invalidate old reads and taint readbacks.
-                for effect in effects(denied) + effects(event):
-                    subject = self.subject(effect['subject'], denied)
-                    self.mutations[subject] = self.q
-                    self.tainted.add(subject)
-                    self.change_code(denied, subject)
-                self.seen.add(tid)
         if pre is None or tid in self.seen or event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or 'tool_input' in event and event['tool_input'] != pre.get('tool_input', {}):
             self.unknown.append({'q': self.q, 'reason': 'unpaired, replayed or mismatched tool result'})
             return
@@ -249,7 +223,7 @@ class Ledger:
         started = self.pending_order.pop(tid)
         self.seen.add(tid)
         targets = self.reservations.get(tid, set()) | {self.subject(r['subject'], pre) for r in effects(event)}
-        no_effect = meta.get('no_effect') is True
+        no_effect = meta.get('no_effect') is True or failed(event) or event.get('tool_response') is None
         ordered = self.bash_order(pre, event, started, no_effect)
         native = dict(pre)
         native.pop('makoto', None)
@@ -261,8 +235,7 @@ class Ledger:
                 self.mutations[subject] = self.q
                 self.written.add(subject)
                 self.change_code(pre, subject)
-        if not failed(event) or no_effect:
-            self.reservations.pop(tid, None)
+        self.reservations.pop(tid, None)
         # Paired call plus returned response proves the act, even on failure.
         # Resolve the invocation against its recorded cwd, never final prose.
         if pre.get('tool_name') not in WRITERS | {'Agent', 'Task'} and run_output(event) and (not ordered or pre.get('makoto', {}).get('invocation') or meta.get('invocation')):

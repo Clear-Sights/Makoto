@@ -293,12 +293,15 @@ def test_shell_and_opaque_recorded_mutations_invalidate_run(tool, ti):
 
 
 @pytest.mark.parametrize('denied', [False, True])
-def test_failed_or_reported_denied_edit_requires_run(denied):
+def test_failed_or_reported_denied_edit_is_not_a_change(denied):
     ledger = Ledger()
     change = edit()
     ledger.ingest(change[0], admitted=not denied)
     change[1]['hook_event_name'] = 'PostToolUseFailure'
     ledger.ingest(change[1])
+    assert not ledger.mutations and not ledger.changed_code()
+    assert not switch_holds(ledger)
+    feed(ledger, edit(tid='successful'))
     assert switch_holds(ledger)
     feed(ledger, pair('Bash', {'command': 'python3 branch.py'}, 'response', tid='run'))
     assert not switch_holds(ledger)
@@ -564,8 +567,13 @@ def test_records_are_subtracted_even_with_code_like_contents(path, boundary, pen
     change = edit(path)
     feed(ledger, change[:1] if pending else change)
     # D18: syntactically declared code ships regardless of its suffix.
-    assert bool(switch_holds(ledger, output(path, boundary))) == (boundary != 'Write')
-    assert ledger.changed_code()
+    assert bool(switch_holds(ledger, output(path, boundary))) == (not pending and boundary != 'Write')
+    assert bool(ledger.changed_code()) == (not pending)
+    assert bool(ledger.mutations) == (not pending)
+    if pending:
+        ledger.ingest(change[1])
+        assert ledger.changed_code()
+        assert bool(switch_holds(ledger, output(path, boundary))) == (boundary != 'Write')
 
 
 @pytest.mark.parametrize('path,expect_hold', [('record.txt', False), ('worker.py', True), ('worker', True)])
@@ -615,3 +623,53 @@ def test_plain_full_replacement_subtracts_former_record_script():
         ev['tool_input']['content'] = 'A plain record.'
     feed(ledger, replacement)
     assert not switch_holds(ledger)
+
+
+@pytest.mark.parametrize('state', ['denied', 'denied_post', 'pending', 'failed', 'missing_response', 'mismatch'])
+def test_uncompleted_writer_words_do_not_select_a_change(state):
+    ledger = Ledger()
+    change = edit()
+    ledger.ingest(change[0], admitted=not state.startswith('denied'))
+    if state not in ('denied', 'pending'):
+        if state == 'failed':
+            change[1]['hook_event_name'] = 'PostToolUseFailure'
+        elif state == 'missing_response':
+            change[1].pop('tool_response')
+        elif state == 'mismatch':
+            change[1]['tool_input'] = {'file_path': 'other.py'}
+        ledger.ingest(change[1])
+    assert not ledger.mutations
+    assert not ledger.changed_code()
+    assert not switch_holds(ledger, output('dispatch returns a response', 'Write'))
+    assert not switch_holds(ledger)
+    feed(ledger, edit(tid='actual'))
+    assert switch_holds(ledger, output('dispatch returns a response', 'Write'))
+
+
+@pytest.mark.parametrize('token', ['=', '100:', '$X', '${X}'])
+def test_non_paths_never_select_switch_subjects(token):
+    ledger = Ledger()
+    feed(ledger, pair(ti={'file_path': token}, text=CONTENT))
+    feed(ledger, edit(token))
+    assert not ledger.changed_code()
+    assert not switch_holds(ledger, output(token + ' returns a response', 'Write'))
+    assert not switch_holds(ledger)
+
+
+def test_assigned_shell_path_still_selects_switch_subject():
+    ledger = Ledger()
+    feed(ledger, pair('Bash', {'command': 'X=branch.py; touch "$X"'}, '', tid='write'))
+    assert [f['subject'] for f in switch_holds(ledger)] == ['branch.py']
+
+
+@pytest.mark.parametrize('reported_post', [False, True])
+def test_hook_denied_write_does_not_hold_later_writer_for_same_words(tmp_path, reported_post):
+    s = Session(tmp_path, live=True)
+    change = edit()
+    for ev in change:
+        ev['tool_input']['content'] += '# unseen_731 is recorded.\n'
+    assert held(s.send(change[0]))
+    if reported_post:
+        s.send(change[1])
+    s.send(output('dispatch returns a response', 'Write', tid='later'))
+    assert 'd' not in s.rules()

@@ -15,7 +15,7 @@ from .borrowed import leaves
 from .observed import failed, FINAL, identity, git_action, text_of
 from .precision import contains, names
 from .shell import redirected_argv
-from .paths import relative_path, path_spellings, program_name
+from .paths import relative_path, path_spellings, program_name, subject_path
 
 
 CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb tcl awk'.split())
@@ -29,6 +29,8 @@ DECLARATIONS = re.compile(r'(?m)(?:\b(?:def|class|function|fn|func)\s+([A-Za-z_]
 
 def edited_forms(event, target):
     """Return code/data name forms for a recorded effect, or None."""
+    if not subject_path(target):
+        return None
     path = target.removeprefix('file:')
     suffix = ntpath.splitext(path)[1].lstrip('.').lower()
     content = '\n'.join(value for _, value in leaves(event.get('tool_input', {})))

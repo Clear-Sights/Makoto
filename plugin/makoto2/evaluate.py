@@ -1,6 +1,7 @@
 """Four independent decisions over one claim projection; see DESIGN.md."""
 import re
 from .claims import claims, literals
+from .paths import subject_path
 from .precision import contains, VERSION
 from .borrowed import receipt
 from .switch import names_change, edited_forms
@@ -94,6 +95,8 @@ def switch(ledger, event, text, spans):
             if span.kind not in ('path', 'url', 'identifier') or not contains(subject_text, span.text, span.kind) or VERSION.fullmatch(span.text):
                 continue
             if any(span.text in c['aliases'] for c in changes.values()):
+                continue
+            if not subject_path(span.text):
                 continue
             subject = ledger.subject(span.text, event)
             changes.setdefault(subject, {'subject': subject, 'display': span.text, 'aliases': {span.text}, 'q': ledger.mutations.get(subject, 0)})

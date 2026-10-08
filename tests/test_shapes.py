@@ -107,10 +107,10 @@ def test_a_original_reading_required(tmp_path, origin):
     if origin == 'assistant':
         s.send(event('AssistantMessage', content='731'))
     elif origin == 'written':
-        # Rejected writes do not mutate; host transcript may contain executed old writes.
-        write = output('731', 'Write')
+        # An admitted creation followed by completion makes its readback own.
+        write = output('value = 731', 'Write')
         s.feed(pair())
-        assert held(s.send(write))
+        assert not held(s.send(write))
         s.send(dict(write, hook_event_name='PostToolUse', tool_response={'content': 'ok'}))
         mutation = output('source data', 'Write', tid='invalidate')
         mutation['tool_input']['file_path'] = 'source.txt'
