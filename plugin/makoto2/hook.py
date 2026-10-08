@@ -172,4 +172,6 @@ def main(raw, config):
             response = d_out(event, reason) if reason else questions(event)
             return response
     except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:
+        if event.get('hook_event_name') in ('Stop', 'SubagentStop') and event.get('stop_hook_active'):
+            return {'systemMessage': 'makoto transport/contract failure (not held twice): ' + str(error)}
         return d_out(event, 'makoto transport/contract failure: ' + str(error))

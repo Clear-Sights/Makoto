@@ -294,7 +294,7 @@ def test_session_separation_and_corruption(tmp_path):
     assert not held(s.send(output('data_91')))
     path = hook.sigma_path(s.config['state_dir'], 'plant')
     path.write_text(path.read_text().replace('data_91', 'invented_91'))
-    assert held(s.send(output('data_91')))
+    assert held(s.send(dict(output('data_91'), stop_hook_active=False)))
 
 
 @pytest.mark.parametrize('raw', ['null', '[]', '{}', 'bad', '{"hook_event_name":"Stop","session_id":"x","x":NaN}'])
