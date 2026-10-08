@@ -129,9 +129,23 @@ def main(raw, config):
         path = sigma_path(config['state_dir'], event['session_id'])
         with session_lock(path):
             journal = sigma_read(path, event['session_id'])
-            ledger = Ledger()
-            for prior, admitted in history(event, journal):
-                ledger.ingest(prior, admitted)
+            # D20: a record that cannot be ingested is unknown, never partial evidence,
+            # and never wedges later calls. Replay again without it; rare, so no per-record copy.
+            records, skipped = list(history(event, journal)), {}
+            while True:
+                ledger = Ledger()
+                for index, (prior, admitted) in enumerate(records):
+                    if index in skipped:
+                        ledger.q += 1
+                        ledger.unknown.append({'q': ledger.q, 'reason': 'historical ingest failed: ' + skipped[index]})
+                        continue
+                    try:
+                        ledger.ingest(prior, admitted)
+                    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
+                        skipped[index] = str(error)
+                        break
+                else:
+                    break
             # Turn metadata on the candidate belongs to this check; its receipts do not.
             if event.get('makoto', {}).get('turn_id') is not None:
                 ledger.turn = str(event['makoto']['turn_id'])

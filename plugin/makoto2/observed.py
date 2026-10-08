@@ -54,7 +54,7 @@ def programs(event):
     for words in segments:
         while words and (re.match(r'^[A-Za-z_]\w*=', words[0]) or words[0] in ('env', 'command', 'exec', 'sudo')):
             words = words[1:]
-        if words:
+        if words and words[0]:
             yield words
 
 
@@ -92,7 +92,7 @@ def failed(event):
 
 
 def effects(event):
-    result = list(event.get('makoto', {}).get('effects', []))
+    result = []
     ti, tool = event.get('tool_input', {}), event.get('tool_name')
     if tool in WRITERS:
         target = ti.get('file_path') or ti.get('notebook_path')
@@ -117,7 +117,7 @@ def effects(event):
             if '>' in words[0] and len(words) > 1:
                 result.append({'subject': words[1]})
             elif name in ('touch', 'rm', 'mkdir', 'rmdir', 'truncate', 'tee'):
-                result.extend({'subject': w} for w in words[1:] if not w.startswith('-'))
+                result.extend({'subject': w} for w in words[1:] if w and not w.startswith('-'))
             elif name in ('cp', 'mv') and len(words) > 2:
                 result.append({'subject': words[-1]})
                 if name == 'mv':
@@ -126,7 +126,7 @@ def effects(event):
                 result.append({'subject': words[-1]})
             elif name == 'gofmt' and '-w' in words[1:]:
                 result.extend({'subject': w} for w in words[1:] if w != '-w' and not w.startswith('-'))
-    return result
+    return list(event.get('makoto', {}).get('effects', [])) + [r for r in result if r['subject'] != '']
 
 
 def reading_subjects(pre):
@@ -142,7 +142,7 @@ def reading_subjects(pre):
     elif name == 'Bash':
         for words in programs(pre):
             if program_name(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
-                result.extend(w for w in words[1:] if not w.startswith('-'))
+                result.extend(w for w in words[1:] if w and not w.startswith('-'))
             # Executing a program reads its response, not the program file.
             # Only direct file readers above inherit that file's own/stale status.
     return result
@@ -162,8 +162,8 @@ def network_targets(pre, post):
             if any(w in ('--offline', '--no-index') for w in words):
                 continue
             if program_name(words[0]) in ('curl', 'wget', 'http', 'https', 'fetch'):
-                result.extend(w for w in words[1:] if not w.startswith('-'))
+                result.extend(w for w in words[1:] if w and not w.startswith('-'))
             elif (program_name(words[0]) in ('pip', 'pip3', 'npm', 'pnpm', 'yarn', 'cargo', 'go') and any(w in ('install', 'add', 'get', 'view') for w in words[1:])) or program_name(words[0]) == 'git' and any(w in ('fetch', 'clone', 'pull') for w in words[1:]):
-                result.extend(words[1:])
+                result.extend(w for w in words[1:] if w)
     result.extend(pre.get('makoto', {}).get('network_subjects', []))
     return result
