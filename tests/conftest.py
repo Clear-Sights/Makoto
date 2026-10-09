@@ -1,7 +1,5 @@
-import pytest
+import os
 
-
-@pytest.fixture(autouse=True)
-def _no_block_in(monkeypatch):
-    """The scope setting lives in the developer's settings; tests choose their own."""
-    monkeypatch.delenv('MAKOTO_BLOCK_IN', raising=False)
+# The scope setting lives in the developer's settings; tests choose their own.
+# Removed at import so session-scoped fixtures and subprocesses never see it.
+os.environ.pop('MAKOTO_BLOCK_IN', None)
