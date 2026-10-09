@@ -2,12 +2,16 @@
 import os
 import re
 from .precision import extract, names, contains, package_parts
-from .observed import text_of, effects
+from .observed import text_of, effects, WRITERS
 from .borrowed import receipt
 from .switch import names_change
 from .paths import path_spellings
 from .shipping import commit_changes, git_calls
 from .creations import introduces
+
+# A dotted name that ends in one of these and is not called is a file name, not an attribute.
+FILE_SUFFIXES = frozenset('''md txt json jsonl ndjson tsv csv yaml yml toml ini cfg xml html css sql py sh bash js mjs
+    ts tsx jsx ipynb pdf png jpg gif svg zip tar gz'''.split())
 
 
 def evaluate(ledger, event, adapter='inferred'):
@@ -67,8 +71,37 @@ def evaluate(ledger, event, adapter='inferred'):
             defined |= set(filter(None, [shebang.group(2)]))
         authored.add(os.path.basename(target))
 
+    # In an edit of a code file, `row.get` or `new.items` is an attribute chain
+    # on a name the code already has: bound in the edited text, or present in
+    # the file this turn read. A file-suffix tail (`row.md`) is still a path.
+    code_roots = set()
+    if event.get('tool_name') in WRITERS and re.search(r'\.(?:py|sh|bash|js|mjs|ts)$', target):
+        file_subject = ledger.subject(target, event)
+        file_texts = [t for r in readings if file_subject in r['subjects'] for t in r['texts']]
+        bound = set(defined)
+        # Names the edited text binds: assignments, parameters, imports, `as` and loop targets.
+        bound |= set(re.findall(r'(?m)^[ \t]*([A-Za-z_]\w*)\s*=(?!=)', text))
+        bound |= {w for args in re.findall(r'(?m)^[ \t]*(?:async\s+)?def\s+\w+\s*\(([^)]*)\)', text)
+                  for a in args.split(',') for w in re.findall(r'^\s*\*{0,2}([A-Za-z_]\w*)', a)}
+        bound |= set(re.findall(r'(?m)^[ \t]*(?:import|from)\s+([A-Za-z_]\w*)', text))
+        bound |= set(re.findall(r'\bas\s+([A-Za-z_]\w*)', text))
+        bound |= {w for tup in re.findall(r'(?m)^[ \t]*for\s+([^:\n]+?)\s+in\b', text)
+                  for w in re.findall(r'[A-Za-z_]\w*', tup)}
+        bound |= {w for tup in re.findall(r'(?m)^[ \t]*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*=(?!=)', text)
+                  for w in re.findall(r'[A-Za-z_]\w*', tup)}
+        code_roots = bound | {w for w in set(re.findall(r'[A-Za-z_]\w*', text))
+                              if any(contains(t, w, 'identifier') for t in file_texts)}
+
+    def attribute_chain(span):
+        root, *tail = span.text.split('.')
+        return (span.kind == 'path' and len(tail) > 0 and re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+', span.text)
+                and root in code_roots
+                and (tail[-1].lower() not in FILE_SUFFIXES or text[span.end:span.end + 1] == '('))
+
     def output_name(span):
         if span.kind == 'identifier' and span.text in defined:
+            return True
+        if attribute_chain(span):
             return True
         if span.kind == 'path' and (span.text in authored or span.text.rstrip('.') in authored):
             return True
