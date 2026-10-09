@@ -94,10 +94,49 @@ def full_read_subjects(pre, post):
             # One operand keeps returned bytes attributable to that same file.
             if len(args) == 1 and args[0] and args[0] != '-' and not args[0].startswith('-'):
                 targets.extend(args)
+    if tool == 'Bash':
+        targets.extend(json_loaded_paths(ti.get('command', '')))
     for event in (pre, post):
         targets.extend(spec['subject'] for spec in event.get('makoto', {}).get('reads', [])
                        if spec.get('complete') is True and not spec.get('producer') and spec.get('role') != 'relay')
     return {identity(target, pre) for target in targets}
+
+
+JSON_LOAD = re.compile(
+    r"""json\.load\(\s*open\(\s*(['"])([^'"$*?`]+)\1\s*\)\s*\)"""
+    r"""|json\.loads\(\s*open\(\s*(['"])([^'"$*?`]+)\3\s*\)\.read\(\s*\)\s*\)""")
+
+
+def json_loaded_paths(command):
+    """Files a successful `python -c` parsed whole with json.load on a literal path.
+
+    json.load either consumes the entire file or raises, so a call that exits
+    zero read the file in full. Statements joined by `;` hide an earlier
+    failure behind a later exit status, so only a lone call or an `&&` chain
+    counts.
+    """
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=';&|()<>\n')
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return []
+    statements, current = [], []
+    for word in words:
+        if word == '&&':
+            statements.append(current)
+            current = []
+        elif word and all(c in ';&|()<>\n' for c in word):
+            return []
+        else:
+            current.append(word)
+    statements.append(current)
+    paths = []
+    for argv in statements:
+        if len(argv) == 3 and re.fullmatch(r'python3?(?:\.\d+)?', program_name(argv[0])) and argv[1] == '-c':
+            for match in JSON_LOAD.finditer(argv[2]):
+                paths.append(match.group(2) or match.group(4))
+    return paths
 
 
 def names_change(event, change):

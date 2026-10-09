@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rule d: a successful `python -c` that parses a literal path with `json.load` counts as a full readback of that file (alone or in an `&&` chain; `;` chains still do not, since a later exit status hides an earlier failure).
+
 ## 5.0.5 — 2026-10-09
 
 - Rule b: `file.py:12` (a line citation) is evidenced by a read of `file.py`, or by the exact citation in output; an unread file still holds.
