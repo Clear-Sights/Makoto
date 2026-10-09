@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Rule b: a Write of a code file may use its own interpreter line and its own file name. Any other path, even an assigned constant, still needs a reading.
 - Report-only output (outside `block_in`) is capped at 700 characters with a count of what was cut; the journal keeps every finding. One 10 KB script write had produced a 21 KB message.
 
 ## 5.0.6 — 2026-10-09

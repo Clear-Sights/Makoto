@@ -52,14 +52,25 @@ def evaluate(ledger, event, adapter='inferred'):
 
     # A new script binds its own functions, classes and variables; writing them
     # is authoring, not citing something unread. Only code files qualify.
+    authored = set()
     target = (event.get('tool_input') or {}).get('file_path') or ''
     if event.get('tool_name') == 'Write' and re.search(r'\.(?:py|sh|bash|js|mjs|ts)$', target):
         defined |= set(re.findall(r'(?m)^[ \t]*(?:async\s+)?(?:def|class|function)\s+([A-Za-z_]\w*)', text))
         defined |= set(re.findall(r'(?m)^[ \t]*(?:(?:export\s+)?(?:const|let|var)\s+)?([A-Za-z_]\w*)\s*=(?!=)', text))
         defined |= set(re.findall(r'(?m)^[ \t]*for\s+([A-Za-z_]\w*)\s+in\b', text))
+        # The interpreter line and the file's own name are authored here too.
+        # Any other path in the text, even a constant, still needs a reading.
+        shebang = re.search(r'(?m)^#!(\S+)(?:[ \t]+(\S+))?', (event.get('tool_input') or {}).get('content') or '')
+        shebang = shebang if shebang and shebang.start() == 0 else None
+        if shebang:
+            authored |= {'#!' + shebang.group(1), *( [shebang.group(2)] if shebang.group(2) else [] )}
+            defined |= set(filter(None, [shebang.group(2)]))
+        authored.add(os.path.basename(target))
 
     def output_name(span):
         if span.kind == 'identifier' and span.text in defined:
+            return True
+        if span.kind == 'path' and (span.text in authored or span.text.rstrip('.') in authored):
             return True
         return span.kind == 'path' and ledger.subject(span.text, event) in output_subjects or any(start <= span.start and span.end <= end for start, end in output_ranges)
 
