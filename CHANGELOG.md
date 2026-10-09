@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.0.6 — 2026-10-09
 
 - Rule b: a Write of a code file (`.py .sh .bash .js .mjs .ts`) may use the functions, classes, assigned variables and loop variables that same text defines. A name used but never defined or read still holds.
 - Rule b: a connector's JSON-string response is also read as its decoded text, so tabs, quotes and newlines inside a body match what the session later writes. An unread name still holds.
