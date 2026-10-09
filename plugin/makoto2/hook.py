@@ -45,6 +45,20 @@ def d_in(raw):
     return event
 
 
+REPORT_LIMIT = 700
+
+
+def brief(report):
+    """Report-only text is advice, not a gate: show the head, keep the count.
+
+    The journal holds every finding; a 20 KB message per write costs the
+    session more than the findings tell it.
+    """
+    if len(report) <= REPORT_LIMIT:
+        return report
+    return report[:REPORT_LIMIT].rstrip() + ' ... (%d more characters; the full findings are in the journal)' % (len(report) - REPORT_LIMIT)
+
+
 def sigma_path(state_dir, session_id):
     return Path(state_dir) / (hashlib.sha256(session_id.encode()).hexdigest() + '.jsonl')
 
@@ -185,7 +199,7 @@ def main(raw, config):
             # Active Stop retries still block. Audit records mark the unpaid
             # retry; no suppression can silently admit its final text.
             if report:
-                return {'systemMessage': 'makoto report only (outside block_in): ' + report}
+                return {'systemMessage': 'makoto report only (outside block_in): ' + brief(report)}
             response = d_out(event, reason) if reason else questions(event)
             return response
     except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:

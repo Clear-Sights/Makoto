@@ -1486,6 +1486,162 @@
   ]
  },
  {
+  "id": "d-script-ran-by-worker-and-parent-then-unrelated-write",
+  "rule": "d",
+  "files": {
+   "src.txt": "guide/index/parts/D.tsv dag/guide.md summary"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "guide/index/parts/D.tsv dag/guide.md summary"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/sc/build_idx_D.py",
+     "content": "F='/tmp/sc/D.tsv'\nopen(F,'w').write('x')\n"
+    },
+    "agent_id": "a1"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/sc/build_idx_D.py",
+     "content": "F='/tmp/sc/D.tsv'\nopen(F,'w').write('x')\n"
+    },
+    "agent_id": "a1",
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b1",
+    "tool_input": {
+     "command": "python3 /tmp/sc/build_idx_D.py"
+    },
+    "agent_id": "a1"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b1",
+    "tool_input": {
+     "command": "python3 /tmp/sc/build_idx_D.py"
+    },
+    "agent_id": "a1",
+    "tool_response": {
+     "stdout": "rows 218\n",
+     "exit_code": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b2",
+    "tool_input": {
+     "command": "python3 -I /tmp/sc/build_idx_D.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b2",
+    "tool_input": {
+     "command": "python3 -I /tmp/sc/build_idx_D.py"
+    },
+    "tool_response": {
+     "stdout": "rows 218\n",
+     "exit_code": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "dag/guide.md",
+     "content": "summary of guide/index/parts/D.tsv"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "guide/index/parts/D.tsv dag/guide.md summary"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/sc/build_idx_D.py",
+     "content": "F='/tmp/sc/D.tsv'\nopen(F,'w').write('x')\n"
+    },
+    "agent_id": "a1"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/sc/build_idx_D.py",
+     "content": "F='/tmp/sc/D.tsv'\nopen(F,'w').write('x')\n"
+    },
+    "agent_id": "a1",
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "dag/guide.md",
+     "content": "summary of guide/index/parts/D.tsv, built by /tmp/sc/build_idx_D.py"
+    },
+    "agent_id": "a1"
+   }
+  ]
+ },
+ {
   "id": "b-script-shebang-and-own-name",
   "rule": "b",
   "files": {
