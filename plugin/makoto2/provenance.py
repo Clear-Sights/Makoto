@@ -3,7 +3,7 @@ import os
 import re
 from .borrowed import get, leaves, fragments
 from .observed import (WRITERS, FINAL, identity, effects, failed,
-                       reading_subjects, network_targets, response_text)
+                       reading_subjects, network_targets, response_text, refused)
 from .precision import contains, VERSIONED, package_parts
 from .switch import edited_forms, execution_subjects, run_output, full_read_subjects, compiled_subjects
 from .shell import selected_segments
@@ -253,7 +253,7 @@ class Ledger:
             denied = self.denied[tid]
             if (event.get('tool_name', denied.get('tool_name')) == denied.get('tool_name')
                     and ('tool_input' not in event or event['tool_input'] == denied.get('tool_input', {}))
-                    and meta.get('no_effect') is not True):
+                    and meta.get('no_effect') is not True and not refused(event)):
                 # A host-reported completion after denial cannot pay evidence,
                 # but its mutation must invalidate old reads and taint readbacks.
                 for effect in effects(denied) + effects(event):
@@ -269,7 +269,7 @@ class Ledger:
         started = self.pending_order.pop(tid)
         self.seen.add(tid)
         targets = self.reservations.get(tid, set()) | {self.subject(r['subject'], pre) for r in effects(event)}
-        no_effect = meta.get('no_effect') is True
+        no_effect = meta.get('no_effect') is True or refused(event)
         ordered = self.bash_order(pre, event, started, no_effect)
         native = dict(pre)
         native.pop('makoto', None)

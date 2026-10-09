@@ -91,6 +91,21 @@ def failed(event):
     return event['hook_event_name'] == 'PostToolUseFailure' or isinstance(response, dict) and bool(response.get('is_error') or response.get('isError') or next((response[k] for k in ('exitCode', 'exit_code', 'exit') if k in response), 0))
 
 
+# A hook's own refusal of a file write, as the host echoes it back: Makoto's
+# reasons (hook.d_out) and the host's "PreToolUse:Edit hook error" wording.
+REFUSAL = re.compile(r'^\s*(?:PreToolUse(?::[\w*]+)?\s+hook\s+(?:error|denied|blocked)\b|hook\s+(?:denied|blocked)\b|makoto (?:rule [a-d]|contract|transport)\b)', re.I)
+
+
+def refused(event):
+    """A file write the host reports as refused by a hook never ran.
+
+    Only an error result of a writer that opens with a refusal counts. Any other
+    failure may have partly written, so it keeps counting as a change.
+    """
+    return (event.get('tool_name') in WRITERS and failed(event)
+            and bool(REFUSAL.match(response_text(event.get('tool_response')))))
+
+
 def effects(event):
     result = []
     ti, tool = event.get('tool_input', {}), event.get('tool_name')

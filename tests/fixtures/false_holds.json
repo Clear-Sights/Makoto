@@ -1707,5 +1707,363 @@
     }
    }
   ]
+ },
+ {
+  "id": "d-refused-write-is-not-a-change",
+  "rule": "d",
+  "files": {
+   "src.txt": "alpha beta"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "alpha beta"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "out.py",
+     "content": "x = open('unread/real-input.md').read()\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "out.py",
+     "content": "print('alpha')\n"
+    }
+   }
+  ],
+  "transcript_honest": [
+   {
+    "message": {
+     "role": "user",
+     "content": "go"
+    }
+   },
+   {
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "r0",
+       "name": "Read",
+       "input": {
+        "file_path": "src.txt"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "r0",
+       "content": "alpha beta",
+       "is_error": false
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "w1",
+       "name": "Write",
+       "input": {
+        "file_path": "out.py",
+        "content": "x = open('unread/real-input.md').read()\n"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "w1",
+       "content": "makoto rule b [spec]: \"unread/real-input.md\": NAMED WITHOUT READING: read a source whose tool input or response contains these exact characters",
+       "is_error": true
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "w2",
+       "name": "Write",
+       "input": {
+        "file_path": "out.py",
+        "content": "print('alpha')\n"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "alpha beta"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "out.py",
+     "content": "x = open('unread/real-input.md').read()\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "out.py",
+     "content": "print('alpha')\n"
+    }
+   }
+  ],
+  "transcript_fake": [
+   {
+    "message": {
+     "role": "user",
+     "content": "go"
+    }
+   },
+   {
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "r0",
+       "name": "Read",
+       "input": {
+        "file_path": "src.txt"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "r0",
+       "content": "alpha beta",
+       "is_error": false
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "w1",
+       "name": "Write",
+       "input": {
+        "file_path": "out.py",
+        "content": "x = open('unread/real-input.md').read()\n"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "w1",
+       "content": "ENOSPC: no space left on device, write",
+       "is_error": true
+      }
+     ]
+    }
+   },
+   {
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "w2",
+       "name": "Write",
+       "input": {
+        "file_path": "out.py",
+        "content": "print('alpha')\n"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "id": "d-hook-refused-edit-is-not-a-change",
+  "rule": "d",
+  "files": {
+   "x.py": "def f(rows):\n    for row in rows:\n        pass\n"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "x.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "x.py"
+    },
+    "tool_response": {
+     "content": "def f(rows):\n    for row in rows:\n        pass\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "x.py",
+     "old_string": "pass",
+     "new_string": "print(1)"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUseFailure",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "x.py",
+     "old_string": "pass",
+     "new_string": "print(1)"
+    },
+    "tool_response": "PreToolUse:Edit hook error: Codex job rule (file edit requires Codex): run it as a Codex job"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e2",
+    "tool_input": {
+     "file_path": "x.py",
+     "old_string": "pass",
+     "new_string": "print(2)"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "x.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "x.py"
+    },
+    "tool_response": {
+     "content": "def f(rows):\n    for row in rows:\n        pass\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "x.py",
+     "old_string": "pass",
+     "new_string": "print(1)"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUseFailure",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "x.py",
+     "old_string": "pass",
+     "new_string": "print(1)"
+    },
+    "tool_response": "Error: EIO, write failed"
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e2",
+    "tool_input": {
+     "file_path": "x.py",
+     "old_string": "pass",
+     "new_string": "print(2)"
+    }
+   }
+  ]
  }
 ]
