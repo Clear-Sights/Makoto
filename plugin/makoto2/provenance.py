@@ -50,6 +50,7 @@ class Ledger:
                     form['aliases'] |= prior.get('aliases', set())
                     form['data'] = form['data'] and subject not in self.shebangs and prior.get('data', True)
                     form['q'] = self.pending_order[tid]
+                    form['agent'] = pre.get('agent_id')
                     if form['q'] > prior.get('q', 0):
                         result[subject] = form
         # Records never run. Keep their observed forms internally so a shebang
@@ -81,6 +82,13 @@ class Ledger:
         if any(effect.get('removed') and self.subject(effect['subject'], event) == subject for effect in effects(event)):
             self.code_changes.pop(subject, None)
             self.shebangs.discard(subject)
+            # Removing a directory removes every edit recorded beneath it.
+            prefix = subject.rstrip('/') + '/'
+            for under in [s for s in self.code_changes if s.startswith(prefix)]:
+                self.code_changes.pop(under)
+                self.shebangs.discard(under)
+            for staged in [s for s in self.staged_code if s == subject or s.startswith(prefix)]:
+                self.staged_code.pop(staged)
             return
         spelling = next((effect['subject'] for effect in effects(event)
                          if self.subject(effect['subject'], event) == subject), subject)
@@ -99,6 +107,7 @@ class Ledger:
             form['data'] = form['data'] and subject not in self.shebangs and (full_write or prior.get('data', True))
             form['q'] = self.q
             form['tool_use_id'] = event.get('tool_use_id')
+            form['agent'] = event.get('agent_id')
             self.code_changes[subject] = form
 
     def run_witnesses(self, change):
@@ -203,7 +212,7 @@ class Ledger:
         name, meta = event['hook_event_name'], event.get('makoto', {})
         if meta.get('turn_id') is not None:
             self.turn = str(meta['turn_id'])
-        elif name == 'UserPromptSubmit':
+        elif name == 'UserPromptSubmit' and not meta.get('same_turn'):
             self.turn = str(self.q)
         if name in ('UserPromptSubmit', 'Register'):
             self.external.extend(meta.get('external_subjects', []))

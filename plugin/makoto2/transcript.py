@@ -69,7 +69,12 @@ def history(candidate, journal):
                     elif role == 'user' and block.get('type') == 'text':
                         prompts.append(block.get('text', ''))
                 if prompts:
-                    imported.append(dict(base, hook_event_name='UserPromptSubmit', prompt='\n'.join(prompts)))
+                    prompt = dict(base, hook_event_name='UserPromptSubmit', prompt='\n'.join(prompts))
+                    if any(isinstance(b, dict) and b.get('type') == 'tool_result' for b in content):
+                        # Text riding on a tool result is harness reminder text for
+                        # the same turn; it is given prose but never a new turn.
+                        prompt['makoto'] = {'same_turn': True}
+                    imported.append(prompt)
     return merge(imported, journal)
 
 

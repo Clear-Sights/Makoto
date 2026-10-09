@@ -116,7 +116,10 @@ def effects(event):
             name = program_name(words[0])
             if '>' in words[0] and len(words) > 1:
                 result.append({'subject': words[1]})
-            elif name in ('touch', 'rm', 'mkdir', 'rmdir', 'truncate', 'tee'):
+            elif name in ('rm', 'rmdir'):
+                # A deleted file or tree is no longer an edit anyone can run.
+                result.extend({'subject': w, 'removed': True} for w in words[1:] if w and not w.startswith('-'))
+            elif name in ('touch', 'mkdir', 'truncate', 'tee'):
                 result.extend({'subject': w} for w in words[1:] if w and not w.startswith('-'))
             elif name in ('cp', 'mv') and len(words) > 2:
                 result.append(dict(subject=words[-1], **({'renamed_from': words[-2]} if name == 'mv' else {})))
