@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rule b: a Write of a code file may use its own interpreter line and its own file name. Any other path, even an assigned constant, still needs a reading.
+
 ## 5.0.6 — 2026-10-09
 
 - Rule b: a Write of a code file (`.py .sh .bash .js .mjs .ts`) may use the functions, classes, assigned variables and loop variables that same text defines. A name used but never defined or read still holds.
