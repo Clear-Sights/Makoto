@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.0.4 — 2026-10-09
 
 Fixes for false holds seen live in the Countdown project (2026-10-09). Each has an honest twin that now passes and a fake twin that is still held, in `tests/fixtures/false_holds.json`; `tools/measure_rates.py` prints catch and false-hold rates.
 
