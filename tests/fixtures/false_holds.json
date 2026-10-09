@@ -2065,5 +2065,212 @@
     }
    }
   ]
+ },
+ {
+  "id": "b-attribute-chain-of-a-name-in-the-read-file",
+  "rule": "b",
+  "files": {
+   "m.py": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    },
+    "tool_response": {
+     "content": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "m.py",
+     "old_string": "        out[row['id']] = row\n",
+     "new_string": "        out[row['id']] = row.get('v')\n"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    },
+    "tool_response": {
+     "content": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "m.py",
+     "old_string": "        out[row['id']] = row\n",
+     "new_string": "        out[row['id']] = row.get('v')\n        extra = open('unread/real-input.md').read()\n"
+    }
+   }
+  ]
+ },
+ {
+  "id": "b-attribute-chain-of-a-name-bound-in-the-edit",
+  "rule": "b",
+  "files": {
+   "m.py": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    },
+    "tool_response": {
+     "content": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "m.py",
+     "old_string": "        out[row['id']] = row\n",
+     "new_string": "    new = dict(old)\n    for k, v in new.items():\n        out[k] = v\n"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    },
+    "tool_response": {
+     "content": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "m.py",
+     "old_string": "        out[row['id']] = row\n",
+     "new_string": "    for k, v in ghost.items():\n        out[k] = v\n"
+    }
+   }
+  ]
+ },
+ {
+  "id": "b-attribute-chain-file-suffix-stays-a-path",
+  "rule": "b",
+  "files": {
+   "m.py": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    },
+    "tool_response": {
+     "content": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "m.py",
+     "old_string": "        out[row['id']] = row\n",
+     "new_string": "        out[row['id']] = row.get('v')\n"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "m.py"
+    },
+    "tool_response": {
+     "content": "def merge(old, rows):\n    out = dict(old)\n    for row in rows:\n        out[row['id']] = row\n    return out\n"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_use_id": "e1",
+    "tool_input": {
+     "file_path": "m.py",
+     "old_string": "        out[row['id']] = row\n",
+     "new_string": "        out[row['id']] = row.get('v')\n        notes = row.md\n"
+    }
+   }
+  ]
  }
 ]
