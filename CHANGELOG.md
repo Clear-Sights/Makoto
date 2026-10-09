@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.0.8 — 2026-10-09
+
+- Rule d: an error result of a file writer (Write, Edit, MultiEdit, NotebookEdit) that opens with a hook refusal (`makoto rule x`, `makoto contract`, `PreToolUse:Edit hook error`, `hook denied`) counts as no effect, on both the normal and the denied-then-reported path, so the corrected retry is judged on its own. Any other write failure still counts as a change.
+- Rule b: in an edit of a `.py .sh .bash .js .mjs .ts` file, a dotted name such as `row.get` is authored when its first part is bound in the edited text or appears in the file this turn read, and its last part is not a file suffix (unless called). A suffix tail such as `row.md` and unread paths in the same edit are still held.
+
 ## 5.0.7 — 2026-10-09
 
 - Rule b: a Write of a code file may use its own interpreter line and its own file name. Any other path, even an assigned constant, still needs a reading.
