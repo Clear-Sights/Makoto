@@ -43,3 +43,12 @@ def test_reported_step_counts_as_admitted_for_later_evidence(tmp_path):
     send(tmp_path, '/home/user/other', ['/home/user/makoto'])
     rows = [json.loads(line) for f in tmp_path.glob('*.jsonl') for line in f.read_text().splitlines()]
     assert rows[-1]['admitted'] is True and rows[-1]['findings']
+
+
+def test_report_only_message_is_capped_and_journal_keeps_every_finding(tmp_path):
+    names = ' '.join('unread/file%d.md' % i for i in range(120))
+    event = dict(WRITE, cwd='/home/user/other', tool_input={'file_path': 'notes.md', 'content': names})
+    response = hook.main(json.dumps(event), {'state_dir': str(tmp_path), 'adapter': 'inferred', 'block_in': ['/home/user/makoto']})
+    assert len(response['systemMessage']) < 1000 and 'more characters' in response['systemMessage']
+    rows = [json.loads(line) for f in tmp_path.glob('*.jsonl') for line in f.read_text().splitlines()]
+    assert len([f for f in rows[-1]['findings'] if f['rule'] == 'b']) >= 100
