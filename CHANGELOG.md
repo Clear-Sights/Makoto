@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Rule b: a Write of a code file (`.py .sh .bash .js .mjs .ts`) may use the functions, classes, assigned variables and loop variables that same text defines. A name used but never defined or read still holds.
 - Rule b: a connector's JSON-string response is also read as its decoded text, so tabs, quotes and newlines inside a body match what the session later writes. An unread name still holds.
 - Rule c: a URL built from shell variables (`$2`, `${x}`, `{{x}}`) and a shell's version floor (`bash >= 4`) are not outside subjects. A real URL or package version still needs a look.
 - Rule d: a worker that only mentions a sibling worker's unrun file is not held for it (the journal is shared per session). Writing the file, a commit or a push still is.
