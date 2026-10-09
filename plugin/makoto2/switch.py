@@ -150,7 +150,11 @@ def names_change(event, change):
     if event['hook_event_name'] in FINAL:
         return change.get('agent') == event.get('agent_id')
     text = text_of(event)
-    for span in names(text):
+    # A worker that merely mentions a sibling worker's file is not answering for
+    # it: the journal is shared by session, so each worker would otherwise
+    # inherit every other worker's unrun items. Writing that file still counts.
+    sibling = bool(event.get('agent_id')) and change.get('agent') not in (None, event['agent_id'])
+    for span in ([] if sibling else names(text)):
         path = re.sub(r':\d+(?::\d+)?$', '', span.text)
         if span.kind == 'path' and identity(path, event) == change['subject']:
             return True
@@ -159,7 +163,7 @@ def names_change(event, change):
     if any(identity(ti[key], event) == change['subject'] for key in ('file_path', 'notebook_path') if ti.get(key)):
         return True
     absolute = change['subject'][5:]
-    if any(contains(text, value, 'path') for value in path_spellings(absolute, event.get('cwd') or os.getcwd())):
+    if not sibling and any(contains(text, value, 'path') for value in path_spellings(absolute, event.get('cwd') or os.getcwd())):
         return True
     # Keys and stems of a data file are its schema. A writer producing another
     # data file with the same keys is authoring a sibling, not naming this one.
