@@ -1160,5 +1160,262 @@
     }
    }
   ]
+ },
+ {
+  "id": "b-connector-json-escaped-body",
+  "rule": "b",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__hearthbot__fetch_project_timeline",
+    "tool_use_id": "m1",
+    "tool_input": {
+     "limit": 5,
+     "full_bodies": true
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__hearthbot__fetch_project_timeline",
+    "tool_use_id": "m1",
+    "tool_input": {
+     "limit": 5,
+     "full_bodies": true
+    },
+    "tool_response": {
+     "content": [
+      {
+       "type": "text",
+       "text": "{\"messages\": [{\"body\": \"```\\n#!/usr/bin/env bash\\nrow=$'rg\\\\tcommand -v rg\\\\tapti ripgrep'\\nf=~/.claude/settings.json\\n```\"}]}"
+      }
+     ]
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "setup-paste/setup.sh",
+     "content": "#!/usr/bin/env bash\nrow=$'rg\\tcommand -v rg\\tapti ripgrep'\nf=~/.claude/settings.json\n"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "mcp__hearthbot__fetch_project_timeline",
+    "tool_use_id": "m1",
+    "tool_input": {
+     "limit": 5,
+     "full_bodies": true
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "mcp__hearthbot__fetch_project_timeline",
+    "tool_use_id": "m1",
+    "tool_input": {
+     "limit": 5,
+     "full_bodies": true
+    },
+    "tool_response": {
+     "content": [
+      {
+       "type": "text",
+       "text": "{\"messages\": [{\"body\": \"```\\n#!/usr/bin/env bash\\nrow=$'rg\\\\tcommand -v rg\\\\tapti ripgrep'\\nf=~/.claude/settings.json\\n```\"}]}"
+      }
+     ]
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "setup-paste/setup.sh",
+     "content": "#!/usr/bin/env bash\nrow=$'rg\\tcommand -v rg\\tapti ripgrep'\nf=~/.claude/settings.json\ncat ~/.claude/never-read-file.cfg\n"
+    }
+   }
+  ]
+ },
+ {
+  "id": "c-shell-url-template-and-bash-floor",
+  "rule": "c",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "# needs bash >= 4\ncurl -fsSL https://raw.githubusercontent.com/$2/main/$3\n setup-paste/get.sh"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "setup-paste/get.sh",
+     "content": "# needs bash >= 4\ncurl -fsSL https://raw.githubusercontent.com/$2/main/$3\n"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "# needs requests >= 2.0\ncurl -fsSL https://raw.githubusercontent.com/acme/main/x\n setup-paste/get.sh"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "setup-paste/get.sh",
+     "content": "# needs requests >= 2.0\ncurl -fsSL https://raw.githubusercontent.com/acme/main/x\n"
+    }
+   }
+  ]
+ },
+ {
+  "id": "d-subagent-inherits-sibling-unrun",
+  "rule": "d",
+  "files": {
+   "src.txt": "method/models.tsv method/models.py sk/stats.py sk/summary.md summary skill verdict seed keep def return notes.md"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py sk/stats.py sk/summary.md summary skill verdict seed keep def return notes.md"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/stats.py",
+     "content": "def f():\n    return 1\n"
+    },
+    "agent_id": "a7"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/stats.py",
+     "content": "def f():\n    return 1\n"
+    },
+    "agent_id": "a7",
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "sk/summary.md",
+     "content": "summary: keep, see sk/stats.py"
+    },
+    "agent_id": "a8"
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py sk/stats.py sk/summary.md summary skill verdict seed keep def return notes.md"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/stats.py",
+     "content": "def f():\n    return 1\n"
+    },
+    "agent_id": "a7"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/stats.py",
+     "content": "def f():\n    return 1\n"
+    },
+    "agent_id": "a7",
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "sk/summary.md",
+     "content": "summary: keep, see sk/stats.py"
+    },
+    "agent_id": "a7"
+   }
+  ]
  }
 ]

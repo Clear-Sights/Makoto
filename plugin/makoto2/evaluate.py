@@ -85,7 +85,12 @@ def evaluate(ledger, event, adapter='inferred'):
         else:
             snapshot.append({'span': span.text, 'kind': span.kind,
                              'reading_receipt_ids': [w.get('tool_use_id', 'user prompt') for w in witnesses]})
-    external = [s.text for s in spans + name_spans if s.kind == 'url' or s.kind == 'external-package' and re.search(r'@|==|>=|<=|~=|\bversion\s|\sv\d', s.text)]
+    # A URL built from shell variables is a template, and a shell's own version
+    # floor is a local requirement: neither names an outside subject.
+    external = [s.text for s in spans + name_spans
+                if (s.kind == 'url' and not re.search(r'\$[\w{(]|\{\{|<[a-z_]+>', s.text))
+                or s.kind == 'external-package' and re.search(r'@|==|>=|<=|~=|\bversion\s|\sv\d', s.text)
+                and not re.match(r'(?:ba|z|da|k)?sh\b', s.text)]
     # An earlier online response can establish a package's external identity;
     # it still needs a fresh online receipt in the current turn.
     for span in spans:

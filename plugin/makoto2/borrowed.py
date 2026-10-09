@@ -4,6 +4,7 @@ Copyright 2026 Clear-Sights. Licensed under Apache-2.0 (LICENSE).
 Changes: numeric leaves, explicit store, SHA verification, call-site traces.
 """
 import hashlib
+import json
 from pathlib import Path
 import re
 
@@ -37,7 +38,17 @@ def receipt(claim, trace, fingerprint):
 
 def fragments(value):
     """Tool input/response includes its literal field names as well as values."""
-    yield from (v for _, v in leaves(value))
+    for _, v in leaves(value):
+        yield v
+        # A connector returns its JSON as one string; what the session saw is
+        # the decoded text, so tabs and quotes inside bodies match their source.
+        if isinstance(v, str) and v[:1] in '{[' and '\\' in v:
+            try:
+                decoded = json.loads(v)
+            except ValueError:
+                continue
+            if isinstance(decoded, (dict, list)):
+                yield from fragments(decoded)
     if isinstance(value, dict):
         for key, child in value.items():
             yield str(key)
