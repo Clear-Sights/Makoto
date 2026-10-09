@@ -45,7 +45,14 @@ def evaluate(ledger, event, adapter='inferred'):
                 pattern = r'(?<![\w/\\.@:+~%#?=&$!*|-])' + re.escape(path) + r'(?![\w/\\.@:+~%#?=&$!*|-])'
                 output_ranges.extend(m.span() for m in re.finditer(pattern, text))
 
+    # An id the write itself defines (first table cell, heading, list label) is
+    # authored here, not a reference to something unread. Uses of other ids still hold.
+    defined = set(re.findall(r'(?m)^\s*\|\s*\**([A-Za-z][\w.-]*)\**\s*\|', text))
+    defined |= set(re.findall(r'(?m)^\s*(?:#+|[-*])\s+\**([A-Za-z][\w.-]*\d)\**(?=[\s:.)]|$)', text))
+
     def output_name(span):
+        if span.kind == 'identifier' and span.text in defined:
+            return True
         return span.kind == 'path' and ledger.subject(span.text, event) in output_subjects or any(start <= span.start and span.end <= end for start, end in output_ranges)
 
     if not readings and not creation and (shipping is None or name_spans):
