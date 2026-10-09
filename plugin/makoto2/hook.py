@@ -116,6 +116,15 @@ def questions(event):
     return {}
 
 
+def in_scope(cwd, prefixes):
+    cwd = cwd.replace('\\', '/').rstrip('/').lower()
+    for prefix in prefixes:
+        prefix = prefix.replace('\\', '/').rstrip('/').lower()
+        if prefix and (cwd == prefix or cwd.startswith(prefix + '/')):
+            return True
+    return False
+
+
 def main(raw, config):
     event = {}
     try:
@@ -160,6 +169,12 @@ def main(raw, config):
                 reason = 'makoto contract: ' + contract
             elif findings:
                 reason = '; '.join('makoto rule ' + f['rule'] + ' [' + f['shape'] + ']: ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
+            report = None
+            scope = config.get('block_in')
+            if reason and scope and not in_scope(event.get('cwd') or '', scope):
+                # Report only outside the listed projects: the step runs, the
+                # journal keeps the finding, and nothing blocks.
+                report, reason = reason, None
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
                    'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
@@ -169,6 +184,8 @@ def main(raw, config):
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
             # Active Stop retries still block. Audit records mark the unpaid
             # retry; no suppression can silently admit its final text.
+            if report:
+                return {'systemMessage': 'makoto report only (outside block_in): ' + report}
             response = d_out(event, reason) if reason else questions(event)
             return response
     except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:

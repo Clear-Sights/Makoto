@@ -1,5 +1,6 @@
 state_dir: locked hash-linked session journal directory; MAKOTO_STATE_DIR overrides.
 adapter: inferred only; MAKOTO_ADAPTER overrides.
+block_in: list of directory prefixes; MAKOTO_BLOCK_IN overrides (path-separator list). When set, a hold whose event cwd is outside every prefix is reported in systemMessage and does not block. Unset: hold everywhere.
 transcript_path: native event field, earlier session record; never assistant prose evidence.
 makoto.effects: host-observed mutation subjects for opaque tools or shell scripts.
 makoto.external_subjects: host-classified bare public project names.
