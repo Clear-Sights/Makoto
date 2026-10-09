@@ -1417,5 +1417,72 @@
     "agent_id": "a7"
    }
   ]
+ },
+ {
+  "id": "b-new-script-defines-its-own-names",
+  "rule": "b",
+  "files": {
+   "src.txt": "notes.md summary seed keep"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "notes.md summary seed keep"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "tools/check_all.py",
+     "content": "def load_rows(path):\n    return path\n\nrow_count = load_rows('notes.md')\nfor entry in [row_count]:\n    print(entry)\n"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "notes.md summary seed keep"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "tools/check_all.py",
+     "content": "def load_rows(path):\n    return path\n\nrow_count = load_rows('notes.md')\nfor entry in [row_count]:\n    print(entry)\nprint(unseen_helper_name)\n"
+    }
+   }
+  ]
  }
 ]

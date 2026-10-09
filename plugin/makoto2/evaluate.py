@@ -50,6 +50,14 @@ def evaluate(ledger, event, adapter='inferred'):
     defined = set(re.findall(r'(?m)^\s*\|\s*\**([A-Za-z][\w.-]*)\**\s*\|', text))
     defined |= set(re.findall(r'(?m)^\s*(?:#+|[-*])\s+\**([A-Za-z][\w.-]*\d)\**(?=[\s:.)]|$)', text))
 
+    # A new script binds its own functions, classes and variables; writing them
+    # is authoring, not citing something unread. Only code files qualify.
+    target = (event.get('tool_input') or {}).get('file_path') or ''
+    if event.get('tool_name') == 'Write' and re.search(r'\.(?:py|sh|bash|js|mjs|ts)$', target):
+        defined |= set(re.findall(r'(?m)^[ \t]*(?:async\s+)?(?:def|class|function)\s+([A-Za-z_]\w*)', text))
+        defined |= set(re.findall(r'(?m)^[ \t]*(?:(?:export\s+)?(?:const|let|var)\s+)?([A-Za-z_]\w*)\s*=(?!=)', text))
+        defined |= set(re.findall(r'(?m)^[ \t]*for\s+([A-Za-z_]\w*)\s+in\b', text))
+
     def output_name(span):
         if span.kind == 'identifier' and span.text in defined:
             return True
