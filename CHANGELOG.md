@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rule b: `file.py:12` (a line citation) is evidenced by a read of `file.py`, or by the exact citation in output; an unread file still holds.
+
 ## 5.0.4 — 2026-10-09
 
 Fixes for false holds seen live in the Countdown project (2026-10-09). Each has an honest twin that now passes and a fake twin that is still held, in `tests/fixtures/false_holds.json`; `tools/measure_rates.py` prints catch and false-hold rates.

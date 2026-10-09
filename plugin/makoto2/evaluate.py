@@ -63,10 +63,16 @@ def evaluate(ledger, event, adapter='inferred'):
     # a derived result or repeated answer to occur verbatim in that artifact.
     # Exact unread names remain governed independently by rule b.
     for span in name_spans:
+        cited = span
+        if span.kind == 'path' and re.search(r':\d+(?::\d+)?$', span.text):
+            # `file.py:12` cites a line of the file: the file read, or the
+            # exact citation seen in output, evidences it.
+            base = re.sub(r':\d+(?::\d+)?$', '', span.text)
+            span = type(span)(base, span.start, span.start + len(base), span.kind)
         if output_name(span):
             snapshot.append({'span': span.text, 'kind': span.kind, 'output': True})
             continue
-        witnesses = ledger.witnesses(span.text, span.kind)
+        witnesses = ledger.witnesses(span.text, span.kind) or ledger.witnesses(cited.text, cited.kind)
         if (span.kind == 'path' and not span.text.startswith('#!')
                 and any(contains(t, span.text, span.kind) for t in ledger.given)):
             # Naming a file in the prompt does not read its contents.
