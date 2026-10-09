@@ -1,0 +1,774 @@
+[
+ {
+  "id": "d-tsv-table",
+  "rule": "d",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "method/models.tsv",
+     "content": "default: haiku-5.5\nmodel\teffort\tindex\nhaiku-5.5\thigh\t38\nsonnet-5.5\thigh\t47\n"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "method/models.tsv",
+     "content": "default: haiku-5.5\nmodel\teffort\tindex\nhaiku-5.5\thigh\t38\nsonnet-5.5\thigh\t47\n"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "dag/codex.md",
+     "content": "Ladder lives in method/models.tsv."
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "method/models.py",
+     "content": "model = \"haiku\"\neffort = \"high\"\n"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "method/models.py",
+     "content": "model = \"haiku\"\neffort = \"high\"\n"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "dag/codex.md",
+     "content": "Ladder lives in method/models.py."
+    }
+   }
+  ],
+  "files": {
+   "src.txt": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+  }
+ },
+ {
+  "id": "d-deleted-file",
+  "rule": "d",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t1/stats.py",
+     "content": "def stats():\n    return 1\n"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t1/stats.py",
+     "content": "def stats():\n    return 1\n"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b1",
+    "tool_input": {
+     "command": "rm /tmp/t1/stats.py"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b1",
+    "tool_input": {
+     "command": "rm /tmp/t1/stats.py"
+    },
+    "tool_response": {
+     "stdout": "",
+     "exitCode": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "notes.md",
+     "content": "The throwaway /tmp/t1/stats.py is gone."
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t1/stats.py",
+     "content": "def stats():\n    return 1\n"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t1/stats.py",
+     "content": "def stats():\n    return 1\n"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "notes.md",
+     "content": "The throwaway /tmp/t1/stats.py is ready."
+    }
+   }
+  ],
+  "files": {
+   "src.txt": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+  }
+ },
+ {
+  "id": "d-deleted-tree-at-commit",
+  "rule": "d",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t2/stats.py",
+     "content": "def stats():\n    return 1\n"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t2/stats.py",
+     "content": "def stats():\n    return 1\n"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b0",
+    "tool_input": {
+     "command": "git add /tmp/t2"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b0",
+    "tool_input": {
+     "command": "git add /tmp/t2"
+    },
+    "tool_response": {
+     "stdout": "",
+     "exitCode": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b1",
+    "tool_input": {
+     "command": "rm -rf /tmp/t2"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b1",
+    "tool_input": {
+     "command": "rm -rf /tmp/t2"
+    },
+    "tool_response": {
+     "stdout": "",
+     "exitCode": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "c1",
+    "tool_input": {
+     "command": "git commit -m \"Update router\""
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t2/stats.py",
+     "content": "def stats():\n    return 1\n"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "/tmp/t2/stats.py",
+     "content": "def stats():\n    return 1\n"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b0",
+    "tool_input": {
+     "command": "git add /tmp/t2"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "b0",
+    "tool_input": {
+     "command": "git add /tmp/t2"
+    },
+    "tool_response": {
+     "stdout": "",
+     "exitCode": 0
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_use_id": "c1",
+    "tool_input": {
+     "command": "git commit -m \"Update router\""
+    }
+   }
+  ],
+  "files": {
+   "src.txt": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+  }
+ },
+ {
+  "id": "d-sibling-json-schema",
+  "rule": "d",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/out7.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/out7.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "sk/out8.json",
+     "content": "{\"skill\": \"awareness\", \"verdict\": \"trim\", \"priorities\": 8}"
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/plan.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/plan.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    },
+    "tool_response": {
+     "content": "ok"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w2",
+    "tool_input": {
+     "file_path": "sk/summary.md",
+     "content": "plan.json is the settled priorities plan: \"verdict\" is keep."
+    }
+   }
+  ],
+  "files": {
+   "src.txt": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+  }
+ },
+ {
+  "id": "d-subagent-stop-sibling-file",
+  "rule": "d",
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/out7.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    },
+    "agent_id": "a7"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/out7.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    },
+    "tool_response": {
+     "content": "ok"
+    },
+    "agent_id": "a7"
+   },
+   {
+    "hook_event_name": "SubagentStop",
+    "last_assistant_message": "Done.",
+    "agent_id": "a8"
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src.txt"
+    },
+    "tool_response": {
+     "content": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/out7.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    },
+    "agent_id": "a7"
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "sk/out7.json",
+     "content": "{\"skill\": \"seed\", \"verdict\": \"keep\", \"priorities\": 8}"
+    },
+    "tool_response": {
+     "content": "ok"
+    },
+    "agent_id": "a7"
+   },
+   {
+    "hook_event_name": "SubagentStop",
+    "last_assistant_message": "Done.",
+    "agent_id": "a7"
+   }
+  ],
+  "files": {
+   "src.txt": "method/models.tsv method/models.py dag/codex.md /tmp/t1/stats.py /tmp/t2/stats.py plan.json sk/out7.json sk/out8.json summary.md skill verdict priorities seed awareness keep trim haiku-5.5 sonnet-5.5 model effort index high stats def return notes.md settled"
+  }
+ },
+ {
+  "id": "c-reminder-is-not-a-new-turn",
+  "rule": "c",
+  "transcript_honest": [
+   {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": "Check the beads tracker and note it."
+    }
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "f1",
+       "name": "WebFetch",
+       "input": {
+        "url": "https://github.com/gastownhall/beads",
+        "prompt": "what is it"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "f1",
+       "content": "Beads is a git-backed issue tracker."
+      },
+      {
+       "type": "text",
+       "text": "<system-reminder>The task tools have not been used recently.</system-reminder>"
+      }
+     ]
+    }
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "cand",
+       "name": "Write",
+       "input": {
+        "file_path": "out2-06.json",
+        "content": "{\"tracker\": \"https://github.com/gastownhall/beads\"}"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "cand",
+    "tool_input": {
+     "file_path": "out2-06.json",
+     "content": "{\"tracker\": \"https://github.com/gastownhall/beads\"}"
+    }
+   }
+  ],
+  "transcript_fake": [
+   {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": "Check the beads tracker and note it."
+    }
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "f1",
+       "name": "WebFetch",
+       "input": {
+        "url": "https://github.com/gastownhall/beads",
+        "prompt": "what is it"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": [
+      {
+       "type": "tool_result",
+       "tool_use_id": "f1",
+       "content": "Beads is a git-backed issue tracker."
+      },
+      {
+       "type": "text",
+       "text": "<system-reminder>The task tools have not been used recently.</system-reminder>"
+      }
+     ]
+    }
+   },
+   {
+    "type": "user",
+    "message": {
+     "role": "user",
+     "content": "Now also note the second tracker."
+    }
+   },
+   {
+    "type": "assistant",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "tool_use",
+       "id": "cand",
+       "name": "Write",
+       "input": {
+        "file_path": "out2-06.json",
+        "content": "{\"tracker\": \"https://github.com/gastownhall/beads\"}"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "cand",
+    "tool_input": {
+     "file_path": "out2-06.json",
+     "content": "{\"tracker\": \"https://github.com/gastownhall/beads\"}"
+    }
+   }
+  ]
+ }
+]

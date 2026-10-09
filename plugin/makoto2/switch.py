@@ -20,7 +20,7 @@ from .paths import relative_path, path_spellings, program_name
 
 CODE_SUFFIXES = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift scala cs fs ex exs erl clj sql ps1 bat cmd ipynb tcl awk'.split())
 CONFIG_SUFFIXES = frozenset('json jsonc yaml yml toml ini cfg conf config xml properties env'.split())
-RECORD_SUFFIXES = frozenset('md txt rst csv log'.split())
+RECORD_SUFFIXES = frozenset('md txt rst csv tsv jsonl ndjson log'.split())
 DATA_SUFFIXES = CONFIG_SUFFIXES | RECORD_SUFFIXES
 CONFIG_FILES = frozenset(('Makefile', 'Dockerfile', 'Rakefile', 'Gemfile', 'Procfile', '.env'))
 RUNTIMES = re.compile(r'(?:python(?:\d+(?:\.\d+)*)?|pypy\d*|node|nodejs|deno|bun|bash|sh|zsh|fish|ruby|perl|php|lua|Rscript|pwsh|tclsh(?:\d+(?:\.\d+)*)?|wish)\Z')
@@ -101,9 +101,15 @@ def full_read_subjects(pre, post):
 
 
 def names_change(event, change):
-    """Every final/ship after code edits counts; writers require a literal name."""
-    if event['hook_event_name'] in FINAL or event.get('tool_name') == 'Bash' and git_action(event):
+    """Every ship after code edits counts; writers require a literal name.
+
+    A final answers for what its own agent wrote: a subagent's Stop is not held
+    for a sibling worker's file. Commit and push still ship every agent's edits.
+    """
+    if event.get('tool_name') == 'Bash' and git_action(event):
         return True
+    if event['hook_event_name'] in FINAL:
+        return change.get('agent') == event.get('agent_id')
     text = text_of(event)
     for span in names(text):
         path = re.sub(r':\d+(?::\d+)?$', '', span.text)
@@ -114,8 +120,14 @@ def names_change(event, change):
     if any(identity(ti[key], event) == change['subject'] for key in ('file_path', 'notebook_path') if ti.get(key)):
         return True
     absolute = change['subject'][5:]
-    return any(contains(text, value, 'path') for value in path_spellings(absolute, event.get('cwd') or os.getcwd())) or any(
-        contains(text, alias, 'identifier') for alias in change['aliases'])
+    if any(contains(text, value, 'path') for value in path_spellings(absolute, event.get('cwd') or os.getcwd())):
+        return True
+    # Keys and stems of a data file are its schema. A writer producing another
+    # data file with the same keys is authoring a sibling, not naming this one.
+    writer = ti.get('file_path') or ti.get('notebook_path') or ''
+    if change.get('data_form') and ntpath.splitext(writer)[1].lstrip('.').lower() in CONFIG_SUFFIXES:
+        return False
+    return any(contains(text, alias, 'identifier') for alias in change['aliases'])
 
 
 def simple_argv(command):

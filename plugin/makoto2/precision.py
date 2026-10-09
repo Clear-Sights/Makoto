@@ -56,7 +56,7 @@ def extract(text, *, tool_output=False):
         for match in pattern.finditer(text):
             if kind == 'external-package':
                 separator = text[match.end('package'):match.start('version')]
-                if separator.isspace() and match['package'].lower() in GRAMMAR_WORDS:
+                if (separator.isspace() or separator.strip().lower() in VERSION_LABELS) and match['package'].lower() in GRAMMAR_WORDS:
                     continue
                 if separator.isspace() and (match['package'].lower() in VERSION_LABELS
                         or match['package'].lower() in RESULT_VERBS and re.fullmatch(r'\d+\.\d+', match['version'])):
