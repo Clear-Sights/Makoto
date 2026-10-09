@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- New `block_in` scope (`MAKOTO_BLOCK_IN`, path-separator list of directories). When set, a hold whose cwd is outside every listed directory is reported in `systemMessage` and does not block; the step is admitted and the finding stays in the journal. Unset: hold everywhere, as before.
+
+## Unreleased
+
 - Rule b: `file.py:12` (a line citation) is evidenced by a read of `file.py`, or by the exact citation in output; an unread file still holds.
 
 ## 5.0.4 — 2026-10-09
