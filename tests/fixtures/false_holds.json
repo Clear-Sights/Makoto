@@ -944,5 +944,72 @@
     }
    }
   ]
+ },
+ {
+  "id": "b-line-number-citation",
+  "rule": "b",
+  "files": {
+   "src/notes.md": "alpha beta gamma"
+  },
+  "honest": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src/notes.md"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src/notes.md"
+    },
+    "tool_response": {
+     "content": "alpha beta gamma"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "report.md",
+     "content": "The claim sits at src/notes.md:12 and src/notes.md:40:3 in the file read."
+    }
+   }
+  ],
+  "fake": [
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src/notes.md"
+    }
+   },
+   {
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_use_id": "r0",
+    "tool_input": {
+     "file_path": "src/notes.md"
+    },
+    "tool_response": {
+     "content": "alpha beta gamma"
+    }
+   },
+   {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_use_id": "w1",
+    "tool_input": {
+     "file_path": "report.md",
+     "content": "The claim sits at src/other.md:12 in the file read."
+    }
+   }
+  ]
  }
 ]
