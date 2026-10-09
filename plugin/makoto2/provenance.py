@@ -199,7 +199,17 @@ class Ledger:
     def witnesses(self, span, kind=None):
         if any(contains(text, span, kind) for text in self.given):
             return [{'given': True}]
-        return [r for r in self.source_readings() + [i for i in self.inputs if self.fresh(i)] if any(contains(text, span, kind) for text in r['texts'])]
+        parts = package_parts(span) if kind == 'external-package' else None
+
+        def seen(text):
+            if contains(text, span, kind):
+                return True
+            # `codex 0.162.0` is the product name of `codex-cli 0.162.0`: same
+            # version, and the shorter name is a whole hyphen part of the longer.
+            return bool(parts) and any(
+                m['version'] == parts[1] and parts[0] in re.split(r'[-_]', m['package'])
+                for m in VERSIONED.finditer(text))
+        return [r for r in self.source_readings() + [i for i in self.inputs if self.fresh(i)] if any(seen(text) for text in r['texts'])]
 
     def fetched(self, span, kind=None):
         parts = package_parts(span)

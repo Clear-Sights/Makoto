@@ -10,6 +10,8 @@ Fixes for false holds seen live in the Countdown project (2026-10-09). Each has 
 - Rule d: Stop and SubagentStop answer only for edits made by the same `agent_id`; commit and push still ship every agent's edits.
 - Rule c: text that rides on a tool result (harness reminders) is still given prose but no longer starts a new turn, so a fetch made earlier in the same turn stays current.
 - Rule c: `at version 1.1.0` and similar grammar-word-plus-version prose is not a package name.
+- Rule b: an id the write itself defines (first table cell, heading or list label) is authored, not a reference; a use of an undefined id still holds.
+- Rule b: `codex 0.162.0` is evidenced by `codex-cli 0.162.0` (same version; the name is a whole hyphen part). A different version still holds.
 
 ## 5.0.3 — 2026-10-08
 
