@@ -4,6 +4,9 @@
     "name": "Clear-Sights",
     "url": "https://github.com/Clear-Sights"
   },
+  "metadata": {
+    "description": "Makoto: hooks that hold dependent steps until the session record holds the readings they need."
+  },
   "plugins": [
     {
       "name": "makoto",

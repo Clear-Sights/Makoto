@@ -1,5 +1,9 @@
 # Makoto 5.0.0
 
+Install (Claude Code 2.1.275 or later):
+
+    /plugin install makoto --marketplace Clear-Sights/Makoto
+
 Makoto holds dependent steps before Write, Edit, MultiEdit, NotebookEdit, Bash
 `git commit`/`git push`, and Stop. The live hook is `python3 -m makoto2` from
 `plugin/`; `plugin/hooks/hooks.json` wires native events into it. No model or
