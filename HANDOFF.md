@@ -28,6 +28,8 @@ I1-I3 remain as implemented pending Gabriel's decision. Local package and fresh
 account tests exercise the current plugin; remote CI and live-session operation
 are separate measurements. README and the plugin manifest state version 4.0.1;
 the historical source snapshot retains 4.0.0.
+The 4.2.0 snapshot plugin/legacy420 (restored by commit 88e6525) is removed;
+git history keeps it.
 
 Regenerate TIGHTEN.tsv after changing constraints and regenerate the route with
 mesh/seed.py after changing fills. Each task owns its evidence output. Preserve
