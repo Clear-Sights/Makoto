@@ -1,114 +1,53 @@
-# Makoto 5.0.0
+# Makoto
 
-Makoto holds dependent steps before Write, Edit, MultiEdit, NotebookEdit, Bash
-`git commit`/`git push`, and Stop. The live hook is `python3 -m makoto2` from
-`plugin/`; `plugin/hooks/hooks.json` wires native events into it. No model or
-network is used by the checker.
+Makoto is a Claude Code hook. Before a dependent step runs (Write, Edit, MultiEdit, NotebookEdit,
+Bash `git commit`/`git push`, or Stop), it checks the session record. If a reading the step needs
+is missing, it holds the step: a PreToolUse step gets a native deny and a Stop gets a native block.
+The hold names the rule, its shape and the exact subject. The checker uses no model and no network.
 
-Rule a requires an original artifact reading. Assistant text, worker answers,
-writer acknowledgments, and readings of files this session wrote cannot supply
-one. A completed code/query/request response is an artifact reading, including
-Bash echo/printf, inline programs, runs of session-written scripts and runs with
-mutations. Executing a script reads its response; directly reading an own file
-still reads own output. A repeated or derived answer needs an original reading;
-its prose need not occur verbatim in that reading.
-Rule b requires each NAME span's exact characters in prior tool input or
-original response bytes. Names are paths, URLs, emails and identifiers, including
-hashes, UUIDs and versions. Plain/hyphenated words, numbers, units and quoted prose
-do not trigger b. Current writer targets and session-written/edited file names
-are outputs and exempt from b; they never supply an original reading for a. A span copied from a user prompt is given. Paths are
-matched in their recorded spelling; normalized paths are used only to track
-writes and stale readings. Rule c requires an online fetch/search of a named URL,
-versioned package, or host-classified public project in the current turn.
-User-given external names still need that online call.
+## Install
 
-Rule d holds an UNRUN CHANGE when a dependent writer names an edited code/script/
-config path, module or identifier, or a commit/push/final ships session edits.
-After the last edit, a paired call must execute that subject and return its
-output. For a configuration file without a shebang, a paired full read of the same
-path after its last edit also pays d. Configuration forms include .json, .toml,
-.ini, .yaml, .yml, .cfg, .conf and .env. Prose/data records (.md, .txt, .rst,
-.csv and .log) and extensionless files without executable permission or a
-shebang are excluded from d, even with code-like declarations or structured
-data. Observed shebangs still identify scripts. Code/scripts still need a run,
-including every edited code file before commit/push; reading code never pays d.
-A failed run counts; an earlier run, code readback, different execution
-path, missing output or background launch acknowledgment does not. An actual
-stdout/stderr response from a background run counts. Silent completed runs can
-return an exit status. Selection is by input form, without behavior word lists.
-The hold says: "run it and read the output before this step".
+Claude Code 2.1.275 or later:
 
-`makoto2.switch` recognizes code/config suffixes, notebooks, shebangs, declarations
-and structured JSON payloads. Module stems, declared identifiers and config keys
-join normalized file paths as edited subjects' name forms. Simple direct runs,
-interpreter script/module operands, explicit pytest files, sourced scripts,
-native Run/Execute/NotebookExecute/NotebookRun and `--config` consumers provide
-execution subjects. Conditional/compound shell, indirect imports, generated
-commands and opaque runners need host-owned `makoto.invocation.subject` or
-`subjects` on the paired pre/post tool event, identifying what actually executed.
-Interpreter eval/check/help flags do not establish execution of a file named as
-an argument; arguments after a script/module operand do not select interpreter
-mode. The checker never executes the recorded program itself.
+    /plugin install makoto --marketplace Clear-Sights/Makoto
 
-Hold messages name the rule, tag its shape (a lineage, b spec, c other point,
-d switch), quote the exact subject, and say which reading or run clears it.
-PreToolUse returns a native deny, and Stop returns a native block. Every
-unpaid retry remains held, including `stop_hook_active`. Admitted dependent
-PreToolUse steps receive Gabriel's exact four questions as `additionalContext`.
-An otherwise admitted Stop presents them once as its block reason; a paid
-`stop_hook_active` retry produces `{}`. The old lineage surface and four-family
-obligation layer have been removed. The questions are:
+`plugin/hooks/hooks.json` sends each native event to `cd plugin && python3 -m makoto2`. Makoto
+needs Python 3.11 or later and uses only the standard library.
+
+## The four questions
+
+Every admitted dependent PreToolUse step receives these questions as `additionalContext`. An
+admitted Stop shows them once as its block reason, and a `stop_hook_active` retry that is
+otherwise admitted gets `{}`:
 
 "Before this step: (1) If it relies on a definition, did you read the thing itself against that definition? (2) If it carries a result to another place or time, did you read the same thing again where and when it lands? (3) If it says how a branch behaves, did you feed that branch an input and read its response? (4) Is it based on the original source, read this turn, rather than on an earlier answer?"
 
-`makoto2.precision.extract` is the single reusable form extractor. It preserves
-quoted/backtick/fenced payloads, output/log lines, paths, URLs, emails, digit and
-symbol tokens, camelCase, versions, timestamps, IDs, and numbers with units.
-Its deterministic non-dictionary substitute is membership in the bundled,
-sorted `common-english.txt`: ordinary alphabetic tokens outside that closed list
-are exact spans. This is an explicit offline allowlist, not an exhaustive English
-dictionary. The extractor returns original string offsets and never rewrites
-characters. `extract(text, tool_output=True)` preserves every output line;
-visible log/stack syntax is also recognized in proposed text.
-`makoto2.precision.names(text)` supplies the narrower NAME view, preserving exact
-source slices. Quoted/backticked names keep their payload bytes; quotation alone
-does not make a value or phrase a name. Output paths are exempt from b; own file contents still need
-an independent artifact reading for a. Quoted URLs use the same current-turn online check.
+## The four rules
 
-The locked, hash-linked session journal retains prior turns. An optional native
-`transcript_path` adds earlier tool-use/result and user-prompt records. Assistant
-prose from the transcript never becomes evidence. A recorded write invalidates
-that subject's earlier inputs and readings; pending writes reserve it immediately.
-Failed mutations remain reserved unless the host attests `makoto.no_effect`.
-Native writer targets, shell redirections and common mutation commands are
-tracked. `makoto.effects` supplies subjects changed by opaque commands or tools.
-Original readbacks of independent subjects can clear holds; own file readbacks
-remain own output. Failed tool errors can be read evidence but cannot pay an
-online fetch. A host-reported mutation after a denied call taints subsequent
-readbacks without supplying witnesses. Completed native fetch text needs no
-explicit exit-status field; reported failures still do not pay c.
+- **a (lineage):** the step needs an original artifact reading. Assistant text, worker answers and
+  readings of files this session wrote do not count. A completed run, query or request response
+  does count, and a run of a session-written script reads that script's response.
+- **b (spec):** each name the step uses (path, URL, email, identifier, hash, UUID, version) must
+  appear with its exact characters in an earlier tool input, an original response, or the user
+  prompt. Writer targets and files this session wrote are outputs, so b does not apply to them.
+- **c (other point):** a named URL, a versioned package or a host-classified public project
+  needs an online fetch or search of that subject in the current turn.
+- **d (switch):** when a step names an edited code, script or config subject, or ships session
+  edits through a commit, push or final answer, a paired call must have run that subject after its
+  last edit and returned output. For a config file without a shebang, a full read after the last
+  edit also pays d. Reading code never pays d.
 
-The outer `makoto` envelope is host-owned instrumentation, never assistant
-content copied out of `tool_input`. `external_subjects` classifies bare public
-project names without a subject-specific registry; `network_subjects` records
-opaque network clients. `turn_id` provides a stable host turn identity.
-`detio_store` or `DETIO_STORE_DIR` identifies a DetIO store. Only references
-already witnessed in a successful source response are expanded, and their SHA
-addresses are verified. Unreferenced stored objects never become evidence.
-`BORROWED.tsv` pins the reused DetIO and Causality pieces. Packages carry their
-licenses, notices and provenance table.
+A locked, hash-linked journal keeps every turn under `~/.claude/makoto2_state`
+(`MAKOTO_STATE_DIR` overrides). If `MAKOTO_BLOCK_IN` is set to a path-separated list of
+directories, a hold whose cwd lies outside all of them is only reported in `systemMessage`.
+The optional host envelope `makoto` (`effects`, `external_subjects`, `network_subjects`,
+`invocation.subject(s)`, `turn_id`, `detio_store`) lets the host record what it saw, such as
+opaque mutations, public names or the program that actually ran. The host must enforce the
+decision before it runs a tool or delivers a final answer.
 
-The host must enforce hook decisions before executing a tool or delivering a
-final answer. `tools/deliver.py` demonstrates this by withholding stdout until a
-Stop is admitted; host-specific final interception still depends on that host.
-`tools/run_pairs.py INPUT.json --adapter inferred` replays supplied events without
-executing recorded commands and prints each session's `held` and exact `response`.
-Runtime dependencies are Python 3.11+ standard library only.
+## Development
 
-Run the whole offline suite with `python3 -m pytest -q`. All test plants are authored
-in this repository. The spent development set is used only for diagnosis and
-replay grading; its words, paths and names are not added to code or tests. See `REPORT.md` for measured
-results and the precise boundary of the record contract. Form and record presence
-cannot establish universal semantic dependency or distinguish every bare public
-name from a local name without host classification. The requested universal
-100% and zero false positives is not claimed.
+`python3 -m pytest -q` runs `tests/test_rules.py`. For each of rules a-d, the test sends a plant
+and its twin through the exact hooks.json command: the plant is held and the twin is admitted.
+The full suite, fixtures, tools and records live in Clear-Sights/Makoto-Dev. This repository
+receives only finished versions. The cut `mesh/` gate is kept in git history at 295bf44.
