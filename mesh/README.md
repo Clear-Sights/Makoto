@@ -39,9 +39,8 @@ shared predicates have one owner selected by their needs line. Dispatch I1-I3
 remain pending with Gabriel and keep their existing units.
 
 TASKS.tsv selects executable product acceptance in tests/acceptance_tasks.py.
-TRACE.tsv connects requirements to those tests. ALREADY-MET.tsv records executed
-passing checks and their output hashes; receipts never override failing product
-acceptance. Re-run the commands after changing selected inputs:
+TRACE.tsv connects requirements to those tests; receipts never override failing
+product acceptance. Re-run the commands after changing selected inputs:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 mesh/tighten.py
