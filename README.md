@@ -45,9 +45,23 @@ The optional host envelope `makoto` (`effects`, `external_subjects`, `network_su
 opaque mutations, public names or the program that actually ran. The host must enforce the
 decision before it runs a tool or delivers a final answer.
 
+## Never stuck
+
+- Only rule findings hold a step. Any other failure (state folder, lock, journal, transcript, a
+  malformed host event) admits the step with a `systemMessage` naming the error.
+- Every hook in hooks.json has a 10 s `timeout`. The per-session lock is never waited on longer
+  than 3 s (`MAKOTO_LOCK_SECONDS`); a busy lock admits the step.
+- A `stop_hook_active` Stop is held at most once per turn. A second held retry is admitted with
+  its findings shown in `systemMessage` and kept in the journal (`stop_cap`).
+- Each call reads only the journal rows and transcript lines added since the previous call: a
+  `.ckpt` file beside the journal keeps both reads and the replayed record. A checkpoint that
+  does not match is ignored and the call replays in full; `MAKOTO_CHECKPOINT=0` always does.
+
 ## Development
 
-`python3 -m pytest -q` runs `tests/test_rules.py`. For each of rules a-d, the test sends a plant
+`python3 -m pytest -q` runs `tests/`. For each of rules a-d, `test_rules.py` sends a plant
 and its twin through the exact hooks.json command: the plant is held and the twin is admitted.
+`test_robust.py` plants each way a session could get stuck and checks that checkpointed calls
+decide exactly as full replay does.
 The full suite, fixtures, tools and records live in Clear-Sights/Makoto-Dev. This repository
 receives only finished versions. The cut `mesh/` gate is kept in git history at 295bf44.
