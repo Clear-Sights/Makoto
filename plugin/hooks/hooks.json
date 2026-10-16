@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+            "timeout": 10
           }
         ]
       }
@@ -17,7 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+            "timeout": 10
           }
         ]
       }
@@ -28,7 +30,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+            "timeout": 10
           }
         ]
       }
@@ -38,7 +41,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+            "timeout": 10
           }
         ]
       }
@@ -48,7 +52,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+            "timeout": 10
           }
         ]
       }
@@ -58,7 +63,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2"
+            "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+            "timeout": 10
           }
         ]
       }

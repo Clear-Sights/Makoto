@@ -9,18 +9,20 @@ import contextlib
 import fnmatch
 import hashlib
 import json
+import marshal
 import ntpath
 import os
 import posixpath
 import re
 import shlex
 import sys
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-# Defaults; MAKOTO_STATE_DIR, MAKOTO_ADAPTER and MAKOTO_BLOCK_IN override (see README).
-CONFIG = {'state_dir': '~/.claude/makoto2_state', 'adapter': 'inferred'}
+# Defaults; MAKOTO_STATE_DIR, MAKOTO_ADAPTER, MAKOTO_LOCK_SECONDS, MAKOTO_CHECKPOINT and MAKOTO_BLOCK_IN override (see README).
+CONFIG = {'state_dir': '~/.claude/makoto2_state', 'adapter': 'inferred', 'lock_seconds': 3.0}
 
 
 # ======================================================================
@@ -700,77 +702,129 @@ def key(event):
     return (name, digest(event))
 
 
-def history(candidate, journal):
+def transcript_cache(path, session_id):
+    """Parse state of one transcript: events parsed so far (uncut; rows without their own cwd
+    take the candidate's at use), the tool calls still awaiting a result, and the byte offset
+    after the last complete line. A line that cannot be parsed stops the parse where it is."""
+    return {'path': path, 'session_id': session_id, 'offset': 0, 'head': '', 'events': [], 'nocwd': [],
+            'first_pre': {}, 'pending': {}, 'error': None}
+
+
+HEAD_BYTES = 4096
+
+
+def head_digest(stream, offset):
+    stream.seek(0)
+    return hashlib.sha256(stream.read(min(offset, HEAD_BYTES))).hexdigest()
+
+
+def parse_transcript(cache):
+    """Read only the bytes after cache['offset'], complete lines only, and extend the cache."""
+    with Path(cache['path']).open('rb') as stream:
+        size = stream.seek(0, 2)
+        if size < cache['offset'] or head_digest(stream, cache['offset']) != cache['head']:
+            # Truncated or replaced: what was parsed is no longer the file.
+            cache.update(transcript_cache(cache['path'], cache['session_id']))
+        if cache['error'] is not None:
+            return cache
+        stream.seek(cache['offset'])
+        data = stream.read(size - cache['offset'])
+    data = data[:data.rfind(b'\n') + 1]
+    events, nocwd, pending = cache['events'], cache['nocwd'], cache['pending']
+    def add(event, own_cwd):
+        if event.get('hook_event_name') == 'PreToolUse':
+            cache['first_pre'].setdefault(event.get('tool_use_id'), len(events))
+        events.append(event)
+        nocwd.append(not own_cwd)
+    for line in data.splitlines(keepends=True):
+        try:
+            row = json.loads(line.decode('utf-8'))
+            if row.get('session_id', row.get('sessionId', cache['session_id'])) != cache['session_id']:
+                raise ValueError('transcript session identity mismatch')
+            base = {'session_id': cache['session_id']}
+            own_cwd = 'cwd' in row
+            if own_cwd:
+                base['cwd'] = row['cwd']
+            if row.get('hook_event_name'):
+                add(dict(base, **row), own_cwd)
+            else:
+                message = row.get('message', {})
+                role = message.get('role', row.get('type'))
+                content = message.get('content', [])
+                if role == 'user' and isinstance(content, str):
+                    add(dict(base, hook_event_name='UserPromptSubmit', prompt=content), own_cwd)
+                elif isinstance(content, list):
+                    prompts = []
+                    for block in content:
+                        if not isinstance(block, dict):
+                            continue
+                        if role == 'assistant' and block.get('type') == 'tool_use':
+                            event = dict(base, hook_event_name='PreToolUse', tool_name=block['name'], tool_use_id=block['id'], tool_input=block.get('input', {}))
+                            add(event, own_cwd)
+                            pending[block['id']] = {'tool_name': event['tool_name'], 'tool_input': event['tool_input']}
+                        elif role == 'user' and block.get('type') == 'tool_result':
+                            tid = block['tool_use_id']
+                            pre = pending.get(tid, {})
+                            response = block.get('content', '')
+                            if pre.get('tool_name') == 'Bash' and isinstance(response, str):
+                                # No inferred exit status: host block status is authoritative.
+                                response = {'stdout': response, 'is_error': block.get('is_error', False)}
+                            elif block.get('is_error'):
+                                response = {'content': response, 'is_error': True}
+                            add(dict(base, hook_event_name='PostToolUse', tool_name=pre.get('tool_name'), tool_use_id=tid, tool_input=pre.get('tool_input', {}), tool_response=response), own_cwd)
+                        elif role == 'user' and block.get('type') == 'text':
+                            prompts.append(block.get('text', ''))
+                    if prompts:
+                        prompt = dict(base, hook_event_name='UserPromptSubmit', prompt='\n'.join(prompts))
+                        if any(isinstance(b, dict) and b.get('type') == 'tool_result' for b in content):
+                            # Text riding on a tool result is harness reminder text for
+                            # the same turn; it is given prose but never a new turn.
+                            prompt['makoto'] = {'same_turn': True}
+                        add(prompt, own_cwd)
+        except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as error:
+            cache['error'] = [len(events), str(error)]
+            return cache
+        cache['offset'] += len(line)
+        if cache['offset'] - len(line) < HEAD_BYTES:
+            with Path(cache['path']).open('rb') as stream:
+                cache['head'] = head_digest(stream, cache['offset'])
+    return cache
+
+
+def history(candidate, journal, cache=None):
+    """Records before the candidate: (event, admitted, tag), the tag naming where each came from."""
     path = candidate.get('transcript_path')
     if not path:
-        return [(row['event'], row['admitted']) for row in journal]
-    imported, pending = [], {}
-    current_id = candidate.get('tool_use_id')
+        return [(row['event'], row['admitted'], ('j', i)) for i, row in enumerate(journal)], None
+    if cache is None or cache.get('path') != path:
+        cache = transcript_cache(path, candidate['session_id'])
     try:
-        stream = Path(path).open(encoding='utf-8')
+        parse_transcript(cache)
     except FileNotFoundError:
         # The host can submit a prompt before writing its first transcript.
         # Missing history adds no evidence and never replaces the verified journal.
-        return merge([], journal)
-    with stream:
-        for line in stream:
-            row = json.loads(line)
-            if row.get('session_id', row.get('sessionId', candidate['session_id'])) != candidate['session_id']:
-                raise ValueError('transcript session identity mismatch')
-            base = {'session_id': candidate['session_id'], 'cwd': row.get('cwd', candidate.get('cwd', ''))}
-            if row.get('hook_event_name'):
-                if row.get('tool_use_id') == current_id and row.get('hook_event_name') == 'PreToolUse':
-                    break
-                imported.append(dict(base, **row))
-                continue
-            message = row.get('message', {})
-            role = message.get('role', row.get('type'))
-            content = message.get('content', [])
-            if role == 'user' and isinstance(content, str):
-                imported.append(dict(base, hook_event_name='UserPromptSubmit', prompt=content))
-            elif isinstance(content, list):
-                prompts = []
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    if role == 'assistant' and block.get('type') == 'tool_use':
-                        if block['id'] == current_id:
-                            return merge(imported, journal)
-                        event = dict(base, hook_event_name='PreToolUse', tool_name=block['name'], tool_use_id=block['id'], tool_input=block.get('input', {}))
-                        imported.append(event)
-                        pending[block['id']] = event
-                    elif role == 'user' and block.get('type') == 'tool_result':
-                        tid = block['tool_use_id']
-                        pre = pending.get(tid, {})
-                        response = block.get('content', '')
-                        if pre.get('tool_name') == 'Bash' and isinstance(response, str):
-                            # No inferred exit status: host block status is authoritative.
-                            response = {'stdout': response, 'is_error': block.get('is_error', False)}
-                        elif block.get('is_error'):
-                            response = {'content': response, 'is_error': True}
-                        imported.append(dict(base, hook_event_name='PostToolUse', tool_name=pre.get('tool_name'), tool_use_id=tid, tool_input=pre.get('tool_input', {}), tool_response=response))
-                    elif role == 'user' and block.get('type') == 'text':
-                        prompts.append(block.get('text', ''))
-                if prompts:
-                    prompt = dict(base, hook_event_name='UserPromptSubmit', prompt='\n'.join(prompts))
-                    if any(isinstance(b, dict) and b.get('type') == 'tool_result' for b in content):
-                        # Text riding on a tool result is harness reminder text for
-                        # the same turn; it is given prose but never a new turn.
-                        prompt['makoto'] = {'same_turn': True}
-                    imported.append(prompt)
-    return merge(imported, journal)
+        return merge([], journal), None
+    # The candidate's own call and everything after it are excluded.
+    current = candidate.get('tool_use_id')
+    if cache['error'] is not None and current not in cache['first_pre']:
+        # The parse stopped on a bad line before reaching the candidate.
+        raise ValueError(cache['error'][1])
+    cut = cache['first_pre'].get(current, len(cache['events']))
+    cwd = candidate.get('cwd', '')
+    imported = [dict(event, cwd=cwd) if bare else event for event, bare in zip(cache['events'][:cut], cache['nocwd'][:cut])]
+    return merge(imported, journal), cache
 
 
 def merge(imported, journal):
     """Anchor imported history to journal order, preserving denied decisions."""
-    rows = [(r['event'], r['admitted']) for r in journal]
+    rows = [(r['event'], r['admitted'], ('j', i)) for i, r in enumerate(journal)]
     def occurrence_keys(events):
         counts = {}
         for event in events:
             k = key(event)
             counts[k] = counts.get(k, 0) + 1
             yield (k, counts[k])
-    positions = {k: i for i, k in enumerate(occurrence_keys(e for e, _ in rows))}
+    positions = {k: i for i, k in enumerate(occurrence_keys(e for e, _, _ in rows))}
     result, cursor, used = [], 0, set()
     for event, k in zip(imported, occurrence_keys(imported)):
         if k in positions:
@@ -780,7 +834,7 @@ def merge(imported, journal):
                 cursor = at + 1
             used.add(k)
         elif k not in used:
-            result.append((event, True))
+            result.append((event, True, ('i',) + k))
             used.add(k)
     result.extend(rows[cursor:])
     return result
@@ -1906,43 +1960,96 @@ def sigma_path(state_dir, session_id):
 
 
 @contextlib.contextmanager
-def session_lock(path):
+def session_lock(path, wait):
+    """Exclusive per-session lock, never waited on longer than `wait` seconds (TimeoutError)."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + wait
     with open(str(path) + '.lock', 'a+b') as stream:
         if os.name == 'nt':
             import msvcrt
             stream.seek(0); stream.write(b'0'); stream.flush(); stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                stream.seek(0); msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            take = lambda: msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            give = lambda: (stream.seek(0), msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1))
         else:
             import fcntl
-            fcntl.flock(stream, fcntl.LOCK_EX)
+            take = lambda: fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            give = lambda: fcntl.flock(stream, fcntl.LOCK_UN)
+        while True:
             try:
-                yield
-            finally:
-                fcntl.flock(stream, fcntl.LOCK_UN)
+                take()
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('session lock busy for %gs' % wait)
+                time.sleep(0.02)
+        try:
+            yield
+        finally:
+            give()
 
 
-def sigma_read(path, session_id):
+def sigma_read(path, session_id, cache=None):
+    """The verified journal. With a cache, only rows after its offset are read and verified,
+    chained to the last verified seal; the cache is extended in place."""
+    if cache is None:
+        cache = {'offset': 0, 'rows': [], 'last': ''}
+    if (path.stat().st_size if path.exists() else 0) < cache['offset']:
+        # Truncated or replaced: start over from its first row.
+        cache.update(offset=0, rows=[], last='')
     if not path.exists():
-        return []
-    result = []
-    previous = ''
-    with path.open(encoding='utf-8') as stream:
-        for line in stream:
-            row = json.loads(line)
+        return cache['rows']
+    previous = cache['last']
+    with path.open('rb') as stream:
+        stream.seek(cache['offset'])
+        for raw in stream:
+            row = json.loads(raw.decode('utf-8'))
             seal = row.pop('sha256')
             if row.get('previous') != previous or seal != hashlib.sha256(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest():
                 raise ValueError('corrupted journal chain')
             if row['event']['session_id'] != session_id:
                 raise ValueError('session identity collision')
-            row['sha256'] = seal
             previous = seal
-            result.append(row)
-    return result
+            # Only what replay reads; findings and snapshots stay in the file.
+            cache['rows'].append({'event': row['event'], 'admitted': row['admitted'], 'sha256': seal,
+                                  'stop_hook_active_unpaid': row.get('stop_hook_active_unpaid', False)})
+            cache['offset'] += len(raw)
+    cache['last'] = previous
+    return cache['rows']
+
+
+# ======================================================================
+# checkpoint: the state a call leaves for the next, so each call reads only what is new.
+#
+# One marshal file beside the journal (marshal builds only plain data, never runs code):
+# the journal read so far, the transcript parse so far, and the replayed Ledger with the
+# tags of the records it covers. A checkpoint that does not load, or whose records differ
+# from this call's, is ignored and the call replays in full.
+
+CHECKPOINT_VERSION = 1
+
+
+def checkpoint_load(path, session_id):
+    try:
+        with open(str(path) + '.ckpt', 'rb') as stream:
+            state = marshal.load(stream)
+        if state.get('version') == CHECKPOINT_VERSION and state.get('session_id') == session_id:
+            return state
+    except (OSError, EOFError, ValueError, TypeError, AttributeError):
+        pass
+    return {'version': CHECKPOINT_VERSION, 'session_id': session_id,
+            'journal': {'offset': 0, 'rows': [], 'last': ''}, 'transcript': None, 'tags': [], 'ledger': None}
+
+
+def checkpoint_save(path, blob):
+    tmp = str(path) + '.ckpt.tmp'
+    try:
+        with open(tmp, 'wb') as stream:
+            stream.write(blob)
+        os.replace(tmp, str(path) + '.ckpt')
+    except OSError:
+        # Unwritable: the next call replays in full.
+        with contextlib.suppress(OSError):
+            os.remove(tmp)
 
 
 def sigma_append(path, row, previous):
@@ -1981,36 +2088,73 @@ def in_scope(cwd, prefixes):
     return False
 
 
+def held_again(event, journal):
+    """True when this active Stop was already held once more this turn: the cap is one repeat."""
+    for row in reversed(journal):
+        prior = row['event']
+        if prior.get('hook_event_name') == 'UserPromptSubmit' and not prior.get('makoto', {}).get('same_turn'):
+            return False
+        if (prior.get('hook_event_name') == event['hook_event_name'] and prior.get('agent_id') == event.get('agent_id')
+                and row.get('stop_hook_active_unpaid')):
+            return True
+    return False
+
+
+def replay(records, base):
+    """The Ledger after `records`, starting from a checkpointed (count, marshalled state) when given."""
+    start, state = base
+    # D20: a record that cannot be ingested is unknown, never partial evidence,
+    # and never wedges later calls. Replay again without it; rare, so no per-record copy.
+    skipped = {}
+    while True:
+        ledger = Ledger()
+        if state is not None:
+            ledger.__dict__.update(marshal.loads(state))
+        for index in range(start, len(records)):
+            prior, admitted, _ = records[index]
+            if index in skipped:
+                ledger.q += 1
+                ledger.unknown.append({'q': ledger.q, 'reason': 'historical ingest failed: ' + skipped[index]})
+                continue
+            try:
+                ledger.ingest(prior, admitted)
+            except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
+                skipped[index] = str(error)
+                break
+        else:
+            return ledger
+
+
 def main(raw, config):
-    event = {}
     try:
-        envelope = json.loads(raw)
-        if isinstance(envelope, dict):
-            event = envelope  # Preserve boundary type for fail-closed transport.
         event = d_in(raw)
         adapter = config.get('adapter', 'inferred')
         if adapter != 'inferred':
             raise ValueError('adapter must be inferred')
         path = sigma_path(config['state_dir'], event['session_id'])
-        with session_lock(path):
-            journal = sigma_read(path, event['session_id'])
-            # D20: a record that cannot be ingested is unknown, never partial evidence,
-            # and never wedges later calls. Replay again without it; rare, so no per-record copy.
-            records, skipped = list(history(event, journal)), {}
-            while True:
-                ledger = Ledger()
-                for index, (prior, admitted) in enumerate(records):
-                    if index in skipped:
-                        ledger.q += 1
-                        ledger.unknown.append({'q': ledger.q, 'reason': 'historical ingest failed: ' + skipped[index]})
-                        continue
-                    try:
-                        ledger.ingest(prior, admitted)
-                    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
-                        skipped[index] = str(error)
-                        break
-                else:
-                    break
+        with session_lock(path, config.get('lock_seconds', 3.0)):
+            checkpoint = config.get('checkpoint', True)
+            state = checkpoint_load(path, event['session_id']) if checkpoint else None
+            journal = sigma_read(path, event['session_id'], state['journal'] if state else None)
+            records, transcript = history(event, journal, state['transcript'] if state else None)
+            tags = [(tag, admitted) for _, admitted, tag in records]
+            base = (0, None)
+            # Rows without their own cwd took this candidate's: a new cwd replays in full.
+            if (state and state['ledger'] is not None and state.get('cwd') == event.get('cwd', '')
+                    and tags[:len(state['tags'])] == state['tags']):
+                base = (len(state['tags']), state['ledger'])
+            ledger = replay(records, base)
+            if state:
+                state['transcript'], state['cwd'] = transcript, event.get('cwd', '')
+                try:
+                    state['tags'], state['ledger'] = tags, marshal.dumps(ledger.__dict__)
+                except ValueError:
+                    state['tags'], state['ledger'] = [], None
+                # Taken before the candidate touches journal, ledger or events.
+                try:
+                    saved = marshal.dumps(state)
+                except ValueError:
+                    state = None
             # Turn metadata on the candidate belongs to this check; its receipts do not.
             if event.get('makoto', {}).get('turn_id') is not None:
                 ledger.turn = str(event['makoto']['turn_id'])
@@ -2025,42 +2169,51 @@ def main(raw, config):
                 reason = 'makoto contract: ' + contract
             elif findings:
                 reason = '; '.join('makoto rule ' + f['rule'] + ' [' + f['shape'] + ']: ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
-            report = None
+            report, capped = None, False
             scope = config.get('block_in')
             if reason and scope and not in_scope(event.get('cwd') or '', scope):
                 # Report only outside the listed projects: the step runs, the
                 # journal keeps the finding, and nothing blocks.
-                report, reason = reason, None
+                report, reason = 'makoto report only (outside block_in): ' + brief(reason), None
+            elif reason and event.get('stop_hook_active') and held_again(event, journal):
+                # One repeat at most: a Stop already held again this turn is admitted
+                # with its findings shown and journaled, so a turn can always end.
+                report, reason, capped = 'makoto held this stop once already; not held again: ' + brief(reason), None, True
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
                    'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
-                   'unknown': ledger.unknown}
+                   'stop_cap': capped, 'unknown': ledger.unknown}
             # Validate transitions before persisting invalid host records.
             ledger.ingest(event, row['admitted'])
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
-            # Active Stop retries still block. Audit records mark the unpaid
-            # retry; no suppression can silently admit its final text.
+            if state:
+                checkpoint_save(path, saved)
             if report:
-                return {'systemMessage': 'makoto report only (outside block_in): ' + brief(report)}
-            response = d_out(event, reason) if reason else questions(event)
-            return response
-    except (OSError, ValueError, KeyError, TypeError, RecursionError, AttributeError, IndexError) as error:
-        if event.get('hook_event_name') in ('Stop', 'SubagentStop') and event.get('stop_hook_active'):
-            return {'systemMessage': 'makoto transport/contract failure (not held twice): ' + str(error)}
-        return d_out(event, 'makoto transport/contract failure: ' + str(error))
+                return {'systemMessage': report}
+            return d_out(event, reason) if reason else questions(event)
+    except Exception as error:
+        # Fail open: an infrastructure or transport error (state, lock, journal, transcript,
+        # malformed host event) never denies a step; only rule findings above do.
+        return {'systemMessage': 'makoto infrastructure error, step allowed: %s: %s' % (type(error).__name__, error)}
 
 
 # ======================================================================
 # __main__: Live entry: python -m makoto2, one serialized native event on stdin.
 
 def run():
-    cfg = dict(CONFIG)
-    cfg['state_dir'] = os.path.expanduser(os.environ.get('MAKOTO_STATE_DIR', cfg['state_dir']))
-    cfg['adapter'] = os.environ.get('MAKOTO_ADAPTER', cfg['adapter'])
-    scope = os.environ.get('MAKOTO_BLOCK_IN')
-    if scope:
-        cfg['block_in'] = [p for p in scope.split(os.pathsep) if p]
-    sys.stdout.write(json.dumps(main(sys.stdin.read(), cfg)))
+    try:
+        cfg = dict(CONFIG)
+        cfg['state_dir'] = os.path.expanduser(os.environ.get('MAKOTO_STATE_DIR', cfg['state_dir']))
+        cfg['adapter'] = os.environ.get('MAKOTO_ADAPTER', cfg['adapter'])
+        cfg['lock_seconds'] = float(os.environ.get('MAKOTO_LOCK_SECONDS', cfg['lock_seconds']))
+        cfg['checkpoint'] = os.environ.get('MAKOTO_CHECKPOINT', '1') != '0'
+        scope = os.environ.get('MAKOTO_BLOCK_IN')
+        if scope:
+            cfg['block_in'] = [p for p in scope.split(os.pathsep) if p]
+        response = main(sys.stdin.read(), cfg)
+    except Exception as error:
+        response = {'systemMessage': 'makoto infrastructure error, step allowed: %s: %s' % (type(error).__name__, error)}
+    sys.stdout.write(json.dumps(response))
     return 0
 
 
