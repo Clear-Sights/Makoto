@@ -706,15 +706,23 @@ def transcript_cache(path, session_id):
     """Parse state of one transcript: events parsed so far (uncut; rows without their own cwd
     take the candidate's at use), the tool calls still awaiting a result, and the byte offset
     after the last complete line. A line that cannot be parsed stops the parse where it is."""
-    return {'path': path, 'session_id': session_id, 'offset': 0, 'events': [], 'nocwd': [],
+    return {'path': path, 'session_id': session_id, 'offset': 0, 'head': '', 'events': [], 'nocwd': [],
             'first_pre': {}, 'pending': {}, 'error': None}
+
+
+HEAD_BYTES = 4096
+
+
+def head_digest(stream, offset):
+    stream.seek(0)
+    return hashlib.sha256(stream.read(min(offset, HEAD_BYTES))).hexdigest()
 
 
 def parse_transcript(cache):
     """Read only the bytes after cache['offset'], complete lines only, and extend the cache."""
     with Path(cache['path']).open('rb') as stream:
         size = stream.seek(0, 2)
-        if size < cache['offset']:
+        if size < cache['offset'] or head_digest(stream, cache['offset']) != cache['head']:
             # Truncated or replaced: what was parsed is no longer the file.
             cache.update(transcript_cache(cache['path'], cache['session_id']))
         if cache['error'] is not None:
@@ -777,6 +785,9 @@ def parse_transcript(cache):
             cache['error'] = [len(events), str(error)]
             return cache
         cache['offset'] += len(line)
+        if cache['offset'] - len(line) < HEAD_BYTES:
+            with Path(cache['path']).open('rb') as stream:
+                cache['head'] = head_digest(stream, cache['offset'])
     return cache
 
 
@@ -2128,11 +2139,13 @@ def main(raw, config):
             records, transcript = history(event, journal, state['transcript'] if state else None)
             tags = [(tag, admitted) for _, admitted, tag in records]
             base = (0, None)
-            if state and state['ledger'] is not None and tags[:len(state['tags'])] == state['tags']:
+            # Rows without their own cwd took this candidate's: a new cwd replays in full.
+            if (state and state['ledger'] is not None and state.get('cwd') == event.get('cwd', '')
+                    and tags[:len(state['tags'])] == state['tags']):
                 base = (len(state['tags']), state['ledger'])
             ledger = replay(records, base)
             if state:
-                state['transcript'] = transcript
+                state['transcript'], state['cwd'] = transcript, event.get('cwd', '')
                 try:
                     state['tags'], state['ledger'] = tags, marshal.dumps(ledger.__dict__)
                 except ValueError:

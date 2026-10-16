@@ -138,15 +138,46 @@ def test_checkpoint_gives_the_same_decisions_as_full_replay(tmp_path):
 
 def test_only_new_transcript_bytes_are_read(tmp_path):
     path = tmp_path / 'transcript.jsonl'
-    lines = transcript_lines(3)
+    big = json.dumps({'type': 'user', 'message': {'role': 'user', 'content': 'p' * 5000}}) + '\n'
+    lines = [big] + transcript_lines(3)[1:]
     path.write_text(''.join(lines))
     state = tmp_path / 'state'
     step = dict(WRITE_STEP, transcript_path=str(path), tool_use_id='a')
     first = raw_send(state, step)
     assert not failure(first)
-    # Blank out an already-read line in place; a full re-read would fail to parse it.
-    path.write_text(' ' * (len(lines[0]) - 1) + '\n' + ''.join(lines[1:]) + transcript_lines(4)[-2] + transcript_lines(4)[-1])
+    # Blank out an already-read line past the first 4 KB in place; a full re-read would fail to parse it.
+    more = transcript_lines(4)[-2:]
+    path.write_text(big + ' ' * (len(lines[1]) - 1) + '\n' + ''.join(lines[2:]) + ''.join(more))
     second = raw_send(state, dict(step, tool_use_id='b'))
     assert not failure(second)
     full = raw_send(state, dict(step, tool_use_id='c'), MAKOTO_CHECKPOINT='0')
     assert failure(full)
+
+
+def test_checkpoint_follows_a_changed_cwd(tmp_path):
+    # A transcript row without its own cwd takes the candidate's; a new cwd must not reuse the old replay.
+    path = tmp_path / 'transcript.jsonl'
+    write = {'type': 'assistant', 'message': {'role': 'assistant', 'content': [
+        {'type': 'tool_use', 'id': 'w', 'name': 'Write', 'input': {'file_path': 'a.py', 'content': 'print(1)\n'}}]}}
+    path.write_text(json.dumps(write) + '\n')
+    outs = {}
+    for mode in ('0', '1'):
+        state = tmp_path / ('state' + mode)
+        for cwd in ('/a', '/b'):
+            step = dict(ev('Stop', transcript_path=str(path), last_assistant_message='Done'), cwd=cwd)
+            outs.setdefault(mode, []).append(raw_send(state, step, MAKOTO_CHECKPOINT=mode))
+    assert outs['0'] == outs['1']
+    ckpt = (tmp_path / 'state1' / (hashlib.sha256(b'plant').hexdigest() + '.jsonl.ckpt')).read_bytes()
+    assert b'/b/a.py' in ckpt and b'/a/a.py' not in ckpt
+
+
+def test_replaced_transcript_is_read_from_its_start(tmp_path):
+    path = tmp_path / 'transcript.jsonl'
+    state = tmp_path / 'state'
+    path.write_text(''.join(transcript_lines(2)))
+    raw_send(state, dict(WRITE_STEP, transcript_path=str(path), tool_use_id='a'))
+    # Same session, rewritten (compacted) to a longer file: an offset into the old one is mid-line here.
+    path.write_text(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': 'x' * 37}}) + '\n' + ''.join(transcript_lines(3)))
+    response = raw_send(state, dict(WRITE_STEP, transcript_path=str(path), tool_use_id='b'))
+    assert not failure(response)
+    assert response == raw_send(state, dict(WRITE_STEP, transcript_path=str(path), tool_use_id='c'), MAKOTO_CHECKPOINT='0')
