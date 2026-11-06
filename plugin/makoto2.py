@@ -1256,6 +1256,16 @@ def git_unquote(text):
     return out.decode('utf-8', 'replace')
 
 
+def pathspecs(action, args):
+    """The paths a git call selects: a revision is not a path, and -A/-u alone select the tree."""
+    specs = operands(args)
+    if action == 'reset' and specs and re.fullmatch(r'(?:HEAD|[0-9a-f]{7,40})(?:[~^]\d*)*', specs[0]):
+        specs = specs[1:]
+    if action == 'add' and not specs and any(a in args for a in ('--all', '-A', '-u', '--update')):
+        specs = ['.']
+    return specs
+
+
 def operands(args):
     result, i = [], 0
     value_options = {'-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message',
@@ -1296,20 +1306,16 @@ def commit_changes(ledger, event, changes=None):
     changes = ledger.changed_code() if changes is None else changes
     staged = dict(ledger.staged_code)
     for context, action, args in git_calls(event):
-        specs = operands(args)
+        specs = pathspecs(action, args)
         # A proposed aggregate command can stage or unstage before committing.
         # This predicts its file selection, never invents a completed run or
         # mutates the ledger with candidate evidence.
         if action == 'add' and not any(a in args for a in ('--dry-run', '-n', '--intent-to-add', '-N', '-p', '--patch', '-i', '--interactive')):
-            if ('--all' in args or '-A' in args or '-u' in args or '--update' in args) and not specs:
-                specs = ['.']
             staged.update({s: c for s, c in changes.items() if matches(s, specs, context)})
         elif action in ('reset', 'restore', 'rm') and (action != 'restore' or '--staged' in args or '-S' in args):
             if action == 'reset':
                 if '--soft' in args:
                     continue  # a soft reset leaves the index alone
-                if specs and re.fullmatch(r'(?:HEAD|[0-9a-f]{7,40})(?:[~^]\d*)*', specs[0]):
-                    specs = specs[1:]  # a revision is not a pathspec
             staged = {s: c for s, c in staged.items() if specs and not matches(s, specs, context)}
         if action not in ('commit', 'push'):
             continue
