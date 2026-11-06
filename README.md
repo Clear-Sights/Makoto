@@ -74,6 +74,10 @@ decision before it runs a tool or delivers a final answer.
   `.ckpt` file beside the journal keeps both reads and the replayed record. A checkpoint that
   does not match is ignored and the call replays in full; `MAKOTO_CHECKPOINT=0` always does.
 
+## License
+
+FSL-1.1-ALv2 (`LICENSE`): use, copy, modify and redistribute Makoto for any purpose except a Competing Use, which is offering it, or a product with the same or substantially similar functionality, to others as a commercial product or service. Internal use, non-commercial education and research, and professional services to a licensee are permitted. Each version becomes Apache-2.0 two years after its release. Versions up to and including 85ac4d5 stay Apache-2.0. `NOTICE` lists the Apache-2.0 excerpts from DetIO and Causality.
+
 ## Development
 
 `python3 -m pytest -q` runs `tests/`. For each of rules a-d, `test_rules.py` sends a plant

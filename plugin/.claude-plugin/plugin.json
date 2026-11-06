@@ -7,7 +7,7 @@
   },
   "homepage": "https://github.com/Clear-Sights/Makoto",
   "repository": "https://github.com/Clear-Sights/Makoto",
-  "license": "Apache-2.0",
+  "license": "FSL-1.1-ALv2",
   "keywords": [
     "claude-code",
     "guardrails",

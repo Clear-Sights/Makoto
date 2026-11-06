@@ -1,5 +1,8 @@
+Makoto is licensed under the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); its text is in LICENSE. Each version becomes available under the Apache License 2.0 on the second anniversary of its release.
+Every version up to and including commit 85ac4d5228509c5aa98412bdf109312cab6d7c78 was released under the Apache License 2.0 and stays under it.
+
 Makoto includes modified excerpts from DetIO and Causality.
-Copyright 2026 Clear-Sights. Licensed under Apache License 2.0.
+Those excerpts: Copyright 2026 Clear-Sights. Licensed under Apache License 2.0.
 DetIO notice: This product includes software developed as part of the Clear-Sights project (https://github.com/Clear-Sights).
 Source locations and exact revisions are recorded below.
 
