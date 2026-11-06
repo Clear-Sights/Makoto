@@ -1,0 +1,46 @@
+{
+ "cold": {
+  "calls": 31,
+  "ms": 2850.6145710005057,
+  "bytes": 1842,
+  "by_hook": {
+   "Stop": {
+    "n": 8,
+    "median_ms": 92.94877700006055,
+    "bytes": 636
+   },
+   "PreToolUse": {
+    "n": 12,
+    "median_ms": 89.43835499997022,
+    "bytes": 1206
+   },
+   "PostToolUse": {
+    "n": 11,
+    "median_ms": 91.79218300005232,
+    "bytes": 0
+   }
+  }
+ },
+ "warm": {
+  "calls": 31,
+  "ms": 1943.6625019995972,
+  "bytes": 1842,
+  "by_hook": {
+   "Stop": {
+    "n": 8,
+    "median_ms": 60.805248499946174,
+    "bytes": 636
+   },
+   "PreToolUse": {
+    "n": 12,
+    "median_ms": 63.08296450004036,
+    "bytes": 1206
+   },
+   "PostToolUse": {
+    "n": 11,
+    "median_ms": 61.492172000043865,
+    "bytes": 0
+   }
+  }
+ }
+}
