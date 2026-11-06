@@ -1868,7 +1868,7 @@ def evaluate(ledger, event, adapter='inferred'):
     if not readings and not creation and (shipping is None or name_spans):
         span = spans[0].text if spans else text
         findings.append({'rule': 'a', 'family': 'a', 'shape': 'lineage', 'subject': span,
-                         'missing': ORIGINAL + ' Missing: a reading of an original artifact; assistant text and files this session wrote do not clear it'})
+                         'missing': ORIGINAL + ' Missing: a reading of an original artifact; assistant text and files this session wrote do not clear it. Clear: Read the original artifact this step relies on.'})
     # Rule a asks whether an original artifact was read. It does not require
     # a derived result or repeated answer to occur verbatim in that artifact.
     # Exact unread names remain governed independently by rule b.
@@ -1891,7 +1891,7 @@ def evaluate(ledger, event, adapter='inferred'):
                 witnesses = [r for r in ledger.source_readings() if any(contains(t, span.text, span.kind) for t in r['texts'])]
         if not witnesses:
             findings.append({'rule': 'b', 'family': 'b', 'shape': 'spec', 'subject': span.text,
-                             'missing': ORIGINAL + ' Missing: a reading whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it'})
+                             'missing': ORIGINAL + ' Missing: a reading whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it. Clear: Read a source that contains these exact characters.'})
         else:
             snapshot.append({'span': span.text, 'kind': span.kind,
                              'reading_receipt_ids': [w.get('tool_use_id', 'user prompt') for w in witnesses]})
@@ -1912,7 +1912,7 @@ def evaluate(ledger, event, adapter='inferred'):
     for span in dict.fromkeys(external):
         if not ledger.fetched(span):
             findings.append({'rule': 'c', 'family': 'c', 'shape': 'other point', 'subject': span,
-                             'missing': ORIGINAL + ' Missing: a fetch or search of this exact external subject in this turn (WebFetch, WebSearch or a Bash network call)'})
+                             'missing': ORIGINAL + ' Missing: a fetch or search of this exact external subject in this turn (WebFetch, WebSearch or a Bash network call). Clear: Fetch this exact subject with WebFetch or WebSearch in this turn.'})
     for change in (shipping if shipping is not None else ledger.changed_code()).values():
         if shipping is None and not names_change(event, change):
             continue
@@ -1921,7 +1921,7 @@ def evaluate(ledger, event, adapter='inferred'):
         if not runs and not readbacks:
             findings.append({'rule': 'd', 'family': 'd', 'shape': 'switch',
                              'subject': change['display'],
-                             'missing': UNCHANGED + ' Missing: a run of it, with its output read, after its last edit'})
+                             'missing': UNCHANGED + ' Missing: a run of it, with its output read, after its last edit. Clear: Run it and read its output.'})
         else:
             witnesses = runs or readbacks
             snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in witnesses],
@@ -2042,6 +2042,14 @@ def sigma_read(path, session_id, cache=None):
 CHECKPOINT_VERSION = 1
 
 
+def quarantine(path):
+    """Move a corrupted journal (and its derived checkpoint) aside; a fresh journal starts at `path`."""
+    if path.exists():
+        os.replace(path, path.with_name(path.name + '.corrupt-%d' % time.time_ns()))
+    with contextlib.suppress(OSError):
+        os.remove(str(path) + '.ckpt')
+
+
 def checkpoint_load(path, session_id):
     try:
         with open(str(path) + '.ckpt', 'rb') as stream:
@@ -2084,9 +2092,12 @@ def infrastructure_block(raw, error):
         event = json.loads(raw)
     except ValueError:
         event = {}
+    event = event if isinstance(event, dict) else {}
+    if event.get('hook_event_name') == 'UserPromptSubmit':
+        return {}  # the user's own prompt is not a step Makoto governs
     reason = ('makoto infrastructure error, step blocked: %s: %s. To disable Makoto run in a terminal: %s'
               % (type(error).__name__, error, DISABLE))
-    return d_out(event if isinstance(event, dict) else {}, reason)
+    return d_out(event, reason)
 
 
 def d_out(event, reason):
@@ -2133,7 +2144,14 @@ def main(raw, config):
         with session_lock(path, config.get('lock_seconds', 3.0)):
             checkpoint = config.get('checkpoint', True)
             state = checkpoint_load(path, event['session_id']) if checkpoint else None
-            journal = sigma_read(path, event['session_id'], state['journal'] if state else None)
+            try:
+                journal = sigma_read(path, event['session_id'], state['journal'] if state else None)
+            except (ValueError, KeyError, TypeError):
+                # Corrupted journal: keep it beside the fresh one and decide from what can still be read
+                # (the transcript), so only a step whose reading is really missing is held.
+                quarantine(path)
+                state = checkpoint_load(path, event['session_id']) if checkpoint else None
+                journal = sigma_read(path, event['session_id'], state['journal'] if state else None)
             records, transcript = history(event, journal, state['transcript'] if state else None)
             tags = [(tag, admitted) for _, admitted, tag in records]
             base = (0, None)

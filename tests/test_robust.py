@@ -63,14 +63,51 @@ def test_malformed_host_event_blocks(tmp_path):
     assert failure(response) and way_out(response)
 
 
-def test_corrupted_journal_blocks_with_the_error(tmp_path):
+def corrupt(tmp):
+    path = journal(tmp)
+    path.write_text(path.read_text().replace('source data', 'tampered!!!', 1))
+    (tmp / 'state' / (path.name + '.ckpt')).unlink(missing_ok=True)
+    return path
+
+
+def test_corrupted_journal_is_set_aside_and_only_the_missing_reading_blocks(tmp_path):
     for event in read('source data'):
         send(tmp_path, event)
-    path = journal(tmp_path)
-    path.write_text(path.read_text().replace('source data', 'tampered!!!', 1))
-    (tmp_path / 'state' / (path.name + '.ckpt')).unlink(missing_ok=True)
-    response = send(tmp_path, dict(WRITE_STEP, tool_use_id='one'))
-    assert failure(response) and way_out(response) and 'corrupted journal' in message(response)
+    path = corrupt(tmp_path)
+    # The step that needed the destroyed reading is held for the reading, not for the error.
+    held = send(tmp_path, dict(WRITE_STEP, tool_use_id='one'))
+    assert denied(held) and not failure(held) and held['hookSpecificOutput']['permissionDecisionReason'].startswith('makoto rule a ')
+    # The corrupted journal is kept beside a fresh one.
+    kept = sorted(path.parent.glob(path.name + '.corrupt-*'))
+    assert len(kept) == 1 and 'tampered!!!' in kept[0].read_text()
+    assert path.exists() and 'tampered!!!' not in path.read_text()
+    # Once the reading is made again the same step is admitted: nothing else stays blocked.
+    for event in read('source data', 'again'):
+        assert send(tmp_path, event) == {}
+    assert send(tmp_path, dict(WRITE_STEP, tool_use_id='two')) == {}
+
+
+def test_corrupted_journal_does_not_block_a_step_that_needs_no_reading(tmp_path):
+    for event in read('source data'):
+        send(tmp_path, event)
+    corrupt(tmp_path)
+    assert send(tmp_path, ev('PostToolUse', tool_name='Read', tool_use_id='x', tool_input={'file_path': 'a'}, tool_response={'content': 'z'})) == {}
+
+
+def test_user_prompt_submit_is_never_blocked(tmp_path):
+    state = tmp_path / 'state'
+    state.write_text('a file where the state folder should be')
+    assert raw_send(state, ev('UserPromptSubmit', prompt='hello')) == {}
+    assert failure(raw_send(state, WRITE_STEP))  # the same error still blocks a step
+
+
+def test_user_prompt_submit_after_a_corrupted_journal_is_admitted_and_recorded(tmp_path):
+    for event in read('source data'):
+        send(tmp_path, event)
+    corrupt(tmp_path)
+    assert send(tmp_path, ev('UserPromptSubmit', prompt='next turn')) == {}
+    rows = [json.loads(line) for line in journal(tmp_path).read_text().splitlines()]
+    assert [r['event']['hook_event_name'] for r in rows] == ['UserPromptSubmit']
 
 
 def test_unreadable_event_input_blocks(tmp_path):

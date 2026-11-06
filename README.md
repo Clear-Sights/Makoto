@@ -24,7 +24,7 @@ Makoto is deterministic enforcement of Immediacy:
 
 Code decides every hold from the session record. An admitted step gets `{}`: Makoto adds nothing to
 the model's context, so no check depends on the model reading injected text. A hold states the rule
-it enforces and the specific missing reading, and asks no question. A decided hold always blocks:
+it enforces, the specific missing reading and the one action that clears it (`Clear: ...`), and asks no question. A decided hold always blocks:
 in every directory, and on every repeat of the same Stop.
 
 ## The four rules
@@ -51,9 +51,14 @@ decision before it runs a tool or delivers a final answer.
 
 ## Errors block, and the way out
 
-- An error in Makoto's own reading (state folder, lock, journal, transcript, a malformed host
-  event) blocks the step, names the error, and gives the one way to disable Makoto. Run this in a
-  terminal, outside the session, so a broken install cannot trap you:
+- An error in Makoto's own reading (state folder, lock, transcript, a malformed host event) blocks
+  the step, names the error, and gives the one way to disable Makoto. The user's own prompt
+  (UserPromptSubmit) is never blocked: it is admitted and, whenever the journal is writable, recorded.
+- A corrupted journal does not stop the session. It is moved beside a fresh journal as
+  `<journal>.corrupt-<ns>`, and only a step whose reading is missing from what can still be read
+  (the transcript, then new calls) is held, for that missing reading.
+- The one way to disable Makoto, if an error keeps blocking, is to run this in a terminal outside the
+  session, so a broken install cannot trap you:
 
       claude plugin disable makoto
 
