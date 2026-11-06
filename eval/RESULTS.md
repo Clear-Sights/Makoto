@@ -148,3 +148,55 @@ n is small because only 115 dependent steps are admitted, 67 of them qualify.
 ## Everything else, re-run on the fixed code
 Per-change table unchanged (all six changes: 2599 holds, 0 errors, 18/69). Clearability: 342 of 342 held Stops admitted after
 the named action. Corruption experiment: 0 error blocks in 3569 later events, 13 extra rule holds (12 before).
+
+# Third round (rules in `RULES3.md`, committed in `4b4bcb0` before either change was measured)
+R0 = `ff63637`, R1 = R0 + rule e (`c221643`), R2 = R1 + evidence change (head). Same 342 sessions (n = 2718 dependent steps), same
+plants, sample seed 20261107 (60 holds per run). `eval/summarize.py` produces every figure.
+
+| | R0 | R1 (rule e) | R2 (evidence) |
+|---|---|---|---|
+| Holds | 2599 | 2644 | 2644 |
+| Hold rate over 2718 dependent steps | 95.6% (94.8% to 96.3%) | 97.3% (96.6% to 97.8%) | 97.3% (96.6% to 97.8%) |
+| Hold-level false positives, `label.py` | 1/2599 (0.0% to 0.2%) | 1/2644 (0.0% to 0.2%) | 1/2644 (0.0% to 0.2%) |
+| Hold-level false positives, independent sample | 0/60 (0.0% to 6.0%) | 0/60 (0.0% to 6.0%) | 0/60 (0.0% to 6.0%) |
+| Recall P1 (first round) | 1/1 | 1/1 | 1/1 |
+| Recall P3 (first round) | 17/68 = 25.0% (16.2% to 36.4%) | 68/68 = 100% (94.7% to 100%) | 68/68 |
+| Recall Q1, edit of an unread file | 0/66 = 0.0% (0.0% to 5.5%) | 66/66 = 100% (94.5% to 100%) | 66/66 |
+| Recall Q3 / Q2 | 1/1 / n=0 | 1/1 / n=0 | 1/1 / n=0 |
+| Recall all Q | 1/67 = 1.5% (0.3% to 8.0%) | 67/67 = 100% (94.6% to 100%) | 67/67 |
+| Misdirected findings, as committed | 58/262 = 22.1% (17.5% to 27.5%) | 65/283 = 23.0% (18.4% to 28.2%) | 42/260 = 16.2% (12.2% to 21.1%) |
+| Misdirected findings, counting only calls that ran | 18/262 = 6.9% (4.4% to 10.6%) | 25/283 = 8.8% (6.1% to 12.7%) | **2/260 = 0.8% (0.2% to 2.8%)** |
+| Errors | 0 | 0 | 0 |
+| Held Stops cleared by the named action | 342/342 | 342/342 | 342/342 |
+| Context bytes, 31-event suite | 1021 | 1021 | 1021 |
+| Hold-message bytes over the corpus (mean per hold) | 3,975,351 (1529.6) | 4,105,569 (1552.8) | 3,866,614 (1462.4) |
+| Warm / cold ms, suite (n = 31) | 1364 / 2214 (repeat 1417 / 2252) | 1401 / 2225 | 1425 / 2295 |
+
+Per hook warm / cold ms (PreToolUse n=12, PostToolUse n=11, Stop n=8): R0 43.4 / 70.7, 43.4 / 71.8, 44.0 / 71.2 (repeat 45.4 / 71.9,
+45.5 / 71.5, 46.0 / 72.6); R1 46.0 / 71.7, 44.3 / 71.7, 45.0 / 71.6; R2 45.0 / 72.7, 46.0 / 72.4, 47.1 / 76.4. The R0 repeat differs from the
+first R0 by up to 2.5 ms, so the three versions are not distinguishable. Bytes in the suite are identical because it never edits an
+existing file; over the corpus, rule e raises the bytes by 3.3% (45 more holds) and the evidence change lowers them to 2.7% below R0.
+
+## Change 1: rule e, read before edit (R0 to R1)
+Recall Q1 0/66 to 66/66 and P3 17/68 to 68/68. Hold rate 95.6% to 97.3%: **45 new holds** (42 Write overwrites, 3 Edits, none on a
+Write that creates a file). Rule e has 318 findings in all holds; both labelers call all 318 true (no earlier Read, Write or Edit of the
+file), and none of the 45 new holds is a false positive by either labeler. Tests `tests/test_read_before_edit.py`: 4 of 5 fail on `ff63637`
+(the fifth, a file the session wrote itself needs no reading, is a control). The host's own Edit and Write tools also refuse a file
+that was not read (as I understand them), so in an interactive session this rule mostly repeats that check; in these headless runs
+42 overwrites of unread files went through.
+
+## Change 2: evidence (R1 to R2)
+Prompt text and the session's own writes and outputs count as evidence for a name, and a file name or directory inside a longer path
+in the prompt or in a path the session wrote counts too. This replaces the rule that a path named in the prompt is not evidence.
+Tests `tests/test_evidence.py`: 5 of 6 fail on `c221643` (the sixth, a name nobody wrote is still held, is a control); the three
+round-two controls stay green. Target "52 of 265 to 0": as committed the share goes 65/283 to 42/260. Each remaining one is traced:
+- 40 findings are present only through a call Makoto denied in this replay. The log recorded those calls as run, so the labeler counts
+  their text; a live session would not have run them. Counting only calls that ran, the share is 25/283 (8.8%) to 2/260 (0.8%).
+- 2 findings (2f9389e7 #7, rule a "Wrote" and rule b `docs/dev/errors.md`) share one cause: the Read of `errors.md` ran, but the replay
+  also fed Makoto the Post of an Edit it had denied, which recorded a mutation and made that Read stale. Without that Post (live) the
+  reading stays fresh. I did not change the replay.
+No false positive was added: hold-level false positives are 1 by `label.py` (the round-two replay artifact) and 0/60 by the sample, in all three runs.
+
+## Items (b) to (d), R2
+Clearability 342/342. Corruption experiment (journal tampered mid-session, 3569 later events): 0 error blocks, 7 extra rule holds
+(1846 against 1839 uncorrupted). The user's prompt is never blocked (tests).
