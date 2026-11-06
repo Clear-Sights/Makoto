@@ -1870,6 +1870,15 @@ def evaluate(ledger, event, adapter='inferred'):
             return True  # a dotted name this session already wrote
         return span.kind == 'path' and ledger.subject(span.text, event) in output_subjects or any(start <= span.start and span.end <= end for start, end in output_ranges)
 
+    # Rule e: a file that is edited or overwritten must have been read, or written, in this session first.
+    edited = (event.get('tool_input') or {}).get('file_path') or (event.get('tool_input') or {}).get('notebook_path')
+    if event['hook_event_name'] == 'PreToolUse' and event.get('tool_name') in WRITERS and edited:
+        recorded = (event.get('makoto') or {}).get('target_exists')
+        exists = recorded if isinstance(recorded, bool) else (event['tool_name'] != 'Write' or os.path.isfile(identity(edited, event)[5:]))
+        known = ledger.subject(edited, event)
+        if exists and known not in ledger.written and not any(known in r['subjects'] for r in ledger.readings):
+            findings.append({'rule': 'e', 'family': 'e', 'shape': 'file', 'subject': edited,
+                             'missing': ORIGINAL + ' Missing: a reading of this file before it is edited or overwritten. Clear: Read ' + edited + '.'})
     if not readings and not creation and (shipping is None or name_spans):
         span = spans[0].text if spans else text
         findings.append({'rule': 'a', 'family': 'a', 'shape': 'lineage', 'subject': span,

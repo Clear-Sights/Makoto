@@ -27,7 +27,7 @@ the model's context, so no check depends on the model reading injected text. A h
 it enforces, the specific missing reading and the one action that clears it (`Clear: ...`), and asks no question. A decided hold always blocks:
 in every directory, and on every repeat of the same Stop.
 
-## The four rules
+## The rules
 
 - **a (lineage), enforces Original:** the step needs an original artifact reading. Assistant text, worker answers and
   readings of files this session wrote do not count. A completed run, query or request response
@@ -41,6 +41,10 @@ in every directory, and on every repeat of the same Stop.
   edits through a commit, push or final answer, a paired call must have run that subject after its
   last edit and returned output. For a config file without a shebang, a full read after the last
   edit also pays d. Reading code never pays d.
+- **e (file), enforces Original:** an Edit, MultiEdit or NotebookEdit, or a Write onto a file that
+  already exists, needs a reading of that file, or a write of it by this session, earlier in the
+  session. A Write that creates a new file needs none. A live hook checks the file system; a host that
+  cannot may record the fact in `makoto.target_exists`. The hold ends in `Clear: Read <path>.`
 
 A locked, hash-linked journal keeps every turn under `~/.claude/makoto2_state`
 (`MAKOTO_STATE_DIR` overrides).
