@@ -1,4 +1,4 @@
-"""Makoto: the four-question hook. Live entry: cd plugin && python3 -m makoto2,
+"""Makoto: the immediacy hook. Live entry: cd plugin && python3 -m makoto2,
 one serialized native Claude Code hook event on stdin, one JSON response on stdout.
 
 Sections, in dependency order: paths, shell, borrowed, precision, observed, transcript, switch, shipping, creations, provenance, evaluate, hook, __main__.
@@ -1868,7 +1868,7 @@ def evaluate(ledger, event, adapter='inferred'):
     if not readings and not creation and (shipping is None or name_spans):
         span = spans[0].text if spans else text
         findings.append({'rule': 'a', 'family': 'a', 'shape': 'lineage', 'subject': span,
-                         'missing': 'ANSWER FROM ITS OWN ANSWER: read an original artifact before this step; assistant text and files this session wrote do not clear it'})
+                         'missing': ORIGINAL + ' Missing: a reading of an original artifact; assistant text and files this session wrote do not clear it'})
     # Rule a asks whether an original artifact was read. It does not require
     # a derived result or repeated answer to occur verbatim in that artifact.
     # Exact unread names remain governed independently by rule b.
@@ -1891,7 +1891,7 @@ def evaluate(ledger, event, adapter='inferred'):
                 witnesses = [r for r in ledger.source_readings() if any(contains(t, span.text, span.kind) for t in r['texts'])]
         if not witnesses:
             findings.append({'rule': 'b', 'family': 'b', 'shape': 'spec', 'subject': span.text,
-                             'missing': 'NAMED WITHOUT READING: read a source whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it'})
+                             'missing': ORIGINAL + ' Missing: a reading whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it'})
         else:
             snapshot.append({'span': span.text, 'kind': span.kind,
                              'reading_receipt_ids': [w.get('tool_use_id', 'user prompt') for w in witnesses]})
@@ -1912,7 +1912,7 @@ def evaluate(ledger, event, adapter='inferred'):
     for span in dict.fromkeys(external):
         if not ledger.fetched(span):
             findings.append({'rule': 'c', 'family': 'c', 'shape': 'other point', 'subject': span,
-                             'missing': 'DID NOT LOOK ONLINE: fetch or search this exact external subject with WebFetch, WebSearch or a Bash network call in this turn'})
+                             'missing': ORIGINAL + ' Missing: a fetch or search of this exact external subject in this turn (WebFetch, WebSearch or a Bash network call)'})
     for change in (shipping if shipping is not None else ledger.changed_code()).values():
         if shipping is None and not names_change(event, change):
             continue
@@ -1921,7 +1921,7 @@ def evaluate(ledger, event, adapter='inferred'):
         if not runs and not readbacks:
             findings.append({'rule': 'd', 'family': 'd', 'shape': 'switch',
                              'subject': change['display'],
-                             'missing': 'UNRUN CHANGE: run it and read the output before this step'})
+                             'missing': UNCHANGED + ' Missing: a run of it, with its output read, after its last edit'})
         else:
             witnesses = runs or readbacks
             snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in witnesses],
@@ -1934,7 +1934,9 @@ def evaluate(ledger, event, adapter='inferred'):
 # ======================================================================
 # hook: Locked append-only hook journal and fail-closed admission transport.
 
-FOUR_QUESTIONS = "Before this step: (1) If it relies on a definition, did you read the thing itself against that definition? (2) If it carries a result to another place or time, did you read the same thing again where and when it lands? (3) If it says how a branch behaves, did you feed that branch an input and read its response? (4) Is it based on the original source, read this turn, rather than on an earlier answer?"
+ORIGINAL = 'Original: Read the original instead of a derivation.'
+UNCHANGED = 'Unchanged: Do not assume what can change has not.'
+IMMEDIACY = 'IMMEDIACY: A more immediate read assumes less.\n  + ' + ORIGINAL + '\n  \u2212 ' + UNCHANGED
 
 
 def d_in(raw):
@@ -2101,9 +2103,9 @@ def questions(event):
     if not dependent(event):
         return {}
     if event['hook_event_name'] == 'PreToolUse':
-        return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': FOUR_QUESTIONS}}
+        return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': IMMEDIACY}}
     if not event.get('stop_hook_active'):
-        return {'decision': 'block', 'reason': FOUR_QUESTIONS}
+        return {'decision': 'block', 'reason': IMMEDIACY}
     return {}
 
 

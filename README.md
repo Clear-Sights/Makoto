@@ -3,7 +3,7 @@
 Makoto is a Claude Code hook. Before a dependent step runs (Write, Edit, MultiEdit, NotebookEdit,
 Bash `git commit`/`git push`, or Stop), it checks the session record. If a reading the step needs
 is missing, it holds the step: a PreToolUse step gets a native deny and a Stop gets a native block.
-The hold names the rule, its shape and the exact subject. The checker uses no model and no network.
+The hold names the rule, its shape, the exact subject, the one Immediacy rule it enforces and the missing reading. The checker uses no model and no network.
 
 ## Install
 
@@ -14,25 +14,29 @@ Claude Code 2.1.275 or later:
 `plugin/hooks/hooks.json` sends each native event to `cd plugin && python3 -m makoto2`. Makoto
 needs Python 3.11 or later and uses only the standard library.
 
-## The four questions
+## The principle
 
-Every admitted dependent PreToolUse step receives these questions as `additionalContext`. An
-admitted Stop shows them once as its block reason, and a `stop_hook_active` retry that is
-otherwise admitted gets `{}`:
+Makoto enforces Immediacy. Every admitted dependent PreToolUse step receives the principle and its
+two rules as `additionalContext`. An admitted Stop shows them once as its block reason, and a
+`stop_hook_active` retry that is otherwise admitted gets `{}`:
 
-"Before this step: (1) If it relies on a definition, did you read the thing itself against that definition? (2) If it carries a result to another place or time, did you read the same thing again where and when it lands? (3) If it says how a branch behaves, did you feed that branch an input and read its response? (4) Is it based on the original source, read this turn, rather than on an earlier answer?"
+    IMMEDIACY: A more immediate read assumes less.
+      + Original: Read the original instead of a derivation.
+      − Unchanged: Do not assume what can change has not.
+
+A hold states the rule it enforces and the specific missing reading. It asks no question.
 
 ## The four rules
 
-- **a (lineage):** the step needs an original artifact reading. Assistant text, worker answers and
+- **a (lineage), enforces Original:** the step needs an original artifact reading. Assistant text, worker answers and
   readings of files this session wrote do not count. A completed run, query or request response
   does count, and a run of a session-written script reads that script's response.
-- **b (spec):** each name the step uses (path, URL, email, identifier, hash, UUID, version) must
+- **b (spec), enforces Original:** each name the step uses (path, URL, email, identifier, hash, UUID, version) must
   appear with its exact characters in an earlier tool input, an original response, or the user
   prompt. Writer targets and files this session wrote are outputs, so b does not apply to them.
-- **c (other point):** a named URL, a versioned package or a host-classified public project
+- **c (other point), enforces Original:** a named URL, a versioned package or a host-classified public project
   needs an online fetch or search of that subject in the current turn.
-- **d (switch):** when a step names an edited code, script or config subject, or ships session
+- **d (switch), enforces Unchanged:** when a step names an edited code, script or config subject, or ships session
   edits through a commit, push or final answer, a paired call must have run that subject after its
   last edit and returned output. For a config file without a shebang, a full read after the last
   edit also pays d. Reading code never pays d.
