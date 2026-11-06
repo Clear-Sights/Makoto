@@ -34,7 +34,8 @@ in every directory, and on every repeat of the same Stop.
   does count, and a run of a session-written script reads that script's response.
 - **b (spec), enforces Original:** each name the step uses (path, URL, email, identifier, hash, UUID, version) must
   appear with its exact characters in an earlier tool input, an original response, or the user
-  prompt. Writer targets and files this session wrote are outputs, so b does not apply to them.
+  prompt, or in text this session wrote or got back from its own writes (a file name or directory
+  inside a longer path counts). Writer targets and files this session wrote are outputs, so b does not apply to them.
 - **c (other point), enforces Original:** a named URL, a versioned package or a host-classified public project
   needs an online fetch or search of that subject in the current turn.
 - **d (switch), enforces Unchanged:** when a step names an edited code, script or config subject, or ships session

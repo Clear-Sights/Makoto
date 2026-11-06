@@ -50,6 +50,18 @@ def main():
             by_rule[rule, p] += 1
             if p:
                 causes[rule] += 1
+    # Added after tracing the first R2 sample (not in RULES3.md): the replay keeps calls Makoto denied, but a live
+    # session would not have run them, so text produced only by a denied call is not evidence. Same sample, same labeler,
+    # counting only the calls that ran.
+    ran_present = ran_total = 0
+    for h in sample:
+        events = corpus[h['id']]['events']
+        dead = {events[r['i']]['tool_use_id'] for r in results[h['id']]['rows'] if r['kind'] == 'hold' and events[r['i']]['hook_event_name'] == 'PreToolUse'}
+        live = [e for e in events[:h['i']] if e.get('tool_use_id') not in dead]
+        for rule, subject in independent.findings(h['reason']):
+            ran_total += 1
+            ran_present += independent.present(live, len(live), rule, subject)
+    out['misdirected_counting_only_calls_that_ran'] = show(ran_present, ran_total)
     out['sample_seed'] = seed
     out['independent_fp'] = show(fps, 60)
     out['misdirected_findings'] = show(present, total)

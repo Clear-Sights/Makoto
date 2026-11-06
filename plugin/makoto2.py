@@ -1258,6 +1258,12 @@ def pathspecs(action, args):
     return specs
 
 
+def path_part(name, text):
+    """name is a file name or directory inside a longer path in text (`claims.py` in `app/claims.py`)."""
+    part = name.rstrip('/')
+    return bool(part) and re.search(r'(?:(?<=/)|(?<![\w.~-]))' + re.escape(part) + r'(?![\w-])(?!\.\w)', text) is not None
+
+
 def operands(args):
     result, i = [], 0
     value_options = {'-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message',
@@ -1897,13 +1903,9 @@ def evaluate(ledger, event, adapter='inferred'):
             snapshot.append({'span': span.text, 'kind': span.kind, 'output': True})
             continue
         witnesses = ledger.witnesses(span.text, span.kind) or ledger.witnesses(cited.text, cited.kind)
-        method_call = bool(re.fullmatch(r'\.[A-Za-z_]\w*', span.text)) and text[span.end:span.end + 1] == '('
-        if (span.kind == 'path' and not span.text.startswith('#!') and not method_call
-                and any(contains(t, span.text, span.kind) for t in ledger.given)):
-            # Naming a file in the prompt does not read its contents.
-            witnesses = [w for w in witnesses if not w.get('given')]
-            if not witnesses:
-                witnesses = [r for r in ledger.source_readings() if any(contains(t, span.text, span.kind) for t in r['texts'])]
+        if not witnesses and (any(contains(t, span.text, span.kind) for t in ledger.own)
+                              or span.kind == 'path' and any(path_part(span.text, t) for t in (*ledger.given, *ledger.own, *ledger.written))):
+            witnesses = [{'own': True}]  # text this session wrote, or got back from its own writes
         if not witnesses:
             findings.append({'rule': 'b', 'family': 'b', 'shape': 'spec', 'subject': span.text,
                              'missing': ORIGINAL + ' Missing: a reading whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it. Clear: Read a source that contains these exact characters.'})
