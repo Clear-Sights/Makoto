@@ -17,7 +17,7 @@ import re
 import shlex
 import sys
 import time
-from dataclasses import dataclass
+from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 
@@ -297,12 +297,7 @@ def fragments(value):
 COMMON = frozenset(Path(__file__).with_name('common-english.txt').read_text(encoding='utf-8').split())
 
 
-@dataclass(frozen=True)
-class Span:
-    text: str
-    start: int
-    end: int
-    kind: str
+Span = namedtuple('Span', 'text start end kind')
 
 
 # Each delimited payload is one exact span, including its whitespace.
