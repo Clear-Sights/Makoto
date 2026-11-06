@@ -1,0 +1,21 @@
+{
+ "plugin": "/home/user/Makoto/plugin",
+ "plant_D_caught": [
+  12,
+  12
+ ],
+ "twin_admitted": [
+  12,
+  12
+ ],
+ "no_use_admitted": [
+  12,
+  12
+ ],
+ "errors": 0,
+ "misses": [],
+ "false_holds": [],
+ "ms_per_hook_median": 71.2,
+ "hook_calls": 612,
+ "rule_f_hold_bytes_median": 227.0
+}

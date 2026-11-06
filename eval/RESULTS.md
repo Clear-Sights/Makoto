@@ -200,3 +200,48 @@ No false positive was added: hold-level false positives are 1 by `label.py` (the
 ## Items (b) to (d), R2
 Clearability 342/342. Corruption experiment (journal tampered mid-session, 3569 later events): 0 error blocks, 7 extra rule holds
 (1846 against 1839 uncorrupted). The user's prompt is never blocked (tests).
+
+# Fourth round: the Downstream hold (rules in `RULES4.md`, committed in `72110d6` before any measurement)
+R0 = `b6de7fe`, R1 = R0 + rule f (this branch's head). **The corpus items are blocked.** The 342-session corpus lives in
+Clear-Sights/Tiller-from-the-Ashes, branch `principles`; `add_repo` for it was denied by the permission classifier, and I did not work
+around it (no clone, no API read). So nothing below is a corpus figure: holds, hold rate over dependent steps, holds this rule adds,
+false positives on `label.py` and on the independent sample (seed 20261108 drawn but not used), recall on P1/P3/Q1/Q2/Q3, bytes per hold
+over the corpus, and plant D on corpus sessions are all **not measured**. The gate (no rise in false positives on either labeler; 0/60;
+earlier recall does not fall) is therefore **not checked on the corpus**. The corpus replay also lacks the working tree rule f needs;
+`run_corpus.py` would have to record each name's uses in `makoto.downstream` (supported by the rule, not built here).
+
+## What was measured instead (synthetic sessions, `eval/synthetic_downstream.py`, n small and constructed)
+Sessions: read `a.py`, edit the line `def area(w, h):`, run it, read the use files, read a notes file, Stop. N = 1..12 downstream users.
+Plant D: the last use file is never read. Twin: all use files read. No-use control: nothing else mentions the name. Same script on both versions.
+
+| | R0 `b6de7fe` | R1 |
+|---|---|---|
+| Plant D caught (rule f naming the unread file) | 0/12 (0.0% to 24.2%) | 12/12 (75.8% to 100%) |
+| Twin admitted | 12/12 (75.8% to 100%) | 12/12 (75.8% to 100%) |
+| No-use control admitted | 12/12 (75.8% to 100%) | 12/12 (75.8% to 100%) |
+| False holds | 0 | 0 |
+| Errors (nonzero exit, infrastructure block) | 0 | 0 |
+| Median ms per hook, cold start, 612 hook calls | 68.6 | 71.5 |
+| Rule f hold message, median bytes (n=12) | n/a | 227 |
+
+These are plants built for the rule: 12/12 shows the rule fires where it was written to fire, not how often it fires or misfires on real
+sessions. The twin and the control are likewise constructed. Wilson intervals of 12 trials are wide (lower bound 75.8%). Misses: none in
+these 12; whether the rule misses on real sessions is unknown. The 3 ms difference is within the run-to-run spread seen in earlier rounds.
+
+## Tests
+`tests/test_downstream.py`: 14 tests; **9 fail on `b6de7fe` and pass now** (hold names rule, name, every `path:line`, ends `Clear: Read <path>.`;
+each unread file in turn; a read made before the change does not count; a module-level assignment holds and a local one does not; Write over
+a read file; MultiEdit; `git commit`; untracked file seen by `git grep`; recorded `makoto.downstream`). The other 5 pass on both versions
+(two are vacuous on the old code, 2 and 5): reading the named file clears the hold; a name with no use is admitted; a use in a file the
+session changed after the definition is accounted for; an unchanged definition line holds nothing; UserPromptSubmit is never blocked. Full suite: 71 passed.
+
+## Limits and choices the brief left open
+- "Changed it" is read as changed after the definition change. A file edited earlier and not since is not accounted for.
+- A Write has an old side only when the session read the file and has not changed it since; otherwise no name is changed by it. A second
+  Write of a file the session itself created is therefore not checked.
+- `def`/`class` count at any indentation (methods included); an assignment counts only at column 0, and when the session read the file,
+  only if that reading shows the name assigned at column 0. Names are not filtered by length or commonness: a changed method called `get`
+  holds on every file that uses the word `get`. On real sessions this could raise false positives; it is not measured.
+- Only the definition line is compared, as written, so an edit that leaves the `def` line alone (a body change) holds nothing.
+- Existing guarantees: all 71 tests including the earlier suites pass, a hold is cleared by the named Read, UserPromptSubmit is untouched.
+  Not re-measured on the corpus: 342/342 clearability, the 3569-event corruption experiment.
