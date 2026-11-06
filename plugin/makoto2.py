@@ -445,7 +445,7 @@ def name_kind(value, *, quoted=False):
     return None
 
 
-def names(text, *, shell=False):
+def names(text):
     """NAME-only view of extract(), retaining original bytes and offsets.
 
     Quoting never promotes prose or values to names. Whole output lines and
@@ -455,17 +455,12 @@ def names(text, *, shell=False):
     found = {}
     spans = extract(text)
     units = [s for s in spans if s.kind == 'unit']
-    # Shell quotes around commit messages delimit prose argv, not one filename.
-    messages = {(s.start, s.end) for s in spans if shell and s.kind == 'delimited'
-                and re.search(r'(?:(?<![\w-])-[A-Za-z]*m|--message)(?:\s+|=)[\x27"]$', text[:s.start])}
     delimited_names = [s for s in spans if s.kind == 'delimited' and name_kind(s.text, quoted=True)
-                       and not re.match(r'^[A-Za-z_]\w*=', s.text) and (s.start, s.end) not in messages]
+                       and not re.match(r'^[A-Za-z_]\w*=', s.text)]
     for span in spans:
         if any(s.start <= span.start and span.end <= s.end and (span.start, span.end) != (s.start, s.end) for s in delimited_names):
             continue
         if span.kind == 'output-line' or span.kind == 'unit' and not HASH.fullmatch(span.text):
-            continue
-        if (span.start, span.end) in messages:
             continue
         # Split token wrappers too: Markdown [label](path) and call(id_name)
         # still name the enclosed path/identifier. A complete URL wins first.

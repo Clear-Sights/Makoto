@@ -35,12 +35,6 @@ def test_url_keeps_balanced_closing_paren():
     assert urls == ['https://example.com/a']
 
 
-@pytest.mark.parametrize('flag', ['--platform', '--from', '--term'])
-def test_long_option_ending_in_m_is_not_a_commit_message(flag):
-    found = [s.text for s in m.names(f"tool {flag} 'linux/amd64' .", shell=True)]
-    assert found == ['linux/amd64']
-
-
 def test_mv_with_several_sources_removes_each():
     effects = m.effects(bash('mv a.txt b.txt dest/'))
     assert {e['subject'] for e in effects if e.get('removed')} == {'a.txt', 'b.txt'}
