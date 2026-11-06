@@ -76,6 +76,8 @@ def redirected_argv(command):
         lex = shlex.shlex(parts[0][0], posix=False, punctuation_chars='<>')
         lex.whitespace_split = True
         raw = list(lex)
+        # Only a digit written flush against the operator (2>x) is a descriptor.
+        flush = re.findall(r'(?:^|\s)(\d+)(?=[<>])', re.sub(r'"(?:\\.|[^"\\])*"|\'[^\']*\'', lambda q: 'x' * len(q[0]), parts[0][0]))
         words, redirects = [], []
         i = 0
         while i < len(raw):
@@ -84,8 +86,8 @@ def redirected_argv(command):
                 if i + 1 >= len(raw):
                     return None
                 target = shlex.split(raw[i + 1])[0]
-                if words and words[-1].isdigit():
-                    words.pop()  # descriptor prefix, e.g. 2>errors.txt
+                if words and words[-1].isdigit() and words[-1] in flush:
+                    flush.remove(words.pop())  # descriptor prefix, e.g. 2>errors.txt
                 redirects.append((word, target))
                 i += 2
                 continue
@@ -335,6 +337,9 @@ def extract(text, *, tool_output=False):
     for match in URL.finditer(text):
         start, end = match.span()
         while end > start and text[end-1] in '.,;!?)]}':
+            closer = text[end-1]
+            if closer in ')]}' and text[start:end].count(closer) <= text[start:end].count('([{'[')]}'.index(closer)]):
+                break  # a balanced bracket belongs to the URL
             end -= 1
         add(start, end, 'url')
     for pattern, kind in ((VERSIONED, 'external-package'), (UNIT, 'unit')):
@@ -362,7 +367,9 @@ def extract(text, *, tool_output=False):
                 and re.fullmatch(r'/?[A-Za-z][\w:-]*', value)):
             continue  # Markup tags are syntax, not authored file paths.
         # Sentence punctuation is outside a token. Internal punctuation is exact.
-        while value.endswith(('.', ',', ';', ':', '?', '!')):
+        while value.endswith(('.', ',', ';', ':', '?', '!')) or (
+                value.startswith(('https://', 'http://')) and value[-1:] in ')]}'
+                and value.count(value[-1]) > value.count('([{'[')]}'.index(value[-1])])):
             value = value[:-1]
             end -= 1
         if not value or not any(c.isalnum() for c in value):
@@ -450,7 +457,7 @@ def names(text, *, shell=False):
     units = [s for s in spans if s.kind == 'unit']
     # Shell quotes around commit messages delimit prose argv, not one filename.
     messages = {(s.start, s.end) for s in spans if shell and s.kind == 'delimited'
-                and re.search(r'(?:-[A-Za-z]*m|--message)(?:\s+|=)[\x27"]$', text[:s.start])}
+                and re.search(r'(?:(?<![\w-])-[A-Za-z]*m|--message)(?:\s+|=)[\x27"]$', text[:s.start])}
     delimited_names = [s for s in spans if s.kind == 'delimited' and name_kind(s.text, quoted=True)
                        and not re.match(r'^[A-Za-z_]\w*=', s.text) and (s.start, s.end) not in messages]
     for span in spans:
@@ -639,7 +646,7 @@ def effects(event):
             elif name in ('cp', 'mv') and len(words) > 2:
                 result.append(dict(subject=words[-1], **({'renamed_from': words[-2]} if name == 'mv' else {})))
                 if name == 'mv':
-                    result.append({'subject': words[-2], 'removed': True})
+                    result.extend({'subject': w, 'removed': True} for w in words[1:-1] if not w.startswith('-'))
             elif name == 'sed' and any(w.startswith('-i') for w in words[1:]):
                 result.append({'subject': words[-1]})
             elif name == 'gofmt' and '-w' in words[1:]:
@@ -867,7 +874,7 @@ def edited_forms(event, target):
     for value in payloads:
         try:
             structured |= isinstance(json.loads(value), (dict, list))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):
             pass
     shebang = bool(re.search(r'(?m)^#!\s*\S+', content))
     absolute = identity(target, event)[5:]
@@ -935,6 +942,16 @@ JSON_LOAD = re.compile(
     r"""|json\.loads\(\s*open\(\s*(['"])([^'"$*?`]+)\3\s*\)\.read\(\s*\)\s*\)""")
 
 
+def shell_words(command):
+    """POSIX words with shell operators split out, or None for unbalanced quoting."""
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=';&|()<>\n')
+        lex.whitespace_split = True
+        return list(lex)
+    except ValueError:
+        return None
+
+
 def json_loaded_paths(command):
     """Files a successful `python -c` parsed whole with json.load on a literal path.
 
@@ -943,11 +960,8 @@ def json_loaded_paths(command):
     failure behind a later exit status, so only a lone call or an `&&` chain
     counts.
     """
-    try:
-        lex = shlex.shlex(command, posix=True, punctuation_chars=';&|()<>\n')
-        lex.whitespace_split = True
-        words = list(lex)
-    except ValueError:
+    words = shell_words(command)
+    if words is None:
         return []
     statements, current = [], []
     for word in words:
@@ -1003,11 +1017,8 @@ def names_change(event, change):
 
 def simple_argv(command):
     """No guessed branch selection or shell expansion from an aggregate output."""
-    try:
-        lex = shlex.shlex(command, posix=True, punctuation_chars=';&|()<>\n')
-        lex.whitespace_split = True
-        words = list(lex)
-    except ValueError:
+    words = shell_words(command)
+    if words is None:
         return []
     if any(word and all(c in ';&|()<>\n' for c in word) for word in words):
         return []
@@ -1229,6 +1240,22 @@ def git_calls(event):
             yield dict(event, cwd=context_cwd), words[i], list(words[i + 1:])
 
 
+def git_unquote(text):
+    """Decode git's C-style quoted path, including octal UTF-8 bytes."""
+    simple = {'a': 7, 'b': 8, 't': 9, 'n': 10, 'v': 11, 'f': 12, 'r': 13, '"': 34, '\\': 92}
+    out = bytearray()
+    for match in re.finditer(r'\\([0-7]{3})|\\(.)|(.)', text[1:-1], re.S):
+        if match[1]:
+            out.append(int(match[1], 8) & 255)
+        elif match[2]:
+            if match[2] not in simple:
+                raise ValueError('unknown escape in quoted path')
+            out.append(simple[match[2]])
+        else:
+            out += match[3].encode()
+    return out.decode('utf-8', 'replace')
+
+
 def operands(args):
     result, i = [], 0
     value_options = {'-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message',
@@ -1274,10 +1301,15 @@ def commit_changes(ledger, event, changes=None):
         # This predicts its file selection, never invents a completed run or
         # mutates the ledger with candidate evidence.
         if action == 'add' and not any(a in args for a in ('--dry-run', '-n', '--intent-to-add', '-N', '-p', '--patch', '-i', '--interactive')):
-            if '--all' in args or '-A' in args or ('-u' in args or '--update' in args) and not specs:
+            if ('--all' in args or '-A' in args or '-u' in args or '--update' in args) and not specs:
                 specs = ['.']
             staged.update({s: c for s, c in changes.items() if matches(s, specs, context)})
         elif action in ('reset', 'restore', 'rm') and (action != 'restore' or '--staged' in args or '-S' in args):
+            if action == 'reset':
+                if '--soft' in args:
+                    continue  # a soft reset leaves the index alone
+                if specs and re.fullmatch(r'(?:HEAD|[0-9a-f]{7,40})(?:[~^]\d*)*', specs[0]):
+                    specs = specs[1:]  # a revision is not a pathspec
             staged = {s: c for s, c in staged.items() if specs and not matches(s, specs, context)}
         if action not in ('commit', 'push'):
             continue
@@ -1342,7 +1374,7 @@ def record_git(ledger, pre, post):
                             continue
                         state, path = line[:2], line[3:].split(' -> ')[-1]
                         try:
-                            path = json.loads(path) if path.startswith('"') else path
+                            path = git_unquote(path) if path.startswith('"') else path
                         except ValueError:
                             continue
                         subject = ledger.subject(path, context)
@@ -2080,9 +2112,10 @@ def questions(event):
 
 
 def in_scope(cwd, prefixes):
-    cwd = cwd.replace('\\', '/').rstrip('/').lower()
+    fold = str.lower if sys.platform in ('win32', 'darwin') else str
+    cwd = fold(cwd.replace('\\', '/').rstrip('/'))
     for prefix in prefixes:
-        prefix = prefix.replace('\\', '/').rstrip('/').lower()
+        prefix = fold(prefix.replace('\\', '/').rstrip('/'))
         if prefix and (cwd == prefix or cwd.startswith(prefix + '/')):
             return True
     return False
