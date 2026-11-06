@@ -1936,7 +1936,6 @@ def evaluate(ledger, event, adapter='inferred'):
 
 ORIGINAL = 'Original: Read the original instead of a derivation.'
 UNCHANGED = 'Unchanged: Do not assume what can change has not.'
-IMMEDIACY = 'IMMEDIACY: A more immediate read assumes less.\n  + ' + ORIGINAL + '\n  \u2212 ' + UNCHANGED
 
 
 def d_in(raw):
@@ -2099,15 +2098,6 @@ def d_out(event, reason):
     return {'decision': 'block', 'reason': reason}
 
 
-def questions(event):
-    if not dependent(event):
-        return {}
-    if event['hook_event_name'] == 'PreToolUse':
-        return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': IMMEDIACY}}
-    if not event.get('stop_hook_active'):
-        return {'decision': 'block', 'reason': IMMEDIACY}
-    return {}
-
 
 def in_scope(cwd, prefixes):
     fold = str.lower if sys.platform in ('win32', 'darwin') else str
@@ -2221,7 +2211,7 @@ def main(raw, config):
                 checkpoint_save(path, saved)
             if report:
                 return {'systemMessage': report}
-            return d_out(event, reason) if reason else questions(event)
+            return d_out(event, reason) if reason else {}
     except Exception as error:
         # Fail open: an infrastructure or transport error (state, lock, journal, transcript,
         # malformed host event) never denies a step; only rule findings above do.

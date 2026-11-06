@@ -3,7 +3,7 @@
 Makoto is a Claude Code hook. Before a dependent step runs (Write, Edit, MultiEdit, NotebookEdit,
 Bash `git commit`/`git push`, or Stop), it checks the session record. If a reading the step needs
 is missing, it holds the step: a PreToolUse step gets a native deny and a Stop gets a native block.
-The hold names the rule, its shape, the exact subject, the one Immediacy rule it enforces and the missing reading. The checker uses no model and no network.
+The hold names the rule, its shape, the exact subject, the one Immediacy rule it enforces and the missing reading. An admitted step gets `{}`. The checker uses no model and no network.
 
 ## Install
 
@@ -16,15 +16,17 @@ needs Python 3.11 or later and uses only the standard library.
 
 ## The principle
 
-Makoto enforces Immediacy. Every admitted dependent PreToolUse step receives the principle and its
-two rules as `additionalContext`. An admitted Stop shows them once as its block reason, and a
-`stop_hook_active` retry that is otherwise admitted gets `{}`:
+Makoto is deterministic enforcement of Immediacy:
 
     IMMEDIACY: A more immediate read assumes less.
       + Original: Read the original instead of a derivation.
       − Unchanged: Do not assume what can change has not.
 
-A hold states the rule it enforces and the specific missing reading. It asks no question.
+Code decides every hold from the session record. An admitted step gets `{}`: Makoto adds nothing to
+the model's context, so no check depends on the model reading injected text. A hold states the rule
+it enforces and the specific missing reading, and asks no question. Three paths turn a decided hold
+into text only: the `MAKOTO_BLOCK_IN` report, the `stop_cap`
+admission and the infrastructure fail-open.
 
 ## The four rules
 

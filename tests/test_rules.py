@@ -8,9 +8,7 @@ import pytest
 
 PLUGIN = Path(__file__).resolve().parents[1] / 'plugin'
 HOOKS = json.loads((PLUGIN / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))['hooks']
-IMMEDIACY = ("IMMEDIACY: A more immediate read assumes less.\n"
-             "  + Original: Read the original instead of a derivation.\n"
-             "  \u2212 Unchanged: Do not assume what can change has not.")
+
 
 
 def send(tmp, event):
@@ -42,7 +40,6 @@ def stop(text):
     return ev('Stop', last_assistant_message=text, stop_hook_active=True)
 
 
-ADMITTED = {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext': IMMEDIACY}}
 WRITE = read('print(731)\n', 'spec') + call('Write', {'file_path': 'run.py', 'content': 'print(731)\n'}, {'content': 'ok'}, 'write')
 RUN = call('Bash', {'command': 'python3 run.py'}, {'stdout': '731\n', 'exitCode': 0}, 'run')
 
@@ -66,7 +63,7 @@ def test_rule_holds_plant_and_admits_twin(tmp_path, rule):
     for name, events in (('plant', plant), ('twin', twin)):
         tmp = tmp_path / name
         for event in events[:-1]:
-            assert send(tmp, event) in ({}, ADMITTED)
+            assert send(tmp, event) == {}
         response = send(tmp, events[-1])
         if name == 'plant':
             assert response.get('decision') == 'block'
@@ -75,8 +72,8 @@ def test_rule_holds_plant_and_admits_twin(tmp_path, rule):
             assert response == {}
 
 
-def test_admitted_write_carries_the_principle(tmp_path):
+def test_admitted_write_is_silent(tmp_path):
     for event in read('source data'):
         send(tmp_path, event)
     step = ev('PreToolUse', tool_name='Write', tool_use_id='step', tool_input={'file_path': 'out.txt', 'content': 'source data'})
-    assert send(tmp_path, step) == ADMITTED
+    assert send(tmp_path, step) == {}

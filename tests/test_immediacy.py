@@ -1,7 +1,7 @@
 """Every hold names the one Immediacy rule it enforces, states the missing reading and asks no question."""
 import pytest
 
-from test_rules import CASES, IMMEDIACY, send
+from test_rules import CASES, ev, read, send
 
 ENFORCES = {'a': 'Original: Read the original instead of a derivation.',
             'b': 'Original: Read the original instead of a derivation.',
@@ -23,6 +23,10 @@ def test_hold_names_its_rule_and_the_missing_reading(tmp_path, rule):
     assert '?' not in reason
 
 
-def test_the_injected_principle_is_the_principle_and_asks_nothing():
-    assert IMMEDIACY.splitlines()[0] == 'IMMEDIACY: A more immediate read assumes less.'
-    assert '?' not in IMMEDIACY
+def test_makoto_speaks_only_when_it_holds(tmp_path):
+    for event in read('source data'):
+        assert send(tmp_path, event) == {}
+    write = ev('PreToolUse', tool_name='Write', tool_use_id='step', tool_input={'file_path': 'out.txt', 'content': 'source data'})
+    assert send(tmp_path, write) == {}
+    # A first Stop that no rule holds is admitted without a block or any text.
+    assert send(tmp_path, ev('Stop', last_assistant_message='source data')) == {}
