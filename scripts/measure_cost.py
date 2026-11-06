@@ -12,6 +12,7 @@ times in a fresh state directory; the reported ms is the median over those runs.
 """
 import json
 import os
+import shutil
 import subprocess
 import statistics
 import sys
@@ -85,6 +86,8 @@ def report(rows):
 
 if __name__ == '__main__':
     out = {}
+    cache = PLUGIN / '__pycache__'
+    shutil.rmtree(cache, ignore_errors=True)  # cold means no cached bytecode, not just no writing of it
     for mode in ('cold', 'warm'):
         if mode == 'warm':  # one untimed pass fills the bytecode cache
             for _name, events in scenarios():
@@ -93,5 +96,6 @@ if __name__ == '__main__':
                         send(Path(tmp), event, True)
         text, out[mode] = report(measure(mode == 'warm'))
         print(f'[{mode}]\n{text}')
+    shutil.rmtree(cache, ignore_errors=True)
     if '--json' in sys.argv:
         Path(sys.argv[sys.argv.index('--json') + 1]).write_text(json.dumps(out, indent=1))
