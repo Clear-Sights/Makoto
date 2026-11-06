@@ -68,4 +68,14 @@ def label(events, index, rule, subject):
                     and base in str(event.get('tool_input', {}).get('command', '')) and nonempty(event)):
                 return 'fp', 'run after the last edit'
         return 'true', ''
+    if rule == 'e':
+        path = str(subject)
+        for event in before:
+            if event['hook_event_name'] == 'PreToolUse':
+                target = str(event.get('tool_input', {}).get('file_path', ''))
+                if event['tool_name'] in ('Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit') and target == path:
+                    return 'fp', 'file read or produced earlier'
+                if event['tool_name'] == 'Bash' and path in str(event['tool_input'].get('command', '')):
+                    return 'fp', 'file read or produced earlier'
+        return 'true', ''
     return 'true', 'unknown rule'

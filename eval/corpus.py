@@ -82,6 +82,13 @@ def events_of(rows, session, cwd, prompt):
                             else response(name, tool_input, block.get('content'), False)
                     events.append(event)
     events.append(dict(base, hook_event_name='Stop', last_assistant_message=last_text, stop_hook_active=False))
+    # The replay has no files: record the log's own fact that a Write onto an existing file (result type
+    # `update`) targeted a file that existed. A hook on a live machine checks the file system instead.
+    kind = {e['tool_use_id']: e.get('tool_response', {}).get('type') for e in events
+            if e['hook_event_name'] == 'PostToolUse' and e['tool_name'] == 'Write' and isinstance(e.get('tool_response'), dict)}
+    for e in events:
+        if e['hook_event_name'] == 'PreToolUse' and e['tool_name'] == 'Write':
+            e['makoto'] = {'target_exists': kind.get(e['tool_use_id']) == 'update'}
     return events
 
 

@@ -96,6 +96,15 @@ def present(events, index, rule, subject):
             return False
         return any(e['hook_event_name'] == 'PostToolUse' and e['tool_name'] == 'Bash' and base in str(e.get('tool_input', {}).get('command', ''))
                    and flat(e.get('tool_response')).strip() for e in before[last + 1:])
+    if rule == 'e':
+        for e in before:
+            if e['hook_event_name'] == 'PreToolUse':
+                target = str(e['tool_input'].get('file_path', ''))
+                if e['tool_name'] in FILE_TOOLS and (target == subject or target.endswith('/' + subject) or subject.endswith('/' + target)):
+                    return True
+                if e['tool_name'] == 'Bash' and subject in str(e['tool_input'].get('command', '')):
+                    return True
+        return False
     # rule b, and any other rule, is a name
     if pathlike(subject):
         for e in before:
