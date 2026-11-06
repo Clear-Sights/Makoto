@@ -87,3 +87,64 @@ Gate (as written in `RULES.md`: false positives must not rise above baseline, ca
   Bash run beyond 63 calls; these numbers say little about interactive sessions or other models.
 - 15 sessions lack their prompt, which can make a rule-b hold look true.
 - Replaying a recorded session cannot show what the model would have done after a block.
+
+# Second round (rules in `RULES2.md`, committed in `322cb98` before the sample or any plant)
+Before = `852bde0`, after = this head. Same corpus (342 sessions), same seed, same plants.
+
+## 1. The five false positives, one cluster: how rule b treats punctuation next to a name
+| hold | name | cause |
+|---|---|---|
+| d32499a1 #13, 22784a89 #23 | `.quantize` | a `.method(` call named in the prompt was read as a hidden file named in the prompt ("naming a file does not read it") |
+| d32499a1 #35, 22784a89 #25 | `rep_`, `invoices_count` / `claims_count` | the prompt ends the sentence with the name (`rep_.`); the boundary test counted the `.` as part of the name |
+| cf29e150 #45 | `app.core.depth_value` | the session had already written that name in an earlier edit, and it was treated as unread |
+
+Fixes (`plugin/makoto2.py`, 10 lines): `contains()` ignores a sentence-ending `.,;:!?` after a name; a `.name(` call is not
+subject to the "file named in the prompt" rule; a dotted name the session already wrote (`ledger.own`) is produced, not unread.
+Tests `tests/test_rule_b_names.py`: the four false-positive cases fail on `852bde0` and pass now; three controls (a dotted
+name nobody wrote, `.get(` that nobody read, a name found nowhere) pass on both, so the check is not switched off.
+Two broader versions of the fixes were tried first and rejected: they also admitted `refunds.summarize`, `.get`,
+`.union` and a first use of `app.core.depth_value`, which both labelers call missing.
+
+| | before | after |
+|---|---|---|
+| Holds | 2603 | 2599 (the four sentence/method cases) |
+| Hold-level false positives (`label.py`) | 5 | **1** |
+| Finding-level false positives (`label.py`) | 2808 of 13135 | 2777 of 13105 (31 removed, all `fp`; no true finding lost; 1 true finding added) |
+| Errors | 0 | 0 |
+| Plants caught (first round) | 18 of 69 | 18 of 69 |
+
+The one remaining hold-level false positive (cf29e150 #45) is a replay artifact. It is the same edit as #39, which both
+labelers call a true hold (the name appeared nowhere). The recorded session ran #39 anyway; a live hook would have
+denied it, so the name would not have been produced and #45 would be held again for the same true reason. I did not
+treat denied-but-recorded edits as produced, because that would be wrong in a live session.
+
+## 2. Independent label (n = 60 holds, seed 20261106, `independent.py`)
+| | before (population 2603) | after (population 2599) |
+|---|---|---|
+| Hold-level false positives | 0/60 = 0.0% (95% Wilson 0.0% to 6.0%) | 0/60 = 0.0% (95% Wilson 0.0% to 6.0%) |
+| Findings that name something that was present | 47/241 = 19.5% (15.0% to 25.0%) | 52/265 = 19.6% (15.3% to 24.8%) |
+| of which rule b | 45/96 = 47% | 47/82 = 57% |
+
+No sampled hold was a false positive: every one had at least one finding whose reading was missing (mostly rule d, a
+Stop after edits that were never run). But about one finding in five, and about half of rule b's, names a subject the
+independent label finds present (for example `AppError`, `i.get`). The hold stands, but its message tells the model to
+read something it already has. The fix did not change this: it comes from Makoto not counting text the session wrote
+or text from the prompt as evidence for names, which the independent label does count.
+
+## 3. Recall with plants that need a reading (n = 67)
+Plant rule excludes steps that need no reading (a Write that creates a file).
+| plant | caught / n before | caught / n after |
+|---|---|---|
+| Q1: Edit or overwrite of a file whose every earlier Read was removed | 0/66 = 0.0% (95% Wilson 0.0% to 5.5%) | 0/66 = 0.0% (0.0% to 5.5%) |
+| Q2: Stop with its runs removed | n = 0 | n = 0 |
+| Q3: step naming a token seen in exactly one response, that response removed | 1/1 (20.7% to 100%) | 1/1 |
+| all | 1/67 = 1.5% (0.3% to 8.0%) | 1/67 |
+
+Makoto does not hold an edit of a file the session never read: rule a is satisfied by any earlier reading, and rule
+b looks at names, not at the file being changed. I checked a plant by hand (a Write to `app/core.py` with its Read
+removed, other files read): admitted. This is a design gap, not a fixed bug, and I did not change it.
+n is small because only 115 dependent steps are admitted, 67 of them qualify.
+
+## Everything else, re-run on the fixed code
+Per-change table unchanged (all six changes: 2599 holds, 0 errors, 18/69). Clearability: 342 of 342 held Stops admitted after
+the named action. Corruption experiment: 0 error blocks in 3569 later events, 13 extra rule holds (12 before).

@@ -496,7 +496,9 @@ def contains(text, span, kind=None):
     start = 0
     while (at := text.find(span, start)) >= 0:
         end = at + len(span)
-        if (not edge(span[0]) or at == 0 or not edge(text[at-1])) and (not edge(span[-1]) or end == len(text) or not edge(text[end])):
+        # A '.' or similar that ends a sentence (followed by space or the end) is not part of the name.
+        closes = end < len(text) and text[end] in '.,;:!?' and (end + 1 == len(text) or text[end + 1].isspace())
+        if (not edge(span[0]) or at == 0 or not edge(text[at-1])) and (not edge(span[-1]) or end == len(text) or not edge(text[end]) or closes):
             return True
         start = at + 1
     return False
@@ -1863,6 +1865,9 @@ def evaluate(ledger, event, adapter='inferred'):
             return True
         if span.kind == 'path' and (span.text in authored or span.text.rstrip('.') in authored):
             return True
+        if (span.kind == 'path' and MODULE.fullmatch(span.text) and span.text.rsplit('.', 1)[-1].lower() not in FILE_SUFFIXES
+                and any(contains(t, span.text, 'path') for t in ledger.own)):
+            return True  # a dotted name this session already wrote
         return span.kind == 'path' and ledger.subject(span.text, event) in output_subjects or any(start <= span.start and span.end <= end for start, end in output_ranges)
 
     if not readings and not creation and (shipping is None or name_spans):
@@ -1883,7 +1888,8 @@ def evaluate(ledger, event, adapter='inferred'):
             snapshot.append({'span': span.text, 'kind': span.kind, 'output': True})
             continue
         witnesses = ledger.witnesses(span.text, span.kind) or ledger.witnesses(cited.text, cited.kind)
-        if (span.kind == 'path' and not span.text.startswith('#!')
+        method_call = bool(re.fullmatch(r'\.[A-Za-z_]\w*', span.text)) and text[span.end:span.end + 1] == '('
+        if (span.kind == 'path' and not span.text.startswith('#!') and not method_call
                 and any(contains(t, span.text, span.kind) for t in ledger.given)):
             # Naming a file in the prompt does not read its contents.
             witnesses = [w for w in witnesses if not w.get('given')]
