@@ -1,0 +1,34 @@
+{
+ "plugin": "/tmp/claude-0/basepl/plugin",
+ "plant_D_caught": [
+  0,
+  12
+ ],
+ "twin_admitted": [
+  12,
+  12
+ ],
+ "no_use_admitted": [
+  12,
+  12
+ ],
+ "errors": 0,
+ "misses": [
+  "D with 1 users: admitted",
+  "D with 2 users: admitted",
+  "D with 3 users: admitted",
+  "D with 4 users: admitted",
+  "D with 5 users: admitted",
+  "D with 6 users: admitted",
+  "D with 7 users: admitted",
+  "D with 8 users: admitted",
+  "D with 9 users: admitted",
+  "D with 10 users: admitted",
+  "D with 11 users: admitted",
+  "D with 12 users: admitted"
+ ],
+ "false_holds": [],
+ "ms_per_hook_median": 67.9,
+ "hook_calls": 612,
+ "rule_f_hold_bytes_median": 0
+}

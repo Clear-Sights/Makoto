@@ -46,11 +46,16 @@ in every directory, and on every repeat of the same Stop.
   already exists, needs a reading of that file, or a write of it by this session, earlier in the
   session. A Write that creates a new file needs none. A live hook checks the file system; a host that
   cannot may record the fact in `makoto.target_exists`. The hold ends in `Clear: Read <path>.`
+- **f (downstream), enforces Openness: Downstream:** when an admitted Edit, MultiEdit or Write changes or
+  removes the line that defines a name (`def`, `class`, or a module-level assignment) in a source file, every other file
+  in the working tree where that name occurs as a whole word (`git grep -w -n`, or a scan without git) must be read after
+  the change or changed by the session before Stop, `git commit` or `git push`. The hold lists each unaccounted
+  `path:line` and ends `Clear: Read <path>.` A name with no use elsewhere holds nothing.
 
 A locked, hash-linked journal keeps every turn under `~/.claude/makoto2_state`
 (`MAKOTO_STATE_DIR` overrides).
 The optional host envelope `makoto` (`effects`, `external_subjects`, `network_subjects`,
-`invocation.subject(s)`, `turn_id`, `detio_store`) lets the host record what it saw, such as
+`invocation.subject(s)`, `turn_id`, `detio_store`, `downstream`) lets the host record what it saw, such as
 opaque mutations, public names or the program that actually ran. The host must enforce the
 decision before it runs a tool or delivers a final answer.
 

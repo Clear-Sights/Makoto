@@ -1,7 +1,7 @@
 """Makoto: the immediacy hook. Live entry: cd plugin && python3 -m makoto2,
 one serialized native Claude Code hook event on stdin, one JSON response on stdout.
 
-Sections, in dependency order: paths, shell, borrowed, precision, observed, transcript, switch, shipping, creations, provenance, evaluate, hook, __main__.
+Sections, in dependency order: paths, shell, borrowed, precision, observed, transcript, switch, shipping, downstream, creations, provenance, evaluate, hook, __main__.
 Modified excerpts from DetIO and Causality (leaves, get, receipt) are credited in NOTICE.
 """
 import ast
@@ -1435,6 +1435,77 @@ def introduces(ledger, event):
 # ======================================================================
 # provenance: Agnostic ordered sweep: source bytes, own output, writes, and online calls.
 
+# ======================================================================
+# downstream: A changed definition owes the session a look at every other file that uses its name.
+
+SOURCE_FILE = re.compile(r'\.(?:py|pyi|sh|bash|js|mjs|cjs|jsx|ts|tsx|go|rs|rb|java|kt|c|h|cc|cpp|hpp|cs|php|swift|lua|pl)$')
+DEF_LINE = re.compile(r'^[ \t]*(?:async[ \t]+)?(?:def|class)[ \t]+([A-Za-z_]\w*)')
+ASSIGN_LINE = re.compile(r'^([A-Za-z_]\w*)[ \t]*(?::[^=\n]+)?=(?!=)')
+DOWNSTREAM_RULE = 'Openness: Downstream. Account for every downstream before moving upward.'
+
+
+def plain_lines(text):
+    """File text without the line-number gutter a reading may carry."""
+    lines = text.split('\n')
+    gutter = re.compile(r'^\s*\d+[\t\u2192]')
+    body = [line for line in lines if line.strip()]
+    if body and all(gutter.match(line) for line in body):
+        lines = [gutter.sub('', line, count=1) for line in lines]
+    return [line.rstrip() for line in lines]
+
+
+def definition_lines(lines, module_level=None):
+    """{name: set of defining lines}: def, class, or a module-level assignment."""
+    found = {}
+    for line in lines:
+        match = DEF_LINE.match(line) or ASSIGN_LINE.match(line)
+        if match and (match.re is DEF_LINE or module_level is None or match.group(1) in module_level):
+            found.setdefault(match.group(1), set()).add(line)
+    return found
+
+
+def changed_definitions(old_lines, new_lines, module_level=None):
+    """Names whose defining line in the old side is not, as written, in the new side."""
+    new = set(new_lines)
+    return {name for name, lines in definition_lines(old_lines, module_level).items() if not lines <= new}
+
+
+def name_uses(name, root):
+    """[(path relative to root, line number)] where `name` occurs as a whole word, by code."""
+    import subprocess
+    try:
+        run = subprocess.run(['git', 'grep', '--untracked', '-F', '-w', '-n', '-I', '-e', name, '--', '.'],
+                             cwd=root, capture_output=True, text=True, timeout=10)
+        if run.returncode in (0, 1):
+            found = []
+            for row in run.stdout.splitlines():
+                path, _, rest = row.partition(':')
+                number, _, _ = rest.partition(':')
+                if number.isdigit():
+                    found.append((path, int(number)))
+            return found
+    except (OSError, subprocess.SubprocessError):
+        pass
+    pattern, found = re.compile(r'(?<!\w)' + re.escape(name) + r'(?!\w)'), []
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d != '.git')
+        for file in sorted(files):
+            full = os.path.join(folder, file)
+            try:
+                if os.path.getsize(full) > 2_000_000:
+                    continue
+                with open(full, 'rb') as stream:
+                    raw = stream.read()
+            except OSError:
+                continue
+            if b'\0' in raw:
+                continue
+            for number, line in enumerate(raw.decode('utf-8', 'replace').splitlines(), 1):
+                if pattern.search(line):
+                    found.append((os.path.relpath(full, root).replace(os.sep, '/'), number))
+    return found
+
+
 class Ledger:
     def __init__(self):
         self.q = 0
@@ -1462,6 +1533,56 @@ class Ledger:
         self.staged_code = {}
         self.git_tracked = set()
         self.committed_code = {}
+        self.def_changes = {}
+
+    def note_definitions(self, pre):
+        """Record the names whose defining line this admitted write changed or removed."""
+        ti, tool = pre.get('tool_input', {}), pre.get('tool_name')
+        path = ti.get('file_path')
+        if not isinstance(path, str) or not SOURCE_FILE.search(path):
+            return
+        subject = self.subject(path, pre)
+        before = [r for r in self.readings if subject in r['subjects']]
+        known = [line for r in before for text in r['texts'] for line in plain_lines(text)]
+        module_level = {m.group(1) for line in known for m in [ASSIGN_LINE.match(line)] if m} if known else None
+        if tool == 'Write':
+            fresh = [r for r in before if r['q'] > self.mutations.get(subject, 0)]
+            if not fresh or not isinstance(ti.get('content'), str):
+                return
+            old = [line for text in fresh[-1]['texts'] for line in plain_lines(text)]
+            changed = changed_definitions(old, plain_lines(ti['content']), module_level)
+        else:
+            pairs = ti.get('edits') if tool == 'MultiEdit' and isinstance(ti.get('edits'), list) else [ti]
+            changed = set()
+            for pair in pairs:
+                if isinstance(pair, dict) and isinstance(pair.get('old_string'), str):
+                    changed |= changed_definitions(plain_lines(pair['old_string']),
+                                                   plain_lines(pair.get('new_string') or ''), module_level)
+        for name in changed:
+            self.def_changes[name] = {'q': self.q, 'subject': subject, 'display': path, 'cwd': pre.get('cwd') or ''}
+
+    def unaccounted_uses(self, name, event):
+        """[(path, line)] of the name's downstream uses in files the session neither read after the change nor changed."""
+        change = self.def_changes[name]
+        recorded = event.get('makoto', {}).get('downstream')
+        if isinstance(recorded, list):
+            uses = [(u['path'], int(u['line'])) for u in recorded if isinstance(u, dict) and u.get('name') == name]
+            root = change['cwd'] or event.get('cwd') or os.getcwd()
+        else:
+            root = change['cwd'] or event.get('cwd') or os.getcwd()
+            uses = name_uses(name, root) if os.path.isdir(root) else []
+        probe = dict(event, cwd=root)
+        result = []
+        for path, line in uses:
+            subject = self.subject(path, probe)
+            if subject == change['subject']:
+                continue
+            if self.mutations.get(subject, 0) > change['q']:
+                continue
+            if any(r['q'] > change['q'] and subject in r['subjects'] for r in self.readings):
+                continue
+            result.append((path, line))
+        return result
 
     def changed_code(self):
         result = dict(self.code_changes)
@@ -1696,6 +1817,8 @@ class Ledger:
         self.seen.add(tid)
         targets = self.reservations.get(tid, set()) | {self.subject(r['subject'], pre) for r in effects(event)}
         no_effect = meta.get('no_effect') is True or refused(event)
+        if not no_effect and not failed(event) and pre.get('tool_name') in ('Edit', 'MultiEdit', 'Write'):
+            self.note_definitions(pre)
         ordered = self.bash_order(pre, event, started, no_effect)
         native = dict(pre)
         native.pop('makoto', None)
@@ -1943,6 +2066,15 @@ def evaluate(ledger, event, adapter='inferred'):
             witnesses = runs or readbacks
             snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in witnesses],
                                     'makoto2.switch/execution-v1' if runs else 'makoto2.switch/readback-v1'))
+    # Rule f: a changed definition owes the session a look at each file that uses its name.
+    if event['hook_event_name'] in FINAL or shipping is not None:
+        for name in sorted(ledger.def_changes):
+            uses = ledger.unaccounted_uses(name, event)
+            if uses:
+                listed = ', '.join(p + ':' + str(n) for p, n in uses)
+                findings.append({'rule': 'f', 'family': 'f', 'shape': 'downstream', 'subject': name,
+                                 'missing': DOWNSTREAM_RULE + ' Missing: a reading after the change of each file that uses the changed name '
+                                 + name + ': ' + listed + '. Clear: Read ' + uses[0][0] + '.'})
     if not findings and readings:
         snapshot.append(receipt(text, [r['tool_use_id'] for r in readings], 'makoto2.precision/form-v1'))
     return list({(f['rule'], f['subject']): f for f in findings}.values()), snapshot
@@ -1964,7 +2096,7 @@ def d_in(raw):
     if not isinstance(event.get('makoto', {}), dict) or not isinstance(event.get('tool_input', {}), dict):
         raise ValueError('makoto and tool_input must be objects')
     meta = event.get('makoto', {})
-    for key in ('definitions', 'reads', 'effects', 'obligations', 'dependencies', 'aliases'):
+    for key in ('definitions', 'reads', 'effects', 'obligations', 'dependencies', 'aliases', 'downstream'):
         if key in meta and (not isinstance(meta[key], list) or any(not isinstance(item, dict) for item in meta[key])):
             raise ValueError('makoto.' + key + ' must be an object list')
     for key in ('place', 'destination', 'points', 'invocation'):
