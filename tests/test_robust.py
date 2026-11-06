@@ -1,5 +1,6 @@
-"""Makoto never wedges a session: infrastructure errors admit, hooks are timed, the lock is capped,
-an active Stop is held at most once more, and each call reads only what is new since the last."""
+"""Makoto holds without exception: an infrastructure error blocks, names the error and the one way to
+disable Makoto; a decided hold blocks everywhere and every time; hooks are timed, the lock is capped,
+and each call reads only what is new since the last."""
 import fcntl
 import hashlib
 import json
@@ -28,37 +29,57 @@ def denied(response):
             or response.get('decision') == 'block')
 
 
+DISABLE = 'claude plugin disable makoto'
+
+
+def message(response):
+    return response.get('reason') or response.get('hookSpecificOutput', {}).get('permissionDecisionReason', '')
+
+
 def failure(response):
-    return 'infrastructure' in response.get('systemMessage', '')
+    return denied(response) and 'makoto infrastructure error' in message(response)
+
+
+def way_out(response):
+    return DISABLE in message(response)
 
 
 def journal(tmp):
     return tmp / 'state' / (hashlib.sha256(b'plant').hexdigest() + '.jsonl')
 
 
-# 1. Fail open on every infrastructure error; deny only on rule findings.
+# 1. Fail closed on every infrastructure error; the block names the error and the way out.
 
-def test_unwritable_state_admits_with_a_message(tmp_path):
+def test_unwritable_state_blocks_and_names_the_error(tmp_path):
     state = tmp_path / 'state'
     state.write_text('a file where the state folder should be')
     response = raw_send(state, WRITE_STEP)
-    assert not denied(response) and failure(response)
+    assert failure(response) and way_out(response)
+    assert any(name in message(response) for name in ('NotADirectoryError', 'FileExistsError'))
 
 
-def test_malformed_host_event_admits(tmp_path):
+def test_malformed_host_event_blocks(tmp_path):
     response = raw_send(tmp_path / 'state', ev('PreToolUse', tool_name='Write', tool_input={'file_path': 'x'}))
-    assert not denied(response) and failure(response)
+    assert failure(response) and way_out(response)
 
 
-def test_corrupted_journal_never_denies_the_rest_of_the_session(tmp_path):
+def test_corrupted_journal_blocks_with_the_error(tmp_path):
     for event in read('source data'):
         send(tmp_path, event)
     path = journal(tmp_path)
     path.write_text(path.read_text().replace('source data', 'tampered!!!', 1))
     (tmp_path / 'state' / (path.name + '.ckpt')).unlink(missing_ok=True)
-    for tid in ('one', 'two'):
-        response = send(tmp_path, dict(WRITE_STEP, tool_use_id=tid))
-        assert not denied(response)
+    response = send(tmp_path, dict(WRITE_STEP, tool_use_id='one'))
+    assert failure(response) and way_out(response) and 'corrupted journal' in message(response)
+
+
+def test_unreadable_event_input_blocks(tmp_path):
+    command = HOOKS['Stop'][0]['hooks'][0]['command']
+    env = {k: v for k, v in os.environ.items() if not k.startswith('MAKOTO_')}
+    env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp_path / 'state'), PYTHONDONTWRITEBYTECODE='1')
+    run = subprocess.run(['bash', '-c', command], input='not json', env=env, capture_output=True, text=True, timeout=60)
+    response = json.loads(run.stdout)
+    assert denied(response) and way_out(response)
 
 
 def test_rule_findings_still_deny(tmp_path):
@@ -66,7 +87,7 @@ def test_rule_findings_still_deny(tmp_path):
     assert send(tmp_path, plant[-1])['decision'] == 'block'
 
 
-# 2. A timeout on every hook and a capped, non-blocking session lock.
+# 2. A timeout on every hook and a capped session lock; a busy lock blocks.
 
 def test_every_hook_has_a_timeout():
     for name, groups in HOOKS.items():
@@ -75,7 +96,7 @@ def test_every_hook_has_a_timeout():
                 assert isinstance(hook.get('timeout'), int) and 0 < hook['timeout'] <= 30, name
 
 
-def test_held_lock_admits_within_its_cap(tmp_path):
+def test_held_lock_blocks_within_its_cap(tmp_path):
     state = tmp_path / 'state'
     state.mkdir()
     lock = state / (hashlib.sha256(b'plant').hexdigest() + '.jsonl.lock')
@@ -84,20 +105,33 @@ def test_held_lock_admits_within_its_cap(tmp_path):
         start = time.monotonic()
         response = raw_send(state, WRITE_STEP, timeout=20, MAKOTO_LOCK_SECONDS='0.5')
         assert time.monotonic() - start < 10
-    assert not denied(response) and failure(response)
+    assert failure(response) and 'session lock busy' in message(response)
 
 
-# 3. An active Stop is held at most once more per turn.
+# 3. A decided hold blocks every time and everywhere; nothing caps or scopes it.
 
-def test_active_stop_is_held_once_then_admitted(tmp_path):
+def test_active_stop_is_held_every_time(tmp_path):
     plant, _ = CASES['a']
-    assert send(tmp_path, plant[-1])['decision'] == 'block'
-    second = send(tmp_path, plant[-1])
-    assert not denied(second) and 'makoto rule a' in second['systemMessage']
+    for _ in range(3):
+        response = send(tmp_path, plant[-1])
+        assert response['decision'] == 'block' and response['reason'].startswith('makoto rule a ')
     rows = [json.loads(line) for line in journal(tmp_path).read_text().splitlines()]
-    assert rows[-1]['findings'] and rows[-1]['stop_cap']
-    send(tmp_path, ev('UserPromptSubmit', prompt='next turn'))
-    assert send(tmp_path, plant[-1])['decision'] == 'block'
+    assert rows[-1]['findings'] and 'stop_cap' not in rows[-1]
+
+
+def test_hold_outside_the_old_block_in_scope_still_blocks(tmp_path):
+    plant, _ = CASES['a']
+    for event in plant[:-1]:
+        send(tmp_path, event)
+    outside = dict(plant[-1], cwd='/somewhere/else')
+    response = raw_send(tmp_path / 'state', outside, MAKOTO_BLOCK_IN='/w')
+    assert response['decision'] == 'block' and 'report only' not in json.dumps(response)
+
+
+def test_readme_names_the_one_way_to_disable_and_no_removed_switch():
+    readme = (PLUGIN.parent / 'README.md').read_text(encoding='utf-8')
+    assert DISABLE in readme
+    assert 'MAKOTO_BLOCK_IN' not in readme and 'stop_cap' not in readme
 
 
 # 4. Incremental replay: same decisions, and only new bytes are read.

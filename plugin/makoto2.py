@@ -21,7 +21,7 @@ from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 
-# Defaults; MAKOTO_STATE_DIR, MAKOTO_ADAPTER, MAKOTO_LOCK_SECONDS, MAKOTO_CHECKPOINT and MAKOTO_BLOCK_IN override (see README).
+# Defaults; MAKOTO_STATE_DIR, MAKOTO_ADAPTER, MAKOTO_LOCK_SECONDS, MAKOTO_CHECKPOINT override (see README).
 CONFIG = {'state_dir': '~/.claude/makoto2_state', 'adapter': 'inferred', 'lock_seconds': 3.0}
 
 
@@ -1970,20 +1970,6 @@ def d_in(raw):
     return event
 
 
-REPORT_LIMIT = 700
-
-
-def brief(report):
-    """Report-only text is advice, not a gate: show the head, keep the count.
-
-    The journal holds every finding; a 20 KB message per write costs the
-    session more than the findings tell it.
-    """
-    if len(report) <= REPORT_LIMIT:
-        return report
-    return report[:REPORT_LIMIT].rstrip() + ' ... (%d more characters; the full findings are in the journal)' % (len(report) - REPORT_LIMIT)
-
-
 def sigma_path(state_dir, session_id):
     return Path(state_dir) / (hashlib.sha256(session_id.encode()).hexdigest() + '.jsonl')
 
@@ -2039,8 +2025,7 @@ def sigma_read(path, session_id, cache=None):
                 raise ValueError('session identity collision')
             previous = seal
             # Only what replay reads; findings and snapshots stay in the file.
-            cache['rows'].append({'event': row['event'], 'admitted': row['admitted'], 'sha256': seal,
-                                  'stop_hook_active_unpaid': row.get('stop_hook_active_unpaid', False)})
+            cache['rows'].append({'event': row['event'], 'admitted': row['admitted'], 'sha256': seal})
             cache['offset'] += len(raw)
     cache['last'] = previous
     return cache['rows']
@@ -2090,6 +2075,20 @@ def sigma_append(path, row, previous):
         os.fsync(stream.fileno())
 
 
+DISABLE = 'claude plugin disable makoto'
+
+
+def infrastructure_block(raw, error):
+    """Block in the shape the host reads for this event; name the error and the one way out."""
+    try:
+        event = json.loads(raw)
+    except ValueError:
+        event = {}
+    reason = ('makoto infrastructure error, step blocked: %s: %s. To disable Makoto run in a terminal: %s'
+              % (type(error).__name__, error, DISABLE))
+    return d_out(event if isinstance(event, dict) else {}, reason)
+
+
 def d_out(event, reason):
     if not reason:
         return {}
@@ -2097,28 +2096,6 @@ def d_out(event, reason):
         return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny', 'permissionDecisionReason': reason}}
     return {'decision': 'block', 'reason': reason}
 
-
-
-def in_scope(cwd, prefixes):
-    fold = str.lower if sys.platform in ('win32', 'darwin') else str
-    cwd = fold(cwd.replace('\\', '/').rstrip('/'))
-    for prefix in prefixes:
-        prefix = fold(prefix.replace('\\', '/').rstrip('/'))
-        if prefix and (cwd == prefix or cwd.startswith(prefix + '/')):
-            return True
-    return False
-
-
-def held_again(event, journal):
-    """True when this active Stop was already held once more this turn: the cap is one repeat."""
-    for row in reversed(journal):
-        prior = row['event']
-        if prior.get('hook_event_name') == 'UserPromptSubmit' and not prior.get('makoto', {}).get('same_turn'):
-            return False
-        if (prior.get('hook_event_name') == event['hook_event_name'] and prior.get('agent_id') == event.get('agent_id')
-                and row.get('stop_hook_active_unpaid')):
-            return True
-    return False
 
 
 def replay(records, base):
@@ -2190,50 +2167,36 @@ def main(raw, config):
                 reason = 'makoto contract: ' + contract
             elif findings:
                 reason = '; '.join('makoto rule ' + f['rule'] + ' [' + f['shape'] + ']: ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
-            report, capped = None, False
-            scope = config.get('block_in')
-            if reason and scope and not in_scope(event.get('cwd') or '', scope):
-                # Report only outside the listed projects: the step runs, the
-                # journal keeps the finding, and nothing blocks.
-                report, reason = 'makoto report only (outside block_in): ' + brief(reason), None
-            elif reason and event.get('stop_hook_active') and held_again(event, journal):
-                # One repeat at most: a Stop already held again this turn is admitted
-                # with its findings shown and journaled, so a turn can always end.
-                report, reason, capped = 'makoto held this stop once already; not held again: ' + brief(reason), None, True
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
-                   'turn_id': ledger.turn, 'stop_hook_active_unpaid': bool(reason and event.get('stop_hook_active')),
-                   'stop_cap': capped, 'unknown': ledger.unknown}
+                   'turn_id': ledger.turn, 'unknown': ledger.unknown}
             # Validate transitions before persisting invalid host records.
             ledger.ingest(event, row['admitted'])
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
             if state:
                 checkpoint_save(path, saved)
-            if report:
-                return {'systemMessage': report}
             return d_out(event, reason) if reason else {}
     except Exception as error:
-        # Fail open: an infrastructure or transport error (state, lock, journal, transcript,
-        # malformed host event) never denies a step; only rule findings above do.
-        return {'systemMessage': 'makoto infrastructure error, step allowed: %s: %s' % (type(error).__name__, error)}
+        # Fail closed: an error in Makoto's own reading (state, lock, journal, transcript,
+        # malformed host event) blocks, names the error and says how to disable Makoto.
+        return infrastructure_block(raw, error)
 
 
 # ======================================================================
 # __main__: Live entry: python -m makoto2, one serialized native event on stdin.
 
 def run():
+    raw = ''
     try:
+        raw = sys.stdin.read()
         cfg = dict(CONFIG)
         cfg['state_dir'] = os.path.expanduser(os.environ.get('MAKOTO_STATE_DIR', cfg['state_dir']))
         cfg['adapter'] = os.environ.get('MAKOTO_ADAPTER', cfg['adapter'])
         cfg['lock_seconds'] = float(os.environ.get('MAKOTO_LOCK_SECONDS', cfg['lock_seconds']))
         cfg['checkpoint'] = os.environ.get('MAKOTO_CHECKPOINT', '1') != '0'
-        scope = os.environ.get('MAKOTO_BLOCK_IN')
-        if scope:
-            cfg['block_in'] = [p for p in scope.split(os.pathsep) if p]
-        response = main(sys.stdin.read(), cfg)
+        response = main(raw, cfg)
     except Exception as error:
-        response = {'systemMessage': 'makoto infrastructure error, step allowed: %s: %s' % (type(error).__name__, error)}
+        response = infrastructure_block(raw, error)
     sys.stdout.write(json.dumps(response))
     return 0
 

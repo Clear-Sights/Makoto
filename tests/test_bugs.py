@@ -63,9 +63,3 @@ def test_deeply_nested_json_payload_does_not_raise():
     event = {'hook_event_name': 'PreToolUse', 'tool_name': 'Write', 'cwd': '/tmp', 'session_id': 's',
              'tool_input': {'file_path': '/tmp/x.txt', 'content': '[' * 100000 + ']' * 100000}}
     m.edited_forms(event, 'file:/tmp/x.txt')
-
-
-@pytest.mark.skipif(sys.platform in ('win32', 'darwin'), reason='case-insensitive filesystem')
-def test_block_in_scope_is_case_sensitive_on_case_sensitive_systems():
-    assert not m.in_scope('/home/u/Proj/x', ['/home/u/proj'])
-    assert m.in_scope('/home/u/proj/x', ['/home/u/proj'])

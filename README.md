@@ -24,9 +24,8 @@ Makoto is deterministic enforcement of Immediacy:
 
 Code decides every hold from the session record. An admitted step gets `{}`: Makoto adds nothing to
 the model's context, so no check depends on the model reading injected text. A hold states the rule
-it enforces and the specific missing reading, and asks no question. Three paths turn a decided hold
-into text only: the `MAKOTO_BLOCK_IN` report, the `stop_cap`
-admission and the infrastructure fail-open.
+it enforces and the specific missing reading, and asks no question. A decided hold always blocks:
+in every directory, and on every repeat of the same Stop.
 
 ## The four rules
 
@@ -44,21 +43,23 @@ admission and the infrastructure fail-open.
   edit also pays d. Reading code never pays d.
 
 A locked, hash-linked journal keeps every turn under `~/.claude/makoto2_state`
-(`MAKOTO_STATE_DIR` overrides). If `MAKOTO_BLOCK_IN` is set to a path-separated list of
-directories, a hold whose cwd lies outside all of them is only reported in `systemMessage`.
+(`MAKOTO_STATE_DIR` overrides).
 The optional host envelope `makoto` (`effects`, `external_subjects`, `network_subjects`,
 `invocation.subject(s)`, `turn_id`, `detio_store`) lets the host record what it saw, such as
 opaque mutations, public names or the program that actually ran. The host must enforce the
 decision before it runs a tool or delivers a final answer.
 
-## Never stuck
+## Errors block, and the way out
 
-- Only rule findings hold a step. Any other failure (state folder, lock, journal, transcript, a
-  malformed host event) admits the step with a `systemMessage` naming the error.
+- An error in Makoto's own reading (state folder, lock, journal, transcript, a malformed host
+  event) blocks the step, names the error, and gives the one way to disable Makoto. Run this in a
+  terminal, outside the session, so a broken install cannot trap you:
+
+      claude plugin disable makoto
+
 - Every hook in hooks.json has a 10 s `timeout`. The per-session lock is never waited on longer
-  than 3 s (`MAKOTO_LOCK_SECONDS`); a busy lock admits the step.
-- A `stop_hook_active` Stop is held at most once per turn. A second held retry is admitted with
-  its findings shown in `systemMessage` and kept in the journal (`stop_cap`).
+  than 3 s (`MAKOTO_LOCK_SECONDS`); a busy lock blocks the step with that error.
+- A hold is never capped: a `stop_hook_active` Stop with a finding is held again every time.
 - Each call reads only the journal rows and transcript lines added since the previous call: a
   `.ckpt` file beside the journal keeps both reads and the replayed record. A checkpoint that
   does not match is ignored and the call replays in full; `MAKOTO_CHECKPOINT=0` always does.
@@ -67,7 +68,7 @@ decision before it runs a tool or delivers a final answer.
 
 `python3 -m pytest -q` runs `tests/`. For each of rules a-d, `test_rules.py` sends a plant
 and its twin through the exact hooks.json command: the plant is held and the twin is admitted.
-`test_robust.py` plants each way a session could get stuck and checks that checkpointed calls
+`test_robust.py` plants each infrastructure error and checks that it blocks with the way out, and that checkpointed calls
 decide exactly as full replay does.
 `scripts/measure_cost.py` reports per-hook wall time (cold and warm bytecode) and the bytes a hook
 adds to the model's context, on the events `tests/` already contains; `MEASURE_REPEAT` sets the repeat count.
