@@ -9,9 +9,31 @@ After every held Stop, `--retries` more copies of that Stop are sent with stop_h
 as `retry` rows, which is how the stop cap shows.
 """
 import argparse
+import contextlib
 import json
+import os
 import sys
 import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import label as oracle  # noqa: E402
+
+
+def clearing_events(base, rule, subject, n):
+    """The events that perform the action a hold names: one reading, fetch or run of its subject."""
+    text, tid = str(subject), f'clear{n}'
+    if rule == 'a':
+        call = ('Read', {'file_path': '/work/clear.txt'}, {'type': 'text', 'file': {'filePath': '/work/clear.txt', 'content': 'original'}})
+    elif rule == 'b':
+        call = ('Read', {'file_path': '/work/clear.txt'}, {'type': 'text', 'file': {'filePath': '/work/clear.txt', 'content': text}})
+    elif rule == 'c':
+        call = ('WebFetch', {'url': text}, {'content': text})
+    else:
+        call = ('Bash', {'command': 'python3 ' + text}, {'stdout': 'ok', 'stderr': '', 'interrupted': False, 'exitCode': 0})
+    name, tool_input, response = call
+    return [dict(base, hook_event_name='PreToolUse', tool_name=name, tool_input=tool_input, tool_use_id=tid),
+            dict(base, hook_event_name='PostToolUse', tool_name=name, tool_input=tool_input, tool_use_id=tid, tool_response=response)]
 
 
 def classify(response):
@@ -34,6 +56,8 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--block-in')
     ap.add_argument('--retries', type=int, default=0)
+    ap.add_argument('--clear', action='store_true', help='after each held Stop, perform the named action and resend it')
+    ap.add_argument('--corrupt-mid', action='store_true', help='tamper with the journal after the middle event')
     args = ap.parse_args()
     sys.path.insert(0, args.plugin)
     import makoto2 as m
@@ -50,6 +74,20 @@ def main():
                     kind, reason, blocked = classify(response)
                     if kind != 'ok':
                         rows.append({'i': i, 'kind': kind, 'blocked': blocked, 'reason': reason})
+                    if args.corrupt_mid and i == len(session['events']) // 2:
+                        journal = m.sigma_path(state, session['id'])
+                        if journal.exists():
+                            journal.write_text(journal.read_text().replace('hook_event_name', 'hook_event_nam3', 1))
+                            with contextlib.suppress(OSError):
+                                os.remove(str(journal) + '.ckpt')
+                    if args.clear and kind == 'hold' and event['hook_event_name'] == 'Stop':
+                        base = {'session_id': event['session_id'], 'cwd': event['cwd']}
+                        for n, (rule, subject) in enumerate(oracle.findings(reason)):
+                            for step in clearing_events(base, rule, subject, n):
+                                m.main(json.dumps(step), cfg)
+                        again = dict(event, stop_hook_active=True)
+                        kind3, reason3, blocked3 = classify(m.main(json.dumps(again), cfg))
+                        rows.append({'i': i, 'kind': 'clear', 'result': kind3, 'blocked': blocked3, 'reason': reason3})
                     if kind == 'hold' and event['hook_event_name'] == 'Stop':
                         for n in range(args.retries):
                             again = dict(event, stop_hook_active=True)
