@@ -1,13 +1,18 @@
 """Cost of Makoto's hook on the events the tests already contain.
 
+Two modes. `cold` runs as the tests do (PYTHONDONTWRITEBYTECODE=1, so every call compiles
+plugin/makoto2.py). `warm` lets Python cache bytecode, as an installed plugin directory does.
+
 Per hook call: wall time in ms (whole `bash -c` command from hooks.json, so it includes
 interpreter start and import) and bytes added to the model's context (the UTF-8 length of
 additionalContext + reason + systemMessage in the reply). Each scenario is replayed REPEAT
 times in a fresh state directory; the reported ms is the median over those runs.
 
-    python3 scripts/measure_cost.py [--json out.json]
+    MEASURE_REPEAT=5 python3 scripts/measure_cost.py [--json out.json]
 """
 import json
+import os
+import subprocess
 import statistics
 import sys
 import tempfile
@@ -16,10 +21,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tests'))
-from test_rules import CASES, ev, read, send  # noqa: E402
+from test_rules import CASES, HOOKS, PLUGIN, ev, read  # noqa: E402
 from test_robust import WRITE_STEP  # noqa: E402
 
-REPEAT = 5
+REPEAT = int(os.environ.get('MEASURE_REPEAT', '5'))
+
+
+def send(tmp, event, warm=False):
+    """One event through the command hooks.json registers for it (as tests/test_rules.send)."""
+    command = HOOKS[event['hook_event_name']][0]['hooks'][0]['command']
+    env = {k: v for k, v in os.environ.items() if not k.startswith('MAKOTO_') and k != 'PYTHONDONTWRITEBYTECODE'}
+    env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp / 'state'))
+    if not warm:
+        env['PYTHONDONTWRITEBYTECODE'] = '1'
+    run = subprocess.run(['bash', '-c', command], input=json.dumps(event), env=env, capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    return json.loads(run.stdout)
 
 
 def scenarios():
@@ -34,14 +51,14 @@ def context_bytes(reply):
     return len(out.encode('utf-8'))
 
 
-def measure():
+def measure(warm=False):
     rows = {}  # (scenario, index) -> {'hook', 'ms': [], 'bytes'}
     for name, events in scenarios():
         for _ in range(REPEAT):
             with tempfile.TemporaryDirectory() as tmp:
                 for i, event in enumerate(events):
                     start = time.perf_counter()
-                    reply = send(Path(tmp), event)
+                    reply = send(Path(tmp), event, warm)
                     ms = (time.perf_counter() - start) * 1000
                     row = rows.setdefault((name, i), {'hook': event['hook_event_name'], 'ms': [], 'bytes': context_bytes(reply)})
                     row['ms'].append(ms)
@@ -67,7 +84,14 @@ def report(rows):
 
 
 if __name__ == '__main__':
-    text, data = report(measure())
-    print(text)
+    out = {}
+    for mode in ('cold', 'warm'):
+        if mode == 'warm':  # one untimed pass fills the bytecode cache
+            for _name, events in scenarios():
+                with tempfile.TemporaryDirectory() as tmp:
+                    for event in events:
+                        send(Path(tmp), event, True)
+        text, out[mode] = report(measure(mode == 'warm'))
+        print(f'[{mode}]\n{text}')
     if '--json' in sys.argv:
-        Path(sys.argv[sys.argv.index('--json') + 1]).write_text(json.dumps(data, indent=1))
+        Path(sys.argv[sys.argv.index('--json') + 1]).write_text(json.dumps(out, indent=1))
