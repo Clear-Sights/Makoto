@@ -63,5 +63,7 @@ decision before it runs a tool or delivers a final answer.
 and its twin through the exact hooks.json command: the plant is held and the twin is admitted.
 `test_robust.py` plants each way a session could get stuck and checks that checkpointed calls
 decide exactly as full replay does.
+`scripts/measure_cost.py` reports per-hook wall time (cold and warm bytecode) and the bytes a hook
+adds to the model's context, on the events `tests/` already contains; `MEASURE_REPEAT` sets the repeat count.
 The full suite, fixtures, tools and records live in Clear-Sights/Makoto-Dev. This repository
 receives only finished versions. The cut `mesh/` gate is kept in git history at 295bf44.
