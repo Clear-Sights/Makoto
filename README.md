@@ -33,7 +33,8 @@ in every directory, and on every repeat of the same Stop.
 
 - **a (lineage), enforces Original:** the step needs an original artifact reading. Assistant text, worker answers and
   readings of files this session wrote do not count. A completed run, query or request response
-  does count, and a run of a session-written script reads that script's response.
+  does count, and a run of a session-written script reads that script's response. A final answer
+  of a session that made no tool call relies on no artifact, so a does not hold it; b still applies.
 - **b (spec), enforces Original:** each name the step uses (path, URL, email, identifier, hash, UUID, version) must
   appear with its exact characters in an earlier tool input, an original response, or the user
   prompt, or in text this session wrote or got back from its own writes (a file name or directory
