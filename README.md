@@ -5,6 +5,8 @@ Bash `git commit`/`git push`, or Stop), it checks the session record. If a readi
 is missing, it holds the step: a PreToolUse step gets a native deny and a Stop gets a native block.
 The hold names the rule, its shape, the exact subject, the one Immediacy rule it enforces and the missing reading. An admitted step gets `{}`. The checker uses no model and no network.
 
+Shipped plugin — installable and versioned. The dispatcher is replay-tested against authored sessions; its effect on a live session's outcome is unmeasured.
+
 ## Install
 
 Claude Code 2.1.275 or later:
