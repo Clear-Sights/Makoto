@@ -38,7 +38,7 @@ CLEARS = {
     'b': ('Clear: Read a source that contains these exact characters.', read('source data unread_subject', 'fix')),
     'c': ('Clear: Fetch this exact subject with WebFetch or WebSearch in this turn.',
           call('WebFetch', {'url': 'https://example.test/a'}, {'content': 'https://example.test/a'}, 'fix')),
-    'd': ('Clear: Run it and read its output.', RUN),
+    'd': ('Clear: Run python3 -c "import run" as its own Bash command and read its output.', RUN),
 }
 
 

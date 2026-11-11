@@ -1007,6 +1007,24 @@ def names_change(event, change):
     return any(contains(text, alias, 'identifier') for alias in change['aliases'])
 
 
+def d_clear(change, event):
+    """Rule d's Clear sentence: one action that already pays rule d for this subject.
+
+    It names a form execution_subjects or readback_witnesses counts, so the hold
+    entails its own clearing; it never changes what pays rule d.
+    """
+    absolute = change['subject'].removeprefix('file:')
+    relative = relative_path(absolute, event.get('cwd') or os.getcwd())
+    inside = relative is not None and relative != '..' and not relative.startswith('../')
+    if change.get('data'):
+        # A single-operand cat is a whole-file read full_read_subjects counts.
+        return f'Clear: Run cat {shlex.quote(relative if inside else absolute)} as its own Bash command and read its output.'
+    module = relative[:-3].replace('/', '.').removesuffix('.__init__') if inside and relative.endswith('.py') else ''
+    if re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', module):
+        return f'Clear: Run python3 -c "import {module}" as its own Bash command and read its output.'
+    return 'Clear: Run it as its own Bash command, with no loop, variable, heredoc or subshell, and read its output.'
+
+
 def simple_argv(command):
     """No guessed branch selection or shell expansion from an aggregate output."""
     words = shell_words(command)
@@ -1938,7 +1956,7 @@ def evaluate(ledger, event, adapter='inferred'):
         if not runs and not readbacks:
             findings.append({'rule': 'd', 'family': 'd', 'shape': 'switch',
                              'subject': change['display'],
-                             'missing': UNCHANGED + ' Missing: a run of it, with its output read, after its last edit. Clear: Run it and read its output.'})
+                             'missing': UNCHANGED + ' Missing: a run of it, with its output read, after its last edit. ' + d_clear(change, event)})
         else:
             witnesses = runs or readbacks
             snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in witnesses],

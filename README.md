@@ -41,7 +41,9 @@ in every directory, and on every repeat of the same Stop.
 - **d (switch), enforces Unchanged:** when a step names an edited code, script or config subject, or ships session
   edits through a commit, push or final answer, a paired call must have run that subject after its
   last edit and returned output. For a config file without a shebang, a full read after the last
-  edit also pays d. Reading code never pays d.
+  edit also pays d. Reading code never pays d. The hold ends in an action that pays it:
+  `Clear: Run python3 -c "import <module>" as its own Bash command and read its output.` for a
+  Python file under the cwd, `cat <path>` for a data file, otherwise a run of it as its own Bash command.
 - **e (file), enforces Original:** an Edit, MultiEdit or NotebookEdit, or a Write onto a file that
   already exists, needs a reading of that file, or a write of it by this session, earlier in the
   session. A Write that creates a new file needs none. A live hook checks the file system; a host that
