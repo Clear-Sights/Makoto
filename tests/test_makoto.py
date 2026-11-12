@@ -11,6 +11,8 @@ PLUGIN = Path(__file__).resolve().parents[1] / 'plugin'
 HOOKS = json.loads((PLUGIN / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))['hooks']
 HOLD = ('makoto rule d [switch]: "%s": Unchanged: Do not assume what can change has not. Missing: a run of it, '
         'with its output read, after its last edit. Clear: Run it and read its output.')
+FAILED = HOLD.replace('a run of it, with its output read, after', 'a run of it that succeeds, after').replace(
+    'Run it and read its output.', 'Fix the error, run it again and read its output.')
 NOTE = 'Before your final answer, run the program or tests that use %s and read the output.'
 
 
@@ -51,6 +53,10 @@ class Session:
 
     def call(self, tool, tool_input):
         return self.send('PostToolUse', tool_name=tool, tool_use_id='t', tool_input=tool_input, tool_response={'stdout': '1\n'})
+
+    def call_out(self, command, stdout, stderr=''):
+        return self.send('PostToolUse', tool_name='Bash', tool_use_id='t', tool_input={'command': command},
+                         tool_response={'stdout': stdout, 'stderr': stderr})
 
     def edit(self, path, text='x = 1\n'):
         self.put(path, text)
@@ -135,7 +141,22 @@ def test_second_stop_is_admitted(s):
 def test_failed_run_does_not_pay(s):
     s.edit('a.py')
     s.send('PostToolUseFailure', tool_name='Bash', tool_use_id='t', tool_input={'command': 'python3 a.py'}, error='x')
-    assert s.stop()['reason'] == HOLD % 'a.py'
+    assert s.stop()['reason'] == FAILED % 'a.py'
+
+
+def test_error_output_does_not_pay_until_a_clean_run(s):
+    s.edit('a.py')
+    bad = 'Traceback (most recent call last):\n  File "a.py", line 1\nValueError: x\nexit=1\n'
+    s.call_out('python3 a.py; echo "exit=$?"', bad)
+    assert s.stop()['reason'] == FAILED % 'a.py'
+    s.call_out('python3 a.py; echo "exit=$?"', 'ok\nexit=0\n')
+    assert s.stop() == {}
+
+
+def test_clean_run_mentioning_error_in_prose_pays(s):
+    s.edit('a.py')
+    s.call_out('python3 a.py', 'no error found, error handling works\n')
+    assert s.stop() == {}
 
 
 def test_config_paid_by_full_read_after_the_change(s):
