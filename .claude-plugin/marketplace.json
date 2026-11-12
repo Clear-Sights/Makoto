@@ -11,7 +11,7 @@
     {
       "name": "makoto",
       "source": "./plugin",
-      "description": "Four reading shapes enforced before dependent steps; declared and inferred obligation adapters.",
+      "description": "Five Immediacy rules (a to e) enforced before dependent steps; obligations are inferred from the session record.",
       "category": "workflow",
       "tags": [
         "integrity",
