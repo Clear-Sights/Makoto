@@ -1,49 +1,41 @@
 # Makoto
 
-Makoto does one job: it holds a final answer while a file changed this session has not been checked since it changed.
-It works for code in any language, and for config and data files. It needs no git.
+Makoto holds a final answer while a file changed this session, or a file that uses a changed file, has not been run
+since. It works in any language and needs no git.
 
-## What it holds
+## How it decides
 
-When Claude Code is about to give its final answer (Stop, or a subagent's SubagentStop), Makoto compares the files
-under the working directory with a snapshot taken when the session started. A file that is new or different is
-unchecked until something checks it. Held files:
+At session start Makoto records two things about the files under the working directory: a snapshot (path, size,
+modified time) and a lookup of which file uses which. A file uses another when one of its import-style lines
+(`import`, `from`, `require`, `include`, `use`, `source`, `load`) names the other's module path or base name. The
+lookup is read again for files that change.
 
-- code and scripts in any language, by extension (py, js, ts, go, rs, rb, php, java, c, sh and many more) or by a
-  `#!` line;
-- config and data files (json, yaml, toml, ini, cfg, env, xml, csv and similar).
+- **changed**: files that differ from the snapshot.
+- **demanded**: changed files, plus every file that uses them, directly or through others. Only files that are in the
+  lookup (use or are used by another file) or start with `#!` are demanded. Plain documents and loose data files
+  with no import-style link are not.
+- **checked**: demanded files reached by a run that succeeded and began after their last change (for a user of a
+  changed file: after the latest change among the files it uses). A run reaches the program it names and everything
+  that program uses. A test runner named with no program argument (pytest, `python -m pytest`, go test, cargo test,
+  npm test, make) reaches every file.
 
-Plain documents (md, txt, rst) are never held. A file that was already different before the session began is in the
-snapshot, so it is never held. Makoto reads the file system, not the edits, so a change made by a script, a build
-or a shell command is seen like any other.
+A run failed when the tool call failed or its output holds an error marker (a Traceback, `...Error:` at a line
+start, `exit=N`, `FAILED`, `panic:`, `command not found`, `No such file or directory`). A failed run checks nothing.
 
-## What pays
+## The message
 
-A completed program or test run that succeeded and started after the file's last change pays it, when the run reaches the file: it
-names the file, or names a program or test in the same top-level folder, or it is a project-wide runner (make,
-npm/yarn/pnpm run, test or start, pytest, jest, vitest, mocha, go test, cargo run or test, npx, and the like).
-Recognised runs: python, node, deno, bun, ruby, perl, php, go run/test/build, cargo run/test, java, dotnet, make,
-npm/yarn/pnpm, pytest, jest, vitest, mocha, sh, bash, zsh and `./path`, including after `cd x &&`, in pipes, with
-`2>&1` or with `VAR=value` prefixes. A run of something unrelated does not pay, and neither does a run that
-began before the change or one that failed: the tool call failed, or its output (stdout or stderr) holds an error
-marker (a Traceback, a line starting `...Error:` or `...Exception:`, `exit=N` or `exit code N` with N not 0, `FAILED`,
-`panic:`, `command not found`, `No such file or directory`). The hold then ends: `Missing: a run of it that succeeds,
-after its last edit. Clear: Fix the error, run it again and read its output.` The word "error" in prose is no marker. A config or data file is also paid by reading it in full after its
-last change (the Read tool, or `cat`).
+One message names the demanded files not yet checked and the entry programs (files no other file uses) that reach
+them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.`
 
-The hold names each unchecked file and asks for a run with its output read. It blocks once: a Stop that follows a
-hold (`stop_hook_active`) is let through.
-
-## The note
-
-After a completed Write, Edit, MultiEdit or NotebookEdit of a code file, Makoto adds one line of context, once per
-file until a run pays it: `Before your final answer, run the program or tests that use <file> and read the output.`
+- After a Write, Edit, MultiEdit or NotebookEdit it arrives as a note, once per changed file until checked.
+- At the final answer (Stop, or a subagent's SubagentStop) it is a hold, once: a Stop that follows a hold
+  (`stop_hook_active`) is let through.
 
 ## What it never does
 
-It never blocks the user's prompt or session start, never holds a plain document, never edits a file, runs
-nothing and calls no model, and sends nothing anywhere. Its only block besides the hold is an error in Makoto itself
-(unreadable input, state lock busy, unwritable state), which names the error and the one way out.
+It never blocks the user's prompt or session start, edits nothing, runs nothing, calls no model and sends nothing
+anywhere. Its only other block is an error in Makoto itself (unreadable input, state lock busy, unwritable state),
+which names the error and the one way out.
 
 ## Install
 
@@ -51,8 +43,8 @@ Claude Code 2.1.275 or later, Python 3.11 or later, standard library only:
 
     /plugin install makoto --marketplace Clear-Sights/Makoto
 
-Hooks (`plugin/hooks/hooks.json`): SessionStart and UserPromptSubmit (take the snapshot, never block),
-PostToolUse and PostToolUseFailure (record runs and read-backs; the note), Stop and SubagentStop.
+Hooks (`plugin/hooks/hooks.json`): SessionStart and UserPromptSubmit (snapshot and lookup, never block),
+PostToolUse and PostToolUseFailure (record runs; the note), Stop and SubagentStop (the hold).
 
 ## Disable
 
@@ -60,10 +52,10 @@ PostToolUse and PostToolUseFailure (record runs and read-backs; the note), Stop 
 
 ## State
 
-One JSON file per session, `~/.claude/makoto2_state/<sha256 of session id>.json`, written under a lock: the
-snapshot (path, size, modified time; at most 20,000 files, skipping only `.git`, `node_modules`, `__pycache__`, `.venv` and `venv` by name), the
-recent runs and reads, the files already noted. `MAKOTO_STATE_DIR` moves it; `MAKOTO_LOCK_SECONDS` (default 3)
-sets how long a busy lock is waited for. Git, when present, only lets Makoto skip ignored files.
+One JSON file per session, `~/.claude/makoto2_state/<sha256 of session id>.json`, written under a lock: the snapshot
+(at most 20,000 files, skipping only `.git`, `node_modules`, `__pycache__`, `.venv` and `venv` by name, and files git
+ignores), the lookup's raw names, the runs. `MAKOTO_STATE_DIR` moves it; `MAKOTO_LOCK_SECONDS` (default 3) sets how
+long a busy lock is waited for.
 
 ## Tests
 

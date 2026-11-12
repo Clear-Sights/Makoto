@@ -1,7 +1,7 @@
 {
   "name": "makoto",
-  "description": "Holds a final answer while a code or config file changed this session (any language, no git needed) has not been run or read back since.",
-  "version": "6.1.0",
+  "description": "Holds a final answer while a file changed this session, or a file that uses it, has not been run since; one note after an edit and one hold at the end (any language, no git needed).",
+  "version": "6.2.0",
   "author": {
     "name": "Clear-Sights"
   },
