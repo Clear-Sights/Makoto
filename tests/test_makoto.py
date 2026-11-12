@@ -88,6 +88,13 @@ def test_edit_then_stop_is_held(s, name, text, command):
     assert s.stop('SubagentStop')['reason'] == HOLD % name
 
 
+@pytest.mark.parametrize('folder', ['target', 'build', 'dist'])
+def test_change_in_a_folder_named_like_build_output_is_held(tmp_path, folder):
+    s = Session(tmp_path, False)  # without git nothing marks the folder as ignored
+    s.edit(folder + '/app.py')
+    assert s.stop()['reason'] == HOLD % (folder + '/app.py')
+
+
 def test_change_made_by_a_script_is_held(s):
     s.put('gen.py')
     (s.cwd / 'out.js').write_text('1')  # no Write, Edit or shell parsing: only the file system shows it

@@ -61,7 +61,7 @@ PostToolUse and PostToolUseFailure (record runs and read-backs; the note), Stop 
 ## State
 
 One JSON file per session, `~/.claude/makoto2_state/<sha256 of session id>.json`, written under a lock: the
-snapshot (path, size, modified time; at most 20,000 files, skipping `.git` and dependency or cache folders), the
+snapshot (path, size, modified time; at most 20,000 files, skipping only `.git`, `node_modules`, `__pycache__`, `.venv` and `venv` by name), the
 recent runs and reads, the files already noted. `MAKOTO_STATE_DIR` moves it; `MAKOTO_LOCK_SECONDS` (default 3)
 sets how long a busy lock is waited for. Git, when present, only lets Makoto skip ignored files.
 

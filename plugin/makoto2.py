@@ -46,8 +46,7 @@ CODE = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r 
                  'scala cs fs ex exs erl clj sql ps1 bat cmd ipynb tcl awk dart zig nim jl hs ml vue svelte'.split())
 CONFIG = frozenset('json jsonc yaml yml toml ini cfg conf config xml properties env csv tsv'.split())
 CONFIG_NAMES = frozenset(('Makefile', 'Dockerfile', 'Rakefile', 'Gemfile', 'Procfile', '.env'))
-SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', 'venv', '.venv', 'env', 'target', 'dist', 'build',
-                       '.tox', '.cache', '.idea', '.vscode', 'site-packages', 'vendor', '.next', 'coverage'))
+SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', '.venv', 'venv'))  # other build output: only when git ignores it
 
 RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|javac|dotnet|make|'
                       r'gmake|npx|pytest|py\.test|jest|vitest|mocha|sh|bash|zsh|fish|pwsh|tclsh[\d.]*)\Z')
