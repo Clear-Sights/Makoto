@@ -13,9 +13,13 @@ Sets, computed without a test of their size (see sets):
   checked   = demanded files reached by a successful run that began after their last change (the latest change among
               them and what they use). A run reaches the program it names plus what that uses; a test runner with
               no program argument reaches every file.
-One message names demanded minus checked and the entry programs (used by no file) that reach it: a note after an
-edit, once per file until checked; a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
-Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
+One message names demanded minus checked and the entry programs (used by no file) that reach it. There is no note.
+At Stop or SubagentStop Makoto runs those entry programs itself (see probes): in a temporary copy of the tree, with a
+scrubbed environment, closed input and no network, only programs a known interpreter runs with no argument, and never
+one that reaches an outward file (a network or process library in the lookup). A pass checks the files it reaches and
+admits silently. A failure holds with the message and the last lines of the output, at most 3 times per final answer.
+What no probe checked is held once as the message (stop_hook_active admits); without network isolation there is no
+probe. An error in Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
 """
 import contextlib
 import hashlib
@@ -23,8 +27,11 @@ import json
 import os
 import re
 import shlex
+import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 try:
@@ -37,11 +44,20 @@ STATE_DIR = '~/.claude/makoto2_state'
 LOCK_SECONDS = 3.0
 MAX_FILES = 20000
 MAX_READ = 262144
+MAX_BYTES = 50 * 1024 * 1024
+PROBE_SECONDS = 5
+PROBE_BUDGET = 22
+MAX_HOLDS = 3
+TAIL = 15
 DISABLE = 'claude plugin disable makoto'
 MESSAGE = 'Not run since a change: %s. Run %s and read the output.'
 FINAL = ('Stop', 'SubagentStop')
 HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
-EDITORS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
+OUTWARD = frozenset('socket ssl http urllib requests httpx aiohttp websockets ftplib smtplib paramiko boto3 grpc net/http '
+                    'axios node-fetch fetch net dgram open-uri subprocess multiprocessing child_process os/exec pty'.split())
+INTERPRETERS = {'py': 'python3', 'js': 'node', 'mjs': 'node', 'cjs': 'node', 'rb': 'ruby', 'pl': 'perl', 'php': 'php',
+                'sh': 'sh', 'bash': 'bash'}
+ISOLATIONS = (['unshare', '-rn'], ['sandbox-exec', '-n', 'no-network'])
 SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', '.venv', 'venv'))  # other build output: only when git ignores it
 
 RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|dotnet|make|gmake|'
@@ -222,7 +238,7 @@ def close(seeds, edges):
 
 
 def lookup(state, files):
-    """(uses, users, nodes): which file uses which, and the files in the lookup or with a shebang."""
+    """(uses, users, nodes, outward): which file uses which, and the files in the lookup or with a shebang."""
     root, snapshot, stored = state['root'], state['snapshot'], state['scan']
     read = {rel: stored.get(rel, [False, []]) if files[rel] == snapshot.get(rel) else scan(os.path.join(root, rel))
             for rel in files}
@@ -241,12 +257,13 @@ def lookup(state, files):
                         uses.setdefault(rel, set()).add(other)
                         users.setdefault(other, set()).add(rel)
     shebang = {rel for rel, (flag, _) in read.items() if flag}
-    return uses, users, shebang | set(uses) | set(users)
+    outward = {rel for rel, (_, names) in read.items() if any(n in OUTWARD or re.split('[./]', n)[0] in OUTWARD for n in names)}
+    return uses, users, shebang | set(uses) | set(users), outward
 
 
 def sets(state, files):
-    """(unchecked, entries, demanded, checked, uses, users); no line here tests the size of a set."""
-    uses, users, nodes = lookup(state, files)
+    """(unchecked, entries, uses, outward); no line here tests the size of a set."""
+    uses, users, nodes, outward = lookup(state, files)
     changed = {rel for rel in files if files[rel] != state['snapshot'].get(rel)}
     demanded = close(changed, users) & nodes
     last = {rel: max(files[other][1] for other in close({rel}, uses) & changed) / 1e9 for rel in demanded}
@@ -254,7 +271,7 @@ def sets(state, files):
                if any(run['t'] > last[rel] and (run['all'] or rel in run['reach']) for run in state['runs'])}
     unchecked = demanded - checked
     entries = sorted(close(unchecked, users) - users.keys())
-    return unchecked, entries, demanded, checked, uses, users
+    return unchecked, entries, uses, outward
 
 
 def message(unchecked, entries):
@@ -282,14 +299,14 @@ def named(argv, cwd, root, files):
 
 
 def record(state, event):
-    """Note completed runs; return the message for a note, or ''."""
+    """Note completed runs that succeeded."""
     root, tool, given = state['root'], event.get('tool_name'), event.get('tool_input') or {}
     cwd, now = event.get('cwd') or root, time.time()
     if event.get('hook_event_name') == 'PostToolUseFailure' and tool != 'Bash':
-        return ''
+        return
     began, state['last'] = state.get('last', now), now  # a run began after the previous hook event, so a change it made is newer
-    files = listing(root)
     if tool == 'Bash' and isinstance(given.get('command'), str) and not failed(event):
+        files = listing(root)
         uses = lookup(state, files)[0]
         for argv, _ in segments(given['command']):
             argv = strip_wrappers(argv)
@@ -299,15 +316,83 @@ def record(state, event):
                 program = named(argv, cwd, root, files)
                 state['runs'] = (state['runs'] + [{'t': began, 'all': is_tester(argv) and not program,
                                                    'reach': sorted(close(program, uses))}])[-300:]
-    unchecked, entries = sets(state, files)[:2]
-    state['noted'] = [rel for rel in state['noted'] if rel in unchecked]
-    target = given.get('file_path') or given.get('notebook_path')
-    if tool in EDITORS and isinstance(target, str) and target:
-        rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
-        if rel in unchecked and rel not in state['noted']:
-            state['noted'].append(rel)
-            return message(unchecked, entries)
-    return ''
+
+
+# ---------------------------------------------------------------- probes
+
+def isolation():
+    """The command prefix that cuts the network and works here, or None."""
+    for prefix in ISOLATIONS:
+        try:
+            if shutil.which(prefix[0]) and subprocess.run(prefix + ['true'], capture_output=True, timeout=5).returncode == 0:
+                return prefix
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return None
+
+
+def command(root, rel):
+    """How a known interpreter runs the file with no argument, or None."""
+    path = os.path.join(root, rel)
+    name = INTERPRETERS.get(rel.rpartition('.')[2].lower()) if '.' in os.path.basename(rel) else None
+    if name is None:
+        words = scan_first_line(path).split()
+        words = words[1:] if words[:1] and os.path.basename(words[0]) == 'env' else words
+        name = os.path.basename(words[0]) if words else None
+        name = name if name in INTERPRETERS.values() else None
+    return [name, rel] if name and shutil.which(name) else None
+
+
+def scan_first_line(path):
+    try:
+        with open(path, 'rb') as stream:
+            line = stream.readline(200).decode('utf-8', 'replace')
+    except OSError:
+        return ''
+    return line[2:].strip() if line.startswith('#!') else ''
+
+
+def copy_tree(root, files, target):
+    for rel in files:
+        os.makedirs(os.path.dirname(os.path.join(target, rel)), exist_ok=True)
+        shutil.copy2(os.path.join(root, rel), os.path.join(target, rel))
+
+
+def probes(state, files, cwd, entries, uses, outward):
+    """Run each entry program that may be probed, in a no-network copy of the tree: (reaches of those that passed,
+    [(program, last output lines)] of those that failed). Programs that time out or cannot be probed are in neither."""
+    root = state['root']
+    prefix = isolation()
+    programs = [e for e in entries if not close({e}, uses) & outward and command(root, e)]
+    if not (prefix and programs and len(files) < MAX_FILES and sum(f[0] for f in files.values()) <= MAX_BYTES):
+        return [], []
+    passed, failed, deadline = [], [], time.monotonic() + PROBE_BUDGET
+    temp = tempfile.mkdtemp(prefix='makoto-probe-')
+    try:
+        copy_tree(root, files, os.path.join(temp, 'tree'))
+        here = os.path.join(temp, 'tree', os.path.relpath(cwd, root)) if cwd.startswith(root + os.sep) else os.path.join(temp, 'tree')
+        os.makedirs(here, exist_ok=True)
+        env = {'PATH': os.environ.get('PATH', os.defpath), 'HOME': temp, 'LANG': os.environ.get('LANG', 'C.UTF-8')}
+        for program in programs:
+            seconds = min(PROBE_SECONDS, deadline - time.monotonic())
+            if seconds <= 0:
+                break
+            child = subprocess.Popen(prefix + [command(root, program)[0], os.path.join(temp, 'tree', program)],
+                                     cwd=here, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, start_new_session=True)
+            try:
+                out = child.communicate(timeout=seconds)[0].decode('utf-8', 'replace')
+            except subprocess.TimeoutExpired:
+                os.killpg(child.pid, signal.SIGKILL)
+                child.communicate()
+                continue
+            if child.returncode or ERROR.search(out):
+                failed.append((program, '\n'.join(out.splitlines()[-TAIL:])))
+            else:
+                passed.append(sorted(close({program}, uses)))
+    finally:
+        shutil.rmtree(temp, ignore_errors=True)
+    return passed, failed
 
 
 def respond(event, config):
@@ -324,7 +409,7 @@ def respond(event, config):
                 root = event.get('cwd') or os.getcwd()
                 files = listing(root)
                 scans = {rel: scan(os.path.join(root, rel)) for rel in files}
-                state = {'root': root, 'snapshot': files, 'runs': [], 'noted': [],
+                state = {'root': root, 'snapshot': files, 'runs': [],
                          'scan': {rel: s for rel, s in scans.items() if s[0] or s[1]}}
             state['last'] = time.time()
             save(path, state)
@@ -332,14 +417,23 @@ def respond(event, config):
         if 'snapshot' not in state:
             return {}
         if name in FINAL:
-            if event.get('stop_hook_active'):
-                return {}
-            unchecked, entries = sets(state, listing(state['root']))[:2]
-            return {'decision': 'block', 'reason': message(unchecked, entries)} if unchecked else {}
-        text = record(state, event)
+            root, active = state['root'], event.get('stop_hook_active')
+            files = listing(root)
+            unchecked, entries, uses, outward = sets(state, files)
+            state['holds'] = state.get('holds', 0) if active else 0
+            passed, failed = probes(state, files, event.get('cwd') or root, entries, uses, outward)
+            if failed:
+                state['holds'] += 1
+                reply = {} if state['holds'] > MAX_HOLDS else {'decision': 'block', 'reason': message(unchecked, entries) + ''.join(
+                    '\nProbe of %s failed; the last %d lines of its output:\n%s' % (p, TAIL, tail) for p, tail in failed)}
+            else:
+                state['runs'] += [{'t': time.time(), 'all': False, 'reach': reach} for reach in passed]
+                unchecked, entries = sets(state, files)[:2]
+                reply = {'decision': 'block', 'reason': message(unchecked, entries)} if unchecked and not active else {}
+            save(path, state)
+            return reply
+        record(state, event)
         save(path, state)
-    if text:
-        return {'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': text}}
     return {}
 
 
