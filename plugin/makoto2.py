@@ -1,8 +1,9 @@
-"""Makoto: the immediacy hook. Live entry: cd plugin && python3 -m makoto2,
+"""Makoto: the immediacy hook. Live entry: cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks/hooks.json),
 one serialized native Claude Code hook event on stdin, one JSON response on stdout.
 
-Sections, in dependency order: paths, shell, borrowed, precision, observed, transcript, switch, shipping, creations, provenance, evaluate, hook, __main__.
-Modified excerpts from DetIO and Causality (leaves, get, receipt) are credited in NOTICE.
+Sections, in dependency order: paths, shell, borrowed, precision, observed, transcript, switch, shipping, creations, provenance, evaluate, hook, checkpoint, __main__.
+Excerpts from DetIO and Causality (leaves and get, modified; receipt, unchanged) and one design
+adaptation (execution_subjects, run_output) are credited in NOTICE.
 """
 import ast
 import contextlib
@@ -21,7 +22,8 @@ from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 
-# Defaults; MAKOTO_STATE_DIR, MAKOTO_ADAPTER, MAKOTO_LOCK_SECONDS, MAKOTO_CHECKPOINT override (see README).
+# Defaults; MAKOTO_STATE_DIR, MAKOTO_LOCK_SECONDS and MAKOTO_CHECKPOINT override them (see README).
+# MAKOTO_ADAPTER accepts only 'inferred'; any other value is an error, and errors block.
 CONFIG = {'state_dir': '~/.claude/makoto2_state', 'adapter': 'inferred', 'lock_seconds': 3.0}
 
 
@@ -232,9 +234,9 @@ def selected_segments(command, post):
 
 
 # ======================================================================
-# borrowed: Modified excerpts from DetIO and Causality; source pins in NOTICE.
+# borrowed: Excerpts from DetIO and Causality; source pins in NOTICE.
 #
-# Copyright 2026 Clear-Sights. Licensed under Apache-2.0 (LICENSE).
+# Copyright 2026 Clear-Sights. Licensed under Apache-2.0, whose text is in NOTICE (LICENSE is Makoto's FSL-1.1-ALv2).
 # Changes: numeric leaves, explicit store, SHA verification, call-site traces.
 
 def leaves(r, path=()):
@@ -1773,7 +1775,7 @@ class Ledger:
 
 
 # ======================================================================
-# evaluate: Four pre-step holds derived only from literal session observations.
+# evaluate: Five pre-step holds derived only from literal session observations.
 
 # A dotted name that ends in one of these and is not called is a file name, not an attribute.
 FILE_SUFFIXES = frozenset('''md txt json jsonl ndjson tsv csv yaml yml toml ini cfg xml html css sql py sh bash js mjs

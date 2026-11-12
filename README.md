@@ -13,7 +13,7 @@ Claude Code 2.1.275 or later:
 
     /plugin install makoto --marketplace Clear-Sights/Makoto
 
-`plugin/hooks/hooks.json` sends each native event to `cd plugin && python3 -m makoto2`. Makoto
+`plugin/hooks/hooks.json` sends each native event to `cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2`, where the plugin root is `plugin/`. Makoto
 needs Python 3.11 or later and uses only the standard library.
 
 ## The principle
@@ -83,10 +83,14 @@ FSL-1.1-ALv2 (`LICENSE`): use, copy, modify and redistribute Makoto for any purp
 ## Development
 
 `python3 -m pytest -q` runs `tests/`. For each of rules a-d, `test_rules.py` sends a plant
-and its twin through the exact hooks.json command: the plant is held and the twin is admitted.
+and its twin through the exact hooks.json command: the plant is held and the twin is admitted;
+`test_read_before_edit.py` does the same for rule e.
 `test_robust.py` plants each infrastructure error and checks that it blocks with the way out, and that checkpointed calls
 decide exactly as full replay does.
 `scripts/measure_cost.py` reports per-hook wall time (cold and warm bytecode) and the bytes a hook
 adds to the model's context, on the events `tests/` already contains; `MEASURE_REPEAT` sets the repeat count.
-The full suite, fixtures, tools and records live in Clear-Sights/Makoto-Dev. This repository
-receives only finished versions. The cut `mesh/` gate is kept in git history at 295bf44.
+`plan/` is the finished cost plan of 2026-11-06: `measure_before.json` and `measure_after.json` measure the code of
+fb31cd1 and 6b6582f (1842 bytes on the 31-event suite); the code since then adds 1021 (`eval/RESULTS.md`).
+`eval/` holds the corpus-gate tools, rules and results of the measured rounds (`eval/RESULTS.md`); `eval/corpus.py`
+needs a Clear-Sights/Tiller-from-the-Ashes checkout and `eval/variants.py` this repository's git history.
+The cut `mesh/` gate is kept in git history at 295bf44.
