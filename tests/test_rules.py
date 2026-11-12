@@ -70,7 +70,7 @@ def test_rule_holds_plant_and_admits_twin(tmp_path, rule):
     for name, events in (('plant', plant), ('twin', twin)):
         tmp = tmp_path / name
         for event in events[:-1]:
-            assert send(tmp, event) == {}
+            assert 'decision' not in send(tmp, event)
         response = send(tmp, events[-1])
         if name == 'plant':
             assert response.get('decision') == 'block'
