@@ -1,8 +1,9 @@
 # Makoto
 
 Makoto is a Claude Code hook with one job: it holds a final answer that ships a code file edited in this session
-and not run since its last edit. It uses no model and no network. Everything else is admitted without a word
-(`{}`), including every edit, commit and push, and the user's own prompt.
+and not run since its last edit. It uses no model and no network. Everything else is admitted, including every
+edit, commit and push, and the user's own prompt; after a Python edit it adds one note naming the program to run
+(see The note).
 
 ## Install
 
