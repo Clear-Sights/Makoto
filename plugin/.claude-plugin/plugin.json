@@ -1,7 +1,7 @@
 {
   "name": "makoto",
-  "description": "Form-based session record holds before writes, commit/push and final answers.",
-  "version": "5.1.0",
+  "description": "Holds a final answer that ships a code file edited this session and not run since; after a .py edit, names the program to run.",
+  "version": "6.0.0",
   "author": {
     "name": "Clear-Sights"
   },
