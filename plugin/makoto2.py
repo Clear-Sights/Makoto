@@ -1,18 +1,25 @@
-"""Makoto: holds a final answer while a code or config file changed this session has not been checked since.
+"""Makoto: holds a final answer while a file changed this session, or a file that depends on it, has not been run since.
 
 Live entry: cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks/hooks.json): one native Claude Code hook event
 on stdin, one JSON response on stdout. Hooks: SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure, Stop,
 SubagentStop.
 
-What changed is read from the file system, never from edits: the first SessionStart or UserPromptSubmit records
-path, size and modified time of the files under the cwd; at a final answer a file is changed when it is new or
-differs. Git is optional (used only to skip ignored files). Code in any language (by extension or shebang) and
-config or data files are held; plain docs never. A completed program or test run that started after the file's
-modified time and succeeded (no failed call, no error marker in its output) pays it when it names the file, a program or test in the same top-level folder, or is a project-wide
-runner; a config or data file is also paid by a full read after its modified time. A Stop with stop_hook_active is
-admitted. After a completed Write, Edit, MultiEdit or NotebookEdit of a code file the PostToolUse response names
-what to run, once per file until paid. An error in Makoto blocks a final answer or tool step, names the error and
-the one way to disable Makoto. State: one JSON file per session under a lock in MAKOTO_STATE_DIR.
+State per session (one JSON file under a lock in MAKOTO_STATE_DIR): the map, and nothing else. One node per file under
+the cwd: its size and mtime at session start, the start time of the last successful run that reached it, a failed flag,
+a noted flag, and the names its text gives for links. Links, from a file to a file it depends on: uses (import-style
+lines: import, from, require, include, use, source, load), reads (a quoted string naming a project file by relative
+path or base name with extension) and produced by (the same on a line with a write marker; from the data file to the
+file that writes it). Links are read again for files that change. A run stamps its start time on every node it reaches
+(a failed run sets the failed flag) and is forgotten, so the state is bounded by the tree.
+Sets, computed without a test of their size (see sets):
+  changed   = nodes that differ from their session-start size or time, and new files;
+  demanded  = changed nodes that are runnable (interpreter extension or shebang) or linked by uses or reads, plus every
+              node that reaches one through links;
+  checked   = demanded nodes stamped after the latest change among the changed nodes they reach.
+A run reaches the program it names plus what that depends on; a test runner with no program argument reaches every
+node. One message names demanded minus checked and the entry programs (used by no file) that reach it: a note after
+an edit, once per file until checked; a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
+Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
 """
 import contextlib
 import hashlib
@@ -33,32 +40,32 @@ except ImportError:  # Windows
 STATE_DIR = '~/.claude/makoto2_state'
 LOCK_SECONDS = 3.0
 MAX_FILES = 20000
+MAX_READ = 262144
 DISABLE = 'claude plugin disable makoto'
-UNCHANGED = 'Unchanged: Do not assume what can change has not.'
-MISSING = ' Missing: a run of it, with its output read, after its last edit. Clear: Run it and read its output.'
-FAILED = ' Missing: a run of it that succeeds, after its last edit. Clear: Fix the error, run it again and read its output.'
-NOTE = 'Before your final answer, run the program or tests that use %s and read the output.'
+MESSAGE = 'Not run since a change: %s. Run %s and read the output.'
 FINAL = ('Stop', 'SubagentStop')
 HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
 EDITORS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
-
-CODE = frozenset('py pyw js jsx mjs cjs ts tsx sh bash zsh fish rb pl php lua r rs go c h cc cpp hpp java kt swift '
-                 'scala cs fs ex exs erl clj sql ps1 bat cmd ipynb tcl awk dart zig nim jl hs ml vue svelte'.split())
-CONFIG = frozenset('json jsonc yaml yml toml ini cfg conf config xml properties env csv tsv'.split())
-CONFIG_NAMES = frozenset(('Makefile', 'Dockerfile', 'Rakefile', 'Gemfile', 'Procfile', '.env'))
 SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', '.venv', 'venv'))  # other build output: only when git ignores it
 
-RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|javac|dotnet|make|'
-                      r'gmake|npx|pytest|py\.test|jest|vitest|mocha|sh|bash|zsh|fish|pwsh|tclsh[\d.]*)\Z')
-SUBCOMMANDS = {'go': ('run', 'test', 'build'), 'cargo': ('run', 'test'), 'npm': ('run', 'test', 'start', 'run-script'),
+RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|dotnet|make|gmake|'
+                      r'pytest|py\.test|jest|vitest|mocha|tox|sh|bash|zsh|fish|pwsh|tclsh[\d.]*)\Z')
+TESTERS = re.compile(r'(?:make|gmake|pytest|py\.test|jest|vitest|mocha|tox|rspec|phpunit|ctest)\Z')
+SUBCOMMANDS = {'go': ('run', 'test'), 'cargo': ('run', 'test'), 'npm': ('run', 'test', 'start'),
                'yarn': ('run', 'test', 'start'), 'pnpm': ('run', 'test', 'start')}
-WIDE = re.compile(r'(?:make|gmake|npx|pytest|py\.test|jest|vitest|mocha|npm|yarn|pnpm)\Z')  # project-wide runners
-WRAPPERS = frozenset('time nohup exec sudo command env stdbuf nice'.split())
-PRINTERS = frozenset('cat bat less more nl tac'.split())
+WRAPPERS = frozenset('time nohup exec sudo command env stdbuf nice npx'.split())
 SEPARATORS = frozenset(('&&', '||', ';', '|', '|&', '&', '(', ')', ';;', '{', '}'))
 ERROR = re.compile(r'Traceback \(most recent call last\)|^[\w.]+(?:Error|Exception):|\bexit(?:=|\s+code\s+)0*[1-9]|'
                    r'\bFAILED\b|panic:|command not found|No such file or directory', re.M)
 HEREDOC = re.compile(r'<<-?\s*([\'"]?)(\w+)\1[^\n]*\n.*?\n[ \t]*\2[ \t]*(?=\n|$)', re.S)
+KEYWORDS = r'(?:import|from|use|include(?:_once)?|require(?:_once|_relative)?|source|load)'
+IMPORT = re.compile(r'^[ \t]*#?[ \t]*' + KEYWORDS + r'\b(.*)|\b' + KEYWORDS + r'\b[ \t]*\(?[ \t]*([\'"][^\'"\n]+[\'"])', re.M)
+QUOTED = re.compile(r'[\'"]([^\'"\s]+\.\w+)[\'"]')
+WRITES = re.compile(r'>|[\'"][wa][bt+]*[\'"]|\b(?:write\w*|dump\w*|save\w*|to_csv|to_json)\b')
+SCRIPTS = ('.py', '.js', '.mjs', '.cjs', '.ts', '.sh', '.bash', '.zsh', '.rb', '.pl', '.php', '.lua', '.r', '.ps1',
+           '.jl', '.tcl', '.awk')
+TOKEN = re.compile(r'[\w@\-]+(?:[./][\w\-]+)*')
+NOISE = frozenset(('import', 'as', 'from', 'static', 'crate', 'self', 'super', 'type'))
 
 
 # ---------------------------------------------------------------- shell
@@ -110,48 +117,24 @@ def is_run(argv):
         return False
     name = os.path.basename(argv[0])
     if name in SUBCOMMANDS:
-        return len(argv) > 1 and argv[1] in SUBCOMMANDS[name]
-    if RUNTIMES.match(name) and not (name.startswith('python') and argv[1:2] == ['-m'] and argv[2:3] in (['pip'], ['venv'])):
+        return argv[1:2] != [] and argv[1] in SUBCOMMANDS[name]
+    if RUNTIMES.match(name) and not (name.startswith('python') and argv[1:3] in (['-m', 'pip'], ['-m', 'venv'])):
         return not any(a in ('--version', '-V', '--help', '-h') for a in argv[1:2])
-    return argv[0].startswith(('./', '../', '/')) and '/' in argv[0] and name not in PRINTERS
+    return argv[0].startswith(('./', '../', '/')) and '/' in argv[0]
 
 
-def kind(path):
-    """'code', 'config' or None for a plain doc or anything else."""
-    name = os.path.basename(path)
-    suffix = name.rpartition('.')[2].lower() if '.' in name.strip('.') else ''
-    if suffix in CODE:
-        return 'code'
-    if suffix in CONFIG or name in CONFIG_NAMES:
-        return 'config'
-    if not suffix:
-        try:
-            with open(path, 'rb') as stream:
-                return 'code' if stream.read(2) == b'#!' else None
-        except OSError:
-            return None
-    return None
-
-
-
-def is_wide(argv):
+def is_tester(argv):
     name = os.path.basename(argv[0])
     if name in SUBCOMMANDS:
-        return argv[1] in ('test', 'run', 'start', 'run-script') and name != 'go' or name == 'go' and argv[1] == 'test'
+        return argv[1:2] == ['test']
     if name.startswith('python'):
-        return argv[1:2] == ['-m'] and argv[2:3] in (['pytest'], ['unittest'], ['tox'])
-    return bool(WIDE.match(name))
+        return argv[1:3] in (['-m', 'pytest'], ['-m', 'unittest'], ['-m', 'tox'])
+    return bool(TESTERS.match(name))
 
-
-# ---------------------------------------------------------------- files
 
 def absolute(path, cwd):
     path = os.path.expanduser(path)
     return os.path.normpath(path if os.path.isabs(path) else os.path.join(cwd, path))
-
-
-def top(rel):
-    return rel.split('/')[0] if '/' in rel else ''
 
 
 def listing(root):
@@ -219,42 +202,95 @@ def save(path, state):
     os.replace(temporary, path)
 
 
+# ---------------------------------------------------------------- map and sets
+
+def scan(path):
+    """The link-bearing parts of one file's text: a shebang flag and the names its lines give."""
+    result = {'shebang': False, 'uses': [], 'quotes': [], 'writes': []}
+    try:
+        with open(path, 'rb') as stream:
+            data = stream.read(MAX_READ)
+    except OSError:
+        return result
+    if b'\0' in data[:1024]:
+        return result
+    text = data.decode('utf-8', 'replace')
+    result['shebang'] = text.startswith('#!')
+    names = [t for m in IMPORT.finditer(text) for t in TOKEN.findall(m.group(1) or m.group(2)) if t not in NOISE]
+    result['uses'] = list(dict.fromkeys(names))[:200]
+    for line in text.splitlines():
+        result['writes' if WRITES.search(line) else 'quotes'].extend(q[2:] if q.startswith('./') else q
+                                                                      for q in QUOTED.findall(line))
+    result['quotes'], result['writes'] = (list(dict.fromkeys(result[k]))[:200] for k in ('quotes', 'writes'))
+    return result
+
+
+def refresh(state, files, begin=False):
+    """The map for the files now: nodes kept, new files added (changed from the start), links read again for changed files."""
+    old, state['nodes'] = state['nodes'], {}
+    for rel, stat in files.items():
+        node = old.get(rel) or {'start': stat if begin else None, 'ran': 0, 'failed': False, 'noted': False}
+        state['nodes'][rel] = node
+        if begin or stat != node['start']:
+            node.update(scan(os.path.join(state['root'], rel)))
+
+
+def close(seeds, edges):
+    """The seeds and everything reached from them along edges."""
+    order, seen = list(seeds), set(seeds)
+    for item in order:
+        for other in edges.get(item, ()):
+            if other not in seen:
+                seen.add(other)
+                order.append(other)
+    return seen
+
+
+def lookup(nodes):
+    """(links, users, linked): from each file the files it depends on, the reverse, and the files tied by uses or reads."""
+    index, named = {}, {}
+    for rel in nodes:
+        parts = os.path.splitext(rel)[0].split('/')
+        parts = parts[:-1] if parts[-1] in ('__init__', 'index') else parts
+        for i, _ in enumerate(parts):
+            index.setdefault('/'.join(parts[i:]), []).append(rel)
+        for i, _ in enumerate(rel.split('/')):
+            named.setdefault('/'.join(rel.split('/')[i:]), []).append(rel)
+    links, tied = {}, set()
+    for rel, node in nodes.items():
+        for name in node['uses']:
+            for key in (name, os.path.splitext(name)[0], name.replace('.', '/')):
+                tied.update((rel, other) for other in index.get(key, ()) if other != rel)
+        tied.update((rel, other) for name in node['quotes'] for other in named.get(name, ()) if other != rel)
+    produced = {(other, rel) for rel, node in nodes.items() for name in node['writes'] for other in named.get(name, ())
+                if other != rel}
+    for a, b in tied | produced:
+        links.setdefault(a, set()).add(b)
+    users = {}
+    for a, b in tied | produced:
+        users.setdefault(b, set()).add(a)
+    return links, users, {x for pair in tied for x in pair}
+
+
+def sets(state, files):
+    """(unchecked, entries); no line here tests the size of a set."""
+    nodes = state['nodes']
+    links, users, linked = lookup(nodes)
+    changed = {rel for rel in files if files[rel] != nodes[rel]['start']}
+    runnable = {rel for rel, node in nodes.items() if node['shebang'] or rel.lower().endswith(SCRIPTS)}
+    demanded = close(changed, users) & (linked | runnable)
+    last = {rel: max(files[other][1] for other in close({rel}, links) & changed) for rel in demanded}
+    unchecked = demanded - {rel for rel in demanded if nodes[rel]['ran'] > last[rel]}
+    return unchecked, sorted(close(unchecked, users) - users.keys())
+
+
+def message(unchecked, entries, nodes):
+    text = MESSAGE % (', '.join(sorted(unchecked)), ', '.join(entries) or 'the program or tests that use them')
+    return text + ''.join(' A run of %s failed; it needs a run that succeeds.' % rel for rel in sorted(unchecked)
+                          if nodes[rel]['failed'])
+
+
 # ---------------------------------------------------------------- rule
-
-def run_record(argv, cwd, root):
-    """What a completed run names, as paths under root: files, directories ('/'-ended) and module files."""
-    named = set()
-    for word in argv:
-        candidates = [word]
-        if re.fullmatch(r'[\w.]+', word) and '/' not in word:
-            candidates.append(word.replace('.', '/') + '.py')
-        for candidate in candidates:
-            path = absolute(candidate, cwd)
-            if path == root or path.startswith(root + os.sep):
-                rel = os.path.relpath(path, root).replace(os.sep, '/')
-                if os.path.isdir(path):
-                    named.add('/' if rel == '.' else rel + '/')
-                elif os.path.isfile(path) and kind(path):
-                    named.add(rel)
-    return {'wide': is_wide(argv), 'named': sorted(named)}
-
-
-def reaches(run, rel):
-    if run['wide']:
-        return True
-    for name in run['named']:
-        if name == rel or name.endswith('/') and (name == '/' or rel.startswith(name)) \
-                or not name.endswith('/') and top(name) == top(rel):
-            return True
-    return False
-
-
-def paid(state, rel, mtime):
-    what = kind(os.path.join(state['root'], rel))
-    if any(r['t'] > mtime and r.get('ok', True) and reaches(r, rel) for r in state['runs']):
-        return True
-    return what == 'config' and any(r['t'] > mtime and r['path'] == rel for r in state['reads'])
-
 
 def failed(event):
     """A tool call that failed, or whose stdout or stderr holds an error marker."""
@@ -263,53 +299,49 @@ def failed(event):
     return event.get('hook_event_name') == 'PostToolUseFailure' or bool(ERROR.search(out))
 
 
+def named(argv, cwd, root, files):
+    """The files a run names: a file, a module, or every file under a directory."""
+    found = set()
+    for word in argv:
+        for candidate in (word, word.replace('.', '/') + '.py' if re.fullmatch(r'[\w.]+', word) else word):
+            path = absolute(candidate, cwd)
+            rel = os.path.relpath(path, root).replace(os.sep, '/')
+            found.update(f for f in files if f == rel or f.startswith(rel.rstrip('/') + '/') or rel == '.')
+    return found
+
+
 def record(state, event):
-    """Note completed runs and full reads; return the files newly needing a note."""
+    """Stamp the nodes completed runs reached; return the message for a note, or ''."""
     root, tool, given = state['root'], event.get('tool_name'), event.get('tool_input') or {}
-    cwd, now, fresh = event.get('cwd') or root, time.time(), []
+    cwd, now = event.get('cwd') or root, time.time_ns()
     if event.get('hook_event_name') == 'PostToolUseFailure' and tool != 'Bash':
-        return fresh
-    began, state['last'] = state.get('last', now), now  # a run began after the previous hook event, so a change it made is newer
-    if tool == 'Read' and isinstance(given.get('file_path'), str) and not given.get('offset') and not given.get('limit'):
-        state['reads'] = (state['reads'] + [{'t': now, 'path': os.path.relpath(absolute(given['file_path'], cwd), root).replace(os.sep, '/')}])[-300:]
-    elif tool == 'Bash' and isinstance(given.get('command'), str):
+        return ''
+    began, state['last'] = state['last'], now  # a run began after the previous hook event, so a change it made is newer
+    files = listing(root)
+    refresh(state, files)
+    nodes = state['nodes']
+    if tool == 'Bash' and isinstance(given.get('command'), str):
+        bad, links = failed(event), lookup(nodes)[0]
         for argv, _ in segments(given['command']):
             argv = strip_wrappers(argv)
             if argv and argv[0] == 'cd':
                 cwd = absolute(argv[1], cwd) if len(argv) > 1 else os.path.expanduser('~')
-            elif argv and os.path.basename(argv[0]) in PRINTERS:
-                for word in argv[1:]:
-                    if not word.startswith('-'):
-                        state['reads'] = (state['reads'] + [{'t': now, 'path': os.path.relpath(absolute(word, cwd), root).replace(os.sep, '/')}])[-300:]
             elif is_run(argv):
-                state['runs'] = (state['runs'] + [dict(run_record(argv, cwd, root), t=began, ok=not failed(event))])[-300:]
-    elif tool in EDITORS:
-        target = given.get('file_path') or given.get('notebook_path')
-        if isinstance(target, str) and target:
-            rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
-            if kind(absolute(target, cwd)) == 'code' and rel not in state['noted']:
-                state['noted'].append(rel)
-                fresh.append(rel)
-    # a note stays quiet only until a run reaches its file
-    for rel in list(state['noted']):
-        try:
-            changed = os.stat(os.path.join(root, rel)).st_mtime
-        except OSError:
-            continue
-        if rel not in fresh and paid(state, rel, changed):
-            state['noted'].remove(rel)
-    return fresh
-
-
-def unpaid(state):
-    now, snapshot, held = listing(state['root']), state['snapshot'], []
-    for rel in sorted(now):
-        if snapshot.get(rel) == now[rel] or not kind(os.path.join(state['root'], rel)):
-            continue
-        mtime = now[rel][1] / 1e9
-        if not paid(state, rel, mtime):  # a failed run after the last edit changes the text
-            held.append((rel, any(r['t'] > mtime and reaches(r, rel) for r in state['runs'])))
-    return held
+                program = named(argv, cwd, root, files)
+                for rel in files if is_tester(argv) and not program else close(program, links):
+                    nodes[rel]['failed'] = bad
+                    if not bad:
+                        nodes[rel]['ran'] = began
+    unchecked, entries = sets(state, files)
+    for rel, node in nodes.items():
+        node['noted'] = node['noted'] and rel in unchecked
+    target = given.get('file_path') or given.get('notebook_path')
+    if tool in EDITORS and isinstance(target, str) and target:
+        rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
+        if rel in unchecked and not nodes[rel]['noted']:
+            nodes[rel]['noted'] = True
+            return message(unchecked, entries, nodes)
+    return ''
 
 
 def respond(event, config):
@@ -322,27 +354,24 @@ def respond(event, config):
     with locked(path, config['lock_seconds']):
         state = load(path)
         if name in ('SessionStart', 'UserPromptSubmit'):
-            if 'snapshot' not in state:
+            if 'nodes' not in state:
                 root = event.get('cwd') or os.getcwd()
-                state = {'root': root, 'snapshot': listing(root), 'runs': [], 'reads': [], 'noted': [], 'unpaid': []}
-            state['last'] = time.time()
+                state = {'root': root, 'nodes': {}}
+                refresh(state, listing(root), begin=True)
+            state['last'] = time.time_ns()
             save(path, state)
             return {}
-        if 'snapshot' not in state:
+        if 'nodes' not in state:
             return {}
         if name in FINAL:
-            held = unpaid(state)
-            if event.get('stop_hook_active') or not held:
-                state['unpaid'] = [f for f, _ in held]
-                save(path, state)
+            if event.get('stop_hook_active'):
                 return {}
-            reason = '; '.join('makoto rule d [switch]: ' + json.dumps(f, ensure_ascii=False) + ': ' + UNCHANGED + (FAILED if bad else MISSING)
-                               for f, bad in held)
-            return {'decision': 'block', 'reason': reason}
-        fresh = record(state, event)
+            refresh(state, files := listing(state['root']))
+            unchecked, entries = sets(state, files)
+            return {'decision': 'block', 'reason': message(unchecked, entries, state['nodes'])} if unchecked else {}
+        text = record(state, event)
         save(path, state)
-    if fresh:
-        text = '\n'.join(NOTE % os.path.relpath(os.path.join(state['root'], p), event.get('cwd') or state['root']) for p in fresh)
+    if text:
         return {'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': text}}
     return {}
 
