@@ -1,0 +1,263 @@
+{
+ "unrun": {
+  "tasks_kept": 40,
+  "arms": {
+   "plain": {
+    "pass": 21,
+    "mean_cost_usd": 0.00265,
+    "mean_seconds": 16.1,
+    "holds_per_run": 0,
+    "notes_per_run": 0,
+    "final_answers_admitted_first_time": 40
+   },
+   "mini": {
+    "pass": 39,
+    "mean_cost_usd": 0.00358,
+    "mean_seconds": 20.9,
+    "holds_per_run": 0.125,
+    "notes_per_run": 2.025,
+    "final_answers_admitted_first_time": 35
+   },
+   "set": {
+    "pass": 36,
+    "mean_cost_usd": 0.00359,
+    "mean_seconds": 21.1,
+    "holds_per_run": 0.1,
+    "notes_per_run": 2.175,
+    "final_answers_admitted_first_time": 36
+   },
+   "onemap": {
+    "pass": 36,
+    "mean_cost_usd": 0.00362,
+    "mean_seconds": 21.2,
+    "holds_per_run": 0.125,
+    "notes_per_run": 2.125,
+    "final_answers_admitted_first_time": 35
+   }
+  },
+  "against_plain": {
+   "mini": {
+    "discordant": [
+     0,
+     18
+    ],
+    "p": 0.0,
+    "diff_points": 45.0,
+    "diff_95": [
+     30.0,
+     60.0
+    ],
+    "cost_ratio": 1.348,
+    "cost_95": [
+     1.233,
+     1.486
+    ],
+    "holm_rejects": true
+   },
+   "set": {
+    "discordant": [
+     2,
+     17
+    ],
+    "p": 0.0007,
+    "diff_points": 37.5,
+    "diff_95": [
+     20.0,
+     55.0
+    ],
+    "cost_ratio": 1.351,
+    "cost_95": [
+     1.234,
+     1.496
+    ],
+    "holm_rejects": true
+   },
+   "onemap": {
+    "discordant": [
+     4,
+     19
+    ],
+    "p": 0.0026,
+    "diff_points": 37.5,
+    "diff_95": [
+     17.5,
+     57.5
+    ],
+    "cost_ratio": 1.364,
+    "cost_95": [
+     1.237,
+     1.502
+    ],
+    "holm_rejects": true
+   }
+  },
+  "against_mini": {
+   "set": {
+    "discordant": [
+     3,
+     0
+    ],
+    "p": 0.25,
+    "diff_points": -7.5,
+    "diff_95": [
+     -17.5,
+     0.0
+    ],
+    "cost_ratio": 1.002,
+    "cost_95": [
+     0.941,
+     1.066
+    ]
+   },
+   "onemap": {
+    "discordant": [
+     4,
+     1
+    ],
+    "p": 0.375,
+    "diff_points": -7.5,
+    "diff_95": [
+     -17.5,
+     2.5
+    ],
+    "cost_ratio": 1.011,
+    "cost_95": [
+     0.915,
+     1.107
+    ]
+   }
+  }
+ },
+ "sigchange": {
+  "tasks_kept": 40,
+  "arms": {
+   "plain": {
+    "pass": 24,
+    "mean_cost_usd": 0.00647,
+    "mean_seconds": 61.1,
+    "holds_per_run": 0,
+    "notes_per_run": 0,
+    "final_answers_admitted_first_time": 40
+   },
+   "mini": {
+    "pass": 16,
+    "mean_cost_usd": 0.00639,
+    "mean_seconds": 31.3,
+    "holds_per_run": 0.35,
+    "notes_per_run": 6.15,
+    "final_answers_admitted_first_time": 26
+   },
+   "set": {
+    "pass": 32,
+    "mean_cost_usd": 0.00848,
+    "mean_seconds": 68.3,
+    "holds_per_run": 0.5,
+    "notes_per_run": 7.35,
+    "final_answers_admitted_first_time": 21
+   },
+   "onemap": {
+    "pass": 38,
+    "mean_cost_usd": 0.00851,
+    "mean_seconds": 38.8,
+    "holds_per_run": 0.4,
+    "notes_per_run": 8.6,
+    "final_answers_admitted_first_time": 24
+   }
+  },
+  "against_plain": {
+   "mini": {
+    "discordant": [
+     14,
+     6
+    ],
+    "p": 0.1153,
+    "diff_points": -20.0,
+    "diff_95": [
+     -40.0,
+     0.0
+    ],
+    "cost_ratio": 0.989,
+    "cost_95": [
+     0.874,
+     1.123
+    ],
+    "holm_rejects": false
+   },
+   "set": {
+    "discordant": [
+     6,
+     14
+    ],
+    "p": 0.1153,
+    "diff_points": 20.0,
+    "diff_95": [
+     -2.5,
+     40.0
+    ],
+    "cost_ratio": 1.311,
+    "cost_95": [
+     1.173,
+     1.46
+    ],
+    "holm_rejects": false
+   },
+   "onemap": {
+    "discordant": [
+     1,
+     15
+    ],
+    "p": 0.0005,
+    "diff_points": 35.0,
+    "diff_95": [
+     17.5,
+     52.5
+    ],
+    "cost_ratio": 1.316,
+    "cost_95": [
+     1.182,
+     1.465
+    ],
+    "holm_rejects": true
+   }
+  },
+  "against_mini": {
+   "set": {
+    "discordant": [
+     1,
+     17
+    ],
+    "p": 0.0001,
+    "diff_points": 40.0,
+    "diff_95": [
+     22.5,
+     57.5
+    ],
+    "cost_ratio": 1.326,
+    "cost_95": [
+     1.169,
+     1.504
+    ]
+   },
+   "onemap": {
+    "discordant": [
+     0,
+     22
+    ],
+    "p": 0.0,
+    "diff_points": 55.0,
+    "diff_95": [
+     40.0,
+     70.0
+    ],
+    "cost_ratio": 1.331,
+    "cost_95": [
+     1.173,
+     1.499
+    ]
+   }
+  }
+ },
+ "ship": {
+  "one_map_ships": true
+ }
+}
