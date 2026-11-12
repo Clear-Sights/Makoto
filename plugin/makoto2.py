@@ -1,20 +1,24 @@
-"""Makoto: holds a final answer while a file changed this session, or a file that uses it, has not been run since.
+"""Makoto: holds a final answer while a file changed this session, or a file that depends on it, has not been run since.
 
 Live entry: cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks/hooks.json): one native Claude Code hook event
 on stdin, one JSON response on stdout. Hooks: SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure, Stop,
 SubagentStop.
 
-State per session (one JSON file under a lock in MAKOTO_STATE_DIR): the snapshot of the files under the cwd taken at
-SessionStart, and the lookup of which file uses which, read from import-style lines (import, from, require, include,
-use, source, load) that name another file's module path or base name; changed files are read again each time.
+State per session (one JSON file under a lock in MAKOTO_STATE_DIR): the map, and nothing else. One node per file under
+the cwd: its size and mtime at session start, the start time of the last successful run that reached it, a failed flag,
+a noted flag, and the names its text gives for links. Links, from a file to a file it depends on: uses (import-style
+lines: import, from, require, include, use, source, load), reads (a quoted string naming a project file by relative
+path or base name with extension) and produced by (the same on a line with a write marker; from the data file to the
+file that writes it). Links are read again for files that change. A run stamps its start time on every node it reaches
+(a failed run sets the failed flag) and is forgotten, so the state is bounded by the tree.
 Sets, computed without a test of their size (see sets):
-  changed   = files that differ from the snapshot;
-  demanded  = changed plus every file that uses them, through the lookup, among files in the lookup or with a shebang;
-  checked   = demanded files reached by a successful run that began after their last change (the latest change among
-              them and what they use). A run reaches the program it names plus what that uses; a test runner with
-              no program argument reaches every file.
-One message names demanded minus checked and the entry programs (used by no file) that reach it: a note after an
-edit, once per file until checked; a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
+  changed   = nodes that differ from their session-start size or time, and new files;
+  demanded  = changed nodes that are runnable (interpreter extension or shebang) or linked by uses or reads, plus every
+              node that reaches one through links;
+  checked   = demanded nodes stamped after the latest change among the changed nodes they reach.
+A run reaches the program it names plus what that depends on; a test runner with no program argument reaches every
+node. One message names demanded minus checked and the entry programs (used by no file) that reach it: a note after
+an edit, once per file until checked; a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
 Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
 """
 import contextlib
@@ -56,6 +60,10 @@ ERROR = re.compile(r'Traceback \(most recent call last\)|^[\w.]+(?:Error|Excepti
 HEREDOC = re.compile(r'<<-?\s*([\'"]?)(\w+)\1[^\n]*\n.*?\n[ \t]*\2[ \t]*(?=\n|$)', re.S)
 KEYWORDS = r'(?:import|from|use|include(?:_once)?|require(?:_once|_relative)?|source|load)'
 IMPORT = re.compile(r'^[ \t]*#?[ \t]*' + KEYWORDS + r'\b(.*)|\b' + KEYWORDS + r'\b[ \t]*\(?[ \t]*([\'"][^\'"\n]+[\'"])', re.M)
+QUOTED = re.compile(r'[\'"]([^\'"\s]+\.\w+)[\'"]')
+WRITES = re.compile(r'>|[\'"][wa][bt+]*[\'"]|\b(?:write\w*|dump\w*|save\w*|to_csv|to_json)\b')
+SCRIPTS = ('.py', '.js', '.mjs', '.cjs', '.ts', '.sh', '.bash', '.zsh', '.rb', '.pl', '.php', '.lua', '.r', '.ps1',
+           '.jl', '.tcl', '.awk')
 TOKEN = re.compile(r'[\w@\-]+(?:[./][\w\-]+)*')
 NOISE = frozenset(('import', 'as', 'from', 'static', 'crate', 'self', 'super', 'type'))
 
@@ -194,20 +202,37 @@ def save(path, state):
     os.replace(temporary, path)
 
 
-# ---------------------------------------------------------------- lookup and sets
+# ---------------------------------------------------------------- map and sets
 
 def scan(path):
-    """[has a shebang, the names its import-style lines give] of one file."""
+    """The link-bearing parts of one file's text: a shebang flag and the names its lines give."""
+    result = {'shebang': False, 'uses': [], 'quotes': [], 'writes': []}
     try:
         with open(path, 'rb') as stream:
             data = stream.read(MAX_READ)
     except OSError:
-        return [False, []]
+        return result
     if b'\0' in data[:1024]:
-        return [False, []]
+        return result
     text = data.decode('utf-8', 'replace')
+    result['shebang'] = text.startswith('#!')
     names = [t for m in IMPORT.finditer(text) for t in TOKEN.findall(m.group(1) or m.group(2)) if t not in NOISE]
-    return [text.startswith('#!'), list(dict.fromkeys(names))[:200]]
+    result['uses'] = list(dict.fromkeys(names))[:200]
+    for line in text.splitlines():
+        result['writes' if WRITES.search(line) else 'quotes'].extend(q[2:] if q.startswith('./') else q
+                                                                      for q in QUOTED.findall(line))
+    result['quotes'], result['writes'] = (list(dict.fromkeys(result[k]))[:200] for k in ('quotes', 'writes'))
+    return result
+
+
+def refresh(state, files, begin=False):
+    """The map for the files now: nodes kept, new files added (changed from the start), links read again for changed files."""
+    old, state['nodes'] = state['nodes'], {}
+    for rel, stat in files.items():
+        node = old.get(rel) or {'start': stat if begin else None, 'ran': 0, 'failed': False, 'noted': False}
+        state['nodes'][rel] = node
+        if begin or stat != node['start']:
+            node.update(scan(os.path.join(state['root'], rel)))
 
 
 def close(seeds, edges):
@@ -221,44 +246,48 @@ def close(seeds, edges):
     return seen
 
 
-def lookup(state, files):
-    """(uses, users, nodes): which file uses which, and the files in the lookup or with a shebang."""
-    root, snapshot, stored = state['root'], state['snapshot'], state['scan']
-    read = {rel: stored.get(rel, [False, []]) if files[rel] == snapshot.get(rel) else scan(os.path.join(root, rel))
-            for rel in files}
-    index = {}
-    for rel in files:
+def lookup(nodes):
+    """(links, users, linked): from each file the files it depends on, the reverse, and the files tied by uses or reads."""
+    index, named = {}, {}
+    for rel in nodes:
         parts = os.path.splitext(rel)[0].split('/')
         parts = parts[:-1] if parts[-1] in ('__init__', 'index') else parts
         for i, _ in enumerate(parts):
             index.setdefault('/'.join(parts[i:]), []).append(rel)
-    uses, users = {}, {}
-    for rel, (_, names) in read.items():
-        for name in names:
+        for i, _ in enumerate(rel.split('/')):
+            named.setdefault('/'.join(rel.split('/')[i:]), []).append(rel)
+    links, tied = {}, set()
+    for rel, node in nodes.items():
+        for name in node['uses']:
             for key in (name, os.path.splitext(name)[0], name.replace('.', '/')):
-                for other in index.get(key, ()):
-                    if other != rel:
-                        uses.setdefault(rel, set()).add(other)
-                        users.setdefault(other, set()).add(rel)
-    shebang = {rel for rel, (flag, _) in read.items() if flag}
-    return uses, users, shebang | set(uses) | set(users)
+                tied.update((rel, other) for other in index.get(key, ()) if other != rel)
+        tied.update((rel, other) for name in node['quotes'] for other in named.get(name, ()) if other != rel)
+    produced = {(other, rel) for rel, node in nodes.items() for name in node['writes'] for other in named.get(name, ())
+                if other != rel}
+    for a, b in tied | produced:
+        links.setdefault(a, set()).add(b)
+    users = {}
+    for a, b in tied | produced:
+        users.setdefault(b, set()).add(a)
+    return links, users, {x for pair in tied for x in pair}
 
 
 def sets(state, files):
-    """(unchecked, entries, demanded, checked, uses, users); no line here tests the size of a set."""
-    uses, users, nodes = lookup(state, files)
-    changed = {rel for rel in files if files[rel] != state['snapshot'].get(rel)}
-    demanded = close(changed, users) & nodes
-    last = {rel: max(files[other][1] for other in close({rel}, uses) & changed) / 1e9 for rel in demanded}
-    checked = {rel for rel in demanded
-               if any(run['t'] > last[rel] and (run['all'] or rel in run['reach']) for run in state['runs'])}
-    unchecked = demanded - checked
-    entries = sorted(close(unchecked, users) - users.keys())
-    return unchecked, entries, demanded, checked, uses, users
+    """(unchecked, entries); no line here tests the size of a set."""
+    nodes = state['nodes']
+    links, users, linked = lookup(nodes)
+    changed = {rel for rel in files if files[rel] != nodes[rel]['start']}
+    runnable = {rel for rel, node in nodes.items() if node['shebang'] or rel.lower().endswith(SCRIPTS)}
+    demanded = close(changed, users) & (linked | runnable)
+    last = {rel: max(files[other][1] for other in close({rel}, links) & changed) for rel in demanded}
+    unchecked = demanded - {rel for rel in demanded if nodes[rel]['ran'] > last[rel]}
+    return unchecked, sorted(close(unchecked, users) - users.keys())
 
 
-def message(unchecked, entries):
-    return MESSAGE % (', '.join(sorted(unchecked)), ', '.join(entries) or 'the program or tests that use them')
+def message(unchecked, entries, nodes):
+    text = MESSAGE % (', '.join(sorted(unchecked)), ', '.join(entries) or 'the program or tests that use them')
+    return text + ''.join(' A run of %s failed; it needs a run that succeeds.' % rel for rel in sorted(unchecked)
+                          if nodes[rel]['failed'])
 
 
 # ---------------------------------------------------------------- rule
@@ -282,31 +311,36 @@ def named(argv, cwd, root, files):
 
 
 def record(state, event):
-    """Note completed runs; return the message for a note, or ''."""
+    """Stamp the nodes completed runs reached; return the message for a note, or ''."""
     root, tool, given = state['root'], event.get('tool_name'), event.get('tool_input') or {}
-    cwd, now = event.get('cwd') or root, time.time()
+    cwd, now = event.get('cwd') or root, time.time_ns()
     if event.get('hook_event_name') == 'PostToolUseFailure' and tool != 'Bash':
         return ''
-    began, state['last'] = state.get('last', now), now  # a run began after the previous hook event, so a change it made is newer
+    began, state['last'] = state['last'], now  # a run began after the previous hook event, so a change it made is newer
     files = listing(root)
-    if tool == 'Bash' and isinstance(given.get('command'), str) and not failed(event):
-        uses = lookup(state, files)[0]
+    refresh(state, files)
+    nodes = state['nodes']
+    if tool == 'Bash' and isinstance(given.get('command'), str):
+        bad, links = failed(event), lookup(nodes)[0]
         for argv, _ in segments(given['command']):
             argv = strip_wrappers(argv)
             if argv and argv[0] == 'cd':
                 cwd = absolute(argv[1], cwd) if len(argv) > 1 else os.path.expanduser('~')
             elif is_run(argv):
                 program = named(argv, cwd, root, files)
-                state['runs'] = (state['runs'] + [{'t': began, 'all': is_tester(argv) and not program,
-                                                   'reach': sorted(close(program, uses))}])[-300:]
-    unchecked, entries = sets(state, files)[:2]
-    state['noted'] = [rel for rel in state['noted'] if rel in unchecked]
+                for rel in files if is_tester(argv) and not program else close(program, links):
+                    nodes[rel]['failed'] = bad
+                    if not bad:
+                        nodes[rel]['ran'] = began
+    unchecked, entries = sets(state, files)
+    for rel, node in nodes.items():
+        node['noted'] = node['noted'] and rel in unchecked
     target = given.get('file_path') or given.get('notebook_path')
     if tool in EDITORS and isinstance(target, str) and target:
         rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
-        if rel in unchecked and rel not in state['noted']:
-            state['noted'].append(rel)
-            return message(unchecked, entries)
+        if rel in unchecked and not nodes[rel]['noted']:
+            nodes[rel]['noted'] = True
+            return message(unchecked, entries, nodes)
     return ''
 
 
@@ -320,22 +354,21 @@ def respond(event, config):
     with locked(path, config['lock_seconds']):
         state = load(path)
         if name in ('SessionStart', 'UserPromptSubmit'):
-            if 'snapshot' not in state:
+            if 'nodes' not in state:
                 root = event.get('cwd') or os.getcwd()
-                files = listing(root)
-                scans = {rel: scan(os.path.join(root, rel)) for rel in files}
-                state = {'root': root, 'snapshot': files, 'runs': [], 'noted': [],
-                         'scan': {rel: s for rel, s in scans.items() if s[0] or s[1]}}
-            state['last'] = time.time()
+                state = {'root': root, 'nodes': {}}
+                refresh(state, listing(root), begin=True)
+            state['last'] = time.time_ns()
             save(path, state)
             return {}
-        if 'snapshot' not in state:
+        if 'nodes' not in state:
             return {}
         if name in FINAL:
             if event.get('stop_hook_active'):
                 return {}
-            unchecked, entries = sets(state, listing(state['root']))[:2]
-            return {'decision': 'block', 'reason': message(unchecked, entries)} if unchecked else {}
+            refresh(state, files := listing(state['root']))
+            unchecked, entries = sets(state, files)
+            return {'decision': 'block', 'reason': message(unchecked, entries, state['nodes'])} if unchecked else {}
         text = record(state, event)
         save(path, state)
     if text:
