@@ -1172,6 +1172,68 @@ def execution_subjects(pre, changes, post=None):
     return {identity(target, pre) for target in targets if target != ''}
 
 
+def import_closure(program, cwd):
+    """Python files under cwd that a run of program imports, read from disk now.
+
+    Static: ast Import/ImportFrom nodes, resolved from the importing program's
+    directory first, then cwd; packages contribute their __init__.py files.
+    """
+    cwd = normalized_path(cwd or os.getcwd(), '/')
+    inside = lambda path: path == cwd or path.startswith(cwd.rstrip('/') + '/')
+    start = normalized_path(program.removeprefix('file:'), cwd)
+    if not start.endswith('.py') or not inside(start):
+        return set()
+    found, queue = set(), [start]
+    while queue and len(found) < 500:
+        path = queue.pop()
+        if path in found:
+            continue
+        try:
+            with open(path, encoding='utf-8') as handle:
+                tree = ast.parse(handle.read(), path)
+        except (OSError, ValueError, SyntaxError, RecursionError):
+            continue
+        found.add(path)
+        here = posixpath.dirname(path)
+
+        def module_files(parts, bases):
+            for base in bases:
+                chain, directory = [], base
+                for part in parts:
+                    directory = posixpath.join(directory, part)
+                    chain.append(directory)
+                if not parts:
+                    return [posixpath.join(base, '__init__.py')] if os.path.isfile(posixpath.join(base, '__init__.py')) else []
+                leaf = chain[-1]
+                if os.path.isfile(leaf + '.py') or os.path.isfile(posixpath.join(leaf, '__init__.py')):
+                    files = [posixpath.join(d, '__init__.py') for d in chain[:-1]]
+                    files.append(leaf + '.py' if os.path.isfile(leaf + '.py') else posixpath.join(leaf, '__init__.py'))
+                    return [f for f in files if os.path.isfile(f)]
+            return []
+
+        wanted = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    wanted.append(module_files(alias.name.split('.'), [here, cwd]))
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:
+                    base = here
+                    for _ in range(node.level - 1):
+                        base = posixpath.dirname(base)
+                    bases = [base]
+                else:
+                    bases = [here, cwd]
+                parts = (node.module or '').split('.') if node.module else []
+                wanted.append(module_files(parts, bases))
+                for alias in node.names:
+                    if alias.name != '*':
+                        wanted.append(module_files(parts + [alias.name], bases))
+        for files in wanted:
+            queue.extend(f for f in files if inside(f) and f not in found)
+    return {'file:' + path for path in found}
+
+
 def compiled_subjects(pre):
     """An explicit native compiler source -> -o product link, never a run."""
     words = simple_argv(pre.get('tool_input', {}).get('command', ''))
@@ -1614,6 +1676,10 @@ class Ledger:
                         run_start = position if self.code_changes.get(subject, {}).get('tool_use_id') == tid else started
                         self.executions.append({'q': position, 'started': run_start,
                                                 'subjects': {subject}, 'tool_use_id': tid})
+                        for paid in sorted(import_closure(subject, pre.get('cwd')) - {subject}):
+                            paid_start = position if self.code_changes.get(paid, {}).get('tool_use_id') == tid else started
+                            self.executions.append({'q': position, 'started': paid_start,
+                                                    'subjects': {paid}, 'tool_use_id': tid})
                     for product in invoked:
                         build = self.compiled.get(product)
                         if build and build['q'] < position:
@@ -1723,6 +1789,11 @@ class Ledger:
             if invoked:
                 self.executions.append({'q': self.q, 'started': started,
                                         'subjects': invoked, 'tool_use_id': tid})
+                for subject in sorted(invoked):
+                    for paid in sorted(import_closure(subject, pre.get('cwd')) - invoked):
+                        paid_start = self.q if self.code_changes.get(paid, {}).get('tool_use_id') == tid else started
+                        self.executions.append({'q': self.q, 'started': paid_start,
+                                                'subjects': {paid}, 'tool_use_id': tid})
         complete = full_read_subjects(pre, event)
         if complete and pre.get('tool_name') not in WRITERS | {'Agent', 'Task'}:
             if not ordered or pre.get('makoto', {}).get('reads') or meta.get('reads'):
