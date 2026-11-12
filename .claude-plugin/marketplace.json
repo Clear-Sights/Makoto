@@ -5,13 +5,14 @@
     "url": "https://github.com/Clear-Sights"
   },
   "metadata": {
-    "description": "Makoto: a hook that holds a final answer while a changed file, or a file that uses it, has not been run since."
+    "description": "Makoto: a hook that holds a final answer while a changed file, or a file that depends on it, has not been run since."
   },
   "plugins": [
     {
       "name": "makoto",
+      "version": "6.2.0",
       "source": "./plugin",
-      "description": "Holds a final answer while a file changed this session, or a file that uses it, has not been run since; one note after an edit and one hold at the end (any language, no git needed).",
+      "description": "Holds a final answer while a file changed this session, or a file that depends on it, has not been run since. One map of files and their links is the only state, and it never grows (any language, no git needed).",
       "category": "workflow",
       "tags": [
         "integrity",

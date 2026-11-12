@@ -93,8 +93,8 @@ def test_width_1_script_nothing_uses(s):
     assert s.stop() == {}
 
 
-def test_file_outside_the_lookup_without_shebang_is_not_demanded(s):
-    assert s.edit('a.py', 'print(1)\n') == {}
+def test_linkless_data_without_shebang_or_script_extension_is_not_demanded(s):
+    assert s.edit('a.txt', 'one\n') == {}
     assert s.edit('data.json', '{}') == {}
     assert s.stop() == {}
 
@@ -244,7 +244,7 @@ def test_infrastructure_errors_block_with_the_disable_text(tmp_path):
     bad = send(tmp_path, dict(hook_event_name='Stop', cwd=str(s.cwd)))  # no session id
     assert bad['decision'] == 'block' and 'claude plugin disable makoto' in bad['reason']
     state = tmp_path / 'state'
-    (state / next(p for p in os.listdir(state) if p.endswith('.json'))).write_text('{"snapshot": 5}')
+    (state / next(p for p in os.listdir(state) if p.endswith('.json'))).write_text('{"nodes": 5}')
     err = s.stop()
     assert err['decision'] == 'block' and 'claude plugin disable makoto' in err['reason']
 
@@ -270,3 +270,71 @@ def test_code_computing_the_sets_does_not_test_a_size():
         assert not [n for n in nodes if isinstance(n, ast.Call) and getattr(n.func, 'id', '') == 'len'], fn.name
         assert not [n for n in nodes if isinstance(n, ast.If) and not isinstance(n.test, ast.Compare)], fn.name  # membership only
         assert not [n for n in nodes if isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.Not)], fn.name
+
+
+WRITER = 'import json\njson.dump({}, open("out.json", "w"))\n'
+READER = 'import json\nprint(json.load(open("out.json")))\n'
+
+
+def test_linkless_changed_script_is_held(s):
+    note = s.edit('solo.py', 'print(1)\n')
+    assert note['hookSpecificOutput']['additionalContext'] == hold(['solo.py'], ['solo.py'])
+    assert s.stop()['reason'] == hold(['solo.py'], ['solo.py'])
+    s.sh('python3 solo.py')
+    assert s.stop() == {}
+
+
+def chain(tmp_path):
+    return Session(tmp_path, False, {'writer.py': WRITER, 'reader.py': READER, 'out.json': '{}'})
+
+
+def test_data_chain_changing_the_writer_demands_the_reader(tmp_path):
+    s = chain(tmp_path)
+    s.edit('writer.py', WRITER + '\n')
+    assert s.stop()['reason'] == hold(['out.json', 'reader.py', 'writer.py'], ['reader.py'])
+    s.sh('python3 writer.py')
+    assert s.stop()['reason'] == hold(['out.json', 'reader.py'], ['reader.py'])
+    s.sh('python3 reader.py')  # reaches out.json and its writer
+    assert s.stop() == {}
+
+
+def test_data_chain_a_run_of_the_reader_alone_checks_both_ends(tmp_path):
+    s = chain(tmp_path)
+    s.edit('writer.py', WRITER + '\n')
+    s.sh('python3 reader.py')
+    assert s.stop() == {}
+
+
+def test_data_chain_a_failed_run_of_the_reader_says_a_run_that_succeeds(tmp_path):
+    s = chain(tmp_path)
+    s.edit('writer.py', WRITER + '\n')
+    s.fail('python3 reader.py')
+    assert 'needs a run that succeeds' in s.stop()['reason']
+
+
+def state_file(tmp_path):
+    return next((tmp_path / 'state').glob('*[0-9a-f].json'))
+
+
+def test_state_is_the_same_size_after_200_runs_as_after_2(tmp_path):
+    s = snapshot_fan(tmp_path)
+    s.edit('lib.py', 'x = 2\n')
+    s.sh('python3 main.py')
+    s.sh('python3 u1.py')
+    small = state_file(tmp_path).stat().st_size
+    for i in range(99):
+        s.sh('python3 main.py')
+        s.sh('python3 u1.py')
+    assert state_file(tmp_path).stat().st_size == small
+
+
+def test_state_holds_a_map_and_no_list_of_runs_reads_notes_or_unpaid_files(tmp_path):
+    s = chain(tmp_path)
+    s.edit('writer.py', WRITER + '\n')
+    s.sh('python3 writer.py')
+    text = state_file(tmp_path).read_text(encoding='utf-8')
+    state = json.loads(text)
+    assert set(state) == {'root', 'nodes', 'last'}
+    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'shebang', 'uses', 'quotes', 'writes'}
+    for word in ('runs', 'reads', 'notes', 'unpaid'):
+        assert word not in text
