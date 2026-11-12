@@ -1,17 +1,9 @@
 Makoto is licensed under the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); its text is in LICENSE. Each version becomes available under the Apache License 2.0 on the second anniversary of its release.
 Every version up to and including commit 85ac4d5228509c5aa98412bdf109312cab6d7c78 was released under the Apache License 2.0 and stays under it.
 
-Makoto includes excerpts from DetIO and Causality (one modified, one unchanged) and one design adaptation.
-Those excerpts: Copyright 2026 Clear-Sights. Licensed under Apache License 2.0.
-DetIO notice: This product includes software developed as part of the Clear-Sights project (https://github.com/Clear-Sights).
-Source locations and exact revisions are recorded below.
+Makoto's code is original: it includes no excerpts from DetIO or Causality. The Apache License 2.0 text below covers only the earlier releases named above.
 
-Credits (our code <- source project, path, commit: what it does):
-- plugin/makoto2.py:leaves <- DetIO detio/core.py:leaves @ 0c7839c4c9e287a2c1f336c0ee95e7e280c5b5b7: Walks every native response string with its structural path, and (modified) every integer or float as its string, so tool inputs and responses can be searched for what they contain.
-- plugin/makoto2.py:receipt <- Causality causality/__init__.py:receipt @ 0d76999a2f81e9e00d2fe550ce3d2859dd568d16: Unchanged Causality receipt reused for the journal's execution and readback traces; they name the actual paired run or read tool-use IDs, proving act/output presence rather than success, branch coverage or hidden semantic dependency.
-- plugin/makoto2.py:execution_subjects/run_output <- Causality causality/__init__.py:run @ 0d76999a2f81e9e00d2fe550ce3d2859dd568d16: Design adaptation: Causality captures actual argv execution plus stdout/stderr before observing it; native paired invocation/output records replace its subprocess runner here. No upstream subprocess code is copied or executed by this checker.
-
-DetIO and Causality are licensed under the Apache License 2.0; its text follows, verbatim.
+The Apache License 2.0 follows, verbatim.
 
                                  Apache License
                            Version 2.0, January 2004
