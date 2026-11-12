@@ -32,7 +32,7 @@ class Session:
         tid = 't%d' % self.n
         for event in (self.ev('PreToolUse', tool_name=tool, tool_use_id=tid, tool_input=tool_input),
                       self.ev('PostToolUse', tool_name=tool, tool_use_id=tid, tool_input=tool_input, tool_response=response)):
-            assert send(self.tmp, event) == {}
+            assert 'decision' not in send(self.tmp, event)
 
     def write(self, path, text):
         (self.cwd / path).write_text(text, encoding='utf-8')

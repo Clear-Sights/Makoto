@@ -1526,6 +1526,8 @@ class Ledger:
         self.staged_code = {}
         self.git_tracked = set()
         self.committed_code = {}
+        self.notes = {}
+        self.new_notes = []
 
     def acted(self):
         """Whether the session made a tool call: completed, pending, refused or unpaired."""
@@ -1717,6 +1719,7 @@ class Ledger:
 
     def ingest(self, event, admitted=True):
         self.q += 1
+        self.new_notes = []
         name, meta = event['hook_event_name'], event.get('makoto', {})
         if meta.get('turn_id') is not None:
             self.turn = str(meta['turn_id'])
@@ -1779,6 +1782,14 @@ class Ledger:
                 self.mutations[subject] = self.q
                 self.written.add(subject)
                 self.change_code(pre, subject)
+                if (pre.get('tool_name') in ('Write', 'Edit', 'MultiEdit') and not failed(event) and subject.endswith('.py')
+                        and subject.startswith('file:') and (pre.get('cwd') or event.get('cwd'))):
+                    cwd = normalized_path(pre.get('cwd') or event.get('cwd'), '/').rstrip('/')
+                    noted = self.notes.get(subject)
+                    if subject[5:].startswith(cwd + '/') and (noted is None or any(
+                            run['started'] > noted and subject in run['subjects'] for run in self.executions)):
+                        self.notes[subject] = self.q
+                        self.new_notes.append(subject)
         if not failed(event) or no_effect:
             self.reservations.pop(tid, None)
         record_git(self, pre, event)
@@ -2198,6 +2209,29 @@ def infrastructure_block(raw, error):
     return d_out(event, reason)
 
 
+def run_note(ledger, event):
+    """lean3: one note per edited .py file until a run pays it; guidance, never a hold."""
+    if event.get('hook_event_name') != 'PostToolUse' or not ledger.new_notes or not event.get('cwd'):
+        return {}
+    cwd = normalized_path(event['cwd'], '/').rstrip('/')
+    files = []
+    for top, dirs, names in os.walk(cwd):
+        dirs[:] = sorted(d for d in dirs if not d.startswith('.') and d != '__pycache__')
+        files.extend(posixpath.join(top, n) for n in sorted(names) if n.endswith('.py'))
+        if len(files) > 2000:
+            break
+    closures = {f: import_closure(f, cwd) for f in files}
+    imported = set()
+    for f, closure in closures.items():
+        imported |= closure - {'file:' + f}
+    edited = ledger.new_notes[0]
+    shown = edited[5:][len(cwd) + 1:]
+    tops = sorted((f[len(cwd) + 1:] for f in files if 'file:' + f not in imported and edited in closures[f]),
+                  key=lambda r: (len(r), r))
+    return {'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext':
+            'Before your final answer, run python3 ' + (tops[0] if tops else shown) + ' and read its output: it runs ' + shown + '.'}}
+
+
 def d_out(event, reason):
     if not reason:
         return {}
@@ -2294,7 +2328,12 @@ def main(raw, config):
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
             if state:
                 checkpoint_save(path, saved)
-            return d_out(event, reason) if reason else {}
+            if reason:
+                return d_out(event, reason)
+            try:
+                return run_note(ledger, event)
+            except Exception:
+                return {}
     except Exception as error:
         # Fail closed: an error in Makoto's own reading (state, lock, journal, transcript,
         # malformed host event) blocks, names the error and says how to disable Makoto.
