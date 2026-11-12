@@ -1465,6 +1465,10 @@ class Ledger:
         self.git_tracked = set()
         self.committed_code = {}
 
+    def acted(self):
+        """Whether the session made a tool call: completed, pending, refused or unpaired."""
+        return bool(self.seen or self.pending or self.denied or self.unknown)
+
     def changed_code(self):
         result = dict(self.code_changes)
         for tid, pre in self.pending.items():
@@ -1887,7 +1891,11 @@ def evaluate(ledger, event, adapter='inferred'):
         if exists and known not in ledger.written and not any(known in r['subjects'] for r in ledger.readings):
             findings.append({'rule': 'e', 'family': 'e', 'shape': 'file', 'subject': edited,
                              'missing': ORIGINAL + ' Missing: a reading of this file before it is edited or overwritten. Clear: Read ' + edited + '.'})
-    if not readings and not creation and (shipping is None or name_spans):
+    # A final answer of a session that made no tool call relies on no artifact, and one
+    # reading of any file would clear rule a without checking it: rule a does not hold it.
+    # Rule b still holds a name in it that no reading showed.
+    if (not readings and not creation and (shipping is None or name_spans)
+            and (event['hook_event_name'] not in FINAL or ledger.acted())):
         span = spans[0].text if spans else text
         findings.append({'rule': 'a', 'family': 'a', 'shape': 'lineage', 'subject': span,
                          'missing': ORIGINAL + ' Missing: a reading of an original artifact; assistant text and files this session wrote do not clear it. Clear: Read the original artifact this step relies on.'})
