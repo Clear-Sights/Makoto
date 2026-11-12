@@ -1,13 +1,19 @@
-"""Makoto: the immediacy hook. Live entry: cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks/hooks.json),
-one serialized native Claude Code hook event on stdin, one JSON response on stdout.
+"""Makoto: holds a final answer that ships a code file edited this session and not run since. Live entry:
+cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks/hooks.json), one serialized native Claude Code hook
+event on stdin, one JSON response on stdout.
 
-Sections, in dependency order: paths, shell, borrowed, precision, observed, transcript, switch, shipping, creations, provenance, evaluate, hook, checkpoint, __main__.
-Excerpts from DetIO and Causality (leaves and get, modified; receipt, unchanged) and one design
+A hook event is appended to a locked, hash-linked journal and replayed, with the host transcript, into a Ledger of
+edits, runs and full reads. Only a final answer (Stop, SubagentStop, PreDelivery) can be held, by rule d, and only
+a run of the file, a run of a program that imports it, or (for a config file) a full read after its last edit
+pays the hold. After a completed .py edit the PostToolUse response names the program to run. An error in Makoto
+itself blocks, names the error and the one way to disable Makoto.
+
+Sections, in dependency order: paths, shell, borrowed, observed, transcript, switch, provenance, evaluate, hook, checkpoint, __main__.
+Excerpts from DetIO and Causality (leaves, modified; receipt, unchanged) and one design
 adaptation (execution_subjects, run_output) are credited in NOTICE.
 """
 import ast
 import contextlib
-import fnmatch
 import hashlib
 import json
 import marshal
@@ -18,7 +24,6 @@ import re
 import shlex
 import sys
 import time
-from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 
@@ -39,24 +44,6 @@ def normalized_path(path, cwd):
     path, cwd = path.replace('\\', '/'), cwd.replace('\\', '/')
     paths = flavour(path, cwd)
     return paths.normpath(paths.join(cwd, path)).replace('\\', '/')
-
-
-def relative_path(path, cwd):
-    """A different drive/share has no relative spelling; never call relpath."""
-    path, cwd = path.replace('\\', '/'), cwd.replace('\\', '/')
-    paths = flavour(path, cwd)
-    if paths is ntpath and ntpath.splitdrive(path)[0].lower() != ntpath.splitdrive(cwd)[0].lower():
-        return None
-    return paths.relpath(path, cwd).replace('\\', '/')
-
-
-def path_spellings(path, cwd):
-    """Equivalent separator spellings for output paths and change references."""
-    spellings = {path}
-    relative = relative_path(path, cwd)
-    if relative is not None:
-        spellings.update((relative, './' + relative))
-    return spellings | {value.replace('/', '\\') for value in spellings}
 
 
 def program_name(path):
@@ -237,7 +224,7 @@ def selected_segments(command, post):
 # borrowed: Excerpts from DetIO and Causality; source pins in NOTICE.
 #
 # Copyright 2026 Clear-Sights. Licensed under Apache-2.0, whose text is in NOTICE (LICENSE is Makoto's FSL-1.1-ALv2).
-# Changes: numeric leaves, explicit store, SHA verification, call-site traces.
+# Changes: numeric leaves.
 
 def leaves(r, path=()):
     """DetIO core.leaves: every string in a nested native response."""
@@ -249,261 +236,11 @@ def leaves(r, path=()):
         yield from leaves(v, path + (k,))
 
 
-def get(store, address):
-    """Adapted DetIO core.get: only a witnessed content address is opened."""
-    if not re.fullmatch(r'[0-9a-f]{12}|[0-9a-f]{64}', address):
-        raise ValueError('invalid DetIO address')
-    data = (Path(store).expanduser() / 'objects' / address).read_bytes()
-    if not hashlib.sha256(data).hexdigest().startswith(address):
-        raise ValueError('DetIO object does not match its bytes')
-    return data.decode('utf-8')
-
-
 def receipt(claim, trace, fingerprint):
     # Causality receipt, copied unchanged; no trace-free admitted write.
     if not trace:
         raise ValueError("a claim without a trace is a belief, not a receipt")
     return {"claim": claim, "trace": trace, "instruments": fingerprint}
-
-
-def fragments(value):
-    """Tool input/response includes its literal field names as well as values."""
-    for _, v in leaves(value):
-        yield v
-        # A connector returns its JSON as one string; what the session saw is
-        # the decoded text, so tabs and quotes inside bodies match their source.
-        if isinstance(v, str) and v[:1] in '{[' and '\\' in v:
-            try:
-                decoded = json.loads(v)
-            except ValueError:
-                continue
-            if isinstance(decoded, (dict, list)):
-                yield from fragments(decoded)
-    if isinstance(value, dict):
-        for key, child in value.items():
-            yield str(key)
-            if isinstance(child, (dict, list)):
-                yield from fragments(child)
-    elif isinstance(value, list):
-        for child in value:
-            if isinstance(child, (dict, list)):
-                yield from fragments(child)
-
-
-# ======================================================================
-# precision: Exact form spans, independent of the hook and reusable by DetIO.
-#
-# The closed common-word list is the documented deterministic catch-all rule.
-# No stemming, spelling correction, path normalization or semantic classification.
-
-COMMON = frozenset(Path(__file__).with_name('common-english.txt').read_text(encoding='utf-8').split())
-
-
-Span = namedtuple('Span', 'text start end kind')
-
-
-# Each delimited payload is one exact span, including its whitespace.
-DELIMITED = re.compile(r'```[^\n]*\n(?P<fence>[\s\S]*?)```|~~~[^\n]*\n(?P<tilde>[\s\S]*?)~~~|`(?P<tick>[^`\n]+)`|"(?P<double>(?:\\.|[^"\\])*)"|(?<!\w)\x27(?P<single>(?:\\.|[^\x27\\])*)\x27(?!\w)|“(?P<curly>[^”]*)”|‘(?P<quote>[^’]*)’')
-TOKEN = re.compile(r'[^\s<>"\x27`“”‘’]+(?:[\x27’][^\s<>"\x27`“”‘’]+)*', re.UNICODE)
-URL = re.compile(r'https?://[^\s<>"\x27`“”‘’]+')
-# Retain compact prerelease/postrelease/build spellings. Only terminal sentence
-# punctuation is excluded; this is a lexical slice, not a version validator.
-PACKAGE_VERSION = r'\d(?:[\w.+-]*\w)?'
-VERSIONED = re.compile(r'(?<![\w/])(?P<package>@?[A-Za-z][\w.-]*(?:/[\w.-]+)?)\s*(?:@|==|>=|<=|~=|\bv(?:ersion)?\s*|\s+(?=\d+\.\d))\s*(?P<version>' + PACKAGE_VERSION + r')(?![\w+.-]*\w)')
-UNIT = re.compile(r'(?<!\w)[+-]?\d+(?:\.\d+)?\s*(?:[A-Za-zµμ°%]+(?:/[A-Za-z]+)?)(?!\w)')
-GRAMMAR_WORDS = frozenset('a an the is are was were be been being am has have had do does did of for to from in on at by with without as than and or but if then it its this that these those'.split())
-VERSION_LABELS = frozenset('version revision release edition build'.split())
-RESULT_VERBS = frozenset('outputs produces returns prints equals'.split())
-
-
-def extract(text, *, tool_output=False):
-    """Return all precision spans with original offsets; never regenerate bytes.
-
-    tool_output=True preserves each complete nonempty output line in addition
-    to lexical spans. Callers may pass prior output lines back via exact matching.
-    """
-    found = {}
-
-    def add(start, end, kind):
-        if end > start:
-            found.setdefault((start, end), Span(text[start:end], start, end, kind))
-
-    for match in DELIMITED.finditer(text):
-        name = match.lastgroup
-        add(*match.span(name), 'delimited')
-    for match in URL.finditer(text):
-        start, end = match.span()
-        while end > start and text[end-1] in '.,;!?)]}':
-            closer = text[end-1]
-            if closer in ')]}' and text[start:end].count(closer) <= text[start:end].count('([{'[')]}'.index(closer)]):
-                break  # a balanced bracket belongs to the URL
-            end -= 1
-        add(start, end, 'url')
-    for pattern, kind in ((VERSIONED, 'external-package'), (UNIT, 'unit')):
-        for match in pattern.finditer(text):
-            if kind == 'external-package':
-                separator = text[match.end('package'):match.start('version')]
-                if (separator.isspace() or separator.strip().lower() in VERSION_LABELS) and match['package'].lower() in GRAMMAR_WORDS:
-                    continue
-                if separator.isspace() and (match['package'].lower() in VERSION_LABELS
-                        or match['package'].lower() in RESULT_VERBS and re.fullmatch(r'\d+\.\d+', match['version'])):
-                    continue
-                # A whitespace pair can accidentally attach the preceding
-                # prose word to a measurement. Explicit package operators/v
-                # forms are still names; a numeric slice of a unit is a value.
-                if separator.isspace() and any(unit.start() <= match.start('version')
-                        and match.end('version') <= unit.end()
-                        and re.sub(r'^[+-]?\d+(?:\.\d+)?\s*', '', unit.group()).lower() not in GRAMMAR_WORDS
-                        for unit in UNIT.finditer(text)):
-                    continue
-            add(*match.span(), kind)
-    for match in TOKEN.finditer(text):
-        start, end = match.span()
-        value = match.group()
-        if (start > 0 and text[start - 1] == '<' and end < len(text) and text[end] == '>'
-                and re.fullmatch(r'/?[A-Za-z][\w:-]*', value)):
-            continue  # Markup tags are syntax, not authored file paths.
-        # Sentence punctuation is outside a token. Internal punctuation is exact.
-        while value.endswith(('.', ',', ';', ':', '?', '!')) or (
-                value.startswith(('https://', 'http://')) and value[-1:] in ')]}'
-                and value.count(value[-1]) > value.count('([{'[')]}'.index(value[-1])])):
-            value = value[:-1]
-            end -= 1
-        if not value or not any(c.isalnum() for c in value):
-            continue
-        if value.startswith(('https://', 'http://')):
-            kind = 'url'
-        elif '@' in value and '.' in value.split('@')[-1]:
-            kind = 'email'
-        elif '/' in value or '\\' in value or re.search(r'\w\.\w', value):
-            kind = 'path'
-        elif any(c.isdigit() for c in value):
-            kind = 'digit'
-        elif any(not c.isalpha() for c in value) or re.search(r'[a-z][A-Z]', value):
-            kind = 'identifier'
-        elif value.lower() not in COMMON:
-            kind = 'non-dictionary'
-        else:
-            continue
-        add(start, end, kind)
-    # Visible log/stack syntax is a form, irrespective of its subject.
-    for match in re.finditer(r'(?m)^(?:\s*(?:Error|ERROR|Fatal|FATAL|Traceback|WARNING|WARN|INFO|DEBUG)(?::|\b)[^\n]*|\s+at [^\n]*|\s*File "[^\n]*|\[\d[^\n]*)$', text):
-        add(*match.span(), 'output-line')
-    if tool_output:
-        offset = 0
-        for line in text.splitlines(keepends=True):
-            add(offset, offset + len(line.rstrip('\r\n')), 'output-line')
-            offset += len(line)
-    return sorted(found.values(), key=lambda s: (s.start, -s.end, s.kind))
-
-
-UUID = re.compile(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}')
-HASH = re.compile(r'(?=[0-9a-fA-F]*[a-fA-F])(?=[0-9a-fA-F]*\d)[0-9a-fA-F]{7,64}|[a-fA-F]{32}|[a-fA-F]{40}|[a-fA-F]{64}')
-VERSION = re.compile(r'(?:v\d+(?:\.\d+)+|\d+(?:\.\d+){2,})(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?')
-EMAIL = re.compile(r'[A-Za-z0-9.!#$%&*+/=?^_{}|~+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+')
-MODULE = re.compile(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+')
-FILENAME = re.compile(r'(?:\.[A-Za-z_][\w.-]*|[\w-]+(?:\.[\w-]+)*\.[A-Za-z_][\w-]*)(?::\d+(?::\d+)?)?')
-IDENTIFIER = re.compile(r'[A-Za-z_]\w*')
-ALPHANUMERIC_ID = re.compile(r'(?=[A-Za-z0-9_-]*\d)[A-Za-z][A-Za-z0-9_-]*')
-PATH = re.compile(r'(?:[A-Za-z]:[\\/]|[.~]?[\\/]|\.\.[\\/])?[^\s<>"\x27`|?*()\[\]{}]+(?:[\\/][^\s<>"\x27`|?*()\[\]{}]+)*[\\/]?')
-
-
-def name_kind(value, *, quoted=False):
-    """Closed lexical NAME forms, independent of the common-word allowlist.
-
-    A dotted numeric pair is a decimal; versions have three numeric components
-    or an explicit v prefix. Short hex hashes require letters and digits; long
-    all-letter hashes use fixed 32/40/64 widths. All digits remain numbers.
-    Hyphenated alphabetic words and digit-leading unit values are not identifiers.
-    """
-    if re.fullmatch(r'https?://[^\s<>"\x27`“”‘’]+', value):
-        return 'url'
-    if EMAIL.fullmatch(value):
-        return 'email'
-    if (UUID.fullmatch(value) or HASH.fullmatch(value) or VERSION.fullmatch(value)
-            or re.fullmatch(r'[A-Za-z][\w-]*-\d+(?:\.\d+)+(?:[-+][\w.-]+)?', value)):
-        return 'identifier'
-    if VERSIONED.fullmatch(value):
-        return 'external-package'
-    if MODULE.fullmatch(value) or FILENAME.fullmatch(value):
-        return 'path'  # Files and dotted modules share exact boundary matching.
-    if PATH.fullmatch(value) and ('/' in value or '\\' in value):
-        # A ratio of plain numbers is a value, not a file name.
-        if not re.fullmatch(r'[+-]?\d+(?:\.\d+)?/\d+(?:\.\d+)?', value):
-            return 'path'
-    if quoted and ' ' in value and '\n' not in value and '\r' not in value:
-        lexical = value.replace(' ', '_')
-        if FILENAME.fullmatch(lexical) or PATH.fullmatch(lexical) and ('/' in lexical or '\\' in lexical):
-            return 'path'
-    if IDENTIFIER.fullmatch(value) and ('_' in value or re.search(r'[a-z][A-Z]', value)):
-        return 'identifier'
-    if ALPHANUMERIC_ID.fullmatch(value):
-        return 'identifier'
-    return None
-
-
-def names(text):
-    """NAME-only view of extract(), retaining original bytes and offsets.
-
-    Quoting never promotes prose or values to names. Whole output lines and
-    unit spans stay in the general extractor, while names inside them still count.
-    Surrounding token brackets are punctuation, not part of a name.
-    """
-    found = {}
-    spans = extract(text)
-    units = [s for s in spans if s.kind == 'unit']
-    delimited_names = [s for s in spans if s.kind == 'delimited' and name_kind(s.text, quoted=True)
-                       and not re.match(r'^[A-Za-z_]\w*=', s.text)]
-    for span in spans:
-        if any(s.start <= span.start and span.end <= s.end and (span.start, span.end) != (s.start, s.end) for s in delimited_names):
-            continue
-        if span.kind == 'output-line' or span.kind == 'unit' and not HASH.fullmatch(span.text):
-            continue
-        # Split token wrappers too: Markdown [label](path) and call(id_name)
-        # still name the enclosed path/identifier. A complete URL wins first.
-        candidates = [(span.start, span.end)]
-        assignment = re.match(r'^[A-Za-z_]\w*=', span.text)
-        if assignment:
-            candidates = [(span.start, span.start + assignment.end() - 1),
-                          (span.start + assignment.end(), span.end)]
-        elif not name_kind(span.text, quoted=span.kind == 'delimited'):
-            candidates += [(span.start + m.start(), span.start + m.end())
-                           for m in re.finditer(r'[^\s()\[\]{}]+', span.text)]
-        for start, end in candidates:
-            value = text[start:end]
-            if any(u.start <= start and end <= u.end for u in units) and not (HASH.fullmatch(value) or UUID.fullmatch(value) or VERSION.fullmatch(value)):
-                continue
-            kind = name_kind(value, quoted=span.kind == 'delimited' and (start, end) == (span.start, span.end))
-            if kind:
-                found.setdefault((start, end), Span(value, start, end, kind))
-    return sorted(found.values(), key=lambda s: (s.start, -s.end, s.kind))
-
-
-def package_parts(value):
-    """Exact package/version components, independent of separator spelling."""
-    match = VERSIONED.fullmatch(value)
-    return (match['package'], match['version']) if match else None
-
-
-def contains(text, span, kind=None):
-    """Exact characters with token boundaries; 731 is not evidence for 73."""
-    strict = kind in ('path', 'email', 'url', 'identifier', 'digit', 'external-package')
-    def edge(char):
-        punctuation = '/\\.@+~%#?&$!*|-'
-        if kind in ('path', 'url', 'external-package'):
-            punctuation += ':'
-        if kind == 'url':
-            punctuation += '='
-        return char.isalnum() or char == '_' or strict and char in punctuation
-    start = 0
-    while (at := text.find(span, start)) >= 0:
-        end = at + len(span)
-        # A '.' or similar that ends a sentence (followed by space or the end) is not part of the name.
-        closes = end < len(text) and text[end] in '.,;:!?' and (end + 1 == len(text) or text[end + 1].isspace())
-        if (not edge(span[0]) or at == 0 or not edge(text[at-1])) and (not edge(span[-1]) or end == len(text) or not edge(text[end]) or closes):
-            return True
-        start = at + 1
-    return False
 
 
 # ======================================================================
@@ -557,30 +294,6 @@ def programs(event):
             words = words[1:]
         if words and words[0]:
             yield words
-
-
-def git_action(event):
-    for words in programs(event):
-        if program_name(words[0]) != 'git':
-            continue
-        i = 1
-        while i < len(words) and words[i].startswith('-'):
-            i += 2 if words[i] in ('-C', '-c', '--git-dir', '--work-tree') else 1
-        if i < len(words) and words[i] in ('commit', 'push'):
-            return True
-    return False
-
-
-def dependent(event):
-    return event['hook_event_name'] in FINAL or event['hook_event_name'] == 'PreToolUse' and (event.get('tool_name') in WRITERS or event.get('tool_name') == 'Bash' and git_action(event))
-
-
-def text_of(event):
-    if event['hook_event_name'] in FINAL:
-        return event.get('last_assistant_message', '')
-    ti = event.get('tool_input', {})
-    # Inputs' keys are protocol, not authored content. Include writer targets.
-    return '\n'.join(value for _, value in leaves(ti))
 
 
 def response_text(response):
@@ -648,48 +361,8 @@ def effects(event):
     return list(event.get('makoto', {}).get('effects', [])) + [r for r in result if r['subject'] != '' and not any(c in r['subject'] for c in '$*?`')]
 
 
-def reading_subjects(pre):
-    ti, name = pre.get('tool_input', {}), pre.get('tool_name')
-    result = [r['subject'] for r in pre.get('makoto', {}).get('reads', [])]
-    if name in ('Read', 'NotebookRead'):
-        if target := ti.get('file_path') or ti.get('notebook_path'):
-            result.append(target)
-    elif name in ('Grep', 'Glob'):
-        result.append(ti.get('path') or pre.get('cwd') or '.')
-    elif name == 'WebFetch' and ti.get('url'):
-        result.append(ti['url'])
-    elif name == 'Bash':
-        for words in programs(pre):
-            if program_name(words[0]) in ('cat', 'head', 'tail', 'less', 'more', 'wc', 'rg', 'grep', 'ls', 'stat', 'find'):
-                result.extend(w for w in words[1:] if w and not w.startswith('-'))
-            # Executing a program reads its response, not the program file.
-            # Only direct file readers above inherit that file's own/stale status.
-    return result
-
-
-def network_targets(pre, post):
-    ti, name = pre.get('tool_input', {}), pre.get('tool_name')
-    result = []
-    if name == 'WebFetch' and ti.get('url'):
-        result.append(ti['url'])
-    elif name == 'WebSearch':
-        # A search pays subjects in its query and returned source links.
-        result.extend(v for _, v in leaves(ti))
-        result.extend(v for _, v in leaves(post.get('tool_response')))
-    elif name == 'Bash':
-        for words in programs(pre):
-            if any(w in ('--offline', '--no-index') for w in words):
-                continue
-            if program_name(words[0]) in ('curl', 'wget', 'http', 'https', 'fetch'):
-                result.extend(w for w in words[1:] if w and not w.startswith('-'))
-            elif (program_name(words[0]) in ('pip', 'pip3', 'npm', 'pnpm', 'yarn', 'cargo', 'go') and any(w in ('install', 'add', 'get', 'view') for w in words[1:])) or program_name(words[0]) == 'git' and any(w in ('fetch', 'clone', 'pull') for w in words[1:]):
-                result.extend(w for w in words[1:] if w)
-    result.extend(pre.get('makoto', {}).get('network_subjects', []))
-    return result
-
-
 # ======================================================================
-# transcript: Read host transcript history without promoting assistant text to evidence.
+# transcript: Read host transcript history; assistant text is never a run.
 #
 # Native JSONL hook rows and Claude message/tool_use/tool_result rows are accepted.
 # The current candidate is excluded. Journal decisions override matching imports.
@@ -803,7 +476,7 @@ def history(candidate, journal, cache=None):
         parse_transcript(cache)
     except FileNotFoundError:
         # The host can submit a prompt before writing its first transcript.
-        # Missing history adds no evidence and never replaces the verified journal.
+        # Missing history adds nothing and never replaces the verified journal.
         return merge([], journal), None
     # The candidate's own call and everything after it are excluded.
     current = candidate.get('tool_use_id')
@@ -882,18 +555,7 @@ def edited_forms(event, target):
             or re.search(r'(?m)^#!\s*\S+', content)
             or suffix not in ('md', 'rst', 'adoc') and (DECLARATIONS.search(content) or structured)):
         return None
-    aliases = {s.text for s in names(content) if s.kind == 'identifier'}
-    aliases.update(value for match in DECLARATIONS.finditer(content) for value in match.groups() if value)
-    # JSON/YAML keys and dotted module names are also syntactic identifiers.
-    aliases.update(re.findall(r'(?:^|[\n{,])\s*["\x27]([A-Za-z_]\w*)["\x27]\s*:', content))
-    stem = ntpath.splitext(ntpath.basename(path))[0]
-    if re.fullmatch(r'[A-Za-z_]\w*', stem):
-        aliases.add(stem)
-    relative = relative_path(absolute, event.get('cwd') or os.getcwd())
-    module = ntpath.splitext(relative)[0].replace('/', '.') if relative is not None else ''
-    if re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*', module):
-        aliases.add(module.removesuffix('.__init__'))
-    return {'subject': identity(target, event), 'display': target, 'aliases': aliases,
+    return {'subject': identity(target, event), 'display': target,
             'data': data, 'data_form': data_form, 'record': record}
 
 
@@ -973,40 +635,6 @@ def json_loaded_paths(command):
             for match in JSON_LOAD.finditer(argv[2]):
                 paths.append(match.group(2) or match.group(4))
     return paths
-
-
-def names_change(event, change):
-    """Every ship after code edits counts; writers require a literal name.
-
-    A final answers for what its own agent wrote: a subagent's Stop is not held
-    for a sibling worker's file. Commit and push still ship every agent's edits.
-    """
-    if event.get('tool_name') == 'Bash' and git_action(event):
-        return True
-    if event['hook_event_name'] in FINAL:
-        return change.get('agent') == event.get('agent_id')
-    text = text_of(event)
-    # A worker that merely mentions a sibling worker's file is not answering for
-    # it: the journal is shared by session, so each worker would otherwise
-    # inherit every other worker's unrun items. Writing that file still counts.
-    sibling = bool(event.get('agent_id')) and change.get('agent') not in (None, event['agent_id'])
-    for span in ([] if sibling else names(text)):
-        path = re.sub(r':\d+(?::\d+)?$', '', span.text)
-        if span.kind == 'path' and identity(path, event) == change['subject']:
-            return True
-    # Include space-containing paths in writer targets and quoted prose.
-    ti = event.get('tool_input', {})
-    if any(identity(ti[key], event) == change['subject'] for key in ('file_path', 'notebook_path') if ti.get(key)):
-        return True
-    absolute = change['subject'][5:]
-    if not sibling and any(contains(text, value, 'path') for value in path_spellings(absolute, event.get('cwd') or os.getcwd())):
-        return True
-    # Keys and stems of a data file are its schema. A writer producing another
-    # data file with the same keys is authoring a sibling, not naming this one.
-    writer = ti.get('file_path') or ti.get('notebook_path') or ''
-    if change.get('data_form') and ntpath.splitext(writer)[1].lstrip('.').lower() in CONFIG_SUFFIXES:
-        return False
-    return any(contains(text, alias, 'identifier') for alias in change['aliases'])
 
 
 def simple_argv(command):
@@ -1172,6 +800,68 @@ def execution_subjects(pre, changes, post=None):
     return {identity(target, pre) for target in targets if target != ''}
 
 
+def import_closure(program, cwd):
+    """Python files under cwd that a run of program imports, read from disk now.
+
+    Static: ast Import/ImportFrom nodes, resolved from the importing program's
+    directory first, then cwd; packages contribute their __init__.py files.
+    """
+    cwd = normalized_path(cwd or os.getcwd(), '/')
+    inside = lambda path: path == cwd or path.startswith(cwd.rstrip('/') + '/')
+    start = normalized_path(program.removeprefix('file:'), cwd)
+    if not start.endswith('.py') or not inside(start):
+        return set()
+    found, queue = set(), [start]
+    while queue and len(found) < 500:
+        path = queue.pop()
+        if path in found:
+            continue
+        try:
+            with open(path, encoding='utf-8') as handle:
+                tree = ast.parse(handle.read(), path)
+        except (OSError, ValueError, SyntaxError, RecursionError):
+            continue
+        found.add(path)
+        here = posixpath.dirname(path)
+
+        def module_files(parts, bases):
+            for base in bases:
+                chain, directory = [], base
+                for part in parts:
+                    directory = posixpath.join(directory, part)
+                    chain.append(directory)
+                if not parts:
+                    return [posixpath.join(base, '__init__.py')] if os.path.isfile(posixpath.join(base, '__init__.py')) else []
+                leaf = chain[-1]
+                if os.path.isfile(leaf + '.py') or os.path.isfile(posixpath.join(leaf, '__init__.py')):
+                    files = [posixpath.join(d, '__init__.py') for d in chain[:-1]]
+                    files.append(leaf + '.py' if os.path.isfile(leaf + '.py') else posixpath.join(leaf, '__init__.py'))
+                    return [f for f in files if os.path.isfile(f)]
+            return []
+
+        wanted = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    wanted.append(module_files(alias.name.split('.'), [here, cwd]))
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:
+                    base = here
+                    for _ in range(node.level - 1):
+                        base = posixpath.dirname(base)
+                    bases = [base]
+                else:
+                    bases = [here, cwd]
+                parts = (node.module or '').split('.') if node.module else []
+                wanted.append(module_files(parts, bases))
+                for alias in node.names:
+                    if alias.name != '*':
+                        wanted.append(module_files(parts + [alias.name], bases))
+        for files in wanted:
+            queue.extend(f for f in files if inside(f) and f not in found)
+    return {'file:' + path for path in found}
+
+
 def compiled_subjects(pre):
     """An explicit native compiler source -> -o product link, never a run."""
     words = simple_argv(pre.get('tool_input', {}).get('command', ''))
@@ -1207,235 +897,7 @@ def run_output(post):
 
 
 # ======================================================================
-# shipping: Commit scope from recorded git arguments and successful staging receipts.
-#
-# Never invokes git or assumes all session edits belong to a commit.
-
-def git_calls(event):
-    cwd = event.get('cwd') or '/'
-    for words in programs(event):
-        if program_name(words[0]) == 'cd' and len(words) == 2:
-            cwd = normalized_path(words[1], cwd)
-            continue
-        if program_name(words[0]) != 'git':
-            continue
-        context_cwd, i = cwd, 1
-        while i < len(words) and words[i].startswith('-'):
-            option = words[i]
-            if option in ('-C', '-c', '--git-dir', '--work-tree'):
-                if i + 1 >= len(words):
-                    break
-                if option == '-C':
-                    context_cwd = normalized_path(words[i + 1], context_cwd)
-                i += 2
-            else:
-                i += 1
-        if i < len(words):
-            yield dict(event, cwd=context_cwd), words[i], list(words[i + 1:])
-
-
-def git_unquote(text):
-    """Decode git's C-style quoted path, including octal UTF-8 bytes."""
-    simple = {'a': 7, 'b': 8, 't': 9, 'n': 10, 'v': 11, 'f': 12, 'r': 13, '"': 34, '\\': 92}
-    out = bytearray()
-    for match in re.finditer(r'\\([0-7]{3})|\\(.)|(.)', text[1:-1], re.S):
-        if match[1]:
-            out.append(int(match[1], 8) & 255)
-        elif match[2]:
-            if match[2] not in simple:
-                raise ValueError('unknown escape in quoted path')
-            out.append(simple[match[2]])
-        else:
-            out += match[3].encode()
-    return out.decode('utf-8', 'replace')
-
-
-def pathspecs(action, args):
-    """The paths a git call selects: a revision is not a path, and -A/-u alone select the tree."""
-    specs = operands(args)
-    if action == 'reset' and specs and re.fullmatch(r'(?:HEAD|[0-9a-f]{7,40})(?:[~^]\d*)*', specs[0]):
-        specs = specs[1:]
-    if action == 'add' and not specs and any(a in args for a in ('--all', '-A', '-u', '--update')):
-        specs = ['.']
-    return specs
-
-
-def path_part(name, text):
-    """name is a file name or directory inside a longer path in text (`claims.py` in `app/claims.py`)."""
-    part = name.rstrip('/')
-    return bool(part) and re.search(r'(?:(?<=/)|(?<![\w.~-]))' + re.escape(part) + r'(?![\w-])(?!\.\w)', text) is not None
-
-
-def operands(args):
-    result, i = [], 0
-    value_options = {'-m', '--message', '-F', '--file', '-C', '-c', '--reuse-message',
-                     '--reedit-message', '--fixup', '--squash', '--author', '--date',
-                     '--cleanup', '--pathspec-from-file', '--unified'}
-    while i < len(args):
-        word = args[i]
-        if word == '--':
-            return result + args[i + 1:]
-        if word in value_options:
-            i += 2
-            continue
-        if re.fullmatch(r'-[a-zA-Z]*[mF]', word):
-            i += 2
-            continue
-        if not word.startswith('-'):
-            result.append(word)
-        i += 1
-    return result
-
-
-def matches(subject, specs, event):
-    if not subject.startswith('file:'):
-        return False
-    path = subject[5:]
-    for spec in specs:
-        if any(c in spec for c in '$`') or spec.startswith(':'):
-            continue  # An opaque pathspec declares no concrete file here.
-        target = normalized_path(spec, event['cwd'])
-        if path == target or path.startswith(target.rstrip('/') + '/') or fnmatch.fnmatchcase(path, target):
-            return True
-    return False
-
-
-def commit_changes(ledger, event, changes=None):
-    """None for nonshipping calls, otherwise the recorded commit's code forms."""
-    result, shipping = {}, False
-    changes = ledger.changed_code() if changes is None else changes
-    staged = dict(ledger.staged_code)
-    for context, action, args in git_calls(event):
-        specs = pathspecs(action, args)
-        # A proposed aggregate command can stage or unstage before committing.
-        # This predicts its file selection, never invents a completed run or
-        # mutates the ledger with candidate evidence.
-        if action == 'add' and not any(a in args for a in ('--dry-run', '-n', '--intent-to-add', '-N', '-p', '--patch', '-i', '--interactive')):
-            staged.update({s: c for s, c in changes.items() if matches(s, specs, context)})
-        elif action in ('reset', 'restore', 'rm') and (action != 'restore' or '--staged' in args or '-S' in args):
-            if action == 'reset':
-                if '--soft' in args:
-                    continue  # a soft reset leaves the index alone
-            staged = {s: c for s, c in staged.items() if specs and not matches(s, specs, context)}
-        if action not in ('commit', 'push'):
-            continue
-        shipping = True
-        if action == 'push':
-            result.update(ledger.committed_code)
-            continue
-        if any(a in args for a in ('--dry-run', '--short', '--porcelain')):
-            continue
-        only = '--only' in args or '-o' in args or specs and '--include' not in args and '-i' not in args
-        selected = {} if only else dict(staged)
-        if specs:
-            selected.update({s: c for s, c in changes.items() if matches(s, specs, context)})
-        if '--all' in args or any(re.fullmatch(r'-[a-zA-Z]*a[a-zA-Z]*', a) for a in args):
-            selected.update({s: c for s, c in changes.items() if s in ledger.git_tracked})
-        result.update(selected)
-    return result if shipping else None
-
-
-def record_git(ledger, pre, post):
-    if failed(post) or post.get('tool_response') is None or pre.get('tool_name') != 'Bash':
-        return
-    response = post['tool_response']
-    if isinstance(response, dict) and any(response.get(k) for k in
-            ('backgroundTaskId', 'session_id', 'sessionId', 'running', 'truncated', 'is_truncated')):
-        return
-    segments = selected_segments(pre.get('tool_input', {}).get('command', ''), post)
-    if segments is None:
-        return
-    cwd = pre.get('cwd') or '/'
-    for command in segments:
-        act = dict(pre, cwd=cwd, tool_input=dict(pre.get('tool_input', {}), command=command))
-        for words in programs(act):
-            if program_name(words[0]) == 'cd' and len(words) == 2:
-                cwd = normalized_path(words[1], cwd)
-        for context, action, args in git_calls(act):
-            specs = operands(args)
-            if action == 'add' and not any(a in args for a in ('--dry-run', '-n', '--intent-to-add', '-N', '-p', '--patch', '-i', '--interactive')):
-                if '--all' in args or '-A' in args or ('-u' in args or '--update' in args) and not specs:
-                    specs = ['.']
-                for subject, change in ledger.changed_code().items():
-                    if matches(subject, specs, context):
-                        ledger.staged_code[subject] = dict(change)
-                        ledger.git_tracked.add(subject)
-            elif action in ('reset', 'restore', 'rm') and (action != 'restore' or '--staged' in args or '-S' in args):
-                for subject in list(ledger.staged_code):
-                    if not specs or matches(subject, specs, context):
-                        ledger.staged_code.pop(subject, None)
-            elif action == 'commit' and not any(a in args for a in ('--dry-run', '--short', '--porcelain')):
-                committed = commit_changes(ledger, act)
-                ledger.committed_code.update(committed)
-                for subject in committed:
-                    ledger.staged_code.pop(subject, None)
-            # A single status/diff receipt attributes returned names to this git
-            # query. Aggregate shell stdout cannot identify which call owned it.
-            elif len(segments) == 1 and action in ('status', 'diff', 'ls-files'):
-                body = response_text(post['tool_response'])
-                staged = []
-                if action == 'status' and any(a.startswith('--porcelain') or a in ('-s', '--short') for a in args):
-                    for line in body.replace('\0', '\n').splitlines():
-                        if len(line) < 4 or line[2] != ' ':
-                            continue
-                        state, path = line[:2], line[3:].split(' -> ')[-1]
-                        try:
-                            path = git_unquote(path) if path.startswith('"') else path
-                        except ValueError:
-                            continue
-                        subject = ledger.subject(path, context)
-                        if state != '??':
-                            ledger.git_tracked.add(subject)
-                        if state[0] not in (' ', '?', '!'):
-                            staged.append(subject)
-                elif action == 'diff' and '--name-only' in args and any(a in args for a in ('--cached', '--staged')):
-                    staged = [ledger.subject(p, context) for p in body.replace('\0', '\n').splitlines() if p]
-                elif action == 'ls-files':
-                    ledger.git_tracked.update(ledger.subject(p, context) for p in body.replace('\0', '\n').splitlines() if p)
-                for subject in staged:
-                    change = ledger.changed_code().get(subject)
-                    if change:
-                        ledger.staged_code[subject] = dict(change)
-                complete_scope = (action == 'status' and not specs or action == 'diff'
-                                  and '--name-only' in args and not specs
-                                  and any(a in args for a in ('--cached', '--staged')))
-                if complete_scope:
-                    for subject in list(ledger.staged_code):
-                        if matches(subject, ['.'], context) and subject not in staged:
-                            ledger.staged_code.pop(subject)
-
-
-# ======================================================================
-# creations: Syntactic introductions in native writes, without treating them as readings.
-
-def introduces(ledger, event):
-    if event.get('tool_name') not in WRITERS:
-        return False
-    ti = event.get('tool_input', {})
-    text = '\n'.join(ti.get(k, '') for k in ('content', 'new_string', 'new_source'))
-    target = ti.get('file_path') or ti.get('notebook_path')
-    if not target or not text.strip():
-        return False
-    # Existing names and located references retain their independent holds.
-    prior = ledger.given + [t for r in ledger.readings + ledger.inputs for t in r['texts']]
-    for span in names(text):
-        if span.kind in ('path', 'url', 'external-package') or any(contains(t, span.text, span.kind) for t in prior):
-            return False
-    try:
-        tree = ast.parse(text)
-        if any(isinstance(n, (ast.Assign, ast.AnnAssign, ast.FunctionDef, ast.ClassDef)) for n in tree.body):
-            return True
-    except SyntaxError:
-        pass
-    if re.fullmatch(r'(?:[A-Za-z_]\w*=[^\n]*\n?)+', text):
-        return True
-    if ntpath.splitext(target)[1] in ('.sh', '.bash', '.zsh'):
-        return ordered_segments(text) is not None
-    return False
-
-
-# ======================================================================
-# provenance: Agnostic ordered sweep: source bytes, own output, writes, and online calls.
+# provenance: Ordered sweep of the session's edits, runs and full reads.
 
 class Ledger:
     def __init__(self):
@@ -1445,29 +907,15 @@ class Ledger:
         self.pending_order = {}
         self.denied = {}
         self.seen = set()
-        self.given = []
-        self.readings = []
-        self.inputs = []
-        self.written = set()
-        self.tainted = set()
-        self.mutations = {}
         self.reservations = {}
-        self.online = []
-        self.external = []
-        self.own = []
         self.unknown = []
         self.code_changes = {}
         self.executions = []
         self.readbacks = []
         self.shebangs = set()
         self.compiled = {}
-        self.staged_code = {}
-        self.git_tracked = set()
-        self.committed_code = {}
-
-    def acted(self):
-        """Whether the session made a tool call: completed, pending, refused or unpaired."""
-        return bool(self.seen or self.pending or self.denied or self.unknown)
+        self.notes = {}
+        self.new_notes = []
 
     def changed_code(self):
         result = dict(self.code_changes)
@@ -1479,7 +927,6 @@ class Ledger:
                 if form:
                     subject = form['subject']
                     prior = result.get(subject, {})
-                    form['aliases'] |= prior.get('aliases', set())
                     form['data'] = form['data'] and subject not in self.shebangs and prior.get('data', True)
                     form['q'] = self.pending_order[tid]
                     form['agent'] = pre.get('agent_id')
@@ -1497,9 +944,7 @@ class Ledger:
             source = self.subject(rename['renamed_from'], event)
             prior = self.code_changes.get(source)
             if prior:
-                form = edited_forms(event, rename['subject'])
-                aliases = prior['aliases'] | (form['aliases'] if form else set())
-                self.code_changes[subject] = dict(prior, subject=subject, display=rename['subject'], aliases=aliases)
+                self.code_changes[subject] = dict(prior, subject=subject, display=rename['subject'])
                 for run in self.executions + self.readbacks:
                     # A prior run of the overwritten destination is a different
                     # program. Only source witnesses travel with the rename.
@@ -1519,8 +964,6 @@ class Ledger:
             for under in [s for s in self.code_changes if s.startswith(prefix)]:
                 self.code_changes.pop(under)
                 self.shebangs.discard(under)
-            for staged in [s for s in self.staged_code if s == subject or s.startswith(prefix)]:
-                self.staged_code.pop(staged)
             return
         spelling = next((effect['subject'] for effect in effects(event)
                          if self.subject(effect['subject'], event) == subject), subject)
@@ -1528,7 +971,6 @@ class Ledger:
         if form or subject in self.code_changes:
             prior = self.code_changes.get(subject, {})
             form = form or dict(prior)
-            form['aliases'] = form['aliases'] | prior.get('aliases', set())
             replacement = event.get('tool_input', {}).get('content')
             full_write = event.get('tool_name') == 'Write' and isinstance(replacement, str)
             if full_write:
@@ -1557,18 +999,8 @@ class Ledger:
     def subject(self, value, event):
         return identity(value, event)
 
-    def fresh(self, item):
-        return all(self.mutations.get(s, 0) < item['q'] and not any(s in targets for targets in self.reservations.values()) for s in item['subjects'])
-
-    def source_readings(self):
-        return [r for r in self.readings if r['source'] and self.fresh(r)]
-
     def bash_order(self, pre, post, started, no_effect):
-        """Apply lexical acts inside one paired call at distinct positions.
-
-        Original read existence is independent of subsequent file changes;
-        aggregate bytes still use the ordinary freshness guard for rule b.
-        """
+        """Apply lexical acts inside one paired call at distinct positions."""
         if pre.get('tool_name') != 'Bash':
             return False
         segments = selected_segments(pre.get('tool_input', {}).get('command', ''), post)
@@ -1580,23 +1012,9 @@ class Ledger:
             segment = dict(pre, tool_input=dict(pre.get('tool_input', {}), command=command))
             # Host observations describe the whole call, never every segment.
             segment.pop('makoto', None)
-            subjects = {self.subject(s, pre) for s in reading_subjects(segment)}
-            original = subjects - (self.written | self.tainted)
-            original -= set().union(*(s for key, s in self.reservations.items() if key != tid))
-            response = post.get('tool_response')
-            if (len(segments) > 1 and original and bool(list(leaves(response)))
-                    and not (isinstance(response, dict) and any(response.get(key)
-                             for key in ('backgroundTaskId', 'session_id', 'sessionId', 'running')))
-                    and not any(r.get('producer') or r.get('role') == 'relay'
-                                for ev in (pre, post) for r in ev.get('makoto', {}).get('reads', []))):
-                self.readings.append({'q': position, 'subjects': [], 'texts': [],
-                                      'source': True, 'tool_use_id': tid, 'tool': 'Bash',
-                                      'turn': self.turn, 'original_subjects': sorted(original)})
             if not no_effect:
                 for effect in effects(segment):
                     subject = self.subject(effect['subject'], pre)
-                    self.mutations[subject] = position
-                    self.written.add(subject)
                     self.compiled.pop(subject, None)
                     self.change_code(segment, subject)
                     if subject in self.code_changes and not effect.get('renamed_from'):
@@ -1614,6 +1032,10 @@ class Ledger:
                         run_start = position if self.code_changes.get(subject, {}).get('tool_use_id') == tid else started
                         self.executions.append({'q': position, 'started': run_start,
                                                 'subjects': {subject}, 'tool_use_id': tid})
+                        for paid in sorted(import_closure(subject, pre.get('cwd')) - {subject}):
+                            paid_start = position if self.code_changes.get(paid, {}).get('tool_use_id') == tid else started
+                            self.executions.append({'q': position, 'started': paid_start,
+                                                    'subjects': {paid}, 'tool_use_id': tid})
                     for product in invoked:
                         build = self.compiled.get(product)
                         if build and build['q'] < position:
@@ -1628,40 +1050,14 @@ class Ledger:
                                            'subjects': {subject}, 'tool_use_id': tid})
         return True
 
-    def witnesses(self, span, kind=None):
-        if any(contains(text, span, kind) for text in self.given):
-            return [{'given': True}]
-        parts = package_parts(span) if kind == 'external-package' else None
-
-        def seen(text):
-            if contains(text, span, kind):
-                return True
-            # `codex 0.162.0` is the product name of `codex-cli 0.162.0`: same
-            # version, and the shorter name is a whole hyphen part of the longer.
-            return bool(parts) and any(
-                m['version'] == parts[1] and parts[0] in re.split(r'[-_]', m['package'])
-                for m in VERSIONED.finditer(text))
-        return [r for r in self.source_readings() + [i for i in self.inputs if self.fresh(i)] if any(seen(text) for text in r['texts'])]
-
-    def fetched(self, span, kind=None):
-        parts = package_parts(span)
-        return [r for r in self.online if r['turn'] == self.turn and self.fresh(r) and any(
-            contains(t, span) or parts and any(package_parts(m.group()) == parts for m in VERSIONED.finditer(t))
-            for t in (r.get('targets', []) if span.startswith(('https://', 'http://')) else r['texts']))]
-
     def ingest(self, event, admitted=True):
         self.q += 1
+        self.new_notes = []
         name, meta = event['hook_event_name'], event.get('makoto', {})
         if meta.get('turn_id') is not None:
             self.turn = str(meta['turn_id'])
         elif name == 'UserPromptSubmit' and not meta.get('same_turn'):
             self.turn = str(self.q)
-        if name in ('UserPromptSubmit', 'Register'):
-            self.external.extend(meta.get('external_subjects', []))
-        if name in FINAL or name == 'AssistantMessage':
-            self.own.extend(v for _, v in leaves(event.get('last_assistant_message', event.get('content', ''))))
-        if name == 'UserPromptSubmit':
-            self.given.append(event.get('prompt', ''))
         if name == 'PreToolUse':
             tid = event.get('tool_use_id')
             if not admitted:
@@ -1673,12 +1069,9 @@ class Ledger:
             self.pending[tid] = event
             self.pending_order[tid] = self.q
             self.reservations[tid] = targets
-            if event.get('tool_name') not in WRITERS and not targets and event.get('tool_name') not in ('Agent', 'Task'):
-                self.inputs.append({'q': self.q, 'subjects': [self.subject(s, event) for s in reading_subjects(event)],
-                                    'texts': list(fragments(event.get('tool_input', {}))), 'tool_use_id': tid})
             return
         if name not in ('PostToolUse', 'PostToolUseFailure'):
-            return  # Assistant text, even a paid final, never supplies evidence.
+            return
         tid = event.get('tool_use_id')
         pre = self.pending.get(tid)
         if pre is None and tid in self.denied and tid not in self.seen:
@@ -1686,12 +1079,10 @@ class Ledger:
             if (event.get('tool_name', denied.get('tool_name')) == denied.get('tool_name')
                     and ('tool_input' not in event or event['tool_input'] == denied.get('tool_input', {}))
                     and meta.get('no_effect') is not True and not refused(event)):
-                # A host-reported completion after denial cannot pay evidence,
-                # but its mutation must invalidate old reads and taint readbacks.
+                # A host-reported completion after denial cannot pay a hold,
+                # but its mutation still counts as an edit.
                 for effect in effects(denied) + effects(event):
                     subject = self.subject(effect['subject'], denied)
-                    self.mutations[subject] = self.q
-                    self.tainted.add(subject)
                     self.change_code(denied, subject)
                 self.seen.add(tid)
         if pre is None or tid in self.seen or event.get('tool_name', pre.get('tool_name')) != pre.get('tool_name') or 'tool_input' in event and event['tool_input'] != pre.get('tool_input', {}):
@@ -1710,12 +1101,17 @@ class Ledger:
             for subject in targets:
                 if subject in native_targets:
                     continue
-                self.mutations[subject] = self.q
-                self.written.add(subject)
                 self.change_code(pre, subject)
+                if (pre.get('tool_name') in ('Write', 'Edit', 'MultiEdit') and not failed(event) and subject.endswith('.py')
+                        and subject.startswith('file:') and (pre.get('cwd') or event.get('cwd'))):
+                    cwd = normalized_path(pre.get('cwd') or event.get('cwd'), '/').rstrip('/')
+                    noted = self.notes.get(subject)
+                    if subject[5:].startswith(cwd + '/') and (noted is None or any(
+                            run['started'] > noted and subject in run['subjects'] for run in self.executions)):
+                        self.notes[subject] = self.q
+                        self.new_notes.append(subject)
         if not failed(event) or no_effect:
             self.reservations.pop(tid, None)
-        record_git(self, pre, event)
         # Paired call plus returned response proves the act, even on failure.
         # Resolve the invocation against its recorded cwd, never final prose.
         if run_output(event) and (not ordered or pre.get('makoto', {}).get('invocation') or meta.get('invocation')):
@@ -1723,6 +1119,11 @@ class Ledger:
             if invoked:
                 self.executions.append({'q': self.q, 'started': started,
                                         'subjects': invoked, 'tool_use_id': tid})
+                for subject in sorted(invoked):
+                    for paid in sorted(import_closure(subject, pre.get('cwd')) - invoked):
+                        paid_start = self.q if self.code_changes.get(paid, {}).get('tool_use_id') == tid else started
+                        self.executions.append({'q': self.q, 'started': paid_start,
+                                                'subjects': {paid}, 'tool_use_id': tid})
         complete = full_read_subjects(pre, event)
         if complete and pre.get('tool_name') not in WRITERS | {'Agent', 'Task'}:
             if not ordered or pre.get('makoto', {}).get('reads') or meta.get('reads'):
@@ -1739,209 +1140,19 @@ class Ledger:
                     self.shebangs.discard(subject)
                 if change and change.get('data_form'):
                     change['data'] = not shebang
-        response = event.get('tool_response')
-        if response is None or isinstance(response, dict) and response.get('backgroundTaskId'):
-            return
-        subjects = [self.subject(s, pre) for s in reading_subjects(pre)]
-        subjects += [self.subject(r['subject'], pre) for r in meta.get('reads', [])]
-        texts = list(fragments(response))
-        content_present = bool(list(leaves(response)))
-        tool = pre.get('tool_name')
-        # A completed run reads an external response, even if it also mutates
-        # something. Direct readbacks of session-written files remain own output.
-        source = tool not in WRITERS | {'Agent', 'Task'} and not any(s in self.written | self.tainted for s in subjects)
-        for spec in meta.get('reads', []) + pre.get('makoto', {}).get('reads', []):
-            if spec.get('role') == 'relay' or spec.get('producer'):
-                source = False
-        # Expand only references actually present in this response, never a store scan.
-        if source:
-            store = meta.get('detio_store') or pre.get('makoto', {}).get('detio_store') or os.environ.get('DETIO_STORE_DIR')
-            for text in list(texts):
-                refs = re.findall(r'detio://([0-9a-f]{64}|[0-9a-f]{12})(?![0-9a-f])', text)
-                if store:
-                    refs += re.findall(re.escape(str(os.path.expanduser(store)).rstrip('/') + '/objects/') + r'([0-9a-f]{64}|[0-9a-f]{12})(?![0-9a-f])', text)
-                for address in refs:
-                    if not store:
-                        raise ValueError('DetIO reference needs a recorded store directory')
-                    texts.append(get(store, address))
-        item = {'q': self.q, 'subjects': subjects, 'texts': texts,
-                'source': source, 'tool_use_id': tid, 'tool': tool, 'turn': self.turn}
-        # Empty file content is a reading; empty writer acknowledgments are not.
-        if content_present:
-            self.readings.append(item)
-        if not source:
-            self.own.extend(texts)
-            self.own.extend(v for _, v in leaves(pre.get('tool_input', {})))
-        if source and not failed(event):
-            network = network_targets(pre, event)
-            if network and content_present:
-                self.online.append(dict(item, targets=network, texts=network + texts))
 
 
 # ======================================================================
-# evaluate: Five pre-step holds derived only from literal session observations.
+# evaluate: Rule d at a final answer, derived only from literal session observations.
 
-# A dotted name that ends in one of these and is not called is a file name, not an attribute.
-FILE_SUFFIXES = frozenset('''md txt json jsonl ndjson tsv csv yaml yml toml ini cfg xml html css sql py sh bash js mjs
-    ts tsx jsx ipynb pdf png jpg gif svg zip tar gz'''.split())
-
-
-def evaluate(ledger, event, adapter='inferred'):
-    if adapter != 'inferred':
-        raise ValueError('adapter must be inferred')
-    text = text_of(event)
-    shipping = commit_changes(ledger, event) if event.get('tool_name') == 'Bash' else None
-    if shipping is not None:
-        # Git options, identity and path selection are operation syntax. Only
-        # commit messages make authored claims; d checks the recorded revisions.
-        messages = []
-        for _, action, args in git_calls(event):
-            if action != 'commit':
-                continue
-            for i, arg in enumerate(args):
-                if arg in ('-m', '--message') or re.fullmatch(r'-[a-zA-Z]*m', arg):
-                    if i + 1 < len(args):
-                        messages.append(args[i + 1])
-                elif arg.startswith('--message='):
-                    messages.append(arg.split('=', 1)[1])
-        text = '\n'.join(messages)
-    creation = introduces(ledger, event)
-    readings = ledger.source_readings()
+def evaluate(ledger, event):
+    """Rule d findings and their receipts: a code file edited by this agent and not run since."""
     findings, snapshot = [], []
-    spans = extract(text)
-    name_spans = [] if creation else names(text)
-    output_subjects = ledger.written | {ledger.subject(r['subject'], event) for r in effects(event)}
-    output_ranges = []
-    # Whitespace in an output filename can split lexical tokens. Exempt those
-    # slices only within a complete output path, with exact token boundaries.
-    for subject in output_subjects:
-        if subject.startswith('file:') and ' ' in subject:
-            absolute = subject[5:]
-            for path in path_spellings(absolute, event.get('cwd') or os.getcwd()):
-                pattern = r'(?<![\w/\\.@:+~%#?=&$!*|-])' + re.escape(path) + r'(?![\w/\\.@:+~%#?=&$!*|-])'
-                output_ranges.extend(m.span() for m in re.finditer(pattern, text))
-
-    # An id the write itself defines (first table cell, heading, list label) is
-    # authored here, not a reference to something unread. Uses of other ids still hold.
-    defined = set(re.findall(r'(?m)^\s*\|\s*\**([A-Za-z][\w.-]*)\**\s*\|', text))
-    defined |= set(re.findall(r'(?m)^\s*(?:#+|[-*])\s+\**([A-Za-z][\w.-]*\d)\**(?=[\s:.)]|$)', text))
-
-    # A new script binds its own functions, classes and variables; writing them
-    # is authoring, not citing something unread. Only code files qualify.
-    authored = set()
-    target = (event.get('tool_input') or {}).get('file_path') or ''
-    if event.get('tool_name') == 'Write' and re.search(r'\.(?:py|sh|bash|js|mjs|ts)$', target):
-        defined |= set(re.findall(r'(?m)^[ \t]*(?:async\s+)?(?:def|class|function)\s+([A-Za-z_]\w*)', text))
-        defined |= set(re.findall(r'(?m)^[ \t]*(?:(?:export\s+)?(?:const|let|var)\s+)?([A-Za-z_]\w*)\s*=(?!=)', text))
-        defined |= set(re.findall(r'(?m)^[ \t]*for\s+([A-Za-z_]\w*)\s+in\b', text))
-        # The interpreter line and the file's own name are authored here too.
-        # Any other path in the text, even a constant, still needs a reading.
-        shebang = re.search(r'(?m)^#!(\S+)(?:[ \t]+(\S+))?', (event.get('tool_input') or {}).get('content') or '')
-        shebang = shebang if shebang and shebang.start() == 0 else None
-        if shebang:
-            authored |= {'#!' + shebang.group(1), *( [shebang.group(2)] if shebang.group(2) else [] )}
-            defined |= set(filter(None, [shebang.group(2)]))
-        authored.add(os.path.basename(target))
-
-    # In an edit of a code file, `row.get` or `new.items` is an attribute chain
-    # on a name the code already has: bound in the edited text, or present in
-    # the file this turn read. A file-suffix tail (`row.md`) is still a path.
-    code_roots = set()
-    if event.get('tool_name') in WRITERS and re.search(r'\.(?:py|sh|bash|js|mjs|ts)$', target):
-        file_subject = ledger.subject(target, event)
-        file_texts = [t for r in readings if file_subject in r['subjects'] for t in r['texts']]
-        bound = set(defined)
-        # Names the edited text binds: assignments, parameters, imports, `as` and loop targets.
-        bound |= set(re.findall(r'(?m)^[ \t]*([A-Za-z_]\w*)\s*=(?!=)', text))
-        bound |= {w for args in re.findall(r'(?m)^[ \t]*(?:async\s+)?def\s+\w+\s*\(([^)]*)\)', text)
-                  for a in args.split(',') for w in re.findall(r'^\s*\*{0,2}([A-Za-z_]\w*)', a)}
-        bound |= set(re.findall(r'(?m)^[ \t]*(?:import|from)\s+([A-Za-z_]\w*)', text))
-        bound |= set(re.findall(r'\bas\s+([A-Za-z_]\w*)', text))
-        bound |= {w for tup in re.findall(r'(?m)^[ \t]*for\s+([^:\n]+?)\s+in\b', text)
-                  for w in re.findall(r'[A-Za-z_]\w*', tup)}
-        bound |= {w for tup in re.findall(r'(?m)^[ \t]*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*=(?!=)', text)
-                  for w in re.findall(r'[A-Za-z_]\w*', tup)}
-        code_roots = bound | {w for w in set(re.findall(r'[A-Za-z_]\w*', text))
-                              if any(contains(t, w, 'identifier') for t in file_texts)}
-
-    def attribute_chain(span):
-        root, *tail = span.text.split('.')
-        return (span.kind == 'path' and len(tail) > 0 and re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+', span.text)
-                and root in code_roots
-                and (tail[-1].lower() not in FILE_SUFFIXES or text[span.end:span.end + 1] == '('))
-
-    def output_name(span):
-        if span.kind == 'identifier' and span.text in defined:
-            return True
-        if attribute_chain(span):
-            return True
-        if span.kind == 'path' and (span.text in authored or span.text.rstrip('.') in authored):
-            return True
-        if (span.kind == 'path' and MODULE.fullmatch(span.text) and span.text.rsplit('.', 1)[-1].lower() not in FILE_SUFFIXES
-                and any(contains(t, span.text, 'path') for t in ledger.own)):
-            return True  # a dotted name this session already wrote
-        return span.kind == 'path' and ledger.subject(span.text, event) in output_subjects or any(start <= span.start and span.end <= end for start, end in output_ranges)
-
-    # Rule e: a file that is edited or overwritten must have been read, or written, in this session first.
-    edited = (event.get('tool_input') or {}).get('file_path') or (event.get('tool_input') or {}).get('notebook_path')
-    if event['hook_event_name'] == 'PreToolUse' and event.get('tool_name') in WRITERS and edited:
-        recorded = (event.get('makoto') or {}).get('target_exists')
-        exists = recorded if isinstance(recorded, bool) else (event['tool_name'] != 'Write' or os.path.isfile(identity(edited, event)[5:]))
-        known = ledger.subject(edited, event)
-        if exists and known not in ledger.written and not any(known in r['subjects'] for r in ledger.readings):
-            findings.append({'rule': 'e', 'family': 'e', 'shape': 'file', 'subject': edited,
-                             'missing': ORIGINAL + ' Missing: a reading of this file before it is edited or overwritten. Clear: Read ' + edited + '.'})
-    # A final answer of a session that made no tool call relies on no artifact, and one
-    # reading of any file would clear rule a without checking it: rule a does not hold it.
-    # Rule b still holds a name in it that no reading showed.
-    if (not readings and not creation and (shipping is None or name_spans)
-            and (event['hook_event_name'] not in FINAL or ledger.acted())):
-        span = spans[0].text if spans else text
-        findings.append({'rule': 'a', 'family': 'a', 'shape': 'lineage', 'subject': span,
-                         'missing': ORIGINAL + ' Missing: a reading of an original artifact; assistant text and files this session wrote do not clear it. Clear: Read the original artifact this step relies on.'})
-    # Rule a asks whether an original artifact was read. It does not require
-    # a derived result or repeated answer to occur verbatim in that artifact.
-    # Exact unread names remain governed independently by rule b.
-    for span in name_spans:
-        cited = span
-        if span.kind == 'path' and re.search(r':\d+(?::\d+)?$', span.text):
-            # `file.py:12` cites a line of the file: the file read, or the
-            # exact citation seen in output, evidences it.
-            base = re.sub(r':\d+(?::\d+)?$', '', span.text)
-            span = type(span)(base, span.start, span.start + len(base), span.kind)
-        if output_name(span):
-            snapshot.append({'span': span.text, 'kind': span.kind, 'output': True})
-            continue
-        witnesses = ledger.witnesses(span.text, span.kind) or ledger.witnesses(cited.text, cited.kind)
-        if not witnesses and (any(contains(t, span.text, span.kind) for t in ledger.own)
-                              or span.kind == 'path' and any(path_part(span.text, t) for t in (*ledger.given, *ledger.own, *ledger.written))):
-            witnesses = [{'own': True}]  # text this session wrote, or got back from its own writes
-        if not witnesses:
-            findings.append({'rule': 'b', 'family': 'b', 'shape': 'spec', 'subject': span.text,
-                             'missing': ORIGINAL + ' Missing: a reading whose tool input or response contains these exact characters; a different spelling or stale reading does not clear it. Clear: Read a source that contains these exact characters.'})
-        else:
-            snapshot.append({'span': span.text, 'kind': span.kind,
-                             'reading_receipt_ids': [w.get('tool_use_id', 'user prompt') for w in witnesses]})
-    # A URL built from shell variables is a template, and a shell's own version
-    # floor is a local requirement: neither names an outside subject.
-    external = [s.text for s in spans + name_spans
-                if (s.kind == 'url' and not re.search(r'\$[\w{(]|\{\{|<[a-z_]+>', s.text))
-                or s.kind == 'external-package' and re.search(r'@|==|>=|<=|~=|\bversion\s|\sv\d', s.text)
-                and not re.match(r'(?:ba|z|da|k)?sh\b', s.text)]
-    # An earlier online response can establish a package's external identity;
-    # it still needs a fresh online receipt in the current turn.
-    for span in spans:
-        parts = package_parts(span.text) if span.kind == 'external-package' else None
-        if parts and any(contains(t, span.text) for r in ledger.online for t in r['texts']):
-            external.append(span.text)
-    # Host-classified public projects are checked by the same literal sweep.
-    external += [s for s in ledger.external + event.get('makoto', {}).get('external_subjects', []) if contains(text, s)]
-    for span in dict.fromkeys(external):
-        if not ledger.fetched(span):
-            findings.append({'rule': 'c', 'family': 'c', 'shape': 'other point', 'subject': span,
-                             'missing': ORIGINAL + ' Missing: a fetch or search of this exact external subject in this turn (WebFetch, WebSearch or a Bash network call). Clear: Fetch this exact subject with WebFetch or WebSearch in this turn.'})
-    for change in (shipping if shipping is not None else ledger.changed_code()).values():
-        if shipping is None and not names_change(event, change):
+    if event['hook_event_name'] not in FINAL:
+        return findings, snapshot
+    # A final answers for what its own agent wrote: a subagent's Stop is not held for a sibling worker's file.
+    for change in ledger.changed_code().values():
+        if change.get('agent') != event.get('agent_id'):
             continue
         runs = ledger.run_witnesses(change)
         readbacks = ledger.readback_witnesses(change)
@@ -1953,15 +1164,12 @@ def evaluate(ledger, event, adapter='inferred'):
             witnesses = runs or readbacks
             snapshot.append(receipt(change['display'], [run['tool_use_id'] for run in witnesses],
                                     'makoto2.switch/execution-v1' if runs else 'makoto2.switch/readback-v1'))
-    if not findings and readings:
-        snapshot.append(receipt(text, [r['tool_use_id'] for r in readings], 'makoto2.precision/form-v1'))
     return list({(f['rule'], f['subject']): f for f in findings}.values()), snapshot
 
 
 # ======================================================================
 # hook: Locked append-only hook journal and fail-closed admission transport.
 
-ORIGINAL = 'Original: Read the original instead of a derivation.'
 UNCHANGED = 'Unchanged: Do not assume what can change has not.'
 
 
@@ -1987,9 +1195,6 @@ def d_in(raw):
         raise ValueError('makoto.invocation.subjects must contain nonempty strings')
     if 'prompt' in event and not isinstance(event['prompt'], str):
         raise ValueError('prompt must be text')
-    for key in ('external_subjects', 'network_subjects'):
-        if key in meta and (not isinstance(meta[key], list) or any(not isinstance(v, str) or not v for v in meta[key])):
-            raise ValueError(key + ' must contain nonempty strings')
     if 'last_assistant_message' in event and not isinstance(event['last_assistant_message'], str):
         raise ValueError('last_assistant_message must be text')
     if event['hook_event_name'] in ('PreToolUse', 'PostToolUse', 'PostToolUseFailure') and (not isinstance(event.get('tool_use_id'), str) or not event['tool_use_id']):
@@ -2066,7 +1271,7 @@ def sigma_read(path, session_id, cache=None):
 # tags of the records it covers. A checkpoint that does not load, or whose records differ
 # from this call's, is ignored and the call replays in full.
 
-CHECKPOINT_VERSION = 1
+CHECKPOINT_VERSION = 2
 
 
 def quarantine(path):
@@ -2127,6 +1332,29 @@ def infrastructure_block(raw, error):
     return d_out(event, reason)
 
 
+def run_note(ledger, event):
+    """One note per edited .py file until a run pays it; guidance, never a hold."""
+    if event.get('hook_event_name') != 'PostToolUse' or not ledger.new_notes or not event.get('cwd'):
+        return {}
+    cwd = normalized_path(event['cwd'], '/').rstrip('/')
+    files = []
+    for top, dirs, names in os.walk(cwd):
+        dirs[:] = sorted(d for d in dirs if not d.startswith('.') and d != '__pycache__')
+        files.extend(posixpath.join(top, n) for n in sorted(names) if n.endswith('.py'))
+        if len(files) > 2000:
+            break
+    closures = {f: import_closure(f, cwd) for f in files}
+    imported = set()
+    for f, closure in closures.items():
+        imported |= closure - {'file:' + f}
+    edited = ledger.new_notes[0]
+    shown = edited[5:][len(cwd) + 1:]
+    tops = sorted((f[len(cwd) + 1:] for f in files if 'file:' + f not in imported and edited in closures[f]),
+                  key=lambda r: (len(r), r))
+    return {'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext':
+            'Before your final answer, run python3 ' + (tops[0] if tops else shown) + ' and read its output: it runs ' + shown + '.'}}
+
+
 def d_out(event, reason):
     if not reason:
         return {}
@@ -2135,11 +1363,10 @@ def d_out(event, reason):
     return {'decision': 'block', 'reason': reason}
 
 
-
 def replay(records, base):
     """The Ledger after `records`, starting from a checkpointed (count, marshalled state) when given."""
     start, state = base
-    # D20: a record that cannot be ingested is unknown, never partial evidence,
+    # D20: a record that cannot be ingested is unknown, never partial,
     # and never wedges later calls. Replay again without it; rare, so no per-record copy.
     skipped = {}
     while True:
@@ -2175,7 +1402,7 @@ def main(raw, config):
                 journal = sigma_read(path, event['session_id'], state['journal'] if state else None)
             except (ValueError, KeyError, TypeError):
                 # Corrupted journal: keep it beside the fresh one and decide from what can still be read
-                # (the transcript), so only a step whose reading is really missing is held.
+                # (the transcript), so only an edit whose run is really missing is held.
                 quarantine(path)
                 state = checkpoint_load(path, event['session_id']) if checkpoint else None
                 journal = sigma_read(path, event['session_id'], state['journal'] if state else None)
@@ -2202,11 +1429,10 @@ def main(raw, config):
             if event.get('makoto', {}).get('turn_id') is not None:
                 ledger.turn = str(event['makoto']['turn_id'])
             findings, snapshot, contract = [], [], None
-            if dependent(event):
-                try:
-                    findings, snapshot = evaluate(ledger, event, adapter)
-                except (KeyError, TypeError, ValueError) as error:
-                    contract = str(error)
+            try:
+                findings, snapshot = evaluate(ledger, event)
+            except (KeyError, TypeError, ValueError) as error:
+                contract = str(error)
             reason = None
             if contract:
                 reason = 'makoto contract: ' + contract
@@ -2220,9 +1446,14 @@ def main(raw, config):
             sigma_append(path, row, journal[-1]['sha256'] if journal else '')
             if state:
                 checkpoint_save(path, saved)
-            return d_out(event, reason) if reason else {}
+            if reason:
+                return d_out(event, reason)
+            try:
+                return run_note(ledger, event)
+            except Exception:
+                return {}
     except Exception as error:
-        # Fail closed: an error in Makoto's own reading (state, lock, journal, transcript,
+        # Fail closed: an error in Makoto's own work (state, lock, journal, transcript,
         # malformed host event) blocks, names the error and says how to disable Makoto.
         return infrastructure_block(raw, error)
 
