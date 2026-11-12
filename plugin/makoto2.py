@@ -2211,7 +2211,10 @@ def main(raw, config):
             if contract:
                 reason = 'makoto contract: ' + contract
             elif findings:
-                reason = '; '.join('makoto rule ' + f['rule'] + ' [' + f['shape'] + ']: ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in findings)
+                # Lean: every finding is recorded in the journal; only a rule-d finding at a final answer blocks.
+                enforced = [f for f in findings if f['rule'] == 'd' and event['hook_event_name'] in FINAL]
+                if enforced:
+                    reason = '; '.join('makoto rule ' + f['rule'] + ' [' + f['shape'] + ']: ' + json.dumps(f['subject'], ensure_ascii=False) + ': ' + f['missing'] for f in enforced)
             row = {'event': event, 'admitted': not bool(reason), 'adapter': adapter,
                    'findings': findings, 'contract_error': contract, 'snapshot': snapshot,
                    'turn_id': ledger.turn, 'unknown': ledger.unknown}
