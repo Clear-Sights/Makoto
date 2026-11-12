@@ -1,4 +1,4 @@
-"""Rule d lean2: a run of a program pays the files in its static import closure (through hooks.json)."""
+"""A run of a program pays the files in its static import closure (through hooks.json)."""
 import json
 import os
 from pathlib import Path

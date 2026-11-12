@@ -1,11 +1,8 @@
 # Makoto
 
-Makoto is a Claude Code hook. Before a dependent step runs (Write, Edit, MultiEdit, NotebookEdit,
-Bash `git commit`/`git push`, or Stop), it checks the session record. If a reading the step needs
-is missing, it holds the step: a PreToolUse step gets a native deny and a Stop gets a native block.
-The hold names the rule, its shape, the exact subject, the one Immediacy rule it enforces and the missing reading. An admitted step gets `{}`. The checker uses no model and no network.
-
-Shipped plugin — installable and versioned. The dispatcher is replay-tested against authored sessions; its effect on a live session's outcome is unmeasured.
+Makoto is a Claude Code hook with one job: it holds a final answer that ships a code file edited in this session
+and not run since its last edit. It uses no model and no network. Everything else is admitted without a word
+(`{}`), including every edit, commit and push, and the user's own prompt.
 
 ## Install
 
@@ -13,58 +10,59 @@ Claude Code 2.1.275 or later:
 
     /plugin install makoto --marketplace Clear-Sights/Makoto
 
-`plugin/hooks/hooks.json` sends each native event to `cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2`, where the plugin root is `plugin/`. Makoto
-needs Python 3.11 or later and uses only the standard library.
+`plugin/hooks/hooks.json` sends each native event (PreToolUse, PostToolUse, PostToolUseFailure, Stop,
+SubagentStop, UserPromptSubmit) to `cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2`, where the plugin root is
+`plugin/`. Makoto needs Python 3.11 or later and uses only the standard library.
 
-## The principle
+## What it holds
 
-Makoto is deterministic enforcement of Immediacy:
+Makoto records each edit (Write, Edit, MultiEdit, NotebookEdit, and Bash redirects, `touch`, `cp`, `mv`,
+`sed -i`) of a code, script or config file. At a final answer (Stop, SubagentStop, or a host's PreDelivery) it
+blocks while such a file has no payment after its last edit. The block names the file:
 
-    IMMEDIACY: A more immediate read assumes less.
-      + Original: Read the original instead of a derivation.
-      − Unchanged: Do not assume what can change has not.
+    makoto rule d [switch]: "<file>": Unchanged: Do not assume what can change has not. Missing: a run of it, with its output read, after its last edit. Clear: Run it and read its output.
 
-Code decides every hold from the session record. An admitted step gets `{}`: Makoto adds nothing to
-the model's context, so no check depends on the model reading injected text. A hold states the rule
-it enforces, the specific missing reading and the one action that clears it (`Clear: ...`), and asks no question. A decided hold always blocks:
-in every directory, and on every repeat of the same Stop.
+Rule d is the name of this one rule; the text is the same every time. A hold is never capped: a Stop with
+`stop_hook_active` is held again every time until the file is paid.
 
-## The rules
+A file is paid, after its last edit, by any one of:
 
-- **a (lineage), enforces Original:** the step needs an original artifact reading. Assistant text, worker answers and
-  readings of files this session wrote do not count. A completed run, query or request response
-  does count, and a run of a session-written script reads that script's response. A final answer
-  of a session that made no tool call relies on no artifact, so a does not hold it; b still applies.
-- **b (spec), enforces Original:** each name the step uses (path, URL, email, identifier, hash, UUID, version) must
-  appear with its exact characters in an earlier tool input, an original response, or the user
-  prompt, or in text this session wrote or got back from its own writes (a file name or directory
-  inside a longer path counts). Writer targets and files this session wrote are outputs, so b does not apply to them.
-- **c (other point), enforces Original:** a named URL, a versioned package or a host-classified public project
-  needs an online fetch or search of that subject in the current turn.
-- **d (switch), enforces Unchanged:** when a step names an edited code, script or config subject, or ships session
-  edits through a commit, push or final answer, a paired call must have run that subject after its
-  last edit and returned output. For a config file without a shebang, a full read after the last
-  edit also pays d. Reading code never pays d.
-- **e (file), enforces Original:** an Edit, MultiEdit or NotebookEdit, or a Write onto a file that
-  already exists, needs a reading of that file, or a write of it by this session, earlier in the
-  session. A Write that creates a new file needs none. A live hook checks the file system; a host that
-  cannot may record the fact in `makoto.target_exists`. The hold ends in `Clear: Read <path>.`
+- a completed run of the file itself (`python3 f.py`, `node f.js`, `./f.sh`, `pytest f.py`, `go run f.go`, ...)
+  that returned a response, even a failing one;
+- a completed run of a Python program whose static imports, resolved from the working directory, include it;
+- for a config file (json, yaml, toml, ini and the like, without a shebang), a full read: `Read` with no
+  offset or limit, `cat` of that one file, or a whole-file `json.load`.
 
-A locked, hash-linked journal keeps every turn under `~/.claude/makoto2_state`
-(`MAKOTO_STATE_DIR` overrides).
-The optional host envelope `makoto` (`effects`, `external_subjects`, `network_subjects`,
-`invocation.subject(s)`, `turn_id`, `detio_store`) lets the host record what it saw, such as
-opaque mutations, public names or the program that actually ran. The host must enforce the
-decision before it runs a tool or delivers a final answer.
+Reading code never pays. A deleted file owes nothing. A subagent's Stop is held only for the files that agent
+edited.
+
+## The note
+
+After a completed `.py` edit inside the working directory, and once per file until it is run, the PostToolUse
+response carries one line of guidance (never a block) naming the program to run:
+
+    Before your final answer, run python3 <program> and read its output: it runs <file>.
+
+`<program>` is a program that is not imported by another and whose imports include the file, else the file itself.
+
+## Records
+
+A locked, hash-linked journal keeps every event under `~/.claude/makoto2_state` (`MAKOTO_STATE_DIR`
+overrides), and the host transcript is replayed with it. Each call reads only the journal rows and transcript
+lines added since the previous call: a `.ckpt` file beside the journal keeps both reads and the replayed
+record. A checkpoint that does not match is ignored and the call replays in full; `MAKOTO_CHECKPOINT=0` always
+does. The optional host envelope `makoto` (`effects`, `reads`, `invocation.subject(s)`, `no_effect`, `turn_id`)
+lets a host record what it saw, such as opaque mutations or the program that actually ran. The host must
+enforce the decision before it delivers a final answer.
 
 ## Errors block, and the way out
 
-- An error in Makoto's own reading (state folder, lock, transcript, a malformed host event) blocks
-  the step, names the error, and gives the one way to disable Makoto. The user's own prompt
-  (UserPromptSubmit) is never blocked: it is admitted and, whenever the journal is writable, recorded.
+- An error in Makoto's own work (state folder, lock, transcript, a malformed host event, `MAKOTO_ADAPTER` set
+  to anything but `inferred`) blocks the step, names the error, and gives the one way to disable Makoto. The
+  user's own prompt (UserPromptSubmit) is never blocked: it is admitted and, whenever the journal is writable,
+  recorded.
 - A corrupted journal does not stop the session. It is moved beside a fresh journal as
-  `<journal>.corrupt-<ns>`, and only a step whose reading is missing from what can still be read
-  (the transcript, then new calls) is held, for that missing reading.
+  `<journal>.corrupt-<ns>`, and the call decides from what can still be read (the transcript, then new calls).
 - The one way to disable Makoto, if an error keeps blocking, is to run this in a terminal outside the
   session, so a broken install cannot trap you:
 
@@ -72,10 +70,6 @@ decision before it runs a tool or delivers a final answer.
 
 - Every hook in hooks.json has a 10 s `timeout`. The per-session lock is never waited on longer
   than 3 s (`MAKOTO_LOCK_SECONDS`); a busy lock blocks the step with that error.
-- A hold is never capped: a `stop_hook_active` Stop with a finding is held again every time.
-- Each call reads only the journal rows and transcript lines added since the previous call: a
-  `.ckpt` file beside the journal keeps both reads and the replayed record. A checkpoint that
-  does not match is ignored and the call replays in full; `MAKOTO_CHECKPOINT=0` always does.
 
 ## License
 
@@ -83,15 +77,14 @@ FSL-1.1-ALv2 (`LICENSE`): use, copy, modify and redistribute Makoto for any purp
 
 ## Development
 
-`python3 -m pytest -q` runs `tests/`. For each of rules a-d, `test_rules.py` sends a plant
-and its twin through the exact hooks.json command: the plant is held and the twin is admitted;
-`test_read_before_edit.py` does the same for rule e.
-`test_robust.py` plants each infrastructure error and checks that it blocks with the way out, and that checkpointed calls
-decide exactly as full replay does.
+`python3 -m pytest -q` runs `tests/`: `test_rules.py` sends rule d's plant and its twin through the exact hooks.json
+command (the plant is held, the twin is admitted); `test_lean2.py` and `test_function.py` cover what pays;
+`test_lean3.py` the note; `test_chat_only.py` that a tool-less final answer is admitted; `test_robust.py` plants
+each infrastructure error and checks that it blocks with the way out, and that checkpointed calls decide exactly
+as full replay does.
 `scripts/measure_cost.py` reports per-hook wall time (cold and warm bytecode) and the bytes a hook
 adds to the model's context, on the events `tests/` already contains; `MEASURE_REPEAT` sets the repeat count.
-`plan/` is the finished cost plan of 2026-11-06: `measure_before.json` and `measure_after.json` measure the code of
-fb31cd1 and 6b6582f (1842 bytes on the 31-event suite); the code since then adds 1021 (`eval/RESULTS.md`).
-`eval/` holds the corpus-gate tools, rules and results of the measured rounds (`eval/RESULTS.md`); `eval/corpus.py`
-needs a Clear-Sights/Tiller-from-the-Ashes checkout and `eval/variants.py` this repository's git history.
-The cut `mesh/` gate is kept in git history at 295bf44.
+`eval/run_corpus.py` replays a corpus of sessions (built by `eval/corpus.py` from a Clear-Sights/Tiller-from-the-Ashes
+checkout) through a plugin directory and records every decision. `eval/equivalence.py` replays a corpus and a test
+suite through two plugin directories and fails on any difference in a hook response.
+`eval/RESULTS.md` is a historical record of Makoto before 6.0.0, which also held a, b, c and e; those no longer exist.

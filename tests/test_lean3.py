@@ -1,4 +1,4 @@
-"""lean3: the PostToolUse note naming the program to run, once per edited file until run (through hooks.json)."""
+"""The PostToolUse note naming the program to run, once per edited file until run (through hooks.json)."""
 import sys
 from pathlib import Path
 

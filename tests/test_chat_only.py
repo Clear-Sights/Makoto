@@ -1,4 +1,4 @@
-"""Rule a does not hold the final answer of a session that made no tool call; every other hold stays."""
+"""A final answer of a session that made no tool call is admitted whatever it says; rule d still holds an unrun edit."""
 import re
 
 import pytest
@@ -12,15 +12,9 @@ CHAT = {
     'greeting': ('hi', 'Hello! How can I help?'),
     'code concept': ('How does a Python list differ from a tuple?', 'A list is mutable and a tuple is not.'),
     'tests pass': ('Do the tests pass?', 'Yes, all tests pass.'),
+    'unread names': ('Which port does the service use?', 'config/app.json sets port to 8080 (see https://example.test/a).'),
 }
-UNSEEN = ('Which port does the service use?', 'config/app.json sets port to 8080.')
 NEW_MODULE = {'file_path': 'new.py', 'content': 'x = 1\n'}
-TEXT_FILE = {'file_path': 'out.txt', 'content': 'source data'}
-# A session whose only tool call is a Write: (its events, whether the Write itself is held).
-WRITE_ONLY = {
-    'admitted': (call('Write', NEW_MODULE, {'content': 'ok'}, 'w'), False),  # a new module needs no reading
-    'refused': ([ev('PreToolUse', tool_name='Write', tool_use_id='w', tool_input=TEXT_FILE)], True),
-}
 
 
 def final(text, name='Stop'):
@@ -44,29 +38,14 @@ def test_a_tool_less_final_answer_is_admitted(tmp_path, form):
     assert send(tmp_path, final(answer)) == {}
 
 
-def test_a_tool_less_write_is_still_held_by_rule_a(tmp_path):
-    response = send(tmp_path, ev('PreToolUse', tool_name='Write', tool_use_id='w', tool_input=TEXT_FILE))
-    assert held(response) and 'a' in rules(response)
-
-
-@pytest.mark.parametrize('case', sorted(WRITE_ONLY))
-def test_a_session_whose_only_tool_call_is_a_write_still_holds_its_final_answer_by_rule_a(tmp_path, case):
-    events, write_held = WRITE_ONLY[case]
-    assert [held(send(tmp_path, event)) for event in events] == [write_held] + [False] * (len(events) - 1)
+def test_a_session_whose_only_tool_call_is_a_code_write_holds_its_final_answer_by_rule_d(tmp_path):
+    assert [held(send(tmp_path, event)) for event in call('Write', NEW_MODULE, {'content': 'ok'}, 'w')] == [False, False]
     response = send(tmp_path, final('Done.'))
-    assert held(response) and 'a' in rules(response)
-
-
-def test_a_tool_less_answer_naming_an_unseen_path_is_still_held_by_rule_b(tmp_path):
-    prompt, answer = UNSEEN
-    assert send(tmp_path, ev('UserPromptSubmit', prompt=prompt)) == {}
-    response = send(tmp_path, final(answer))
-    assert held(response) and 'b' in rules(response)
+    assert held(response) and rules(response) == ['d']
 
 
 SESSIONS = {form: ([ev('UserPromptSubmit', prompt=prompt)], answer) for form, (prompt, answer) in CHAT.items()}
-SESSIONS['unseen path'] = ([ev('UserPromptSubmit', prompt=UNSEEN[0])], UNSEEN[1])
-SESSIONS.update(('write ' + case, (events, 'Done.')) for case, (events, _) in WRITE_ONLY.items())
+SESSIONS['write'] = (call('Write', NEW_MODULE, {'content': 'ok'}, 'w'), 'Done.')
 
 
 @pytest.mark.parametrize('case', sorted(SESSIONS))

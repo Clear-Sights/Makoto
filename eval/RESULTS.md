@@ -1,3 +1,7 @@
+> Historical record. This describes Makoto before 6.0.0, when it also enforced rules a, b, c and e; those rules, and the
+> scripts, rule files and plan named below (`label.py`, `plant.py`, `variants.py`, `RULES*.md`, `plan/` and the rest), were removed in
+> 6.0.0 and are in git history at `fe2e32c`. Nothing here describes what the code does now.
+
 # Corpus gate for the blocks PR (run 2026-11-06)
 
 Scripts: `corpus.py` (logs -> hook events), `variants.py` (builds each variant), `run_corpus.py`, `plant.py`,

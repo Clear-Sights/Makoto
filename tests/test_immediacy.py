@@ -1,12 +1,9 @@
-"""Every hold names the one Immediacy rule it enforces, states the missing reading and asks no question."""
+"""Every hold names rule d, states what is missing and asks no question; the named action clears it."""
 import pytest
 
-from test_rules import CASES, RUN, call, ev, read, send
+from test_rules import CASES, RUN, ev, read, send
 
-ENFORCES = {'a': 'Original: Read the original instead of a derivation.',
-            'b': 'Original: Read the original instead of a derivation.',
-            'c': 'Original: Read the original instead of a derivation.',
-            'd': 'Unchanged: Do not assume what can change has not.'}
+ENFORCES = {'d': 'Unchanged: Do not assume what can change has not.'}
 
 
 @pytest.mark.parametrize('rule', sorted(CASES))
@@ -17,8 +14,6 @@ def test_hold_names_its_rule_and_the_missing_reading(tmp_path, rule):
     reason = send(tmp_path, plant[-1])['reason']
     assert reason.startswith('makoto rule ' + rule + ' ')
     assert ENFORCES[rule] in reason
-    other = [text for key, text in ENFORCES.items() if text != ENFORCES[rule]][0]
-    assert other not in reason, 'a hold names the one rule it enforces'
     assert ' Missing: ' in reason
     assert '?' not in reason
 
@@ -34,10 +29,6 @@ def test_makoto_speaks_only_when_it_holds(tmp_path):
 
 # The one action each hold names, and the events that perform it.
 CLEARS = {
-    'a': ('Clear: Read the original artifact this step relies on.', read('source data', 'fix')),
-    'b': ('Clear: Read a source that contains these exact characters.', read('source data unread_subject', 'fix')),
-    'c': ('Clear: Fetch this exact subject with WebFetch or WebSearch in this turn.',
-          call('WebFetch', {'url': 'https://example.test/a'}, {'content': 'https://example.test/a'}, 'fix')),
     'd': ('Clear: Run it and read its output.', RUN),
 }
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import subprocess
 import time
 
-from test_rules import CASES, HOOKS, PLUGIN, ev, read, send, stop
+from test_rules import CASES, HOOKS, PLUGIN, call, ev, read, send, stop
 
 WRITE_STEP = ev('PreToolUse', tool_name='Write', tool_use_id='step', tool_input={'file_path': 'out.txt', 'content': 'source data'})
 
@@ -63,28 +63,32 @@ def test_malformed_host_event_blocks(tmp_path):
     assert failure(response) and way_out(response)
 
 
-def corrupt(tmp):
+def corrupt(tmp, text='source data'):
     path = journal(tmp)
-    path.write_text(path.read_text().replace('source data', 'tampered!!!', 1))
+    path.write_text(path.read_text().replace(text, 'tampered!!!', 1))
     (tmp / 'state' / (path.name + '.ckpt')).unlink(missing_ok=True)
     return path
 
 
-def test_corrupted_journal_is_set_aside_and_only_the_missing_reading_blocks(tmp_path):
-    for event in read('source data'):
+def test_corrupted_journal_is_set_aside_and_only_what_is_lost_goes(tmp_path):
+    for event in call('Write', {'file_path': 'old.py', 'content': 'print(731)\n'}, {'content': 'ok'}, 'old'):
         send(tmp_path, event)
-    path = corrupt(tmp_path)
-    # The step that needed the destroyed reading is held for the reading, not for the error.
-    held = send(tmp_path, dict(WRITE_STEP, tool_use_id='one'))
-    assert denied(held) and not failure(held) and held['hookSpecificOutput']['permissionDecisionReason'].startswith('makoto rule a ')
+    path = corrupt(tmp_path, 'print(731)')
+    # The destroyed edit is gone from the record: a final answer is held for no error and not for old.py.
+    assert send(tmp_path, stop('Done')) == {}
+    for event in call('Write', {'file_path': 'new.py', 'content': 'print(732)\n'}, {'content': 'ok'}, 'new'):
+        send(tmp_path, event)
+    held = send(tmp_path, stop('Done'))
+    assert denied(held) and not failure(held) and held['reason'].startswith('makoto rule d ')
+    assert 'new.py' in held['reason'] and 'old.py' not in held['reason']
     # The corrupted journal is kept beside a fresh one.
     kept = sorted(path.parent.glob(path.name + '.corrupt-*'))
     assert len(kept) == 1 and 'tampered!!!' in kept[0].read_text()
     assert path.exists() and 'tampered!!!' not in path.read_text()
-    # Once the reading is made again the same step is admitted: nothing else stays blocked.
-    for event in read('source data', 'again'):
+    # Once the edit is run the same answer is admitted: nothing else stays blocked.
+    for event in call('Bash', {'command': 'python3 new.py'}, {'stdout': '732\n', 'exitCode': 0}, 'run'):
         assert send(tmp_path, event) == {}
-    assert send(tmp_path, dict(WRITE_STEP, tool_use_id='two')) == {}
+    assert send(tmp_path, stop('Done')) == {}
 
 
 def test_corrupted_journal_does_not_block_a_step_that_needs_no_reading(tmp_path):
@@ -92,6 +96,11 @@ def test_corrupted_journal_does_not_block_a_step_that_needs_no_reading(tmp_path)
         send(tmp_path, event)
     corrupt(tmp_path)
     assert send(tmp_path, ev('PostToolUse', tool_name='Read', tool_use_id='x', tool_input={'file_path': 'a'}, tool_response={'content': 'z'})) == {}
+
+
+def test_an_adapter_other_than_inferred_blocks(tmp_path):
+    response = raw_send(tmp_path / 'state', WRITE_STEP, MAKOTO_ADAPTER='other')
+    assert failure(response) and way_out(response)
 
 
 def test_user_prompt_submit_is_never_blocked(tmp_path):
@@ -120,7 +129,7 @@ def test_unreadable_event_input_blocks(tmp_path):
 
 
 def test_rule_findings_still_deny(tmp_path):
-    plant, _ = CASES['a']
+    plant, _ = CASES['d']
     for event in plant[:-1]:
         send(tmp_path, event)
     assert send(tmp_path, plant[-1])['decision'] == 'block'
@@ -150,18 +159,18 @@ def test_held_lock_blocks_within_its_cap(tmp_path):
 # 3. A decided hold blocks every time and everywhere; nothing caps or scopes it.
 
 def test_active_stop_is_held_every_time(tmp_path):
-    plant, _ = CASES['a']
+    plant, _ = CASES['d']
     for event in plant[:-1]:
         send(tmp_path, event)
     for _ in range(3):
         response = send(tmp_path, plant[-1])
-        assert response['decision'] == 'block' and response['reason'].startswith('makoto rule a ')
+        assert response['decision'] == 'block' and response['reason'].startswith('makoto rule d ')
     rows = [json.loads(line) for line in journal(tmp_path).read_text().splitlines()]
     assert rows[-1]['findings'] and 'stop_cap' not in rows[-1]
 
 
 def test_hold_outside_the_old_block_in_scope_still_blocks(tmp_path):
-    plant, _ = CASES['a']
+    plant, _ = CASES['d']
     for event in plant[:-1]:
         send(tmp_path, event)
     outside = dict(plant[-1], cwd='/somewhere/else')
@@ -173,6 +182,9 @@ def test_readme_names_the_one_way_to_disable_and_no_removed_switch():
     readme = (PLUGIN.parent / 'README.md').read_text(encoding='utf-8')
     assert DISABLE in readme
     assert 'MAKOTO_BLOCK_IN' not in readme and 'stop_cap' not in readme
+    # The README quotes the hold and the note exactly as the code says them.
+    assert 'Unchanged: Do not assume what can change has not. Missing: a run of it, with its output read, after its last edit. Clear: Run it and read its output.' in readme
+    assert 'Before your final answer, run python3 <program> and read its output: it runs <file>.' in readme
 
 
 # 4. Incremental replay: same decisions, and only new bytes are read.
