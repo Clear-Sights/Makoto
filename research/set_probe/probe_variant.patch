@@ -1,0 +1,599 @@
+diff --git a/.claude-plugin/marketplace.json b/.claude-plugin/marketplace.json
+index 254034d..f0f50b9 100644
+--- a/.claude-plugin/marketplace.json
++++ b/.claude-plugin/marketplace.json
+@@ -11,7 +11,7 @@
+     {
+       "name": "makoto",
+       "source": "./plugin",
+-      "description": "Holds a final answer while a file changed this session, or a file that uses it, has not been run since; one note after an edit and one hold at the end (any language, no git needed).",
++      "description": "Holds a final answer while a file changed this session, or a file that uses it, has not been run since; at the end it runs the programs that reach it in an isolated copy with no network, and holds if they fail or cannot be run (any language, no git needed).",
+       "category": "workflow",
+       "tags": [
+         "integrity",
+diff --git a/README.md b/README.md
+index 0ddf9d7..53fcab8 100644
+--- a/README.md
++++ b/README.md
+@@ -1,7 +1,8 @@
+ # Makoto
+ 
+ Makoto holds a final answer while a file changed this session, or a file that uses a changed file, has not been run
+-since. It works in any language and needs no git.
++since. It works in any language and needs no git. This variant can also run the project's own programs itself, to
++check for you; see "The probe", which says exactly when it does and when it does not.
+ 
+ ## How it decides
+ 
+@@ -25,16 +26,45 @@ start, `exit=N`, `FAILED`, `panic:`, `command not found`, `No such file or direc
+ ## The message
+ 
+ One message names the demanded files not yet checked and the entry programs (files no other file uses) that reach
+-them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.`
+-
+-- After a Write, Edit, MultiEdit or NotebookEdit it arrives as a note, once per changed file until checked.
+-- At the final answer (Stop, or a subagent's SubagentStop) it is a hold, once: a Stop that follows a hold
+-  (`stop_hook_active`) is let through.
++them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.` There is no note after an
++edit.
++
++## The probe: Makoto runs project programs itself
++
++At the final answer (Stop, or a subagent's SubagentStop), if demanded files are unchecked, Makoto runs the entry
++programs that reach them. **This executes your project's code, by Makoto, not by Claude.** It does so only like this:
++
++- **In an isolated copy.** The files under the working directory (the same set the snapshot uses) are copied to a new
++  temporary directory, and the programs run there, in the same relative directory as the session, never in the real
++  tree. The copy is deleted afterwards. Nothing is written into the real tree.
++- **With no network.** `unshare -rn` on Linux, `sandbox-exec -n no-network` on macOS. If neither works on the
++  machine, Makoto runs nothing and behaves as in "The hold" below.
++- **Scrubbed.** The environment is PATH, HOME (the temporary directory) and LANG only; input is closed; each program
++  gets 5 seconds, and the whole probe about 22.
++- **Only these programs.** Programs a known interpreter (python3, node, ruby, perl, php, sh, bash; by extension or
++  `#!` line) runs with no argument. Nothing else is run.
++- **Never an outward program.** A file is outward when an import-style line names a network library (socket, ssl,
++  http, urllib, requests, httpx, aiohttp, websockets, ftplib, smtplib, paramiko, boto3, grpc, net/http, axios,
++  node-fetch, fetch, net, dgram, open-uri) or a process library (subprocess, multiprocessing, child_process,
++  os/exec, pty). An entry program that reaches an outward file through the lookup is not probed. The lookup cannot
++  see a shell string, a computed import or an environment switch, so the isolated copy with no network is the
++  backstop, not the gate.
++- **Not at all** when the copy would exceed 20,000 files or 50 MB.
++
++A probe passes when the program exits 0 and its output holds no error marker. The files it reaches are then checked
++and, if nothing else is unchecked, the final answer is admitted with no message. A probe that fails holds with the
++message plus the last 15 lines of its output, at most 3 times per final answer, then the answer is admitted. A probe
++that times out is neither a pass nor a failure.
++
++## The hold
++
++What no probe checked (an outward or unrunnable program, a timeout, no isolation, a copy over the caps) is held as
++the message, once: a Stop that follows (`stop_hook_active`) is let through.
+ 
+ ## What it never does
+ 
+-It never blocks the user's prompt or session start, edits nothing, runs nothing, calls no model and sends nothing
+-anywhere. Its only other block is an error in Makoto itself (unreadable input, state lock busy, unwritable state),
++It never blocks the user's prompt or session start, never edits the real tree, calls no model and sends nothing
++anywhere. The only programs it runs are the probes above. Its only other block is an error in Makoto itself (unreadable input, state lock busy, unwritable state),
+ which names the error and the one way out.
+ 
+ ## Install
+@@ -44,7 +74,7 @@ Claude Code 2.1.275 or later, Python 3.11 or later, standard library only:
+     /plugin install makoto --marketplace Clear-Sights/Makoto
+ 
+ Hooks (`plugin/hooks/hooks.json`): SessionStart and UserPromptSubmit (snapshot and lookup, never block),
+-PostToolUse and PostToolUseFailure (record runs; the note), Stop and SubagentStop (the hold).
++PostToolUse and PostToolUseFailure (record runs), Stop and SubagentStop (the probe and the hold; timeout 30 seconds).
+ 
+ ## Disable
+ 
+diff --git a/plugin/.claude-plugin/plugin.json b/plugin/.claude-plugin/plugin.json
+index 8f2b1da..5a3192e 100644
+--- a/plugin/.claude-plugin/plugin.json
++++ b/plugin/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "makoto",
+-  "description": "Holds a final answer while a file changed this session, or a file that uses it, has not been run since; one note after an edit and one hold at the end (any language, no git needed).",
++  "description": "Holds a final answer while a file changed this session, or a file that uses it, has not been run since; at the end it runs the programs that reach it in an isolated copy with no network, and holds if they fail or cannot be run (any language, no git needed).",
+   "version": "6.2.0",
+   "author": {
+     "name": "Clear-Sights"
+diff --git a/plugin/hooks/hooks.json b/plugin/hooks/hooks.json
+index 4067327..5a0cf78 100644
+--- a/plugin/hooks/hooks.json
++++ b/plugin/hooks/hooks.json
+@@ -52,7 +52,7 @@
+           {
+             "type": "command",
+             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+-            "timeout": 10
++            "timeout": 30
+           }
+         ]
+       }
+@@ -63,7 +63,7 @@
+           {
+             "type": "command",
+             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
+-            "timeout": 10
++            "timeout": 30
+           }
+         ]
+       }
+diff --git a/plugin/makoto2.py b/plugin/makoto2.py
+index ccdd18a..7154c57 100644
+--- a/plugin/makoto2.py
++++ b/plugin/makoto2.py
+@@ -13,9 +13,13 @@ Sets, computed without a test of their size (see sets):
+   checked   = demanded files reached by a successful run that began after their last change (the latest change among
+               them and what they use). A run reaches the program it names plus what that uses; a test runner with
+               no program argument reaches every file.
+-One message names demanded minus checked and the entry programs (used by no file) that reach it: a note after an
+-edit, once per file until checked; a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
+-Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
++One message names demanded minus checked and the entry programs (used by no file) that reach it. There is no note.
++At Stop or SubagentStop Makoto runs those entry programs itself (see probes): in a temporary copy of the tree, with a
++scrubbed environment, closed input and no network, only programs a known interpreter runs with no argument, and never
++one that reaches an outward file (a network or process library in the lookup). A pass checks the files it reaches and
++admits silently. A failure holds with the message and the last lines of the output, at most 3 times per final answer.
++What no probe checked is held once as the message (stop_hook_active admits); without network isolation there is no
++probe. An error in Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
+ """
+ import contextlib
+ import hashlib
+@@ -23,8 +27,11 @@ import json
+ import os
+ import re
+ import shlex
++import shutil
++import signal
+ import subprocess
+ import sys
++import tempfile
+ import time
+ 
+ try:
+@@ -37,11 +44,20 @@ STATE_DIR = '~/.claude/makoto2_state'
+ LOCK_SECONDS = 3.0
+ MAX_FILES = 20000
+ MAX_READ = 262144
++MAX_BYTES = 50 * 1024 * 1024
++PROBE_SECONDS = 5
++PROBE_BUDGET = 22
++MAX_HOLDS = 3
++TAIL = 15
+ DISABLE = 'claude plugin disable makoto'
+ MESSAGE = 'Not run since a change: %s. Run %s and read the output.'
+ FINAL = ('Stop', 'SubagentStop')
+ HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
+-EDITORS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
++OUTWARD = frozenset('socket ssl http urllib requests httpx aiohttp websockets ftplib smtplib paramiko boto3 grpc net/http '
++                    'axios node-fetch fetch net dgram open-uri subprocess multiprocessing child_process os/exec pty'.split())
++INTERPRETERS = {'py': 'python3', 'js': 'node', 'mjs': 'node', 'cjs': 'node', 'rb': 'ruby', 'pl': 'perl', 'php': 'php',
++                'sh': 'sh', 'bash': 'bash'}
++ISOLATIONS = (['unshare', '-rn'], ['sandbox-exec', '-n', 'no-network'])
+ SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', '.venv', 'venv'))  # other build output: only when git ignores it
+ 
+ RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|dotnet|make|gmake|'
+@@ -222,7 +238,7 @@ def close(seeds, edges):
+ 
+ 
+ def lookup(state, files):
+-    """(uses, users, nodes): which file uses which, and the files in the lookup or with a shebang."""
++    """(uses, users, nodes, outward): which file uses which, and the files in the lookup or with a shebang."""
+     root, snapshot, stored = state['root'], state['snapshot'], state['scan']
+     read = {rel: stored.get(rel, [False, []]) if files[rel] == snapshot.get(rel) else scan(os.path.join(root, rel))
+             for rel in files}
+@@ -241,12 +257,13 @@ def lookup(state, files):
+                         uses.setdefault(rel, set()).add(other)
+                         users.setdefault(other, set()).add(rel)
+     shebang = {rel for rel, (flag, _) in read.items() if flag}
+-    return uses, users, shebang | set(uses) | set(users)
++    outward = {rel for rel, (_, names) in read.items() if any(n in OUTWARD or re.split('[./]', n)[0] in OUTWARD for n in names)}
++    return uses, users, shebang | set(uses) | set(users), outward
+ 
+ 
+ def sets(state, files):
+-    """(unchecked, entries, demanded, checked, uses, users); no line here tests the size of a set."""
+-    uses, users, nodes = lookup(state, files)
++    """(unchecked, entries, uses, outward); no line here tests the size of a set."""
++    uses, users, nodes, outward = lookup(state, files)
+     changed = {rel for rel in files if files[rel] != state['snapshot'].get(rel)}
+     demanded = close(changed, users) & nodes
+     last = {rel: max(files[other][1] for other in close({rel}, uses) & changed) / 1e9 for rel in demanded}
+@@ -254,7 +271,7 @@ def sets(state, files):
+                if any(run['t'] > last[rel] and (run['all'] or rel in run['reach']) for run in state['runs'])}
+     unchecked = demanded - checked
+     entries = sorted(close(unchecked, users) - users.keys())
+-    return unchecked, entries, demanded, checked, uses, users
++    return unchecked, entries, uses, outward
+ 
+ 
+ def message(unchecked, entries):
+@@ -282,14 +299,14 @@ def named(argv, cwd, root, files):
+ 
+ 
+ def record(state, event):
+-    """Note completed runs; return the message for a note, or ''."""
++    """Note completed runs that succeeded."""
+     root, tool, given = state['root'], event.get('tool_name'), event.get('tool_input') or {}
+     cwd, now = event.get('cwd') or root, time.time()
+     if event.get('hook_event_name') == 'PostToolUseFailure' and tool != 'Bash':
+-        return ''
++        return
+     began, state['last'] = state.get('last', now), now  # a run began after the previous hook event, so a change it made is newer
+-    files = listing(root)
+     if tool == 'Bash' and isinstance(given.get('command'), str) and not failed(event):
++        files = listing(root)
+         uses = lookup(state, files)[0]
+         for argv, _ in segments(given['command']):
+             argv = strip_wrappers(argv)
+@@ -299,15 +316,83 @@ def record(state, event):
+                 program = named(argv, cwd, root, files)
+                 state['runs'] = (state['runs'] + [{'t': began, 'all': is_tester(argv) and not program,
+                                                    'reach': sorted(close(program, uses))}])[-300:]
+-    unchecked, entries = sets(state, files)[:2]
+-    state['noted'] = [rel for rel in state['noted'] if rel in unchecked]
+-    target = given.get('file_path') or given.get('notebook_path')
+-    if tool in EDITORS and isinstance(target, str) and target:
+-        rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
+-        if rel in unchecked and rel not in state['noted']:
+-            state['noted'].append(rel)
+-            return message(unchecked, entries)
+-    return ''
++
++
++# ---------------------------------------------------------------- probes
++
++def isolation():
++    """The command prefix that cuts the network and works here, or None."""
++    for prefix in ISOLATIONS:
++        try:
++            if shutil.which(prefix[0]) and subprocess.run(prefix + ['true'], capture_output=True, timeout=5).returncode == 0:
++                return prefix
++        except (OSError, subprocess.SubprocessError):
++            continue
++    return None
++
++
++def command(root, rel):
++    """How a known interpreter runs the file with no argument, or None."""
++    path = os.path.join(root, rel)
++    name = INTERPRETERS.get(rel.rpartition('.')[2].lower()) if '.' in os.path.basename(rel) else None
++    if name is None:
++        words = scan_first_line(path).split()
++        words = words[1:] if words[:1] and os.path.basename(words[0]) == 'env' else words
++        name = os.path.basename(words[0]) if words else None
++        name = name if name in INTERPRETERS.values() else None
++    return [name, rel] if name and shutil.which(name) else None
++
++
++def scan_first_line(path):
++    try:
++        with open(path, 'rb') as stream:
++            line = stream.readline(200).decode('utf-8', 'replace')
++    except OSError:
++        return ''
++    return line[2:].strip() if line.startswith('#!') else ''
++
++
++def copy_tree(root, files, target):
++    for rel in files:
++        os.makedirs(os.path.dirname(os.path.join(target, rel)), exist_ok=True)
++        shutil.copy2(os.path.join(root, rel), os.path.join(target, rel))
++
++
++def probes(state, files, cwd, entries, uses, outward):
++    """Run each entry program that may be probed, in a no-network copy of the tree: (reaches of those that passed,
++    [(program, last output lines)] of those that failed). Programs that time out or cannot be probed are in neither."""
++    root = state['root']
++    prefix = isolation()
++    programs = [e for e in entries if not close({e}, uses) & outward and command(root, e)]
++    if not (prefix and programs and len(files) < MAX_FILES and sum(f[0] for f in files.values()) <= MAX_BYTES):
++        return [], []
++    passed, failed, deadline = [], [], time.monotonic() + PROBE_BUDGET
++    temp = tempfile.mkdtemp(prefix='makoto-probe-')
++    try:
++        copy_tree(root, files, os.path.join(temp, 'tree'))
++        here = os.path.join(temp, 'tree', os.path.relpath(cwd, root)) if cwd.startswith(root + os.sep) else os.path.join(temp, 'tree')
++        os.makedirs(here, exist_ok=True)
++        env = {'PATH': os.environ.get('PATH', os.defpath), 'HOME': temp, 'LANG': os.environ.get('LANG', 'C.UTF-8')}
++        for program in programs:
++            seconds = min(PROBE_SECONDS, deadline - time.monotonic())
++            if seconds <= 0:
++                break
++            child = subprocess.Popen(prefix + [command(root, program)[0], os.path.join(temp, 'tree', program)],
++                                     cwd=here, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
++                                     stderr=subprocess.STDOUT, start_new_session=True)
++            try:
++                out = child.communicate(timeout=seconds)[0].decode('utf-8', 'replace')
++            except subprocess.TimeoutExpired:
++                os.killpg(child.pid, signal.SIGKILL)
++                child.communicate()
++                continue
++            if child.returncode or ERROR.search(out):
++                failed.append((program, '\n'.join(out.splitlines()[-TAIL:])))
++            else:
++                passed.append(sorted(close({program}, uses)))
++    finally:
++        shutil.rmtree(temp, ignore_errors=True)
++    return passed, failed
+ 
+ 
+ def respond(event, config):
+@@ -324,7 +409,7 @@ def respond(event, config):
+                 root = event.get('cwd') or os.getcwd()
+                 files = listing(root)
+                 scans = {rel: scan(os.path.join(root, rel)) for rel in files}
+-                state = {'root': root, 'snapshot': files, 'runs': [], 'noted': [],
++                state = {'root': root, 'snapshot': files, 'runs': [],
+                          'scan': {rel: s for rel, s in scans.items() if s[0] or s[1]}}
+             state['last'] = time.time()
+             save(path, state)
+@@ -332,14 +417,23 @@ def respond(event, config):
+         if 'snapshot' not in state:
+             return {}
+         if name in FINAL:
+-            if event.get('stop_hook_active'):
+-                return {}
+-            unchecked, entries = sets(state, listing(state['root']))[:2]
+-            return {'decision': 'block', 'reason': message(unchecked, entries)} if unchecked else {}
+-        text = record(state, event)
++            root, active = state['root'], event.get('stop_hook_active')
++            files = listing(root)
++            unchecked, entries, uses, outward = sets(state, files)
++            state['holds'] = state.get('holds', 0) if active else 0
++            passed, failed = probes(state, files, event.get('cwd') or root, entries, uses, outward)
++            if failed:
++                state['holds'] += 1
++                reply = {} if state['holds'] > MAX_HOLDS else {'decision': 'block', 'reason': message(unchecked, entries) + ''.join(
++                    '\nProbe of %s failed; the last %d lines of its output:\n%s' % (p, TAIL, tail) for p, tail in failed)}
++            else:
++                state['runs'] += [{'t': time.time(), 'all': False, 'reach': reach} for reach in passed]
++                unchecked, entries = sets(state, files)[:2]
++                reply = {'decision': 'block', 'reason': message(unchecked, entries)} if unchecked and not active else {}
++            save(path, state)
++            return reply
++        record(state, event)
+         save(path, state)
+-    if text:
+-        return {'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': text}}
+     return {}
+ 
+ 
+diff --git a/tests/test_makoto.py b/tests/test_makoto.py
+index a2897b4..65a651a 100644
+--- a/tests/test_makoto.py
++++ b/tests/test_makoto.py
+@@ -2,6 +2,9 @@
+ import json
+ import os
+ import subprocess
++import shutil
++import socket
++import tempfile
+ import time
+ from pathlib import Path
+ 
+@@ -33,8 +36,28 @@ def s(request, tmp_path):
+     return Session(tmp_path, request.param == 'git')
+ 
+ 
++def unshared():
++    return subprocess.run(['unshare', '-rn', 'true'], capture_output=True).returncode == 0
++
++
++needs_isolation = pytest.mark.skipif(not unshared(), reason='unshare -rn does not work here')
++
++
++def without_isolation(tmp):
++    """A PATH that has what the hook needs but neither unshare nor sandbox-exec."""
++    bin = tmp / 'bin'
++    bin.mkdir(exist_ok=True)
++    for name in ('python3', 'bash', 'git', 'sh', 'env'):
++        if shutil.which(name) and not (bin / name).exists():
++            (bin / name).symlink_to(shutil.which(name))
++    return str(bin)
++
++
+ class Session:
+-    def __init__(self, tmp, git, files=None):
++    """Probes are off (no isolation on PATH) unless iso is true, so the set rules are tested alone."""
++
++    def __init__(self, tmp, git, files=None, iso=False):
++        self.iso, self.env = iso, {}
+         self.tmp, self.cwd, self.clock = tmp, tmp / 'work', time.time() - 1000
+         self.cwd.mkdir()
+         for name, text in (files or {}).items():
+@@ -44,7 +67,8 @@ class Session:
+         self.send('SessionStart')
+ 
+     def send(self, name, **fields):
+-        return send(self.tmp, dict(hook_event_name=name, session_id='s', cwd=str(self.cwd), **fields))
++        extra = dict(self.env) if self.iso else dict(self.env, PATH=without_isolation(self.tmp))
++        return send(self.tmp, dict(hook_event_name=name, session_id='s', cwd=str(self.cwd), **fields), **extra)
+ 
+     def put(self, path, text='x = 1\n'):
+         """Write a file whose modified time is a new moment on a clock that starts in the past."""
+@@ -86,8 +110,7 @@ def test_width_0_chat_session_has_no_message(s):
+ 
+ 
+ def test_width_1_script_nothing_uses(s):
+-    note = s.edit('tool', SH)
+-    assert note['hookSpecificOutput']['additionalContext'] == hold(['tool'], ['tool'])
++    assert s.edit('tool', SH) == {}  # no note in this variant
+     assert s.stop() == {'decision': 'block', 'reason': hold(['tool'], ['tool'])}
+     s.sh('./tool')
+     assert s.stop() == {}
+@@ -107,9 +130,8 @@ def test_markdown_is_not_demanded(s):
+ def test_width_n_module_with_three_users(tmp_path):
+     s = snapshot_fan(tmp_path)
+     everyone = ['lib.py', 'main.py'] + USERS
+-    note = s.edit('lib.py', 'x = 2\n')
+-    assert note['hookSpecificOutput']['additionalContext'] == hold(everyone, ['main.py'])
+-    assert s.edit('lib.py', 'x = 3\n') == {}  # once per changed file until checked
++    assert s.edit('lib.py', 'x = 2\n') == {}
++    assert s.edit('lib.py', 'x = 3\n') == {}
+     assert s.stop()['reason'] == hold(everyone, ['main.py'])
+     s.sh('python3 u1.py')  # reaches u1 and lib only
+     assert s.stop(stop_hook_active=True) == {}
+@@ -149,7 +171,7 @@ def test_reedit_after_check_notes_again(tmp_path):
+     s.edit('lib.py', 'x = 2\n')
+     s.sh('python3 main.py')
+     s.clock = time.time() + 100
+-    assert s.edit('lib.py', 'x = 3\n')['hookSpecificOutput']['additionalContext'].startswith('Not run since')
++    assert s.edit('lib.py', 'x = 3\n') == {}
+     assert s.stop()['decision'] == 'block'
+ 
+ 
+@@ -233,7 +255,7 @@ def test_git_ignored_files_are_skipped(tmp_path):
+     assert s.stop() == {}
+ 
+ 
+-def test_second_stop_is_admitted(s):
++def test_second_stop_is_admitted_when_nothing_was_probed(s):
+     s.edit('tool', SH)
+     assert s.stop()['decision'] == 'block'
+     assert s.stop(stop_hook_active=True) == {}
+@@ -260,6 +282,7 @@ def test_prompt_and_session_start_are_never_blocked(tmp_path):
+ def test_hooks_have_timeouts():
+     for groups in HOOKS.values():
+         assert all(h['timeout'] >= 10 for g in groups for h in g['hooks'])
++    assert all(h['timeout'] == 30 for k in ('Stop', 'SubagentStop') for g in HOOKS[k] for h in g['hooks'])
+ 
+ 
+ def test_code_computing_the_sets_does_not_test_a_size():
+@@ -270,3 +293,132 @@ def test_code_computing_the_sets_does_not_test_a_size():
+         assert not [n for n in nodes if isinstance(n, ast.Call) and getattr(n.func, 'id', '') == 'len'], fn.name
+         assert not [n for n in nodes if isinstance(n, ast.If) and not isinstance(n.test, ast.Compare)], fn.name  # membership only
+         assert not [n for n in nodes if isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.Not)], fn.name
++
++
++# ---------------------------------------------------------------- the probe
++
++def tree(tmp, **extra):
++    """lib.py, three users and main.py, all unchanged at session start, with probes on."""
++    files = {'lib.py': 'x = 1\n', 'u1.py': MODULE, 'u2.py': MODULE, 'u3.py': MODULE,
++             'main.py': 'import u1\nimport u2\nimport u3\nprint("ran")\n'}
++    files.update(extra)
++    return Session(tmp, False, files, iso=True)
++
++
++@needs_isolation
++def test_probe_passes_silently_and_checks_what_it_reaches(tmp_path):
++    s = tree(tmp_path)
++    assert s.edit('lib.py', 'x = 2\n') == {}
++    assert s.stop() == {}
++    s.edit('lib.py', 'x = 3\n')
++    assert s.stop('SubagentStop') == {}
++
++
++@needs_isolation
++def test_probe_that_fails_holds_with_the_output_at_most_three_times(tmp_path):
++    s = tree(tmp_path)
++    s.edit('lib.py', 'print("line %d" % i) if False else None\nfor i in range(30):\n    print("line", i)\nraise SystemExit(3)\n')
++    reason = s.stop()['reason']
++    assert reason.startswith(hold(['lib.py', 'main.py', 'u1.py', 'u2.py', 'u3.py'], ['main.py']))
++    assert 'Probe of main.py failed' in reason and 'line 29' in reason and 'line 15\n' in reason and 'line 14\n' not in reason
++    assert s.stop(stop_hook_active=True)['decision'] == 'block'
++    assert s.stop(stop_hook_active=True)['decision'] == 'block'
++    assert s.stop(stop_hook_active=True) == {}  # the fourth is admitted
++    assert s.stop()['decision'] == 'block'  # a new final answer starts over
++
++
++@needs_isolation
++def test_probe_fixed_after_a_hold_is_admitted_silently(tmp_path):
++    s = tree(tmp_path)
++    s.edit('lib.py', 'raise SystemExit(1)\n')
++    assert s.stop()['decision'] == 'block'
++    s.edit('lib.py', 'x = 5\n')
++    assert s.stop(stop_hook_active=True) == {}
++
++
++def test_without_isolation_it_holds_as_set_does_once(tmp_path):
++    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'main.py': 'import lib\nraise SystemExit(1)\n'})
++    s.edit('lib.py', 'x = 2\n')
++    assert s.stop() == {'decision': 'block', 'reason': hold(['lib.py', 'main.py'], ['main.py'])}
++    assert s.stop(stop_hook_active=True) == {}
++
++
++@needs_isolation
++def test_probe_cannot_write_into_the_tree_or_reach_the_network(tmp_path):
++    server = socket.socket()
++    server.bind(('127.0.0.1', 0))
++    server.listen(1)
++    server.settimeout(0.5)
++    script = ('#!/bin/bash\nimport_marker=1\necho leaked > leak.txt\necho leaked > ../leak2.txt\n'
++              'exec 3<>/dev/tcp/127.0.0.1/%d || { echo NOCONNECT; exit 3; }\necho CONNECTED\n' % server.getsockname()[1])
++    s = Session(tmp_path, False, {'probe_net': script, 'lib.py': 'x = 1\n'}, iso=True)
++    (tmp_path / 'tmp').mkdir()
++    s.env['TMPDIR'] = str(tmp_path / 'tmp')
++    before = sorted(p.name for p in tmp_path.rglob('*'))
++    s.edit('probe_net', script + '# changed\n')
++    reason = s.stop()['reason']
++    assert 'NOCONNECT' in reason and 'CONNECTED\n' not in reason.replace('NOCONNECT', '')
++    with pytest.raises(socket.timeout):
++        server.accept()
++    assert not (s.cwd / 'leak.txt').exists() and not (tmp_path / 'leak2.txt').exists()
++    assert sorted(p.name for p in tmp_path.rglob('*')) == before
++    assert os.listdir(tmp_path / 'tmp') == []  # the temporary copy is deleted
++    server.close()
++
++
++@needs_isolation
++def test_probe_environment_input_and_directory(tmp_path):
++    s = Session(tmp_path, False, {'sub/tool': '#!/bin/sh\n', 'sub/lib.sh': 'X=1\n'}, iso=True)
++    s.env['MAKOTO_SECRET'] = 'hunter2'
++    script = '#!/bin/sh\n. ./lib.sh\nenv | sort\npwd\nif read -r line; then echo GOTINPUT; else echo STDIN_CLOSED; fi\nexit 1\n'
++    s.edit('sub/tool', script)
++    reason = send(tmp_path, dict(hook_event_name='Stop', session_id='s', cwd=str(s.cwd / 'sub')),
++                  PATH=os.environ['PATH'], MAKOTO_SECRET='hunter2')['reason']
++    assert 'hunter2' not in reason and 'STDIN_CLOSED' in reason and 'HOME=' in reason
++    assert '/tree/sub' in reason  # the same relative cwd, inside the copy
++
++
++@needs_isolation
++def test_probe_that_times_out_is_not_a_failure(tmp_path):
++    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'main.py': 'import lib\n'}, iso=True)
++    s.edit('main.py', 'import lib\nimport time\ntime.sleep(60)\n')
++    started = time.time()
++    assert s.stop()['reason'] == hold(['main.py'], ['main.py'])
++    assert time.time() - started < 25
++
++
++@needs_isolation
++def test_nothing_is_probed_over_the_size_cap(tmp_path):
++    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'main.py': 'import lib\n'}, iso=True)
++    with open(s.cwd / 'big.bin', 'wb') as big:
++        big.truncate(51 * 1024 * 1024)
++    s.edit('main.py', 'import lib\nraise SystemExit(1)\n')
++    assert s.stop()['reason'] == hold(['main.py'], ['main.py'])
++
++
++@needs_isolation
++def test_entry_that_imports_subprocess_is_not_probed(tmp_path):
++    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'main.py': 'import lib\n'}, iso=True)
++    s.edit('main.py', 'import lib\nimport subprocess\nraise SystemExit(1)\n')
++    assert s.stop() == {'decision': 'block', 'reason': hold(['main.py'], ['main.py'])}  # held as set: no probe output
++
++
++@needs_isolation
++def test_entry_reaching_subprocess_through_a_module_is_not_probed(tmp_path):
++    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'mid.py': 'import lib\n', 'main.py': 'import mid\nraise SystemExit(1)\n'}, iso=True)
++    s.edit('lib.py', 'import subprocess\n')
++    assert s.stop()['reason'] == hold(['lib.py', 'main.py', 'mid.py'], ['main.py'])
++
++
++@needs_isolation
++def test_entry_with_no_outward_reach_is_probed(tmp_path):
++    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'main.py': 'import lib\nraise SystemExit(1)\n'}, iso=True)
++    s.edit('lib.py', 'x = 2\n')
++    assert 'Probe of main.py failed' in s.stop()['reason']
++
++
++@needs_isolation
++def test_an_entry_the_probe_cannot_run_is_held_as_set(tmp_path):
++    s = Session(tmp_path, False, {'lib.go': 'package lib\n', 'main.go': 'import "lib"\n'}, iso=True)
++    s.edit('lib.go', 'package lib // 2\n')
++    assert s.stop()['reason'] == hold(['lib.go', 'main.go'], ['main.go'])

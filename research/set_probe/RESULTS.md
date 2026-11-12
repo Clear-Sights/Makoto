@@ -52,3 +52,9 @@
 1. **Ship set, with one fix:** a changed runnable file with no lookup edge is demanded too, which is the likely cause of unrun's 32. Then confirm on fresh tasks.
 2. **Build "one map"** (owner, 2026-11-12): all state on the map, with reads and writes links for literal paths. Measure it against set.
 3. **Drop the probe as built:** it adds 94 lines and no gain.
+
+## The probe variant's code
+- **Where it is kept:** `probe_variant.patch` holds the probe variant as a diff from set (856a5cf) to ba6ae89 on the former branch `claude/makoto-probe`. It was not shipped.
+- **How to rebuild it:**
+  - `git checkout 856a5cf`
+  - `git apply research/set_probe/probe_variant.patch`
