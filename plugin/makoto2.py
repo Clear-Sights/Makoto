@@ -8,7 +8,7 @@ What changed is read from the file system, never from edits: the first SessionSt
 path, size and modified time of the files under the cwd; at a final answer a file is changed when it is new or
 differs. Git is optional (used only to skip ignored files). Code in any language (by extension or shebang) and
 config or data files are held; plain docs never. A completed program or test run that started after the file's
-modified time pays it when it names the file, a program or test in the same top-level folder, or is a project-wide
+modified time and succeeded (no failed call, no error marker in its output) pays it when it names the file, a program or test in the same top-level folder, or is a project-wide
 runner; a config or data file is also paid by a full read after its modified time. A Stop with stop_hook_active is
 admitted. After a completed Write, Edit, MultiEdit or NotebookEdit of a code file the PostToolUse response names
 what to run, once per file until paid. An error in Makoto blocks a final answer or tool step, names the error and
@@ -36,6 +36,7 @@ MAX_FILES = 20000
 DISABLE = 'claude plugin disable makoto'
 UNCHANGED = 'Unchanged: Do not assume what can change has not.'
 MISSING = ' Missing: a run of it, with its output read, after its last edit. Clear: Run it and read its output.'
+FAILED = ' Missing: a run of it that succeeds, after its last edit. Clear: Fix the error, run it again and read its output.'
 NOTE = 'Before your final answer, run the program or tests that use %s and read the output.'
 FINAL = ('Stop', 'SubagentStop')
 HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
@@ -56,6 +57,8 @@ WIDE = re.compile(r'(?:make|gmake|npx|pytest|py\.test|jest|vitest|mocha|npm|yarn
 WRAPPERS = frozenset('time nohup exec sudo command env stdbuf nice'.split())
 PRINTERS = frozenset('cat bat less more nl tac'.split())
 SEPARATORS = frozenset(('&&', '||', ';', '|', '|&', '&', '(', ')', ';;', '{', '}'))
+ERROR = re.compile(r'Traceback \(most recent call last\)|^[\w.]+(?:Error|Exception):|\bexit(?:=|\s+code\s+)0*[1-9]|'
+                   r'\bFAILED\b|panic:|command not found|No such file or directory', re.M)
 HEREDOC = re.compile(r'<<-?\s*([\'"]?)(\w+)\1[^\n]*\n.*?\n[ \t]*\2[ \t]*(?=\n|$)', re.S)
 
 
@@ -249,15 +252,24 @@ def reaches(run, rel):
 
 def paid(state, rel, mtime):
     what = kind(os.path.join(state['root'], rel))
-    if any(r['t'] > mtime and reaches(r, rel) for r in state['runs']):
+    if any(r['t'] > mtime and r.get('ok', True) and reaches(r, rel) for r in state['runs']):
         return True
     return what == 'config' and any(r['t'] > mtime and r['path'] == rel for r in state['reads'])
+
+
+def failed(event):
+    """A tool call that failed, or whose stdout or stderr holds an error marker."""
+    out = event.get('tool_response')
+    out = '\n'.join(str(out.get(k) or '') for k in ('stdout', 'stderr')) if isinstance(out, dict) else str(out or '')
+    return event.get('hook_event_name') == 'PostToolUseFailure' or bool(ERROR.search(out))
 
 
 def record(state, event):
     """Note completed runs and full reads; return the files newly needing a note."""
     root, tool, given = state['root'], event.get('tool_name'), event.get('tool_input') or {}
     cwd, now, fresh = event.get('cwd') or root, time.time(), []
+    if event.get('hook_event_name') == 'PostToolUseFailure' and tool != 'Bash':
+        return fresh
     began, state['last'] = state.get('last', now), now  # a run began after the previous hook event, so a change it made is newer
     if tool == 'Read' and isinstance(given.get('file_path'), str) and not given.get('offset') and not given.get('limit'):
         state['reads'] = (state['reads'] + [{'t': now, 'path': os.path.relpath(absolute(given['file_path'], cwd), root).replace(os.sep, '/')}])[-300:]
@@ -271,7 +283,7 @@ def record(state, event):
                     if not word.startswith('-'):
                         state['reads'] = (state['reads'] + [{'t': now, 'path': os.path.relpath(absolute(word, cwd), root).replace(os.sep, '/')}])[-300:]
             elif is_run(argv):
-                state['runs'] = (state['runs'] + [dict(run_record(argv, cwd, root), t=began)])[-300:]
+                state['runs'] = (state['runs'] + [dict(run_record(argv, cwd, root), t=began, ok=not failed(event))])[-300:]
     elif tool in EDITORS:
         target = given.get('file_path') or given.get('notebook_path')
         if isinstance(target, str) and target:
@@ -295,8 +307,9 @@ def unpaid(state):
     for rel in sorted(now):
         if snapshot.get(rel) == now[rel] or not kind(os.path.join(state['root'], rel)):
             continue
-        if not paid(state, rel, now[rel][1] / 1e9):
-            held.append(rel)
+        mtime = now[rel][1] / 1e9
+        if not paid(state, rel, mtime):  # a failed run after the last edit changes the text
+            held.append((rel, any(r['t'] > mtime and reaches(r, rel) for r in state['runs'])))
     return held
 
 
@@ -316,16 +329,16 @@ def respond(event, config):
             state['last'] = time.time()
             save(path, state)
             return {}
-        if 'snapshot' not in state or name == 'PostToolUseFailure':
+        if 'snapshot' not in state:
             return {}
         if name in FINAL:
             held = unpaid(state)
             if event.get('stop_hook_active') or not held:
-                state['unpaid'] = held
+                state['unpaid'] = [f for f, _ in held]
                 save(path, state)
                 return {}
-            reason = '; '.join('makoto rule d [switch]: ' + json.dumps(f, ensure_ascii=False) + ': ' + UNCHANGED + MISSING
-                               for f in held)
+            reason = '; '.join('makoto rule d [switch]: ' + json.dumps(f, ensure_ascii=False) + ': ' + UNCHANGED + (FAILED if bad else MISSING)
+                               for f, bad in held)
             return {'decision': 'block', 'reason': reason}
         fresh = record(state, event)
         save(path, state)

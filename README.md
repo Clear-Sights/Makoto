@@ -19,13 +19,16 @@ or a shell command is seen like any other.
 
 ## What pays
 
-A completed program or test run that started after the file's last change pays it, when the run reaches the file: it
+A completed program or test run that succeeded and started after the file's last change pays it, when the run reaches the file: it
 names the file, or names a program or test in the same top-level folder, or it is a project-wide runner (make,
 npm/yarn/pnpm run, test or start, pytest, jest, vitest, mocha, go test, cargo run or test, npx, and the like).
 Recognised runs: python, node, deno, bun, ruby, perl, php, go run/test/build, cargo run/test, java, dotnet, make,
 npm/yarn/pnpm, pytest, jest, vitest, mocha, sh, bash, zsh and `./path`, including after `cd x &&`, in pipes, with
 `2>&1` or with `VAR=value` prefixes. A run of something unrelated does not pay, and neither does a run that
-began before the change or one that failed. A config or data file is also paid by reading it in full after its
+began before the change or one that failed: the tool call failed, or its output (stdout or stderr) holds an error
+marker (a Traceback, a line starting `...Error:` or `...Exception:`, `exit=N` or `exit code N` with N not 0, `FAILED`,
+`panic:`, `command not found`, `No such file or directory`). The hold then ends: `Missing: a run of it that succeeds,
+after its last edit. Clear: Fix the error, run it again and read its output.` The word "error" in prose is no marker. A config or data file is also paid by reading it in full after its
 last change (the Read tool, or `cat`).
 
 The hold names each unchecked file and asks for a run with its output read. It blocks once: a Stop that follows a
