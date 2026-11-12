@@ -5,13 +5,13 @@
     "url": "https://github.com/Clear-Sights"
   },
   "metadata": {
-    "description": "Makoto: a hook that holds a final answer shipping a code file edited this session and not run since."
+    "description": "Makoto: a hook that holds a final answer while a changed code or config file has not been run or read back since."
   },
   "plugins": [
     {
       "name": "makoto",
       "source": "./plugin",
-      "description": "Holds a final answer that ships a code file edited this session and not run since; after a .py edit, names the program to run.",
+      "description": "Holds a final answer while a code or config file changed this session (any language, no git needed) has not been run or read back since.",
       "category": "workflow",
       "tags": [
         "integrity",
