@@ -5,19 +5,19 @@
     "url": "https://github.com/Clear-Sights"
   },
   "metadata": {
-    "description": "Makoto: hooks that hold dependent steps until the session record holds the readings they need."
+    "description": "Makoto: a hook that holds a final answer shipping a code file edited this session and not run since."
   },
   "plugins": [
     {
       "name": "makoto",
       "source": "./plugin",
-      "description": "Five Immediacy rules (a to e) enforced before dependent steps; obligations are inferred from the session record.",
+      "description": "Holds a final answer that ships a code file edited this session and not run since; after a .py edit, names the program to run.",
       "category": "workflow",
       "tags": [
         "integrity",
         "guardrails",
         "hooks",
-        "claims"
+        "run-before-done"
       ],
       "license": "FSL-1.1-ALv2",
       "homepage": "https://github.com/Clear-Sights/Makoto"
