@@ -35,6 +35,13 @@ def read(text, tid='read'):
     return call('Read', {'file_path': 'source.txt'}, {'content': text}, tid)
 
 
+def failed_read(tid='read'):
+    """The same Read, failed: a tool call that reads nothing."""
+    tool_input = {'file_path': 'source.txt'}
+    return [ev('PreToolUse', tool_name='Read', tool_use_id=tid, tool_input=tool_input),
+            ev('PostToolUseFailure', tool_name='Read', tool_use_id=tid, tool_input=tool_input, error='File does not exist.')]
+
+
 def stop(text):
     # An active Stop: an admitted one answers {} (the questions were shown once already).
     return ev('Stop', last_assistant_message=text, stop_hook_active=True)
@@ -45,7 +52,7 @@ RUN = call('Bash', {'command': 'python3 run.py'}, {'stdout': '731\n', 'exitCode'
 
 CASES = {
     # rule: (plant events, twin events); the last event of each is the step under test.
-    'a': ([stop('source data')],
+    'a': (failed_read() + [stop('source data')],
           read('source data') + [stop('source data')]),
     'b': (read('source data') + [stop('unread_subject')],
           read('source data unread_subject') + [stop('unread_subject')]),

@@ -121,6 +121,8 @@ def test_unreadable_event_input_blocks(tmp_path):
 
 def test_rule_findings_still_deny(tmp_path):
     plant, _ = CASES['a']
+    for event in plant[:-1]:
+        send(tmp_path, event)
     assert send(tmp_path, plant[-1])['decision'] == 'block'
 
 
@@ -149,6 +151,8 @@ def test_held_lock_blocks_within_its_cap(tmp_path):
 
 def test_active_stop_is_held_every_time(tmp_path):
     plant, _ = CASES['a']
+    for event in plant[:-1]:
+        send(tmp_path, event)
     for _ in range(3):
         response = send(tmp_path, plant[-1])
         assert response['decision'] == 'block' and response['reason'].startswith('makoto rule a ')
