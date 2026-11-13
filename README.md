@@ -45,9 +45,10 @@ failed run checks nothing and the message then says the file needs a run that su
 One message names the demanded files not yet checked and the entry programs (files no other file depends on) that
 reach them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.`
 
-- After a Write, Edit, MultiEdit or NotebookEdit it arrives as a note only when the entry programs it names include
-  one that no earlier note in the session named; otherwise the edit gets no note. Twelve edits whose runs are all
-  the same entry program give one note; a new entry program gives another.
+- After any completed tool call (PostToolUse; Bash, Write, Edit, or any other) it arrives as a note when the tree
+  holds a new unchecked change and the entry programs it names include one that no earlier note in the session
+  named; otherwise no note. It does not matter which tool made the change. A run that checks the change gets no
+  note. Twelve changes whose runs are all the same entry program give one note; a new entry program gives another.
 - At the final answer (Stop, or a subagent's SubagentStop) it is a hold, once: a Stop that follows a hold
   (`stop_hook_active`) is let through.
 
