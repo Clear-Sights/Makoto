@@ -1,7 +1,7 @@
 # Makoto
 
 Makoto holds a final answer while a file changed this session, or a file that depends on it, has not been run since.
-It works in any language and needs no git.
+It needs no git. Its rules are not tied to a language; what has been measured is under "What is measured".
 
 ## The map
 
@@ -62,6 +62,28 @@ nothing else. No list of runs, reads, notes or unpaid files. It never grows with
 the tree's files (at most 20,000, skipping only `.git`, `node_modules`, `__pycache__`, `.venv` and `venv` by name,
 and files git ignores) and their links. `MAKOTO_STATE_DIR` moves it; `MAKOTO_LOCK_SECONDS` (default 3) sets how long
 a busy lock is waited for.
+
+## What is measured
+
+Each row compares Makoto 6.2.1 with the same model without it, on 40 fresh tasks per row (Claude Code 2.1.323).
+The tasks were built for these tests, so they show what Makoto does on tasks of these kinds and no more. The records
+are on the `research` branch (`research/v621/` and `research/claims/`).
+
+| tasks | model | without Makoto | with Makoto | cost with Makoto |
+|---|---|---|---|---|
+| Python: an edit that fails only when run | Haiku | 24 of 40 | 36 of 40 | 1.34 times |
+| Python: a change with 12 dependent files | Haiku | 27 of 40 | 37 of 40 | 1.33 times |
+| Python: one script writes a file another reads | Haiku | 6 of 40 | 19 of 40 | 1.44 times |
+| JavaScript: an edit that fails only when run | Haiku | 40 of 40 | 40 of 40 | 1.21 times |
+| Python: an edit that fails only when run | Sonnet | 16 of 40 | 38 of 40 | 1.68 times |
+| Python: a change with 12 dependent files | Sonnet | 28 of 40 | 40 of 40 | 1.57 times |
+
+- **Where it helps:** where the model would finish without running what it changed. In these tasks the goal says
+  there is no need to run it, and both models then skip the run.
+- **Where it only costs:** where the model already gets it right, as on the JavaScript tasks. Makoto then adds about
+  a fifth to the cost and gains nothing.
+- **Not measured live:** Go, Rust, Ruby and shell projects, which only the unit tests cover; Opus; tasks whose goal
+  does not discourage a run.
 
 ## Limits
 
