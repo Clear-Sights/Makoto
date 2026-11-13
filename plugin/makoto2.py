@@ -6,7 +6,7 @@ SubagentStop.
 
 State per session (one JSON file under a lock in MAKOTO_STATE_DIR): the map, and nothing else. One node per file under
 the cwd: its size and mtime at session start, the start time of the last successful run that reached it, a failed flag,
-a noted flag, and the names its text gives for links. Links, from a file to a file it depends on: uses (import-style
+a noted flag (an entry program an earlier note named), and the names its text gives for links. Links, from a file to a file it depends on: uses (import-style
 lines: import, from, require, include, use, source, load), reads (a quoted string naming a project file by relative
 path or base name with extension) and produced by (the same on a line with a write marker; from the data file to the
 file that writes it). Links are read again for files that change. A run stamps its start time on every node it reaches
@@ -16,9 +16,10 @@ Sets, computed without a test of their size (see sets):
   demanded  = changed nodes that are runnable (interpreter extension or shebang) or linked by uses or reads, plus every
               node that reaches one through links;
   checked   = demanded nodes stamped after the latest change among the changed nodes they reach.
-A run reaches the program it names plus what that depends on; a test runner with no program argument reaches every
-node. One message names demanded minus checked and the entry programs (used by no file) that reach it: a note after
-an edit, once per file until checked; a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
+A run reaches the program it names plus what that depends on; a test runner with no program argument reaches the test
+files (name holds test or spec, or under a folder test, tests, spec, __tests__) and what they depend on. One message
+names demanded minus checked and the entry programs (used by no file) that reach it: a note after an edit, only when
+an entry program it names was named by no earlier note (the noted flag, on the entry program's node); a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
 Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
 """
 import contextlib
@@ -65,6 +66,11 @@ WRITES = re.compile(r'>|[\'"][wa][bt+]*[\'"]|\b(?:write\w*|dump\w*|save\w*|to_cs
 SCRIPTS = ('.py', '.js', '.mjs', '.cjs', '.ts', '.sh', '.bash', '.zsh', '.rb', '.pl', '.php', '.lua', '.r', '.ps1',
            '.jl', '.tcl', '.awk')
 TOKEN = re.compile(r'[\w@\-]+(?:[./][\w\-]+)*')
+TESTS = re.compile(r'(?:^|/)(?:tests?|spec|__tests__)/|(?:test|spec)[^/]*$')
+SHELL = re.compile(r'#!.*\b(?:ba|z|da|k)?sh\b')
+OPERAND = r'([^\s\'"<>|&;()$`]+)(?=[\s;|&)]|$)'  # an unquoted path
+SHELL_WRITES = re.compile(r'(?:>>?[ \t]*|\btee\b(?:[ \t]+-\w+)*[ \t]+)' + OPERAND)
+SHELL_READS = re.compile(r'(?<!<)<(?![<(])[ \t]*' + OPERAND)
 NOISE = frozenset(('import', 'as', 'from', 'static', 'crate', 'self', 'super', 'type'))
 
 
@@ -218,7 +224,11 @@ def scan(path):
     result['shebang'] = text.startswith('#!')
     names = [t for m in IMPORT.finditer(text) for t in TOKEN.findall(m.group(1) or m.group(2)) if t not in NOISE]
     result['uses'] = list(dict.fromkeys(names))[:200]
+    shell = path.endswith(('.sh', '.bash', '.zsh')) or bool(SHELL.match(text))
     for line in text.splitlines():
+        if shell and not line.lstrip().startswith('#'):
+            result['writes'].extend(SHELL_WRITES.findall(line))
+            result['quotes'].extend(SHELL_READS.findall(line))
         result['writes' if WRITES.search(line) else 'quotes'].extend(q[2:] if q.startswith('./') else q
                                                                       for q in QUOTED.findall(line))
     result['quotes'], result['writes'] = (list(dict.fromkeys(result[k]))[:200] for k in ('quotes', 'writes'))
@@ -328,18 +338,20 @@ def record(state, event):
                 cwd = absolute(argv[1], cwd) if len(argv) > 1 else os.path.expanduser('~')
             elif is_run(argv):
                 program = named(argv, cwd, root, files)
-                for rel in files if is_tester(argv) and not program else close(program, links):
+                if is_tester(argv):
+                    program = program or {f for f in files if TESTS.search(f.lower())}
+                for rel in close(program, links):
                     nodes[rel]['failed'] = bad
                     if not bad:
                         nodes[rel]['ran'] = began
     unchecked, entries = sets(state, files)
-    for rel, node in nodes.items():
-        node['noted'] = node['noted'] and rel in unchecked
     target = given.get('file_path') or given.get('notebook_path')
     if tool in EDITORS and isinstance(target, str) and target:
         rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
-        if rel in unchecked and not nodes[rel]['noted']:
-            nodes[rel]['noted'] = True
+        fresh = [e for e in entries if not nodes[e]['noted']]
+        if rel in unchecked and fresh:
+            for e in fresh:
+                nodes[e]['noted'] = True
             return message(unchecked, entries, nodes)
     return ''
 
