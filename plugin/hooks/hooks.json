@@ -29,7 +29,7 @@
           {
             "type": "command",
             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
-            "timeout": 20
+            "timeout": 10
           }
         ]
       }
@@ -52,7 +52,7 @@
           {
             "type": "command",
             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
-            "timeout": 20
+            "timeout": 10
           }
         ]
       }
@@ -63,7 +63,7 @@
           {
             "type": "command",
             "command": "cd \"${CLAUDE_PLUGIN_ROOT}\" && python3 -m makoto2",
-            "timeout": 20
+            "timeout": 10
           }
         ]
       }
