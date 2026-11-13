@@ -8,7 +8,7 @@ It needs no git. Its rules are not tied to a language; what has been measured is
 Makoto's whole state is one map of the files under the working directory.
 
 - **Node**, one per file: its size and modified time at session start, the start time of the last successful run
-  that reached it, a failed flag, and a noted flag (set on an entry program an earlier note named).
+  that reached it, a failed flag, and a noted flag (set on an entry program an earlier note named), and the hash of the last probe failure noted for it.
 - **Link**, from a file to a file it depends on, read from the files' text and read again for files that change:
   - **uses**: an import-style line (`import`, `from`, `require`, `include`, `use`, `source`, `load`) names the other
     file's module path or base name;
@@ -45,15 +45,45 @@ failed run checks nothing and the message then says the file needs a run that su
 One message names the demanded files not yet checked and the entry programs (files no other file depends on) that
 reach them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.`
 
-- After a Write, Edit, MultiEdit or NotebookEdit it arrives as a note only when the entry programs it names include
-  one that no earlier note in the session named; otherwise the edit gets no note. Twelve edits whose runs are all
-  the same entry program give one note; a new entry program gives another.
+- After any completed tool call (PostToolUse; Bash, Write, Edit, or any other) it arrives as a note when the tree
+  holds a new unchecked change and the entry programs it names include one that no earlier note in the session
+  named; otherwise no note. It does not matter which tool made the change. A run that checks the change gets no
+  note. Twelve changes whose runs are all the same entry program give one note; a new entry program gives another.
 - At the final answer (Stop, or a subagent's SubagentStop) it is a hold, once: a Stop that follows a hold
   (`stop_hook_active`) is let through.
 
-It never blocks the user's prompt or session start, edits nothing, runs nothing and calls no model. Its only other
-block is an error in Makoto itself (unreadable input, state lock busy, unwritable state), which names the error and
-the one way out.
+It never blocks the user's prompt or session start, edits nothing in your tree and calls no model. The only
+programs it runs are the probes below. Its only other block is an error in Makoto itself (unreadable input, state lock
+busy, unwritable state), which names the error and the one way out.
+
+When Makoto has run the program itself and it failed, the message also carries the last 15 lines of the output and
+ends `(run in a sandbox with no network)`.
+
+## Makoto runs the check itself
+
+Where the Claude Code sandbox runtime (`srt`, the `@anthropic-ai/sandbox-runtime` package) is installed, Makoto runs
+the check instead of asking Claude to:
+
+- **When:** after any completed tool call that leaves an unchecked change, and at the final answer if one remains.
+- **Without the sandbox** the note follows only the edit tools (Write, Edit, MultiEdit, NotebookEdit), and a change
+  made any other way is caught at the final answer.
+- **What it runs:** every entry program the message names (a file nothing else depends on) that a known interpreter
+  (python3, node, ruby, perl, php, sh, bash; by extension or `#!` line) runs with no argument, whatever it imports.
+  Programs run in the same relative directory as the session, in order, with input closed, and all of them together
+  get 8 seconds.
+- **In which sandbox:** one `srt` call, in a temporary copy of the tree (at most 20,000 files and 50 MB), deleted
+  afterwards. The sandbox allows no network and no write outside the copy, so a probe cannot change your files or send
+  anything out. The settings file it uses is deleted too.
+- **A pass** (exit 0, output with no error marker) marks the files it reached as checked, silently. **A fail** puts
+  the output's last 15 lines in the message: as a note once per distinct output, and in the hold at the final answer.
+  A program that needs the network (or anything else the sandbox blocks) fails there and is reported with the note
+  `(run in a sandbox with no network)`.
+- **When it does not probe,** and behaves exactly as without it (the note and the hold of "The message"): `srt` is
+  not found or errors; the program has no known interpreter; the copy would pass the caps; the probe times out; or the
+  tree changed while the probe ran (a result counts only for the tree it read).
+- **Is it active?** It is when `srt` is installed: on `PATH`, or named by the environment variable `MAKOTO_SRT`.
+  No setting turns it on or off. Install it with `npm install -g @anthropic-ai/sandbox-runtime`; it needs bubblewrap
+  and socat on Linux.
 
 ## State
 
@@ -87,9 +117,11 @@ are on the `research` branch (`research/v621/` and `research/claims/`).
 
 ## Limits
 
+- A probe is a run with no argument in a copy: a program that needs arguments, input, the network or files outside the
+  tree fails there, and what it prints is not a test of the real environment.
 - Literal paths only: a path built at run time, or a name that is not quoted (outside shell redirects), makes no link.
 - Per file, not per function: any change to a file demands everything that depends on the file.
-- A run is judged by the tool call and its output markers, not by what the program did.
+- A run is judged by the tool call (or the probe's exit code) and its output markers, not by what the program did.
 
 ## Install
 
@@ -98,7 +130,8 @@ Claude Code 2.1.275 or later, Python 3.11 or later, standard library only:
     /plugin install makoto --marketplace Clear-Sights/Makoto
 
 Hooks (`plugin/hooks/hooks.json`): SessionStart and UserPromptSubmit (build the map, never block), PostToolUse and
-PostToolUseFailure (stamp runs; the note), Stop and SubagentStop (the hold).
+PostToolUseFailure (stamp runs; the note; the probe after PostToolUse, timeout 20 seconds), Stop and SubagentStop (the
+probe and the hold, timeout 20 seconds).
 
 ## Disable
 
