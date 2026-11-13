@@ -344,8 +344,8 @@ def command(name, copy, rel):
 
 
 def probe(state, files, cwd, entries):
-    """Run the entry programs that can be probed in one srt call, in a temporary copy of the tree. A pass stamps the nodes
-    it reached; returns {entry program: last lines of its output} for the failures. A timeout, an error, a program that
+    """Run the entry programs that can be probed in one srt call, in a temporary copy of the tree. A pass that printed
+    something stamps the nodes it reached; returns {entry program: last lines of its output} for the failures. A timeout, an error, a program that
     cannot be probed, or a tree that changed meanwhile gives no result for it."""
     root, nodes, srt = state['root'], state['nodes'], shutil.which(os.environ.get('MAKOTO_SRT') or 'srt')
     links = lookup(nodes)[0]
@@ -392,7 +392,7 @@ def probe(state, files, cwd, entries):
     if not same:
         return {}
     for e, (code, text) in results.items():
-        if code == 0 and not ERROR.search(text):
+        if code == 0 and text.strip() and not ERROR.search(text):  # a silent exit shows nothing of the change: it checks nothing
             for rel in reach[e]:
                 nodes[rel].update(ran=start, failed=False)
     return {e: '\n'.join(text.splitlines()[-TAIL:]) for e, (code, text) in results.items() if code or ERROR.search(text)}
