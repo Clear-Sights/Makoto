@@ -1,0 +1,7 @@
+from app.core import depth
+
+def _depth_value(x):
+    return depth(x)["value"]
+
+def quotas_apply(x, f=_depth_value):
+    return f(x) - 8

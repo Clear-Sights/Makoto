@@ -1,0 +1,52 @@
+{
+ "arm": "v621",
+ "mech": "sigchange",
+ "seed": 9830000034,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "221ff131132dc76e176460bc43a378c7e412c2557d272ec85a88ba6b1d6145e2",
+ "prompt_chars": 341,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"core\": true, \"billing\": true, \"reports\": true, \"alerts\": true, \"notify\": true, \"rollup\": true, \"summary\": true, \"quotas\": true, \"stats\": true, \"export\": true, \"audit\": true, \"budget\": true, \"ledger\": true}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.00849219,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "I ran all 12 edited modules directly as the hook asked. Each exited with code 0 and printed nothing, which is expected because none of them has a `__main__` block. They import cleanly, so the earlier checks still hold: the comparison against the baseline is identical and the test suite passes.",
+ "seconds": 42.8,
+ "num_turns": 23,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "makoto",
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 25,
+ "holds": [
+  {
+   "hook": "Stop",
+   "rules": []
+  }
+ ],
+ "hold_reasons": [
+  "Not run since a change: target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py. Run target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py and read the output."
+ ],
+ "journal_files": 0,
+ "stream_sha256": "0858429142c8ce88460b4a243864c9952cdf08f59654d61a99cc585313282b04",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}

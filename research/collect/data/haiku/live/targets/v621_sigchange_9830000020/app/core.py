@@ -1,0 +1,3 @@
+def margin(x):
+    """The margin of x, as a dict with the number under "value" and its unit."""
+    return {"value": x * 4, "unit": "pct"}

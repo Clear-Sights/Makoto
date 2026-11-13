@@ -1,0 +1,44 @@
+{
+ "arm": "plain",
+ "mech": "sigchange",
+ "seed": 9830000007,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "524643155ee039d45029e63be758e378c8665fe39d8c1c222c2aecde634740c0",
+ "prompt_chars": 344,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"core\": true, \"quotas\": true, \"notify\": true, \"summary\": true, \"stats\": true, \"ledger\": true, \"alerts\": true, \"reports\": true, \"export\": true, \"budget\": true, \"audit\": true, \"rollup\": true, \"billing\": true}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.010038890000000002,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "`credit(x)` now returns `{\"value\": x * 2.5, \"unit\": \"cr\"}`. Every other module returns the same results as before.\n\n**What changed** (all under `target/`):\n- `app/core.py`: `credit` returns the dict. The docstring is updated to match.\n- Call sites that used the result as a number now read `[\"value\"]",
+ "seconds": 48.0,
+ "num_turns": 24,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 0,
+ "holds": [],
+ "hold_reasons": [],
+ "journal_files": 0,
+ "stream_sha256": "b78c35ea88d0e833e92f9c6f1baaf65c1ed3269536004bd5c01544df84e5b266",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}
