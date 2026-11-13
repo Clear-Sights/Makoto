@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+SRT = Path(os.environ.get('MAKOTO_SRT_TEST') or '/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/srt/node_modules/.bin/srt')
 PLUGIN = Path(__file__).resolve().parents[1] / 'plugin'
 HOOKS = json.loads((PLUGIN / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))['hooks']
 SH = '#!/bin/sh\necho 1\n'
@@ -21,7 +22,8 @@ def hold(unchecked, entries):
 def send(tmp, event, **extra):
     command = HOOKS[event['hook_event_name']][0]['hooks'][0]['command']
     env = {k: v for k, v in os.environ.items() if not k.startswith('MAKOTO_')}
-    env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp / 'state'), PYTHONDONTWRITEBYTECODE='1')
+    env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp / 'state'), PYTHONDONTWRITEBYTECODE='1',
+               MAKOTO_SRT=str(tmp / 'no-srt'))  # no srt unless a test names one: 6.2.2's behaviour
     env.update(extra)
     run = subprocess.run(['bash', '-c', command], input=json.dumps(event), env=env, capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stderr
@@ -35,7 +37,8 @@ def s(request, tmp_path):
 
 class Session:
     def __init__(self, tmp, git, files=None):
-        self.tmp, self.cwd, self.clock = tmp, tmp / 'work', time.time() - 1000
+        self.tmp, self.cwd, self.clock, self.env = tmp, tmp / 'work', time.time() - 1000, {}
+        self.real = False  # True: files keep their real modified times
         self.cwd.mkdir()
         for name, text in (files or {}).items():
             self.put(name, text)
@@ -44,14 +47,15 @@ class Session:
         self.send('SessionStart')
 
     def send(self, name, **fields):
-        return send(self.tmp, dict(hook_event_name=name, session_id='s', cwd=str(self.cwd), **fields))
+        return send(self.tmp, dict(hook_event_name=name, session_id='s', cwd=str(self.cwd), **fields), **self.env)
 
     def put(self, path, text='x = 1\n'):
         """Write a file whose modified time is a new moment on a clock that starts in the past."""
         (self.cwd / path).parent.mkdir(parents=True, exist_ok=True)
         (self.cwd / path).write_text(text, encoding='utf-8')
         self.clock += 10
-        os.utime(self.cwd / path, (self.clock, self.clock))
+        if not self.real:
+            os.utime(self.cwd / path, (self.clock, self.clock))
 
     def call(self, tool, tool_input):
         return self.send('PostToolUse', tool_name=tool, tool_use_id='t', tool_input=tool_input, tool_response={'stdout': '1\n'})
@@ -336,7 +340,7 @@ def test_state_holds_a_map_and_no_list_of_runs_reads_notes_or_unpaid_files(tmp_p
     text = state_file(tmp_path).read_text(encoding='utf-8')
     state = json.loads(text)
     assert set(state) == {'root', 'nodes', 'last'}
-    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'shebang', 'uses', 'quotes', 'writes'}
+    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'hash', 'shebang', 'uses', 'quotes', 'writes'}
     for word in ('runs', 'reads', 'notes', 'unpaid'):
         assert word not in text
 
@@ -407,3 +411,107 @@ def test_a_non_edit_tool_that_follows_a_change_gets_the_note(tmp_path):
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
     assert note_of(s.call('Read', {'file_path': 'lib.py'})) is not None
+
+
+# ---------------------------------------------------------------- collect: the probe, through srt
+
+needs_srt = pytest.mark.skipif(not SRT.is_file(), reason='srt is not installed here')
+NOTE = 'hookSpecificOutput'
+
+
+def probing(tmp_path, files):
+    s = Session(tmp_path, False, files)
+    s.env, s.real = {'MAKOTO_SRT': str(SRT)}, True
+    return s
+
+
+def context(reply):
+    return reply[NOTE]['additionalContext']
+
+
+def test_without_srt_the_behaviour_is_6_2_2s(tmp_path):
+    s = Session(tmp_path, False, {'a.py': 'print(1)\n'})
+    assert context(s.edit('a.py', 'print(2)\n')) == hold(['a.py'], ['a.py'])
+    assert s.stop() == {'decision': 'block', 'reason': hold(['a.py'], ['a.py'])}
+
+
+@needs_srt
+def test_passing_probe_checks_silently_and_the_final_answer_is_admitted(tmp_path):
+    s = probing(tmp_path, {'lib.py': 'x = 1\n', 'main.py': 'import lib\nprint(lib.x)\n'})
+    assert s.edit('lib.py', 'x = 2\n') == {}
+    assert s.stop() == {}
+    assert s.stop('SubagentStop') == {}
+
+
+@needs_srt
+def test_failing_probe_puts_the_error_in_the_note_and_the_hold(tmp_path):
+    s = probing(tmp_path, {'lib.py': 'x = 1\n', 'main.py': 'import lib\nprint(lib.x)\n'})
+    note = context(s.edit('lib.py', 'x = 1 / 0\n'))
+    assert note.startswith(hold(['lib.py', 'main.py'], ['main.py']))
+    assert 'ZeroDivisionError' in note and note.endswith('(run in a sandbox with no network)')
+    hold_reply = s.stop()
+    assert hold_reply['decision'] == 'block' and 'ZeroDivisionError' in hold_reply['reason']
+    assert s.stop(stop_hook_active=True) == {}
+
+
+@needs_srt
+def test_the_same_failure_is_not_noted_twice_but_a_new_one_is(tmp_path):
+    s = probing(tmp_path, {'main.py': 'print(1)\n'})
+    assert 'ZeroDivisionError' in context(s.edit('main.py', 'print(1 / 0)\n'))
+    assert s.edit('main.py', 'print(1 / 0)\n\n') == {}
+    assert 'NameError' in context(s.edit('main.py', 'print(undefined_name)\n'))
+    assert s.edit('main.py', 'print(1)\n') == {}  # passes: checked
+
+
+@needs_srt
+def test_a_probe_cannot_write_outside_its_copy_or_reach_the_network(tmp_path):
+    outside = tmp_path / 'outside.txt'
+    program = ('import socket\nopen(%r, "w").write("x")\n' % str(outside)
+               + 'socket.create_connection(("1.1.1.1", 53), timeout=2)\n')
+    s = probing(tmp_path, {'main.py': 'print(1)\n'})
+    note = context(s.edit('main.py', program))
+    assert 'main.py' in note and note.endswith('(run in a sandbox with no network)')
+    assert not outside.exists()
+    assert (s.cwd / 'main.py').read_text() == program and sorted(p.name for p in s.cwd.iterdir()) == ['main.py']
+
+
+@needs_srt
+def test_a_probe_writes_only_in_its_copy_and_the_real_tree_is_unchanged(tmp_path):
+    s = probing(tmp_path, {'main.py': 'print(1)\n'})
+    s.edit('main.py', 'open("made.txt", "w").write("x")\n')
+    assert sorted(p.name for p in s.cwd.iterdir()) == ['main.py']
+    assert s.stop() == {}
+
+
+@needs_srt
+@pytest.mark.parametrize('library', ['subprocess', 'socket'])
+def test_a_program_that_imports_subprocess_or_socket_is_probed(tmp_path, library):
+    s = probing(tmp_path, {'main.py': 'print(1)\n'})
+    assert s.edit('main.py', 'import %s\nprint(1)\n' % library) == {}
+    assert s.stop() == {}
+    assert 'NameError' in context(s.edit('main.py', 'import %s\nundefined_name\n' % library))
+
+
+@needs_srt
+def test_a_timeout_leaves_6_2_2s_note_and_hold(tmp_path):
+    s = probing(tmp_path, {'main.py': 'print(1)\n'})
+    started = time.time()
+    assert context(s.edit('main.py', 'import time\ntime.sleep(60)\n')) == hold(['main.py'], ['main.py'])
+    assert time.time() - started < 15
+    assert s.stop() == {'decision': 'block', 'reason': hold(['main.py'], ['main.py'])}
+
+
+@needs_srt
+def test_a_program_without_a_known_interpreter_is_not_probed(tmp_path):
+    s = probing(tmp_path, {'data.json': '{}', 'main.py': 'import json\njson.load(open("data.json"))\n'})
+    assert s.edit('data.json', '{"a": 1}') == {}  # main.py is the entry and passes
+    s.put('tool.lua', 'print(1)\n')
+    assert context(s.call('Write', {'file_path': 'tool.lua'})) == hold(['tool.lua'], ['tool.lua'])
+
+
+@needs_srt
+def test_a_shell_program_with_a_shebang_is_probed_in_the_same_relative_directory(tmp_path):
+    s = probing(tmp_path, {'sub/run': '#!/bin/sh\necho 1\n', 'sub/data.txt': 'a\n'})
+    s.cwd = tmp_path / 'work' / 'sub'
+    assert s.edit('run', '#!/bin/sh\ncat data.txt\n') == {}
+    assert 'No such file' in context(s.edit('run', '#!/bin/sh\ncat nothere.txt\n'))
