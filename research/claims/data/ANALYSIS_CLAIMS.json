@@ -1,0 +1,130 @@
+{
+ "live/datachain": {
+  "n": 40,
+  "models": [
+   "claude-haiku-5-5"
+  ],
+  "pass_plain": 6,
+  "pass_makoto": 19,
+  "discordant": [
+   4,
+   17
+  ],
+  "p": 0.0072,
+  "diff_points": 32.5,
+  "diff_95": [
+   12.5,
+   52.5
+  ],
+  "mean_cost_plain": 0.0025,
+  "cost_ratio": 1.439,
+  "cost_95": [
+   1.348,
+   1.533
+  ],
+  "mean_seconds": [
+   14.0,
+   20.9
+  ],
+  "makoto_holds_per_run": 0.95,
+  "makoto_notes_per_run": 1.45,
+  "makoto_runs_naming_report_or_json": 37,
+  "verdict": "supported"
+ },
+ "live/unrun_js": {
+  "n": 40,
+  "models": [
+   "claude-haiku-5-5"
+  ],
+  "pass_plain": 40,
+  "pass_makoto": 40,
+  "discordant": [
+   0,
+   0
+  ],
+  "p": 1.0,
+  "diff_points": 0.0,
+  "diff_95": [
+   0.0,
+   0.0
+  ],
+  "mean_cost_plain": 0.00247,
+  "cost_ratio": 1.206,
+  "cost_95": [
+   1.142,
+   1.274
+  ],
+  "mean_seconds": [
+   14.3,
+   17.2
+  ],
+  "makoto_holds_per_run": 0.275,
+  "makoto_notes_per_run": 1.5,
+  "makoto_runs_naming_report_or_json": 0,
+  "verdict": "supported"
+ },
+ "live/sigchange": {
+  "n": 40,
+  "models": [
+   "claude-sonnet-5-5"
+  ],
+  "pass_plain": 28,
+  "pass_makoto": 40,
+  "discordant": [
+   0,
+   12
+  ],
+  "p": 0.0005,
+  "diff_points": 30.0,
+  "diff_95": [
+   17.5,
+   45.0
+  ],
+  "mean_cost_plain": 0.0349,
+  "cost_ratio": 1.57,
+  "cost_95": [
+   1.512,
+   1.628
+  ],
+  "mean_seconds": [
+   15.0,
+   24.9
+  ],
+  "makoto_holds_per_run": 1.0,
+  "makoto_notes_per_run": 0.0,
+  "makoto_runs_naming_report_or_json": 0,
+  "verdict": "supported"
+ },
+ "live/unrun": {
+  "n": 40,
+  "models": [
+   "claude-sonnet-5-5"
+  ],
+  "pass_plain": 16,
+  "pass_makoto": 38,
+  "discordant": [
+   2,
+   24
+  ],
+  "p": 0.0,
+  "diff_points": 55.0,
+  "diff_95": [
+   37.5,
+   72.5
+  ],
+  "mean_cost_plain": 0.0264,
+  "cost_ratio": 1.678,
+  "cost_95": [
+   1.537,
+   1.832
+  ],
+  "mean_seconds": [
+   13.2,
+   23.9
+  ],
+  "makoto_holds_per_run": 1.0,
+  "makoto_notes_per_run": 0.0,
+  "makoto_runs_naming_report_or_json": 17,
+  "verdict": "supported"
+ }
+}
