@@ -545,3 +545,13 @@ def test_a_passing_test_file_checks_what_it_reaches_and_a_silent_module_stays_un
     s.put('app/core.py', 'def price(x):\n    return {"value": x}\n')
     reply = s.stop()
     assert reply == {'decision': 'block', 'reason': hold(['app/user.py'], ['app/user.py'])}
+
+
+@needs_srt
+def test_a_shell_made_change_gets_no_plain_note_but_a_probe_failure_is_noted(tmp_path):
+    s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'user.py': 'import core\n\n\ndef total(x):\n    return core.price(x) + 1\n'})
+    s.put('core.py', 'def price(x):\n    return {"value": x}\n')
+    assert s.sh('sed -i s/x/y/ core.py') == {}  # the probe of user.py prints nothing: nothing to report
+    assert s.stop() == {'decision': 'block', 'reason': hold(['core.py', 'user.py'], ['user.py'])}
+    s.put('user.py', 'import core\nprint(core.price(1) + 1)\n')
+    assert 'TypeError' in context(s.sh('sed -i s/x/y/ user.py'))
