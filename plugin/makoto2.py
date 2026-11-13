@@ -485,7 +485,10 @@ def record(state, event):
     text = message(unchecked, entries, nodes) + failures({e: bad[e] for e in new}, entries) if fresh or new else ''
     for rel in unchecked if text else ():  # the message names them already: each fact is said once
         nodes[rel]['named'] = True
-    return '\n'.join(part for part in (text, downstream(state, files, quiet)) if part)
+    # Without the sandbox the hold stays and names the same files; there the note only adds cost (measured,
+    # research/downstream on the research branch).
+    users = downstream(state, files, quiet) if shutil.which(os.environ.get('MAKOTO_SRT') or 'srt') else ''
+    return '\n'.join(part for part in (text, users) if part)
 
 
 def respond(event, config):
