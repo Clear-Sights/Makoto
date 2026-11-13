@@ -45,10 +45,11 @@ failed run checks nothing and the message then says the file needs a run that su
 One message names the demanded files not yet checked and the entry programs (files no other file depends on) that
 reach them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.`
 
-- After any completed tool call (PostToolUse; Bash, Write, Edit, or any other) it arrives as a note when the tree
-  holds a new unchecked change and the entry programs it names include one that no earlier note in the session
-  named; otherwise no note. It does not matter which tool made the change. A run that checks the change gets no
-  note. Twelve changes whose runs are all the same entry program give one note; a new entry program gives another.
+- After a completed Write, Edit, MultiEdit or NotebookEdit it arrives as a note when the tree holds a new unchecked
+  change and the entry programs it names include one that no earlier note in the session named; otherwise no note. A
+  run that checks the change gets no note. Twelve changes whose runs are all the same entry program give one note; a
+  new entry program gives another. A change made any other way (a shell command, a script) gets no plain note and is
+  caught at the final answer: measured, a note there costs more and gains nothing.
 - At the final answer (Stop, or a subagent's SubagentStop) it is a hold, once: a Stop that follows a hold
   (`stop_hook_active`) is let through.
 
@@ -65,8 +66,6 @@ Where the Claude Code sandbox runtime (`srt`, the `@anthropic-ai/sandbox-runtime
 the check instead of asking Claude to:
 
 - **When:** after any completed tool call that leaves an unchecked change, and at the final answer if one remains.
-- **Without the sandbox** the note follows only the edit tools (Write, Edit, MultiEdit, NotebookEdit), and a change
-  made any other way is caught at the final answer.
 - **What it runs:** every entry program the message names (a file nothing else depends on) that a known interpreter
   (python3, node, ruby, perl, php, sh, bash; by extension or `#!` line) runs with no argument, whatever it imports.
   Programs run in the same relative directory as the session, in order, with input closed, and all of them together
@@ -74,10 +73,14 @@ the check instead of asking Claude to:
 - **In which sandbox:** one `srt` call, in a temporary copy of the tree (at most 20,000 files and 50 MB), deleted
   afterwards. The sandbox allows no network and no write outside the copy, so a probe cannot change your files or send
   anything out. The settings file it uses is deleted too.
-- **A pass** (exit 0, output with no error marker) marks the files it reached as checked, silently. **A fail** puts
-  the output's last 15 lines in the message: as a note once per distinct output, and in the hold at the final answer.
-  A program that needs the network (or anything else the sandbox blocks) fails there and is reported with the note
-  `(run in a sandbox with no network)`.
+- **A pass** counts only when the run exited 0, printed no error marker **and printed something**. It then marks the
+  files it reached as checked, silently. A run that prints nothing shows nothing of the change (a file that only
+  defines functions exits 0 whether its callers are right or wrong), so it checks nothing and the note and the hold
+  of "The message" cover those files.
+- **A fail** puts the output's last 15 lines in the message, ending `(run in a sandbox with no network)`: as a note
+  after any tool call, once per distinct output, and in the hold at the final answer. **A failing test file** is
+  reported only at the final answer: while a change is in progress, a test states what the code did before it.
+  A program that needs the network (or anything else the sandbox blocks) fails there and is reported the same way.
 - **When it does not probe,** and behaves exactly as without it (the note and the hold of "The message"): `srt` is
   not found or errors; the program has no known interpreter; the copy would pass the caps; the probe times out; or the
   tree changed while the probe ran (a result counts only for the tree it read).
@@ -95,9 +98,26 @@ a busy lock is waited for.
 
 ## What is measured
 
-Each row compares Makoto 6.2.1 with the same model without it, on 40 fresh tasks per row (Claude Code 2.1.323).
-The tasks were built for these tests, so they show what Makoto does on tasks of these kinds and no more. The records
-are on the `research` branch (`research/v621/` and `research/claims/`).
+Each row is 40 fresh tasks (Claude Code 2.1.323). The tasks were built for these tests, so they show what Makoto
+does on tasks of these kinds and no more. The records are on the `research` branch.
+
+**This version (6.4.0) with the sandbox runtime installed,** against 6.2.1, which had no sandboxed check
+(`research/testwait/`):
+
+| tasks | model | without Makoto | 6.2.1 | 6.4.0 with sandbox | cost: 6.2.1; 6.4.0 | held answers per run: 6.2.1; 6.4.0 |
+|---|---|---|---|---|---|---|
+| Python: an edit that fails only when run | Sonnet | 13 of 40 | 39 of 40 | 40 of 40 | 1.54; 1.35 times | 1.00; 0 |
+| Python: a change with 12 dependent files | Sonnet | 25 of 40 | 40 of 40 | 40 of 40 | 1.54; 1.55 times | 1.00; 1.00 |
+| Python: an edit that fails only when run | Haiku | 24 of 40 | 34 of 40 | 34 of 40 | 1.26; 1.26 times | 0.18; 0.15 |
+| Python: a change with 12 dependent files | Haiku | 26 of 40 | 39 of 40 | 38 of 40 | 1.43; 1.25 times | 0.98; 0.83 |
+
+- **What the sandboxed check adds:** where running the entry program exercises the change, Sonnet's final answer is
+  no longer held and thrown away, and the cost falls from 1.54 to 1.35 times. Elsewhere 6.4.0 behaves as 6.2.1.
+- **Earlier builds of the sandboxed check failed** and were not kept: one counted a silent exit 0 as a check and
+  passed fewer tasks than no Makoto (`research/collect/`); two cost more than 6.2.1 in one cell
+  (`research/observed/`, `research/quiet/`).
+
+**Without the sandbox runtime,** 6.4.0 behaves as 6.2.1 (`research/v621/` and `research/claims/`):
 
 | tasks | model | without Makoto | with Makoto | cost with Makoto |
 |---|---|---|---|---|
@@ -113,10 +133,12 @@ are on the `research` branch (`research/v621/` and `research/claims/`).
 - **Where it only costs:** where the model already gets it right, as on the JavaScript tasks. Makoto then adds about
   a fifth to the cost and gains nothing.
 - **Not measured live:** Go, Rust, Ruby and shell projects, which only the unit tests cover; Opus; tasks whose goal
-  does not discourage a run.
+  does not discourage a run; the sandboxed check on anything but the two Python task kinds above.
 
 ## Limits
 
+- A probe that does real work but prints nothing (it only writes a file, say) checks nothing; the model is then asked
+  to run it, as without the sandbox.
 - A probe is a run with no argument in a copy: a program that needs arguments, input, the network or files outside the
   tree fails there, and what it prints is not a test of the real environment.
 - Literal paths only: a path built at run time, or a name that is not quoted (outside shell redirects), makes no link.
