@@ -1,4 +1,0 @@
-from app.core import rate
-
-def test_rate():
-    assert rate(2) == {"value": 5.0, "unit": "pct"}

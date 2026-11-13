@@ -1,4 +1,0 @@
-from app.core import depth
-
-def stats_apply(x, f=lambda x: depth(x)["value"]):
-    return f(x) - 7
