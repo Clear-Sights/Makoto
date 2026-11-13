@@ -394,11 +394,10 @@ def note_of(response):
 
 
 @pytest.mark.parametrize('command', ["echo 'x = 2' > lib.py", "sed -i 's/1/2/' lib.py"])
-def test_without_the_sandbox_a_bash_made_change_names_the_unchanged_users_once_and_is_held(tmp_path, command):
+def test_without_the_sandbox_a_bash_made_change_gets_no_note_and_is_held(tmp_path, command):
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
-    assert note_of(s.sh(command)) == FAN  # no plain note, as in 6.2.1: that one follows only the edit tools
-    assert s.sh('ls') == {}
+    assert s.sh(command) == {}  # as in 6.2.1: the hold names the files
     assert s.stop()['decision'] == 'block'
 
 
@@ -415,12 +414,10 @@ def test_a_run_that_checks_the_change_gets_no_note(tmp_path):
     assert s.stop() == {}
 
 
-def test_any_tool_that_follows_a_change_names_the_unchanged_users_and_a_changed_user_is_not_named(tmp_path):
+def test_without_the_sandbox_a_non_edit_tool_that_follows_a_change_gets_no_note(tmp_path):
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
-    s.put('u1.py', MODULE + 'y = 1\n')
-    assert note_of(s.call('Read', {'file_path': 'lib.py'})) == down(
-        ('main.py', 'lib.py, u1.py'), ('u2.py', 'lib.py'), ('u3.py', 'lib.py'))
+    assert note_of(s.call('Read', {'file_path': 'lib.py'})) is None
 
 
 def test_an_edit_tool_change_is_named_by_the_plain_note_alone(tmp_path):
@@ -575,3 +572,13 @@ def test_a_failing_test_waits_for_the_final_answer_and_a_failing_program_does_no
     assert reply['decision'] == 'block' and 'test_core.py' in reply['reason'] and 'AssertionError' in reply['reason']
     note = context(s.edit('core.py', 'def price(x):\n    return {"value": x}\n'))
     assert 'main.py in a sandboxed copy failed' in note and 'TypeError' in note and 'test_core.py in a sandboxed' not in note
+
+
+@needs_srt
+def test_any_tool_that_follows_a_change_names_the_unchanged_users_once_and_a_changed_user_is_not_named(tmp_path):
+    s = probing(tmp_path, {'lib.py': 'x = 1\n', 'u1.py': MODULE, 'u2.py': MODULE, 'u3.py': MODULE})
+    s.put('lib.py', 'x = 2\n')
+    s.put('u1.py', MODULE + 'y = 1\n')
+    assert note_of(s.call('Read', {'file_path': 'lib.py'})) == down(('u2.py', 'lib.py'), ('u3.py', 'lib.py'))
+    assert s.sh('ls') == {}
+    assert s.stop() == {}
