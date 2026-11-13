@@ -53,7 +53,7 @@
 
 ## Limits
 - Two fitted task families, two models, one CLI; n 40 per cell. The rule was chosen from sigchange, where every plain failure is an unchanged dependent.
-- With the sandbox, a silent wrong edit of a dependent the model did change is no longer held. No such failure occurred in these 80 Sonnet sigchange runs or the 43 failures examined before the round.
+- With the sandbox, a silent wrong edit of a dependent the model did change is no longer held. No such failure occurred in this round's 40 Sonnet sigchange runs with the sandbox, nor among the 43 failures examined before the round.
 
 ## Spend
 - Worker calls: kill tests 0.148 USD; live 14.358 USD (Haiku 1.301, Sonnet 9.116, Sonnet without sandbox 3.941). Total **14.51 USD**, under the 30 USD cap.
