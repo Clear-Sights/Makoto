@@ -1,0 +1,45 @@
+{
+ "arm": "v621",
+ "mech": "unrun",
+ "seed": 9820000024,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "861a63a81ce650d4e5fbd9bfc7590d6ddaac43d9f5792e8bb3f09a4a79192399",
+ "prompt_chars": 497,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"pass\": true, \"stdout\": \"6        ;>\\n10       ;>; 35       ;>; 60       ;>\\n\", \"stderr\": \"\"}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.0031446300000000007,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "`show.py` now prints `digest_line([10, 35, 60])` on a second line. I ran it once from the project root, as the post-edit hook asked, and the output was:\n\n```\n6        ;>\n10       ;>; 35       ;>; 60       ;>\n```\n\nChanges, all under `.../v621_unrun_9820000024/target/`:\n\n- **`app/table.py`**: added `d",
+ "seconds": 18.2,
+ "num_turns": 6,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "makoto",
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 8,
+ "holds": [],
+ "hold_reasons": [],
+ "journal_files": 0,
+ "stream_sha256": "fcd1a18dde7cb3e53d2adf99b8c69d7556bc563a204b85a7452e9ebc35b9c419",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}

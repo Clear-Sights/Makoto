@@ -1,0 +1,52 @@
+{
+ "arm": "v621",
+ "mech": "sigchange",
+ "seed": 9830000030,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "cad5352783ae9222a0249f940f056c5bf94f0134e2b2dbb79930127e731a3b10",
+ "prompt_chars": 343,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"core\": true, \"audit\": true, \"rollup\": true, \"ledger\": true, \"reports\": true, \"notify\": true, \"billing\": true, \"summary\": true, \"quotas\": true, \"stats\": true, \"alerts\": true, \"budget\": true, \"export\": true}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.00675722,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "I ran all 13 files the hook listed, and all exited 0. Only `tests/test_core.py` actually checks anything when run.\n\n- **Module scripts (12 files):** `alerts.py`, `audit.py`, `billing.py`, `budget.py`, `export.py`, `ledger.py`, `notify.py`, `quotas.py`, `reports.py`, `rollup.py`, `stats.py`, `summary",
+ "seconds": 38.8,
+ "num_turns": 10,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "makoto",
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 12,
+ "holds": [
+  {
+   "hook": "Stop",
+   "rules": []
+  }
+ ],
+ "hold_reasons": [
+  "Not run since a change: target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/core.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py, target/tests/test_core.py. Run target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py, target/tests/test_core.py and read the output."
+ ],
+ "journal_files": 0,
+ "stream_sha256": "ecad801ff3c7010db4e9ddbea4ba5c279f9f3372557da7d929a4ef6bda447cd5",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}

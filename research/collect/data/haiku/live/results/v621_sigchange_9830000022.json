@@ -1,0 +1,52 @@
+{
+ "arm": "v621",
+ "mech": "sigchange",
+ "seed": 9830000022,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "0b70c96a4fee3e31a35241ad1483be285d18342e09b84753afd9bfe61bcd967d",
+ "prompt_chars": 343,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"core\": true, \"alerts\": true, \"audit\": true, \"export\": true, \"ledger\": true, \"summary\": true, \"stats\": true, \"rollup\": true, \"reports\": true, \"notify\": true, \"billing\": true, \"budget\": true, \"quotas\": true}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.00962688,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "All 12 modules ran and exited 0. None printed anything, because none of them has a `__main__` block. Running them only executes their top-level definitions, so this confirms they import cleanly but does not exercise the changed code.\n\nThe earlier check, which called each function with the same input",
+ "seconds": 45.3,
+ "num_turns": 24,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "makoto",
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 26,
+ "holds": [
+  {
+   "hook": "Stop",
+   "rules": []
+  }
+ ],
+ "hold_reasons": [
+  "Not run since a change: target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py. Run target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py and read the output."
+ ],
+ "journal_files": 0,
+ "stream_sha256": "db3f9915a55e8d79cd25a625f69a63f166d7c70a4c87ae893f26d139babbba4b",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}

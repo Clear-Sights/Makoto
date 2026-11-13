@@ -1,0 +1,52 @@
+{
+ "arm": "v621",
+ "mech": "sigchange",
+ "seed": 9830000012,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "a457d96e9f00ea377094546b98b3106a9e6375ffe99f00d9e766bcd542f04d01",
+ "prompt_chars": 343,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"core\": true, \"quotas\": true, \"rollup\": true, \"budget\": true, \"audit\": true, \"export\": true, \"billing\": true, \"reports\": true, \"stats\": true, \"summary\": true, \"notify\": true, \"ledger\": true, \"alerts\": true}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.009050409999999998,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "All 12 listed modules ran with exit code 0 and printed nothing. None of them has a `__main__` block, so running them only imports the module. The real check of their behavior is the earlier comparison against the original tree, which matched on all 98 outputs. The test suite also still passes.",
+ "seconds": 43.2,
+ "num_turns": 25,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "makoto",
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 27,
+ "holds": [
+  {
+   "hook": "Stop",
+   "rules": []
+  }
+ ],
+ "hold_reasons": [
+  "Not run since a change: target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py. Run target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py and read the output."
+ ],
+ "journal_files": 0,
+ "stream_sha256": "f3d9c28974f0d250fd1712d806723555697210a7f27b00db245e53ebdc7efb25",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}

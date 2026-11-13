@@ -1,0 +1,52 @@
+{
+ "arm": "collect",
+ "mech": "sigchange",
+ "seed": 9830000027,
+ "level": 0,
+ "attempt": 1,
+ "request_sha256": "eb249553f671b6a52c52d9daae3b9b711db605c860351c0c8fb21a7f44e19297",
+ "prompt_chars": 346,
+ "passed": true,
+ "grade_exit": 0,
+ "grade_stdout": "{\"core\": true, \"billing\": true, \"summary\": true, \"export\": true, \"reports\": true, \"quotas\": true, \"stats\": true, \"audit\": true, \"ledger\": true, \"notify\": true, \"budget\": true, \"rollup\": true, \"alerts\": true}\n",
+ "grade_stderr": "",
+ "cost_usd": 0.014812119999999998,
+ "status": "success",
+ "is_error": false,
+ "result_text_head": "The hook's failures came from running the modules as scripts, not from the change. Each module is a library with no `__main__` block, and running one directly puts `app/` on `sys.path` instead of the project root, so `import app` fails.\n\nI checked them the way they're used, by importing each from th",
+ "seconds": 59.1,
+ "num_turns": 27,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "init_tools": [
+  "Bash",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Read",
+  "Write"
+ ],
+ "init_plugins": [
+  "makoto",
+  "cc-plugin-agents-md",
+  "cc-plugin-telemetry",
+  "cc-plugin-privacy",
+  "cc-plugin-plugin-authoring"
+ ],
+ "hook_responses": 29,
+ "holds": [
+  {
+   "hook": "Stop",
+   "rules": []
+  }
+ ],
+ "hold_reasons": [
+  "Not run since a change: target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py. Run target/app/alerts.py, target/app/audit.py, target/app/billing.py, target/app/budget.py, target/app/export.py, target/app/ledger.py, target/app/notify.py, target/app/quotas.py, target/app/reports.py, target/app/rollup.py, target/app/stats.py, target/app/summary.py and read the output.\nA run of target/app/alerts.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/alerts.py\", line 1, in <module>\n    import app.core\nModuleNotFoundError: No module named 'app'\nA run of target/app/audit.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/audit.py\", line 1, in <module>\n    import app.core\nModuleNotFoundError: No module named 'app'\nA run of target/app/billing.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/billing.py\", line 1, in <module>\n    from app import core as c\nModuleNotFoundError: No module named 'app'\nA run of target/app/budget.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/budget.py\", line 1, in <module>\n    from app.core import weight\nModuleNotFoundError: No module named 'app'\nA run of target/app/export.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/export.py\", line 1, in <module>\n    from app.core import weight\nModuleNotFoundError: No module named 'app'\nA run of target/app/ledger.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/ledger.py\", line 1, in <module>\n    from app.core import weight as measure\nModuleNotFoundError: No module named 'app'\nA run of target/app/notify.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/notify.py\", line 1, in <module>\n    import app.core\nModuleNotFoundError: No module named 'app'\nA run of target/app/quotas.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/quotas.py\", line 1, in <module>\n    from app.core import weight as measure\nModuleNotFoundError: No module named 'app'\nA run of target/app/reports.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/reports.py\", line 1, in <module>\n    from app import core\nModuleNotFoundError: No module named 'app'\nA run of target/app/rollup.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/rollup.py\", line 1, in <module>\n    from app import core\nModuleNotFoundError: No module named 'app'\nA run of target/app/stats.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/stats.py\", line 1, in <module>\n    from app import core as c\nModuleNotFoundError: No module named 'app'\nA run of target/app/summary.py in a sandboxed copy failed; the last 15 lines of its output:\nTraceback (most recent call last):\n  File \"/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/collect_sigchange_9830000027/target/app/summary.py\", line 1, in <module>\n    from app.core import weight\nModuleNotFoundError: No module named 'app'\n(run in a sandbox with no network)"
+ ],
+ "journal_files": 0,
+ "stream_sha256": "4d69a2f742f578fc78559005508e708112811d4242bc94de47086c7df71bf49f",
+ "rate_limited": false,
+ "cli_version": "2.1.323",
+ "usable": true
+}
