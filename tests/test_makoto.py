@@ -478,7 +478,7 @@ def test_a_probe_cannot_write_outside_its_copy_or_reach_the_network(tmp_path):
 @needs_srt
 def test_a_probe_writes_only_in_its_copy_and_the_real_tree_is_unchanged(tmp_path):
     s = probing(tmp_path, {'main.py': 'print(1)\n'})
-    s.edit('main.py', 'open("made.txt", "w").write("x")\n')
+    s.edit('main.py', 'open("made.txt", "w").write("x")\nprint("made")\n')
     assert sorted(p.name for p in s.cwd.iterdir()) == ['main.py']
     assert s.stop() == {}
 
@@ -503,7 +503,7 @@ def test_a_timeout_leaves_6_2_2s_note_and_hold(tmp_path):
 
 @needs_srt
 def test_a_program_without_a_known_interpreter_is_not_probed(tmp_path):
-    s = probing(tmp_path, {'data.json': '{}', 'main.py': 'import json\njson.load(open("data.json"))\n'})
+    s = probing(tmp_path, {'data.json': '{}', 'main.py': 'import json\nprint(json.load(open("data.json")))\n'})
     assert s.edit('data.json', '{"a": 1}') == {}  # main.py is the entry and passes
     s.put('tool.lua', 'print(1)\n')
     assert context(s.call('Write', {'file_path': 'tool.lua'})) == hold(['tool.lua'], ['tool.lua'])
@@ -526,3 +526,22 @@ def test_the_probe_runs_a_package_module_and_a_test_file_as_the_project_would(tm
     assert s.stop() == {}
     note = context(s.edit('pkg/app/core.py', 'def price(x):\n    return x + 1\n'))  # the test file now fails under pytest
     assert 'test_core.py' in note and 'ModuleNotFoundError' not in note
+
+
+@needs_srt
+def test_a_probe_that_prints_nothing_checks_nothing_and_the_final_answer_is_held_once(tmp_path):
+    s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'user.py': 'import core\n\n\ndef total(x):\n    return core.price(x) + 1\n'})
+    message = hold(['core.py', 'user.py'], ['user.py'])
+    assert context(s.edit('core.py', 'def price(x):\n    return {"value": x}\n')) == message  # user.py exits 0 and is wrong
+    assert s.stop() == {'decision': 'block', 'reason': message}
+    assert s.stop(stop_hook_active=True) == {}
+
+
+@needs_srt
+def test_a_passing_test_file_checks_what_it_reaches_and_a_silent_module_stays_unchecked(tmp_path):
+    s = probing(tmp_path, {'app/__init__.py': '', 'app/core.py': 'def price(x):\n    return x\n',
+                           'app/user.py': 'import app.core\n\n\ndef total(x):\n    return app.core.price(x) + 1\n',
+                           'tests/test_core.py': 'from app.core import price\n\n\ndef test_price():\n    assert price(2)\n'})
+    s.put('app/core.py', 'def price(x):\n    return {"value": x}\n')
+    reply = s.stop()
+    assert reply == {'decision': 'block', 'reason': hold(['app/user.py'], ['app/user.py'])}
