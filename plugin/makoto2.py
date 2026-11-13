@@ -18,16 +18,9 @@ Sets, computed without a test of their size (see sets):
   checked   = demanded nodes stamped after the latest change among the changed nodes they reach.
 A run reaches the program it names plus what that depends on; a test runner with no program argument reaches the test
 files (name holds test or spec, or under a folder test, tests, spec, __tests__) and what they depend on. One message
-names demanded minus checked and the entry programs (used by no file) that reach it: a note after any tool call, only when
+names demanded minus checked and the entry programs (used by no file) that reach it: a note after an edit, only when
 an entry program it names was named by no earlier note (the noted flag, on the entry program's node); a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
 Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
-Probe (collect): after a completed tool call that leaves unchecked nodes, and at the final answer if any remain, Makoto
-runs the entry programs itself: one srt call (MAKOTO_SRT, else srt on PATH; none found or any error: no probe) running,
-in a temporary copy of the tree with no network and writes only in the copy, each entry program that a known
-interpreter runs with no argument, whatever it imports (the sandbox is the gate). A pass (exit 0, no error
-marker) stamps the nodes it reaches, silently. A fail adds the last 15 lines of its output to the message: in a note
-once per distinct output (the hash on the entry program's node), always in the hold. A timeout, or a program not probed,
-leaves the note and hold as above. A result counts only if the tree is unchanged since the copy.
 """
 import contextlib
 import hashlib
@@ -35,13 +28,9 @@ import json
 import os
 import re
 import shlex
-import signal
-import shutil
 import subprocess
 import sys
-import tempfile
 import time
-import uuid
 
 try:
     import fcntl
@@ -53,15 +42,11 @@ STATE_DIR = '~/.claude/makoto2_state'
 LOCK_SECONDS = 3.0
 MAX_FILES = 20000
 MAX_READ = 262144
-MAX_BYTES = 50 * 1024 * 1024
-PROBE_SECONDS = 8
-TAIL = 15
 DISABLE = 'claude plugin disable makoto'
 MESSAGE = 'Not run since a change: %s. Run %s and read the output.'
 FINAL = ('Stop', 'SubagentStop')
 HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
-INTERPRETERS = {'.py': 'python3', '.js': 'node', '.mjs': 'node', '.cjs': 'node', '.rb': 'ruby', '.pl': 'perl',
-                '.php': 'php', '.sh': 'sh', '.bash': 'bash'}
+EDITORS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
 SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', '.venv', 'venv'))  # other build output: only when git ignores it
 
 RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|dotnet|make|gmake|'
@@ -254,7 +239,7 @@ def refresh(state, files, begin=False):
     """The map for the files now: nodes kept, new files added (changed from the start), links read again for changed files."""
     old, state['nodes'] = state['nodes'], {}
     for rel, stat in files.items():
-        node = old.get(rel) or {'start': stat if begin else None, 'ran': 0, 'failed': False, 'noted': False, 'hash': ''}
+        node = old.get(rel) or {'start': stat if begin else None, 'ran': 0, 'failed': False, 'noted': False}
         state['nodes'][rel] = node
         if begin or stat != node['start']:
             node.update(scan(os.path.join(state['root'], rel)))
@@ -315,94 +300,6 @@ def message(unchecked, entries, nodes):
                           if nodes[rel]['failed'])
 
 
-# ---------------------------------------------------------------- probe
-
-def interpreter(root, rel, node):
-    """The known interpreter that runs the file with no argument, or None."""
-    name = INTERPRETERS.get(os.path.splitext(rel)[1].lower())
-    if name is None and node['shebang']:
-        try:
-            with open(os.path.join(root, rel), 'rb') as stream:
-                words = stream.readline(200).decode('utf-8', 'replace')[2:].split()
-        except OSError:
-            words = []
-        words = words[1:] if words[:1] and os.path.basename(words[0]) == 'env' else words
-        name = os.path.basename(words[0]) if words else ''
-        name = 'python3' if name.startswith('python') else name if name in INTERPRETERS.values() else None
-    return name if name and shutil.which(name) else None
-
-
-def command(name, copy, rel):
-    """The shell command that runs one entry program as its project would: a Python file sees every folder above it, so a
-    module of a package resolves its own imports, and a Python test file runs under pytest when pytest is installed."""
-    path = shlex.quote(os.path.join(copy, rel))
-    if name != 'python3':
-        return '%s %s' % (name, path)
-    above = [os.path.join(copy, *rel.split('/')[:k]) for k in range(rel.count('/'), -1, -1)]
-    runner = 'python3 -m pytest -q -p no:cacheprovider' if TESTS.search(rel.lower()) and shutil.which('pytest') else 'python3'
-    return 'PYTHONPATH=%s %s %s' % (shlex.quote(os.pathsep.join(above)), runner, path)
-
-
-def probe(state, files, cwd, entries):
-    """Run the entry programs that can be probed in one srt call, in a temporary copy of the tree. A pass stamps the nodes
-    it reached; returns {entry program: last lines of its output} for the failures. A timeout, an error, a program that
-    cannot be probed, or a tree that changed meanwhile gives no result for it."""
-    root, nodes, srt = state['root'], state['nodes'], shutil.which(os.environ.get('MAKOTO_SRT') or 'srt')
-    links = lookup(nodes)[0]
-    reach = {e: close({e}, links) for e in entries}
-    programs = {e: interpreter(root, e, nodes[e]) for e in entries}
-    programs = {e: name for e, name in programs.items() if name}
-    if not (srt and programs and len(files) < MAX_FILES and sum(info[0] for info in files.values()) <= MAX_BYTES):
-        return {}
-    start, token, here = time.time_ns(), uuid.uuid4().hex, os.path.relpath(cwd, root)
-    here = '.' if here.startswith('..') else here
-    copy, settings = tempfile.mkdtemp(prefix='makoto-copy-'), tempfile.mkstemp(prefix='makoto-srt-', suffix='.json')
-    order, results = list(programs), {}
-    try:
-        for rel in files:
-            os.makedirs(os.path.dirname(os.path.join(copy, rel)), exist_ok=True)
-            shutil.copy2(os.path.join(root, rel), os.path.join(copy, rel))
-        os.makedirs(os.path.join(copy, here), exist_ok=True)
-        with os.fdopen(settings[0], 'w') as stream:
-            json.dump({'network': {'allowedDomains': [], 'deniedDomains': []},
-                       'filesystem': {'denyRead': [], 'allowWrite': [copy], 'denyWrite': []}}, stream)
-        script = 'cd %s || exit 1; ' % shlex.quote(os.path.join(copy, here)) + ''.join(
-            "%s </dev/null 2>&1; printf '\\n%s %d %%s\\n' $?; " % (command(programs[e], copy, e), token, i)
-            for i, e in enumerate(order))
-        child = subprocess.Popen([srt, '--settings', settings[1], '-c', script], stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True,
-                                 env={'PATH': os.environ.get('PATH', os.defpath), 'HOME': copy,
-                                      'LANG': os.environ.get('LANG', 'C.UTF-8')})
-        try:
-            out = child.communicate(timeout=PROBE_SECONDS)[0]
-        except subprocess.TimeoutExpired:
-            os.killpg(child.pid, signal.SIGKILL)
-            out = child.communicate()[0]
-        text = out.decode('utf-8', 'replace').replace(copy, root)  # the output names the real tree, so a repeat is a repeat
-        parts = re.split('\\nPREFIX (\\d+) (\\d+)\\n'.replace('PREFIX', token), text)
-        for k in range(0, len(parts) - 2, 3):
-            results[order[int(parts[k + 1])]] = (int(parts[k + 2]), parts[k].strip('\n'))
-        same = listing(root) == files
-    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
-        return {}
-    finally:
-        shutil.rmtree(copy, ignore_errors=True)
-        with contextlib.suppress(OSError):
-            os.unlink(settings[1])
-    if not same:
-        return {}
-    for e, (code, text) in results.items():
-        if code == 0 and not ERROR.search(text):
-            for rel in reach[e]:
-                nodes[rel].update(ran=start, failed=False)
-    return {e: '\n'.join(text.splitlines()[-TAIL:]) for e, (code, text) in results.items() if code or ERROR.search(text)}
-
-
-def failures(bad, entries):
-    return ''.join('\nA run of %s in a sandboxed copy failed; the last %d lines of its output:\n%s' % (e, TAIL, bad[e])
-                   for e in entries if e in bad) + ('\n(run in a sandbox with no network)' if bad else '')
-
-
 # ---------------------------------------------------------------- rule
 
 def failed(event):
@@ -421,9 +318,6 @@ def named(argv, cwd, root, files):
             rel = os.path.relpath(path, root).replace(os.sep, '/')
             found.update(f for f in files if f == rel or f.startswith(rel.rstrip('/') + '/') or rel == '.')
     return found
-
-
-EDIT_TOOLS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
 
 
 def record(state, event):
@@ -451,18 +345,15 @@ def record(state, event):
                     if not bad:
                         nodes[rel]['ran'] = began
     unchecked, entries = sets(state, files)
-    bad = probe(state, files, cwd, entries) if unchecked and event.get('hook_event_name') == 'PostToolUse' else {}
-    unchecked, entries = sets(state, files)
-    new = [e for e in entries if e in bad and nodes[e]['hash'] != hashlib.sha256(bad[e].encode()).hexdigest()]
-    # Without the sandbox the note follows only the edit tools, as in 6.2.1: measured, a note after a shell-made
-    # change costs more and gains nothing (research/v622 on the research branch).
-    told = tool in EDIT_TOOLS or shutil.which(os.environ.get('MAKOTO_SRT') or 'srt')
-    fresh = [e for e in entries if told and e not in bad and not nodes[e]['noted']]
-    for e in fresh:
-        nodes[e]['noted'] = True
-    for e in new:
-        nodes[e]['hash'] = hashlib.sha256(bad[e].encode()).hexdigest()
-    return message(unchecked, entries, nodes) + failures({e: bad[e] for e in new}, entries) if fresh or new else ''
+    target = given.get('file_path') or given.get('notebook_path')
+    if tool in EDITORS and isinstance(target, str) and target:
+        rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
+        fresh = [e for e in entries if not nodes[e]['noted']]
+        if rel in unchecked and fresh:
+            for e in fresh:
+                nodes[e]['noted'] = True
+            return message(unchecked, entries, nodes)
+    return ''
 
 
 def respond(event, config):
@@ -489,11 +380,7 @@ def respond(event, config):
                 return {}
             refresh(state, files := listing(state['root']))
             unchecked, entries = sets(state, files)
-            bad = probe(state, files, event.get('cwd') or state['root'], entries) if unchecked else {}
-            unchecked, entries = sets(state, files)
-            save(path, state)
-            return ({'decision': 'block', 'reason': message(unchecked, entries, state['nodes']) + failures(bad, entries)}
-                    if unchecked else {})
+            return {'decision': 'block', 'reason': message(unchecked, entries, state['nodes'])} if unchecked else {}
         text = record(state, event)
         save(path, state)
     if text:

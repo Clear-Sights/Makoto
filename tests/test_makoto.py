@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-SRT = Path(os.environ.get('MAKOTO_SRT_TEST') or '/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/srt/node_modules/.bin/srt')
 PLUGIN = Path(__file__).resolve().parents[1] / 'plugin'
 HOOKS = json.loads((PLUGIN / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))['hooks']
 SH = '#!/bin/sh\necho 1\n'
@@ -22,8 +21,7 @@ def hold(unchecked, entries):
 def send(tmp, event, **extra):
     command = HOOKS[event['hook_event_name']][0]['hooks'][0]['command']
     env = {k: v for k, v in os.environ.items() if not k.startswith('MAKOTO_')}
-    env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp / 'state'), PYTHONDONTWRITEBYTECODE='1',
-               MAKOTO_SRT=str(tmp / 'no-srt'))  # no srt unless a test names one: 6.2.2's behaviour
+    env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp / 'state'), PYTHONDONTWRITEBYTECODE='1')
     env.update(extra)
     run = subprocess.run(['bash', '-c', command], input=json.dumps(event), env=env, capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stderr
@@ -37,8 +35,7 @@ def s(request, tmp_path):
 
 class Session:
     def __init__(self, tmp, git, files=None):
-        self.tmp, self.cwd, self.clock, self.env = tmp, tmp / 'work', time.time() - 1000, {}
-        self.real = False  # True: files keep their real modified times
+        self.tmp, self.cwd, self.clock = tmp, tmp / 'work', time.time() - 1000
         self.cwd.mkdir()
         for name, text in (files or {}).items():
             self.put(name, text)
@@ -47,15 +44,14 @@ class Session:
         self.send('SessionStart')
 
     def send(self, name, **fields):
-        return send(self.tmp, dict(hook_event_name=name, session_id='s', cwd=str(self.cwd), **fields), **self.env)
+        return send(self.tmp, dict(hook_event_name=name, session_id='s', cwd=str(self.cwd), **fields))
 
     def put(self, path, text='x = 1\n'):
         """Write a file whose modified time is a new moment on a clock that starts in the past."""
         (self.cwd / path).parent.mkdir(parents=True, exist_ok=True)
         (self.cwd / path).write_text(text, encoding='utf-8')
         self.clock += 10
-        if not self.real:
-            os.utime(self.cwd / path, (self.clock, self.clock))
+        os.utime(self.cwd / path, (self.clock, self.clock))
 
     def call(self, tool, tool_input):
         return self.send('PostToolUse', tool_name=tool, tool_use_id='t', tool_input=tool_input, tool_response={'stdout': '1\n'})
@@ -340,7 +336,7 @@ def test_state_holds_a_map_and_no_list_of_runs_reads_notes_or_unpaid_files(tmp_p
     text = state_file(tmp_path).read_text(encoding='utf-8')
     state = json.loads(text)
     assert set(state) == {'root', 'nodes', 'last'}
-    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'hash', 'shebang', 'uses', 'quotes', 'writes'}
+    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'shebang', 'uses', 'quotes', 'writes'}
     for word in ('runs', 'reads', 'notes', 'unpaid'):
         assert word not in text
 
@@ -380,149 +376,3 @@ def test_shell_redirects_make_produced_by_and_reads_links(tmp_path):
     s.clock = time.time() + 100
     s.edit('in.txt', 'c\n')
     assert s.stop()['reason'] == hold(['in.txt', 'out.json', 'reader.py', 'run.sh'], ['reader.py'])
-
-
-def note_of(response):
-    return response.get('hookSpecificOutput', {}).get('additionalContext')
-
-
-@pytest.mark.parametrize('command', ["echo 'x = 2' > lib.py", "sed -i 's/1/2/' lib.py"])
-def test_without_the_sandbox_a_bash_made_change_gets_no_note_and_is_held(tmp_path, command):
-    s = snapshot_fan(tmp_path)
-    s.put('lib.py', 'x = 2\n')
-    assert s.sh(command) == {}  # as in 6.2.1: the note follows only the edit tools
-    assert s.stop()['decision'] == 'block'
-
-
-def test_a_bash_call_that_changes_nothing_gets_no_note(tmp_path):
-    s = snapshot_fan(tmp_path)
-    assert s.sh('ls') == {}
-    assert s.call('Read', {'file_path': 'lib.py'}) == {}
-
-
-def test_a_run_that_checks_the_change_gets_no_note(tmp_path):
-    s = snapshot_fan(tmp_path)
-    s.put('lib.py', 'x = 2\n')
-    assert s.sh('python3 main.py') == {}
-    assert s.stop() == {}
-
-
-def test_without_the_sandbox_a_non_edit_tool_that_follows_a_change_gets_no_note(tmp_path):
-    s = snapshot_fan(tmp_path)
-    s.put('lib.py', 'x = 2\n')
-    assert note_of(s.call('Read', {'file_path': 'lib.py'})) is None
-
-
-# ---------------------------------------------------------------- collect: the probe, through srt
-
-needs_srt = pytest.mark.skipif(not SRT.is_file(), reason='srt is not installed here')
-NOTE = 'hookSpecificOutput'
-
-
-def probing(tmp_path, files):
-    s = Session(tmp_path, False, files)
-    s.env, s.real = {'MAKOTO_SRT': str(SRT)}, True
-    return s
-
-
-def context(reply):
-    return reply[NOTE]['additionalContext']
-
-
-def test_without_srt_the_behaviour_is_6_2_2s(tmp_path):
-    s = Session(tmp_path, False, {'a.py': 'print(1)\n'})
-    assert context(s.edit('a.py', 'print(2)\n')) == hold(['a.py'], ['a.py'])
-    assert s.stop() == {'decision': 'block', 'reason': hold(['a.py'], ['a.py'])}
-
-
-@needs_srt
-def test_passing_probe_checks_silently_and_the_final_answer_is_admitted(tmp_path):
-    s = probing(tmp_path, {'lib.py': 'x = 1\n', 'main.py': 'import lib\nprint(lib.x)\n'})
-    assert s.edit('lib.py', 'x = 2\n') == {}
-    assert s.stop() == {}
-    assert s.stop('SubagentStop') == {}
-
-
-@needs_srt
-def test_failing_probe_puts_the_error_in_the_note_and_the_hold(tmp_path):
-    s = probing(tmp_path, {'lib.py': 'x = 1\n', 'main.py': 'import lib\nprint(lib.x)\n'})
-    note = context(s.edit('lib.py', 'x = 1 / 0\n'))
-    assert note.startswith(hold(['lib.py', 'main.py'], ['main.py']))
-    assert 'ZeroDivisionError' in note and note.endswith('(run in a sandbox with no network)')
-    hold_reply = s.stop()
-    assert hold_reply['decision'] == 'block' and 'ZeroDivisionError' in hold_reply['reason']
-    assert s.stop(stop_hook_active=True) == {}
-
-
-@needs_srt
-def test_the_same_failure_is_not_noted_twice_but_a_new_one_is(tmp_path):
-    s = probing(tmp_path, {'main.py': 'print(1)\n'})
-    assert 'ZeroDivisionError' in context(s.edit('main.py', 'print(1 / 0)\n'))
-    assert s.edit('main.py', 'print(1 / 0)\n\n') == {}
-    assert 'NameError' in context(s.edit('main.py', 'print(undefined_name)\n'))
-    assert s.edit('main.py', 'print(1)\n') == {}  # passes: checked
-
-
-@needs_srt
-def test_a_probe_cannot_write_outside_its_copy_or_reach_the_network(tmp_path):
-    outside = tmp_path / 'outside.txt'
-    program = ('import socket\nopen(%r, "w").write("x")\n' % str(outside)
-               + 'socket.create_connection(("1.1.1.1", 53), timeout=2)\n')
-    s = probing(tmp_path, {'main.py': 'print(1)\n'})
-    note = context(s.edit('main.py', program))
-    assert 'main.py' in note and note.endswith('(run in a sandbox with no network)')
-    assert not outside.exists()
-    assert (s.cwd / 'main.py').read_text() == program and sorted(p.name for p in s.cwd.iterdir()) == ['main.py']
-
-
-@needs_srt
-def test_a_probe_writes_only_in_its_copy_and_the_real_tree_is_unchanged(tmp_path):
-    s = probing(tmp_path, {'main.py': 'print(1)\n'})
-    s.edit('main.py', 'open("made.txt", "w").write("x")\n')
-    assert sorted(p.name for p in s.cwd.iterdir()) == ['main.py']
-    assert s.stop() == {}
-
-
-@needs_srt
-@pytest.mark.parametrize('library', ['subprocess', 'socket'])
-def test_a_program_that_imports_subprocess_or_socket_is_probed(tmp_path, library):
-    s = probing(tmp_path, {'main.py': 'print(1)\n'})
-    assert s.edit('main.py', 'import %s\nprint(1)\n' % library) == {}
-    assert s.stop() == {}
-    assert 'NameError' in context(s.edit('main.py', 'import %s\nundefined_name\n' % library))
-
-
-@needs_srt
-def test_a_timeout_leaves_6_2_2s_note_and_hold(tmp_path):
-    s = probing(tmp_path, {'main.py': 'print(1)\n'})
-    started = time.time()
-    assert context(s.edit('main.py', 'import time\ntime.sleep(60)\n')) == hold(['main.py'], ['main.py'])
-    assert time.time() - started < 15
-    assert s.stop() == {'decision': 'block', 'reason': hold(['main.py'], ['main.py'])}
-
-
-@needs_srt
-def test_a_program_without_a_known_interpreter_is_not_probed(tmp_path):
-    s = probing(tmp_path, {'data.json': '{}', 'main.py': 'import json\njson.load(open("data.json"))\n'})
-    assert s.edit('data.json', '{"a": 1}') == {}  # main.py is the entry and passes
-    s.put('tool.lua', 'print(1)\n')
-    assert context(s.call('Write', {'file_path': 'tool.lua'})) == hold(['tool.lua'], ['tool.lua'])
-
-
-@needs_srt
-def test_a_shell_program_with_a_shebang_is_probed_in_the_same_relative_directory(tmp_path):
-    s = probing(tmp_path, {'sub/run': '#!/bin/sh\necho 1\n', 'sub/data.txt': 'a\n'})
-    s.cwd = tmp_path / 'work' / 'sub'
-    assert s.edit('run', '#!/bin/sh\ncat data.txt\n') == {}
-    assert 'No such file' in context(s.edit('run', '#!/bin/sh\ncat nothere.txt\n'))
-
-
-@needs_srt
-def test_the_probe_runs_a_package_module_and_a_test_file_as_the_project_would(tmp_path):
-    s = probing(tmp_path, {'pkg/app/__init__.py': '', 'pkg/app/core.py': 'def price(x):\n    return x\n',
-                           'pkg/app/user.py': 'from app.core import price\nprint(price(2))\n',
-                           'pkg/tests/test_core.py': 'from app.core import price\n\n\ndef test_price():\n    assert price(2) == 2\n'})
-    assert s.edit('pkg/app/core.py', 'def price(x):\n    return x + 0\n') == {}  # no ModuleNotFoundError for the package
-    assert s.stop() == {}
-    note = context(s.edit('pkg/app/core.py', 'def price(x):\n    return x + 1\n'))  # the test file now fails under pytest
-    assert 'test_core.py' in note and 'ModuleNotFoundError' not in note
