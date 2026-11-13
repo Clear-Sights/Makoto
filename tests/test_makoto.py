@@ -144,18 +144,19 @@ def test_failed_run_does_not_check(tmp_path):
     assert s.stop() == {}
 
 
-def test_reedit_after_check_notes_again(tmp_path):
+def test_reedit_after_check_gives_no_second_note_for_the_same_entry_program(tmp_path):
     s = snapshot_fan(tmp_path)
     s.edit('lib.py', 'x = 2\n')
     s.sh('python3 main.py')
     s.clock = time.time() + 100
-    assert s.edit('lib.py', 'x = 3\n')['hookSpecificOutput']['additionalContext'].startswith('Not run since')
+    assert s.edit('lib.py', 'x = 3\n') == {}  # main.py was named by an earlier note
     assert s.stop()['decision'] == 'block'
 
 
 @pytest.mark.parametrize('command', ['pytest', 'python3 -m pytest -q', 'go test ./...', 'cargo test', 'npm test', 'make'])
-def test_test_runner_without_program_reaches_every_file(tmp_path, command):
+def test_test_runner_without_program_reaches_the_test_files_and_what_they_use(tmp_path, command):
     s = snapshot_fan(tmp_path)
+    s.put('test_fan.py', 'import main\n')
     s.edit('lib.py', 'x = 2\n')
     s.sh(command)
     assert s.stop() == {}
@@ -338,3 +339,40 @@ def test_state_holds_a_map_and_no_list_of_runs_reads_notes_or_unpaid_files(tmp_p
     assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'shebang', 'uses', 'quotes', 'writes'}
     for word in ('runs', 'reads', 'notes', 'unpaid'):
         assert word not in text
+
+
+def test_passing_test_run_checks_what_the_tests_import_and_leaves_an_unreached_module_demanded(s):
+    s.put('lib.py')
+    s.put('other.py')
+    s.put('tests/check.py', 'import lib\n')
+    s.send('UserPromptSubmit', prompt='x')
+    s.edit('lib.py', 'x = 2\n')
+    s.edit('other.py', 'x = 2\n')
+    s.sh('pytest')
+    assert s.stop()['reason'] == hold(['other.py'], ['other.py'])
+
+
+def test_twelve_edits_with_the_same_entry_program_give_one_note(tmp_path):
+    s = snapshot_fan(tmp_path)
+    notes = [s.edit('lib.py', 'x = %d\n' % i) for i in range(12)]
+    assert [n != {} for n in notes] == [True] + [False] * 11
+    assert s.stop()['decision'] == 'block'
+
+
+def test_a_new_entry_program_gives_a_second_note(tmp_path):
+    s = Session(tmp_path, False, {'lib.py': 'x = 1\n', 'a.py': 'import lib\n', 'lib2.py': 'y = 1\n', 'b.py': 'import lib2\n'})
+    assert s.edit('lib.py', 'x = 2\n')['hookSpecificOutput']['additionalContext'] == hold(['a.py', 'lib.py'], ['a.py'])
+    assert s.edit('lib.py', 'x = 3\n') == {}
+    assert s.edit('lib2.py', 'y = 2\n')['hookSpecificOutput']['additionalContext'] == hold(['a.py', 'b.py', 'lib.py', 'lib2.py'], ['a.py', 'b.py'])
+
+
+def test_shell_redirects_make_produced_by_and_reads_links(tmp_path):
+    s = Session(tmp_path, False, {'run.sh': 'python3 gen.py > out.json\nsort < in.txt\n', 'gen.py': 'print(1)\n',
+                                  'out.json': '{}', 'in.txt': 'b\na\n', 'reader.py': READER})
+    s.edit('run.sh', 'python3 gen.py > out.json\nsort < in.txt\n\n')
+    assert s.stop()['reason'] == hold(['out.json', 'reader.py', 'run.sh'], ['reader.py'])
+    s.sh('python3 reader.py')
+    assert s.stop() == {}
+    s.clock = time.time() + 100
+    s.edit('in.txt', 'c\n')
+    assert s.stop()['reason'] == hold(['in.txt', 'out.json', 'reader.py', 'run.sh'], ['reader.py'])
