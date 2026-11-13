@@ -1,7 +1,7 @@
 {
   "name": "makoto",
   "description": "Holds a final answer while a file changed this session, or a file that depends on it, has not been run since. One map of files and their links is the only state, and it never grows (any language, no git needed).",
-  "version": "6.5.0",
+  "version": "6.5.1",
   "author": {
     "name": "Clear-Sights"
   },

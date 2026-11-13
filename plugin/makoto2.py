@@ -176,6 +176,9 @@ def listing(root):
             names.extend(os.path.relpath(os.path.join(here, f), root).replace(os.sep, '/') for f in found)
             if len(names) > MAX_FILES:
                 break
+    # A folder that holds CACHEDIR.TAG is a tool's cache (the Cache Directory Tagging Specification): not the user's files.
+    caches = tuple(n[:-len('CACHEDIR.TAG')] for n in names if n.endswith('/CACHEDIR.TAG'))
+    names = [n for n in names if not n.startswith(caches)] if caches else names
     result = {}
     for name in names[:MAX_FILES]:
         try:
