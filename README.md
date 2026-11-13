@@ -95,9 +95,25 @@ a busy lock is waited for.
 
 ## What is measured
 
-**This version (6.3.0) is not yet measured.** The rows below are for 6.2.1, which had no sandboxed check: there the model
-ran the program itself. A comparison of 6.3.0 with 6.2.1 is in progress, and its rows replace this notice when it ends.
-Without the sandbox runtime installed, 6.3.0 behaves as 6.2.1, so the rows below apply to it as they stand.
+**With the sandbox runtime installed (6.3.0's own check), measured against 6.2.1 and against no Makoto,** on 40 fresh
+tasks per row (Claude Code 2.1.323; records on the `research` branch, `research/collect/`):
+
+| tasks | model | without Makoto | 6.2.1 | 6.3.0 with sandbox | cost: 6.2.1; 6.3.0 |
+|---|---|---|---|---|---|
+| Python: an edit that fails only when run | Haiku | 26 of 40 | 33 of 40 | 34 of 40 | 1.23; 1.26 times |
+| Python: a change with 12 dependent files | Haiku | 30 of 40 | 40 of 40 | 35 of 40 | 1.27; 1.01 times |
+| Python: an edit that fails only when run | Sonnet | 21 of 40 | 38 of 40 | 39 of 40 | 1.42; 1.25 times |
+| Python: a change with 12 dependent files | Sonnet | 37 of 40 | 40 of 40 | 29 of 40 | 1.55; 1.04 times |
+
+- **Where the sandboxed check works:** where running the entry program exercises the change. It then matches 6.2.1
+  with no held answer, and on Sonnet costs less.
+- **Where it fails:** where the changed files only define functions. Running such a file calls nothing and exits 0,
+  so Makoto marks it checked and says nothing, and a wrong caller goes through. On those tasks 6.3.0 with the sandbox
+  passed fewer than 6.2.1 on both models, and on Sonnet fewer than no Makoto (29 against 37; not significant after
+  correction for two tests). **On a project of that kind, do not install the sandbox runtime:** without it 6.3.0
+  behaves as 6.2.1.
+
+**Without the sandbox runtime,** 6.3.0 behaves as 6.2.1, and the rows below apply to it as they stand.
 
 Each row compares Makoto 6.2.1 with the same model without it, on 40 fresh tasks per row (Claude Code 2.1.323).
 The tasks were built for these tests, so they show what Makoto does on tasks of these kinds and no more. The records
@@ -121,6 +137,8 @@ are on the `research` branch (`research/v621/` and `research/claims/`).
 
 ## Limits
 
+- A probe's pass covers only what the run executed, but Makoto counts it for every file the program reaches: a file
+  whose run only defines functions is marked checked with none of them called (measured; see above).
 - A probe is a run with no argument in a copy: a program that needs arguments, input, the network or files outside the
   tree fails there, and what it prints is not a test of the real environment.
 - Literal paths only: a path built at run time, or a name that is not quoted (outside shell redirects), makes no link.
