@@ -237,6 +237,17 @@ def test_five_names_are_skipped(tmp_path, folder):
     assert s.stop() == {}
 
 
+def test_a_tagged_cache_folder_is_skipped(s):
+    s.put('app.py', 'x = 1\n')
+    s.put('test_app.py', 'import app\n')
+    s.put('.pytest_cache/CACHEDIR.TAG', 'Signature: 8a477f597d28d172789f06886806bc55\n')
+    s.put('.pytest_cache/v/cache/lastfailed', '{"test_app.py": true}')
+    s.sh('python3 -m pytest -q')
+    assert s.stop() == {}
+    s.put('data/cache/lastfailed', '{"test_app.py": true}')  # the same file in an untagged folder is the user's
+    assert 'data/cache/lastfailed' in s.stop()['reason']
+
+
 def test_git_ignored_files_are_skipped(tmp_path):
     s = Session(tmp_path, True)
     s.put('.gitignore', 'out/\n')
