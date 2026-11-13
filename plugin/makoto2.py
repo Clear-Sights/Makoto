@@ -412,6 +412,9 @@ def named(argv, cwd, root, files):
     return found
 
 
+EDIT_TOOLS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
+
+
 def record(state, event):
     """Stamp the nodes completed runs reached; return the message for a note, or ''."""
     root, tool, given = state['root'], event.get('tool_name'), event.get('tool_input') or {}
@@ -440,7 +443,10 @@ def record(state, event):
     bad = probe(state, files, cwd, entries) if unchecked and event.get('hook_event_name') == 'PostToolUse' else {}
     unchecked, entries = sets(state, files)
     new = [e for e in entries if e in bad and nodes[e]['hash'] != hashlib.sha256(bad[e].encode()).hexdigest()]
-    fresh = [e for e in entries if e not in bad and not nodes[e]['noted']]
+    # Without the sandbox the note follows only the edit tools, as in 6.2.1: measured, a note after a shell-made
+    # change costs more and gains nothing (research/v622 on the research branch).
+    told = tool in EDIT_TOOLS or shutil.which(os.environ.get('MAKOTO_SRT') or 'srt')
+    fresh = [e for e in entries if told and e not in bad and not nodes[e]['noted']]
     for e in fresh:
         nodes[e]['noted'] = True
     for e in new:
