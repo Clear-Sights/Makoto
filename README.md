@@ -8,7 +8,7 @@ It needs no git. Its rules are not tied to a language; what has been measured is
 Makoto's whole state is one map of the files under the working directory.
 
 - **Node**, one per file: its size and modified time at session start, the start time of the last successful run
-  that reached it, a failed flag, and a noted flag (set on an entry program an earlier note named), and the hash of the last probe failure noted for it.
+  that reached it, a failed flag, and a noted flag (set on an entry program an earlier note named), the hash of the last probe failure noted for it, and a named flag (set when a note has named it as an unchanged user of a changed file).
 - **Link**, from a file to a file it depends on, read from the files' text and read again for files that change:
   - **uses**: an import-style line (`import`, `from`, `require`, `include`, `use`, `source`, `load`) names the other
     file's module path or base name;
@@ -73,10 +73,13 @@ the check instead of asking Claude to:
 - **In which sandbox:** one `srt` call, in a temporary copy of the tree (at most 20,000 files and 50 MB), deleted
   afterwards. The sandbox allows no network and no write outside the copy, so a probe cannot change your files or send
   anything out. The settings file it uses is deleted too.
-- **A pass** counts only when the run exited 0, printed no error marker **and printed something**. It then marks the
-  files it reached as checked, silently. A run that prints nothing shows nothing of the change (a file that only
-  defines functions exits 0 whether its callers are right or wrong), so it checks nothing and the note and the hold
-  of "The message" cover those files.
+- **A pass** (exit 0, no error marker) marks the files it reached as checked, silently.
+- **A pass that printed nothing** shows nothing of the change: a file that only defines functions exits 0 whether
+  its callers are right or wrong. Makoto does not then ask Claude for a run it has itself seen show nothing. It
+  names the files at risk instead, at once: after any tool call, every file that uses a changed file, was not
+  itself changed, and is unchecked or only silently run is named once, with the changed files it uses:
+  `Not changed, but uses a changed file: app/rollup.py (app/core.py). Check each against the change.`
+  Measured, every failure of this kind was such a file, and the note replaces the held final answer.
 - **A fail** puts the output's last 15 lines in the message, ending `(run in a sandbox with no network)`: as a note
   after any tool call, once per distinct output, and in the hold at the final answer. **A failing test file** is
   reported only at the final answer: while a change is in progress, a test states what the code did before it.
@@ -101,23 +104,26 @@ a busy lock is waited for.
 Each row is 40 fresh tasks (Claude Code 2.1.323). The tasks were built for these tests, so they show what Makoto
 does on tasks of these kinds and no more. The records are on the `research` branch.
 
-**This version (6.4.0) with the sandbox runtime installed,** against 6.2.1, which had no sandboxed check
-(`research/testwait/`):
+**This version (6.5.0) with the sandbox runtime installed,** against 6.2.1, which had no sandboxed check
+(`research/downstream/`):
 
-| tasks | model | without Makoto | 6.2.1 | 6.4.0 with sandbox | cost: 6.2.1; 6.4.0 | held answers per run: 6.2.1; 6.4.0 |
+| tasks | model | without Makoto | 6.2.1 | 6.5.0 with sandbox | cost: 6.2.1; 6.5.0 | held answers per run: 6.2.1; 6.5.0 |
 |---|---|---|---|---|---|---|
-| Python: an edit that fails only when run | Sonnet | 13 of 40 | 39 of 40 | 40 of 40 | 1.54; 1.35 times | 1.00; 0 |
-| Python: a change with 12 dependent files | Sonnet | 25 of 40 | 40 of 40 | 40 of 40 | 1.54; 1.55 times | 1.00; 1.00 |
-| Python: an edit that fails only when run | Haiku | 24 of 40 | 34 of 40 | 34 of 40 | 1.26; 1.26 times | 0.18; 0.15 |
-| Python: a change with 12 dependent files | Haiku | 26 of 40 | 39 of 40 | 38 of 40 | 1.43; 1.25 times | 0.98; 0.83 |
+| Python: a change with 12 dependent files | Sonnet | 33 of 40 | 40 of 40 | 40 of 40 | 1.54; 1.06 times | 1.00; 0 |
+| Python: an edit that fails only when run | Sonnet | 17 of 40 | 40 of 40 | 38 of 40 | 1.52; 1.31 times | 1.00; 0 |
+| Python: a change with 12 dependent files | Haiku | 34 of 40 | 39 of 40 | 38 of 40 | 1.21; 0.95 times | 1.00; 0 |
+| Python: an edit that fails only when run | Haiku | 27 of 40 | 34 of 40 | 35 of 40 | 1.29; 1.25 times | 0.15; 0.08 |
 
-- **What the sandboxed check adds:** where running the entry program exercises the change, Sonnet's final answer is
-  no longer held and thrown away, and the cost falls from 1.54 to 1.35 times. Elsewhere 6.4.0 behaves as 6.2.1.
-- **Earlier builds of the sandboxed check failed** and were not kept: one counted a silent exit 0 as a check and
-  passed fewer tasks than no Makoto (`research/collect/`); two cost more than 6.2.1 in one cell
-  (`research/observed/`, `research/quiet/`).
+- **What the sandboxed check adds:** the final answer is no longer held and thrown away. Where running the entry
+  program exercises the change, Makoto reports the failure itself; where a run shows nothing, it names the files
+  that use the change and were not changed.
+- **Earlier builds of the sandboxed check failed** and were not kept: one counted a silent exit 0 as a check with
+  nothing said, and passed fewer tasks than no Makoto (`research/collect/`); two cost more than 6.2.1 in one cell
+  (`research/observed/`, `research/quiet/`). 6.4.0 kept the hold for silent files (`research/testwait/`).
+- **The note is sent only with the sandbox.** Without it the hold stays and names the same files, and the note then
+  only added cost (Sonnet, run-only failures: 1.63 against 1.52 times, 35 against 40 of 40).
 
-**Without the sandbox runtime,** 6.4.0 behaves as 6.2.1 (`research/v621/` and `research/claims/`):
+**Without the sandbox runtime,** 6.5.0 behaves as 6.2.1 (`research/v621/` and `research/claims/`):
 
 | tasks | model | without Makoto | with Makoto | cost with Makoto |
 |---|---|---|---|---|
@@ -137,8 +143,8 @@ does on tasks of these kinds and no more. The records are on the `research` bran
 
 ## Limits
 
-- A probe that does real work but prints nothing (it only writes a file, say) checks nothing; the model is then asked
-  to run it, as without the sandbox.
+- With the sandbox, a file whose run prints nothing is not held. If Claude changed such a file wrongly, nothing but
+  the note on its unchanged users can catch it; no such failure occurred in the measured runs.
 - A probe is a run with no argument in a copy: a program that needs arguments, input, the network or files outside the
   tree fails there, and what it prints is not a test of the real environment.
 - Literal paths only: a path built at run time, or a name that is not quoted (outside shell redirects), makes no link.

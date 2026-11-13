@@ -58,6 +58,7 @@ PROBE_SECONDS = 8
 TAIL = 15
 DISABLE = 'claude plugin disable makoto'
 MESSAGE = 'Not run since a change: %s. Run %s and read the output.'
+DOWNSTREAM = 'Not changed, but uses a changed file: %s. Check each against the change.'
 FINAL = ('Stop', 'SubagentStop')
 HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
 INTERPRETERS = {'.py': 'python3', '.js': 'node', '.mjs': 'node', '.cjs': 'node', '.rb': 'ruby', '.pl': 'perl',
@@ -254,7 +255,7 @@ def refresh(state, files, begin=False):
     """The map for the files now: nodes kept, new files added (changed from the start), links read again for changed files."""
     old, state['nodes'] = state['nodes'], {}
     for rel, stat in files.items():
-        node = old.get(rel) or {'start': stat if begin else None, 'ran': 0, 'failed': False, 'noted': False, 'hash': ''}
+        node = old.get(rel) or {'start': stat if begin else None, 'ran': 0, 'failed': False, 'noted': False, 'named': False, 'hash': ''}
         state['nodes'][rel] = node
         if begin or stat != node['start']:
             node.update(scan(os.path.join(state['root'], rel)))
@@ -343,9 +344,9 @@ def command(name, copy, rel):
     return 'PYTHONPATH=%s %s %s' % (shlex.quote(os.pathsep.join(above)), runner, path)
 
 
-def probe(state, files, cwd, entries):
-    """Run the entry programs that can be probed in one srt call, in a temporary copy of the tree. A pass that printed
-    something stamps the nodes it reached; returns {entry program: last lines of its output} for the failures. A timeout, an error, a program that
+def probe(state, files, cwd, entries, quiet):
+    """Run the entry programs that can be probed in one srt call, in a temporary copy of the tree. A pass stamps the nodes
+    it reached, and the nodes of a pass that printed nothing are added to quiet: their run showed nothing of the change; returns {entry program: last lines of its output} for the failures. A timeout, an error, a program that
     cannot be probed, or a tree that changed meanwhile gives no result for it."""
     root, nodes, srt = state['root'], state['nodes'], shutil.which(os.environ.get('MAKOTO_SRT') or 'srt')
     links = lookup(nodes)[0]
@@ -392,10 +393,26 @@ def probe(state, files, cwd, entries):
     if not same:
         return {}
     for e, (code, text) in results.items():
-        if code == 0 and text.strip() and not ERROR.search(text):  # a silent exit shows nothing of the change: it checks nothing
+        if code == 0 and not ERROR.search(text):
             for rel in reach[e]:
                 nodes[rel].update(ran=start, failed=False)
+            if not text.strip():  # Makoto does not ask the model for a run it has seen show nothing: downstream() names the files
+                quiet.update(reach[e])
     return {e: '\n'.join(text.splitlines()[-TAIL:]) for e, (code, text) in results.items() if code or ERROR.search(text)}
+
+
+def downstream(state, files, quiet):
+    """The note naming the files that use a changed file, were not changed, and are unchecked or only quietly run, once
+    each; '' when it would name no new file."""
+    nodes = state['nodes']
+    links, users, _ = lookup(nodes)
+    changed = {rel for rel in files if files[rel] != nodes[rel]['start']}
+    kept = sorted((close(changed, users) - changed) & (sets(state, files)[0] | quiet))
+    if all(nodes[rel].get('named') for rel in kept):
+        return ''
+    for rel in kept:
+        nodes[rel]['named'] = True
+    return DOWNSTREAM % '; '.join('%s (%s)' % (rel, ', '.join(sorted(close({rel}, links) & changed))) for rel in kept)
 
 
 def failures(bad, entries):
@@ -451,7 +468,8 @@ def record(state, event):
                     if not bad:
                         nodes[rel]['ran'] = began
     unchecked, entries = sets(state, files)
-    bad = probe(state, files, cwd, entries) if unchecked and event.get('hook_event_name') == 'PostToolUse' else {}
+    quiet = set()
+    bad = probe(state, files, cwd, entries, quiet) if unchecked and event.get('hook_event_name') == 'PostToolUse' else {}
     unchecked, entries = sets(state, files)
     # A failing test waits for the final answer: mid-change it states what the code did before the change (measured,
     # research/quiet on the research branch).
@@ -464,7 +482,13 @@ def record(state, event):
         nodes[e]['noted'] = True
     for e in new:
         nodes[e]['hash'] = hashlib.sha256(bad[e].encode()).hexdigest()
-    return message(unchecked, entries, nodes) + failures({e: bad[e] for e in new}, entries) if fresh or new else ''
+    text = message(unchecked, entries, nodes) + failures({e: bad[e] for e in new}, entries) if fresh or new else ''
+    for rel in unchecked if text else ():  # the message names them already: each fact is said once
+        nodes[rel]['named'] = True
+    # Without the sandbox the hold stays and names the same files; there the note only adds cost (measured,
+    # research/downstream on the research branch).
+    users = downstream(state, files, quiet) if shutil.which(os.environ.get('MAKOTO_SRT') or 'srt') else ''
+    return '\n'.join(part for part in (text, users) if part)
 
 
 def respond(event, config):
@@ -491,7 +515,7 @@ def respond(event, config):
                 return {}
             refresh(state, files := listing(state['root']))
             unchecked, entries = sets(state, files)
-            bad = probe(state, files, event.get('cwd') or state['root'], entries) if unchecked else {}
+            bad = probe(state, files, event.get('cwd') or state['root'], entries, set()) if unchecked else {}
             unchecked, entries = sets(state, files)
             save(path, state)
             return ({'decision': 'block', 'reason': message(unchecked, entries, state['nodes']) + failures(bad, entries)}
