@@ -454,10 +454,9 @@ def record(state, event):
     bad = probe(state, files, cwd, entries) if unchecked and event.get('hook_event_name') == 'PostToolUse' else {}
     unchecked, entries = sets(state, files)
     new = [e for e in entries if e in bad and nodes[e]['hash'] != hashlib.sha256(bad[e].encode()).hexdigest()]
-    # Without the sandbox the note follows only the edit tools, as in 6.2.1: measured, a note after a shell-made
-    # change costs more and gains nothing (research/v622 on the research branch).
-    told = tool in EDIT_TOOLS or shutil.which(os.environ.get('MAKOTO_SRT') or 'srt')
-    fresh = [e for e in entries if told and e not in bad and not nodes[e]['noted']]
+    # The plain note follows only the edit tools: measured, a note after a shell-made change costs more and gains
+    # nothing (research/v622, research/observed on the research branch). A probe's failure is noted after any tool.
+    fresh = [e for e in entries if tool in EDIT_TOOLS and e not in bad and not nodes[e]['noted']]
     for e in fresh:
         nodes[e]['noted'] = True
     for e in new:
