@@ -22,7 +22,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 LIVE, OUT, PLUGIN_MINI, PLUGIN_V620, PLUGIN_V621, GEN = (os.environ[k] for k in ('LIVE', 'OUT', 'PLUGIN_MINI', 'PLUGIN_V620', 'PLUGIN_V621', 'GEN'))
-CLI = '2.1.322'
+CLI = '2.1.323'
 MODEL = 'claude-haiku-5-5'
 CAPRUN = '0.80'
 SPEND = os.path.join(OUT, 'SPEND_V621.tsv')
