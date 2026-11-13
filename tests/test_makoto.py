@@ -23,7 +23,7 @@ def send(tmp, event, **extra):
     command = HOOKS[event['hook_event_name']][0]['hooks'][0]['command']
     env = {k: v for k, v in os.environ.items() if not k.startswith('MAKOTO_')}
     env.update(CLAUDE_PLUGIN_ROOT=str(PLUGIN), MAKOTO_STATE_DIR=str(tmp / 'state'), PYTHONDONTWRITEBYTECODE='1',
-               MAKOTO_SRT=str(tmp / 'no-srt'))  # no srt unless a test names one: 6.2.2's behaviour
+               MAKOTO_SRT=str(tmp / 'no-srt'))  # no srt unless a test names one: 6.2.1's behaviour
     env.update(extra)
     run = subprocess.run(['bash', '-c', command], input=json.dumps(event), env=env, capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stderr
@@ -429,7 +429,7 @@ def context(reply):
     return reply[NOTE]['additionalContext']
 
 
-def test_without_srt_the_behaviour_is_6_2_2s(tmp_path):
+def test_without_srt_the_behaviour_is_6_2_1s(tmp_path):
     s = Session(tmp_path, False, {'a.py': 'print(1)\n'})
     assert context(s.edit('a.py', 'print(2)\n')) == hold(['a.py'], ['a.py'])
     assert s.stop() == {'decision': 'block', 'reason': hold(['a.py'], ['a.py'])}
@@ -493,7 +493,7 @@ def test_a_program_that_imports_subprocess_or_socket_is_probed(tmp_path, library
 
 
 @needs_srt
-def test_a_timeout_leaves_6_2_2s_note_and_hold(tmp_path):
+def test_a_timeout_leaves_the_plain_note_and_hold(tmp_path):
     s = probing(tmp_path, {'main.py': 'print(1)\n'})
     started = time.time()
     assert context(s.edit('main.py', 'import time\ntime.sleep(60)\n')) == hold(['main.py'], ['main.py'])
