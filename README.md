@@ -95,6 +95,10 @@ a busy lock is waited for.
 
 ## What is measured
 
+**This version (6.3.0) is not yet measured.** The rows below are for 6.2.1, which had no sandboxed check: there the model
+ran the program itself. A comparison of 6.3.0 with 6.2.1 is in progress, and its rows replace this notice when it ends.
+Without the sandbox runtime installed, 6.3.0 behaves as 6.2.1, so the rows below apply to it as they stand.
+
 Each row compares Makoto 6.2.1 with the same model without it, on 40 fresh tasks per row (Claude Code 2.1.323).
 The tasks were built for these tests, so they show what Makoto does on tasks of these kinds and no more. The records
 are on the `research` branch (`research/v621/` and `research/claims/`).
