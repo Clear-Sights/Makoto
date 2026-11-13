@@ -8,18 +8,23 @@ It works in any language and needs no git.
 Makoto's whole state is one map of the files under the working directory.
 
 - **Node**, one per file: its size and modified time at session start, the start time of the last successful run
-  that reached it, a failed flag, and a noted flag.
+  that reached it, a failed flag, and a noted flag (set on an entry program an earlier note named).
 - **Link**, from a file to a file it depends on, read from the files' text and read again for files that change:
   - **uses**: an import-style line (`import`, `from`, `require`, `include`, `use`, `source`, `load`) names the other
     file's module path or base name;
   - **reads**: a quoted string names another project file by relative path or base name with extension;
   - **produced by**: the same, on a line with a write marker (`>`, `>>`, a `'w'` or `'a'` mode, `write`, `dump`,
     `save`, `to_csv`, `to_json`). The link points from the data file to the file that writes it.
+  - **shell redirects**: in a shell file (extension `sh`, `bash` or `zsh`, or a shell shebang), an unquoted `> path`,
+    `>> path` or `tee path` makes a produced-by link and an unquoted `< path` a reads link, when the path names a
+    project file.
 
 A run is not kept. A successful run stamps its start time on every node it reaches; a failed run sets their failed
 flag. A run reaches the program it names and everything that program depends on, so a run of a script that reads
 `out.json` reaches `out.json` and the script that writes it. A test runner with no program argument (pytest,
-`python -m pytest`, go test, cargo test, npm test, make) reaches every file.
+`python -m pytest`, go test, cargo test, jest, vitest, mocha, make, npm/yarn/pnpm run, test or start) reaches the
+test files (a name containing `test` or `spec`, or a file under a folder named `test`, `tests`, `spec` or
+`__tests__`) and everything they depend on, not every file; a changed file no test reaches stays demanded.
 
 ## What is demanded
 
@@ -40,7 +45,9 @@ failed run checks nothing and the message then says the file needs a run that su
 One message names the demanded files not yet checked and the entry programs (files no other file depends on) that
 reach them: `Not run since a change: lib.py, main.py, u1.py. Run main.py and read the output.`
 
-- After a Write, Edit, MultiEdit or NotebookEdit it arrives as a note, once per changed file until checked.
+- After a Write, Edit, MultiEdit or NotebookEdit it arrives as a note only when the entry programs it names include
+  one that no earlier note in the session named; otherwise the edit gets no note. Twelve edits whose runs are all
+  the same entry program give one note; a new entry program gives another.
 - At the final answer (Stop, or a subagent's SubagentStop) it is a hold, once: a Stop that follows a hold
   (`stop_hook_active`) is let through.
 
@@ -58,7 +65,7 @@ a busy lock is waited for.
 
 ## Limits
 
-- Literal paths only: a path built at run time, or a name that is not quoted, makes no link.
+- Literal paths only: a path built at run time, or a name that is not quoted (outside shell redirects), makes no link.
 - Per file, not per function: any change to a file demands everything that depends on the file.
 - A run is judged by the tool call and its output markers, not by what the program did.
 
