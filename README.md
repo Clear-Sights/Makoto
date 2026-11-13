@@ -65,6 +65,8 @@ Where the Claude Code sandbox runtime (`srt`, the `@anthropic-ai/sandbox-runtime
 the check instead of asking Claude to:
 
 - **When:** after any completed tool call that leaves an unchecked change, and at the final answer if one remains.
+- **Without the sandbox** the note follows only the edit tools (Write, Edit, MultiEdit, NotebookEdit), and a change
+  made any other way is caught at the final answer.
 - **What it runs:** every entry program the message names (a file nothing else depends on) that a known interpreter
   (python3, node, ruby, perl, php, sh, bash; by extension or `#!` line) runs with no argument, whatever it imports.
   Programs run in the same relative directory as the session, in order, with input closed, and all of them together

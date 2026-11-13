@@ -387,11 +387,11 @@ def note_of(response):
 
 
 @pytest.mark.parametrize('command', ["echo 'x = 2' > lib.py", "sed -i 's/1/2/' lib.py"])
-def test_a_file_changed_by_a_bash_call_gets_the_note_after_that_call(tmp_path, command):
+def test_without_the_sandbox_a_bash_made_change_gets_no_note_and_is_held(tmp_path, command):
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
-    assert note_of(s.sh(command)) == hold(['lib.py', 'main.py', 'u1.py', 'u2.py', 'u3.py'], ['main.py'])
-    assert s.sh(command) == {}  # the entry program was named by that note
+    assert s.sh(command) == {}  # as in 6.2.1: the note follows only the edit tools
+    assert s.stop()['decision'] == 'block'
 
 
 def test_a_bash_call_that_changes_nothing_gets_no_note(tmp_path):
@@ -407,10 +407,10 @@ def test_a_run_that_checks_the_change_gets_no_note(tmp_path):
     assert s.stop() == {}
 
 
-def test_a_non_edit_tool_that_follows_a_change_gets_the_note(tmp_path):
+def test_without_the_sandbox_a_non_edit_tool_that_follows_a_change_gets_no_note(tmp_path):
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
-    assert note_of(s.call('Read', {'file_path': 'lib.py'})) is not None
+    assert note_of(s.call('Read', {'file_path': 'lib.py'})) is None
 
 
 # ---------------------------------------------------------------- collect: the probe, through srt
