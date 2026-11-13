@@ -332,6 +332,17 @@ def interpreter(root, rel, node):
     return name if name and shutil.which(name) else None
 
 
+def command(name, copy, rel):
+    """The shell command that runs one entry program as its project would: a Python file sees every folder above it, so a
+    module of a package resolves its own imports, and a Python test file runs under pytest when pytest is installed."""
+    path = shlex.quote(os.path.join(copy, rel))
+    if name != 'python3':
+        return '%s %s' % (name, path)
+    above = [os.path.join(copy, *rel.split('/')[:k]) for k in range(rel.count('/'), -1, -1)]
+    runner = 'python3 -m pytest -q -p no:cacheprovider' if TESTS.search(rel.lower()) and shutil.which('pytest') else 'python3'
+    return 'PYTHONPATH=%s %s %s' % (shlex.quote(os.pathsep.join(above)), runner, path)
+
+
 def probe(state, files, cwd, entries):
     """Run the entry programs that can be probed in one srt call, in a temporary copy of the tree. A pass stamps the nodes
     it reached; returns {entry program: last lines of its output} for the failures. A timeout, an error, a program that
@@ -356,7 +367,7 @@ def probe(state, files, cwd, entries):
             json.dump({'network': {'allowedDomains': [], 'deniedDomains': []},
                        'filesystem': {'denyRead': [], 'allowWrite': [copy], 'denyWrite': []}}, stream)
         script = 'cd %s || exit 1; ' % shlex.quote(os.path.join(copy, here)) + ''.join(
-            "%s %s </dev/null 2>&1; printf '\\n%s %d %%s\\n' $?; " % (programs[e], shlex.quote(os.path.join(copy, e)), token, i)
+            "%s </dev/null 2>&1; printf '\\n%s %d %%s\\n' $?; " % (command(programs[e], copy, e), token, i)
             for i, e in enumerate(order))
         child = subprocess.Popen([srt, '--settings', settings[1], '-c', script], stdin=subprocess.DEVNULL,
                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True,

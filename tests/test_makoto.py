@@ -515,3 +515,14 @@ def test_a_shell_program_with_a_shebang_is_probed_in_the_same_relative_directory
     s.cwd = tmp_path / 'work' / 'sub'
     assert s.edit('run', '#!/bin/sh\ncat data.txt\n') == {}
     assert 'No such file' in context(s.edit('run', '#!/bin/sh\ncat nothere.txt\n'))
+
+
+@needs_srt
+def test_the_probe_runs_a_package_module_and_a_test_file_as_the_project_would(tmp_path):
+    s = probing(tmp_path, {'pkg/app/__init__.py': '', 'pkg/app/core.py': 'def price(x):\n    return x\n',
+                           'pkg/app/user.py': 'from app.core import price\nprint(price(2))\n',
+                           'pkg/tests/test_core.py': 'from app.core import price\n\n\ndef test_price():\n    assert price(2) == 2\n'})
+    assert s.edit('pkg/app/core.py', 'def price(x):\n    return x + 0\n') == {}  # no ModuleNotFoundError for the package
+    assert s.stop() == {}
+    note = context(s.edit('pkg/app/core.py', 'def price(x):\n    return x + 1\n'))  # the test file now fails under pytest
+    assert 'test_core.py' in note and 'ModuleNotFoundError' not in note
