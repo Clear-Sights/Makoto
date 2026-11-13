@@ -15,6 +15,13 @@ MODULE = 'import lib\n'
 USERS = ['u1.py', 'u2.py', 'u3.py']
 
 
+def down(*pairs):
+    return 'Not changed, but uses a changed file: %s. Check each against the change.' % '; '.join('%s (%s)' % pair for pair in pairs)
+
+
+FAN = down(('main.py', 'lib.py'), ('u1.py', 'lib.py'), ('u2.py', 'lib.py'), ('u3.py', 'lib.py'))
+
+
 def hold(unchecked, entries):
     return 'Not run since a change: %s. Run %s and read the output.' % (', '.join(sorted(unchecked)), ', '.join(entries))
 
@@ -340,7 +347,7 @@ def test_state_holds_a_map_and_no_list_of_runs_reads_notes_or_unpaid_files(tmp_p
     text = state_file(tmp_path).read_text(encoding='utf-8')
     state = json.loads(text)
     assert set(state) == {'root', 'nodes', 'last'}
-    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'hash', 'shebang', 'uses', 'quotes', 'writes'}
+    assert set(state['nodes']['reader.py']) == {'start', 'ran', 'failed', 'noted', 'named', 'hash', 'shebang', 'uses', 'quotes', 'writes'}
     for word in ('runs', 'reads', 'notes', 'unpaid'):
         assert word not in text
 
@@ -390,7 +397,7 @@ def note_of(response):
 def test_without_the_sandbox_a_bash_made_change_gets_no_note_and_is_held(tmp_path, command):
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
-    assert s.sh(command) == {}  # as in 6.2.1: the note follows only the edit tools
+    assert s.sh(command) == {}  # as in 6.2.1: the hold names the files
     assert s.stop()['decision'] == 'block'
 
 
@@ -411,6 +418,12 @@ def test_without_the_sandbox_a_non_edit_tool_that_follows_a_change_gets_no_note(
     s = snapshot_fan(tmp_path)
     s.put('lib.py', 'x = 2\n')
     assert note_of(s.call('Read', {'file_path': 'lib.py'})) is None
+
+
+def test_an_edit_tool_change_is_named_by_the_plain_note_alone(tmp_path):
+    s = snapshot_fan(tmp_path)
+    assert note_of(s.edit('lib.py', 'x = 2\n')) == hold(['lib.py', 'main.py'] + USERS, ['main.py'])
+    assert s.sh('ls') == {}
 
 
 # ---------------------------------------------------------------- collect: the probe, through srt
@@ -530,30 +543,21 @@ def test_the_probe_runs_a_package_module_and_a_test_file_as_the_project_would(tm
 
 
 @needs_srt
-def test_a_probe_that_prints_nothing_checks_nothing_and_the_final_answer_is_held_once(tmp_path):
+def test_a_probe_that_prints_nothing_leaves_no_demand_and_the_unchanged_user_is_named_once(tmp_path):
     s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'user.py': 'import core\n\n\ndef total(x):\n    return core.price(x) + 1\n'})
-    message = hold(['core.py', 'user.py'], ['user.py'])
-    assert context(s.edit('core.py', 'def price(x):\n    return {"value": x}\n')) == message  # user.py exits 0 and is wrong
-    assert s.stop() == {'decision': 'block', 'reason': message}
-    assert s.stop(stop_hook_active=True) == {}
+    assert context(s.edit('core.py', 'def price(x):\n    return {"value": x}\n')) == down(('user.py', 'core.py'))  # user.py exits 0 and is wrong
+    assert s.sh('ls') == {}
+    assert s.stop() == {}  # Makoto saw the run show nothing, so it asks for none
+    assert s.edit('user.py', 'import core\n\n\ndef total(x):\n    return core.price(x)["value"] + 1\n') == {}
 
 
 @needs_srt
-def test_a_passing_test_file_checks_what_it_reaches_and_a_silent_module_stays_unchecked(tmp_path):
-    s = probing(tmp_path, {'app/__init__.py': '', 'app/core.py': 'def price(x):\n    return x\n',
-                           'app/user.py': 'import app.core\n\n\ndef total(x):\n    return app.core.price(x) + 1\n',
-                           'tests/test_core.py': 'from app.core import price\n\n\ndef test_price():\n    assert price(2)\n'})
-    s.put('app/core.py', 'def price(x):\n    return {"value": x}\n')
-    reply = s.stop()
-    assert reply == {'decision': 'block', 'reason': hold(['app/user.py'], ['app/user.py'])}
-
-
-@needs_srt
-def test_a_shell_made_change_gets_no_plain_note_but_a_probe_failure_is_noted(tmp_path):
-    s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'user.py': 'import core\n\n\ndef total(x):\n    return core.price(x) + 1\n'})
+def test_a_shell_made_change_names_the_unchanged_user_and_a_probe_failure_is_noted(tmp_path):
+    s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'user.py': 'import core\n\n\ndef total(x):\n    return core.price(x) + 1\n',
+                           'tests/test_core.py': 'from core import price\n\n\ndef test_price():\n    assert price(2)\n'})
     s.put('core.py', 'def price(x):\n    return {"value": x}\n')
-    assert s.sh('sed -i s/x/y/ core.py') == {}  # the probe of user.py prints nothing: nothing to report
-    assert s.stop() == {'decision': 'block', 'reason': hold(['core.py', 'user.py'], ['user.py'])}
+    assert context(s.sh('sed -i s/x/y/ core.py')) == down(('user.py', 'core.py'))  # the passing test printed: it is checked, not named
+    assert s.stop() == {}
     s.put('user.py', 'import core\nprint(core.price(1) + 1)\n')
     assert 'TypeError' in context(s.sh('sed -i s/x/y/ user.py'))
 
@@ -562,8 +566,19 @@ def test_a_shell_made_change_gets_no_plain_note_but_a_probe_failure_is_noted(tmp
 def test_a_failing_test_waits_for_the_final_answer_and_a_failing_program_does_not(tmp_path):
     s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'main.py': 'import core\nprint(core.price(1) + 1)\n',
                            'test_core.py': 'from core import price\n\n\ndef test_price():\n    assert price(2) == 2\n'})
-    assert s.edit('core.py', 'def price(x):\n    return x * 2\n') == {}  # main.py passes; the test fails and waits
+    note = context(s.edit('core.py', 'def price(x):\n    return x * 2\n'))  # main.py passes; the test fails and waits
+    assert note == down(('test_core.py', 'core.py'))  # named as an unchanged user, without its failure
     reply = s.stop()
     assert reply['decision'] == 'block' and 'test_core.py' in reply['reason'] and 'AssertionError' in reply['reason']
     note = context(s.edit('core.py', 'def price(x):\n    return {"value": x}\n'))
     assert 'main.py in a sandboxed copy failed' in note and 'TypeError' in note and 'test_core.py in a sandboxed' not in note
+
+
+@needs_srt
+def test_any_tool_that_follows_a_change_names_the_unchanged_users_once_and_a_changed_user_is_not_named(tmp_path):
+    s = probing(tmp_path, {'lib.py': 'x = 1\n', 'u1.py': MODULE, 'u2.py': MODULE, 'u3.py': MODULE})
+    s.put('lib.py', 'x = 2\n')
+    s.put('u1.py', MODULE + 'y = 1\n')
+    assert note_of(s.call('Read', {'file_path': 'lib.py'})) == down(('u2.py', 'lib.py'), ('u3.py', 'lib.py'))
+    assert s.sh('ls') == {}
+    assert s.stop() == {}
