@@ -95,7 +95,8 @@ the check instead of asking Claude to:
 
 One JSON file per session, `~/.claude/makoto2_state/<sha256 of session id>.json`, written under a lock: the map and
 nothing else. No list of runs, reads, notes or unpaid files. It never grows with the session; its size is bounded by
-the tree's files (at most 20,000, skipping only `.git`, `node_modules`, `__pycache__`, `.venv` and `venv` by name,
+the tree's files (at most 20,000, skipping only `.git`, `node_modules`, `__pycache__`, `.venv` and `venv` by name, any folder that holds a
+`CACHEDIR.TAG` file (a tool's cache, such as `.pytest_cache`),
 and files git ignores) and their links. `MAKOTO_STATE_DIR` moves it; `MAKOTO_LOCK_SECONDS` (default 3) sets how long
 a busy lock is waited for.
 
