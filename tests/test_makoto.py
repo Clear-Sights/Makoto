@@ -376,3 +376,34 @@ def test_shell_redirects_make_produced_by_and_reads_links(tmp_path):
     s.clock = time.time() + 100
     s.edit('in.txt', 'c\n')
     assert s.stop()['reason'] == hold(['in.txt', 'out.json', 'reader.py', 'run.sh'], ['reader.py'])
+
+
+def note_of(response):
+    return response.get('hookSpecificOutput', {}).get('additionalContext')
+
+
+@pytest.mark.parametrize('command', ["echo 'x = 2' > lib.py", "sed -i 's/1/2/' lib.py"])
+def test_a_file_changed_by_a_bash_call_gets_the_note_after_that_call(tmp_path, command):
+    s = snapshot_fan(tmp_path)
+    s.put('lib.py', 'x = 2\n')
+    assert note_of(s.sh(command)) == hold(['lib.py', 'main.py', 'u1.py', 'u2.py', 'u3.py'], ['main.py'])
+    assert s.sh(command) == {}  # the entry program was named by that note
+
+
+def test_a_bash_call_that_changes_nothing_gets_no_note(tmp_path):
+    s = snapshot_fan(tmp_path)
+    assert s.sh('ls') == {}
+    assert s.call('Read', {'file_path': 'lib.py'}) == {}
+
+
+def test_a_run_that_checks_the_change_gets_no_note(tmp_path):
+    s = snapshot_fan(tmp_path)
+    s.put('lib.py', 'x = 2\n')
+    assert s.sh('python3 main.py') == {}
+    assert s.stop() == {}
+
+
+def test_a_non_edit_tool_that_follows_a_change_gets_the_note(tmp_path):
+    s = snapshot_fan(tmp_path)
+    s.put('lib.py', 'x = 2\n')
+    assert note_of(s.call('Read', {'file_path': 'lib.py'})) is not None

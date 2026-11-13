@@ -18,7 +18,7 @@ Sets, computed without a test of their size (see sets):
   checked   = demanded nodes stamped after the latest change among the changed nodes they reach.
 A run reaches the program it names plus what that depends on; a test runner with no program argument reaches the test
 files (name holds test or spec, or under a folder test, tests, spec, __tests__) and what they depend on. One message
-names demanded minus checked and the entry programs (used by no file) that reach it: a note after an edit, only when
+names demanded minus checked and the entry programs (used by no file) that reach it: a note after any tool call, only when
 an entry program it names was named by no earlier note (the noted flag, on the entry program's node); a hold at Stop or SubagentStop, once (stop_hook_active admits). An error in
 Makoto blocks a final answer or tool step, names the error and the one way to disable Makoto.
 """
@@ -46,7 +46,6 @@ DISABLE = 'claude plugin disable makoto'
 MESSAGE = 'Not run since a change: %s. Run %s and read the output.'
 FINAL = ('Stop', 'SubagentStop')
 HANDLED = FINAL + ('PostToolUse', 'PostToolUseFailure', 'SessionStart', 'UserPromptSubmit')
-EDITORS = ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
 SKIP_DIRS = frozenset(('.git', 'node_modules', '__pycache__', '.venv', 'venv'))  # other build output: only when git ignores it
 
 RUNTIMES = re.compile(r'(?:python[\d.]*|pypy\d*|node|nodejs|deno|bun|ruby|perl|php|lua|Rscript|java|dotnet|make|gmake|'
@@ -345,15 +344,10 @@ def record(state, event):
                     if not bad:
                         nodes[rel]['ran'] = began
     unchecked, entries = sets(state, files)
-    target = given.get('file_path') or given.get('notebook_path')
-    if tool in EDITORS and isinstance(target, str) and target:
-        rel = os.path.relpath(absolute(target, cwd), root).replace(os.sep, '/')
-        fresh = [e for e in entries if not nodes[e]['noted']]
-        if rel in unchecked and fresh:
-            for e in fresh:
-                nodes[e]['noted'] = True
-            return message(unchecked, entries, nodes)
-    return ''
+    fresh = [e for e in entries if not nodes[e]['noted']]
+    for e in fresh:
+        nodes[e]['noted'] = True
+    return message(unchecked, entries, nodes) if fresh else ''
 
 
 def respond(event, config):
