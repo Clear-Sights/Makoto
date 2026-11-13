@@ -524,8 +524,9 @@ def test_the_probe_runs_a_package_module_and_a_test_file_as_the_project_would(tm
                            'pkg/tests/test_core.py': 'from app.core import price\n\n\ndef test_price():\n    assert price(2) == 2\n'})
     assert s.edit('pkg/app/core.py', 'def price(x):\n    return x + 0\n') == {}  # no ModuleNotFoundError for the package
     assert s.stop() == {}
-    note = context(s.edit('pkg/app/core.py', 'def price(x):\n    return x + 1\n'))  # the test file now fails under pytest
-    assert 'test_core.py' in note and 'ModuleNotFoundError' not in note
+    s.edit('pkg/app/core.py', 'def price(x):\n    return x + 1\n')  # the test file now fails under pytest
+    reason = s.stop()['reason']
+    assert 'test_core.py' in reason and 'AssertionError' in reason and 'ModuleNotFoundError' not in reason
 
 
 @needs_srt
@@ -555,3 +556,14 @@ def test_a_shell_made_change_gets_no_plain_note_but_a_probe_failure_is_noted(tmp
     assert s.stop() == {'decision': 'block', 'reason': hold(['core.py', 'user.py'], ['user.py'])}
     s.put('user.py', 'import core\nprint(core.price(1) + 1)\n')
     assert 'TypeError' in context(s.sh('sed -i s/x/y/ user.py'))
+
+
+@needs_srt
+def test_a_failing_test_waits_for_the_final_answer_and_a_failing_program_does_not(tmp_path):
+    s = probing(tmp_path, {'core.py': 'def price(x):\n    return x\n', 'main.py': 'import core\nprint(core.price(1) + 1)\n',
+                           'test_core.py': 'from core import price\n\n\ndef test_price():\n    assert price(2) == 2\n'})
+    assert s.edit('core.py', 'def price(x):\n    return x * 2\n') == {}  # main.py passes; the test fails and waits
+    reply = s.stop()
+    assert reply['decision'] == 'block' and 'test_core.py' in reply['reason'] and 'AssertionError' in reply['reason']
+    note = context(s.edit('core.py', 'def price(x):\n    return {"value": x}\n'))
+    assert 'main.py in a sandboxed copy failed' in note and 'TypeError' in note and 'test_core.py in a sandboxed' not in note
