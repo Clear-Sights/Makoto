@@ -1,0 +1,184 @@
+{
+ "unrun": {
+  "tasks_kept": 40,
+  "arms": {
+   "plain": {
+    "pass": 13,
+    "mean_cost_usd": 0.02573,
+    "mean_seconds": 13.2,
+    "holds_per_run": 0,
+    "notes_per_run": 0,
+    "final_answers_admitted_first_time": 40
+   },
+   "v621": {
+    "pass": 39,
+    "mean_cost_usd": 0.04081,
+    "mean_seconds": 22.9,
+    "holds_per_run": 1,
+    "notes_per_run": 0,
+    "final_answers_admitted_first_time": 0
+   },
+   "collect": {
+    "pass": 40,
+    "mean_cost_usd": 0.03466,
+    "mean_seconds": 17.7,
+    "holds_per_run": 0,
+    "notes_per_run": 0.7,
+    "final_answers_admitted_first_time": 40
+   }
+  },
+  "against_plain": {
+   "v621": {
+    "discordant": [
+     0,
+     26
+    ],
+    "p": 0.0,
+    "diff_points": 65.0,
+    "diff_95": [
+     50.0,
+     80.0
+    ],
+    "cost_ratio": 1.586,
+    "cost_95": [
+     1.485,
+     1.692
+    ],
+    "holm_rejects": true
+   },
+   "collect": {
+    "discordant": [
+     0,
+     27
+    ],
+    "p": 0.0,
+    "diff_points": 67.5,
+    "diff_95": [
+     52.5,
+     82.5
+    ],
+    "cost_ratio": 1.347,
+    "cost_95": [
+     1.241,
+     1.458
+    ],
+    "holm_rejects": true
+   }
+  },
+  "against_mini": {
+   "collect": {
+    "discordant": [
+     0,
+     1
+    ],
+    "p": 1.0,
+    "diff_points": 2.5,
+    "diff_95": [
+     0.0,
+     7.5
+    ],
+    "cost_ratio": 0.849,
+    "cost_95": [
+     0.805,
+     0.895
+    ]
+   }
+  }
+ },
+ "sigchange": {
+  "tasks_kept": 40,
+  "arms": {
+   "plain": {
+    "pass": 38,
+    "mean_cost_usd": 0.03516,
+    "mean_seconds": 15.3,
+    "holds_per_run": 0,
+    "notes_per_run": 0,
+    "final_answers_admitted_first_time": 40
+   },
+   "v621": {
+    "pass": 40,
+    "mean_cost_usd": 0.05213,
+    "mean_seconds": 23.7,
+    "holds_per_run": 1,
+    "notes_per_run": 0,
+    "final_answers_admitted_first_time": 0
+   },
+   "collect": {
+    "pass": 40,
+    "mean_cost_usd": 0.03821,
+    "mean_seconds": 17.4,
+    "holds_per_run": 0,
+    "notes_per_run": 0.275,
+    "final_answers_admitted_first_time": 40
+   }
+  },
+  "against_plain": {
+   "v621": {
+    "discordant": [
+     0,
+     2
+    ],
+    "p": 0.5,
+    "diff_points": 5.0,
+    "diff_95": [
+     0.0,
+     12.5
+    ],
+    "cost_ratio": 1.483,
+    "cost_95": [
+     1.435,
+     1.536
+    ],
+    "holm_rejects": false
+   },
+   "collect": {
+    "discordant": [
+     0,
+     2
+    ],
+    "p": 0.5,
+    "diff_points": 5.0,
+    "diff_95": [
+     0.0,
+     12.5
+    ],
+    "cost_ratio": 1.087,
+    "cost_95": [
+     1.048,
+     1.127
+    ],
+    "holm_rejects": false
+   }
+  },
+  "against_mini": {
+   "collect": {
+    "discordant": [
+     0,
+     0
+    ],
+    "p": 1.0,
+    "diff_points": 0.0,
+    "diff_95": [
+     0.0,
+     0.0
+    ],
+    "cost_ratio": 0.733,
+    "cost_95": [
+     0.702,
+     0.765
+    ]
+   }
+  }
+ },
+ "ship_rule_parts": {
+  "unrun": {
+   "pass_gap": 1,
+   "cost_gap": -0.239
+  },
+  "sigchange": {
+   "pass_gap": 0,
+   "cost_gap": -0.396
+  }
+ }
+}
