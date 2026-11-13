@@ -453,7 +453,10 @@ def record(state, event):
     unchecked, entries = sets(state, files)
     bad = probe(state, files, cwd, entries) if unchecked and event.get('hook_event_name') == 'PostToolUse' else {}
     unchecked, entries = sets(state, files)
-    new = [e for e in entries if e in bad and nodes[e]['hash'] != hashlib.sha256(bad[e].encode()).hexdigest()]
+    # A failing test waits for the final answer: mid-change it states what the code did before the change (measured,
+    # research/quiet on the research branch).
+    new = [e for e in entries if e in bad and not TESTS.search(e.lower())
+           and nodes[e]['hash'] != hashlib.sha256(bad[e].encode()).hexdigest()]
     # The plain note follows only the edit tools: measured, a note after a shell-made change costs more and gains
     # nothing (research/v622, research/observed on the research branch). A probe's failure is noted after any tool.
     fresh = [e for e in entries if tool in EDIT_TOOLS and e not in bad and not nodes[e]['noted']]
