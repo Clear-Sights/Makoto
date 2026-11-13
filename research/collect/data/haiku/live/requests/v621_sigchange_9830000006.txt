@@ -1,1 +1,0 @@
-Goal and target: Change length(x) in app/core.py so that it returns a dict {"value": <the number it returns now>, "unit": "m"} instead of a bare number. Everything else in the repo must keep behaving exactly as it does now. /tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/live_col/scr/v621_sigchange_9830000006/target
