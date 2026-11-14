@@ -1,6 +1,8 @@
 # Makoto
 
 Makoto holds a final answer while a file changed this session, or a file that depends on it, has not been run since.
+Where the Claude Code sandbox runtime is installed it runs the check itself and names the files at risk when the
+change is made, so the answer is rarely held.
 It needs no git. Its rules are not tied to a language; what has been measured is under "What is measured".
 
 ## The map
@@ -105,26 +107,39 @@ a busy lock is waited for.
 Each row is 40 fresh tasks (Claude Code 2.1.323). The tasks were built for these tests, so they show what Makoto
 does on tasks of these kinds and no more. The records are on the `research` branch.
 
-**This version (6.5.0) with the sandbox runtime installed,** against 6.2.1, which had no sandboxed check
-(`research/downstream/`):
+**This version (6.5) with the sandbox runtime installed,** against 6.2.1, which had no sandboxed check. These rows
+are the merged 6.5.0's own run (`research/v650/`); the run before it, on the build it came from, agrees in every
+cell (`research/downstream/`):
 
-| tasks | model | without Makoto | 6.2.1 | 6.5.0 with sandbox | cost: 6.2.1; 6.5.0 | held answers per run: 6.2.1; 6.5.0 |
+| tasks | model | without Makoto | 6.2.1 | 6.5 with sandbox | cost: 6.2.1; 6.5 | held answers per run: 6.2.1; 6.5 |
 |---|---|---|---|---|---|---|
-| Python: a change with 12 dependent files | Sonnet | 33 of 40 | 40 of 40 | 40 of 40 | 1.54; 1.06 times | 1.00; 0 |
-| Python: an edit that fails only when run | Sonnet | 17 of 40 | 40 of 40 | 38 of 40 | 1.52; 1.31 times | 1.00; 0 |
-| Python: a change with 12 dependent files | Haiku | 34 of 40 | 39 of 40 | 38 of 40 | 1.21; 0.95 times | 1.00; 0 |
-| Python: an edit that fails only when run | Haiku | 27 of 40 | 34 of 40 | 35 of 40 | 1.29; 1.25 times | 0.15; 0.08 |
+| Python: a change with 12 dependent files | Sonnet | 38 of 40 | 40 of 40 | 40 of 40 | 1.48; 1.09 times | 1.00; 0 |
+| Python: an edit that fails only when run | Sonnet | 13 of 40 | 39 of 40 | 40 of 40 | 1.59; 1.35 times | 1.00; 0 |
+| Python: a change with 12 dependent files | Haiku | 23 of 40 | 36 of 40 | 39 of 40 | 1.20; 1.07 times | 0.93; 0 |
+| Python: an edit that fails only when run | Haiku | 26 of 40 | 34 of 40 | 33 of 40 | 1.22; 1.20 times | 0.10; 0.13 |
 
 - **What the sandboxed check adds:** the final answer is no longer held and thrown away. Where running the entry
   program exercises the change, Makoto reports the failure itself; where a run shows nothing, it names the files
   that use the change and were not changed.
+- **Why it is cheaper:** the cost of 6.2.1 was the hold. A held answer is written, thrown away and written again,
+  with a round of runs in between. With the sandbox there is no such round: on the dependent-files tasks Haiku
+  took 16.9 turns a run against 16.7 without Makoto and 19.9 under 6.2.1, and what is left of Makoto's cost is one
+  note.
 - **Earlier builds of the sandboxed check failed** and were not kept: one counted a silent exit 0 as a check with
   nothing said, and passed fewer tasks than no Makoto (`research/collect/`); two cost more than 6.2.1 in one cell
   (`research/observed/`, `research/quiet/`). 6.4.0 kept the hold for silent files (`research/testwait/`).
 - **The note is sent only with the sandbox.** Without it the hold stays and names the same files, and the note then
-  only added cost (Sonnet, run-only failures: 1.63 against 1.52 times, 35 against 40 of 40).
+  only added cost (`research/downstream/`).
 
-**Without the sandbox runtime,** 6.5.0 behaves as 6.2.1 (`research/v621/` and `research/claims/`):
+**Without the sandbox runtime,** 6.5 behaves as 6.2.1. Measured on Sonnet in the same run (`research/v650/`):
+
+| tasks | without Makoto | 6.2.1 | 6.5 without sandbox | cost: 6.2.1; 6.5 |
+|---|---|---|---|---|
+| Python: a change with 12 dependent files | 38 of 40 | 40 of 40 | 40 of 40 | 1.48; 1.58 times |
+| Python: an edit that fails only when run | 13 of 40 | 39 of 40 | 39 of 40 | 1.59; 1.54 times |
+
+Makoto sent the same messages as 6.2.1 in every one of those runs; the cost differences are the model's own
+variation from run to run. 6.2.1's own rows (`research/v621/` and `research/claims/`):
 
 | tasks | model | without Makoto | with Makoto | cost with Makoto |
 |---|---|---|---|---|
