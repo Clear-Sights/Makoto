@@ -171,4 +171,4 @@ probe and the hold, timeout 20 seconds).
     python3 -m pytest -q tests
 
 `tests/test_makoto.py` drives the hooks.json command with real temporary directories, with and without a git
-repository. The code is `plugin/makoto2.py`. License: see LICENSE and NOTICE.
+repository. The code is `plugin/makoto2.py`. License: Apache-2.0; see LICENSE and NOTICE.
