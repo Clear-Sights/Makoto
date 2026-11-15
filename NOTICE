@@ -3,6 +3,6 @@ Copyright 2026 Clear-Sights
 
 Makoto is licensed under the Apache License, Version 2.0; its text is in LICENSE.
 
-History: versions up to and including commit 85ac4d5228509c5aa98412bdf109312cab6d7c78 were released under the Apache License 2.0. Versions from commit b6de7fe up to the commit before this change of license (944b69b) were first released under the Functional Source License, Version 1.1, ALv2 Future License; the copyright holder now offers them under the Apache License 2.0 as well.
+History: versions up to and including commit 85ac4d5228509c5aa98412bdf109312cab6d7c78 were released under the Apache License 2.0. Versions from commit b6de7fe up to the commit before this change of license (4a34430) were first released under the Functional Source License, Version 1.1, ALv2 Future License; the copyright holder now offers them under the Apache License 2.0 as well.
 
 Makoto's code is original: it includes no excerpts from DetIO or Causality.
