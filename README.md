@@ -111,12 +111,7 @@ does on tasks of these kinds and no more. The records are on the `research` bran
 are the merged 6.5.0's own run (`research/v650/`); the run before it, on the build it came from, agrees in every
 cell (`research/downstream/`):
 
-| tasks | model | without Makoto | 6.2.1 | 6.5 with sandbox | cost: 6.2.1; 6.5 | held answers per run: 6.2.1; 6.5 |
-|---|---|---|---|---|---|---|
-| Python: a change with 12 dependent files | Sonnet | 38 of 40 | 40 of 40 | 40 of 40 | 1.48; 1.09 times | 1.00; 0 |
-| Python: an edit that fails only when run | Sonnet | 13 of 40 | 39 of 40 | 40 of 40 | 1.59; 1.35 times | 1.00; 0 |
-| Python: a change with 12 dependent files | Haiku | 23 of 40 | 36 of 40 | 39 of 40 | 1.20; 1.07 times | 0.93; 0 |
-| Python: an edit that fails only when run | Haiku | 26 of 40 | 34 of 40 | 33 of 40 | 1.22; 1.20 times | 0.10; 0.13 |
+These rows are the sheet `Sandbox 6.5` of `RESULTS.xlsx`.
 
 - **What the sandboxed check adds:** the final answer is no longer held and thrown away. Where running the entry
   program exercises the change, Makoto reports the failure itself; where a run shows nothing, it names the files
@@ -133,22 +128,12 @@ cell (`research/downstream/`):
 
 **Without the sandbox runtime,** 6.5 behaves as 6.2.1. Measured on Sonnet in the same run (`research/v650/`):
 
-| tasks | without Makoto | 6.2.1 | 6.5 without sandbox | cost: 6.2.1; 6.5 |
-|---|---|---|---|---|
-| Python: a change with 12 dependent files | 38 of 40 | 40 of 40 | 40 of 40 | 1.48; 1.58 times |
-| Python: an edit that fails only when run | 13 of 40 | 39 of 40 | 39 of 40 | 1.59; 1.54 times |
+These rows are the sheet `No sandbox 6.5` of `RESULTS.xlsx`.
 
 Makoto sent the same messages as 6.2.1 in every one of those runs; the cost differences are the model's own
 variation from run to run. 6.2.1's own rows (`research/v621/` and `research/claims/`):
 
-| tasks | model | without Makoto | with Makoto | cost with Makoto |
-|---|---|---|---|---|
-| Python: an edit that fails only when run | Haiku | 24 of 40 | 36 of 40 | 1.34 times |
-| Python: a change with 12 dependent files | Haiku | 27 of 40 | 37 of 40 | 1.33 times |
-| Python: one script writes a file another reads | Haiku | 6 of 40 | 19 of 40 | 1.44 times |
-| JavaScript: an edit that fails only when run | Haiku | 40 of 40 | 40 of 40 | 1.21 times |
-| Python: an edit that fails only when run | Sonnet | 16 of 40 | 38 of 40 | 1.68 times |
-| Python: a change with 12 dependent files | Sonnet | 28 of 40 | 40 of 40 | 1.57 times |
+These rows are the sheet `Makoto 6.2.1` of `RESULTS.xlsx`.
 
 - **Where it helps:** where the model would finish without running what it changed. In these tasks the goal says
   there is no need to run it, and both models then skip the run.
