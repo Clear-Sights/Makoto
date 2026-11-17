@@ -111,7 +111,7 @@ does on tasks of these kinds and no more. The records are on the `research` bran
 are the merged 6.5.0's own run (`research/v650/`); the run before it, on the build it came from, agrees in every
 cell (`research/downstream/`):
 
-These rows are the sheet `Sandbox 6.5` of `RESULTS.xlsx`.
+These rows are the sheet `Sandbox 6.5` of `RESEARCH.xlsx`.
 
 - **What the sandboxed check adds:** the final answer is no longer held and thrown away. Where running the entry
   program exercises the change, Makoto reports the failure itself; where a run shows nothing, it names the files
@@ -128,12 +128,12 @@ These rows are the sheet `Sandbox 6.5` of `RESULTS.xlsx`.
 
 **Without the sandbox runtime,** 6.5 behaves as 6.2.1. Measured on Sonnet in the same run (`research/v650/`):
 
-These rows are the sheet `No sandbox 6.5` of `RESULTS.xlsx`.
+These rows are the sheet `No sandbox 6.5` of `RESEARCH.xlsx`.
 
 Makoto sent the same messages as 6.2.1 in every one of those runs; the cost differences are the model's own
 variation from run to run. 6.2.1's own rows (`research/v621/` and `research/claims/`):
 
-These rows are the sheet `Makoto 6.2.1` of `RESULTS.xlsx`.
+These rows are the sheet `Makoto 6.2.1` of `RESEARCH.xlsx`.
 
 - **Where it helps:** where the model would finish without running what it changed. In these tasks the goal says
   there is no need to run it, and both models then skip the run.
