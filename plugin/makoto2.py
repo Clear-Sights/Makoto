@@ -1,6 +1,6 @@
 """Makoto: holds a final answer while a file changed this session, or a file that depends on it, has not been run since.
 
-Live entry: cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks/hooks.json): one native Claude Code hook event
+Live entry: cd "${CLAUDE_PLUGIN_ROOT}" && python3 -m makoto2 (hooks.json): one native Claude Code hook event
 on stdin, one JSON response on stdout. Hooks: SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure, Stop,
 SubagentStop.
 

@@ -158,7 +158,7 @@ Claude Code 2.1.275 or later, Python 3.11 or later, standard library only:
 
     /plugin install makoto --marketplace Clear-Sights/Makoto
 
-Hooks (`plugin/hooks/hooks.json`): SessionStart and UserPromptSubmit (build the map, never block), PostToolUse and
+Hooks (`plugin/hooks.json`): SessionStart and UserPromptSubmit (build the map, never block), PostToolUse and
 PostToolUseFailure (stamp runs; the note; the probe after PostToolUse, timeout 20 seconds), Stop and SubagentStop (the
 probe and the hold, timeout 20 seconds).
 
