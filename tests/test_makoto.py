@@ -9,7 +9,7 @@ import pytest
 
 SRT = Path(os.environ.get('MAKOTO_SRT_TEST') or '/tmp/claude-0/-home-user/a404ef3c-b256-5c21-a29c-bd27a2f29734/scratchpad/srt/node_modules/.bin/srt')
 PLUGIN = Path(__file__).resolve().parents[1] / 'plugin'
-HOOKS = json.loads((PLUGIN / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))['hooks']
+HOOKS = json.loads((PLUGIN / 'hooks.json').read_text(encoding='utf-8'))['hooks']
 SH = '#!/bin/sh\necho 1\n'
 MODULE = 'import lib\n'
 USERS = ['u1.py', 'u2.py', 'u3.py']
