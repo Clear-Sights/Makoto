@@ -1,11 +1,11 @@
-"""RESULTS.xlsx: each sheet sorted by its key, keys unique, an autoFilter on each header, a Superseded sheet with reasons and dates."""
+"""RESEARCH.xlsx: each sheet sorted by its key, keys unique, an autoFilter on each header, a Superseded sheet with reasons and dates."""
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import xlsx  # noqa: E402
 
-BOOK = Path(__file__).resolve().parents[1] / 'RESULTS.xlsx'
+BOOK = Path(__file__).resolve().parents[1] / 'RESEARCH.xlsx'
 
 
 def test_sheets_are_sorted_unique_and_filtered():

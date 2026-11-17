@@ -18,4 +18,4 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m pip install pytest
       - run: python -m pytest -q tests
-      - run: python tests/xlsx.py --xlsx RESULTS.xlsx >> "$GITHUB_STEP_SUMMARY"
+      - run: python tests/xlsx.py --xlsx RESEARCH.xlsx >> "$GITHUB_STEP_SUMMARY"
