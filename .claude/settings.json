@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [
+      {"type": "command", "shell": "bash", "command": "git -C \"${CLAUDE_PROJECT_DIR}\" config diff.xlsx.textconv \"python3 tests/xlsx.py --xlsx\""}
+    ]}]
+  }
+}
